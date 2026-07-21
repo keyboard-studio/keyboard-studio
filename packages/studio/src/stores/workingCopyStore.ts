@@ -115,8 +115,6 @@ export type IdentityPatch = Partial<{
   bcp47: string;
   /** Human-readable display name for the new keyboard. */
   displayName: string;
-  /** Raw target script subtag as entered by the user (e.g. "Latn", "Deva"). */
-  targetScript: string;
   /**
    * New keyboard identifier chosen by the author (Track 1 only).
    *

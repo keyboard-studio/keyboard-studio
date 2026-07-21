@@ -20,6 +20,7 @@ import {
   scriptToTargetOption,
 } from "../lib/langtagsDefaults.ts";
 import { answerString } from "./answerString.ts";
+import { normalizeForCompare } from "../lib/normalizeForCompare.ts";
 
 import identityLiteRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
 
@@ -462,10 +463,10 @@ export function IdentityLite({
         const opts: FlowOption[] = [];
         for (const n of source) {
           const trimmed = n.trim();
-          // NFC-normalize before case-folding so NFC/NFD variants of the same
+          // Normalize before case-folding so NFC/NFD variants of the same
           // name (Vietnamese, Yorùbá/Akan, Ainu diacritics) don't produce
           // duplicate rows; resolveTyped in QuestionField matches the same way.
-          const key = trimmed.normalize("NFC").toLowerCase();
+          const key = normalizeForCompare(n);
           if (trimmed === "" || seen.has(key)) continue;
           seen.add(key);
           opts.push({ value: trimmed, label: trimmed });

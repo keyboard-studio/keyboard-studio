@@ -505,11 +505,11 @@ describe("workingCopyStore — setIdentity", () => {
   });
 
   it("partial patches are allowed (exactOptionalPropertyTypes safe)", () => {
-    useWorkingCopyStore.getState().setIdentity({ targetScript: "Latn" });
+    useWorkingCopyStore.getState().setIdentity({ displayName: "Hausa" });
     const s = useWorkingCopyStore.getState();
-    // bcp47 and displayName are absent, not set to undefined
+    // bcp47 is absent, not set to undefined
     expect("bcp47" in (s.identity ?? {})).toBe(false);
-    expect(s.identity?.targetScript).toBe("Latn");
+    expect(s.identity?.displayName).toBe("Hausa");
   });
 
   it("accepts keyboardId in the patch", () => {
