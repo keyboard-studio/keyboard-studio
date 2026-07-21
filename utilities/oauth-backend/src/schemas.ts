@@ -5,6 +5,7 @@
  * are rejected with 400 before any GitHub API call is made.
  */
 
+import { GITHUB_OAUTH_CLIENTS, type GitHubOAuthClient } from "@keyboard-studio/contracts";
 import { z } from "zod";
 
 // ---------------------------------------------------------------------------
@@ -13,6 +14,9 @@ import { z } from "zod";
 
 /**
  * Discriminator that selects which GitHub credential pair the backend uses.
+ * Built from the shared wire-contract union `GitHubOAuthClient`
+ * (`@keyboard-studio/contracts`) so this schema cannot diverge from the SPA's
+ * `GitHubClient` type without a compile error.
  *
  * - `"github_app"` (default when absent) — GitHub App user-to-server
  *   credentials (`GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`). Used for the
@@ -26,16 +30,16 @@ import { z } from "zod";
  * is made. The field is optional in the request body; handlers default to
  * `"github_app"` when it is absent.
  */
-const ClientDiscriminatorSchema = z.enum(["github_app", "oauth_app"]).optional();
+const ClientDiscriminatorSchema = z.enum(GITHUB_OAUTH_CLIENTS).optional();
 
 /**
  * The resolved client discriminator value — always one of the two literal
  * strings, never `undefined`. Use this type for handler parameters that have
  * already defaulted the field; the optional wrapper is retained in the request
  * body schemas (`ExchangeBodySchema`, `RefreshBodySchema`) where the field may
- * be absent.
+ * be absent. Alias of the shared `GitHubOAuthClient` wire-contract type.
  */
-export type ClientDiscriminator = "github_app" | "oauth_app";
+export type ClientDiscriminator = GitHubOAuthClient;
 
 export const ExchangeBodySchema = z.object({
   /** The one-time authorization code from GitHub's redirect. */

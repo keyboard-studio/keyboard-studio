@@ -29,7 +29,7 @@
 // Browser-only: uses crypto.subtle / crypto.getRandomValues / crypto.randomUUID;
 // no node:* imports.
 
-import type { VerifyTokenResult } from "@keyboard-studio/contracts";
+import type { GitHubOAuthClient, VerifyTokenResult } from "@keyboard-studio/contracts";
 import { generatePkce } from "./pkce.ts";
 
 // Re-export PKCE helpers from the shared module so existing imports are
@@ -71,6 +71,10 @@ const FLOW_KEY = "ks.github.oauth.flow";
  * Which GitHub OAuth flow is in progress:
  *   - `"identity"` — GitHub App (default sign-in, NO scope).
  *   - `"submit"`   — OAuth App (Option A fork+PR opt-in, `public_repo` scope).
+ *
+ * SPA-internal only — unlike {@link GitHubClient}, this value never appears
+ * in an OAuth backend request body, so (by decision) it does not need a
+ * shared wire-contract type in `@keyboard-studio/contracts`.
  */
 export type AuthFlow = "identity" | "submit";
 
@@ -78,8 +82,12 @@ export type AuthFlow = "identity" | "submit";
  * Which GitHub credential pair was used to obtain a token.
  *   - `"github_app"` — default identity flow (no scope).
  *   - `"oauth_app"`  — Option A fork+PR flow (`public_repo` scope).
+ *
+ * Re-exported alias of the shared wire-contract type in
+ * `@keyboard-studio/contracts` so the SPA and the OAuth backend cannot
+ * diverge on this discriminator without a compile error.
  */
-export type GitHubClient = "github_app" | "oauth_app";
+export type GitHubClient = GitHubOAuthClient;
 
 // ---------------------------------------------------------------------------
 // Config (read from import.meta.env, see vite-env.d.ts)

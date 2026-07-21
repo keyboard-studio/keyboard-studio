@@ -76,6 +76,7 @@ function normalizePath(path: string): string {
 interface Args {
   releaseDir: string;
   outDir: string;
+  placementOutDir: string;
   limit: number | null;
   check: boolean;
   quiet: boolean;
@@ -97,6 +98,10 @@ function parseArgs(argv: string[]): Args {
     // Default: the sibling keymanapp/keyboards checkout (see docs/keyboard-index.md).
     releaseDir: resolve(REPO_ROOT, "..", "keyboards", "release"),
     outDir: resolve(REPO_ROOT, "docs"),
+    // placement-priors.json is runtime data consumed by the studio, so it is
+    // homed in a package data dir (packages/engine/data/), not docs/ — see
+    // docs/spec-amendment-2026-06-11-placement-priors.md.
+    placementOutDir: resolve(REPO_ROOT, "packages", "engine", "data"),
     limit: null,
     check: false,
     quiet: false,
@@ -110,6 +115,9 @@ function parseArgs(argv: string[]): Args {
         break;
       case "--out":
         out.outDir = resolve(requireValue(argv, ++i, a));
+        break;
+      case "--placement-out":
+        out.placementOutDir = resolve(requireValue(argv, ++i, a));
         break;
       case "--limit": {
         const n = Number(requireValue(argv, ++i, a));
@@ -152,11 +160,13 @@ function printHelp(): void {
       "",
       "  --release-dir <path>  release/ tree to scan (default: ../keyboards/release)",
       "  --out <dir>           output directory (default: <repo>/docs)",
+      "  --placement-out <dir> placement-priors.json output directory",
+      "                        (default: <repo>/packages/engine/data)",
       "  --limit <n>           scan only the first n keyboards (dev)",
       "  --check               regenerate to a temp buffer and fail if the",
       "                        committed import-corpus.json is stale (CI mode)",
       "  --quiet               suppress per-keyboard progress",
-      "  --emit-placements     also emit docs/placement-priors.json (§7.6 corpus priors)",
+      "  --emit-placements     also emit placement-priors.json (§7.6 corpus priors)",
       "  -h, --help            show this help",
     ].join("\n"),
   );
@@ -736,7 +746,8 @@ async function main(): Promise<void> {
     const priorsJSON = aggregatePlacements(placementReports, {
       generatedFrom: resolveKeyboardsProvenance(args.releaseDir),
     });
-    const priorsPath = join(args.outDir, "placement-priors.json");
+    mkdirSync(args.placementOutDir, { recursive: true });
+    const priorsPath = join(args.placementOutDir, "placement-priors.json");
     await fsp.writeFile(priorsPath, JSON.stringify(priorsJSON, null, 2) + "\n", "utf8");
     console.error(
       `[OK] placement-priors.json written (${placementReports.length} keyboards with candidates) -> ${normalizePath(relative(REPO_ROOT, priorsPath))}`,
