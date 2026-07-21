@@ -2,7 +2,7 @@
 
 **Status:** composition / meta-flow reference. Keyboard Studio analyses every
 authoring decision through four lenses — the **keyboard-facets**, the **§7.1
-discovery axes**, the **DISCUS** principles, and the **§18 criteria**. They are
+discovery axes**, the **DISCUS** principles, and the **§11 criteria**. They are
 often described separately, which makes them look like four competing frameworks.
 They are not: they are **one flow**, framed by a single question — *what did the
 base keyboard already decide, versus what are you authoring in the new keyboard?*
@@ -35,7 +35,7 @@ different angle, and each runs at a single decision node:
 | §7.1 discovery axes A1–A7 | **FRAME** | the base→target diff, axis by axis | [spec.md §7.1](../spec.md) / [specs/007](../specs/007-strategy-selection/spec.md) |
 | §7.2 tree → §7.7 gallery | **DECIDE** | which strategy to keep or override | [spec.md §7.2 / §7.7](../spec.md) |
 | DISCUS | **JUDGE** | the quality of the deltas (advisory) | [docs/discus-principles-integration.md](discus-principles-integration.md) |
-| §18 criteria | **VERIFY** | the finished artifact (the gate) | [criteria.json](../packages/contracts/data/criteria.json) |
+| §11 criteria | **VERIFY** | the finished artifact (the gate) | [criteria.json](../packages/contracts/data/criteria.json) |
 
 ## The five-verb flow
 
@@ -81,9 +81,9 @@ hardest on decisions **changed from the base**, which is exactly where authoring
 concentrates. See [docs/discus-principles-integration.md](discus-principles-integration.md)
 for the principle→heuristic mapping.
 
-### 5. VERIFY — the §18 criteria (the gate on the result)
+### 5. VERIFY — the §11 criteria (the gate on the result)
 
-The [§18 criteria](../packages/contracts/data/criteria.json) verify the finished
+The [§11 criteria](../packages/contracts/data/criteria.json) verify the finished
 artifact in three bands:
 
 - **18.1–18.7 — auto-lint** `KM_*` (touch heuristics 18.1–18.5, inventory-coverage
@@ -112,7 +112,7 @@ flowchart TB
   subgraph JUDGE["4 - JUDGE : DISCUS (advisory, on the deltas)"]
     DIS["6 principles rank + warn<br/>never gate - bites on CHANGES from base"]
   end
-  subgraph VERIFY["5 - VERIFY : 18 criteria (gate on the result)"]
+  subgraph VERIFY["5 - VERIFY : 11 criteria (gate on the result)"]
     CR["18.1-7 auto-lint<br/>18.8-10 judgement survey<br/>18.11-12 human attestation"]
   end
   KF --> AX
@@ -188,22 +188,46 @@ staleness-per-node. Two further alignments fall out of the same structure:
 The four lenses share vocabulary, and shared vocabulary that is **copied** rather
 than **referenced** can drift. The real hazard the 2026-07-21 DISCUS↔facets audit
 found is *not* DISCUS/facets duplication (they are complementary — DISCUS judges,
-facets measure). It is that **three parallel enumerations describe the same value
-sets and can silently diverge**:
+facets measure). Nor is it the axis value sets or the strategy catalog: **those
+already have a single source of truth in `packages/contracts`** and the engine
+already consumes it.
 
-1. the [§7.1](../spec.md) discovery-axis value sets (A1–A7a);
-2. the axis-valued **keyboard-facets** — added-char-count = **A1**,
-   diacritic-mechanism = **A4**, spare-key-budget = **A7**
-   ([content/keyboard-facets](../content/keyboard-facets) +
-   [utilities/facet-index](../utilities/facet-index) classifiers); and
-3. the **S-01..S-13** strategy catalog.
+- the **discovery-axis value sets** (A1–A7a) are the per-axis types on
+  `DiscoveryAxisVector` in
+  [packages/contracts/src/axes.ts](../packages/contracts/src/axes.ts) — e.g. A4 is
+  the `DiacriticBehavior` union (`none | stacking-combining | replacing-cycling |
+  multi-family`), A1 is `Scale`, A7 is `SpareKeyAvailability`; and
+- the **S-01..S-13** strategy catalog is the `StrategyId` union (with
+  `ALL_STRATEGY_IDS`) in
+  [packages/contracts/src/strategy.ts](../packages/contracts/src/strategy.ts).
 
-The drift is worst at **A4 (diacritic-mechanism)**, where the axis value set and the
-facet value set restate the same distinctions in two places. The fix is tracked in
+The engine's §7.2 decision tree imports **both** of those directly —
+[packages/engine/src/strategy-selector/rules.ts](../packages/engine/src/strategy-selector/rules.ts)
+takes `DiscoveryAxisVector` and `StrategyId` from `@keyboard-studio/contracts`
+rather than restating them — so the axis→tree path is already referenced, not copied.
+
+The remaining, **narrower** hazard is the straggler consumers that still declare
+the same value sets *independently* of those contracts types instead of deriving
+from them:
+
+1. the **facet-index classifiers** under
+   [utilities/facet-index](../utilities/facet-index) — e.g.
+   `diacritic-mechanism-classifier.ts` emits its A4 value as a bare `string` and
+   hardcodes the `"stacking-combining" | "replacing-cycling" | "multi-family" |
+   "none"` literals rather than typing against `DiacriticBehavior`; and
+2. the axis-valued **keyboard-facet definitions** —
+   [content/keyboard-facets](../content/keyboard-facets) `*.yaml` (added-char-count
+   = **A1**, diacritic-mechanism = **A4**, spare-key-budget = **A7**) — whose
+   `limits.values` re-list the same enum by hand (e.g.
+   `diacritic-mechanism.yaml` restates the four A4 states).
+
+The drift is worst at **A4 (diacritic-mechanism)**, where the classifier literals
+and the facet `limits.values` restate the `DiacriticBehavior` distinctions in two
+further places with nothing binding them to the contracts type. The fix is tracked in
 [specs/045-lens-vocabulary-source-of-truth](../specs/045-lens-vocabulary-source-of-truth/spec.md):
-a single source-of-truth enumeration in `packages/contracts` that all three
-consumers import, protected by the compile-time drift-guard pattern that already
-binds `Pattern` to its zod schema.
+wire those straggler classifiers and facet YAMLs to derive from the **existing**
+contracts enumerations, protected by the compile-time drift-guard pattern that
+already binds `Pattern` to its zod schema plus a runtime lockstep test.
 
 ## Tracking
 
