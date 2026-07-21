@@ -5,6 +5,7 @@
 // no logic of its own, so it can never drift from the selector. The primary
 // pass is a first-match-wins waterfall; the secondary passes always run.
 
+import { Trans } from "@lingui/react/macro";
 import {
   PRIMARY_RULES,
   SECONDARY_RULES,
@@ -53,7 +54,7 @@ function SecondaryChip({ sec }: { sec: ConditionalSecondary }) {
       <StrategyChip id={sec.strategy} kind="secondary" />
       {sec.whenText !== undefined && (
         <span style={{ color: COLORS.gray.textDim, fontSize: 11, fontFamily: MONO }}>
-          if {sec.whenText}
+          <Trans id="dashboard.strategyTree.secondaryChip.if">if {sec.whenText}</Trans>
         </span>
       )}
     </span>
@@ -77,13 +78,15 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
   return (
     <div style={{ fontFamily: SANS, color: COLORS.gray.text, maxWidth: 920 }}>
       <p style={{ fontSize: 13, color: COLORS.gray.textDim, margin: "0 0 16px" }}>
-        The survey computes a seven-axis vector (A1–A7), then{" "}
-        <code style={{ fontFamily: MONO, color: COLORS.gray.textMuted }}>
-          selectStrategy()
-        </code>{" "}
-        runs this tree. Primary rules are tried top-to-bottom; the first match
-        fixes the primary strategy. The secondary passes then always run,
-        appending add-ons.
+        <Trans id="dashboard.strategyTree.intro">
+          The survey computes a seven-axis vector (A1–A7), then{" "}
+          <code style={{ fontFamily: MONO, color: COLORS.gray.textMuted }}>
+            {"selectStrategy()"}
+          </code>{" "}
+          runs this tree. Primary rules are tried top-to-bottom; the first match
+          fixes the primary strategy. The secondary passes then always run,
+          appending add-ons.
+        </Trans>
       </p>
 
       <h3
@@ -95,7 +98,7 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
           letterSpacing: 0.4,
         }}
       >
-        Primary pass — first match wins
+        <Trans id="dashboard.strategyTree.primaryPass.heading">Primary pass — first match wins</Trans>
       </h3>
       <div style={{ display: "flex", flexDirection: "column" }}>
         {PRIMARY_RULES.map((r, i) => (
@@ -125,7 +128,7 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
                   whiteSpace: "nowrap",
                 }}
               >
-                Rule {r.rule}
+                <Trans id="dashboard.strategyTree.rule.label">Rule {r.rule}</Trans>
               </span>
               <code
                 style={{
@@ -154,7 +157,7 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
                   lineHeight: "18px",
                 }}
               >
-                else ↓
+                <Trans id="dashboard.strategyTree.rule.else">else ↓</Trans>
               </div>
             )}
           </div>
@@ -170,7 +173,7 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
           letterSpacing: 0.4,
         }}
       >
-        Secondary passes — always run, in order
+        <Trans id="dashboard.strategyTree.secondaryPass.heading">Secondary passes — always run, in order</Trans>
       </h3>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {SECONDARY_RULES.map((sr) => (
@@ -211,24 +214,28 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
             >
               {sr.conditionText}
             </code>
-            <span style={{ color: COLORS.gray.textVeryDim }}>→ add</span>
+            <span style={{ color: COLORS.gray.textVeryDim }}>
+              <Trans id="dashboard.strategyTree.secondaryPass.addArrow">→ add</Trans>
+            </span>
             <StrategyChip id={sr.add} kind="secondary" />
           </div>
         ))}
       </div>
 
       <p style={{ fontSize: 11.5, color: COLORS.gray.textVeryDim, margin: "16px 0 0", fontFamily: SANS }}>
-        Note: rule 3a (postfix-preference intercept → S-03, shown above between rules 3 and 4) is
-        implemented in <code style={{ fontFamily: MONO }}>selectStrategy()</code>. When a base is
-        instantiated (either track), its IR is scanned for the unconditional postfix
-        sequence-replace shape and{" "}
-        <code style={{ fontFamily: MONO }}>markInputOrder=&quot;postfix&quot;</code> is seeded onto{" "}
-        <code style={{ fontFamily: MONO }}>irAxes</code>{" "}
-        (<code style={{ fontFamily: MONO }}>source: &quot;import-derived&quot;</code> below), so rule
-        3a now fires live for such a base — though{" "}
-        <code style={{ fontFamily: MONO }}>if()</code>-guarded rules are still opaque, so no shipping{" "}
-        <code style={{ fontFamily: MONO }}>sil_ipa</code> rule reaches it yet. No survey phase elicits
-        it end-to-end yet — that half remains deferred.
+        <Trans id="dashboard.strategyTree.postfixNote">
+          Note: rule 3a (postfix-preference intercept → {"S-03"}, shown above between rules 3 and 4) is
+          implemented in <code style={{ fontFamily: MONO }}>{"selectStrategy()"}</code>. When a base is
+          instantiated (either track), its IR is scanned for the unconditional postfix
+          sequence-replace shape and{" "}
+          <code style={{ fontFamily: MONO }}>{'markInputOrder="postfix"'}</code> is seeded onto{" "}
+          <code style={{ fontFamily: MONO }}>{"irAxes"}</code>{" "}
+          (<code style={{ fontFamily: MONO }}>{'source: "import-derived"'}</code> below), so rule
+          3a now fires live for such a base — though{" "}
+          <code style={{ fontFamily: MONO }}>{"if()"}</code>-guarded rules are still opaque, so no shipping{" "}
+          <code style={{ fontFamily: MONO }}>{"sil_ipa"}</code> rule reaches it yet. No survey phase elicits
+          it end-to-end yet — that half remains deferred.
+        </Trans>
       </p>
 
       <DefaultFillProvenance axisFills={axisFills} />
@@ -262,16 +269,20 @@ function DefaultFillProvenance({ axisFills }: { axisFills: AxisFill[] | undefine
           letterSpacing: 0.4,
         }}
       >
-        Pre-filled axes (not survey-elicited)
+        <Trans id="dashboard.strategyTree.prefilledAxes.heading">Pre-filled axes (not survey-elicited)</Trans>
       </h3>
       <p style={{ fontSize: 11.5, color: COLORS.gray.textDim, margin: "0 0 8px", fontFamily: SANS }}>
-        These phase-gated axes were not elicited by the survey. Each was supplied either by the §7.2
-        script-class prior (the unmarked/off-state value, never rule-triggering) or derived from
-        structural evidence in the base keyboard (which <em>can</em> be rule-triggering, e.g.{" "}
-        <code style={{ fontFamily: MONO, color: COLORS.gray.textMuted }}>markInputOrder=&quot;postfix&quot;</code>{" "}
-        → rule 3a) — the source is shown on each row. Filled before{" "}
-        <code style={{ fontFamily: MONO, color: COLORS.gray.textMuted }}>selectStrategy()</code> ran.
-        Read-only for now; confirm/override UI is a follow-up.
+        <Trans id="dashboard.strategyTree.prefilledAxes.description">
+          These phase-gated axes were not elicited by the survey. Each was supplied either by the §7.2
+          script-class prior (the unmarked/off-state value, never rule-triggering) or derived from
+          structural evidence in the base keyboard (which <em>can</em> be rule-triggering, e.g.{" "}
+          <code style={{ fontFamily: MONO, color: COLORS.gray.textMuted }}>
+            {'markInputOrder="postfix"'}
+          </code>{" "}
+          → rule 3a) — the source is shown on each row. Filled before{" "}
+          <code style={{ fontFamily: MONO, color: COLORS.gray.textMuted }}>{"selectStrategy()"}</code> ran.
+          Read-only for now; confirm/override UI is a follow-up.
+        </Trans>
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {axisFills.map((f) => (

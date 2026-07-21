@@ -5,6 +5,7 @@
 // terminal). Pure presentation — all data comes from layoutFlowGraph().
 
 import { type CSSProperties } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { GraphEdge } from "./model.ts";
 import {
   layoutFlowGraph,
@@ -69,72 +70,45 @@ function edgePath(from: Pt, to: Pt): string {
   return `M ${x1} ${y1} C ${x1} ${y1 + dy}, ${x2} ${y2 - dy}, ${x2} ${y2}`;
 }
 
+/** Node-role badge kind — a stable, translation-free tag. The macro-extractable
+ *  `t()` calls that turn a kind into display text live in `badgeLabel()` below,
+ *  inside the component's render (where the `useLingui()`-bound `t` is actually
+ *  in scope) — passing `t` through a function parameter breaks the Lingui
+ *  extractor's binding-based static analysis (it does not see through a
+ *  re-parameterized alias), so this helper stays translation-free by design. */
+type BadgeKind = "reserve" | "stub" | "proposed" | "entry" | "gate" | "engine" | "terminal" | null;
+
 function nodeRole(n: PositionedNode): {
   border: string;
   bg: string;
-  badge: string | null;
+  badgeKind: BadgeKind;
   badgeBg: string;
 } {
   // Library-not-in-flow nodes (registered Phase B modules not in the live manifest)
   // are rendered with a distinct muted purple palette and a "reserve" badge so it is
   // immediately clear they do NOT run in the current survey.
   if (n.kind === "library-not-in-flow") {
-    return {
-      border: "#6e40c9",
-      bg: "#1a1030",
-      badge: "reserve",
-      badgeBg: "#4a2a8a",
-    };
+    return { border: "#6e40c9", bg: "#1a1030", badgeKind: "reserve", badgeBg: "#4a2a8a" };
   }
   // Stub nodes (galleries / wizard steps not yet in the question registry).
   if (n.kind === "stub") {
-    return {
-      border: "#58a6ff",
-      bg: "#0d2035",
-      badge: "stub",
-      badgeBg: "#1c4a7a",
-    };
+    return { border: "#58a6ff", bg: "#0d2035", badgeKind: "stub", badgeBg: "#1c4a7a" };
   }
   // Proposed-flow nodes (spec 025): a distinct teal palette + "proposed" badge so
   // it is immediately clear they render only in the Library section and do NOT run.
   if (n.kind === "proposed") {
-    return {
-      border: "#39c5cf",
-      bg: "#0c2a2e",
-      badge: "proposed",
-      badgeBg: "#1b6b73",
-    };
+    return { border: "#39c5cf", bg: "#0c2a2e", badgeKind: "proposed", badgeBg: "#1b6b73" };
   }
   // Live nodes — standard role-based styling.
   if (n.isEntry)
-    return {
-      border: "#6ea8fe",
-      bg: "#11203a",
-      badge: "entry",
-      badgeBg: "#1f6feb",
-    };
+    return { border: "#6ea8fe", bg: "#11203a", badgeKind: "entry", badgeBg: "#1f6feb" };
   if (n.isGate)
-    return {
-      border: "#d29922",
-      bg: "#241c10",
-      badge: "gate",
-      badgeBg: "#9e6a03",
-    };
+    return { border: "#d29922", bg: "#241c10", badgeKind: "gate", badgeBg: "#9e6a03" };
   if (n.engineResolved)
-    return {
-      border: "#6e7681",
-      bg: "#14181f",
-      badge: "engine",
-      badgeBg: "#373e47",
-    };
+    return { border: "#6e7681", bg: "#14181f", badgeKind: "engine", badgeBg: "#373e47" };
   if (n.isTerminal)
-    return {
-      border: "#3fb950",
-      bg: "#0f2417",
-      badge: "terminal",
-      badgeBg: "#238636",
-    };
-  return { border: "#30363d", bg: "#161b22", badge: null, badgeBg: "#30363d" };
+    return { border: "#3fb950", bg: "#0f2417", badgeKind: "terminal", badgeBg: "#238636" };
+  return { border: "#30363d", bg: "#161b22", badgeKind: null, badgeBg: "#30363d" };
 }
 
 interface FlowGraphViewProps {
@@ -142,6 +116,33 @@ interface FlowGraphViewProps {
 }
 
 export function FlowGraphView({ graph }: FlowGraphViewProps) {
+  const { t } = useLingui();
+
+  // Localized badge text per BadgeKind. Defined here (not inside nodeRole)
+  // so the `t()` calls stay in the same lexical scope as the `useLingui()`
+  // binding above — see the BadgeKind comment for why that matters to the
+  // Lingui extractor.
+  function badgeLabel(kind: BadgeKind): string | null {
+    switch (kind) {
+      case "reserve":
+        return t({ id: "dashboard.flowGraph.badge.reserve", message: "reserve" });
+      case "stub":
+        return t({ id: "dashboard.flowGraph.badge.stub", message: "stub" });
+      case "proposed":
+        return t({ id: "dashboard.flowGraph.badge.proposed", message: "proposed" });
+      case "entry":
+        return t({ id: "dashboard.flowGraph.badge.entry", message: "entry" });
+      case "gate":
+        return t({ id: "dashboard.flowGraph.badge.gate", message: "gate" });
+      case "engine":
+        return t({ id: "dashboard.flowGraph.badge.engine", message: "engine" });
+      case "terminal":
+        return t({ id: "dashboard.flowGraph.badge.terminal", message: "terminal" });
+      case null:
+        return null;
+    }
+  }
+
   const laid: LaidOutGraph = layoutFlowGraph(graph);
   const pos = new Map<string, PositionedNode>(laid.nodes.map((n) => [n.id, n]));
   // Render the canvas a little taller than the laid-out node extent so bottom-row
@@ -245,6 +246,7 @@ export function FlowGraphView({ graph }: FlowGraphViewProps) {
         {/* Node cards */}
         {laid.nodes.map((n) => {
           const role = nodeRole(n);
+          const badge = badgeLabel(role.badgeKind);
           const cardStyle: CSSProperties = {
             position: "absolute",
             left: n.x,
@@ -266,10 +268,17 @@ export function FlowGraphView({ graph }: FlowGraphViewProps) {
           // Build the tooltip: id + label + writes + inputs + lock.
           const tooltipLines: string[] = [`${n.id}\n${n.label}`];
           if (n.writePaths !== undefined && n.writePaths.length > 0)
-            tooltipLines.push(`writes: ${n.writePaths.join(", ")}`);
+            tooltipLines.push(
+              `${t({ id: "dashboard.flowGraph.tooltip.writes", message: "writes" })}: ${n.writePaths.join(", ")}`,
+            );
           if (n.inputPaths !== undefined && n.inputPaths.length > 0)
-            tooltipLines.push(`inputs: ${n.inputPaths.join(", ")}`);
-          if (n.lock !== undefined) tooltipLines.push(`lock: ${n.lock}`);
+            tooltipLines.push(
+              `${t({ id: "dashboard.flowGraph.tooltip.inputs", message: "inputs" })}: ${n.inputPaths.join(", ")}`,
+            );
+          if (n.lock !== undefined)
+            tooltipLines.push(
+              `${t({ id: "dashboard.flowGraph.tooltip.lock", message: "lock" })}: ${n.lock}`,
+            );
 
           // Metadata lines to show inline — only on nodes that carry writePaths
           // (projected manifest-step nodes). Empty arrays still show the line so
@@ -308,10 +317,10 @@ export function FlowGraphView({ graph }: FlowGraphViewProps) {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {`lock·${n.lock}`}
+                    {`${t({ id: "dashboard.flowGraph.badge.lock", message: "lock" })}·${n.lock}`}
                   </span>
                 )}
-                {role.badge !== null && (
+                {badge !== null && (
                   <span
                     style={{
                       fontFamily: SANS,
@@ -324,7 +333,7 @@ export function FlowGraphView({ graph }: FlowGraphViewProps) {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {role.badge}
+                    {badge}
                   </span>
                 )}
                 {/* spec 025 (FR-005): dual-reference WARN — this proposed question also
@@ -342,9 +351,12 @@ export function FlowGraphView({ graph }: FlowGraphViewProps) {
                       padding: "0 4px",
                       whiteSpace: "nowrap",
                     }}
-                    title="This question also appears in a live flow (also live)."
+                    title={t({
+                      id: "dashboard.flowGraph.alsoLive.title",
+                      message: "This question also appears in a live flow (also live).",
+                    })}
                   >
-                    also live
+                    <Trans id="dashboard.flowGraph.alsoLive.badge">also live</Trans>
                   </span>
                 )}
               </div>
@@ -377,7 +389,9 @@ export function FlowGraphView({ graph }: FlowGraphViewProps) {
                     textOverflow: "ellipsis",
                   }}
                 >
-                  <span style={{ color: "#3fb950" }}>writes:</span>{" "}
+                  <span style={{ color: "#3fb950" }}>
+                    <Trans id="dashboard.flowGraph.metadata.writes">writes:</Trans>
+                  </span>{" "}
                   {n.writePaths !== undefined && n.writePaths.length > 0
                     ? n.writePaths.map((p) => truncatePath(p)).join(", ")
                     : "—"}
@@ -395,7 +409,9 @@ export function FlowGraphView({ graph }: FlowGraphViewProps) {
                     textOverflow: "ellipsis",
                   }}
                 >
-                  <span style={{ color: "#58a6ff" }}>inputs:</span>{" "}
+                  <span style={{ color: "#58a6ff" }}>
+                    <Trans id="dashboard.flowGraph.metadata.inputs">inputs:</Trans>
+                  </span>{" "}
                   {n.inputPaths!.length > 0
                     ? n.inputPaths!.map((p) => truncatePath(p)).join(", ")
                     : "—"}
