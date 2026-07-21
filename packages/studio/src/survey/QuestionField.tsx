@@ -20,6 +20,7 @@ import type { DropdownOption } from "../ui/Dropdown.tsx";
 import type { RadioOption } from "../ui/RadioGroup.tsx";
 import type { MultiSelectOption } from "../ui/MultiSelect.tsx";
 import { helpText, TEXT_DIM } from "./surveyStyles.ts";
+import { normalizeForCompare } from "../lib/normalizeForCompare.ts";
 
 
 interface FieldProps {
@@ -172,15 +173,14 @@ function StyledOptionsField({ question, value, onChange, onSelectAdvance }: Fiel
   // own-script autonyms in both value and label (IdentityLite.getSeedOptions),
   // matching the dedup key in IdentityLite.getSeedOptions and the comparison in
   // LangtagsComboboxField.resolveTyped.
-  const q = typed.trim().normalize("NFC").toLowerCase();
+  const q = normalizeForCompare(typed);
   const exact = allOptions.some((o) => o.value.normalize("NFC") === typed.normalize("NFC"));
   const shown =
     q === "" || exact
       ? allOptions
       : allOptions.filter(
           (o) =>
-            o.label.normalize("NFC").toLowerCase().includes(q) ||
-            o.value.normalize("NFC").toLowerCase().includes(q),
+            normalizeForCompare(o.label).includes(q) || normalizeForCompare(o.value).includes(q),
         );
 
   return (
@@ -328,9 +328,9 @@ function LangtagsComboboxField({
     // ref.current is the current prop, so this path is unchanged.
     const onResolved = onEntryResolvedRef.current;
     if (onResolved === undefined) return;
-    // NFC-normalize before case-folding so NFC/NFD variants of the same name
+    // Normalize before case-folding so NFC/NFD variants of the same name
     // compare equal — matches the own-name dedup key in IdentityLite.getSeedOptions.
-    const trimmed = text.trim().normalize("NFC").toLowerCase();
+    const trimmed = normalizeForCompare(text);
     if (trimmed === "") {
       onResolved(null);
       return;
@@ -342,10 +342,10 @@ function LangtagsComboboxField({
     // read them through the loaded module.
     const mod = modRef.current;
     const primaryMatch = (r: LanguageSummary): boolean =>
-      (r.englishName ?? "").normalize("NFC").toLowerCase() === trimmed;
+      normalizeForCompare(r.englishName ?? "") === trimmed;
     const aliasMatch = (r: LanguageSummary): boolean => {
       const altNames = mod?.getLanguageDefaults(r.code)?.englishNames;
-      return altNames?.some((n) => n.normalize("NFC").toLowerCase() === trimmed) ?? false;
+      return altNames?.some((n) => normalizeForCompare(n) === trimmed) ?? false;
     };
 
     // The primary English name takes precedence over aliases: a *unique*
