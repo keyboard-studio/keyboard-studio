@@ -3,6 +3,7 @@
 // Layer A errors (red), Layer B warnings (yellow), Layer C info (blue).
 // Matches the editor-gutter colour contract in the agent profile.
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { CompilerDiagnostic } from "@keyboard-studio/contracts";
 import { BG_CARD, CARD_BORDER, FONT_MONO, SUCCESS_ACCENT, TEXT_MAIN } from "../ui/theme.ts";
 
@@ -18,6 +19,7 @@ export const SEVERITY_COLOR: Record<string, string> = {
 };
 
 export function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnostic[] }) {
+  const { t } = useLingui();
   if (diagnostics.length === 0) {
     return (
       <div
@@ -33,13 +35,13 @@ export function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnos
           fontFamily: FONT_MONO,
         }}
       >
-        No compiler diagnostics.
+        <Trans id="diagnostics.empty">No compiler diagnostics.</Trans>
       </div>
     );
   }
   return (
     <div
-      aria-label="Compiler diagnostics"
+      aria-label={t({ id: "diagnostics.panel.ariaLabel", message: "Compiler diagnostics" })}
       aria-live="polite"
       style={{
         marginTop: 12,
@@ -59,7 +61,9 @@ export function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnos
           marginBottom: 8,
         }}
       >
-        Compiler diagnostics ({diagnostics.length})
+        <Trans id="diagnostics.heading">
+          Compiler diagnostics ({diagnostics.length})
+        </Trans>
       </div>
       <ul
         style={{
@@ -85,7 +89,10 @@ export function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnos
             }}
           >
             <span
-              aria-label={`Severity: ${d.severity}`}
+              aria-label={t({
+                id: "diagnostics.item.severityAriaLabel",
+                message: `Severity: ${d.severity}`,
+              })}
               style={{
                 color: SEVERITY_COLOR[d.severity] ?? "#e6edf3",
                 minWidth: 50,

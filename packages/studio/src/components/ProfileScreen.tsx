@@ -6,6 +6,7 @@
 // sits at the bottom — Keyboard Studio is one account, so there is no
 // per-provider sign-out; providers can only be linked.
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useIdentitySession } from "../hooks/useIdentitySession.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import {
@@ -180,6 +181,7 @@ const backLinkStyle: React.CSSProperties = {
 // ---------------------------------------------------------------------------
 
 export function ProfileScreen() {
+  const { t } = useLingui();
   const { isSignedIn, isVerifying, displayName, initial, github, google, signOut } =
     useIdentitySession();
 
@@ -188,7 +190,10 @@ export function ProfileScreen() {
   // state and the link controls before the GitHub token round-trip resolves.
   if (isVerifying) {
     return (
-      <main aria-label="Account profile" style={pageStyle}>
+      <main
+        aria-label={t({ id: "profile.page.ariaLabel", message: "Account profile" })}
+        style={pageStyle}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
           <div style={verifyingAvatarStyle} aria-hidden="true" />
           <div
@@ -196,7 +201,7 @@ export function ProfileScreen() {
             aria-live="polite"
             style={{ fontSize: 15, color: TEXT_DIM, fontFamily: FONT }}
           >
-            Checking sign-in&hellip;
+            <Trans id="profile.checkingSignIn">Checking sign-in&hellip;</Trans>
           </div>
         </div>
       </main>
@@ -204,7 +209,10 @@ export function ProfileScreen() {
   }
 
   return (
-    <main aria-label="Account profile" style={pageStyle}>
+    <main
+      aria-label={t({ id: "profile.page.ariaLabel", message: "Account profile" })}
+      style={pageStyle}
+    >
       {/* Left column — avatar + username, then the provider + "My keyboards" buttons */}
       <div style={columnStyle}>
         {/* Avatar + username */}
@@ -222,7 +230,7 @@ export function ProfileScreen() {
                 fontFamily: FONT,
               }}
             >
-              {displayName ?? "Guest"}
+              {displayName ?? t({ id: "profile.guestName", message: "Guest" })}
             </h1>
             <p
               style={{
@@ -232,9 +240,13 @@ export function ProfileScreen() {
                 fontFamily: FONT,
               }}
             >
-              {isSignedIn
-                ? "Keyboard Studio account"
-                : "Sign in to save and submit keyboards"}
+              {isSignedIn ? (
+                <Trans id="profile.accountKind.signedIn">Keyboard Studio account</Trans>
+              ) : (
+                <Trans id="profile.accountKind.guest">
+                  Sign in to save and submit keyboards
+                </Trans>
+              )}
             </p>
           </div>
         </div>
@@ -247,18 +259,18 @@ export function ProfileScreen() {
               <GitHubMark />
               <span style={providerLabelStyle}>GitHub</span>
               <span style={{ ...providerValueStyle, marginLeft: "auto" }}>
-                {github.login ?? "Connected"}
+                {github.login ?? t({ id: "profile.provider.connected", message: "Connected" })}
               </span>
             </div>
           ) : (
             <button
               type="button"
               style={connectProviderStyle}
-              aria-label="Link GitHub"
+              aria-label={t({ id: "profile.github.linkAriaLabel", message: "Link GitHub" })}
               onClick={() => { void github.connect("identity"); }}
             >
               <GitHubMark />
-              <span>Link GitHub</span>
+              <span><Trans id="profile.github.linkLabel">Link GitHub</Trans></span>
             </button>
           )}
 
@@ -270,18 +282,18 @@ export function ProfileScreen() {
               <span style={{ ...providerValueStyle, marginLeft: "auto" }}>
                 {google.name !== null && google.name.length > 0
                   ? google.name
-                  : (google.email ?? "Connected")}
+                  : (google.email ?? t({ id: "profile.provider.connected", message: "Connected" }))}
               </span>
             </div>
           ) : (
             <button
               type="button"
               style={connectProviderStyle}
-              aria-label="Link Google"
+              aria-label={t({ id: "profile.google.linkAriaLabel", message: "Link Google" })}
               onClick={() => { void google.connect(); }}
             >
               <GoogleMark />
-              <span>Link Google</span>
+              <span><Trans id="profile.google.linkLabel">Link Google</Trans></span>
             </button>
           )}
 
@@ -304,9 +316,13 @@ export function ProfileScreen() {
             style={myKeyboardsStyle}
             disabled
           >
-            <span>My keyboards</span>
+            <span><Trans id="profile.myKeyboards.label">My keyboards</Trans></span>
           </button>
-          <p style={comingSoonStyle}>Coming soon. It&rsquo;s non-functional.</p>
+          <p style={comingSoonStyle}>
+            <Trans id="profile.myKeyboards.comingSoon">
+              Coming soon. It&rsquo;s non-functional.
+            </Trans>
+          </p>
         </div>
       </div>
 
@@ -317,7 +333,7 @@ export function ProfileScreen() {
           style={backLinkStyle}
           onClick={() => navigateTo("survey")}
         >
-          &larr; Back to studio
+          <Trans id="profile.backToStudio">&larr; Back to studio</Trans>
         </button>
 
         {isSignedIn && (
@@ -326,7 +342,7 @@ export function ProfileScreen() {
             style={signOutStyle}
             onClick={signOut}
           >
-            Sign out
+            <Trans id="profile.signOut">Sign out</Trans>
           </button>
         )}
       </div>

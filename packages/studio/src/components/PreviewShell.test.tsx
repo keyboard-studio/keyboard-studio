@@ -138,6 +138,18 @@ function renderOutputScreen() {
   );
 }
 
+/** Render helper — PreviewScreen (and its DiagnosticsPanel / OSKFrame /
+ * PickerPane children) also uses Lingui Trans/t macros, which require an
+ * I18nProvider ancestor. All PreviewScreen render call-sites in this file go
+ * through this helper so there is exactly one place the provider is wired up. */
+function renderPreviewScreen() {
+  return render(
+    <I18nProvider i18n={i18n}>
+      <PreviewScreen />
+    </I18nProvider>,
+  );
+}
+
 function seedInstantiatedWorkingCopy() {
   const vfs = createVirtualFS([
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
@@ -176,25 +188,25 @@ afterEach(() => {
 
 describe("PreviewScreen — route-split AC", () => {
   it("renders the OSK frame (osk-frame testid)", () => {
-    render(<PreviewScreen />);
+    renderPreviewScreen();
     expect(screen.getByTestId("osk-frame")).toBeTruthy();
   });
 
   it("renders DiagnosticsPanel (no-diagnostics message) after base is picked", () => {
-    render(<PreviewScreen />);
+    renderPreviewScreen();
     fireEvent.click(screen.getByTestId("base-picker"));
     // DiagnosticsPanel renders "No compiler diagnostics." when empty.
     expect(screen.getByText(/no compiler diagnostics/i)).toBeTruthy();
   });
 
   it("does NOT render a Download .zip button", () => {
-    render(<PreviewScreen />);
+    renderPreviewScreen();
     fireEvent.click(screen.getByTestId("base-picker"));
     expect(screen.queryByRole("button", { name: /download/i })).toBeNull();
   });
 
   it("does NOT render SignUpPanel", () => {
-    render(<PreviewScreen />);
+    renderPreviewScreen();
     fireEvent.click(screen.getByTestId("base-picker"));
     expect(screen.queryByTestId("signup-panel")).toBeNull();
   });

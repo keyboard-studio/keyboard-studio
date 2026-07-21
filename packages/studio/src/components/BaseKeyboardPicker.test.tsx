@@ -22,6 +22,9 @@
 import { describe, it, expect, vi, afterEach, beforeAll, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
 import React from "react";
+import { i18n } from "@lingui/core";
+import { I18nProvider } from "@lingui/react";
+import { messages as enMessages } from "../locales/en/messages.json?lingui";
 
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { ImportStatus } from "@keyboard-studio/contracts";
@@ -130,12 +133,26 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
+// BaseKeyboardPicker now calls useLingui() (Trans/t macros), which requires an
+// I18nProvider ancestor (see docs/i18n-spike.md). Activate the source (en)
+// catalog so t()/Trans resolve to the English text the assertions expect.
+i18n.load("en", enMessages);
+i18n.activate("en");
+
+function withI18n(ui: React.ReactElement) {
+  return <I18nProvider i18n={i18n}>{ui}</I18nProvider>;
+}
+
 function renderPicker(props: Partial<React.ComponentProps<typeof BaseKeyboardPicker>> = {}) {
   const onChange = vi.fn();
   const { rerender, unmount } = render(
-    <BaseKeyboardPicker value={null} onChange={onChange} {...props} />,
+    withI18n(<BaseKeyboardPicker value={null} onChange={onChange} {...props} />),
   );
-  return { onChange, rerender, unmount };
+  return {
+    onChange,
+    rerender: (ui: React.ReactElement) => { rerender(withI18n(ui)); },
+    unmount,
+  };
 }
 
 // Wait for the loading state to clear and the combobox to appear.
@@ -610,12 +627,12 @@ describe("BaseKeyboardPicker — controlled value prop", () => {
   it("controlled value changes when a new value prop is passed", async () => {
     const onChange = vi.fn();
     const { rerender } = render(
-      <BaseKeyboardPicker value={basicKbdus} onChange={onChange} />,
+      withI18n(<BaseKeyboardPicker value={basicKbdus} onChange={onChange} />),
     );
     const input = await waitForCombobox();
     expect((input as HTMLInputElement).value).toBe(basicKbdus.displayName);
 
-    rerender(<BaseKeyboardPicker value={silEuroLatin} onChange={onChange} />);
+    rerender(withI18n(<BaseKeyboardPicker value={silEuroLatin} onChange={onChange} />));
     expect((input as HTMLInputElement).value).toBe(silEuroLatin.displayName);
   });
 });

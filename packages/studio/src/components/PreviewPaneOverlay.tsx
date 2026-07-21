@@ -2,6 +2,7 @@
 // context is expensive to reinitialise), only sets aria-busy and shows a
 // transient message. Mirrors the Stage union from useKeyboardArtifact.
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { Stage } from "../hooks/useKeyboardArtifact.ts";
 
 export interface PreviewPaneOverlayProps {
@@ -16,6 +17,7 @@ function diagnosticHead(stage: Extract<Stage, { kind: "error" }>): string {
 }
 
 export function PreviewPaneOverlay({ stage, onRetry }: PreviewPaneOverlayProps) {
+  const { t } = useLingui();
   if (stage.kind === "idle" || stage.kind === "ready") return null;
 
   let title: string;
@@ -25,29 +27,49 @@ export function PreviewPaneOverlay({ stage, onRetry }: PreviewPaneOverlayProps) 
 
   switch (stage.kind) {
     case "fetching":
-      title = "Loading keyboard source...";
-      detail = "fetching .kmn + siblings via /kbd-proxy";
+      title = t({ id: "preview.overlay.fetching.title", message: "Loading keyboard source..." });
+      detail = t({
+        id: "preview.overlay.fetching.detail",
+        message: "fetching .kmn + siblings via /kbd-proxy",
+      });
       break;
     case "vfs-loading":
-      title = "Loading into VirtualFS...";
+      title = t({
+        id: "preview.overlay.vfsLoading.title",
+        message: "Loading into VirtualFS...",
+      });
       break;
     case "compiling":
-      title = stage.isWarmCompile ? "Compiling..." : "Compiler warming up...";
+      title = stage.isWarmCompile
+        ? t({ id: "preview.overlay.compiling.title", message: "Compiling..." })
+        : t({ id: "preview.overlay.compilingCold.title", message: "Compiler warming up..." });
       detail = stage.isWarmCompile
-        ? "kmcmplib running over VFS snapshot"
-        : "first call pays the WASM cold-start cost (~1-3s)";
+        ? t({
+            id: "preview.overlay.compiling.detail",
+            message: "kmcmplib running over VFS snapshot",
+          })
+        : t({
+            id: "preview.overlay.compilingCold.detail",
+            message: "first call pays the WASM cold-start cost (~1-3s)",
+          });
       break;
     case "error":
       isError = true;
       showRetry = true;
       if (stage.step === "fetch") {
-        title = "Could not fetch keyboard source";
-        detail = stage.message + " — check network or proxy config";
+        title = t({
+          id: "preview.overlay.error.fetch.title",
+          message: "Could not fetch keyboard source",
+        });
+        detail = t({
+          id: "preview.overlay.error.fetch.detail",
+          message: `${stage.message} — check network or proxy config`,
+        });
       } else if (stage.step === "compile") {
-        title = "Compile failed";
+        title = t({ id: "preview.overlay.error.compile.title", message: "Compile failed" });
         detail = diagnosticHead(stage);
       } else {
-        title = "VFS load failed";
+        title = t({ id: "preview.overlay.error.vfs.title", message: "VFS load failed" });
         detail = stage.message;
       }
       break;
@@ -109,7 +131,7 @@ export function PreviewPaneOverlay({ stage, onRetry }: PreviewPaneOverlayProps) 
             fontWeight: 600,
           }}
         >
-          Retry
+          <Trans id="preview.overlay.retry">Retry</Trans>
         </button>
       )}
     </div>
