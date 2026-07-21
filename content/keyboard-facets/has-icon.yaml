@@ -1,12 +1,17 @@
 # has-icon — declared-metadata archetype.
 #
 # Whether the keyboard declares an icon bitmap at all: value `present` iff the
-# .kmn header declares a &BITMAP store OR the .kps bundles an icon file
-# (.ico/.bmp), else `absent`. Deliberately BROADER than package-completeness's
-# `icon` member, which credits only a .kps-bundled .ico — this also credits the
-# classic Keyman &BITMAP header declaration (the icon shown next to the keyboard
-# in the OS language switcher). Read from the parsed .kmn IR (&BITMAP store) plus
-# the .kps <Files> via the shared kps-reader. Feeds source.package-completeness.
+# .kmn header declares a &BITMAP store (value may be .ico OR .bmp) OR the .kps
+# bundles a .ico among <Files>, else `absent`. Deliberately BROADER than
+# package-completeness's `icon` member, which credits only a .kps-bundled .ico —
+# this also credits the classic Keyman &BITMAP header declaration (the icon shown
+# next to the keyboard in the OS language switcher). Read from the parsed .kmn IR
+# (&BITMAP store) plus the .kps <Files> via the shared kps-reader. Feeds
+# source.package-completeness.
+#
+# The .kps side is .ico-only on purpose: a <Files> .bmp is the MSI <GraphicFile>
+# installer splash graphic in the corpus, not a language-bar icon. Real .bmp
+# icons are declared via the &BITMAP store, which is credited extension-agnostic.
 #
 # The deciding signal is a declaration (a header store / a bundled package file),
 # so the record tier is declared-metadata; a keyboard with neither a readable
@@ -15,9 +20,10 @@ id: has-icon
 title: Has icon
 description: >
   Whether the keyboard declares an icon bitmap — present when the .kmn header
-  declares a &BITMAP store or the .kps bundles a .ico/.bmp icon file, else
-  absent. Broader than package-completeness's icon member (which credits only a
-  bundled .ico): this also credits the &BITMAP header declaration.
+  declares a &BITMAP store (value may be .ico or .bmp) or the .kps bundles a
+  .ico icon file, else absent. Broader than package-completeness's icon member
+  (which credits only a bundled .ico): this also credits the &BITMAP header
+  declaration.
 valueType: enum
 limits:
   values:

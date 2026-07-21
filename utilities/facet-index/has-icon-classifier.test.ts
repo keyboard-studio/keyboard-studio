@@ -74,10 +74,25 @@ describe("classifyHasIcon", () => {
     expect(result?.notes).toMatch(/\.ico/);
   });
 
-  it("no &BITMAP but the .kps bundles a .bmp -> present (broader than the .ico-only package slot)", () => {
-    const kps = filesKps("icon.bmp");
-    const result = classifyHasIcon(ir(KMN_NO_BITMAP), DEF, makeKb({ kmn: KMN_NO_BITMAP, kps }));
+  it("a &BITMAP store naming a .bmp icon -> present (the store check is extension-agnostic)", () => {
+    const kmn = "store(&BITMAP) 'test.bmp'\nbegin Unicode > use(main)\ngroup(main) using keys\n+ 'a' > 'b'\n";
+    const result = classifyHasIcon(ir(kmn), DEF, makeKb({ kmn }));
     expect(result?.value).toBe("present");
+    expect(result?.notes).toMatch(/&BITMAP/);
+  });
+
+  it("no &BITMAP and the .kps bundles only a .bmp (MSI <GraphicFile> splash, not an icon) -> absent", () => {
+    // A <Files> .bmp is the installer splash graphic, not a language-bar icon;
+    // the package side credits .ico only. (Real .bmp icons come via &BITMAP.)
+    const kps = filesKps("splash.bmp");
+    const result = classifyHasIcon(ir(KMN_NO_BITMAP), DEF, makeKb({ kmn: KMN_NO_BITMAP, kps }));
+    expect(result?.value).toBe("absent");
+  });
+
+  it("an empty &BITMAP store (store(&BITMAP) '') -> absent", () => {
+    const kmn = "store(&BITMAP) ''\nbegin Unicode > use(main)\ngroup(main) using keys\n+ 'a' > 'b'\n";
+    const result = classifyHasIcon(ir(kmn), DEF, makeKb({ kmn }));
+    expect(result?.value).toBe("absent");
   });
 
   it("no &BITMAP and a readable .kps with no icon -> absent, declared-metadata", () => {

@@ -6,8 +6,17 @@
  *
  *   - the `.kmn` header declares a `&BITMAP` system store with a value (the
  *     classic Keyman keyboard icon — `store(&BITMAP) 'foo.ico'` — shown next to
- *     the keyboard in the OS language switcher), OR
- *   - the `.kps` bundles an icon file (`.ico` / `.bmp`) among its `<Files>`.
+ *     the keyboard in the OS language switcher; the store value may be `.ico`
+ *     OR `.bmp`, and this check is extension-agnostic), OR
+ *   - the `.kps` bundles a `.ico` icon file among its `<Files>`.
+ *
+ * The `.kps` side is `.ico`-only ON PURPOSE. A `.bmp` in `<Files>` is, in the
+ * corpus, the MSI-installer `<GraphicFile>` splash graphic, not a language-bar
+ * icon — crediting it produced confirmed false positives (e.g. a keyboard that
+ * ships a splash `.bmp` but declares no `&BITMAP` and bundles no `.ico`). Real
+ * `.bmp` *icons* are always declared via the `&BITMAP` store, which the
+ * extension-agnostic store check above already credits, so the `.kps` `.bmp`
+ * branch added no true positives — only splash-graphic false positives.
  *
  * This is deliberately BROADER than `package-completeness`'s `icon` member,
  * which credits only a `.kps`-bundled `.ico`: this facet also credits the
@@ -35,9 +44,14 @@ function declaresBitmapStore(ir: KeyboardIR): boolean {
   return ir.stores.some((s) => s.isSystem && s.name === "BITMAP" && s.items.length > 0);
 }
 
-/** True when the `.kps` bundles an icon file (`.ico`/`.bmp`) among `<Files>`. */
+/**
+ * True when the `.kps` bundles a `.ico` icon file among `<Files>`. `.ico` only:
+ * a `<Files>` `.bmp` is the MSI `<GraphicFile>` splash graphic in the corpus, not
+ * a language-bar icon (real `.bmp` icons are declared via the `&BITMAP` store,
+ * which `declaresBitmapStore` credits extension-agnostically).
+ */
 function bundlesIconFile(fileExtensions: Set<string>): boolean {
-  return fileExtensions.has(".ico") || fileExtensions.has(".bmp");
+  return fileExtensions.has(".ico");
 }
 
 /**
@@ -58,7 +72,7 @@ export function classifyHasIcon(ir: KeyboardIR, def: FacetDefinition, kb: Scanne
 
   const signals: string[] = [];
   if (bitmapStore) signals.push("&BITMAP header store");
-  if (bundledIcon) signals.push("bundled .ico/.bmp");
+  if (bundledIcon) signals.push("bundled .ico");
 
   return {
     value: present ? "present" : "absent",
@@ -71,7 +85,7 @@ export function classifyHasIcon(ir: KeyboardIR, def: FacetDefinition, kb: Scanne
     notes: present
       ? `declares an icon via ${signals.join(" + ")}`
       : pkg.present
-        ? "no &BITMAP store and no bundled .ico/.bmp; absent"
+        ? "no &BITMAP store and no bundled .ico; absent"
         : "no &BITMAP store in the .kmn; no readable .kps to check for a bundled icon; absent",
   };
 }
@@ -97,9 +111,9 @@ export function hasIconFallback(kb: ScannedKeyboard, def: FacetDefinition): Cate
     analyzedCoverage: 1,
     analysisOutcome: pkg.present ? "fully" : "fallback-only",
     notes: bundledIcon
-      ? "no parsed .kmn to check for a &BITMAP store; .kps bundles an icon (.ico/.bmp)"
+      ? "no parsed .kmn to check for a &BITMAP store; .kps bundles a .ico icon"
       : pkg.present
-        ? "no parsed .kmn to check for a &BITMAP store; .kps bundles no .ico/.bmp; absent"
+        ? "no parsed .kmn to check for a &BITMAP store; .kps bundles no .ico; absent"
         : "no parsed .kmn and no readable .kps; icon presence undetermined, defaulted to absent",
   };
 }
