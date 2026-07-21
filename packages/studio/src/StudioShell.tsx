@@ -46,6 +46,7 @@ import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
+import { LocaleSwitcher } from "./components/LocaleSwitcher.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
 import { AccountControl } from "./components/AccountControl.tsx";
 import { hasVisited } from "./lib/firstVisit.ts";
@@ -184,8 +185,12 @@ function NavBar({ active }: NavBarProps) {
         })}
       </div>
 
-      {/* Right group — account control (hidden on the welcome route) */}
-      {active !== "welcome" && <AccountControl />}
+      {/* Right group — locale switcher (all routes) + account control
+          (hidden on the welcome route) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <LocaleSwitcher />
+        {active !== "welcome" && <AccountControl />}
+      </div>
     </nav>
   );
 }
