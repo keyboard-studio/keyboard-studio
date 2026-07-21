@@ -1,5 +1,3 @@
-// TODO(P4a shell extraction): see MechanismGallery.tsx for the extraction note.
-
 // TouchGallery — Phase E "touch mechanisms" flow (character-by-character redesign).
 //
 // Mirrors MechanismGallery's character-by-character loop — adapted for touch
@@ -79,6 +77,7 @@ import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
+import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { KEY_OPTIONS, VALID_HOST_KEYS } from "../../lib/keyOptions.ts";
 import { resolveKeyPickerSelection, resolvedVkeyOf } from "../../lib/charInput.ts";
 import {
@@ -1750,130 +1749,58 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   );
 
   // ---------------------------------------------------------------------------
-  // Two-pane layout (matching MechanismGallery exactly)
+  // Two-pane layout (via the shared AssignLoopShell)
   // ---------------------------------------------------------------------------
 
-  return (
-    <div
-      style={{
-        ...pageStyle,
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        overflow: "hidden",
-      }}
-    >
-      {/* Header — title + modality label, the character counter, and the
-          description, all in a single row. The primary forward action now
-          sits in the top toolbar row of the left pane (see leftContent),
-          paired with the Back button, rather than here. */}
-      <div
-        style={{
-          borderBottom: `1px solid ${BORDER}`,
-          flexShrink: 0,
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "baseline",
-          gap: 16,
-          flexWrap: "wrap",
-          padding: "16px 24px 14px",
-        }}
-      >
-        <h1
-          style={{
-            margin: 0,
-            fontSize: "1.05rem",
-            fontWeight: 600,
-            color: ACCENT,
-            fontFamily: FONT,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          Mechanism Gallery
-          <span
-            style={{
-              fontSize: 12,
-              color: TEXT_DIM,
-              textTransform: "uppercase" as const,
-              letterSpacing: "0.06em",
-              fontWeight: 400,
-            }}
-          >
-            Touch
-          </span>
-        </h1>
-        {totalChars > 0 && (
-          <span
-            aria-label={`Character ${currentIdx + 1} of ${totalChars}`}
-            style={{
-              fontSize: 12,
-              color: TEXT_DIM,
-              fontFamily: FONT,
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-            }}
-          >
-            Character {Math.max(currentIdx + 1, 1)} of {totalChars}
-          </span>
-        )}
+  const headerExtras = (
+    <>
+      {totalChars > 0 && (
         <span
+          aria-label={`Character ${currentIdx + 1} of ${totalChars}`}
           style={{
-            fontSize: 13,
+            fontSize: 12,
             color: TEXT_DIM,
             fontFamily: FONT,
-            flex: 1,
-            minWidth: 0,
+            whiteSpace: "nowrap",
+            flexShrink: 0,
           }}
         >
-          For each character, choose how it appears on the touch keyboard. Your
-          desktop layout is locked — these apply to phone and tablet only.
+          Character {Math.max(currentIdx + 1, 1)} of {totalChars}
         </span>
-      </div>
-
-      {/* Two-pane body */}
-      <div
+      )}
+      <span
         style={{
+          fontSize: 13,
+          color: TEXT_DIM,
+          fontFamily: FONT,
           flex: 1,
-          display: "flex",
-          flexDirection: "row",
-          overflow: "hidden",
+          minWidth: 0,
         }}
       >
-        {/* LEFT pane */}
-        <div
-          style={{
-            flexBasis: "45%",
-            flexShrink: 0,
-            borderRight: `1px solid ${BORDER}`,
-            overflowY: "auto",
-            boxSizing: "border-box",
-          }}
-        >
-          {leftContent}
-        </div>
+        For each character, choose how it appears on the touch keyboard. Your
+        desktop layout is locked — these apply to phone and tablet only.
+      </span>
+    </>
+  );
 
-        {/* RIGHT pane */}
-        <div
-          style={{
-            flexGrow: 1,
-            overflowY: "auto",
-            padding: "24px 20px",
-            boxSizing: "border-box",
-          }}
-        >
-          <GalleryPreviewPane
-            baseKeyboard={baseKeyboard}
-            stage={stage}
-            retry={retry}
-            {...(handleKeyTap !== undefined ? { onKeyTap: handleKeyTap } : {})}
-            defaultOskMode="touch"
-            heading="Touch preview"
-            warningLabel="Preview warnings:"
-          />
-        </div>
-      </div>
-    </div>
+  return (
+    <AssignLoopShell
+      headingText="Touch Gallery"
+      modalityLabel="Touch"
+      modalityLabelPlacement="inline"
+      headerExtras={headerExtras}
+      leftContent={leftContent}
+      rightContent={
+        <GalleryPreviewPane
+          baseKeyboard={baseKeyboard}
+          stage={stage}
+          retry={retry}
+          {...(handleKeyTap !== undefined ? { onKeyTap: handleKeyTap } : {})}
+          defaultOskMode="touch"
+          heading="Touch preview"
+          warningLabel="Preview warnings:"
+        />
+      }
+    />
   );
 }
