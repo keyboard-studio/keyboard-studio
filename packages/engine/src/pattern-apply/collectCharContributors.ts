@@ -14,12 +14,17 @@
  *     NEVER enter the contributor set; only the fan-out rule's single matching
  *     SLOT is a contributor. A trigger rule is detected as: output is exactly one
  *     `{kind:"deadkey"}` element.
- *   - OUTPUT-STORE ONLY (this function's job): only the one matching slot index
- *     in the output store is added to `storeSlotIds` here — the input/trigger
- *     store is never explicitly targeted by THIS function. applyStoreSlotRemovals
- *     is the one that resolves the pairing graph and coordinates the drop across
- *     the paired input store too, so the caller doesn't need to (and shouldn't)
- *     duplicate that resolution here.
+ *   - OUTPUT + INPUT STORE SLOTS ("remove everywhere", #525 v2): every matching
+ *     slot index in an output store (`index()`/`outs()`) AND every matching
+ *     slot index in an `any()`-consumed INPUT store is added to `storeSlotIds`
+ *     — a character removal must reach every store it appears in, not just the
+ *     one it's emitted through. `notany()` stores are deliberately NOT scanned:
+ *     dropping a char from a `notany()` store WIDENS what that rule matches,
+ *     the opposite of removal. This function only ever names the DIRECTLY
+ *     matching slot on each store; applyStoreSlotRemovals is still the one that
+ *     resolves the pairing graph and coordinates the drop across any OTHER
+ *     paired store at the same position, so the caller doesn't need to (and
+ *     shouldn't) duplicate that resolution here.
  *   - SINGLE-CHAR WHOLE-DELETE: whole-rule-delete only when the rule's ENTIRE
  *     NFC output === targetChar (single-char producer). Multi-char producers go
  *     to `blocked`.
@@ -136,7 +141,33 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
     for (const rule of group.rules) {
       // Skip S-02 trigger rules (output is exactly one deadkey element) — deleting
       // one would destroy the whole deadkey family, not this single character.
+      // NOTE: this `continue` skips the WHOLE rule, including any any()-context
+      // element it carries — so a store consumed only via any() on a trigger
+      // rule (e.g. a guarded registration rule) would be missed here as a
+      // contributor. No corpus example currently exercises this shape.
       if (isTriggerRule(rule)) continue;
+
+      // (0) Input-store occurrences — any() context elements ("remove everywhere",
+      //     #525 v2). Independent of the output-store/literal classification below
+      //     (no early `continue` here): a rule's INPUT store slot for this char is a
+      //     contributor regardless of what that same rule's OUTPUT does. `notany()`
+      //     is deliberately excluded (see the module doc comment) — only `any()`.
+      for (const el of rule.context) {
+        if (el.kind !== 'any') continue;
+        const inputStore = storeMap.get(el.storeRef);
+        if (inputStore === undefined) continue;
+        let inputMatched = false;
+        for (let i = 0; i < inputStore.items.length; i++) {
+          const item = inputStore.items[i];
+          if (item !== undefined && item.kind === 'char' && item.value.normalize('NFC') === target) {
+            const slotId = `${inputStore.nodeId}#${i}`;
+            if (!seenStoreSlotIds.has(slotId)) { seenStoreSlotIds.add(slotId); storeSlotIds.push(slotId); }
+            addLocation('store', inputStore.name, inputStore.nodeId);
+            inputMatched = true;
+          }
+        }
+        if (inputMatched) addRuleLocation(rule, group);
+      }
 
       const outEls = rule.output as { kind: string; value?: string; storeRef?: string }[];
 

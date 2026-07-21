@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
-import { toRailNodes, nodeState, buildCharWeb, annotateRemovalRecommendations, recommendedRemovalChars } from '../../lib/irToCarveNodes.ts';
-import type { CarveNode, CharLocation, RecommendedRemovalChar } from '../../lib/irToCarveNodes.ts';
+import { toRailNodes, nodeState, buildCharWeb, annotateRemovalRecommendations, recommendedRemovalChars, coordinatedCollateralForSlots } from '../../lib/irToCarveNodes.ts';
+import type { CarveNode, CharLocation, RecommendedRemovalChar, CoordinatedCollateralChar } from '../../lib/irToCarveNodes.ts';
 import { KIND_COLOR } from '../assignLoop/parts/KindBadge.tsx';
 import { StatusBar } from '../assignLoop/parts/StatusBar.tsx';
 import type { RemovedItem } from '../assignLoop/parts/StatusBar.tsx';
@@ -14,8 +14,8 @@ import { InfoView, capabilityHint } from '../assignLoop/parts/InfoView.tsx';
 import { InfoIcon } from '../assignLoop/parts/carveShared.tsx';
 import { ConfirmDialog } from '../assignLoop/parts/ConfirmDialog.tsx';
 import { useHoverInfoStore } from '../../stores/hoverInfoStore.ts';
-import { collectCharContributors } from '@keyboard-studio/engine';
-import type { CharContributors } from '@keyboard-studio/engine';
+import { collectCharContributors, analyzeStores } from '@keyboard-studio/engine';
+import type { CharContributors, StoreAnalysis } from '@keyboard-studio/engine';
 import type { KeyboardIR, RemovalCapability } from '@keyboard-studio/contracts';
 import { neededCharsForLanguage } from '../../lib/services.ts';
 
@@ -31,6 +31,31 @@ interface PendingCascade {
   restoreIds: string[];
   /** contributors.ruleNodeIds is the REMOVABLE set only; blocked carries the warnings (remove mode). */
   contributors: CharContributors;
+  /**
+   * Remove mode only (always `[]` for restore) — coordinated-drop collateral
+   * this removal will ALSO cause in a PAIRED store, via
+   * classifyStoreSlotEdit's `coordinatedWith` (see coordinatedCollateralForSlots).
+   * Never silent: any non-empty collateral routes the click through this
+   * dialog even when the clicked chip is otherwise its char's sole producer.
+   */
+  collateral: CoordinatedCollateralChar[];
+}
+
+/**
+ * Pending BULK-removal cascade state — set when a store-card master toggle
+ * (Rail's whole-store ToggleBox, or StoreDetail's "select all" toggle, both
+ * routed through handleSetManyGlyphs) would ALSO drop a coordinated
+ * collateral character from a paired store. A bulk removal is MORE likely to
+ * hit a coordinated pair than a single chip (it can span every slot in a
+ * store at once), so it gets the same "remove everywhere" awareness a single
+ * chip gets via PendingCascade — one dialog for the whole batch, not one per
+ * gid (see handleSetManyGlyphs below).
+ */
+interface PendingBulkCascade {
+  /** The full batch of ids the caller asked to remove (glyph gids and/or store slot ids). */
+  gids: string[];
+  /** Coordinated-drop collateral aggregated across the WHOLE batch (deduped by partner slot id). */
+  collateral: CoordinatedCollateralChar[];
 }
 
 interface BuildPendingCascadeArgs {
@@ -44,6 +69,21 @@ interface BuildPendingCascadeArgs {
   isItemDeleted: (id: string) => boolean;
   removalCapabilities: Map<string, RemovalCapability>;
   nodes: CarveNode[];
+  /** Confirmed-inventory ∪ CLDR needed-set — threaded into coordinatedCollateralForSlots
+   *  so a collateral partner char can be flagged "needed" in the confirm dialog. */
+  needed: ReadonlySet<string>;
+  /** Target language, for the Turkic-aware case fold in isCharCoveredForLocale. */
+  bcp47?: string | null | undefined;
+  /**
+   * Precomputed engine analyzeStores(ir) result, hoisted ONCE per `ir` by the
+   * caller (see the `storeAnalysis` memo below) and threaded through to
+   * coordinatedCollateralForSlots — classifyStoreSlotEdit/describeStorePairing
+   * scan every rule in the IR, so recomputing this per chip click would
+   * re-scan the whole IR on every 300ms-cycle-adjacent click (#931 perf).
+   * Undefined only when `ir` itself is null (buildPendingCascade bails before
+   * using it in that case).
+   */
+  analysis: StoreAnalysis | undefined;
 }
 
 /**
@@ -53,9 +93,17 @@ interface BuildPendingCascadeArgs {
  * or open the cascade ConfirmDialog (returns a PendingCascade). Only the
  * caller-resolved clickedCapability/clickedLabel differ between callers —
  * store chips carry no per-rule capability, so they pass undefined / 'this character'.
+ *
+ * Manual-carve safety (#525/#931 follow-up): remove-mode ALWAYS resolves
+ * coordinatedCollateralForSlots over the store slots this removal will
+ * actually drop. Any non-empty collateral forces the ConfirmDialog open —
+ * even for what would otherwise be a "sole producer" plain toggle — because
+ * a coordinated drop can silently take a PAIRED store's aligned character
+ * (e.g. a deadkey's composed output) along with it. Awareness, not
+ * prevention: the user can still confirm and remove.
  */
 function buildPendingCascade({
-  ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes,
+  ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes, needed, bcp47, analysis,
 }: BuildPendingCascadeArgs): PendingCascade | null {
   // No IR to analyse → plain single-chip toggle.
   if (ir == null) return null;
@@ -72,6 +120,7 @@ function buildPendingCascade({
     return {
       gid, targetChar, mode: 'restore', actionCount: restoreIds.length, restoreIds,
       contributors: { ...found, blocked: [] },
+      collateral: [],
     };
   }
 
@@ -95,14 +144,67 @@ function buildPendingCascade({
 
   const removableCount = removableRuleIds.length + found.storeSlotIds.length;
 
+  // Coordinated collateral — resolved over the store slots that will ACTUALLY
+  // be dropped (classifyStoreSlotEdit inside the helper already filters to
+  // mode 'drop' only, so a slot classifyStoreSlotEdit would block is never
+  // reported as collateral here either). Threads the precomputed `analysis`
+  // through so this doesn't re-scan the whole IR on every chip click (#931 perf).
+  const collateral = coordinatedCollateralForSlots(found.storeSlotIds, ir, needed, bcp47, analysis);
+
   // Plain toggle (no dialog) ONLY for a removable chip that is its char's sole
-  // producer with nothing blocked. A not-removable chip ALWAYS opens the dialog.
-  if (!clickedIsNotRemovable && removableCount <= 1 && blocked.length === 0) return null;
+  // producer, nothing blocked, AND no coordinated collateral. A not-removable
+  // chip, or ANY collateral (even for a sole producer), ALWAYS opens the dialog.
+  if (!clickedIsNotRemovable && removableCount <= 1 && blocked.length === 0 && collateral.length === 0) return null;
 
   return {
     gid, targetChar, mode: 'remove', actionCount: removableCount, restoreIds: [],
     contributors: { ...found, ruleNodeIds: removableRuleIds, blocked },
+    collateral,
   };
+}
+
+/**
+ * Coordinated-removal collateral warning box — shared markup for both the
+ * single-cascade dialog (one clicked chip) and the bulk-cascade dialog (a
+ * whole batch), which previously duplicated this `role="alert"` block
+ * near-verbatim (#525/#931 follow-up review fix — dedup). Only the
+ * anyNeeded lead-in copy differs between the two callers (singular chip vs
+ * plural batch), switched via `plural`; the non-anyNeeded copy was already
+ * identical in both.
+ */
+function CollateralWarning({ collateral, plural }: { collateral: CoordinatedCollateralChar[]; plural: boolean }) {
+  const anyNeeded = collateral.some((c) => c.isNeeded);
+  return (
+    <div
+      role="alert"
+      style={{
+        marginTop: 8,
+        padding: '8px 12px',
+        borderRadius: 8,
+        background: 'color-mix(in srgb, var(--sil-orange) 10%, var(--app-surface))',
+        border: anyNeeded
+          ? '1px solid var(--sil-orange)'
+          : '1px solid color-mix(in srgb, var(--sil-orange) 40%, transparent)',
+        fontSize: 12,
+        color: 'var(--sil-orange-dark)',
+      }}
+    >
+      <b>
+        {anyNeeded
+          ? plural
+            ? '⚠ This will also remove characters you need, from paired stores:'
+            : '⚠ This will also remove a character you need, from a paired store:'
+          : 'Removing this will also remove from paired stores:'}
+      </b>{' '}
+      {collateral.map((c, i) => (
+        <span key={i}>
+          &quot;{c.ch}&quot; from {c.storeName}
+          {c.isNeeded ? <b> — needed for your language</b> : null}
+          {i < collateral.length - 1 ? ', ' : ''}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 interface CarveGalleryProps {
@@ -170,6 +272,14 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   useEffect(() => () => clearInfo(), [clearInfo]);
 
   const nodes = useMemo(() => (ir ? toRailNodes(ir, removalCapabilities) : []), [ir, removalCapabilities]);
+
+  // Precomputed ONCE per `ir` (memoized on its reference) and threaded through
+  // every buildPendingCascade() call and the bulk-toggle collateral check
+  // below — classifyStoreSlotEdit/describeStorePairing scan every rule in the
+  // IR, so recomputing this per chip click would re-scan the whole IR on
+  // every click within the 300ms cycle (#931 perf; see the analysis field doc
+  // on BuildPendingCascadeArgs above).
+  const storeAnalysis = useMemo(() => (ir ? analyzeStores(ir) : undefined), [ir]);
 
   // #525 FOUNDATION slice + items 2/4 (language-driven surplus) — non-destructive
   // removal-recommendation annotation, kept as a SEPARATE pass over `nodes`
@@ -251,6 +361,9 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   // -- Cascade-delete state ----------------------------------------------------
   const [pendingCascade, setPendingCascade] = useState<PendingCascade | null>(null);
 
+  // -- Bulk cascade-delete state (P0 — store-card master toggle) ---------------
+  const [pendingBulkCascade, setPendingBulkCascade] = useState<PendingBulkCascade | null>(null);
+
   // -- Cross-reference "web" popup (a character's other locations) --------------
   const [webPopup, setWebPopup] = useState<{ ch: string; locations: CharLocation[] } | null>(null);
 
@@ -261,10 +374,55 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
     if (locations.length > 1) { setWebPopup({ ch, locations }); }
   }, []);
 
-  // Handlers for Rail/Inspector callbacks
+  /**
+   * Handler for Rail/Inspector bulk-toggle callbacks (a store card's master
+   * toggle, or StoreDetail's "select all" toggle) — gids may be glyph gids,
+   * store-slot ids, or a mix.
+   *
+   * Restore (off === false) never routes through the collateral guard —
+   * restoring can't silently drop anything, only bring characters back.
+   *
+   * Remove (off === true): resolves coordinatedCollateralForSlots over the
+   * WHOLE batch at once (P0 — a bulk removal is more likely than a single
+   * chip to hit a coordinated pair, since it can touch every slot in a store
+   * in one click — see Rail.tsx's whole-store ToggleBox). Any aggregated
+   * collateral opens ONE confirm dialog for the batch (not one per gid); with
+   * no collateral, the batch applies immediately (existing fast path,
+   * unchanged for the common case).
+   */
   const handleSetManyGlyphs = useCallback((gids: string[], off: boolean) => {
-    gids.forEach((gid) => { if (off) { deleteItem(gid); } else { restoreItem(gid); } });
-  }, [deleteItem, restoreItem]);
+    if (!off) {
+      gids.forEach((gid) => restoreItem(gid));
+      return;
+    }
+    if (ir == null) {
+      gids.forEach((gid) => deleteItem(gid));
+      return;
+    }
+    const collateral = coordinatedCollateralForSlots(gids, ir, neededSet, identityBcp47, storeAnalysis);
+    if (collateral.length === 0) {
+      gids.forEach((gid) => deleteItem(gid));
+      return;
+    }
+    setPendingBulkCascade({ gids, collateral });
+  }, [ir, deleteItem, restoreItem, neededSet, identityBcp47, storeAnalysis]);
+
+  const handleBulkCascadePrimary = useCallback(() => {
+    if (!pendingBulkCascade) return;
+    // Reuses cascadeDelete (the SAME persistence path as the single-chip
+    // cascade's handleCascadePrimary below) so the batch AND the aggregated
+    // collateral slot ids land in deletedItemIds together, as one undo entry.
+    const collateralSlotIds = pendingBulkCascade.collateral.map((c) => c.slotId);
+    // gids may mix glyph gids and store-slot ids; passed positionally into
+    // storeSlotIds (not ruleNodeIds) is safe because cascadeDelete unions
+    // both id params into one item-channel set (workingCopyStore.ts).
+    cascadeDelete([], [...pendingBulkCascade.gids, ...collateralSlotIds]);
+    setPendingBulkCascade(null);
+  }, [pendingBulkCascade, cascadeDelete]);
+
+  const handleBulkCascadeCancel = useCallback(() => {
+    setPendingBulkCascade(null);
+  }, []);
 
   const handleToggleNode = useCallback((nodeId: string, off: boolean) => {
     if (off) { deleteNode(nodeId); } else { restoreNode(nodeId); }
@@ -299,10 +457,11 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
     const pending = buildPendingCascade({
       ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes,
+      needed: neededSet, bcp47: identityBcp47, analysis: storeAnalysis,
     });
     if (pending === null) { handleToggleGlyph(gid); return; }
     setPendingCascade(pending);
-  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities]);
+  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities, neededSet, identityBcp47, storeAnalysis]);
 
   /**
    * Store-chip cascade toggle — same "remove/restore everywhere" contract as
@@ -316,17 +475,29 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
     const pending = buildPendingCascade({
       ir, gid: chipId, targetChar: ch, clickedLabel: 'this character',
       isItemDeleted, removalCapabilities, nodes,
+      needed: neededSet, bcp47: identityBcp47, analysis: storeAnalysis,
     });
     if (pending === null) { handleToggleGlyph(chipId); return; }
     setPendingCascade(pending);
-  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities]);
+  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities, neededSet, identityBcp47, storeAnalysis]);
 
   const handleCascadePrimary = useCallback(() => {
     if (!pendingCascade) return;
     if (pendingCascade.mode === 'restore') {
       cascadeRestore(pendingCascade.restoreIds);
     } else {
-      cascadeDelete(pendingCascade.contributors.ruleNodeIds, pendingCascade.contributors.storeSlotIds);
+      // P1 fix: fold the CONFIRMED collateral partner slot ids into the same
+      // cascadeDelete call so they land in deletedItemIds alongside the
+      // primary removal. Without this, "Yes, remove everywhere" only marked
+      // the directly-targeted slots as deleted — the Gallery kept showing
+      // the collateral char as KEPT even though export-time
+      // applyStoreSlotRemovals coordinately drops it regardless, a silent
+      // divergence between the reviewed state and the exported .kmn.
+      const collateralSlotIds = pendingCascade.collateral.map((c) => c.slotId);
+      cascadeDelete(
+        pendingCascade.contributors.ruleNodeIds,
+        [...pendingCascade.contributors.storeSlotIds, ...collateralSlotIds],
+      );
     }
     setPendingCascade(null);
   }, [pendingCascade, cascadeDelete, cascadeRestore]);
@@ -679,8 +850,17 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
                   );
                 })}
               </ul>
+              {/* Coordinated-removal collateral (#525/#931 follow-up) — a manual
+                  removal that hits a PAIRED store also drops that store's
+                  aligned partner character at the same position. Never
+                  silent: shown for every collateral char, with a needed one
+                  flagged prominently so the author can back out via Cancel. */}
+              {!isRestore && pendingCascade.collateral.length > 0 && (
+                <CollateralWarning collateral={pendingCascade.collateral} plural={false} />
+              )}
               {pendingCascade.contributors.blocked.length > 0 && (
                 <div
+                  role="alert"
                   style={{
                     marginTop: 8,
                     padding: '8px 12px',
@@ -705,6 +885,33 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
           onPrimary={!isRestore && !hasActions ? handleCascadeCancel : handleCascadePrimary}
           {...(!isRestore && !hasActions ? {} : { secondaryLabel: 'Cancel', onSecondary: handleCascadeCancel })}
         />);
+      })()}
+
+      {/* Bulk cascade-delete confirmation dialog (P0 — store-card master
+          toggle). ONE dialog for the whole batch, aggregating the coordinated
+          collateral across every slot the batch will drop — see
+          handleSetManyGlyphs above. */}
+      {pendingBulkCascade !== null && (() => {
+        const n = pendingBulkCascade.gids.length;
+        return (
+          <ConfirmDialog
+            open={true}
+            title="Remove everywhere?"
+            body={
+              <div>
+                <p style={{ margin: '0 0 10px' }}>
+                  Removing {n} selected character{n !== 1 ? 's' : ''} will also drop the following
+                  paired character{pendingBulkCascade.collateral.length !== 1 ? 's' : ''} from linked stores.
+                </p>
+                <CollateralWarning collateral={pendingBulkCascade.collateral} plural={true} />
+              </div>
+            }
+            primaryLabel="Yes, remove everywhere"
+            onPrimary={handleBulkCascadePrimary}
+            secondaryLabel="Cancel"
+            onSecondary={handleBulkCascadeCancel}
+          />
+        );
       })()}
 
       {/* Cross-reference web popup — the character's OTHER locations, each a link. */}

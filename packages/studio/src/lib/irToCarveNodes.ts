@@ -12,8 +12,8 @@ import type {
   StoreItem,
 } from '@keyboard-studio/contracts';
 import { buildProducedSet } from '@keyboard-studio/contracts';
-import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, isCharCoveredForLocale, collectCharContributors, isPlusSeparator } from '@keyboard-studio/engine';
-import type { StoreSlotBlockReason, StoreAnalysis, CharContributors } from '@keyboard-studio/engine';
+import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, isCharCoveredForLocale, collectCharContributors, isPlusSeparator, parseSlotId } from '@keyboard-studio/engine';
+import type { StoreSlotBlockReason, StoreSlotEditMode, StoreAnalysis, CharContributors } from '@keyboard-studio/engine';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 
 // ---------------------------------------------------------------------------
@@ -1350,73 +1350,196 @@ function producedCharsOf(node: CarveNode): Set<string> {
   return chars;
 }
 
-/**
- * Resolve the real characters a rule's output can produce, for the store
- * dependency guard below. Literal `char` outputs resolve directly; `index()`/
- * `outs()` outputs resolve to ALL char items of the referenced output store
- * (mirroring how expandParallelStoreRule resolves the same store reference
- * for glyph fan-out) rather than the outputToChar() placeholder ('…') — that
- * placeholder is what let the dk(D) any(BASE) > index(OUT, offset) idiom
- * slip past the guard undetected. `unresolved` is true when an index()/outs()
- * element names a store that isn't found in ir.stores.
- */
-function producedCharsOfRuleOutput(
-  output: OutputElement[],
-  ir: KeyboardIR,
-): { chars: Set<string>; unresolved: boolean } {
-  const chars = new Set<string>();
-  let unresolved = false;
-  for (const el of output) {
-    switch (el.kind) {
-      case 'char':
-        chars.add(el.value.normalize('NFC'));
-        break;
-      case 'index':
-      case 'outs': {
-        const outputStore = ir.stores.find((s) => s.name === el.storeRef);
-        if (!outputStore) { unresolved = true; break; }
-        for (const item of outputStore.items) {
-          if (item.kind === 'char') chars.add(item.value.normalize('NFC'));
-        }
-        break;
-      }
-      default:
-        break;
-    }
-  }
-  return { chars, unresolved };
+// ---------------------------------------------------------------------------
+// resolveCoordinatedPartnerItems — SHARED coordinated-partner resolution
+// (#525/#931 follow-up review fix — refactor).
+//
+// Both coordinatedDropHitsNeededChar (boolean short-circuit) and
+// coordinatedCollateralForSlots (display-list builder) independently walked
+// classifyStoreSlotEdit's `coordinatedWith` and looked up each partner
+// store's item at the same `itemsIndex` — this is that walk, written once.
+// Pure and read-only: it never re-derives or changes the engine's
+// coordinated-drop algorithm (classifyStoreSlotEdit/applyStoreSlotRemovals
+// remain the single source of truth for WHICH stores pair and how), it only
+// projects what the engine will do.
+//
+// Takes an ALREADY-CLASSIFIED `mode` rather than (store, ir, analysis) so a
+// caller looping over multiple itemsIndex values for the SAME store can
+// hoist the classifyStoreSlotEdit call once outside that loop (mode never
+// changes across itemsIndex — see the #931-perf fix in
+// annotateRemovalRecommendations below).
+// ---------------------------------------------------------------------------
+
+/** A coordinated partner store's item at a given slot, resolved from a StoreSlotEditMode. */
+interface CoordinatedPartnerItem {
+  partnerStore: IRStore;
+  /** The partner's char item at the same itemsIndex (never a non-char item — those are skipped). */
+  item: Extract<StoreItem, { kind: 'char' }>;
+  /** "<partnerStore.nodeId>#<itemsIndex>" — the locked slot-id contract. */
+  slotId: string;
 }
 
 /**
- * Dependency guard for store nodes: true when ANY rule referencing this store
- * (by name, via the same storeRefsOf() used by analyzeStoreUsage) produces a
- * confirmed-inventory character in its output. Covers the case where a store
- * is itself entirely out-of-inventory but a wanted character's rule depends
- * on it positionally (e.g. an any()-matched context store feeding a literal
- * output elsewhere, or the deadkey/combining-mark idiom's index()/outs()
- * output store — resolved via producedCharsOfRuleOutput, not the
- * outputToChar() placeholder).
- *
- * Conservative in the direction that matters: a false 'none' (skipping a
- * removal recommendation) just means the author double-checks a store that
- * turned out fine; a false 'high' (recommending removal of a store that
- * actually feeds a wanted char) breaks the keyboard. So when a rule's output
- * can't be resolved at all (an index()/outs() element naming a store this
- * function can't find), this guard returns true — "assume it might feed a
- * wanted char" — rather than let an unresolvable rule fall through to 'high'.
+ * Resolve every coordinated PARTNER store's item at `itemsIndex`, given an
+ * already-classified `mode` for the store being edited. Returns `[]` when
+ * `mode` is 'blocked' (not this helper's concern — the caller already treats
+ * `mode.mode === 'blocked'` as "not simple" separately), has no coordinated
+ * partners (`coordinatedWith: []` — e.g. a self-paired or unpaired store),
+ * or when a named partner can't be resolved (unknown name, or no char item
+ * at that index — a shorter/non-char partner store slot).
  */
-function storeFeedsConfirmedChar(storeName: string, ir: KeyboardIR, confirmedInventory: ReadonlySet<string>): boolean {
-  for (const group of ir.groups) {
-    for (const rule of group.rules) {
-      if (!storeRefsOf(rule).some((r) => r.storeName === storeName)) continue;
-      const { chars, unresolved } = producedCharsOfRuleOutput(rule.output, ir);
-      if (unresolved) return true;
-      for (const ch of chars) {
-        if (confirmedInventory.has(ch)) return true;
-      }
+function resolveCoordinatedPartnerItems(
+  mode: StoreSlotEditMode,
+  itemsIndex: number,
+  storesByName: ReadonlyMap<string, IRStore>,
+): CoordinatedPartnerItem[] {
+  if (mode.mode === 'blocked' || mode.coordinatedWith.length === 0) return [];
+
+  const results: CoordinatedPartnerItem[] = [];
+  for (const partnerName of mode.coordinatedWith) {
+    const partnerStore = storesByName.get(partnerName);
+    if (partnerStore === undefined) continue;
+    const item = partnerStore.items[itemsIndex];
+    if (item === undefined || item.kind !== 'char') continue;
+    results.push({ partnerStore, item, slotId: `${partnerStore.nodeId}#${itemsIndex}` });
+  }
+  return results;
+}
+
+/**
+ * Coordinated-removal collateral guard ("remove everywhere", #525 v2) —
+ * replaces the old store-LEVEL `storeFeedsConfirmedChar` shield, which
+ * conflated "some rule referencing this store produces a needed char
+ * SOMEWHERE" (store-level, and — via the Cameroon `word` idiom, where a
+ * self-referencing index() output resolves back to the WHOLE store's own
+ * items — trivially true for almost every store) with the actual question
+ * that matters for a specific slot: "would dropping THIS item, via
+ * applyStoreSlotRemovals' coordinated pairing graph, also drop a needed
+ * character from a PAIRED store at the same position?"
+ *
+ * `classifyStoreSlotEdit`'s `coordinatedWith` names the store(s) that a drop
+ * on `store` splices at the SAME `itemsIndex` (see applyStoreSlotRemovals).
+ * A self-paired or unpaired store (`coordinatedWith: []` — e.g. Cameroon's
+ * `word`, self-paired with itself in the SAME rule) has no partner, so it can
+ * never trip this guard: removing one of its own surplus chars never touches
+ * another store's item. A blocked store is not this guard's concern — the
+ * caller already treats `mode.mode === 'blocked'` as "not simple" separately.
+ *
+ * Takes an already-classified `mode` (see resolveCoordinatedPartnerItems)
+ * rather than (store, ir, analysis) — callers looping over itemsIndex for
+ * the same store hoist classifyStoreSlotEdit once outside the loop.
+ */
+function coordinatedDropHitsNeededChar(
+  mode: StoreSlotEditMode,
+  itemsIndex: number,
+  needed: ReadonlySet<string>,
+  bcp47: string | null | undefined,
+  storesByName: ReadonlyMap<string, IRStore>,
+): boolean {
+  const partners = resolveCoordinatedPartnerItems(mode, itemsIndex, storesByName);
+  return partners.some(({ item }) =>
+    isCharCoveredForLocale(item.value.normalize('NFC'), needed, bcp47 ?? ''),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// coordinatedCollateralForSlots — manual-carve safety helper (#525/#931
+// follow-up, MANUAL-carve gap).
+//
+// collectCharContributors names the store slots a manual chip/cascade click
+// targets DIRECTLY. applyStoreSlotRemovals' coordinated-drop pairing graph
+// (classifyStoreSlotEdit's `coordinatedWith`) then ALSO splices every PAIRED
+// partner store at the SAME itemsIndex — e.g. removing an input char from a
+// deadkey INPUT store silently drops the aligned composed character from the
+// OUTPUT store too. That collateral is otherwise invisible to the confirm
+// dialog. This pass resolves it explicitly for display: for every slot that
+// will actually be dropped (mode 'drop'), it names each coordinated
+// partner's character at the same index, flagging whether it's a needed
+// character (isNeeded) — reusing resolveCoordinatedPartnerItems, the exact
+// same walk coordinatedDropHitsNeededChar above uses for the
+// recommendation-signal guard, never a separate heuristic. Does NOT change
+// or re-derive the engine's coordinated-drop algorithm itself — purely a
+// read-only projection of what applyStoreSlotRemovals will do.
+// ---------------------------------------------------------------------------
+
+/** One character collaterally dropped from a PAIRED store by a coordinated removal. */
+export interface CoordinatedCollateralChar {
+  ch: string;
+  storeName: string;
+  isNeeded: boolean;
+  /**
+   * "<partnerStore.nodeId>#<itemsIndex>" — the locked slot-id contract (same
+   * convention as CharContributors.storeSlotIds / StoreCharChip.chipId).
+   * Lets a caller (e.g. CarveGallery's handleCascadePrimary) fold this
+   * partner slot into cascadeDelete's storeSlotIds argument so a confirmed
+   * "remove everywhere" persists the collateral drop in deletedItemIds —
+   * without this, the Gallery kept showing the collateral char as KEPT even
+   * though export-time applyStoreSlotRemovals had already dropped it.
+   */
+  slotId: string;
+}
+
+/**
+ * Resolve the coordinated-drop collateral for a set of store-slot ids about
+ * to be removed (typically `CharContributors.storeSlotIds` from
+ * collectCharContributors). A partner slot already present in `storeSlotIds`
+ * itself (i.e. already an explicit removal target, not a hidden surprise) is
+ * excluded — this surfaces only the collateral the author did NOT already
+ * ask to remove. Deduped by partner slot id (a partner can only be hit once
+ * per index, but two different requested slots could in principle name the
+ * same partner+index).
+ *
+ * @param storeSlotIds Slot ids ("<storeNodeId>#<itemsIndex>") targeted for removal.
+ * @param ir           The full IR.
+ * @param needed       Confirmed-inventory ∪ CLDR needed-set — the same union the
+ *                      caller already threads into annotateRemovalRecommendations /
+ *                      recommendedRemovalChars.
+ * @param bcp47        Target language, for the Turkic-aware case fold in isCharCoveredForLocale.
+ * @param analysis     Optional precomputed analyzeStores(ir) result (see StoreAnalysis doc) —
+ *                      pass this when calling for many removals against the same ir.
+ */
+export function coordinatedCollateralForSlots(
+  storeSlotIds: readonly string[],
+  ir: KeyboardIR,
+  needed: ReadonlySet<string>,
+  bcp47?: string | null,
+  analysis: StoreAnalysis = analyzeStores(ir),
+): CoordinatedCollateralChar[] {
+  if (storeSlotIds.length === 0) return [];
+
+  // storesByNodeId resolves the TARGETED slot's own store (keyed by nodeId,
+  // as parseSlotId yields) — not carried by StoreAnalysis, which keys by
+  // name. storesByName (partner-name resolution) IS carried by StoreAnalysis
+  // (analysis.storeByName), so it is reused rather than rebuilt (#931 perf).
+  const storesByNodeId = new Map(ir.stores.map((s) => [s.nodeId, s]));
+  const targetSlotIds = new Set(storeSlotIds);
+  const seenPartnerSlotIds = new Set<string>();
+  const collateral: CoordinatedCollateralChar[] = [];
+
+  for (const slotId of storeSlotIds) {
+    const parsed = parseSlotId(slotId);
+    if (parsed === null) continue;
+    const store = storesByNodeId.get(parsed.storeNodeId);
+    if (store === undefined) continue;
+
+    const mode = classifyStoreSlotEdit(store, ir, analysis);
+    const partners = resolveCoordinatedPartnerItems(mode, parsed.itemsIndex, analysis.storeByName);
+
+    for (const { partnerStore, item, slotId: partnerSlotId } of partners) {
+      if (targetSlotIds.has(partnerSlotId) || seenPartnerSlotIds.has(partnerSlotId)) continue;
+
+      seenPartnerSlotIds.add(partnerSlotId);
+      const ch = item.value.normalize('NFC');
+      collateral.push({
+        ch,
+        storeName: partnerStore.name,
+        isNeeded: isCharCoveredForLocale(ch, needed, bcp47 ?? ''),
+        slotId: partnerSlotId,
+      });
     }
   }
-  return false;
+
+  return collateral;
 }
 
 /**
@@ -1519,6 +1642,13 @@ export function annotateRemovalRecommendations(
   // as closely as possible when the target language hasn't resolved yet.
   const isNeeded = (ch: string): boolean => isCharCoveredForLocale(ch, needed, bcp47 ?? '');
 
+  // Precomputed ONCE per IR (not per store node) — classifyStoreSlotEdit scans
+  // every rule in the IR, mirroring recommendedRemovalChars' perf note below.
+  // storesByName is NOT rebuilt here — analysis.storeByName already carries
+  // an identical name-keyed map (#931 perf).
+  const analysis = analyzeStores(ir);
+  const storesByNodeId = new Map(ir.stores.map((s) => [s.nodeId, s]));
+
   return nodes.map((node) => {
     if (isStructuralExclusion(node, ir, ownedNodeIds)) return { ...node, recommendation: 'none' };
 
@@ -1529,8 +1659,19 @@ export function annotateRemovalRecommendations(
       if (isNeeded(ch) || isAlwaysKeepCategory(ch)) return { ...node, recommendation: 'none' };
     }
 
-    if (node.kind === 'store' && storeFeedsConfirmedChar(node.name, ir, needed)) {
-      return { ...node, recommendation: 'none' };
+    if (node.kind === 'store') {
+      const store = storesByNodeId.get(node.nodeId);
+      if (store !== undefined) {
+        // classifyStoreSlotEdit is index-INDEPENDENT (it classifies the whole
+        // store, not a single slot) — hoisted out of the itemsIndex loop below
+        // so it runs ONCE per store instead of once per item (#931 perf).
+        const mode = classifyStoreSlotEdit(store, ir, analysis);
+        for (let i = 0; i < store.items.length; i++) {
+          if (coordinatedDropHitsNeededChar(mode, i, needed, bcp47, analysis.storeByName)) {
+            return { ...node, recommendation: 'none' };
+          }
+        }
+      }
     }
 
     // TODO(#525): fold in the Unicode-block signal here (a node whose produced
@@ -1641,9 +1782,20 @@ export interface RecommendedRemovalChar {
  *          real store whose classifyStoreSlotEdit mode is 'drop' — never
  *          'blocked' (notany-widens/context-index-aligned/system-store/
  *          unresolved-index-pairing/outs-reference-unanalyzed).
- *   3. Dependency guard — no store `ch` is produced through also feeds a
- *      needed character elsewhere (storeFeedsConfirmedChar, reused unchanged
- *      from the node-level pass above).
+ *   3. Coordinated-removal collateral guard ("remove everywhere", #525 v2) —
+ *      for each contributing store slot `store#i`, resolving
+ *      `classifyStoreSlotEdit`'s `coordinatedWith` partners and checking
+ *      whether any partner store's item AT THE SAME INDEX `i` is itself a
+ *      needed character (`coordinatedDropHitsNeededChar`, shared with the
+ *      node-level pass above). A self-paired or unpaired store
+ *      (`coordinatedWith: []`) has no partner and can never shield on this
+ *      account — this is deliberately narrower than the old store-level
+ *      `storeFeedsConfirmedChar` shield it replaces, which treated "some
+ *      rule referencing this store produces ANY needed char anywhere" as
+ *      grounds to shield EVERY character the store contributes to (the
+ *      Cameroon `word`-store over-coarse-guard bug — `word` self-feeds the
+ *      whole Latin alphabet AND a needed Greek letter, so the old guard
+ *      shielded every Latin letter).
  *
  * Returns [] when `needed` is empty — no signal at all yet (mirrors
  * annotateRemovalRecommendations's "no default is a defect until we're
@@ -1692,12 +1844,18 @@ export function recommendedRemovalChars(args: {
     let dependsOnNeeded = false;
     if (allSimple) {
       for (const slotId of contributors.storeSlotIds) {
-        const storeNodeId = slotId.slice(0, slotId.lastIndexOf('#'));
-        const store = storesById.get(storeNodeId);
+        const parsed = parseSlotId(slotId);
+        if (parsed === null) { allSimple = false; break; }
+        const store = storesById.get(parsed.storeNodeId);
         if (store === undefined) { allSimple = false; break; }
         const mode = classifyStoreSlotEdit(store, ir, analysis);
         if (mode.mode === 'blocked') { allSimple = false; break; }
-        if (storeFeedsConfirmedChar(store.name, ir, needed)) { dependsOnNeeded = true; break; }
+        // Reuses the `mode` just computed above — coordinatedDropHitsNeededChar
+        // takes an already-classified mode rather than re-deriving it (#931 perf).
+        if (coordinatedDropHitsNeededChar(mode, parsed.itemsIndex, needed, bcp47, analysis.storeByName)) {
+          dependsOnNeeded = true;
+          break;
+        }
       }
     }
 
