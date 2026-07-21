@@ -85,6 +85,7 @@ import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
   galleryPageStyle as pageStyle,
   galleryGhostBtn as ghostBtn,
+  gallerySelectStyle as selectStyle,
 } from "../../lib/galleryTheme.ts";
 
 // ---------------------------------------------------------------------------
@@ -124,15 +125,6 @@ function touchMechanismLabel(target: string, m: MechanismRef): string {
   return target;
 }
 
-const selectStyle: CSSProperties = {
-  background: BG_PAGE,
-  border: `1px solid ${BORDER}`,
-  borderRadius: 4,
-  color: TEXT_MAIN,
-  fontSize: 12,
-  padding: "4px 8px",
-  fontFamily: FONT,
-};
 
 // Static styles shared across TouchMethodChooser renders — none depend on
 // props or state, so they are hoisted to module scope rather than recreated
