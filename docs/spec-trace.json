@@ -634,6 +634,14 @@
       "implements": [],
       "decisions": [],
       "notes": ""
+    },
+    "docs/lens-model.md": {
+      "title": "How the four analytic lenses compose",
+      "hash": "sha256:71d55e64ebebad72",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
     }
   }
 }
