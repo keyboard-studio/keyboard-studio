@@ -126,21 +126,55 @@ function readBytes(corpusRoot: string, relPath: string): Buffer | null {
 }
 
 /**
- * Resolve the git SHA of the corpus checkout for provenance (FR-005). Returns
- * `keymanapp/keyboards@<sha>` or `@unknown` when the SHA can't be determined.
- * Mirrors supportability-scanner's provenance helper.
+ * Normalize a git remote URL (SSH or HTTPS github.com form) to an
+ * `<org>/<repo>` label. Returns null if the URL doesn't match a recognized
+ * github.com remote shape. Mirrors supportability-scanner's normalizer.
  */
-function resolveCorpusCommit(corpusRoot: string): string {
+export function normalizeGithubRemote(remoteUrl: string): string | null {
+  const trimmed = remoteUrl.trim();
+  // https://github.com/<org>/<repo>(.git)
+  let m = /^(?:https?:\/\/)?github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(trimmed);
+  if (m) return `${m[1]}/${m[2]}`;
+  // git@github.com:<org>/<repo>(.git)
+  m = /^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(trimmed);
+  if (m) return `${m[1]}/${m[2]}`;
+  return null;
+}
+
+/**
+ * Resolve the git SHA and org/repo label of the corpus checkout for
+ * provenance (FR-005). The label is derived from the checkout's actual
+ * `origin` remote (not hardcoded) so the field reflects whichever corpus
+ * fork was actually scanned. Returns `<org>/<repo>@<sha>`, falling back to
+ * `unknown/unknown@<sha>` when the remote can't be resolved/normalized, and
+ * to `@unknown` when the SHA itself can't be determined. Mirrors
+ * supportability-scanner's provenance helper.
+ */
+export function resolveCorpusCommit(corpusRoot: string): string {
+  let sha = "";
   try {
-    const sha = execSync("git rev-parse HEAD", {
+    sha = execSync("git rev-parse HEAD", {
       cwd: corpusRoot,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
-    return sha ? `keymanapp/keyboards@${sha}` : "keymanapp/keyboards@unknown";
   } catch {
-    return "keymanapp/keyboards@unknown";
+    sha = "";
   }
+
+  let label = "unknown/unknown";
+  try {
+    const remoteUrl = execSync("git remote get-url origin", {
+      cwd: corpusRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    label = normalizeGithubRemote(remoteUrl) ?? "unknown/unknown";
+  } catch {
+    label = "unknown/unknown";
+  }
+
+  return `${label}@${sha || "unknown"}`;
 }
 
 /**
