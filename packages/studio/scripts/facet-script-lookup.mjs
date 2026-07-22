@@ -11,7 +11,8 @@
 // Resolution order per keyboard:
 //   1. facet index `script` facet value (content-derived, e.g. "Arab"),
 //   2. first four-letter script subtag among the .kps declared BCP47 tags
-//      (declared metadata — same derivation as the engine's kps-parser),
+//      (declared metadata — see scriptFromDeclaredTags for how this relates
+//      to the engine's kps-parser derivation),
 //   3. "Latn" (the corpus-dominant default, matching kps-parser's default).
 
 import * as fs from "node:fs";
@@ -52,8 +53,19 @@ export function loadFacetScripts(facetIndexPath) {
 
 /**
  * Derive the script from a keyboard's declared BCP47 tags: the four-letter
- * script subtag of the first tag that carries one, normalised to Title case
- * (mirrors the engine's kps-parser derivation). Null when no tag declares one.
+ * script subtag of the first tag that carries one, normalised to Title case.
+ * Null when no tag declares one.
+ *
+ * Deliberately a local copy, NOT an import of the engine's
+ * `extractScriptSubtag` (packages/engine/src/base-browser/kps-parser.ts):
+ * this file is consumed by the plain-node postbuild script, which cannot
+ * import engine TS sources, and the two implementations intentionally
+ * diverge — the engine scans ALL subtags, while this one skips the primary
+ * language subtag (`.slice(1)`), so a bare 4-letter tag such as "aiku" is
+ * not mistaken for a script (pinned by tests/facetScriptLookup.test.ts).
+ * The divergence is unobservable on real tags: assigned BCP47 primary
+ * language subtags are 2-3 or 5-8 letters (4-letter primaries are reserved
+ * and unassigned), so both derivations agree on every well-formed .kps tag.
  *
  * @param {readonly string[]} languages Declared BCP47 tags from the .kps.
  * @returns {string | null}

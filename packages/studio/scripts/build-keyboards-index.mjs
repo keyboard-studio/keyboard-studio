@@ -34,6 +34,13 @@ const REPO_BRANCH = process.env["KEYBOARDS_REPO_BRANCH"] ?? "master";
 const OUT_DIR = path.join(STUDIO_DIR, "dist", "local-kbd-api");
 const OUT_FILE = path.join(OUT_DIR, "list");
 
+// Mirrors DEFAULT_FACET_INDEX_PATH in vite-plugins/localKeyboards.ts.
+const FACET_INDEX_PATH = path.join(
+  REPO_ROOT,
+  "docs",
+  "keyboard-facet-index.json",
+);
+
 const STORE_NAME_RE = /^\s*store\s*\(\s*&NAME\s*\)\s*'([^']*)'/im;
 const STORE_VERSION_RE = /^\s*store\s*\(\s*&VERSION\s*\)\s*'([^']*)'/im;
 const KPS_LANGUAGE_ID_RE = /<Language\s+ID="([^"]+)"/g;
@@ -128,14 +135,9 @@ function parseKmnMetadata(kmnPath) {
   }
 }
 
-function scan(keyboardsRepoRoot, sourceRepoSlug) {
+function scan(keyboardsRepoRoot, sourceRepoSlug, facetIndexPath) {
   const releaseDir = path.join(keyboardsRepoRoot, "release");
   if (!fs.existsSync(releaseDir)) return [];
-  const facetIndexPath = path.join(
-    REPO_ROOT,
-    "docs",
-    "keyboard-facet-index.json",
-  );
   const facetScripts = loadFacetScripts(facetIndexPath);
   if (facetScripts.size === 0) {
     log(
@@ -203,7 +205,7 @@ function main() {
   }
   const repoDir = resolveRepoDir();
   const slug = repoSlugFromUrl(REPO_URL);
-  const catalog = scan(repoDir, slug);
+  const catalog = scan(repoDir, slug, FACET_INDEX_PATH);
   fs.mkdirSync(OUT_DIR, { recursive: true });
   fs.writeFileSync(OUT_FILE, JSON.stringify(catalog), "utf8");
   log(
