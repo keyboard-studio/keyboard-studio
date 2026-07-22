@@ -10,7 +10,8 @@
 //   - useWorkingCopyStore is seeded directly before each test that needs a baseIr.
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
+import { screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { PhaseB, parseSpacedChars } from "./PhaseB.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";

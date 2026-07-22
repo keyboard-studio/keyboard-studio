@@ -3,6 +3,7 @@
 // and calls onChange when the user modifies it.
 
 import { useState, useEffect, useRef } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { FlowQuestion } from "./types.ts";
 import type { LintFinding, LanguageSummary } from "@keyboard-studio/contracts";
 import { LintChip } from "../lint/LintChip.tsx";
@@ -91,6 +92,7 @@ function TextFieldControl({ question, value, onChange }: FieldProps) {
 // ---------------------------------------------------------------------------
 
 function AutocompleteField({ question, value, onChange, onEntryResolved, onSelectAdvance }: FieldProps) {
+  const { t } = useLingui();
   // `@langtags_names` (spec 030 US1): the English-name-first picker. It shows
   // the language NAME in the field and reports the resolved entry via
   // onEntryResolved so homonyms (same name, different code) can be told apart.
@@ -101,7 +103,10 @@ function AutocompleteField({ question, value, onChange, onEntryResolved, onSelec
         value={value}
         onChange={onChange}
         valueMode="name"
-        placeholder="Type your language name in English…"
+        placeholder={t({
+          id: "survey.questionField.autocomplete.namePlaceholder",
+          message: "Type your language name in English…",
+        })}
         {...(onEntryResolved !== undefined ? { onEntryResolved } : {})}
         {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
       />
@@ -132,7 +137,10 @@ function AutocompleteField({ question, value, onChange, onEntryResolved, onSelec
         value={value}
         onChange={onChange}
         valueMode="code"
-        placeholder="Search by name, autonym, or code…"
+        placeholder={t({
+          id: "survey.questionField.autocomplete.codePlaceholder",
+          message: "Search by name, autonym, or code…",
+        })}
         {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
       />
     );
@@ -262,6 +270,7 @@ function LangtagsComboboxField({
   valueMode,
   placeholder,
 }: FieldProps & LangtagsComboboxExtras) {
+  const { t } = useLingui();
   const strVal = stringValue(value);
   const [options, setOptions] = useState<LanguageSummary[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -413,7 +422,7 @@ function LangtagsComboboxField({
       id={question.id}
       value={strVal}
       options={comboOptions}
-      placeholder={loaded ? placeholder : "Loading languages…"}
+      placeholder={loaded ? placeholder : t({ id: "survey.questionField.langtagsCombobox.loading", message: "Loading languages…" })}
       required={question.required === true}
       onType={handleType}
       onSelect={handleSelect}
@@ -682,7 +691,9 @@ function MultiSelectField({ question, value, onChange }: FieldProps) {
   if (options.length === 0 && question.options_source !== undefined) {
     return (
       <p style={{ fontSize: 13, color: TEXT_DIM, fontStyle: "italic" }}>
-        Dynamic options ({question.options_source}) not loaded in this build.
+        <Trans id="survey.questionField.multiSelect.dynamicOptionsNotLoaded">
+          Dynamic options ({question.options_source}) not loaded in this build.
+        </Trans>
       </p>
     );
   }

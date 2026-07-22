@@ -5,6 +5,8 @@
 // confirmations (spec §5, §9). Language and script are decoupled. refs #369.
 
 import { useMemo, useRef, useCallback } from "react";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { SurveyPhaseResult, LintFinding, LangtagsProvenance, LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { loadModularFlow } from "./loadModularFlow.ts";
@@ -28,12 +30,12 @@ import identityLiteRaw from "../../../../content/flows/identity_lite.modular.yam
 // ends on the "not supported" notice and the slice should not proceed.
 const UNSUPPORTED_SCRIPTS = new Set(["Ethi", "Hani", "Hang"]);
 
-// Shared caption for every langtags-derived seed (spec 030 FR-010). Frozen: it
-// is stored by reference into provenanceRef at multiple sites, so an in-place
-// mutation would silently corrupt every other seeded field's caption.
-const LANGTAGS_PROVENANCE: LangtagsProvenance = Object.freeze({
-  source: "langtags",
-  caption: "Suggested from langtags — edit if needed",
+// Shared caption descriptor for every langtags-derived seed (spec 030
+// FR-010). Resolved to a plain string (via i18nRef, below) at each seeding
+// site rather than frozen once — the resolved text must track the active locale.
+const LANGTAGS_CAPTION = msg({
+  id: "survey.identityLite.langtagsCaption",
+  message: "Suggested from langtags — edit if needed",
 });
 
 /** Typed result of the identity-lite step. */
@@ -209,6 +211,17 @@ export function IdentityLite({
   findingsByQuestionId,
   resume,
 }: IdentityLiteProps) {
+  const { t, i18n } = useLingui();
+  // Mirrors the latest `i18n` for seedFromEntry/handleAnswerCommit below (deps
+  // `[]`, unchanged — same ref-mirroring idiom this file already uses for
+  // props/state, e.g. q1EnglishRef), so a locale switch is picked up without
+  // changing when those callbacks re-fire. `i18n.t(descriptor)` (a plain method
+  // call on the real i18n instance) is safe to read via ref — unlike the macro
+  // `t` below, it does no compile-time extraction of its own; the extraction
+  // already happened at LANGTAGS_CAPTION's `msg({...})` call site.
+  const i18nRef = useRef(i18n);
+  i18nRef.current = i18n;
+
   const flow = useMemo(() => loadModularFlow(identityLiteRaw as string), []);
 
   const resumeAnswers = useMemo(
@@ -292,11 +305,15 @@ export function IdentityLite({
         ? defaults.englishNames
         : undefined;
 
+    const langtagsProvenance: LangtagsProvenance = {
+      source: "langtags",
+      caption: i18nRef.current.t(LANGTAGS_CAPTION),
+    };
     const provenance = new Map<string, LangtagsProvenance>();
-    if (scriptSeedRef.current !== undefined) provenance.set("il_target_script", LANGTAGS_PROVENANCE);
-    if (codeSeedRef.current !== undefined) provenance.set("il_language_code", LANGTAGS_PROVENANCE);
+    if (scriptSeedRef.current !== undefined) provenance.set("il_target_script", langtagsProvenance);
+    if (codeSeedRef.current !== undefined) provenance.set("il_language_code", langtagsProvenance);
     // The autonym default is a langtags value only when an own-script name exists.
-    if (localNamesSeedRef.current !== undefined) provenance.set("il_language_autonym", LANGTAGS_PROVENANCE);
+    if (localNamesSeedRef.current !== undefined) provenance.set("il_language_autonym", langtagsProvenance);
     provenanceRef.current = provenance;
   }, []);
 
@@ -381,14 +398,18 @@ export function IdentityLite({
           // Keep provenance in step with the reseeded fields (FR-010): the autonym
           // default is a langtags value only when the variant has an own-script
           // name; il_language_code is untouched (region variants share the subtag).
+          const langtagsProvenance: LangtagsProvenance = {
+            source: "langtags",
+            caption: i18nRef.current.t(LANGTAGS_CAPTION),
+          };
           const nextProvenance = new Map(provenanceRef.current);
           if (scriptSeedRef.current !== undefined) {
-            nextProvenance.set("il_target_script", LANGTAGS_PROVENANCE);
+            nextProvenance.set("il_target_script", langtagsProvenance);
           } else {
             nextProvenance.delete("il_target_script");
           }
           if (localNamesSeedRef.current !== undefined) {
-            nextProvenance.set("il_language_autonym", LANGTAGS_PROVENANCE);
+            nextProvenance.set("il_language_autonym", langtagsProvenance);
           } else {
             nextProvenance.delete("il_language_autonym");
           }
@@ -498,13 +519,28 @@ export function IdentityLite({
           seen.add(c);
           opts.push({ value: c, label });
         };
-        add(d.iso639_3, `${d.iso639_3 ?? ""} — ISO 639-3`);
-        add(d.code, `${d.code} — BCP 47 language subtag`);
+        add(
+          d.iso639_3,
+          t({
+            id: "survey.identityLite.codeOption.iso6393",
+            message: `${{ code: d.iso639_3 ?? "" }} — ISO 639-3`,
+          }),
+        );
+        add(
+          d.code,
+          t({
+            id: "survey.identityLite.codeOption.bcp47",
+            message: `${{ code: d.code }} — BCP 47 language subtag`,
+          }),
+        );
         return opts.length > 0 ? opts : undefined;
       }
       return undefined;
     },
-    [],
+    // `t` closes over the live useLingui() binding directly (required for the
+    // lingui macro extractor to track this call site — see the note above
+    // seedFromEntry's i18nRef usage) so it must be a dependency here.
+    [t],
   );
 
   // Route il_language_english -> il_language_region only when the picked language
@@ -545,7 +581,7 @@ export function IdentityLite({
           fontWeight: 600,
         }}
       >
-        Let's identify your language
+        <Trans id="survey.identityLite.heading">Let's identify your language</Trans>
       </h2>
       <SurveyRunner
         key={flow.flow_id}

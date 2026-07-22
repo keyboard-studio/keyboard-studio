@@ -12,6 +12,7 @@
 //     Full boolean DSL is out of scope — these cover the actual YAML content.
 
 import { useState, useId, useMemo, useRef, useEffect } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { FlowDef, FlowQuestion, FlowOption, FlowGotoRule, SurveyContext, AnswerStackEntry } from "./types.ts";
 import type { SurveyAnswer, SurveyPhaseResult, LintFinding, LangtagsProvenance, LanguageSummary } from "@keyboard-studio/contracts";
 import { QuestionField } from "./QuestionField.tsx";
@@ -328,6 +329,7 @@ export function SurveyRunner({
   contentMinHeight,
   resumeAnswers,
 }: SurveyRunnerProps) {
+  const { t } = useLingui();
   // Single gate for all debug-mode behaviour — evaluated once per render so all
   // branches are driven by the same boolean, not scattered checks.
   const debugEnabled = debugPinsStore.isDebugEnabled();
@@ -417,7 +419,7 @@ export function SurveyRunner({
           fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
         }}
       >
-        Survey complete.
+        <Trans id="survey.surveyRunner.complete">Survey complete.</Trans>
       </div>
     );
   }
@@ -565,7 +567,7 @@ export function SurveyRunner({
   return (
     <div
       role="form"
-      aria-label={`Survey phase ${flow.phase}`}
+      aria-label={t({ id: "survey.surveyRunner.formAriaLabel", message: `Survey phase ${{ phase: flow.phase }}` })}
       onKeyDown={handleContainerKeyDown}
       style={{
         display: "flex",
@@ -578,7 +580,10 @@ export function SurveyRunner({
       {/* Progress indicator */}
       <div
         id={progressDescId}
-        aria-label={`Step ${stepNum} of approximately ${approxTotal}`}
+        aria-label={t({
+          id: "survey.surveyRunner.progressAriaLabel",
+          message: `Step ${{ stepNum }} of approximately ${{ approxTotal }}`,
+        })}
         style={{
           fontSize: 12,
           color: "#8b949e",
@@ -587,7 +592,7 @@ export function SurveyRunner({
           gap: 8,
         }}
       >
-        <span>Step {stepNum} of ~{approxTotal}</span>
+        <span><Trans id="survey.surveyRunner.progressLabel">Step {stepNum} of ~{approxTotal}</Trans></span>
         <div
           aria-hidden="true"
           style={{
@@ -629,8 +634,14 @@ export function SurveyRunner({
               aria-pressed={pinned}
               aria-label={
                 pinned
-                  ? `Unpin default answer for question ${currentQId}`
-                  : `Pin current answer as default for question ${currentQId}`
+                  ? t({
+                      id: "survey.surveyRunner.debugPin.unpinAriaLabel",
+                      message: `Unpin default answer for question ${{ currentQId }}`,
+                    })
+                  : t({
+                      id: "survey.surveyRunner.debugPin.pinAriaLabel",
+                      message: `Pin current answer as default for question ${{ currentQId }}`,
+                    })
               }
               onClick={() => {
                 if (debugPinsStore.isPinned(currentQId)) {
@@ -653,7 +664,11 @@ export function SurveyRunner({
                 userSelect: "none",
               }}
             >
-              {pinned ? "[PIN] Pinned" : "[+] Pin this answer"}
+              {pinned ? (
+                <Trans id="survey.surveyRunner.debugPin.pinnedLabel">[PIN] Pinned</Trans>
+              ) : (
+                <Trans id="survey.surveyRunner.debugPin.pinLabel">[+] Pin this answer</Trans>
+              )}
             </button>
           </div>
         );
@@ -714,7 +729,7 @@ export function SurveyRunner({
             className="ks-focus-ring ks-hit-target"
             style={secondaryButton}
           >
-            Back
+            <Trans id="survey.surveyRunner.backButton">Back</Trans>
           </button>
         )}
         <button
@@ -726,7 +741,11 @@ export function SurveyRunner({
           className="ks-focus-ring ks-hit-target"
           style={{ ...primaryButton(!canAdvance), transition: "background 120ms ease" }}
         >
-          {isLastQuestion ? "Finish" : "Next"}
+          {isLastQuestion ? (
+            <Trans id="survey.surveyRunner.finishButton">Finish</Trans>
+          ) : (
+            <Trans id="survey.surveyRunner.nextButton">Next</Trans>
+          )}
         </button>
       </div>
     </div>
