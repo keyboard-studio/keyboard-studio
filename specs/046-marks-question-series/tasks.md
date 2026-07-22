@@ -230,9 +230,9 @@ The contract types, the decomposition helper, the shared posture table, and the 
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T034** [P] Retire the five superseded questions — `pb_accent_marks_gate`, `pb_diacritic_select`, `pb_mark_style`, `pb_capitals_marks`, `pb_stacking_marks` — from the registry and the flow YAML, retarget the surrounding `next` routing, update the flow-parity snapshot (FR-025 removal half) · `packages/studio/src/survey/questions/registry.b.ts`, `packages/studio/src/survey/questions/b/` (5 modules), `content/flows/phase_b_characters.modular.yaml`
-- [ ] **T035** [P] Digraph wording-parity pass: the digraph question stays outside the series (FR-026), with parallel wording where the "unit or sequence" distinction is the same — review and align prompt text only, no structural change · existing digraph question module under `packages/studio/src/survey/questions/`
-- [ ] **T036** [P] E2E: `driveMarksSeries(page, ...)` helper slotted between the characters helpers and `confirmMechanismsEmpty`, plus walk coverage of the skip path (US1) and the simple-confirm path (US2) using `seedReturningVisitor` · `packages/studio/e2e/helpers/surveyFlow.ts` + a walk spec under `packages/studio/e2e/`
+- [x] **T034** [P] Retire the five superseded questions — `pb_accent_marks_gate`, `pb_diacritic_select`, `pb_mark_style`, `pb_capitals_marks`, `pb_stacking_marks` — from the registry and the flow YAML, retarget the surrounding `next` routing, update the flow-parity snapshot (FR-025 removal half) · `packages/studio/src/survey/questions/registry.b.ts`, `packages/studio/src/survey/questions/b/` (5 modules), `content/flows/phase_b_characters.modular.yaml`
+- [x] **T035** [P] Digraph wording-parity pass: the digraph question stays outside the series (FR-026), with parallel wording where the "unit or sequence" distinction is the same — review and align prompt text only, no structural change · existing digraph question module under `packages/studio/src/survey/questions/`
+- [x] **T036** [P] E2E: `driveMarksSeries(page, ...)` helper slotted between the characters helpers and `confirmMechanismsEmpty`, plus walk coverage of the skip path (US1) and the simple-confirm path (US2) using `seedReturningVisitor` · `packages/studio/e2e/helpers/surveyFlow.ts` + a walk spec under `packages/studio/e2e/`
 
 **⟶ Wait for Wave 1 to finish, then:**
 

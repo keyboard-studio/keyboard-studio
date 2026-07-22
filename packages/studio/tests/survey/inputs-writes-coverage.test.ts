@@ -16,8 +16,11 @@ describe("inputs/writes coverage gate — every registered module declares both 
     expect(Object.keys(questionRegistry).length).toBeGreaterThan(0);
   });
 
-  it("registry has exactly 102 modules (floor guard — accidental deletions fail here)", () => {
-    expect(Object.keys(questionRegistry).length).toBe(102);
+  it("registry has exactly 97 modules (floor guard — accidental deletions fail here)", () => {
+    // 102 at spec-034 lock, minus the five marks questions RETIRED by spec 046
+    // (pb_accent_marks_gate, pb_diacritic_select, pb_stacking_marks,
+    // pb_mark_style, pb_capitals_marks — superseded by the marks series).
+    expect(Object.keys(questionRegistry).length).toBe(97);
   });
 
   for (const [id, mod] of Object.entries(questionRegistry)) {

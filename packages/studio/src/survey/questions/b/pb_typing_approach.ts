@@ -36,7 +36,8 @@ export const definition = {
     },
   ],
   next: [
-    { condition: "value == 'phonetic'", goto: "pb_mark_input_order" },
+    // spec 046: pb_mark_input_order relocated into the marks series (S3);
+    // the phonetic branch no longer detours through it here.
     { default: true, goto: "pb_special_letters" },
   ],
 } satisfies import("../../types.ts").FlowQuestion;

@@ -304,6 +304,29 @@ export async function buildOneCharacterList(
 }
 
 /**
+ * Marks series step (spec 046) — sits between carve and mechanisms.
+ *
+ * Its S0 gate is computed, never rendered: an alphabet with NO marks skips
+ * the whole series (no screen appears — this helper returns immediately).
+ * When the alphabet carries marks (e.g. buildOneCharacterList(page, "é")),
+ * stations S1-S5 render in sequence, everything prefilled propose-then-confirm;
+ * each click of data-testid="marks-continue" accepts the current station's
+ * proposal and advances, and the last one completes the step. The station
+ * count varies with the alphabet (at most 5, SC-006), so this loops rather
+ * than assuming a fixed count.
+ */
+export async function driveMarksSeries(page: Page): Promise<void> {
+  const continueBtn = page.getByTestId("marks-continue");
+  for (let i = 0; i < 6; i++) {
+    const visible = await continueBtn
+      .isVisible({ timeout: i === 0 ? 5_000 : 2_000 })
+      .catch(() => false);
+    if (!visible) return; // gate skipped the series, or it just completed
+    await continueBtn.click();
+  }
+}
+
+/**
  * Mechanisms step — handle the empty-diff exit when no new characters
  * remain after base-inventory comparison.
  *
@@ -313,6 +336,10 @@ export async function buildOneCharacterList(
  * to add." message appears with a "mechanisms-continue" button.
  */
 export async function confirmMechanismsEmpty(page: Page): Promise<void> {
+  // Defensive spec-046 pass-through: if the walk's alphabet implied marks,
+  // the marks series renders before the gallery — drive it first.
+  await driveMarksSeries(page);
+
   const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
   if (await startButton.isVisible().catch(() => false)) {
     await startButton.click();

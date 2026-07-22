@@ -17,11 +17,6 @@ import pbLinguistConfirmMod from "./b/pb_linguist_confirm.ts";
 import pbPickerConfirmMod from "./b/pb_picker_confirm.ts";
 import pbRoutingBranchMod from "./b/pb_routing_branch.ts";
 import pbStandardLettersMod from "./b/pb_standard_letters.ts";
-import pbAccentMarksGateMod from "./b/pb_accent_marks_gate.ts";
-import pbDiacriticSelectMod from "./b/pb_diacritic_select.ts";
-import pbStackingMarksMod from "./b/pb_stacking_marks.ts";
-import pbMarkStyleMod from "./b/pb_mark_style.ts";
-import pbCapitalsMarksMod from "./b/pb_capitals_marks.ts";
 import pbTypingApproachMod from "./b/pb_typing_approach.ts";
 import pbMarkInputOrderMod from "./b/pb_mark_input_order.ts";
 import pbSpecialLettersMod from "./b/pb_special_letters.ts";
@@ -78,11 +73,6 @@ export const phaseBRegistry: Readonly<Record<string, QuestionModule>> = {
   pb_picker_confirm: pbPickerConfirmMod,
   pb_routing_branch: pbRoutingBranchMod,
   pb_standard_letters: pbStandardLettersMod,
-  pb_accent_marks_gate: pbAccentMarksGateMod,
-  pb_diacritic_select: pbDiacriticSelectMod,
-  pb_stacking_marks: pbStackingMarksMod,
-  pb_mark_style: pbMarkStyleMod,
-  pb_capitals_marks: pbCapitalsMarksMod,
   pb_typing_approach: pbTypingApproachMod,
   pb_mark_input_order: pbMarkInputOrderMod,
   pb_special_letters: pbSpecialLettersMod,
@@ -93,6 +83,10 @@ export const phaseBRegistry: Readonly<Record<string, QuestionModule>> = {
   pb_punctuation_gate: pbPunctuationGateMod,
   pb_punctuation_list: pbPunctuationListMod,
   pb_digit_set: pbDigitSetMod,
+  // spec 046: pb_accent_marks_gate, pb_diacritic_select, pb_stacking_marks,
+  // pb_mark_style, pb_capitals_marks are RETIRED from active use (superseded by
+  // the marks question series); pb_mark_input_order is relocated as its S3
+  // station. Modules stay on disk (demotion, not deletion — spec 022 precedent).
   pb_char_count: pbCharCountMod,
   pb_latin_qwerty_branch: pbLatinQwertyBranchMod,
   pb_spare_keys_qwerty: pbSpareKeysQwertyMod,

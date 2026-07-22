@@ -8,6 +8,7 @@
 // when available. Rendered only when at least one mark-class was confirmed as
 // letter-plus-mark — attach order is meaningless without a productive mark key.
 
+import { definition as markInputOrderDefinition } from "../questions/b/pb_mark_input_order.ts";
 import { BORDER, TEXT_MAIN, mutedParaFlush, sectionHeading } from "../surveyStyles.ts";
 
 export type MarkInputOrder = "prefix" | "postfix";
@@ -19,32 +20,14 @@ export interface InputOrderStationProps {
   prefilledFromImport: boolean;
 }
 
-// Wording preserved from pb_mark_input_order (FR-025 preserve-and-relocate).
-const PROMPT =
-  "When typing a letter with a diacritic, does the typist expect to press the " +
-  "diacritic key before the letter, or type the letter first and then the diacritic?";
-
-const HELP_TEXT =
-  "For example: pressing the diacritic key first and then the letter (like " +
-  "pressing a key for an acute accent and then a to get a-with-acute, or " +
-  "pressing an underdot key before s to get s-with-underdot), or typing " +
-  "the letter first and then a suffix key (like typing a and then a special " +
-  "key to add the diacritic after). There is no wrong answer -- this depends " +
-  "on what feels natural to your community and what existing keyboards " +
-  "already do.";
-
-const OPTIONS: { value: MarkInputOrder; label: string }[] = [
-  {
-    value: "prefix",
-    label:
-      "Diacritic key first, then the letter (the diacritic key is pressed before the base letter)",
-  },
-  {
-    value: "postfix",
-    label:
-      "Letter first, then the diacritic key (type the base letter, then press a key to add the diacritic)",
-  },
-];
+// Content read from the RELOCATED module itself (FR-025: relocated, not
+// duplicated) — pb_mark_input_order stays on disk, unregistered from the
+// Phase B flow; this station is its new home.
+const PROMPT = markInputOrderDefinition.prompt;
+const HELP_TEXT = markInputOrderDefinition.help_text;
+const OPTIONS: { value: MarkInputOrder; label: string }[] = (
+  markInputOrderDefinition.options ?? []
+).map((o) => ({ value: o.value as MarkInputOrder, label: o.label }));
 
 export function InputOrderStation({ value, onChange, prefilledFromImport }: InputOrderStationProps) {
   return (

@@ -339,6 +339,30 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-22T02:20:55.040Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T02:47:51.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T02:47:51.932Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T02:47:52.174Z"
     }
   ],
   "telemetryInstanceId": "2fbeb931-cc8e-463b-9a7c-bfa4e0b7a804",
@@ -574,9 +598,13 @@
     {
       "note": "Merge with PR #1291 will produce small adjacent-hunk conflicts in CharacterMapPane.tsx (filteredGroups memo sits directly above the 046 describeContribution insert) and characterMap.ts (export keyword on isCombiningMarkChar sits in 1291 hunk context); both are trivial semantic no-ops to resolve",
       "step": "implement"
+    },
+    {
+      "note": "E2E walk specs updated for the marks series but NOT executed here: the global Playwright CLI is unavailable in this shell (only @playwright/mcp nested alpha). Run npx playwright test in the manual/CD e2e lane before release",
+      "step": "implement"
     }
   ],
-  "currentTask": "T033",
+  "currentTask": "T036",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -851,6 +879,36 @@
         "packages/studio/src/StudioShell.tsx",
         "packages/studio/src/stores/surveySessionStore.ts",
         "packages/studio/src/survey/marks/MarksSeriesStep.tsx"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Retired 5 marks questions from active use (flow YAML + registry.b.ts unregistered; modules/tests stay on disk per spec-022 demotion precedent); pb_mark_input_order relocated off-flow with orphan-lint exemption; pb_standard_letters/pb_typing_approach routing retargeted; registry floor 102->97; Phase B graph snapshot regenerated; posture facet asked-derivation dropped; 1887 tests green",
+      "files": [
+        "content/flows/phase_b_characters.modular.yaml",
+        "packages/studio/src/survey/questions/registry.b.ts",
+        "packages/studio/src/survey/questions/b/pb_standard_letters.ts",
+        "packages/studio/src/survey/questions/b/pb_typing_approach.ts",
+        "packages/studio/tests/survey/inputs-writes-coverage.test.ts",
+        "packages/studio/tests/survey/orphan-input-lint.test.ts",
+        "content/facets/orth/mark-composition-posture.yaml",
+        "packages/studio/src/survey/marks/InputOrderStation.tsx"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Digraph wording parity (FR-026): pb_latin_digraphs_gate help text aligned to 'its own letter of the alphabet' phrasing + parity comment pinning the parallel to MentalModelStation; structural change none",
+      "files": [
+        "packages/studio/src/survey/questions/b/pb_latin_digraphs_gate.ts"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "driveMarksSeries e2e helper (gate-skip tolerant, <=6 continues) slotted before confirmMechanismsEmpty + wired into touch-derivation us1/us2 (simple-confirm path via e); carve.spec covers the skip path via defensive pass-through; TS-syntax-verified (e2e lane runs in manual/CD step)",
+      "files": [
+        "packages/studio/e2e/helpers/surveyFlow.ts",
+        "packages/studio/e2e/touch-derivation-us1.spec.ts",
+        "packages/studio/e2e/touch-derivation-us2.spec.ts"
       ]
     }
   }
