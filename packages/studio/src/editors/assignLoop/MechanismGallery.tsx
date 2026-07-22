@@ -47,6 +47,7 @@ import type {
   Pattern,
   MechanismAssignment,
   PlacementMap,
+  PlacementWorklist,
 } from "@keyboard-studio/contracts";
 import { toUPlusNotation, isDecomposableAccented } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -1005,6 +1006,16 @@ export interface MechanismGalleryProps {
    * No kbgen data => no row; gallery behaves exactly as today.
    */
   placementMap?: PlacementMap;
+  /**
+   * Optional marks-series placement worklist (spec 046, FR-020 — the
+   * placementMap seam pattern). When supplied, composed units covered by a
+   * PRODUCTIVE mark key (a `markUnits` entry: base key + mark key reach them)
+   * are dropped from the walk — the mark itself is walked instead (it is in
+   * the inventory via the marks store). Own-letter units keep their whole-unit
+   * walk entries. Absent (or empty — a skipped series) ⇒ the existing flat
+   * `lettersToAdd` behavior, unchanged.
+   */
+  worklist?: PlacementWorklist;
 }
 
 export function MechanismGallery({
@@ -1012,6 +1023,7 @@ export function MechanismGallery({
   onComplete,
   onBack,
   placementMap,
+  worklist,
 }: MechanismGalleryProps) {
   const { t } = useLingui();
   const deadkeyBaseLetterResolveOptions = useMemo(
@@ -1037,7 +1049,25 @@ export function MechanismGallery({
   const mechIntroSeen = useWorkingCopyStore((s) => s.galleryIntrosSeen.mechanism);
   const markGalleryIntroSeen = useWorkingCopyStore((s) => s.markGalleryIntroSeen);
 
-  const { lettersToAdd } = useInventoryDiff();
+  const { lettersToAdd: inventoryLettersToAdd } = useInventoryDiff();
+
+  // Spec 046 worklist filter (FR-020): a composed unit whose marks are ALL
+  // productive mark keys is reachable via base key + mark key — it needs no
+  // whole-unit placement of its own, so it leaves the walk. Everything else
+  // (plain bases, own-letter units, the productive marks themselves) keeps its
+  // flat-inventory walk entry. No worklist (or an empty one) ⇒ identity.
+  const lettersToAdd = useMemo(() => {
+    if (worklist === undefined || worklist.markUnits.length === 0) {
+      return inventoryLettersToAdd;
+    }
+    const productiveMarks = new Set(worklist.markUnits.map((u) => u.mark));
+    return inventoryLettersToAdd.filter((c) => {
+      const units = [...c.normalize("NFD")];
+      if (units.length < 2) return true;
+      const marks = units.slice(1);
+      return !marks.every((m) => productiveMarks.has(m));
+    });
+  }, [inventoryLettersToAdd, worklist]);
 
   // Read Phase C assignments directly (not the merged session.assignments view)
   // so multiple methods per character are preserved.

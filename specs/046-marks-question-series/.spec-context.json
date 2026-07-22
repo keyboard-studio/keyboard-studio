@@ -259,6 +259,46 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-22T01:50:22.800Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:59:10.143Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:59:10.387Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:59:10.620Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:59:10.852Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:59:11.091Z"
     }
   ],
   "telemetryInstanceId": "2fbeb931-cc8e-463b-9a7c-bfa4e0b7a804",
@@ -496,7 +536,7 @@
       "step": "implement"
     }
   ],
-  "currentTask": "T023",
+  "currentTask": "T028",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -688,6 +728,44 @@
         "packages/engine/src/marks/worklist.ts",
         "packages/engine/src/marks/worklist-and-prefill.test.ts",
         "packages/engine/src/index.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "MentalModelStation S2: per-class radiogroup with suggested markers, unaffordable own-letter disabled with reason; trivially-single-pair classes take the prefill without a screen (classNeedsMentalModelScreen keeps SC-002)",
+      "files": [
+        "packages/studio/src/survey/marks/MentalModelStation.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "InputOrderStation S3: pb_mark_input_order prompt/help/options relocated verbatim, prefill from session.axes.markInputOrder (detectMarkInputOrderFromImport), rendered only with a letter-plus-mark class",
+      "files": [
+        "packages/studio/src/survey/marks/InputOrderStation.tsx"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "StackingStation S5: evidence-gated (attested multi-mark stack or overlapping reachable sets), yes/no + explicit attested-stack checkbox confirm (never inferred from rows)",
+      "files": [
+        "packages/studio/src/survey/marks/StackingStation.tsx"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Series completion assembles buildPlacementWorklist from all station answers, commits marksWorklist via phase result; FR-023 staleness = content-keyed re-seed + return to first station on alphabet edit; 2 full-walk tests (17 total in marks suite)",
+      "files": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "MechanismGallery worklist?: PlacementWorklist optional prop (placementMap seam): composed units covered by productive mark keys leave the walk, empty/absent = identity; AddPhysicalAdapter passes session.marksWorklist",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx",
+        "packages/studio/src/editors/adapters/addPhysicalAdapter.tsx"
       ]
     }
   }

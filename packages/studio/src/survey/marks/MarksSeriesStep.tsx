@@ -10,12 +10,22 @@
 // station that has nothing to decide is skipped, so the simple fully-attested
 // orthography confirms in at most two rendered screens (SC-002/SC-006).
 //
+// FR-023 (staleness): every derived input is keyed on the alphabet's CONTENT
+// (not object identity). An alphabet edit that changes the evidence re-seeds
+// the affected answers from fresh proposals and returns the designer to the
+// first station — the affected decisions must be reconfirmed before the
+// series can complete again.
+//
 // Editors are pure (Article IV / G2): this component reports completion via
 // onComplete with a SurveyPhaseResult carrying `marksWorklist`; the manifest
 // reducer path (StepHost.handleComplete → recordPhase) owns the session merge.
 
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
-import type { ConfirmedAlphabet, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type {
+  AttestedStack,
+  ConfirmedAlphabet,
+  SurveyPhaseResult,
+} from "@keyboard-studio/contracts";
 import { makeConfirmedAlphabet, makeEmptyPlacementWorklist } from "@keyboard-studio/contracts";
 import {
   groupMarkClasses,
@@ -24,15 +34,21 @@ import {
   nfcPostureOfInventory,
   resolveOutputFormProposal,
   hasDecidablePairs,
+  computeMentalModelPrefills,
+  buildPlacementWorklist,
   type AttachmentProposal,
   type MarkClass,
+  type MentalModelAnswer,
   type OutputForm,
 } from "@keyboard-studio/engine";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { AttachmentStation } from "./AttachmentStation.tsx";
+import { MentalModelStation } from "./MentalModelStation.tsx";
+import { InputOrderStation, type MarkInputOrder } from "./InputOrderStation.tsx";
 import { OutputFormStation } from "./OutputFormStation.tsx";
+import { StackingStation, stackKey } from "./StackingStation.tsx";
 import {
   ACCENT,
   TEXT_MAIN,
@@ -65,10 +81,7 @@ export function computeMarksGate(alphabet: ConfirmedAlphabet | undefined): Marks
 }
 
 // ---------------------------------------------------------------------------
-// Station sequencing — the pinned station ids, in series order. A station is
-// rendered only when its render condition holds; conditions for stations not
-// yet implemented resolve to false, keeping the walk completable throughout
-// the build-out.
+// Station sequencing — the pinned station ids, in series order.
 // ---------------------------------------------------------------------------
 
 export type MarksStationId =
@@ -94,6 +107,25 @@ export function initialAttachmentChecked(proposals: AttachmentProposal[]): Attac
   return out;
 }
 
+/**
+ * A class needs an on-screen S2 confirmation only when there is a genuine
+ * decision: more than one mark in the class, or any of its marks reaching
+ * more than one base (attested or plausible). A trivially single-pair class
+ * takes its recorded answer from the prefill without a screen (SC-002: the
+ * simple orthography stays at two screens).
+ */
+export function classNeedsMentalModelScreen(
+  markClass: MarkClass,
+  proposals: AttachmentProposal[],
+): boolean {
+  if (markClass.marks.length > 1) return true;
+  return markClass.marks.some((mark) => {
+    const proposal = proposals.find((p) => p.mark === mark);
+    if (proposal === undefined) return false;
+    return Object.values(proposal.states).filter((s) => s !== "blocked").length > 1;
+  });
+}
+
 /** The series' phase result: reported on completion (or on the S0 skip). */
 function seriesResult(worklist = makeEmptyPlacementWorklist()): SurveyPhaseResult {
   return { phase: "C", answers: [], marksWorklist: worklist };
@@ -101,8 +133,14 @@ function seriesResult(worklist = makeEmptyPlacementWorklist()): SurveyPhaseResul
 
 const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
   const session = useWorkingCopyStore((s) => s.session);
+  const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const surveyContext = useSurveySessionStore((s) => s.surveyContext);
-  const gate = useMemo(() => computeMarksGate(session.alphabet), [session.alphabet]);
+
+  // Content key: derived inputs re-compute only when the alphabet's CONTENT
+  // changes, not when the session object is recreated by an unrelated merge.
+  const alphabetKey = useMemo(() => JSON.stringify(session.alphabet ?? null), [session.alphabet]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const gate = useMemo(() => computeMarksGate(session.alphabet), [alphabetKey]);
 
   // Derived station inputs — all pure engine functions over the gate alphabet.
   const classes: MarkClass[] = useMemo(() => groupMarkClasses(gate.alphabet), [gate.alphabet]);
@@ -115,16 +153,13 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     [gate.alphabet, surveyContext.bcp47_tag],
   );
   const posture = useMemo(() => nfcPostureOfInventory(gate.alphabet), [gate.alphabet]);
-  // Mental-model outcome feeds the S4 policy; until the S2 station lands, no
-  // class is confirmed letter-plus-mark (the FR-015/FR-014 branches still fire
-  // correctly — FR-016's open case needs S2).
-  const hasLetterPlusMarkClass = false;
-  const outputFormProposal = useMemo(
-    () => resolveOutputFormProposal(posture, hasLetterPlusMarkClass),
-    [posture, hasLetterPlusMarkClass],
+  const mentalModelPrefills = useMemo(
+    () => computeMentalModelPrefills(gate.alphabet, classes, proposals, { baseIr }),
+    [gate.alphabet, classes, proposals, baseIr],
   );
 
-  // S1 answers — re-seeded whenever the proposals change (alphabet edited).
+  // --- answers (each re-seeded when its evidence changes — FR-023) ---
+
   const [attachmentChecked, setAttachmentChecked] = useState<AttachmentChecked>(() =>
     initialAttachmentChecked(proposals),
   );
@@ -132,34 +167,87 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     setAttachmentChecked(initialAttachmentChecked(proposals));
   }, [proposals]);
 
-  // S4 answer — seeded from the policy proposal, re-seeded when it changes.
+  const [mentalModel, setMentalModel] = useState<Record<string, MentalModelAnswer>>({});
+  useEffect(() => {
+    const seeded: Record<string, MentalModelAnswer> = {};
+    for (const prefill of mentalModelPrefills) seeded[prefill.classId] = prefill.recommended;
+    setMentalModel(seeded);
+  }, [mentalModelPrefills]);
+
+  const hasLetterPlusMarkClass = Object.values(mentalModel).includes("letter-plus-mark");
+
+  // S3 — prefilled from the base keyboard's own behavior when available
+  // (detectMarkInputOrderFromImport seeds session.axes.markInputOrder).
+  const importedOrder = session.axes.markInputOrder;
+  const prefilledFromImport = importedOrder === "prefix" || importedOrder === "postfix";
+  const [inputOrder, setInputOrder] = useState<MarkInputOrder>(
+    prefilledFromImport ? (importedOrder as MarkInputOrder) : "postfix",
+  );
+
+  const outputFormProposal = useMemo(
+    () => resolveOutputFormProposal(posture, hasLetterPlusMarkClass),
+    [posture, hasLetterPlusMarkClass],
+  );
   const [outputForm, setOutputForm] = useState<OutputForm>(outputFormProposal.form);
   useEffect(() => {
     setOutputForm(outputFormProposal.form);
   }, [outputFormProposal.form]);
 
-  // Visible stations, in order. Stations not yet implemented contribute no
-  // entry; S1 renders whenever the series runs (an all-auto-confirmed S1 is
-  // still one screen — the confirm, not an interrogation).
+  // S5 — evidence: an attested >=2-mark stack, or two marks' reachable base
+  // sets overlapping (FR-018). Confirmed list defaults to the attested stacks
+  // (propose-then-confirm), never inferred from attachment rows (FR-019).
+  const multiMarkStacks = useMemo<AttestedStack[]>(
+    () => gate.alphabet.attestedStacks.filter((s) => s.marks.length >= 2),
+    [gate.alphabet],
+  );
+  const marksOverlap = useMemo(() => {
+    const reachable = proposals.map((p) =>
+      new Set(Object.entries(p.states).filter(([, s]) => s !== "blocked").map(([b]) => b)),
+    );
+    for (let i = 0; i < reachable.length; i++) {
+      for (let j = i + 1; j < reachable.length; j++) {
+        const a = reachable[i];
+        const b = reachable[j];
+        if (a !== undefined && b !== undefined && [...a].some((x) => b.has(x))) return true;
+      }
+    }
+    return false;
+  }, [proposals]);
+  const stackingEvidence = multiMarkStacks.length > 0 || marksOverlap;
+  const [stackingAllowed, setStackingAllowed] = useState<boolean>(multiMarkStacks.length > 0);
+  const [stacksConfirmed, setStacksConfirmed] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    setStackingAllowed(multiMarkStacks.length > 0);
+    const seeded: Record<string, boolean> = {};
+    for (const stack of multiMarkStacks) seeded[stackKey(stack)] = true;
+    setStacksConfirmed(seeded);
+  }, [multiMarkStacks]);
+
+  // --- visible stations, in series order ---
+  const needsMentalModelScreen = classes.some((c) => classNeedsMentalModelScreen(c, proposals));
   const visibleStations: MarksStationId[] = useMemo(() => {
     const stations: MarksStationId[] = [];
     if (proposals.length > 0) stations.push("marks_attachment");
-    // S4 renders only when there is something to decide (zero decidable pairs
-    // = station not rendered at all, spec edge case).
+    if (needsMentalModelScreen) stations.push("marks_mental_model");
+    if (hasLetterPlusMarkClass) stations.push("marks_input_order");
     if (hasDecidablePairs(posture)) stations.push("marks_output_form");
+    if (stackingEvidence) stations.push("marks_stacking");
     return stations;
-  }, [proposals, posture]);
+  }, [proposals, needsMentalModelScreen, hasLetterPlusMarkClass, posture, stackingEvidence]);
 
   const [stationIndex, setStationIndex] = useState(0);
+  // FR-023: evidence changed → back to the first station; the affected
+  // (re-seeded) decisions must be walked again before completing.
+  useEffect(() => {
+    setStationIndex(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alphabetKey]);
   const currentStation = visibleStations[Math.min(stationIndex, visibleStations.length - 1)];
 
   // S0 skip: never render — stay TRANSPARENT in the direction of travel. On a
   // forward entry, complete immediately (empty worklist → mechanism gallery).
   // On a back-pop entry (the designer pressed Back on the mechanism gallery),
   // keep popping backward to carve instead of bouncing them forward again.
-  // The ref guards the onComplete → advance → unmount cycle against
-  // double-fire under StrictMode re-invocation or a parent re-render racing
-  // the advance.
   const completedRef = useRef(false);
   useEffect(() => {
     if (gate.skip && !completedRef.current) {
@@ -177,10 +265,17 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   function complete(): void {
     if (completedRef.current) return;
     completedRef.current = true;
-    // Worklist assembly lands with the worklist builder (T023/T027); until
-    // then the series exits with the empty worklist (gallery falls back to
-    // the flat-inventory flow).
-    onComplete(seriesResult());
+    // Assemble the FR-020 handoff. The stacking answer constrains the stack
+    // list downstream; the worklist's three groups cover every base and mark
+    // (SC-007, verified in engine tests).
+    const worklist = buildPlacementWorklist({
+      alphabet: gate.alphabet,
+      classes,
+      attachments: attachmentChecked,
+      mentalModel,
+      inputOrder,
+    });
+    onComplete(seriesResult(worklist));
   }
 
   function handleContinue(): void {
@@ -214,15 +309,6 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
         your letters before placing keys.
       </p>
 
-      {currentStation === "marks_output_form" && (
-        <OutputFormStation
-          posture={posture}
-          proposal={outputFormProposal}
-          value={outputForm}
-          onChange={setOutputForm}
-        />
-      )}
-
       {currentStation === "marks_attachment" && (
         <AttachmentStation
           proposals={proposals}
@@ -235,6 +321,46 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
             }))
           }
           casePairCount={casePairs.size}
+        />
+      )}
+
+      {currentStation === "marks_mental_model" && (
+        <MentalModelStation
+          classes={classes}
+          prefills={mentalModelPrefills}
+          answers={mentalModel}
+          onChange={(classId, answer) =>
+            setMentalModel((prev) => ({ ...prev, [classId]: answer }))
+          }
+        />
+      )}
+
+      {currentStation === "marks_input_order" && (
+        <InputOrderStation
+          value={inputOrder}
+          onChange={setInputOrder}
+          prefilledFromImport={prefilledFromImport}
+        />
+      )}
+
+      {currentStation === "marks_output_form" && (
+        <OutputFormStation
+          posture={posture}
+          proposal={outputFormProposal}
+          value={outputForm}
+          onChange={setOutputForm}
+        />
+      )}
+
+      {currentStation === "marks_stacking" && (
+        <StackingStation
+          multiMarkStacks={multiMarkStacks}
+          allowed={stackingAllowed}
+          onAllowedChange={setStackingAllowed}
+          confirmed={stacksConfirmed}
+          onConfirmChange={(key, next) =>
+            setStacksConfirmed((prev) => ({ ...prev, [key]: next }))
+          }
         />
       )}
 

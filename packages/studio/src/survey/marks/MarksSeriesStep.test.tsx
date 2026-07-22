@@ -229,3 +229,89 @@ describe("MarksSeriesStep — S4 output-form station", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Full-series walk → PlacementWorklist handoff (US7, FR-020)
+// ---------------------------------------------------------------------------
+
+describe("MarksSeriesStep — worklist handoff (US7)", () => {
+  const GRAVE = "̀";
+
+  function seedTonalAlphabet(): void {
+    // Acute + grave attested across three vowels → one productive above-marks
+    // class (spread >= 3 → letter-plus-mark prefill), S2/S3/S5 all render.
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "B",
+      answers: [],
+      alphabet: {
+        bases: ["a", "e", "i", "k"],
+        marks: [ACUTE, GRAVE],
+        attestedStacks: [
+          { base: "a", marks: [ACUTE] },
+          { base: "e", marks: [ACUTE] },
+          { base: "i", marks: [ACUTE] },
+          { base: "a", marks: [GRAVE] },
+          { base: "e", marks: [GRAVE] },
+        ],
+        declaredRoles: {},
+      },
+    });
+  }
+
+  function continueUntilComplete(onComplete: ReturnType<typeof vi.fn>): number {
+    let screens = 0;
+    while (onComplete.mock.calls.length === 0 && screens < 10) {
+      screens++;
+      fireEvent.click(screen.getByTestId("marks-continue"));
+    }
+    return screens;
+  }
+
+  it("walks S1..S5 and hands over markUnits + blocked combinations", () => {
+    seedTonalAlphabet();
+    const onComplete = vi.fn();
+    act(() => {
+      render(<MarksSeriesStep onComplete={onComplete} />);
+    });
+    // S1 renders first; the series completes within the five-station budget.
+    expect(screen.getByTestId("marks-attachment")).toBeTruthy();
+    const screens = continueUntilComplete(onComplete);
+    expect(screens).toBeLessThanOrEqual(5); // SC-006
+    const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
+    const worklist = result.marksWorklist;
+    // Productive class → both marks are mark units with an input order.
+    expect(worklist?.markUnits.map((u) => u.mark).sort()).toEqual([ACUTE, GRAVE].sort());
+    expect(worklist?.markUnits.every((u) => u.inputOrder === "prefix" || u.inputOrder === "postfix")).toBe(true);
+    // k was never attested/checked for either mark → blocked both ways.
+    expect(worklist?.blockedCombinations).toContainEqual({ base: "k", mark: ACUTE });
+    expect(worklist?.blockedCombinations).toContainEqual({ base: "k", mark: GRAVE });
+    // Every plain base keeps a whole-unit entry.
+    for (const b of ["a", "e", "i", "k"]) {
+      expect(worklist?.ownLetterUnits).toContain(b);
+    }
+  });
+
+  it("renders S2 (mental model), S3 (input order), S5 (stacking) along the tonal walk", () => {
+    seedTonalAlphabet();
+    const onComplete = vi.fn();
+    act(() => {
+      render(<MarksSeriesStep onComplete={onComplete} />);
+    });
+    const seen = new Set<string>();
+    for (let i = 0; i < 6 && onComplete.mock.calls.length === 0; i++) {
+      for (const id of [
+        "marks-attachment",
+        "marks-mental-model",
+        "marks-input-order",
+        "marks-output-form",
+        "marks-stacking",
+      ]) {
+        if (screen.queryByTestId(id) !== null) seen.add(id);
+      }
+      fireEvent.click(screen.getByTestId("marks-continue"));
+    }
+    expect(seen.has("marks-mental-model")).toBe(true);
+    expect(seen.has("marks-input-order")).toBe(true);
+    expect(seen.has("marks-stacking")).toBe(true); // overlap evidence (FR-018)
+  });
+});

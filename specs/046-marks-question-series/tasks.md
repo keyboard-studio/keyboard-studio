@@ -156,16 +156,16 @@ The contract types, the decomposition helper, the shared posture table, and the 
 
 **Wave 2 — independent (different files):**
 
-- [ ] **T024** [P] [US7] `MentalModelStation.tsx` (S2): per-class radio (`own-letter` / `letter-plus-mark` / `mixed` with per-mark/per-pair split recording — mixed-answer edge case), prefill + unaffordability rendering from T022; MVP degradation (one global confirmation still carrying the FR-011 signals) acceptable per the spec assumption; testid `marks-mental-model` · `packages/studio/src/survey/marks/MentalModelStation.tsx`
-- [ ] **T025** [P] [US7] `InputOrderStation.tsx` (S3): `pb_mark_input_order` content and prefill (`detectMarkInputOrderFromImport`) relocated verbatim, rendered only when ≥1 class is letter-plus-mark (FR-012, FR-025 preserve-and-relocate half); testid `marks-input-order` · `packages/studio/src/survey/marks/InputOrderStation.tsx`
-- [ ] **T026** [P] [US7] `StackingStation.tsx` (S5): rendered only on stacking evidence (attested ≥2-mark stack or overlapping plausible sets — FR-018), affirmative answer surfaces the specific attested multi-mark combinations for explicit confirmation, never inferred from attachment rows (FR-019, two-mark-stack edge case); testid `marks-stacking` · `packages/studio/src/survey/marks/StackingStation.tsx`
+- [x] **T024** [P] [US7] `MentalModelStation.tsx` (S2): per-class radio (`own-letter` / `letter-plus-mark` / `mixed` with per-mark/per-pair split recording — mixed-answer edge case), prefill + unaffordability rendering from T022; MVP degradation (one global confirmation still carrying the FR-011 signals) acceptable per the spec assumption; testid `marks-mental-model` · `packages/studio/src/survey/marks/MentalModelStation.tsx`
+- [x] **T025** [P] [US7] `InputOrderStation.tsx` (S3): `pb_mark_input_order` content and prefill (`detectMarkInputOrderFromImport`) relocated verbatim, rendered only when ≥1 class is letter-plus-mark (FR-012, FR-025 preserve-and-relocate half); testid `marks-input-order` · `packages/studio/src/survey/marks/InputOrderStation.tsx`
+- [x] **T026** [P] [US7] `StackingStation.tsx` (S5): rendered only on stacking evidence (attested ≥2-mark stack or overlapping plausible sets — FR-018), affirmative answer surfaces the specific attested multi-mark combinations for explicit confirmation, never inferred from attachment rows (FR-019, two-mark-stack edge case); testid `marks-stacking` · `packages/studio/src/survey/marks/StackingStation.tsx`
 
 **⟶ Wait for Wave 2 to finish, then:**
 
 **Wave 3 — ordered (same file, then the consumer):**
 
-- [ ] **T027** [US7] Series completion in the step host: assemble all station decisions through T023 into the `PlacementWorklist`, commit `marksWorklist` onto the session, and track per-station `stale` flags — an alphabet edit that changes a decision's evidence marks the affected station(s) requiring reconfirmation before the designer can proceed past them again (FR-023, attachment-set-edited edge case) · `packages/studio/src/survey/marks/MarksSeriesStep.tsx`
-- [ ] **T028** [US7] `MechanismGallery` accepts `worklist?: PlacementWorklist` as an optional typed prop (the `placementMap` seam pattern); absent ⇒ existing flat `lettersToAdd` behavior unchanged; present ⇒ own-letter units, mark units, blocked combinations drive placement · `packages/studio/src/editors/assignLoop/MechanismGallery.tsx`
+- [x] **T027** [US7] Series completion in the step host: assemble all station decisions through T023 into the `PlacementWorklist`, commit `marksWorklist` onto the session, and track per-station `stale` flags — an alphabet edit that changes a decision's evidence marks the affected station(s) requiring reconfirmation before the designer can proceed past them again (FR-023, attachment-set-edited edge case) · `packages/studio/src/survey/marks/MarksSeriesStep.tsx`
+- [x] **T028** [US7] `MechanismGallery` accepts `worklist?: PlacementWorklist` as an optional typed prop (the `placementMap` seam pattern); absent ⇒ existing flat `lettersToAdd` behavior unchanged; present ⇒ own-letter units, mark units, blocked combinations drive placement · `packages/studio/src/editors/assignLoop/MechanismGallery.tsx`
 
 **Checkpoint**: US7 is independently testable — the full P1 spine (pick → confirm → series → typed handoff → gallery) works end to end.
 
