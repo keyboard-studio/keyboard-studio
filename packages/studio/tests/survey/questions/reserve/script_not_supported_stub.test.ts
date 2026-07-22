@@ -15,13 +15,8 @@ describe("script_not_supported_stub — definition", () => {
   });
 });
 
-describe("script_not_supported_stub — fixtures (no validate)", () => {
+describe("script_not_supported_stub — fixtures", () => {
   it("has no invalid fixtures", () => {
     expect(fixtures.invalid).toHaveLength(0);
   });
-  for (const { value, note } of fixtures.valid) {
-    it(`valid fixture: ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      expect(true).toBe(true);
-    });
-  }
 });
