@@ -584,7 +584,7 @@ export function CharacterMapPane({
                 key={key}
                 aria-label={groupAriaLabel}
               >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <h3 style={sectionHeading}>
                     {group.block}
                     {label !== null && (
