@@ -14,7 +14,7 @@ Every task includes its own vitest coverage in the same change unless it is a pu
 
 **Wave 1 — single task:**
 
-- [ ] **T001** Baseline: `pnpm install && pnpm build && pnpm typecheck && pnpm -r test` green on the branch before any edit, so later failures are attributable · (repo root)
+- [x] **T001** Baseline: `pnpm install && pnpm build && pnpm typecheck && pnpm -r test` green on the branch before any edit, so later failures are attributable · (repo root)
 
 ---
 
@@ -24,8 +24,8 @@ The contract types, the decomposition helper, the shared posture table, and the 
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T002** [P] New contracts module with the pinned types `DeclaredRole`, `AttestedStack` (ordered, closest-to-base first), `ConfirmedAlphabet` (`bases`/`marks`/`attestedStacks`/`declaredRoles`), `AttachmentState`, `MarkUnit`, `BlockedCombination`, `PlacementWorklist` — names exactly per the contract doc · `packages/contracts/src/confirmedAlphabet.ts`
-- [ ] **T003** [P] Grapheme decomposition helper `decomposeGrapheme(grapheme)` → `{ base, marks[] } | null` (NFD, order-preserving, full `\p{Mn}\p{Mc}` combining-run split; `null` for PUA / no known decomposition), reusing `isCombiningMarkChar` / `isPrivateUseCodePoint` from `characterMap.ts` · `packages/engine/src/character-discovery/decompose.ts`
+- [x] **T002** [P] New contracts module with the pinned types `DeclaredRole`, `AttestedStack` (ordered, closest-to-base first), `ConfirmedAlphabet` (`bases`/`marks`/`attestedStacks`/`declaredRoles`), `AttachmentState`, `MarkUnit`, `BlockedCombination`, `PlacementWorklist` — names exactly per the contract doc · `packages/contracts/src/confirmedAlphabet.ts`
+- [x] **T003** [P] Grapheme decomposition helper `decomposeGrapheme(grapheme)` → `{ base, marks[] } | null` (NFD, order-preserving, full `\p{Mn}\p{Mc}` combining-run split; `null` for PUA / no known decomposition), reusing `isCombiningMarkChar` / `isPrivateUseCodePoint` from `characterMap.ts` · `packages/engine/src/character-discovery/decompose.ts`
 
 **⟶ Wait for Wave 1 to finish, then:**
 

@@ -112,7 +112,7 @@ function isControlCodePoint(cp: number): boolean {
   return (cp >= 0x0000 && cp <= 0x001f) || (cp >= 0x007f && cp <= 0x009f);
 }
 
-function isPrivateUseCodePoint(cp: number): boolean {
+export function isPrivateUseCodePoint(cp: number): boolean {
   return (
     (cp >= 0xe000 && cp <= 0xf8ff) || // BMP Private Use Area
     (cp >= 0xf0000 && cp <= 0xffffd) || // Supplementary PUA-A (plane 15)
@@ -155,7 +155,7 @@ function isGuardrailExcluded(ch: string): boolean {
  * what the browsing-block table already carries (e.g. Combining Diacritical
  * Marks, U+0300–036F).
  */
-function isCombiningMarkChar(ch: string): boolean {
+export function isCombiningMarkChar(ch: string): boolean {
   return /^[\p{Mn}\p{Mc}]$/u.test(ch);
 }
 

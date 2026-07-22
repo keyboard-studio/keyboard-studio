@@ -75,6 +75,30 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-07-22T00:32:40.080Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T00:41:58.565Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T00:47:46.864Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T00:47:47.098Z"
     }
   ],
   "telemetryInstanceId": "2fbeb931-cc8e-463b-9a7c-bfa4e0b7a804",
@@ -294,6 +318,38 @@
       "tasks": [
         "T011",
         "T012"
+      ]
+    }
+  },
+  "concerns": [
+    {
+      "note": "Baseline not fully green: 19 pre-existing studio test failures (useKeyboardArtifact.test.ts, browserPatternLibrary.test.ts, projectWorkingCopyVfs*.test.ts, articleIVProbe.test.ts) present before any 046 edit; new-failure attribution is by diff against this set",
+      "step": "implement"
+    }
+  ],
+  "currentTask": "T003",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Baseline: install/build/typecheck green; 19 pre-existing studio test failures in 4 files (useKeyboardArtifact, browserPatternLibrary, projectWorkingCopyVfs x2, articleIVProbe) documented as attributable baseline"
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "New contracts module confirmedAlphabet.ts: ConfirmedAlphabet/AttestedStack/DeclaredRole/AttachmentState/MarkUnit/BlockedCombination/PlacementWorklist + factories, deriveConfirmedInventory, validateConfirmedAlphabet, 10 tests",
+      "files": [
+        "packages/contracts/src/confirmedAlphabet.ts",
+        "packages/contracts/src/confirmedAlphabet.test.ts",
+        "packages/contracts/src/index.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "decomposeGrapheme engine helper (NFD, order-preserving, full Mn/Mc range, null for PUA/plain/digraph); exported isCombiningMarkChar/isPrivateUseCodePoint from characterMap; 9 tests",
+      "files": [
+        "packages/engine/src/character-discovery/decompose.ts",
+        "packages/engine/src/character-discovery/decompose.test.ts",
+        "packages/engine/src/character-discovery/characterMap.ts",
+        "packages/engine/src/index.ts"
       ]
     }
   }

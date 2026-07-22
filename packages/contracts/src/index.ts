@@ -8,6 +8,7 @@ export * from "./axes";
 export * from "./axisFill";
 export * from "./baseKeyboard";
 export * from "./compileResult";
+export * from "./confirmedAlphabet";
 export * from "./criteria";
 export * from "./keyboard-ir";
 export * from "./keyboardId";

@@ -139,8 +139,12 @@ export { caseCounterpart } from "./character-discovery/casePair.js";
 // Phase B tiered/browsable character-map candidate builder (right pane).
 // Reuses the cldr.ts exemplar-loading path; CHARACTER_MAP_BLOCKS is a
 // SEPARATE, multi-block-per-script table from cldr.ts's calibrated SCRIPT_BLOCKS.
-export { buildCharacterMap, CHARACTER_MAP_BLOCKS } from "./character-discovery/characterMap.js";
+export { buildCharacterMap, CHARACTER_MAP_BLOCKS, isCombiningMarkChar, isPrivateUseCodePoint } from "./character-discovery/characterMap.js";
 export type { CharacterMapTier, CharacterMapCell, CharacterMapGroup } from "./character-discovery/characterMap.js";
+// Whole-grapheme decomposition for the three-store confirmed alphabet (spec 046):
+// one base + ordered combining marks; null for PUA / plain letters / digraphs.
+export { decomposeGrapheme } from "./character-discovery/decompose.js";
+export type { GraphemeDecomposition } from "./character-discovery/decompose.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
 export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, describeStorePairing, analyzeStores, parseSlotId, collectCharContributors, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap, isPlusSeparator } from "./pattern-apply/index.js";
