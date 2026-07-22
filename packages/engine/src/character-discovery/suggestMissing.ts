@@ -37,7 +37,7 @@
  */
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
-import { buildProducedSet } from "@keyboard-studio/contracts";
+import { buildProducedSet, scriptSubtagOf } from "@keyboard-studio/contracts";
 import type { CldrFullLoader } from "./cldr.js";
 import { loadExemplarsFromFull, parseUnicodeSet } from "./cldr.js";
 
@@ -175,9 +175,8 @@ function letterFilter(chars: string[]): string[] {
  * default-script fallback (step 2) only covers those primaries.
  *
  * Detection order:
- *   1. Look for an explicit 4-letter alpha script subtag in any position after
- *      the primary subtag (BCP47: variant subtags are >=5 chars or digit-led;
- *      a 4-alpha subtag here is a script code). Compare case-insensitively to
+ *   1. Look for an explicit script subtag via the shared scriptSubtagOf()
+ *      helper (@keyboard-studio/contracts). Compare case-insensitively to
  *      "latn".
  *   2. If no explicit script subtag is present, fall back to TURKIC_DEFAULT_SCRIPT
  *      for the primary. This map is only consulted for primaries already in
@@ -190,15 +189,9 @@ function letterFilter(chars: string[]): string[] {
  *                default-script fallback — pass it rather than re-deriving.
  */
 function effectiveScriptIsLatin(bcp47: string, primary: string): boolean {
-  const parts = bcp47.split("-");
-  // Skip the primary subtag (index 0) and look for a 4-letter alpha script subtag.
-  // BCP47: variant subtags are >=5 chars or digit-led; a 4-alpha subtag is a script code.
-  for (let i = 1; i < parts.length; i++) {
-    const part = parts[i]!;
-    if (/^[A-Za-z]{4}$/.test(part)) {
-      // Found an explicit script subtag.
-      return part.toLowerCase() === "latn";
-    }
+  const explicit = scriptSubtagOf(bcp47);
+  if (explicit !== undefined) {
+    return explicit.toLowerCase() === "latn";
   }
   // No explicit script subtag — use the locale default.
   // Unreachable in practice: every TURKIC_LOCALES primary has a TURKIC_DEFAULT_SCRIPT entry;

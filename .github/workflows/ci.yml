@@ -35,6 +35,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Offline codegen the build depends on. Most prebuild steps fetch over
+      # the network (langtags/glottolog) and commit their derived index, so CI
+      # skips them; but codegen-charnames derives from the committed,
+      # SHA-pinned lib/ucd/UnicodeData.txt into a gitignored JSON that
+      # engine/src/character-discovery/charNames.ts imports at build time.
+      # Regenerate it here — hermetic, no network — so `pnpm -r build` resolves.
+      - name: Codegen (charnames — offline, build input)
+        run: pnpm run codegen-charnames
+
       # Build before typecheck — engine/studio depend on contracts'
       # dist/*.d.ts at type-resolution time. Without this, downstream
       # typechecks fail with "Cannot find module '@keyboard-studio/contracts'"
