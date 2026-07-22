@@ -198,23 +198,35 @@ export type { MissingCharSuggestions };
 // the function after first import so subsequent calls skip the dynamic
 // import entirely (mirrors suggestMissingChars above).
 //
+// `baseScripts` forwards to buildCharacterMap's opts.baseScripts — additional
+// ISO 15924 scripts (e.g. the base keyboard's own script) to enumerate
+// alongside the resolved target script, so groups from both appear.
+//
 // NOTE: buildCharacterMap is a parallel-track engine deliverable (character
 // discovery, spec §8 Phase B) — the import below is written against its
 // locked signature and resolves once the engine export lands.
 let characterMapEngineCache:
-  | ((baseIr: KeyboardIR | null, bcp47?: string, languageName?: string) => Promise<CharacterMapGroup[]>)
+  | ((
+      baseIr: KeyboardIR | null,
+      bcp47?: string,
+      languageName?: string,
+      opts?: { baseScripts?: readonly string[] },
+    ) => Promise<CharacterMapGroup[]>)
   | null = null;
 export async function characterMapGroups(
   baseIr: KeyboardIR | null,
   bcp47?: string,
   languageName?: string,
+  baseScripts?: readonly string[],
 ): Promise<CharacterMapGroup[]> {
   if (!USE_REAL) return [];
   if (characterMapEngineCache === null) {
     const { buildCharacterMap } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
     characterMapEngineCache = buildCharacterMap;
   }
-  return characterMapEngineCache(baseIr, bcp47, languageName);
+  return characterMapEngineCache(baseIr, bcp47, languageName, {
+    ...(baseScripts !== undefined ? { baseScripts } : {}),
+  });
 }
 
 // Re-export the type so callers (CharacterMapPane.tsx) can use it without a

@@ -22,14 +22,16 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { parseUPlusNotation, toUPlusNotation } from "@keyboard-studio/contracts";
+import { parseUPlusNotation, scriptSubtagOf, toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
 import { isPrivateUseCodePoint } from "@keyboard-studio/engine";
 import { prefixCombiningMark } from "../lib/irToCarveNodes.ts";
-import { TextField } from "../ui/index.ts";
+import { matchesQuery } from "./characterSearch.ts";
+import { TextField, Checkbox } from "../ui/index.ts";
+import { useGlyphFontStack } from "./useGlyphFontStack.ts";
 import {
   ACCENT,
   ERROR_RED,
@@ -72,6 +74,15 @@ type LoadState =
 // editors/assignLoop/parts/Inspector.tsx's ruleDetailLabel(r, t) helper takes
 // this shape and its ids do NOT appear in locales/en/messages.json even after
 // extraction — do not copy that shape here).
+
+// Stable identity for a group — used as the React list key. Includes `script`
+// because the multi-script grid can carry several groups that share a generic
+// fallback block name (e.g. uncurated scripts all label their letter block
+// "Letters", digits "Digits", punctuation "Punctuation"); without the script
+// the key collides across scripts and React drops/merges same-key sections.
+function groupKey(group: CharacterMapGroup): string {
+  return `${group.tier}-${group.script}-${group.block}`;
+}
 
 // ---------------------------------------------------------------------------
 // Raw U+XXXX entry — the "all options" escape hatch. The browse grid only
@@ -132,6 +143,7 @@ export function CharacterMapPane({
 }: CharacterMapPaneProps = {}) {
   const { t } = useLingui();
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
+  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
   const surveyContext = useSurveySessionStore((s) => s.surveyContext);
   const bcp47 = surveyContext.bcp47_tag;
   const languageName = surveyContext.language_name;
@@ -139,9 +151,11 @@ export function CharacterMapPane({
   const chars = usePhaseBDraftStore((s) => s.chars);
   const toggle = usePhaseBDraftStore((s) => s.toggle);
   const addChar = usePhaseBDraftStore((s) => s.add);
+  const glyphFontStack = useGlyphFontStack();
 
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [query, setQuery] = useState("");
+  const [blocksOnly, setBlocksOnly] = useState(true);
   const [announcement, setAnnouncement] = useState("");
   const [rawInput, setRawInput] = useState("");
   const [rawError, setRawError] = useState<string | null>(null);
@@ -159,14 +173,38 @@ export function CharacterMapPane({
   const displayName =
     languageName ?? bcp47 ?? t({ id: "survey.characterMapPane.genericLanguage", message: "this language" });
 
-  // Fetch the character map whenever the base IR or language identity changes.
+  // The base keyboard's own script(s) — its primary `script` field plus any
+  // script subtag parsed out of its `.kps` `languages` list (e.g.
+  // "lif-Deva" -> "Deva"). Forwarded to buildCharacterMap's opts.baseScripts
+  // so the base keyboard's script(s) are enumerated alongside the target
+  // script — this only drives WHICH groups are built, not the "blocks my
+  // keyboard uses" filter below (that filter narrows by usedByBase instead).
+  const baseScripts = useMemo<string[]>(() => {
+    const set = new Set<string>();
+    if (baseKeyboard?.script) set.add(baseKeyboard.script);
+    for (const tag of baseKeyboard?.languages ?? []) {
+      const script = scriptSubtagOf(tag);
+      if (script !== undefined) set.add(script);
+    }
+    return [...set];
+  }, [baseKeyboard]);
+
+  // Fetch the character map whenever the base IR, base keyboard, or language
+  // identity changes.
   useEffect(() => {
+    // A stale search/error/announcement from the previous language must not
+    // persist across a language/base change — reset the transient UI state
+    // before the new fetch starts.
+    setQuery("");
+    setRawInput("");
+    setRawError(null);
+    setAnnouncement("");
     if (noBaseOrLanguage) {
       return;
     }
     let cancelled = false;
     setLoadState({ status: "loading" });
-    characterMapGroups(baseIr, bcp47, languageName)
+    characterMapGroups(baseIr, bcp47, languageName, baseScripts)
       .then((groups) => {
         if (!cancelled) setLoadState({ status: "done", groups });
       })
@@ -176,17 +214,44 @@ export function CharacterMapPane({
     return () => {
       cancelled = true;
     };
-  }, [noBaseOrLanguage, baseIr, bcp47, languageName]);
+  }, [noBaseOrLanguage, baseIr, bcp47, languageName, baseKeyboard, baseScripts]);
 
-  // Client-side filter — plain array filter, no timer of any kind.
+  // Whether the loaded groups actually carry a known produced set — the
+  // engine only sets `usedByBase: true` on any group when it had a baseIr to
+  // derive producedGlyphs() from (see buildCharacterMap). Without at least
+  // one usedByBase group the "blocks my keyboard uses" filter is meaningless,
+  // so it stays hidden and every group shows regardless of `blocksOnly`.
+  const hasKnownBlocks = useMemo(
+    () => loadState.status === "done" && loadState.groups.some((g) => g.usedByBase),
+    [loadState],
+  );
+
+  // Client-side filter — plain array filter, no timer of any kind. Search is
+  // ALWAYS whole-set: when a query is present it searches every loaded group
+  // regardless of the "blocks my keyboard uses" checkbox, so a query can
+  // surface a character from a currently-hidden block. Only when there's no
+  // query does the checkbox narrow the grid — and only when we actually know
+  // which blocks the base keyboard uses (hasKnownBlocks). A block already
+  // represented in the author's accumulating alphabet (`chars`, from
+  // phaseBDraftStore) is also allowed even if the base doesn't produce it —
+  // this is the auto-unhide mechanism: adding a character from a hidden block
+  // (via search, or the raw code point field) unhides that block, even while
+  // the checkbox stays checked.
   const filteredGroups = useMemo(() => {
     if (loadState.status !== "done") return [];
     const q = query.trim();
-    if (q === "") return loadState.groups;
-    return loadState.groups
-      .map((g) => ({ ...g, cells: g.cells.filter((c) => c.char.includes(q)) }))
-      .filter((g) => g.cells.length > 0);
-  }, [loadState, query]);
+    if (q !== "") {
+      return loadState.groups
+        .map((g) => ({ ...g, cells: g.cells.filter((c) => matchesQuery(c, q)) }))
+        .filter((g) => g.cells.length > 0);
+    }
+    if (blocksOnly && hasKnownBlocks) {
+      return loadState.groups.filter(
+        (g) => g.usedByBase || g.cells.some((c) => chars.includes(c.char.normalize("NFC"))),
+      );
+    }
+    return loadState.groups;
+  }, [loadState, query, blocksOnly, hasKnownBlocks, chars]);
 
   // Defined here (not at module scope) so its `t()` calls close over this
   // component's own `t` binding directly — see the note above CodepointParseResult.
@@ -282,6 +347,23 @@ export function CharacterMapPane({
     setPendingPuaChar(null);
   }
 
+  // Toggles the "blocks my keyboard uses" filter — reuses the existing
+  // announcement live region rather than adding a second one.
+  function handleToggleBlocksOnly(next: boolean): void {
+    setBlocksOnly(next);
+    setAnnouncement(
+      next
+        ? t({
+            id: "survey.characterMapPane.blocksOnly.announceOn",
+            message: "Showing only blocks your keyboard uses",
+          })
+        : t({
+            id: "survey.characterMapPane.blocksOnly.announceOff",
+            message: "Showing all blocks",
+          }),
+    );
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%", minHeight: 0 }}>
       <h2 style={{ margin: 0, fontSize: "1.1rem", color: ACCENT }}>
@@ -366,6 +448,30 @@ export function CharacterMapPane({
         placeholder={t({ id: "survey.characterMapPane.search.placeholder", message: "Search characters" })}
         aria-label={t({ id: "survey.characterMapPane.search.ariaLabel", message: "Search the character map" })}
       />
+      {!noBaseOrLanguage && hasKnownBlocks && (
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 12,
+            color: TEXT_DIM,
+            alignSelf: "flex-start",
+          }}
+        >
+          <Checkbox
+            checked={blocksOnly}
+            onChange={(e) => handleToggleBlocksOnly(e.target.checked)}
+            aria-label={t({
+              id: "survey.characterMapPane.blocksOnly.ariaLabel",
+              message: "Show only blocks my keyboard uses",
+            })}
+          />
+          <Trans id="survey.characterMapPane.blocksOnly.label">
+            Show only blocks my keyboard uses
+          </Trans>
+        </label>
+      )}
       {/* Screen-reader announcer for toggle actions — visually hidden. */}
       <div aria-live="polite" style={visuallyHidden}>
         {announcement}
@@ -410,9 +516,10 @@ export function CharacterMapPane({
                     id: "survey.characterMapPane.group.ariaLabel",
                     message: `${{ block: group.block }} characters`,
                   });
+            const key = groupKey(group);
             return (
               <section
-                key={`${group.tier}-${group.block}`}
+                key={key}
                 aria-label={groupAriaLabel}
               >
                 <h3 style={sectionHeading}>
@@ -448,7 +555,7 @@ export function CharacterMapPane({
                         aria-label={`${actionLabel} ${cell.char} (${cp})`}
                         style={charChip(selected)}
                       >
-                        <span style={chipGlyph(selected)}>{display}</span>
+                        <span style={chipGlyph(selected, glyphFontStack)}>{display}</span>
                         <span style={chipCodepoint}>{cp}</span>
                         {/* Non-color selected indicator (colorblind-safe) — shared
                             helper with SuggestionChip's "[x]"/"+" pattern in

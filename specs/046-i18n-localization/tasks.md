@@ -41,7 +41,7 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 - [x] T007 `I18nProvider` ownership in [StudioShell.tsx](../../packages/studio/src/StudioShell.tsx) (covers app + direct-render tests)
 - [x] T008 Drift gate [utilities/i18n-catalog-lint/index.js](../../utilities/i18n-catalog-lint/index.js) + wired into `pnpm lint`
 - [x] T009 Establish the `area.component.thing` id-namespace convention ([contracts/catalog-format.md](contracts/catalog-format.md))
-- [ ] T010 Provision the Crowdin project; set `CROWDIN_PROJECT_ID` / `CROWDIN_PERSONAL_TOKEN` as CI secrets; verify `crowdin upload sources --dry-run -b main` (ops; blocks the live round-trip, not the code work) (#1253)
+- [x] T010 Provision the Crowdin project; set `CROWDIN_PROJECT_ID` / `CROWDIN_PERSONAL_TOKEN` as CI secrets; verify `crowdin upload sources --dryrun -b main` (ops; blocks the live round-trip, not the code work) (#1253)
 
 **Checkpoint**: Foundation ready — user-story chrome work can proceed.
 
@@ -56,7 +56,7 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 ### Tests for User Story 1
 
 - [x] T011 [P] [US1] LocaleSwitcher tests (render / persist / activate / `resolveInitialLocale`) — [LocaleSwitcher.test.tsx](../../packages/studio/src/components/LocaleSwitcher.test.tsx)
-- [ ] T012 [P] [US1] Acceptance check: a fully-translated area renders zero English chrome under `fr` (extend a converted-area test) (#1254)
+- [x] T012 [P] [US1] Acceptance check: a fully-translated area renders zero English chrome under `fr` (extend a converted-area test) (#1254)
 
 ### Implementation for User Story 1
 
@@ -68,9 +68,9 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 - [x] T018 [P] [US1] Convert dashboard chrome (`dashboard.*`) — `packages/studio/src/dashboard/*.tsx` (#1257)
 - [x] T019 [P] [US1] Localize `ui/` primitive user-facing strings + aria (`ui.*`) — `packages/studio/src/ui/*.tsx` (#1258)
 - [x] T020 [P] [US1] Convert remaining `components/` chrome (`preview.*`/`profile.*`/`account.*`) — PreviewScreen, ProfileScreen, AccountControl, OAuthCallbackScreen, etc. (#1259)
-- [ ] T021 [US1] Convert [lib/publishManagedPRErrorMessage.ts](../../packages/studio/src/lib/publishManagedPRErrorMessage.ts) error-copy (global `t` macro pattern) + fix its unit test (deferred from the Output area) (#1260)
-- [ ] T022 [US1] After each area: re-extract catalogs, keep the drift gate green, add illustrative `fr` for the demo — `pnpm --filter @keyboard-studio/studio messages:extract` (#1261)
-- [ ] T023 [US1] Crowdin Tier A first live `upload sources` (after T010) (#1262)
+- [x] T021 [US1] Convert [lib/publishManagedPRErrorMessage.ts](../../packages/studio/src/lib/publishManagedPRErrorMessage.ts) error-copy (global `t` macro pattern) + fix its unit test (deferred from the Output area) (#1260)
+- [x] T022 [US1] After each area: re-extract catalogs, keep the drift gate green, add illustrative `fr` for the demo — `pnpm --filter @keyboard-studio/studio messages:extract` (#1261)
+- [x] T023 [US1] Crowdin Tier A first live `upload sources` (after T010) (#1262)
 
 **Checkpoint**: Studio UI fully localizable; MVP demonstrable in `fr`.
 

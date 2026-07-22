@@ -39,6 +39,9 @@ const BASE_STYLE: React.CSSProperties = {
  * the shared focus-ring / >=44px touch-target conventions. Callers may
  * override style or className (merged, not replaced); the base styles are
  * applied first.
+ * Note: native <select> popups do not open in the VS Code Simple Browser /
+ * Electron webview — see `ui/SelectMenu.tsx` for a DOM-rendered alternative
+ * used where that matters.
  */
 export function Dropdown({
   options,

@@ -1,0 +1,4 @@
+# Generated codepoint -> Unicode NAME lookup table — ~1.4 MB, derived from
+# lib/ucd/UnicodeData.txt by scripts/codegen-charnames.mjs (a prebuild step).
+# Run `pnpm run codegen-charnames` (or `pnpm prebuild`) to regenerate.
+charnames.generated.json

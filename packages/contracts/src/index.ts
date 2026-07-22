@@ -68,6 +68,7 @@ export * from "./ir-path";
 // Utilities — shared pure helpers consumed across packages.
 // ---------------------------------------------------------------------------
 export * from "./utils/charUtils";
+export * from "./utils/bcp47";
 
 // ---------------------------------------------------------------------------
 // Loader / data — modules that load checked-in data files (criteria.json) and
