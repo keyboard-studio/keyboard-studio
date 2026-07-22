@@ -14,7 +14,8 @@
     "messages:extract": "lingui extract",
     "messages:compile": "lingui compile",
     "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@keyboard-studio/contracts": "workspace:*",
