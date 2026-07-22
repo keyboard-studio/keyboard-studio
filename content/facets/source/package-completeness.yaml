@@ -24,6 +24,17 @@ derivations:
       Reads the .kps <Files>/<Options> for OSK, welcome, predictive-model, and
       icon presence, produced by the keyboard-facet-index package-completeness
       classifier (spec 043); session consumption is planned.
+  - kind: computed
+    source: "planned:has-icon-of-kmn-and-kps"
+    sourceStatus: planned
+    notes: >
+      Corroborating/broadening source for the `icon` member only, produced by the
+      keyboard-facet-index has-icon-classifier. Broader than the narrow icon
+      signal above: has-icon reads `present` when the .kmn header declares a
+      &BITMAP store (value .ico OR .bmp) in addition to a .kps-bundled .ico, so
+      an icon that rides only in the .kmn header still counts. When session
+      consumption is implemented, the `icon` member reflects the narrow
+      (.kps-bundled .ico) definition; has-icon is the broader corroborating read.
 
 consumers:
   prefills: []
