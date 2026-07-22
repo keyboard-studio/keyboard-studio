@@ -11,7 +11,6 @@
 
 import { describe, it, expect } from "vitest";
 import { I18n } from "@lingui/core";
-import { messages as enMessages } from "../locales/en/messages.json?lingui";
 import { messages as frMessages } from "../locales/fr/messages.json?lingui";
 import type { PublishManagedPRError } from "@keyboard-studio/contracts";
 import {
