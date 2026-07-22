@@ -145,13 +145,87 @@ describe("MarksSeriesStep — S1 attachment station", () => {
     );
   });
 
-  it("simple orthography completes in ONE marks screen via Continue (SC-002)", () => {
+  it("simple orthography completes in at most TWO marks screens (SC-002)", () => {
     seedAlphabet([ACUTE], ["e"]);
     const onComplete = vi.fn();
     act(() => {
       render(<MarksSeriesStep onComplete={onComplete} />);
     });
+    // Screen 1: the auto-confirmed attachment summary.
+    expect(screen.getByTestId("marks-attachment")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    // Screen 2: the output-form notice.
+    expect(screen.getByTestId("marks-output-form")).toBeTruthy();
     fireEvent.click(screen.getByTestId("marks-continue"));
     expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// S4 output-form station (US3, FR-013..FR-017; SC-005)
+// ---------------------------------------------------------------------------
+
+describe("MarksSeriesStep — S4 output-form station", () => {
+  const SCHWA = "ə"; // no ready-made accented forms exist
+
+  function reachOutputForm(): void {
+    fireEvent.click(screen.getByTestId("marks-continue")); // past S1
+  }
+
+  it("proposes base-plus-mark as a notice when a pair never composes (FR-014, US3 AC1)", () => {
+    seedAlphabet([ACUTE], [SCHWA]);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    reachOutputForm();
+    const station = screen.getByTestId("marks-output-form");
+    expect(station.textContent).toContain("letter plus its mark");
+    // A notice, not an open question: no radio inputs.
+    expect(station.querySelectorAll('input[type="radio"]')).toHaveLength(0);
+  });
+
+  it("proposes ready-made as a notice when every pair composes (FR-015, US2 AC2)", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    reachOutputForm();
+    expect(screen.getByTestId("marks-output-form").textContent).toContain("ready-made");
+  });
+
+  it("shows the mandatory step-by-step backspace preview (FR-017)", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    reachOutputForm();
+    expect(screen.getByTestId("backspace-preview")).toBeTruthy();
+  });
+
+  it("offers a way to change the proposed form (propose-then-confirm)", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    reachOutputForm();
+    fireEvent.click(screen.getByTestId("output-form-change"));
+    expect(screen.getByTestId("marks-output-form").textContent).toContain(
+      "Letter plus mark, built as you type",
+    );
+  });
+
+  it("SC-005: the station never renders the words Unicode or normalization", () => {
+    for (const bases of [["e"], [SCHWA]]) {
+      cleanup();
+      useWorkingCopyStore.getState().reset();
+      seedAlphabet([ACUTE], bases);
+      act(() => {
+        render(<MarksSeriesStep onComplete={vi.fn()} />);
+      });
+      reachOutputForm();
+      const text = screen.getByTestId("marks-output-form").textContent ?? "";
+      expect(text).not.toMatch(/unicode/i);
+      expect(text).not.toMatch(/normali[sz]/i);
+    }
   });
 });

@@ -211,6 +211,38 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-22T01:28:23.344Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:46:31.503Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:46:31.737Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:46:31.982Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:46:32.226Z"
     }
   ],
   "telemetryInstanceId": "2fbeb931-cc8e-463b-9a7c-bfa4e0b7a804",
@@ -245,6 +277,11 @@
       "decision": "Record the nfc-to-nfd migration need as a session flag only; do not build the reverse facet-transform in this feature",
       "why": "The spec assumption and design-note open question 3 hold it as a separate decision; silently implementing would reopen a resolved v1 decline informally",
       "rejected": "Implementing the reverse transform now"
+    },
+    {
+      "decision": "Keep 046 CharacterMapPane edits localized to handleToggle/handleRawSubmit + additive exports so open PR #1291 (km/charmap-jump-to-script) merges cleanly",
+      "why": "User flagged PR #1291 must land against this branch; its diff rewrites the pane fetch/filter/scripts-checkbox areas and characterMap.ts script tagging but leaves handleToggle/handleRawSubmit bodies and both predicates (isCombiningMarkChar/isPrivateUseCodePoint) intact",
+      "rejected": "Restructuring the pane search path for the decomposition narration (would collide with 1291 matchesQuery/characterSearch.ts)"
     }
   ],
   "step_summaries": {
@@ -437,9 +474,13 @@
     {
       "note": "Baseline not fully green: 19 pre-existing studio test failures (useKeyboardArtifact.test.ts, browserPatternLibrary.test.ts, projectWorkingCopyVfs*.test.ts, articleIVProbe.test.ts) present before any 046 edit; new-failure attribution is by diff against this set",
       "step": "implement"
+    },
+    {
+      "note": "Merge with PR #1291 will produce small adjacent-hunk conflicts in CharacterMapPane.tsx (filteredGroups memo sits directly above the 046 describeContribution insert) and characterMap.ts (export keyword on isCombiningMarkChar sits in 1291 hunk context); both are trivial semantic no-ops to resolve",
+      "step": "implement"
     }
   ],
-  "currentTask": "T017",
+  "currentTask": "T021",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -577,6 +618,43 @@
       "files": [
         "packages/studio/src/survey/marks/MarksSeriesStep.tsx",
         "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "resolveOutputFormProposal ordered decision table (FR-014 notice / FR-016 open-choice flag / FR-015 default notice) + hasDecidablePairs gate; SC-005 asserted mechanically; 7 tests",
+      "files": [
+        "packages/engine/src/marks/output-form-policy.ts",
+        "packages/engine/src/marks/output-form-policy.test.ts"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "checkNormalizationUniformity IR check (layer B, KM_LINT_MARK_NORMALIZATION_UNIFORM, one aggregate finding, non-system stores included) wired into validateWithOracle reference TS task - same single debounce cycle; 7 tests incl. cycle integration",
+      "files": [
+        "packages/engine/src/validator/layer-b-uniformity.ts",
+        "packages/engine/src/validator/layer-b-uniformity.test.ts",
+        "packages/engine/src/validator/oracle.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "OutputFormStation S4: notice presentation, mandatory step-by-step backspace preview (peel-one-mark vs one-step), change control, skipped when zero decidable pairs; SC-005 render test; 5 station tests + SC-002 two-screen test",
+      "files": [
+        "packages/studio/src/survey/marks/OutputFormStation.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "criteria.json +18.13-mark-normalization-uniform (layer-c-enforce, consistency, lintRuleId KM_LINT_MARK_NORMALIZATION_UNIFORM); counts 148->149, band 66->67, section-18 12->13/7->8 in types.test.ts, schemas.test.ts, criteria-summary.md",
+      "files": [
+        "packages/contracts/data/criteria.json",
+        "packages/contracts/src/types.test.ts",
+        "packages/contracts/src/schemas.test.ts",
+        "packages/contracts/data/criteria-summary.md"
       ]
     }
   }

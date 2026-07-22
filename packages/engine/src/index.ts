@@ -155,6 +155,9 @@ export { groupMarkClasses, attestedBasesOf, ATTACHMENT_SIMILARITY_THRESHOLD } fr
 export type { MarkClass } from "./marks/mark-classes.js";
 export { proposeAttachments, deriveCaseCounterparts } from "./marks/attachment-proposals.js";
 export type { AttachmentProposal, ProposedAttachmentState } from "./marks/attachment-proposals.js";
+export { resolveOutputFormProposal, hasDecidablePairs } from "./marks/output-form-policy.js";
+export type { OutputForm, OutputFormProposal } from "./marks/output-form-policy.js";
+export { checkNormalizationUniformity, MARK_NORMALIZATION_UNIFORM_CODE } from "./validator/layer-b-uniformity.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
 export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, describeStorePairing, analyzeStores, parseSlotId, collectCharContributors, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap, isPlusSeparator } from "./pattern-apply/index.js";

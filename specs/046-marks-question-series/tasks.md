@@ -125,15 +125,15 @@ The contract types, the decomposition helper, the shared posture table, and the 
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T018** [P] [US3] Output-form policy `resolveOutputFormProposal(posture, hasLetterPlusMarkClass)` as an ordered first-match-wins decision table (the `house-target-policy.ts` row shape): row 1 any pair lacks ready-made → base-plus-mark notice (FR-014); default row all compose + no letter-plus-mark class → ready-made notice (FR-015); open case flagged `open-choice` (FR-016 branch fires in Phase 8); authored explanations free of "Unicode"/"normalization" · `packages/engine/src/marks/output-form-policy.ts`
-- [ ] **T019** [P] [US3] Uniformity validator `checkNormalizationUniformity(ir): LintFinding[]` — IR-aware per the `layer-a-prime.ts` convention, `layer: "B"`, code `KM_LINT_MARK_NORMALIZATION_UNIFORM`, reusing the combining-run/compose logic from `nfd-to-nfc.ts`; wired into the existing single 300 ms debounce validation run (no second debounce) · `packages/engine/src/validator/layer-b-uniformity.ts` + validator index wiring
+- [x] **T018** [P] [US3] Output-form policy `resolveOutputFormProposal(posture, hasLetterPlusMarkClass)` as an ordered first-match-wins decision table (the `house-target-policy.ts` row shape): row 1 any pair lacks ready-made → base-plus-mark notice (FR-014); default row all compose + no letter-plus-mark class → ready-made notice (FR-015); open case flagged `open-choice` (FR-016 branch fires in Phase 8); authored explanations free of "Unicode"/"normalization" · `packages/engine/src/marks/output-form-policy.ts`
+- [x] **T019** [P] [US3] Uniformity validator `checkNormalizationUniformity(ir): LintFinding[]` — IR-aware per the `layer-a-prime.ts` convention, `layer: "B"`, code `KM_LINT_MARK_NORMALIZATION_UNIFORM`, reusing the combining-run/compose logic from `nfd-to-nfc.ts`; wired into the existing single 300 ms debounce validation run (no second debounce) · `packages/engine/src/validator/layer-b-uniformity.ts` + validator index wiring
 
 **⟶ Wait for Wave 1 to finish, then:**
 
 **Wave 2 — independent (different files):**
 
-- [ ] **T020** [P] [US3] `OutputFormStation.tsx` (S4): notice presentation for the unambiguous branches, mandatory step-by-step backspace preview for the selected form (FR-017), station not rendered when zero decidable pairs exist (edge case); mechanical SC-005 test asserting no "Unicode"/"normalization" in any designer-facing string; container testid `marks-output-form` · `packages/studio/src/survey/marks/OutputFormStation.tsx`
-- [ ] **T021** [P] [US3] New `layer-c-enforce` criteria row carrying `lintRuleId: "KM_LINT_MARK_NORMALIZATION_UNIFORM"`; enforced counts bump 148 → 149 and band 66 → 67 in the count tests and the summary recompute · `packages/contracts/data/criteria.json`, `packages/contracts/src/types.test.ts`, `packages/contracts/src/schemas.test.ts`, `criteria-summary.md`
+- [x] **T020** [P] [US3] `OutputFormStation.tsx` (S4): notice presentation for the unambiguous branches, mandatory step-by-step backspace preview for the selected form (FR-017), station not rendered when zero decidable pairs exist (edge case); mechanical SC-005 test asserting no "Unicode"/"normalization" in any designer-facing string; container testid `marks-output-form` · `packages/studio/src/survey/marks/OutputFormStation.tsx`
+- [x] **T021** [P] [US3] New `layer-c-enforce` criteria row carrying `lintRuleId: "KM_LINT_MARK_NORMALIZATION_UNIFORM"`; enforced counts bump 148 → 149 and band 66 → 67 in the count tests and the summary recompute · `packages/contracts/data/criteria.json`, `packages/contracts/src/types.test.ts`, `packages/contracts/src/schemas.test.ts`, `criteria-summary.md`
 
 **Checkpoint**: US3 is independently testable — the never-composing alphabet gets the decomposed proposal as a notice, and mixing forms is a mechanically detected defect.
 

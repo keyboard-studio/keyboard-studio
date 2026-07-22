@@ -21,13 +21,18 @@ import {
   groupMarkClasses,
   proposeAttachments,
   deriveCaseCounterparts,
+  nfcPostureOfInventory,
+  resolveOutputFormProposal,
+  hasDecidablePairs,
   type AttachmentProposal,
   type MarkClass,
+  type OutputForm,
 } from "@keyboard-studio/engine";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { AttachmentStation } from "./AttachmentStation.tsx";
+import { OutputFormStation } from "./OutputFormStation.tsx";
 import {
   ACCENT,
   TEXT_MAIN,
@@ -109,6 +114,15 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     () => deriveCaseCounterparts(gate.alphabet, surveyContext.bcp47_tag),
     [gate.alphabet, surveyContext.bcp47_tag],
   );
+  const posture = useMemo(() => nfcPostureOfInventory(gate.alphabet), [gate.alphabet]);
+  // Mental-model outcome feeds the S4 policy; until the S2 station lands, no
+  // class is confirmed letter-plus-mark (the FR-015/FR-014 branches still fire
+  // correctly — FR-016's open case needs S2).
+  const hasLetterPlusMarkClass = false;
+  const outputFormProposal = useMemo(
+    () => resolveOutputFormProposal(posture, hasLetterPlusMarkClass),
+    [posture, hasLetterPlusMarkClass],
+  );
 
   // S1 answers — re-seeded whenever the proposals change (alphabet edited).
   const [attachmentChecked, setAttachmentChecked] = useState<AttachmentChecked>(() =>
@@ -118,14 +132,23 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     setAttachmentChecked(initialAttachmentChecked(proposals));
   }, [proposals]);
 
+  // S4 answer — seeded from the policy proposal, re-seeded when it changes.
+  const [outputForm, setOutputForm] = useState<OutputForm>(outputFormProposal.form);
+  useEffect(() => {
+    setOutputForm(outputFormProposal.form);
+  }, [outputFormProposal.form]);
+
   // Visible stations, in order. Stations not yet implemented contribute no
   // entry; S1 renders whenever the series runs (an all-auto-confirmed S1 is
   // still one screen — the confirm, not an interrogation).
   const visibleStations: MarksStationId[] = useMemo(() => {
     const stations: MarksStationId[] = [];
     if (proposals.length > 0) stations.push("marks_attachment");
+    // S4 renders only when there is something to decide (zero decidable pairs
+    // = station not rendered at all, spec edge case).
+    if (hasDecidablePairs(posture)) stations.push("marks_output_form");
     return stations;
-  }, [proposals]);
+  }, [proposals, posture]);
 
   const [stationIndex, setStationIndex] = useState(0);
   const currentStation = visibleStations[Math.min(stationIndex, visibleStations.length - 1)];
@@ -190,6 +213,15 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
         {gate.alphabet.marks.length === 1 ? "" : "s"}. Confirm how they attach to
         your letters before placing keys.
       </p>
+
+      {currentStation === "marks_output_form" && (
+        <OutputFormStation
+          posture={posture}
+          proposal={outputFormProposal}
+          value={outputForm}
+          onChange={setOutputForm}
+        />
+      )}
 
       {currentStation === "marks_attachment" && (
         <AttachmentStation

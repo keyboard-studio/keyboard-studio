@@ -1034,6 +1034,14 @@
     "description": "The keyboard meets any applicable legislated, societal, and accessibility requirements for its locale"
   },
   {
+    "id": "18.13-mark-normalization-uniform",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "layer-c-enforce",
+    "principle": "consistency",
+    "lintRuleId": "KM_LINT_MARK_NORMALIZATION_UNIFORM",
+    "description": "Mark-bearing output is uniformly one form - all ready-made characters or all letter-plus-mark sequences, never a mix - so search and backspace behave the same for every accented letter"
+  },
+  {
     "id": "19.1-import-attribution-in-pr-body",
     "section": "19. Import output",
     "band": "scaffolder-bake",
