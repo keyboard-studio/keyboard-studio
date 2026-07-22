@@ -193,6 +193,28 @@ export function CharacterMapPane({
     return null;
   }
 
+  // Visible decomposition at the point of picking (spec 046 US5/FR-003): a
+  // whole-grapheme pick contributes its base to Letters and its mark(s) to
+  // Marks; the announcement narrates that three-way update so the pick itself
+  // is the teaching moment — no interrupting question.
+  function describeContribution(char: string): string {
+    const lastPick = usePhaseBDraftStore.getState().lastPick;
+    if (lastPick === null || lastPick.grapheme !== char.normalize("NFC")) return "";
+    const parts: string[] = [];
+    if (lastPick.addedBases.length > 0) {
+      parts.push(`${lastPick.addedBases.join(", ")} added to Letters`);
+    }
+    if (lastPick.addedMarks.length > 0) {
+      parts.push(
+        `${lastPick.addedMarks.map((m) => prefixCombiningMark(m, true)).join(", ")} added to Marks`,
+      );
+    }
+    if (lastPick.addedStack !== null && parts.length > 0) {
+      parts.push("combination recorded");
+    }
+    return parts.length > 0 ? ` — ${parts.join(", ")}` : "";
+  }
+
   function handleToggle(cell: CharacterMapCell): void {
     const nfc = cell.char.normalize("NFC");
     const wasSelected = chars.includes(nfc);
@@ -200,7 +222,11 @@ export function CharacterMapPane({
     const actionWord = wasSelected
       ? t({ id: "survey.characterMapPane.announce.removed", message: "Removed" })
       : t({ id: "survey.characterMapPane.announce.added", message: "Added" });
-    setAnnouncement(`${actionWord} ${cell.char} (${toUPlusNotation(cell.char)})`);
+    setAnnouncement(
+      `${actionWord} ${cell.char} (${toUPlusNotation(cell.char)})${
+        wasSelected ? "" : describeContribution(cell.char)
+      }`,
+    );
   }
 
   // "All options" escape hatch: add a character by raw code point, bypassing
@@ -224,7 +250,7 @@ export function CharacterMapPane({
     const char = result.char.normalize("NFC");
     addChar(char);
     const addedLabel = t({ id: "survey.characterMapPane.announce.added", message: "Added" });
-    setAnnouncement(`${addedLabel} ${char} (${toUPlusNotation(char)})`);
+    setAnnouncement(`${addedLabel} ${char} (${toUPlusNotation(char)})${describeContribution(char)}`);
     setRawInput("");
     setRawError(null);
   }

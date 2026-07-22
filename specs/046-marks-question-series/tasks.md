@@ -55,14 +55,14 @@ The contract types, the decomposition helper, the shared posture table, and the 
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T008** [P] Pick-commit decomposition in the picker: whole-grapheme pick runs `decomposeGrapheme`, records base → `bases`, mark(s) → `marks`, ordered sequence → `attestedStacks`, deduped (already-present items not duplicated, only the new attested combination added — edge case), with a transient "just added" highlight on the existing chip-indicator + `aria-live` announcer patterns · `packages/studio/src/survey/CharacterMapPane.tsx`
-- [ ] **T009** [P] Three-section inventory rendering (Letters / Marks / Accented letters), marks rendered on U+25CC carriers · `packages/studio/src/survey/PhaseB.tsx`
+- [x] **T008** [P] Pick-commit decomposition in the picker: whole-grapheme pick runs `decomposeGrapheme`, records base → `bases`, mark(s) → `marks`, ordered sequence → `attestedStacks`, deduped (already-present items not duplicated, only the new attested combination added — edge case), with a transient "just added" highlight on the existing chip-indicator + `aria-live` announcer patterns · `packages/studio/src/survey/CharacterMapPane.tsx`
+- [x] **T009** [P] Three-section inventory rendering (Letters / Marks / Accented letters), marks rendered on U+25CC carriers · `packages/studio/src/survey/PhaseB.tsx`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
 **Wave 2 — single task:**
 
-- [ ] **T010** Commit `ConfirmedAlphabet` (plus the derived flat `confirmedInventory`) onto the phase result when the characters step completes · `packages/studio/src/survey/CharactersStep.tsx`
+- [x] **T010** Commit `ConfirmedAlphabet` (plus the derived flat `confirmedInventory`) onto the phase result when the characters step completes · `packages/studio/src/survey/CharactersStep.tsx`
 
 **Checkpoint**: US5 is independently testable — a precomposed pick visibly lands in both lists and the stack list, and the confirmed alphabet carries the three stores forward.
 
