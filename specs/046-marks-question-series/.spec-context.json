@@ -3,8 +3,8 @@
   "specName": "046-marks-question-series",
   "branch": "046-marks-question-series",
   "selectedAt": "2026-07-21T22:43:12.777Z",
-  "currentStep": "specify",
-  "status": "specified",
+  "currentStep": "implement",
+  "status": "implementing",
   "history": [
     {
       "step": "specify",
@@ -12,6 +12,289 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-07-21T22:52:57.741Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-21T23:09:12.820Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-21T23:09:12.826Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-21T23:28:14.207Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-21T23:30:27.833Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-21T23:31:53.986Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-21T23:38:39.969Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T00:27:25.545Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T00:27:42.362Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-22T00:32:40.080Z"
     }
-  ]
+  ],
+  "telemetryInstanceId": "2fbeb931-cc8e-463b-9a7c-bfa4e0b7a804",
+  "approach": "Split the confirmed alphabet into three additive contract stores (bases/marks/attestedStacks, flat confirmedInventory derived), host the S0-S5 marks series as one new spine EditorStep between carve and mechanisms with card-based stations, and hand the mechanism gallery a typed PlacementWorklist via an optional prop. Engine logic lands as pure functions in a new engine/src/marks/ subsystem (nfc-posture-of-inventory shared table, house-target-policy-shaped output-form decision table), with the uniformity invariant enforced by a new IR-level validator check plus one new layer-c-enforce criteria row (148 to 149).",
+  "decisions": [
+    {
+      "decision": "Host the series as one new spine EditorStep (marks) between carve and mechanisms, stations sequenced internally with S0 as an unrendered gate",
+      "why": "S1/S2 interpolate the designer's own glyphs, which the static FlowQuestion shape cannot express; the EditorStep card mechanism already exists (CharactersStep/MechanismGallery precedents)",
+      "rejected": "Extending the Phase B sub-flow with more pb_* FlowQuestions, or one spine step per station"
+    },
+    {
+      "decision": "Three stores + PlacementWorklist as additive optional contract fields; legacy confirmedInventory kept and derived from the stores",
+      "why": "Inventory is contract-owned today and the documented convention is additive fields; deriving the flat list keeps every existing consumer working with no locked-type edit",
+      "rejected": "Studio-local store split (engine needs typed input) or replacing confirmedInventory (major-bump locked-contract removal)"
+    },
+    {
+      "decision": "Build nfc-posture-of-inventory as the single shared pure function and copy the house-target-policy decision-table shape for the S4 output-form proposal",
+      "why": "The facet YAML already names the function as its planned derivation, and one computed table keeps the facet, proposal, unwrap stores, and blocking rules from ever disagreeing",
+      "rejected": "Independent posture computation in the station and the validator (divergence is the failure mode FR-022 exists to prevent)"
+    },
+    {
+      "decision": "Enforce the uniformity invariant as an IR-level check (layer-a-prime convention, tagged layer B) plus one new layer-c-enforce criteria row, bumping enforced counts 148 to 149 and band 66 to 67",
+      "why": "FR-022 requires mechanical checkability against the produced keyboard; normalization form of emitted outputs is an IR property, not a lexical one",
+      "rejected": "Survey-side assertion only (advisory) or a Layer A source-string regex check"
+    },
+    {
+      "decision": "Ship blocked combinations as generated swallow-behavior rules (minimal A6 pull-forward) and generate stepwise backspace-unwrap stores from the attachment matrix",
+      "why": "No blocking generator exists; swallow defers the Phase-C-gated A6 loudness axis without blocking FR-021, and nfd-to-nfc.ts already recognizes the unwrap rule shape",
+      "rejected": "Implementing the full A6 axis now (scope creep) or pairwise NxN exclusion UI"
+    },
+    {
+      "decision": "Record the nfc-to-nfd migration need as a session flag only; do not build the reverse facet-transform in this feature",
+      "why": "The spec assumption and design-note open question 3 hold it as a separate decision; silently implementing would reopen a resolved v1 decline informally",
+      "rejected": "Implementing the reverse transform now"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Full plan + research + data model + contracts for the marks question series: three-store alphabet, S0-S5 card stations as one spine step, typed worklist handoff, uniformity check",
+      "key_finding": "Every seam the feature needs already has an in-tree precedent - the placementMap optional-prop seam into MechanismGallery, the house-target-policy decision table, the engine_resolved gate pattern, and the planned nfc-posture-of-inventory stub in the posture facet YAML - so no locked contract changes and no new architectural surface are required"
+    },
+    "tasks": {
+      "summary": "37 tasks in 11 phases: Setup + Foundational (contracts/decompose/posture/store split), one phase per P1 story (US5, US1, US2, US3, US7) then P2 (US4, US6, US8), Polish (retirement, e2e, SC validation); waves 2-3 deep per phase"
+    }
+  },
+  "coverage": {
+    "FR-001": {
+      "title": "Three distinct records: bases, marks, ordered attested combinations",
+      "tasks": [
+        "T002",
+        "T005"
+      ]
+    },
+    "FR-002": {
+      "title": "Whole composed character selectable as a single pick",
+      "tasks": [
+        "T008"
+      ]
+    },
+    "FR-003": {
+      "title": "Composed pick records base+marks+stack, visibly at pick time",
+      "tasks": [
+        "T008",
+        "T009",
+        "T010"
+      ]
+    },
+    "FR-004": {
+      "title": "PUA pick asks letter-or-mark; answer is a permanent declared role",
+      "tasks": [
+        "T030"
+      ]
+    },
+    "FR-006": {
+      "title": "One prefilled attachment row per mark (attested/plausible/blocked)",
+      "tasks": [
+        "T015",
+        "T016"
+      ]
+    },
+    "FR-007": {
+      "title": "Unchecked base means blocked, consequence stated in row help text",
+      "tasks": [
+        "T015",
+        "T016"
+      ]
+    },
+    "FR-008": {
+      "title": "Single-attested-base mark shows as auto-confirmed summary, still editable",
+      "tasks": [
+        "T015",
+        "T016"
+      ]
+    },
+    "FR-009": {
+      "title": "Case pairs derived from alphabet case data, no separate question",
+      "tasks": [
+        "T015"
+      ]
+    },
+    "FR-010": {
+      "title": "Marks grouped into classes; mental model confirmed per class with overrides",
+      "tasks": [
+        "T014",
+        "T024"
+      ]
+    },
+    "FR-011": {
+      "title": "Mental-model prefill from spread, base mechanism, spare-key affordability",
+      "tasks": [
+        "T022",
+        "T024"
+      ]
+    },
+    "FR-012": {
+      "title": "Input-order question only when a letter-plus-mark class exists, prefilled from import",
+      "tasks": [
+        "T025"
+      ]
+    },
+    "FR-013": {
+      "title": "Output form is one uniform keyboard-wide decision, never mixed",
+      "tasks": [
+        "T018"
+      ]
+    },
+    "FR-014": {
+      "title": "Any pair lacking a ready-made form: propose base-plus-mark as a notice",
+      "tasks": [
+        "T018",
+        "T020"
+      ]
+    },
+    "FR-015": {
+      "title": "All pairs compose + no letter-plus-mark class: propose ready-made as a notice",
+      "tasks": [
+        "T018",
+        "T020"
+      ]
+    },
+    "FR-016": {
+      "title": "Ambiguous case: open choice, recommended first, no Unicode/normalization wording",
+      "tasks": [
+        "T018",
+        "T029"
+      ]
+    },
+    "FR-017": {
+      "title": "Output-form preview demonstrates repeated-backspace behavior",
+      "tasks": [
+        "T020",
+        "T029"
+      ]
+    },
+    "FR-018": {
+      "title": "Stacking confirmation only on evidence, else two-mark combos stay blocked",
+      "tasks": [
+        "T026"
+      ]
+    },
+    "FR-019": {
+      "title": "Affirmative stacking shows specific attested stacks for explicit confirmation",
+      "tasks": [
+        "T026"
+      ]
+    },
+    "FR-020": {
+      "title": "Series exit hands the gallery a complete three-group classification",
+      "tasks": [
+        "T023",
+        "T027",
+        "T028"
+      ]
+    },
+    "FR-021": {
+      "title": "Blocked combinations unreachable by any ordinary key sequence",
+      "tasks": [
+        "T031",
+        "T033"
+      ]
+    },
+    "FR-022": {
+      "title": "Uniformity invariant mechanically checkable on the produced keyboard",
+      "tasks": [
+        "T019",
+        "T021"
+      ]
+    },
+    "FR-023": {
+      "title": "Alphabet edits that change decision evidence flag stations for reconfirmation",
+      "tasks": [
+        "T013",
+        "T027"
+      ]
+    },
+    "FR-024": {
+      "title": "No up-front marks question; every station derived from the confirmed alphabet",
+      "tasks": [
+        "T011"
+      ]
+    },
+    "FR-025": {
+      "title": "Retire five standalone marks questions; relocate pb_mark_input_order as S3",
+      "tasks": [
+        "T025",
+        "T034"
+      ]
+    },
+    "FR-026": {
+      "title": "Digraphs keep their own question, with parallel wording",
+      "tasks": [
+        "T035"
+      ]
+    },
+    "FR-005": {
+      "title": "Computed, never-displayed gate skips the series when marks list is empty",
+      "tasks": [
+        "T011",
+        "T012"
+      ]
+    }
+  }
 }
