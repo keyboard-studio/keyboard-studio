@@ -8,6 +8,17 @@
 // same array without prop drilling across the pane-swap boundary (StudioShell's
 // SurveyView renders CharacterMapPane independently of BuildListView).
 //
+// Three-store model (spec 046): the designer's PICKS are canonical — each pick
+// is one whole grapheme (plus a declared role for private-use characters).
+// Everything else is derived from the picks on every mutation:
+//   - `bases` / `marks` / `attestedStacks` / `declaredRoles` — the three-store
+//     ConfirmedAlphabet split (a precomposed pick contributes its base, its
+//     marks, and its ordered attested stack);
+//   - `chars` — the legacy flat NFC list every pre-046 consumer keeps reading.
+// Deriving (rather than mutating stores independently) means removing a pick
+// can never leave an orphaned mark behind: a mark stays only while some
+// remaining pick still implies it.
+//
 // Lifecycle: reset() is called from ../survey/CharactersStep.tsx on the
 // prefill -> B substage transition (a fresh alphabet each time the build-list
 // screen is entered) — NOT on every render of BuildListView/CharacterMapPane.
@@ -28,19 +39,49 @@
 // discarding everything they'd added. `snapshotPhaseBDraft`/
 // `applyPhaseBDraftSnapshot` below mirror the snapshotTraversal/
 // applyTraversalSnapshot idiom in ../stores/surveySessionStore.ts so
-// ../lib/draftPersistence.ts can fold `chars` into the same DurableDraft
+// ../lib/draftPersistence.ts can fold the picks into the same DurableDraft
 // envelope and restore them here before the build-list screen ever renders.
 
 import { create } from "zustand";
+import type { AttestedStack, ConfirmedAlphabet, DeclaredRole } from "@keyboard-studio/contracts";
+import { makeConfirmedAlphabet } from "@keyboard-studio/contracts";
+import { decomposeGrapheme, isCombiningMarkChar, isPrivateUseCodePoint } from "@keyboard-studio/engine";
 import { nfcDedup } from "../survey/charNormUtils.ts";
 
+/** One designer pick: a whole grapheme, plus the declared role for PUA picks. */
+interface DraftPick {
+  grapheme: string;
+  role?: DeclaredRole;
+}
+
+/** What one pick just contributed — drives the "just added" highlight (US5). */
+export interface LastPickContribution {
+  grapheme: string;
+  addedBases: string[];
+  addedMarks: string[];
+  addedStack: AttestedStack | null;
+}
+
 export interface PhaseBDraftState {
+  /** Legacy flat NFC alphabet (derived from the picks; kept for every pre-046 consumer). */
   chars: string[];
+  /** Three-store split derived from the picks (spec 046). */
+  bases: string[];
+  marks: string[];
+  attestedStacks: AttestedStack[];
+  declaredRoles: Record<string, DeclaredRole>;
+  /** The most recent add()'s contribution, for the visible-decomposition highlight. */
+  lastPick: LastPickContribution | null;
 
-  /** Add one character (NFC-normalized, deduped against the existing list). */
-  add: (c: string) => void;
+  /**
+   * Add one whole-grapheme pick (NFC-normalized, deduped). A decomposable pick
+   * visibly contributes its base, its mark(s), and the attested stack; a
+   * private-use pick should carry the designer's declared `role` (FR-004) —
+   * without one it is treated as a letter until classified.
+   */
+  add: (c: string, opts?: { role?: DeclaredRole }) => void;
 
-  /** Remove one character (NFC-normalized before comparison). */
+  /** Remove one pick (NFC-normalized before comparison). Derived stores recompute. */
   remove: (c: string) => void;
 
   /** Add if absent, remove if present (NFC-normalized before comparison). */
@@ -53,14 +94,148 @@ export interface PhaseBDraftState {
   reset: () => void;
 }
 
+// ---------------------------------------------------------------------------
+// Pure derivation: picks -> { chars, bases, marks, attestedStacks, declaredRoles }
+// ---------------------------------------------------------------------------
+
+interface DerivedStores {
+  chars: string[];
+  bases: string[];
+  marks: string[];
+  attestedStacks: AttestedStack[];
+  declaredRoles: Record<string, DeclaredRole>;
+}
+
+function isPrivateUseGrapheme(g: string): boolean {
+  for (const ch of g) {
+    const cp = ch.codePointAt(0);
+    if (cp !== undefined && isPrivateUseCodePoint(cp)) return true;
+  }
+  return false;
+}
+
+function deriveStores(picks: DraftPick[]): DerivedStores {
+  const chars: string[] = [];
+  const bases: string[] = [];
+  const marks: string[] = [];
+  const attestedStacks: AttestedStack[] = [];
+  const declaredRoles: Record<string, DeclaredRole> = {};
+  const charSeen = new Set<string>();
+  const baseSeen = new Set<string>();
+  const markSeen = new Set<string>();
+  const stackSeen = new Set<string>();
+
+  const pushChar = (g: string): void => {
+    if (!charSeen.has(g)) {
+      charSeen.add(g);
+      chars.push(g);
+    }
+  };
+  const pushBase = (b: string): void => {
+    if (!baseSeen.has(b)) {
+      baseSeen.add(b);
+      bases.push(b);
+    }
+  };
+  const pushMark = (m: string): void => {
+    if (!markSeen.has(m)) {
+      markSeen.add(m);
+      marks.push(m);
+    }
+  };
+  const pushStack = (s: AttestedStack): void => {
+    const key = `${s.base} ${s.marks.join(" ")}`;
+    if (!stackSeen.has(key)) {
+      stackSeen.add(key);
+      attestedStacks.push(s);
+    }
+  };
+
+  for (const pick of picks) {
+    const nfc = pick.grapheme.normalize("NFC");
+    pushChar(nfc);
+
+    if (isPrivateUseGrapheme(nfc)) {
+      // No linguistic data exists — the designer's declared role decides
+      // (FR-004); an unclassified PUA pick behaves as a letter until asked.
+      const role = pick.role ?? declaredRoles[nfc] ?? "letter";
+      declaredRoles[nfc] = role;
+      if (role === "mark") pushMark(nfc);
+      else pushBase(nfc);
+      continue;
+    }
+    if (isCombiningMarkChar(nfc)) {
+      pushMark(nfc);
+      continue;
+    }
+    const decomposition = decomposeGrapheme(nfc);
+    if (decomposition !== null) {
+      pushBase(decomposition.base);
+      for (const m of decomposition.marks) pushMark(m);
+      pushStack({ base: decomposition.base, marks: decomposition.marks });
+      continue;
+    }
+    // Plain letter, digit, punctuation, or a multi-base sequence (digraph):
+    // a whole unit of the Letters list.
+    pushBase(nfc);
+  }
+
+  return { chars, bases, marks, attestedStacks, declaredRoles };
+}
+
+/** Contribution diff for the just-added grapheme (visible decomposition, US5). */
+function contribution(
+  before: DerivedStores,
+  after: DerivedStores,
+  grapheme: string
+): LastPickContribution {
+  const beforeBases = new Set(before.bases);
+  const beforeMarks = new Set(before.marks);
+  const beforeStacks = new Set(before.attestedStacks.map((s) => `${s.base} ${s.marks.join(" ")}`));
+  const addedStack =
+    after.attestedStacks.find((s) => !beforeStacks.has(`${s.base} ${s.marks.join(" ")}`)) ?? null;
+  return {
+    grapheme: grapheme.normalize("NFC"),
+    addedBases: after.bases.filter((b) => !beforeBases.has(b)),
+    addedMarks: after.marks.filter((m) => !beforeMarks.has(m)),
+    addedStack,
+  };
+}
+
+// Canonical picks live module-side alongside the store (zustand state carries
+// only the derived arrays consumers subscribe to).
+let picks: DraftPick[] = [];
+
 export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
   chars: [],
+  bases: [],
+  marks: [],
+  attestedStacks: [],
+  declaredRoles: {},
+  lastPick: null,
 
-  add: (c) => set((s) => ({ chars: nfcDedup(s.chars, [c]) })),
+  add: (c, opts) => {
+    const nfc = c.normalize("NFC");
+    if (nfc.length === 0) return;
+    const chars = nfcDedup(get().chars, [c]);
+    if (!picks.some((p) => p.grapheme === nfc)) {
+      const before = deriveStores(picks);
+      picks = [
+        ...picks,
+        { grapheme: nfc, ...(opts?.role !== undefined ? { role: opts.role } : {}) },
+      ];
+      const after = deriveStores(picks);
+      set({ ...after, chars, lastPick: contribution(before, after, nfc) });
+    } else {
+      set({ chars });
+    }
+  },
 
   remove: (c) => {
     const nfc = c.normalize("NFC");
-    set((s) => ({ chars: s.chars.filter((x) => x !== nfc) }));
+    picks = picks.filter((p) => p.grapheme !== nfc);
+    const chars = get().chars.filter((x) => x !== nfc);
+    set({ ...deriveStores(picks), chars, lastPick: null });
   },
 
   toggle: (c) => {
@@ -72,10 +247,43 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
     }
   },
 
-  setAll: (next) => set({ chars: next }),
+  // Pinned contract (see phaseBDraftStore.test.ts): `chars` takes the input
+  // VERBATIM — no dedupe, no NFC-normalization; that is the caller's job. The
+  // three-store split still derives from a normalized/deduped pick rebuild,
+  // since the stores are canonical-model data, not a display list.
+  setAll: (next) => {
+    const deduped = nfcDedup([], next);
+    const roles = { ...usePhaseBDraftStore.getState().declaredRoles };
+    picks = deduped.map((grapheme) => {
+      const role = roles[grapheme];
+      return role !== undefined ? { grapheme, role } : { grapheme };
+    });
+    set({ ...deriveStores(picks), chars: next, lastPick: null });
+  },
 
-  reset: () => set({ chars: [] }),
+  reset: () => {
+    picks = [];
+    set({
+      chars: [],
+      bases: [],
+      marks: [],
+      attestedStacks: [],
+      declaredRoles: {},
+      lastPick: null,
+    });
+  },
 }));
+
+/** The three-store ConfirmedAlphabet the current draft resolves to (spec 046). */
+export function draftConfirmedAlphabet(): ConfirmedAlphabet {
+  const s = usePhaseBDraftStore.getState();
+  return makeConfirmedAlphabet({
+    bases: s.bases,
+    marks: s.marks,
+    attestedStacks: s.attestedStacks,
+    declaredRoles: s.declaredRoles,
+  });
+}
 
 // ---------------------------------------------------------------------------
 // PhaseBDraftSnapshot serialize/restore — draft-persistence fold-in (P0 fix)
@@ -83,23 +291,29 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
 // Mirrors the snapshotTraversal/applyTraversalSnapshot idiom in
 // ../stores/surveySessionStore.ts. `chars` is already a plain string array (no
 // Set/binary), so no encoding is needed beyond JSON.stringify/JSON.parse.
+// `declaredRoles` rides along additively (spec 046) so a restored draft keeps
+// its PUA classifications; old snapshots without the field restore fine.
 // ---------------------------------------------------------------------------
 
 /** Serializable snapshot of this store's accumulating alphabet. */
 export interface PhaseBDraftSnapshot {
   chars: string[];
+  declaredRoles?: Record<string, DeclaredRole>;
 }
 
 /** Build a serializable snapshot of the CURRENT phase-B draft alphabet. */
 export function snapshotPhaseBDraft(): PhaseBDraftSnapshot {
-  return { chars: usePhaseBDraftStore.getState().chars };
+  const s = usePhaseBDraftStore.getState();
+  return { chars: s.chars, declaredRoles: s.declaredRoles };
 }
 
 /**
- * Patch a `PhaseBDraftSnapshot` directly into the phase-B draft store. Uses
- * `setAll` (not a raw `setState`) so the restored list still flows through the
- * same replace path BuildListView/CharacterMapPane already call.
+ * Patch a `PhaseBDraftSnapshot` directly into the phase-B draft store. Restores
+ * declared roles first so the pick rebuild keeps PUA classifications, then
+ * flows the char list through the same `setAll` replace path
+ * BuildListView/CharacterMapPane already call.
  */
 export function applyPhaseBDraftSnapshot(snapshot: PhaseBDraftSnapshot): void {
+  usePhaseBDraftStore.setState({ declaredRoles: snapshot.declaredRoles ?? {} });
   usePhaseBDraftStore.getState().setAll(snapshot.chars);
 }

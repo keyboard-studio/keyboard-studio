@@ -39,7 +39,7 @@ The contract types, the decomposition helper, the shared posture table, and the 
 
 **Wave 3 — single task:**
 
-- [ ] **T007** Split the Phase B draft store into `bases` / `marks` / `attestedStacks` / `declaredRoles` sections (three-store canonical, flat list derived), keeping current consumers compiling · `packages/studio/src/stores/phaseBDraftStore.ts`
+- [x] **T007** Split the Phase B draft store into `bases` / `marks` / `attestedStacks` / `declaredRoles` sections (three-store canonical, flat list derived), keeping current consumers compiling · `packages/studio/src/stores/phaseBDraftStore.ts`
 
 **Checkpoint**: Contracts + engine foundations exist and typecheck; no user-visible change yet.
 

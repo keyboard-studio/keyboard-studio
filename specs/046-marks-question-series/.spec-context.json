@@ -123,6 +123,14 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-22T00:53:49.416Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:00:06.456Z"
     }
   ],
   "telemetryInstanceId": "2fbeb931-cc8e-463b-9a7c-bfa4e0b7a804",
@@ -351,7 +359,7 @@
       "step": "implement"
     }
   ],
-  "currentTask": "T006",
+  "currentTask": "T007",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -400,6 +408,14 @@
         "packages/engine/src/marks/nfc-posture-of-inventory.test.ts",
         "content/facets/orth/mark-composition-posture.yaml",
         "packages/engine/src/index.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "phaseBDraftStore split: picks canonical, bases/marks/attestedStacks/declaredRoles derived (orphan-free removal), lastPick contribution for US5 highlight, snapshot carries declaredRoles; chars keeps pinned verbatim setAll contract; 29 tests green incl. consumers",
+      "files": [
+        "packages/studio/src/stores/phaseBDraftStore.ts",
+        "packages/studio/src/stores/phaseBDraftStore.test.ts"
       ]
     }
   }
