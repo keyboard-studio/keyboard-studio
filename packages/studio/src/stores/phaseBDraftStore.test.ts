@@ -207,7 +207,7 @@ describe("phaseBDraftStore — snapshotPhaseBDraft/applyPhaseBDraftSnapshot roun
     usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
 
     const snapshot = snapshotPhaseBDraft();
-    expect(snapshot).toEqual({ chars: ["a", "b", "ɛ"], selectedFont: "charis-sil" });
+    expect(snapshot).toEqual({ chars: ["a", "b", "ɛ"], declaredRoles: {}, selectedFont: "charis-sil" });
 
     usePhaseBDraftStore.getState().reset();
     usePhaseBDraftStore.getState().setSelectedFont(DEFAULT_PHASE_B_FONT);

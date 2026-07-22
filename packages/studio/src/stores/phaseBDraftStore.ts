@@ -75,23 +75,19 @@ export interface PhaseBDraftState {
   lastPick: LastPickContribution | null;
 
   /**
-<<<<<<< HEAD
-   * Add one whole-grapheme pick (NFC-normalized, deduped). A decomposable pick
-   * visibly contributes its base, its mark(s), and the attested stack; a
-   * private-use pick should carry the designer's declared `role` (FR-004) —
-   * without one it is treated as a letter until classified.
-   */
-  add: (c: string, opts?: { role?: DeclaredRole }) => void;
-=======
    * The font applied to every character glyph rendered while building the
    * alphabet (chip editor, suggestion chips, character map) — set via the
    * font-selection dropdown at the top of the Phase B build-list step.
    */
   selectedFont: PhaseBFontValue;
 
-  /** Add one character (NFC-normalized, deduped against the existing list). */
-  add: (c: string) => void;
->>>>>>> a05563e (feat(studio): font picker for Phase B add-characters step)
+  /**
+   * Add one whole-grapheme pick (NFC-normalized, deduped). A decomposable pick
+   * visibly contributes its base, its mark(s), and the attested stack; a
+   * private-use pick should carry the designer's declared `role` (FR-004) —
+   * without one it is treated as a letter until classified.
+   */
+  add: (c: string, opts?: { role?: DeclaredRole }) => void;
 
   /** Remove one pick (NFC-normalized before comparison). Derived stores recompute. */
   remove: (c: string) => void;
