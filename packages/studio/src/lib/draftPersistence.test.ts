@@ -26,6 +26,7 @@ import type { BaseKeyboard, KeyboardIR, SurveyPhaseResult } from "@keyboard-stud
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { DEFAULT_PHASE_B_FONT } from "../survey/surveyStyles.ts";
 import type { IdentityLiteResult } from "../survey/index.ts";
 import {
   DRAFT_KEY_PREFIX,
@@ -629,6 +630,60 @@ describe("draftPersistence", () => {
 
       expect(loadDraft(pk)).toBe(true);
       expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    });
+
+    it("a pre-font-change record whose phaseBDraft has no selectedFont field restores to DEFAULT_PHASE_B_FONT (backward compat — additive optional field, not a version bump)", () => {
+      const pk = "phaseb-draft-legacy-font";
+      instantiateMinimal(pk);
+      usePhaseBDraftStore.getState().setAll(["a"]);
+      saveDraft(pk);
+
+      // Simulate a record written before selectedFont was added to phaseBDraft.
+      const envelope = JSON.parse(localStorage.getItem(draftKey(pk))!) as Record<string, unknown>;
+      const phaseBDraft = envelope.phaseBDraft as Record<string, unknown>;
+      delete phaseBDraft.selectedFont;
+      localStorage.setItem(draftKey(pk), JSON.stringify(envelope));
+
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      usePhaseBDraftStore.getState().setSelectedFont("charis-sil"); // must be overwritten by restore, not left dangling
+
+      expect(loadDraft(pk)).toBe(true);
+      expect(usePhaseBDraftStore.getState().selectedFont).toBe(DEFAULT_PHASE_B_FONT);
+      expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
+    });
+
+    it("a malformed selectedFont value (not one of the known FONT_OPTIONS) restores to DEFAULT_PHASE_B_FONT rather than propagating garbage", () => {
+      const pk = "phaseb-draft-malformed-font";
+      instantiateMinimal(pk);
+      saveDraft(pk);
+
+      const envelope = JSON.parse(localStorage.getItem(draftKey(pk))!) as Record<string, unknown>;
+      const phaseBDraft = envelope.phaseBDraft as Record<string, unknown>;
+      phaseBDraft.selectedFont = "comic-sans";
+      localStorage.setItem(draftKey(pk), JSON.stringify(envelope));
+
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
+
+      expect(loadDraft(pk)).toBe(true);
+      expect(usePhaseBDraftStore.getState().selectedFont).toBe(DEFAULT_PHASE_B_FONT);
+    });
+
+    it("a valid persisted selectedFont ('charis-sil') round-trips intact through save + load", () => {
+      const pk = "phaseb-draft-valid-font";
+      instantiateMinimal(pk);
+      usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
+      saveDraft(pk);
+
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      usePhaseBDraftStore.getState().reset();
+      usePhaseBDraftStore.getState().setSelectedFont(DEFAULT_PHASE_B_FONT);
+
+      expect(loadDraft(pk)).toBe(true);
+      expect(usePhaseBDraftStore.getState().selectedFont).toBe("charis-sil");
     });
 
     it("installDraftAutosave also debounce-saves a phaseBDraftStore mutation (same 500ms window, no new timer)", () => {

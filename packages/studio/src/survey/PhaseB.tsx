@@ -25,11 +25,12 @@ import { buildPlacementSeeds } from "./placementSeeds.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore, type DiscoveryMethod } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { useGlyphFontStack } from "./useGlyphFontStack.ts";
 import { nfcDedup } from "./charNormUtils.ts";
 import { prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { suggestMissingChars } from "../lib/services.ts";
 import type { MissingCharSuggestions } from "../lib/services.ts";
-import { RadioGroup } from "../ui/index.ts";
+import { RadioGroup, SelectMenu } from "../ui/index.ts";
 import {
   BG_PAGE,
   BORDER,
@@ -54,6 +55,8 @@ import {
   chipIndicatorText,
   chipIndicatorColor,
   visuallyHidden,
+  FONT_OPTIONS,
+  phaseBFontStack,
 } from "./surveyStyles.ts";
 
 // Vite ?raw import — typed via the `*.yaml?raw` declaration in src/vite-env.d.ts.
@@ -176,6 +179,7 @@ interface CharChipEditorProps {
 
 function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorProps) {
   const { t } = useLingui();
+  const glyphFontStack = useGlyphFontStack();
   const [inputVal, setInputVal] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -281,7 +285,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
                 })}
                 style={charChip(false)}
               >
-                <span style={chipGlyph(true)}>
+                <span style={chipGlyph(true, glyphFontStack)}>
                   {c}
                 </span>
                 <span style={chipCodepoint}>
@@ -309,6 +313,7 @@ interface SuggestionChipProps {
 
 function SuggestionChip({ char, checked, onToggle }: SuggestionChipProps) {
   const { t } = useLingui();
+  const glyphFontStack = useGlyphFontStack();
   const cp = toUPlusNotation(char);
   const actionLabel = checked
     ? t({ id: "survey.phaseB.suggestionChip.removeAction", message: "Remove" })
@@ -321,7 +326,7 @@ function SuggestionChip({ char, checked, onToggle }: SuggestionChipProps) {
       aria-pressed={checked}
       style={charChip(checked)}
     >
-      <span style={chipGlyph(checked)}>
+      <span style={chipGlyph(checked, glyphFontStack)}>
         {char}
       </span>
       <span style={chipCodepoint}>{cp}</span>
@@ -622,6 +627,8 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   const { t } = useLingui();
   const chars = usePhaseBDraftStore((s) => s.chars);
   const setAll = usePhaseBDraftStore((s) => s.setAll);
+  const selectedFont = usePhaseBDraftStore((s) => s.selectedFont);
+  const setSelectedFont = usePhaseBDraftStore((s) => s.setSelectedFont);
   const doneDisabled = chars.length === 0;
 
   return (
@@ -648,6 +655,30 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
       <h2 style={phaseHeadingFlush}>
         <Trans id="survey.phaseB.buildList.heading">Phase B — Add your whole alphabet</Trans>
       </h2>
+
+      {/* Font selection — custom SelectMenu (webview-safe dropdown): native
+          <select> popups don't open in the VS Code Simple Browser, so this is
+          a DOM-rendered menu. Applies to every character glyph on this step,
+          incl. the character map — see phaseBDraftStore.selectedFont. */}
+      <div style={{ maxWidth: 280 }} data-testid="phase-b-font-select">
+        <label id="phase-b-font-select-label"
+               style={{ display: "block", margin: "0 0 8px 0", fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>
+          <Trans id="survey.phaseB.buildList.fontSelectLabel">Font for characters</Trans>
+        </label>
+        <SelectMenu
+          id="phase-b-font-select-control"
+          value={selectedFont}
+          options={FONT_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+          ariaLabelledby="phase-b-font-select-label"
+          renderOptionLabel={(opt) => (
+            <span style={{ fontFamily: phaseBFontStack(opt.value) }}>{opt.label}</span>
+          )}
+          onChange={(v) => {
+            const opt = FONT_OPTIONS.find((o) => o.value === v);
+            if (opt) setSelectedFont(opt.value);
+          }}
+        />
+      </div>
 
       {/* Instructions */}
       <div

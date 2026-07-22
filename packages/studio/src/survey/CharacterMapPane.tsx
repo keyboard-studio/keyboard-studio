@@ -30,6 +30,7 @@ import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
 import { isPrivateUseCodePoint } from "@keyboard-studio/engine";
 import { prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { TextField } from "../ui/index.ts";
+import { useGlyphFontStack } from "./useGlyphFontStack.ts";
 import {
   ACCENT,
   ERROR_RED,
@@ -139,6 +140,7 @@ export function CharacterMapPane({
   const chars = usePhaseBDraftStore((s) => s.chars);
   const toggle = usePhaseBDraftStore((s) => s.toggle);
   const addChar = usePhaseBDraftStore((s) => s.add);
+  const glyphFontStack = useGlyphFontStack();
 
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [query, setQuery] = useState("");
@@ -448,7 +450,7 @@ export function CharacterMapPane({
                         aria-label={`${actionLabel} ${cell.char} (${cp})`}
                         style={charChip(selected)}
                       >
-                        <span style={chipGlyph(selected)}>{display}</span>
+                        <span style={chipGlyph(selected, glyphFontStack)}>{display}</span>
                         <span style={chipCodepoint}>{cp}</span>
                         {/* Non-color selected indicator (colorblind-safe) — shared
                             helper with SuggestionChip's "[x]"/"+" pattern in

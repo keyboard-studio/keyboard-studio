@@ -286,6 +286,7 @@
   "editor.assignLoop.flaggedForSequencesHeading": "Marqués pour des séquences",
   "editor.assignLoop.touch.flickDirectionAriaLabel": "Direction du balayage",
   "dashboard.flowMap.title": "Carte des parcours",
+  "survey.phaseB.buildList.fontSelectLabel": "",
   "editor.assignLoop.touch.headerDescription": "Pour chaque caractère, choisissez comment il apparaît sur le clavier tactile. Votre disposition de bureau est verrouillée — ceci s'applique uniquement au téléphone et à la tablette.",
   "survey.phaseB.suggestionPanel.fromCldr": "",
   "dashboard.flowGraph.badge.gate": "porte",

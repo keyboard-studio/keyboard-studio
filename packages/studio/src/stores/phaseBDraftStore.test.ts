@@ -21,6 +21,7 @@ import {
   snapshotPhaseBDraft,
   applyPhaseBDraftSnapshot,
 } from "./phaseBDraftStore.ts";
+import { DEFAULT_PHASE_B_FONT } from "../survey/surveyStyles.ts";
 
 // e-acute: precomposed (NFC, 1 codepoint) vs decomposed (NFD, "e" + combining
 // acute U+0301, 2 codepoints). Same grapheme, different encodings.
@@ -162,6 +163,58 @@ describe("phaseBDraftStore — reset", () => {
     usePhaseBDraftStore.getState().reset();
     usePhaseBDraftStore.getState().reset();
     expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+  });
+
+  it("does not touch selectedFont — font selection is left untouched, per the store's own reset() doc comment", () => {
+    usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
+    usePhaseBDraftStore.getState().reset();
+    expect(usePhaseBDraftStore.getState().selectedFont).toBe("charis-sil");
+    // Restore the default so this test doesn't leak state to later tests
+    // (this file's top-level afterEach only resets chars, not the font).
+    usePhaseBDraftStore.getState().setSelectedFont(DEFAULT_PHASE_B_FONT);
+  });
+});
+
+describe("phaseBDraftStore — selectedFont", () => {
+  afterEach(() => {
+    usePhaseBDraftStore.getState().setSelectedFont(DEFAULT_PHASE_B_FONT);
+  });
+
+  it("defaults to DEFAULT_PHASE_B_FONT (noto-sans) on a fresh store", () => {
+    expect(usePhaseBDraftStore.getState().selectedFont).toBe(DEFAULT_PHASE_B_FONT);
+    expect(usePhaseBDraftStore.getState().selectedFont).toBe("noto-sans");
+  });
+
+  it("setSelectedFont updates the selection", () => {
+    usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
+    expect(usePhaseBDraftStore.getState().selectedFont).toBe("charis-sil");
+  });
+
+  it("setSelectedFont does not disturb the accumulated chars list", () => {
+    usePhaseBDraftStore.getState().setAll(["a", "b"]);
+    usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
+    expect(usePhaseBDraftStore.getState().chars).toEqual(["a", "b"]);
+  });
+});
+
+describe("phaseBDraftStore — snapshotPhaseBDraft/applyPhaseBDraftSnapshot round-trip", () => {
+  afterEach(() => {
+    usePhaseBDraftStore.getState().setSelectedFont(DEFAULT_PHASE_B_FONT);
+  });
+
+  it("round-trips both chars and selectedFont together", () => {
+    usePhaseBDraftStore.getState().setAll(["a", "b", "ɛ"]);
+    usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
+
+    const snapshot = snapshotPhaseBDraft();
+    expect(snapshot).toEqual({ chars: ["a", "b", "ɛ"], declaredRoles: {}, selectedFont: "charis-sil" });
+
+    usePhaseBDraftStore.getState().reset();
+    usePhaseBDraftStore.getState().setSelectedFont(DEFAULT_PHASE_B_FONT);
+
+    applyPhaseBDraftSnapshot(snapshot);
+    expect(usePhaseBDraftStore.getState().chars).toEqual(["a", "b", "ɛ"]);
+    expect(usePhaseBDraftStore.getState().selectedFont).toBe("charis-sil");
   });
 });
 
