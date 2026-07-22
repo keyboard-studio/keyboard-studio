@@ -6,6 +6,13 @@
 #
 # The download half of the round-trip (scheduled `download` -> translations PR)
 # is the sibling workflow crowdin-download-translations.yml (T038).
+#
+# seed_translations (manual-trigger only): also uploads the repo's existing
+# target-locale catalogs (fr/messages.json etc.) to Crowdin as translations.
+# One-off seeding tool, not part of the normal round-trip -- without it,
+# Crowdin has no record of the illustrative translations already committed
+# to the repo, so the first `download` overwrites them with English fallback
+# (skip_untranslated_strings: false fills every untranslated key from source).
 
 name: Crowdin upload sources
 
@@ -15,7 +22,12 @@ on:
     paths:
       - "packages/studio/src/locales/en/messages.json"
       - "crowdin.yml"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      seed_translations:
+        description: "Also upload existing target-locale catalogs (e.g. fr) as translations (one-off seeding)"
+        type: boolean
+        default: false
 
 jobs:
   upload:
@@ -27,12 +39,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Upload sources to Crowdin
+      - name: Upload sources (and optionally seed translations) to Crowdin
         uses: crowdin/github-action@v2
         with:
           config: crowdin.yml
           upload_sources: true
-          upload_translations: false
+          upload_translations: ${{ inputs.seed_translations == true }}
           download_translations: false
         env:
           CROWDIN_PROJECT_ID: ${{ secrets.CROWDIN_PROJECT_ID }}
