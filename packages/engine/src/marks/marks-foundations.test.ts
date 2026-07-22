@@ -76,6 +76,33 @@ describe("groupMarkClasses (FR-010)", () => {
     });
     expect(groupMarkClasses(a)).toEqual(groupMarkClasses(a));
   });
+
+  // Pins the documented v1 gap (see bucketOf): marks outside the Combining
+  // Diacritical Marks blocks all land in the "other" bucket, so functionally
+  // distinct Arabic harakat with the same attested consonants merge into one
+  // class. When ccc-based bucketing lands, this test should start failing —
+  // update it to assert the per-mark fixed-position split instead.
+  it("v1 gap: same-base non-Latin marks merge into a single 'other' class", () => {
+    const FATHA = "َ";
+    const KASRA = "ِ";
+    const SHADDA = "ّ";
+    const a = makeConfirmedAlphabet({
+      bases: ["ب", "ت"], // beh, teh
+      marks: [FATHA, KASRA, SHADDA],
+      attestedStacks: [
+        { base: "ب", marks: [FATHA] },
+        { base: "ب", marks: [KASRA] },
+        { base: "ب", marks: [SHADDA] },
+        { base: "ت", marks: [FATHA] },
+        { base: "ت", marks: [KASRA] },
+        { base: "ت", marks: [SHADDA] },
+      ],
+    });
+    const classes = groupMarkClasses(a);
+    expect(classes).toHaveLength(1);
+    expect(classes[0]?.id).toBe("other-1");
+    expect(classes[0]?.marks).toEqual([FATHA, KASRA, SHADDA]);
+  });
 });
 
 describe("proposeAttachments (FR-006/FR-007/FR-008)", () => {

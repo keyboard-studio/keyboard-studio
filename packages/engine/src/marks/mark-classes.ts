@@ -40,6 +40,18 @@ function bucketOf(mark: string): FunctionBucket {
   // ccc isn't exposed to JS; the standard combining ranges give a serviceable
   // approximation: U+0300–0315 + common above marks are rendered above,
   // U+0316–0333 + friends below. Anything unclassified lands in "other".
+  //
+  // v1 SCOPE: the above/below split is calibrated for alphabetic scripts
+  // using the Combining Diacritical Marks blocks (Latin/Cyrillic/Greek-style
+  // orthographies). Marks from other systems — Arabic harakat, Hebrew niqqud,
+  // Thai/Lao/Khmer vowel and tone signs, Indic matras/anusvara — all fall
+  // into the single "other" bucket, where classing relies on attachment
+  // similarity alone and may merge functionally distinct marks. This is a
+  // documented v1 gap (same posture as the EuroLatin/IPA gaps in spec.md
+  // §7.5). The intended fix is a pinned UnicodeData ccc join (like the
+  // DerivedAge.txt join in display-difficulty): ccc gives above (230), below
+  // (220), and per-mark fixed-position classes for Arabic (27–35), which
+  // dissolves the harakat merge problem without hand-rolled ranges.
   const cp = mark.codePointAt(0);
   if (cp === undefined) return "other";
   if (

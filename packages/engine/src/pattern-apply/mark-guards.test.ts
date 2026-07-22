@@ -78,6 +78,10 @@ describe("applyMarkGuards — blocking (FR-021 swallow)", () => {
     const emitted = emit(result.ir);
     expect(emitted).toContain(`group(${MARKS_GUARD_GROUP})`);
     expect(emitted).toContain("match > use(generated_marks_guard)");
+    // The swallow rule itself, verbatim: [base, mark] context > [base]. The
+    // combining mark must emit as a standalone U+XXXX token, never a quoted
+    // literal that would attach to a neighbouring char in source.
+    expect(emitted).toContain("U+006B U+0301 > U+006B");
   });
 
   it("is idempotent — re-applying replaces rather than duplicates", () => {
