@@ -16,6 +16,10 @@ import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  loadFacetScripts,
+  resolveKeyboardScript,
+} from "./facet-script-lookup.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const STUDIO_DIR = path.resolve(SCRIPT_DIR, "..");
@@ -60,7 +64,15 @@ function ensureClone(target) {
   if (fs.existsSync(gitDir)) {
     log(`refreshing existing clone at ${target}`);
     try {
-      run("git", ["-C", target, "fetch", "--depth", "1", "origin", REPO_BRANCH]);
+      run("git", [
+        "-C",
+        target,
+        "fetch",
+        "--depth",
+        "1",
+        "origin",
+        REPO_BRANCH,
+      ]);
       run("git", ["-C", target, "reset", "--hard", `origin/${REPO_BRANCH}`]);
       return;
     } catch (e) {
@@ -72,8 +84,10 @@ function ensureClone(target) {
   log(`cloning ${REPO_URL} (branch=${REPO_BRANCH}, depth=1) -> ${target}`);
   run("git", [
     "clone",
-    "--depth", "1",
-    "--branch", REPO_BRANCH,
+    "--depth",
+    "1",
+    "--branch",
+    REPO_BRANCH,
     REPO_URL,
     target,
   ]);
@@ -117,6 +131,18 @@ function parseKmnMetadata(kmnPath) {
 function scan(keyboardsRepoRoot, sourceRepoSlug) {
   const releaseDir = path.join(keyboardsRepoRoot, "release");
   if (!fs.existsSync(releaseDir)) return [];
+  const facetIndexPath = path.join(
+    REPO_ROOT,
+    "docs",
+    "keyboard-facet-index.json",
+  );
+  const facetScripts = loadFacetScripts(facetIndexPath);
+  if (facetScripts.size === 0) {
+    log(
+      `no script facets loaded from ${facetIndexPath} — ` +
+        "falling back to .kps declared-tag script derivation",
+    );
+  }
   const out = [];
   for (const vendor of fs.readdirSync(releaseDir)) {
     const vendorDir = path.join(releaseDir, vendor);
@@ -148,9 +174,9 @@ function scan(keyboardsRepoRoot, sourceRepoSlug) {
       const entry = {
         id,
         path: `release/${vendor}/${id}`,
-        // [SCAFFOLD] script hardcoded to "Latn" — mirrors localKeyboards.ts;
-        // derive from .kpj BaseLanguage once that parsing lands.
-        script: "Latn",
+        // Facet-index script facet > .kps declared tags > "Latn" — mirrors
+        // localKeyboards.ts via the shared facet-script-lookup module.
+        script: resolveKeyboardScript(id, languages, facetScripts),
         targets: ["windows", "macosx", "linux", "web"],
         displayName: meta.name !== "" ? meta.name : id,
         version: meta.version,
@@ -180,7 +206,9 @@ function main() {
   const catalog = scan(repoDir, slug);
   fs.mkdirSync(OUT_DIR, { recursive: true });
   fs.writeFileSync(OUT_FILE, JSON.stringify(catalog), "utf8");
-  log(`emitted ${catalog.length} keyboards to ${path.relative(STUDIO_DIR, OUT_FILE)}`);
+  log(
+    `emitted ${catalog.length} keyboards to ${path.relative(STUDIO_DIR, OUT_FILE)}`,
+  );
 }
 
 main();
