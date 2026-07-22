@@ -52,7 +52,6 @@ import {
 } from "../../src/dashboard/buildStepGraph.ts";
 import {
   buildManifestProjection,
-  CHARACTERS_STEP_ID,
 } from "../../src/dashboard/manifestProjection.ts";
 import {
   CARVE_WRITES,
@@ -90,12 +89,11 @@ describe("spec 021 T013 — carve resolves as a first-class map node carrying CA
     expect(projection.nodes.filter((n) => n.id === CARVE_ID)).toHaveLength(1);
   });
 
-  it("the carve node sits on the manifest spine immediately after `characters`", () => {
+  it("the carve node is a spine step (carries a spine edge in the step graph)", () => {
+    // Modular: assert carve is on the spine, not its exact position — the marks
+    // series (spec 046) and future steps may be inserted around it freely.
     const ids = manifest.filter((s) => s.spine === true).map((s) => s.id);
-    const charIdx = ids.indexOf(CHARACTERS_STEP_ID);
-    expect(charIdx).toBeGreaterThanOrEqual(0);
-    expect(ids[charIdx + 1]).toBe(CARVE_ID);
-    // The carve step is a spine step (it carries a spine edge in the step graph).
+    expect(ids).toContain(CARVE_ID);
     expect(stepGraph.edges.some((e) => e.kind === "spine" && e.from === CARVE_ID)).toBe(true);
   });
 

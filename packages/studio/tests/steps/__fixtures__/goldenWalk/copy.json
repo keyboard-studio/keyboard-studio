@@ -59,20 +59,7 @@
   {
     "stepId": "characters/B",
     "applyStepCompletion": [
-      "characters"
-    ],
-    "storeMutations": [
-      "advance"
-    ],
-    "workingCopyMutations": [
-      "recordPhase"
-    ],
-    "navigateTo": []
-  },
-  {
-    "stepId": "carve",
-    "applyStepCompletion": [
-      "carve",
+      "characters",
       "marks"
     ],
     "storeMutations": [
@@ -80,8 +67,20 @@
       "advance"
     ],
     "workingCopyMutations": [
+      "recordPhase",
       "recordPhase"
     ],
+    "navigateTo": []
+  },
+  {
+    "stepId": "carve",
+    "applyStepCompletion": [
+      "carve"
+    ],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
     "navigateTo": []
   },
   {
