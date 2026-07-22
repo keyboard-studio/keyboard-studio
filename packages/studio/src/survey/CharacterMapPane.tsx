@@ -21,6 +21,7 @@
 // oracle; this is a synchronous UI filter over already-loaded data).
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { parseUPlusNotation, toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
@@ -61,13 +62,15 @@ type LoadState =
 // GlyphCell/InfoView/etc. use — parameterized here on cell.isCombiningMark
 // (Mn-or-Mc) rather than that helper's default Mn-only isCombining() test.
 
-function tierLabel(tier: CharacterMapGroup["tier"]): string | null {
-  if (tier === "main") return "main";
-  if (tier === "auxiliary") return "loanwords";
-  if (tier === "digits") return "Digits & numerals";
-  if (tier === "punctuation") return "Punctuation & symbols";
-  return null;
-}
+// tierLabel is defined INSIDE CharacterMapPane (below), closing over the
+// component's own `t` from useLingui() directly, rather than taking `t` as a
+// parameter — the lingui macro transform tracks a specific variable BINDING
+// (see @lingui/babel-plugin-lingui-macro's getBinding().referencePaths), so a
+// `t` re-bound as a plain function parameter in a module-level helper is a
+// distinct binding the extractor does not follow (confirmed empirically:
+// editors/assignLoop/parts/Inspector.tsx's ruleDetailLabel(r, t) helper takes
+// this shape and its ids do NOT appear in locales/en/messages.json even after
+// extraction — do not copy that shape here).
 
 // ---------------------------------------------------------------------------
 // Raw U+XXXX entry — the "all options" escape hatch. The browse grid only
@@ -82,26 +85,22 @@ function tierLabel(tier: CharacterMapGroup["tier"]): string | null {
 
 type CodepointParseResult =
   | { ok: true; char: string }
-  | { ok: false; message: string };
+  | { ok: false };
 
 /**
  * Parse a free-typed code point string into a validated Unicode character.
  * Delegates the actual hex-parse / surrogate / range / noncharacter checks to
  * the canonical `parseUPlusNotation` (@keyboard-studio/contracts) rather than
- * re-implementing them — this function's only job is to turn that parser's
- * bare `null` into a human-readable message. PUA code points (e.g. U+E000)
- * pass through unchanged: that is the escape hatch's whole point.
+ * re-implementing them. Returns a stable ok/not-ok result only — CharacterMapPane
+ * (below) turns a `false` result into the translated error message, since it
+ * (not this pure helper) holds the live `t` binding the extractor tracks.
+ * PUA code points (e.g. U+E000) pass through unchanged: that is the escape
+ * hatch's whole point.
  */
 function parseCodepointInput(raw: string): CodepointParseResult {
   const trimmed = raw.trim();
   const resolved = parseUPlusNotation(trimmed);
-  if (resolved === null) {
-    return {
-      ok: false,
-      message:
-        "Enter a valid code point: U+ followed by 4-6 hex digits (e.g. U+1E900). Surrogate halves and Unicode noncharacters aren't allowed.",
-    };
-  }
+  if (resolved === null) return { ok: false };
   return { ok: true, char: resolved };
 }
 
@@ -130,6 +129,7 @@ interface CharacterMapPaneProps {
 export function CharacterMapPane({
   maxCellsPerGroup = MAX_CELLS_PER_GROUP,
 }: CharacterMapPaneProps = {}) {
+  const { t } = useLingui();
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const surveyContext = useSurveySessionStore((s) => s.surveyContext);
   const bcp47 = surveyContext.bcp47_tag;
@@ -151,7 +151,8 @@ export function CharacterMapPane({
   // the generic "No characters available" empty state instead of a message that
   // tells the author WHY (and what to do instead).
   const noBaseOrLanguage = baseIr === null || !bcp47;
-  const displayName = languageName ?? bcp47 ?? "this language";
+  const displayName =
+    languageName ?? bcp47 ?? t({ id: "survey.characterMapPane.genericLanguage", message: "this language" });
 
   // Fetch the character map whenever the base IR or language identity changes.
   useEffect(() => {
@@ -182,13 +183,24 @@ export function CharacterMapPane({
       .filter((g) => g.cells.length > 0);
   }, [loadState, query]);
 
+  // Defined here (not at module scope) so its `t()` calls close over this
+  // component's own `t` binding directly — see the note above CodepointParseResult.
+  function tierLabel(tier: CharacterMapGroup["tier"]): string | null {
+    if (tier === "main") return t({ id: "survey.characterMapPane.tier.main", message: "main" });
+    if (tier === "auxiliary") return t({ id: "survey.characterMapPane.tier.auxiliary", message: "loanwords" });
+    if (tier === "digits") return t({ id: "survey.characterMapPane.tier.digits", message: "Digits & numerals" });
+    if (tier === "punctuation") return t({ id: "survey.characterMapPane.tier.punctuation", message: "Punctuation & symbols" });
+    return null;
+  }
+
   function handleToggle(cell: CharacterMapCell): void {
     const nfc = cell.char.normalize("NFC");
     const wasSelected = chars.includes(nfc);
     toggle(cell.char);
-    setAnnouncement(
-      `${wasSelected ? "Removed" : "Added"} ${cell.char} (${toUPlusNotation(cell.char)})`,
-    );
+    const actionWord = wasSelected
+      ? t({ id: "survey.characterMapPane.announce.removed", message: "Removed" })
+      : t({ id: "survey.characterMapPane.announce.added", message: "Added" });
+    setAnnouncement(`${actionWord} ${cell.char} (${toUPlusNotation(cell.char)})`);
   }
 
   // "All options" escape hatch: add a character by raw code point, bypassing
@@ -200,12 +212,19 @@ export function CharacterMapPane({
     if (trimmed === "") return;
     const result = parseCodepointInput(trimmed);
     if (!result.ok) {
-      setRawError(result.message);
+      setRawError(
+        t({
+          id: "survey.characterMapPane.rawInput.invalidCodepoint",
+          message:
+            "Enter a valid code point: U+ followed by 4-6 hex digits (e.g. U+1E900). Surrogate halves and Unicode noncharacters aren't allowed.",
+        }),
+      );
       return;
     }
     const char = result.char.normalize("NFC");
     addChar(char);
-    setAnnouncement(`Added ${char} (${toUPlusNotation(char)})`);
+    const addedLabel = t({ id: "survey.characterMapPane.announce.added", message: "Added" });
+    setAnnouncement(`${addedLabel} ${char} (${toUPlusNotation(char)})`);
     setRawInput("");
     setRawError(null);
   }
@@ -213,11 +232,13 @@ export function CharacterMapPane({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%", minHeight: 0 }}>
       <h2 style={{ margin: 0, fontSize: "1.1rem", color: ACCENT }}>
-        Character map
+        <Trans id="survey.characterMapPane.title">Character map</Trans>
       </h2>
       <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, lineHeight: 1.5 }}>
-        Browse and click to toggle characters into your alphabet — the same
-        list you're building on the left.
+        <Trans id="survey.characterMapPane.subtitle">
+          Browse and click to toggle characters into your alphabet — the same
+          list you're building on the left.
+        </Trans>
       </p>
       <form
         onSubmit={handleRawSubmit}
@@ -225,7 +246,7 @@ export function CharacterMapPane({
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 160px" }}>
           <label htmlFor="char-map-raw-codepoint" style={{ fontSize: 11, color: TEXT_DIM }}>
-            Add any character by code point
+            <Trans id="survey.characterMapPane.rawInput.label">Add any character by code point</Trans>
           </label>
           <TextField
             id="char-map-raw-codepoint"
@@ -235,12 +256,15 @@ export function CharacterMapPane({
               if (rawError !== null) setRawError(null);
             }}
             placeholder="U+1E900"
-            aria-label="Add a character by Unicode code point"
+            aria-label={t({
+              id: "survey.characterMapPane.rawInput.ariaLabel",
+              message: "Add a character by Unicode code point",
+            })}
             aria-describedby={rawError !== null ? "char-map-raw-codepoint-error" : undefined}
           />
         </div>
         <button type="submit" disabled={rawInput.trim() === ""} style={primaryButton(rawInput.trim() === "")}>
-          Add
+          <Trans id="survey.characterMapPane.rawInput.addButton">Add</Trans>
         </button>
       </form>
       {rawError !== null && (
@@ -251,8 +275,8 @@ export function CharacterMapPane({
       <TextField
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search characters"
-        aria-label="Search the character map"
+        placeholder={t({ id: "survey.characterMapPane.search.placeholder", message: "Search characters" })}
+        aria-label={t({ id: "survey.characterMapPane.search.ariaLabel", message: "Search the character map" })}
       />
       {/* Screen-reader announcer for toggle actions — visually hidden. */}
       <div aria-live="polite" style={visuallyHidden}>
@@ -262,18 +286,22 @@ export function CharacterMapPane({
       <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
         {noBaseOrLanguage ? (
           <div style={mutedNote}>
-            No verified character list for {displayName} — type your alphabet
-            in the left panel.
+            <Trans id="survey.characterMapPane.noVerifiedList">
+              No verified character list for {displayName} — type your alphabet
+              in the left panel.
+            </Trans>
           </div>
         ) : loadState.status === "idle" || loadState.status === "loading" ? (
-          <div style={mutedNote}>Loading the character map…</div>
+          <div style={mutedNote}><Trans id="survey.characterMapPane.loading">Loading the character map…</Trans></div>
         ) : loadState.status === "error" ? (
-          <div style={mutedNote}>Could not load the character map.</div>
+          <div style={mutedNote}><Trans id="survey.characterMapPane.loadError">Could not load the character map.</Trans></div>
         ) : filteredGroups.length === 0 ? (
           <div style={mutedNote}>
-            {query.trim() === ""
-              ? "No characters available for this language yet."
-              : `No characters match "${query.trim()}".`}
+            {query.trim() === "" ? (
+              <Trans id="survey.characterMapPane.noneAvailable">No characters available for this language yet.</Trans>
+            ) : (
+              <Trans id="survey.characterMapPane.noMatch">No characters match "{query.trim()}".</Trans>
+            )}
           </div>
         ) : (
           filteredGroups.map((group) => {
@@ -284,10 +312,20 @@ export function CharacterMapPane({
             // field reaches anything regardless of this cap).
             const visibleCells = group.cells.slice(0, maxCellsPerGroup);
             const hiddenCount = group.cells.length - visibleCells.length;
+            const groupAriaLabel =
+              label !== null
+                ? t({
+                    id: "survey.characterMapPane.group.ariaLabelWithTier",
+                    message: `${{ block: group.block }} characters (${{ tier: label }})`,
+                  })
+                : t({
+                    id: "survey.characterMapPane.group.ariaLabel",
+                    message: `${{ block: group.block }} characters`,
+                  });
             return (
               <section
                 key={`${group.tier}-${group.block}`}
-                aria-label={`${group.block} characters${label !== null ? ` (${label})` : ""}`}
+                aria-label={groupAriaLabel}
               >
                 <h3 style={sectionHeading}>
                   {group.block}
@@ -300,20 +338,26 @@ export function CharacterMapPane({
                 </h3>
                 <div
                   role="group"
-                  aria-label={`${group.block} characters — click to toggle`}
+                  aria-label={t({
+                    id: "survey.characterMapPane.group.clickToToggleAriaLabel",
+                    message: `${{ block: group.block }} characters — click to toggle`,
+                  })}
                   style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
                 >
                   {visibleCells.map((cell) => {
                     const selected = chars.includes(cell.char.normalize("NFC"));
                     const cp = toUPlusNotation(cell.char);
                     const display = prefixCombiningMark(cell.char, cell.isCombiningMark);
+                    const actionLabel = selected
+                      ? t({ id: "survey.characterMapPane.cell.removeAction", message: "Remove" })
+                      : t({ id: "survey.characterMapPane.cell.addAction", message: "Add" });
                     return (
                       <button
                         key={cell.char}
                         type="button"
                         onClick={() => handleToggle(cell)}
                         aria-pressed={selected}
-                        aria-label={`${selected ? "Remove" : "Add"} ${cell.char} (${cp})`}
+                        aria-label={`${actionLabel} ${cell.char} (${cp})`}
                         style={charChip(selected)}
                       >
                         <span style={chipGlyph(selected)}>{display}</span>
@@ -330,8 +374,10 @@ export function CharacterMapPane({
                 </div>
                 {hiddenCount > 0 && (
                   <div style={{ ...mutedNote, marginTop: 6 }}>
-                    Showing {visibleCells.length} of {group.cells.length} characters — use search
-                    or "Add any character by code point" above to find a specific one.
+                    <Trans id="survey.characterMapPane.group.hiddenCount">
+                      Showing {visibleCells.length} of {group.cells.length} characters — use search
+                      or "Add any character by code point" above to find a specific one.
+                    </Trans>
                   </div>
                 )}
               </section>

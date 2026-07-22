@@ -63,7 +63,7 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 - [x] T013 [US1] Convert WelcomeScreen chrome to `<Trans>` (`welcome.*`) — [WelcomeScreen.tsx](../../packages/studio/src/components/WelcomeScreen.tsx)
 - [x] T014 [US1] LocaleSwitcher in NavBar + persistence (`ks.locale`) + browser-language detection — [LocaleSwitcher.tsx](../../packages/studio/src/components/LocaleSwitcher.tsx)
 - [x] T015 [US1] Convert Output delivery area chrome (`output.*`) — [OutputScreen.tsx](../../packages/studio/src/components/OutputScreen.tsx), [ManagedPRSubmitPanel.tsx](../../packages/studio/src/components/ManagedPRSubmitPanel.tsx), [SignUpPanel.tsx](../../packages/studio/src/components/SignUpPanel.tsx)
-- [ ] T016 [US1] Convert survey chrome (`survey.*`) — `packages/studio/src/survey/*.tsx`. **Only hardcoded chrome** — do NOT touch Tier B text sourced from `content/` YAML records. (#1255)
+- [x] T016 [US1] Convert survey chrome (`survey.*`) — `packages/studio/src/survey/*.tsx`. **Only hardcoded chrome** — do NOT touch Tier B text sourced from `content/` YAML records. (#1255)
 - [x] T017 [P] [US1] Convert editors chrome (`editor.*`) — `packages/studio/src/editors/*.tsx` (#1256)
 - [x] T018 [P] [US1] Convert dashboard chrome (`dashboard.*`) — `packages/studio/src/dashboard/*.tsx` (#1257)
 - [x] T019 [P] [US1] Localize `ui/` primitive user-facing strings + aria (`ui.*`) — `packages/studio/src/ui/*.tsx` (#1258)

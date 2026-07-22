@@ -16,7 +16,8 @@
 // persistence round-trip (covered in ../lib/draftPersistence.test.ts).
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup, waitFor, within } from "@testing-library/react";
+import { screen, fireEvent, cleanup, waitFor, within } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { CharacterMapPane, MAX_CELLS_PER_GROUP } from "./CharacterMapPane.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";

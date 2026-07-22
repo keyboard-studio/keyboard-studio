@@ -9,6 +9,8 @@
 //   answers array; the caller extracts it via PhaseA.extractProvenance() helper.
 
 import { useMemo, useRef, useCallback, useEffect } from "react";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type {
   SurveyPhaseResult,
   KeyboardIdentity,
@@ -30,6 +32,15 @@ import { answerString } from "./answerString.ts";
 // Vite ?raw import — YAML source as a plain string, no network request.
 // Typed via the `*.yaml?raw` module declaration in src/vite-env.d.ts.
 import phaseARaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
+
+// Shared caption descriptor for every langtags-derived seed (spec 030
+// FR-010), mirroring IdentityLite.tsx's LANGTAGS_CAPTION. Resolved to a plain
+// string via i18nRef at the seeding site, below, so the resolved text tracks
+// the active locale.
+const LANGTAGS_CAPTION = msg({
+  id: "survey.identityLite.langtagsCaption",
+  message: "Suggested from langtags — edit if needed",
+});
 
 // ---------------------------------------------------------------------------
 // Answer extraction helpers (exported for callers)
@@ -191,6 +202,14 @@ export interface PhaseAProps {
 }
 
 export function PhaseA({ context = {}, onComplete, onBack, findingsByQuestionId }: PhaseAProps) {
+  const { i18n } = useLingui();
+  // Mirrors the latest `i18n` for the langtags-seeding effect below (deps
+  // `[]`, unchanged — the effect fires once per Phase A mount by design, see
+  // its own comment) so a locale switch is picked up without re-firing that
+  // effect. Same idiom as IdentityLite.tsx's i18nRef.
+  const i18nRef = useRef(i18n);
+  i18nRef.current = i18n;
+
   const flow = useMemo(() => loadModularFlow(phaseARaw as string), []);
 
   // ---------------------------------------------------------------------------
@@ -226,7 +245,7 @@ export function PhaseA({ context = {}, onComplete, onBack, findingsByQuestionId 
 
       const provenance: LangtagsProvenance = {
         source: "langtags",
-        caption: "Suggested from langtags — edit if needed",
+        caption: i18nRef.current.t(LANGTAGS_CAPTION),
       };
 
       const seeds = new Map<string, string>();
@@ -291,7 +310,7 @@ export function PhaseA({ context = {}, onComplete, onBack, findingsByQuestionId 
   return (
     <div style={phaseContainer}>
       <h2 style={phaseHeading}>
-        Phase A — Language identity
+        <Trans id="survey.phaseA.heading">Phase A — Language identity</Trans>
       </h2>
       <SurveyRunner
         key={flow.flow_id}

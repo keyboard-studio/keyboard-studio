@@ -14,6 +14,8 @@
 // reads this via session.confirmedInventory (mergePhaseResults union).
 
 import { useCallback, useMemo, useState, useRef, useEffect } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import type { SurveyAnswer, SurveyPhaseResult, LintFinding, PlacementMap } from "@keyboard-studio/contracts";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
@@ -172,6 +174,7 @@ interface CharChipEditorProps {
 }
 
 function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorProps) {
+  const { t } = useLingui();
   const [inputVal, setInputVal] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -207,8 +210,11 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
               add();
             }
           }}
-          placeholder="Type your alphabet with a space between each character (a b c …)"
-          aria-label="Character to add"
+          placeholder={t({
+            id: "survey.phaseB.charChipEditor.placeholder",
+            message: "Type your alphabet with a space between each character (a b c …)",
+          })}
+          aria-label={t({ id: "survey.phaseB.charChipEditor.ariaLabel", message: "Character to add" })}
           style={{
             flex: 1,
             background: BG_PAGE,
@@ -227,7 +233,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
           onClick={add}
           style={{ ...primaryButton(addDisabled), whiteSpace: "nowrap" }}
         >
-          + Add
+          <Trans id="survey.phaseB.charChipEditor.addButton">+ Add</Trans>
         </button>
       </div>
 
@@ -241,17 +247,22 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
             color: TEXT_MAIN,
           }}
         >
-          Your alphabet ({chars.length})
+          <Trans id="survey.phaseB.charChipEditor.count">Your alphabet ({chars.length})</Trans>
         </p>
         {chars.length === 0 ? (
           <p style={mutedParaFlush}>
-            No characters yet — type your whole alphabet above, with a space
-            between each character.
+            <Trans id="survey.phaseB.charChipEditor.empty">
+              No characters yet — type your whole alphabet above, with a space
+              between each character.
+            </Trans>
           </p>
         ) : (
           <div
             role="group"
-            aria-label="Accumulated characters — click to remove"
+            aria-label={t({
+              id: "survey.phaseB.charChipEditor.groupAriaLabel",
+              message: "Accumulated characters — click to remove",
+            })}
             style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}
           >
             {chars.map((c) => (
@@ -263,7 +274,10 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
                 key={c}
                 type="button"
                 onClick={() => onChange(chars.filter((x) => x !== c))}
-                aria-label={`Remove ${c} (${toUPlusNotation(c)})`}
+                aria-label={t({
+                  id: "survey.phaseB.charChipEditor.removeAriaLabel",
+                  message: `Remove ${{ char: c }} (${{ cp: toUPlusNotation(c) }})`,
+                })}
                 style={charChip(false)}
               >
                 <span style={chipGlyph(true)}>
@@ -293,12 +307,16 @@ interface SuggestionChipProps {
 }
 
 function SuggestionChip({ char, checked, onToggle }: SuggestionChipProps) {
+  const { t } = useLingui();
   const cp = toUPlusNotation(char);
+  const actionLabel = checked
+    ? t({ id: "survey.phaseB.suggestionChip.removeAction", message: "Remove" })
+    : t({ id: "survey.phaseB.suggestionChip.addAction", message: "Add" });
   return (
     <button
       type="button"
       onClick={() => onToggle(char)}
-      aria-label={`${checked ? "Remove" : "Add"} ${char} (${cp})`}
+      aria-label={`${actionLabel} ${char} (${cp})`}
       aria-pressed={checked}
       style={charChip(checked)}
     >
@@ -324,6 +342,7 @@ interface SuggestionPanelProps {
 }
 
 function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
+  const { t } = useLingui();
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const bcp47 = context.bcp47_tag;
   const languageName = context.language_name;
@@ -359,13 +378,16 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
     }
   }
 
-  const displayName = languageName ?? bcp47 ?? "this language";
+  const displayName =
+    languageName ?? bcp47 ?? t({ id: "survey.phaseB.suggestionPanel.genericLanguage", message: "this language" });
 
   // Neutral note when no BCP47 or no baseIr yet
   if (!bcp47 || baseIr === null) {
     return (
       <div style={mutedNote}>
-        No verified character list for {displayName}. Add characters below.
+        <Trans id="survey.phaseB.suggestionPanel.noVerifiedList">
+          No verified character list for {displayName}. Add characters below.
+        </Trans>
       </div>
     );
   }
@@ -373,7 +395,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
   if (loadState.status === "idle" || loadState.status === "loading") {
     return (
       <div style={mutedNote}>
-        Checking for a verified character list…
+        <Trans id="survey.phaseB.suggestionPanel.checking">Checking for a verified character list…</Trans>
       </div>
     );
   }
@@ -381,7 +403,9 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
   if (loadState.status === "error") {
     return (
       <div style={mutedNote}>
-        Could not load character suggestions. Add characters below.
+        <Trans id="survey.phaseB.suggestionPanel.loadError">
+          Could not load character suggestions. Add characters below.
+        </Trans>
       </div>
     );
   }
@@ -392,7 +416,9 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
   if (data === null) {
     return (
       <div style={mutedNote}>
-        No verified character list for {displayName}. Add characters below.
+        <Trans id="survey.phaseB.suggestionPanel.noVerifiedList">
+          No verified character list for {displayName}. Add characters below.
+        </Trans>
       </div>
     );
   }
@@ -401,7 +427,9 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
   if (data.main.length === 0 && data.auxiliary.length === 0) {
     return (
       <div style={mutedNote}>
-        Your base keyboard already covers this language's alphabet.
+        <Trans id="survey.phaseB.suggestionPanel.baseAlreadyCovers">
+          Your base keyboard already covers this language's alphabet.
+        </Trans>
       </div>
     );
   }
@@ -410,15 +438,20 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div>
         <p style={{ margin: "0 0 4px 0", fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>
-          Suggested for {data.languageName ?? displayName}
+          <Trans id="survey.phaseB.suggestionPanel.suggestedFor">
+            Suggested for {data.languageName ?? displayName}
+          </Trans>
         </p>
         <p style={{ margin: "0 0 10px 0", fontSize: 11, color: TEXT_DIM }}>
-          from CLDR exemplars — tick to add
+          <Trans id="survey.phaseB.suggestionPanel.fromCldr">from CLDR exemplars — tick to add</Trans>
         </p>
         {data.main.length > 0 ? (
           <div
             role="group"
-            aria-label="Suggested main characters — tick to add"
+            aria-label={t({
+              id: "survey.phaseB.suggestionPanel.mainGroupAriaLabel",
+              message: "Suggested main characters — tick to add",
+            })}
             style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
           >
             {data.main.map((c) => (
@@ -432,7 +465,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
           </div>
         ) : (
           <p style={mutedParaFlush}>
-            No additional main characters needed.
+            <Trans id="survey.phaseB.suggestionPanel.noAdditionalMain">No additional main characters needed.</Trans>
           </p>
         )}
       </div>
@@ -457,12 +490,17 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
             }}
           >
             <span>{auxExpanded ? "▼" : "▶"}</span>
-            Also used in loanwords ({data.auxiliary.length})
+            <Trans id="survey.phaseB.suggestionPanel.auxiliaryToggle">
+              Also used in loanwords ({data.auxiliary.length})
+            </Trans>
           </button>
           {auxExpanded && (
             <div
               role="group"
-              aria-label="Suggested auxiliary characters for loanwords — tick to add"
+              aria-label={t({
+                id: "survey.phaseB.suggestionPanel.auxiliaryGroupAriaLabel",
+                message: "Suggested auxiliary characters for loanwords — tick to add",
+              })}
               style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}
             >
               {data.auxiliary.map((c) => (
@@ -498,6 +536,7 @@ interface BuildListViewProps {
 }
 
 function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
+  const { t } = useLingui();
   const chars = usePhaseBDraftStore((s) => s.chars);
   const setAll = usePhaseBDraftStore((s) => s.setAll);
   const doneDisabled = chars.length === 0;
@@ -519,12 +558,12 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         onClick={onBack}
         style={{ alignSelf: "flex-start", ...secondaryButton }}
       >
-        Back
+        <Trans id="survey.phaseB.buildList.backButton">Back</Trans>
       </button>
 
       {/* Heading */}
       <h2 style={phaseHeadingFlush}>
-        Phase B — Add your whole alphabet
+        <Trans id="survey.phaseB.buildList.heading">Phase B — Add your whole alphabet</Trans>
       </h2>
 
       {/* Instructions */}
@@ -539,10 +578,12 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         }}
       >
         <p style={{ margin: 0 }}>
-          Add <strong>your whole alphabet</strong> on this page — every
-          character your language uses, not just the special ones. Tick the
-          suggested characters below, then type any that are missing{" "}
-          <strong>with a space between each character</strong>, like this:
+          <Trans id="survey.phaseB.buildList.instructions">
+            Add <strong>your whole alphabet</strong> on this page — every
+            character your language uses, not just the special ones. Tick the
+            suggested characters below, then type any that are missing{" "}
+            <strong>with a space between each character</strong>, like this:
+          </Trans>
         </p>
         <p style={{ margin: "8px 0 0 0", fontFamily: "monospace", fontSize: 15 }}>
           a b c d e ɛ ŋ ɔ …
@@ -550,9 +591,14 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
       </div>
 
       {/* Section 1: Suggestions from CLDR */}
-      <section aria-label="Suggested characters from CLDR">
+      <section
+        aria-label={t({
+          id: "survey.phaseB.buildList.cldrSectionAriaLabel",
+          message: "Suggested characters from CLDR",
+        })}
+      >
         <h3 style={sectionHeading}>
-          Suggested characters
+          <Trans id="survey.phaseB.buildList.suggestedCharactersHeading">Suggested characters</Trans>
         </h3>
         <SuggestionPanel context={context} chars={chars} onChange={setAll} />
       </section>
@@ -561,13 +607,17 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
       <hr style={divider} />
 
       {/* Section 2: Type-in characters */}
-      <section aria-label="Type your alphabet">
+      <section
+        aria-label={t({ id: "survey.phaseB.buildList.typeSectionAriaLabel", message: "Type your alphabet" })}
+      >
         <h3 style={sectionHeading}>
-          Type your alphabet
+          <Trans id="survey.phaseB.buildList.typeAlphabetHeading">Type your alphabet</Trans>
         </h3>
         <p style={{ ...mutedParaFlush, margin: "0 0 12px 0" }}>
-          Type the rest of your alphabet here, putting a space between each
-          character (for example: a b c ŋ ɛ), then press Enter or + Add.
+          <Trans id="survey.phaseB.buildList.typeAlphabetHelp">
+            Type the rest of your alphabet here, putting a space between each
+            character (for example: a b c ŋ ɛ), then press Enter or + Add.
+          </Trans>
         </p>
         <CharChipEditor chars={chars} onChange={setAll} autoFocus={false} />
       </section>
@@ -591,7 +641,13 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
           className="ks-focus-ring ks-hit-target"
           style={primaryButton(doneDisabled)}
         >
-          Done ({chars.length} character{chars.length === 1 ? "" : "s"})
+          {t({
+            id: "survey.phaseB.buildList.doneButton",
+            message: plural(chars.length, {
+              one: "Done (# character)",
+              other: "Done (# characters)",
+            }),
+          })}
         </button>
       </div>
     </div>
@@ -687,7 +743,7 @@ export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId,
   return (
     <div style={phaseContainer}>
       <h2 style={phaseHeading}>
-        Phase B — Character inventory
+        <Trans id="survey.phaseB.manual.heading">Phase B — Character inventory</Trans>
       </h2>
       <SurveyRunner
         key={manualFlow.flow_id}
@@ -712,15 +768,29 @@ interface IntroChooserProps {
   onBack?: () => void;
 }
 
-const METHODS: Array<{ value: DiscoveryMethod; label: string }> = [
-  { value: "build-list", label: "Add your whole alphabet — type every character your language uses and tick suggested ones" },
-  { value: "manual", label: "Step by step — I will answer the questions below" },
-];
-
 function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
+  const { t } = useLingui();
   const [selected, setSelected] = useState<DiscoveryMethod>("build-list");
 
-  const languageName = context["language_name"] ?? context["detected_group"] ?? "your language";
+  const languageName =
+    context["language_name"] ?? context["detected_group"] ?? t({ id: "survey.phaseB.intro.genericLanguage", message: "your language" });
+
+  const methods: Array<{ value: DiscoveryMethod; label: string }> = [
+    {
+      value: "build-list",
+      label: t({
+        id: "survey.phaseB.intro.method.buildList",
+        message: "Add your whole alphabet — type every character your language uses and tick suggested ones",
+      }),
+    },
+    {
+      value: "manual",
+      label: t({
+        id: "survey.phaseB.intro.method.manual",
+        message: "Step by step — I will answer the questions below",
+      }),
+    },
+  ];
 
   return (
     <div
@@ -733,25 +803,27 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
       }}
     >
       <h2 style={phaseHeadingFlush}>
-        Phase B — Character discovery
+        <Trans id="survey.phaseB.intro.heading">Phase B — Character discovery</Trans>
       </h2>
       <p style={mutedParaFlush}>
-        How would you like to add the alphabet {languageName} uses?
+        <Trans id="survey.phaseB.intro.question">How would you like to add the alphabet {languageName} uses?</Trans>
       </p>
       <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, lineHeight: 1.5 }}>
-        Both methods feed the same final alphabet.
-        The first method starts with verified suggestions and lets you type the rest of your alphabet yourself.
+        <Trans id="survey.phaseB.intro.explanation">
+          Both methods feed the same final alphabet.
+          The first method starts with verified suggestions and lets you type the rest of your alphabet yourself.
+        </Trans>
       </p>
 
       {/* Issue #536: shared ui/RadioGroup (accent-ring focus, >=44px touch
           hit area on the wrapping label) instead of a hand-rolled radio list. */}
       <span id="discovery-method-label" style={visuallyHidden}>
-        Discovery method
+        <Trans id="survey.phaseB.intro.discoveryMethodLabel">Discovery method</Trans>
       </span>
       <RadioGroup
         name="discovery_method"
         value={selected}
-        options={METHODS}
+        options={methods}
         accent={ACCENT}
         onChange={(v) => setSelected(v as DiscoveryMethod)}
         ariaLabelledby="discovery-method-label"
@@ -765,7 +837,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
             className="ks-focus-ring ks-hit-target"
             style={secondaryButton}
           >
-            Back
+            <Trans id="survey.phaseB.intro.backButton">Back</Trans>
           </button>
         )}
         <button
@@ -775,7 +847,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
           className="ks-focus-ring ks-hit-target"
           style={primaryButton(false)}
         >
-          Continue
+          <Trans id="survey.phaseB.intro.continueButton">Continue</Trans>
         </button>
       </div>
     </div>
