@@ -2,7 +2,9 @@
 // — ready-made single characters vs base-plus-mark sequences — computed from
 // the shared posture table (nfc-posture-of-inventory.ts) as an ordered,
 // first-match-wins decision table with authored explanation text and a
-// mandatory default row, mirroring facet-transform/house-target-policy.ts.
+// mandatory default row, modeled on facet-transform/house-target-policy.ts
+// (ordered rows, first-match-wins, authored explanation, mandatory default)
+// with simpler predicate matching.
 //
 // Designer-facing constraint (SC-005): no explanation below may contain the
 // words "Unicode" or "normalization" — asserted mechanically in tests.

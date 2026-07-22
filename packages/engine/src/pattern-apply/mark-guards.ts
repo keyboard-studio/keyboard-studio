@@ -37,11 +37,52 @@ export interface MarkGuardsResult {
   ir: KeyboardIR;
   blockingRuleCount: number;
   unwrapPairCount: number;
+  /**
+   * Set when an existing match rule already ends with a `use(...)` to a
+   * group other than the marks guard group — kmcmplib allows only one
+   * trailing `use()` per rule, so chaining a second hop would break that
+   * foreign rule. The guard hop is skipped (the foreign rule is left
+   * untouched) rather than silently reordering someone else's use() chain.
+   */
+  guardHopSkipped?: boolean;
 }
 
 /** The entry group: the first using-keys group (KMN's begin target). */
 function entryGroupOf(groups: IRGroup[]): IRGroup | undefined {
   return groups.find((g) => g.usingKeys && !g.readonly);
+}
+
+/**
+ * Insert a rule immediately before the first match/nomatch rule in the
+ * group, or append if there is none. kmcmplib requires match/nomatch rules
+ * to be last in a group, so any newly generated ordinary rule must land
+ * before them, not after.
+ */
+function insertBeforeTerminalRules(rules: IRRule[], rule: IRRule): IRRule[] {
+  const idx = rules.findIndex((r) => r.matchKind === "match" || r.matchKind === "nomatch");
+  if (idx === -1) return [...rules, rule];
+  return [...rules.slice(0, idx), rule, ...rules.slice(idx)];
+}
+
+/**
+ * Whether an output element is a `use(...)` group transition targeting
+ * `groupName` — either the structured `{kind:"useGroup"}` node (what this
+ * module and the parser's non-match `use()` path emit) or the `{kind:"raw"}`
+ * node the parser produces for `match > use(...)` / `nomatch > use(...)`
+ * lines (see codec/parse.ts's match/nomatch case, which preserves the RHS
+ * verbatim as raw text rather than parsing it structurally).
+ */
+function isUseGroupOutputFor(el: { kind: string; groupName?: string; text?: string }, groupName: string): boolean {
+  if (el.kind === "useGroup") return el.groupName === groupName;
+  if (el.kind === "raw") return el.text?.trim() === `use(${groupName})`;
+  return false;
+}
+
+/** Whether an output element is any `use(...)` group transition (structured or raw). */
+function isAnyUseGroupOutput(el: { kind: string; text?: string }): boolean {
+  if (el.kind === "useGroup") return true;
+  if (el.kind === "raw") return /^use\([^)]*\)$/.test(el.text?.trim() ?? "");
+  return false;
 }
 
 function buildGuardGroup(worklist: PlacementWorklist): IRGroup | null {
@@ -98,6 +139,7 @@ function buildUnwrap(
     nodeId: "gen-marks-unwrap-rule",
     context: [
       { kind: "any", storeRef: MARKS_UNWRAP_FROM_STORE },
+      { kind: "raw", text: "+" },
       { kind: "vkey", name: "K_BKSP", modifiers: [] },
     ],
     output: [{ kind: "index", storeRef: MARKS_UNWRAP_TO_STORE, offset: 1 }],
@@ -123,37 +165,68 @@ export function applyMarkGuards(
     return { ir, blockingRuleCount: 0, unwrapPairCount: 0 };
   }
 
-  // Strip any previously generated artifacts (idempotent re-run).
+  // Strip any previously generated artifacts (idempotent re-run). Never
+  // mutates a rule object shared with the input IR — every rule that needs
+  // changing is rebuilt as a new object.
   const groups = ir.groups
     .filter((g) => g.name !== MARKS_GUARD_GROUP)
     .map((g) => ({
       ...g,
-      rules: g.rules.filter(
-        (r) =>
-          r.nodeId !== "gen-marks-unwrap-rule" &&
-          !(r.matchKind === "match" && r.nodeId === "gen-marks-guard-hop"),
-      ),
+      rules: g.rules
+        .filter(
+          (r) =>
+            r.nodeId !== "gen-marks-unwrap-rule" &&
+            !(r.matchKind === "match" && r.nodeId === "gen-marks-guard-hop"),
+        )
+        .map((r) =>
+          r.output.some((o) => isUseGroupOutputFor(o, MARKS_GUARD_GROUP))
+            ? {
+                ...r,
+                output: r.output.filter((o) => !isUseGroupOutputFor(o, MARKS_GUARD_GROUP)),
+              }
+            : r,
+        ),
     }));
   const stores = ir.stores.filter(
     (s) => s.name !== MARKS_UNWRAP_FROM_STORE && s.name !== MARKS_UNWRAP_TO_STORE,
   );
 
   const entry = entryGroupOf(groups);
+  let guardHopSkipped = false;
 
   if (unwrap !== null && entry !== undefined) {
     stores.push(...unwrap.stores);
-    entry.rules = [...entry.rules, unwrap.rule];
+    entry.rules = insertBeforeTerminalRules(entry.rules, unwrap.rule);
   }
 
   if (guardGroup !== null && entry !== undefined) {
     // Enter the guard group after every entry-group rule fires: extend the
     // existing `match` rule when one exists, otherwise add one.
-    const existingMatch = entry.rules.find((r) => r.matchKind === "match");
-    if (existingMatch !== undefined) {
-      existingMatch.output = [
-        ...existingMatch.output,
-        { kind: "useGroup", groupName: MARKS_GUARD_GROUP },
-      ];
+    const existingMatchIndex = entry.rules.findIndex((r) => r.matchKind === "match");
+    if (existingMatchIndex !== -1) {
+      const existingMatch = entry.rules[existingMatchIndex]!;
+      const alreadyHasHop = existingMatch.output.some((o) =>
+        isUseGroupOutputFor(o, MARKS_GUARD_GROUP),
+      );
+      const lastOutput = existingMatch.output[existingMatch.output.length - 1];
+      const endsWithForeignUseGroup =
+        lastOutput !== undefined &&
+        isAnyUseGroupOutput(lastOutput) &&
+        !isUseGroupOutputFor(lastOutput, MARKS_GUARD_GROUP);
+      if (alreadyHasHop) {
+        // Already present from a previous run — nothing to do.
+      } else if (endsWithForeignUseGroup) {
+        // The rule already ends in a use() to some other group; kmcmplib
+        // allows only one trailing use() per rule. Leave the foreign rule
+        // untouched rather than chaining a second hop after it.
+        guardHopSkipped = true;
+      } else {
+        const updatedMatch: IRRule = {
+          ...existingMatch,
+          output: [...existingMatch.output, { kind: "useGroup", groupName: MARKS_GUARD_GROUP }],
+        };
+        entry.rules = entry.rules.map((r, i) => (i === existingMatchIndex ? updatedMatch : r));
+      }
     } else {
       entry.rules = [
         ...entry.rules,
@@ -176,5 +249,6 @@ export function applyMarkGuards(
     },
     blockingRuleCount: guardGroup?.rules.length ?? 0,
     unwrapPairCount: unwrap !== null ? unwrap.stores[0]?.items.length ?? 0 : 0,
+    ...(guardHopSkipped ? { guardHopSkipped: true } : {}),
   };
 }

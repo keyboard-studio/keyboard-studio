@@ -156,6 +156,10 @@ function describeChar(ch: string): string {
   return `"${ch}" (U+${hex})`;
 }
 
+// Deliberately mirrors engine's characterMap.ts isCombiningMarkChar's PUA
+// sibling (isPrivateUseCodePoint) rather than importing it: contracts is the
+// dependency root and cannot depend on engine. Keep the two ranges in sync by
+// hand if either changes.
 function isPrivateUseChar(ch: string): boolean {
   const cp = ch.codePointAt(0);
   if (cp === undefined) return false;
@@ -164,4 +168,25 @@ function isPrivateUseChar(ch: string): boolean {
     (cp >= 0xf0000 && cp <= 0xffffd) ||
     (cp >= 0x100000 && cp <= 0x10fffd)
   );
+}
+
+/**
+ * Canonical, deterministic content key for a confirmed alphabet — used by
+ * consumers (e.g. the studio's MarksSeriesStep) that need to detect a
+ * genuine content change without depending on object identity or property
+ * insertion order (`JSON.stringify` is not a safe key: object key order is
+ * not guaranteed equal across equivalent construction paths). Field-ordered:
+ * bases, then marks, then attested stacks (base+marks joined), then
+ * `declaredRoles` entries sorted by character.
+ */
+export function confirmedAlphabetKey(alphabet: ConfirmedAlphabet | undefined): string {
+  if (alphabet === undefined) return "";
+  const bases = alphabet.bases.join(",");
+  const marks = alphabet.marks.join(",");
+  const stacks = alphabet.attestedStacks.map((s) => `${s.base}:${s.marks.join("")}`).join(",");
+  const roles = Object.entries(alphabet.declaredRoles)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([ch, role]) => `${ch}=${role}`)
+    .join(",");
+  return `${bases}|${marks}|${stacks}|${roles}`;
 }

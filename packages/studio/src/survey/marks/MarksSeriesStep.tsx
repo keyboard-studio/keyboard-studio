@@ -26,7 +26,11 @@ import type {
   ConfirmedAlphabet,
   SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
-import { makeConfirmedAlphabet, makeEmptyPlacementWorklist } from "@keyboard-studio/contracts";
+import {
+  confirmedAlphabetKey,
+  makeConfirmedAlphabet,
+  makeEmptyPlacementWorklist,
+} from "@keyboard-studio/contracts";
 import {
   groupMarkClasses,
   proposeAttachments,
@@ -145,15 +149,16 @@ function seriesResult(
 }
 
 const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
-  const session = useWorkingCopyStore((s) => s.session);
+  const alphabet = useWorkingCopyStore((s) => s.session.alphabet);
+  const importedOrder = useWorkingCopyStore((s) => s.session.axes.markInputOrder);
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const surveyContext = useSurveySessionStore((s) => s.surveyContext);
 
   // Content key: derived inputs re-compute only when the alphabet's CONTENT
   // changes, not when the session object is recreated by an unrelated merge.
-  const alphabetKey = useMemo(() => JSON.stringify(session.alphabet ?? null), [session.alphabet]);
+  const alphabetKey = useMemo(() => confirmedAlphabetKey(alphabet), [alphabet]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const gate = useMemo(() => computeMarksGate(session.alphabet), [alphabetKey]);
+  const gate = useMemo(() => computeMarksGate(alphabet), [alphabetKey]);
 
   // Derived station inputs — all pure engine functions over the gate alphabet.
   const classes: MarkClass[] = useMemo(() => groupMarkClasses(gate.alphabet), [gate.alphabet]);
@@ -191,7 +196,6 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
 
   // S3 — prefilled from the base keyboard's own behavior when available
   // (detectMarkInputOrderFromImport seeds session.axes.markInputOrder).
-  const importedOrder = session.axes.markInputOrder;
   const prefilledFromImport = importedOrder === "prefix" || importedOrder === "postfix";
   const [inputOrder, setInputOrder] = useState<MarkInputOrder>(
     prefilledFromImport ? (importedOrder as MarkInputOrder) : "postfix",

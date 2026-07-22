@@ -19,6 +19,17 @@ const BASE_KMN = [
   "",
 ].join("\n");
 
+// Fixture with a pre-existing foreign match rule (a use() hop to some other
+// group that has nothing to do with the marks guard).
+const FOREIGN_MATCH_KMN = [
+  'store(&NAME) "Guard fixture"',
+  "begin Unicode > use(main)",
+  "group(main) using keys",
+  '+ "a" > "a"',
+  "match > use(somewhere_else)",
+  "",
+].join("\n");
+
 function worklist(overrides: Partial<PlacementWorklist> = {}): PlacementWorklist {
   return {
     ownLetterUnits: [],
@@ -105,11 +116,25 @@ describe("applyMarkGuards — stepwise backspace unwrap", () => {
     const rule = main?.rules.find((r) => r.nodeId === "gen-marks-unwrap-rule");
     expect(rule?.context).toEqual([
       { kind: "any", storeRef: MARKS_UNWRAP_FROM_STORE },
+      { kind: "raw", text: "+" },
       { kind: "vkey", name: "K_BKSP", modifiers: [] },
     ]);
     expect(rule?.output).toEqual([
       { kind: "index", storeRef: MARKS_UNWRAP_TO_STORE, offset: 1 },
     ]);
+  });
+
+  it("emits a valid any(...) + [K_BKSP] > index(...) line (no leading +)", () => {
+    const { ir } = parse(BASE_KMN, "guards");
+    const result = applyMarkGuards(
+      ir,
+      worklist({ ownLetterUnits: ["e", "é"] }),
+      "ready-made",
+    );
+    const emitted = emit(result.ir);
+    expect(emitted).toContain(
+      `any(${MARKS_UNWRAP_FROM_STORE}) + [K_BKSP] > index(${MARKS_UNWRAP_TO_STORE}, 1)`,
+    );
   });
 
   it("generates nothing under the base-plus-mark form (native peel)", () => {
@@ -123,5 +148,69 @@ describe("applyMarkGuards — stepwise backspace unwrap", () => {
     const { ir } = parse(BASE_KMN, "guards");
     const result = applyMarkGuards(ir, worklist(), "base-plus-mark");
     expect(result.ir).toBe(ir);
+  });
+});
+
+describe("applyMarkGuards — guard-hop purity, idempotency, ordering", () => {
+  it("does not mutate an existing match rule from the input IR (purity)", () => {
+    const { ir } = parse(FOREIGN_MATCH_KMN, "guards");
+    const before = JSON.parse(JSON.stringify(ir));
+    applyMarkGuards(
+      ir,
+      worklist({ blockedCombinations: [{ base: "k", mark: ACUTE }] }),
+      "base-plus-mark",
+    );
+    expect(JSON.parse(JSON.stringify(ir))).toEqual(before);
+  });
+
+  it("skips the guard hop (and leaves the rule untouched) when an existing match rule already ends with a foreign use()", () => {
+    const { ir } = parse(FOREIGN_MATCH_KMN, "guards");
+    const result = applyMarkGuards(
+      ir,
+      worklist({ blockedCombinations: [{ base: "k", mark: ACUTE }] }),
+      "base-plus-mark",
+    );
+    expect(result.guardHopSkipped).toBe(true);
+    const main = result.ir.groups.find((g) => g.name === "main");
+    const match = main?.rules.find((r) => r.matchKind === "match");
+    expect(match?.output).toEqual([{ kind: "raw", text: "use(somewhere_else)" }]);
+    expect(
+      match?.output.some((o) => o.kind === "useGroup" && o.groupName === MARKS_GUARD_GROUP),
+    ).toBe(false);
+  });
+
+  it("does not append a second useGroup when re-applied against an already-hopped match rule", () => {
+    const { ir } = parse(BASE_KMN, "guards");
+    const once = applyMarkGuards(
+      ir,
+      worklist({ blockedCombinations: [{ base: "k", mark: ACUTE }] }),
+      "base-plus-mark",
+    );
+    const twice = applyMarkGuards(
+      once.ir,
+      worklist({ blockedCombinations: [{ base: "k", mark: ACUTE }] }),
+      "base-plus-mark",
+    );
+    const main = twice.ir.groups.find((g) => g.name === "main");
+    const match = main?.rules.find((r) => r.matchKind === "match");
+    expect(
+      match?.output.filter((o) => o.kind === "useGroup" && o.groupName === MARKS_GUARD_GROUP),
+    ).toHaveLength(1);
+  });
+
+  it("inserts the unwrap rule before an existing match/nomatch rule (kmcmplib ordering)", () => {
+    const { ir } = parse(FOREIGN_MATCH_KMN, "guards");
+    const result = applyMarkGuards(
+      ir,
+      worklist({ ownLetterUnits: ["e", "é"] }),
+      "ready-made",
+    );
+    const main = result.ir.groups.find((g) => g.name === "main");
+    const rules = main?.rules ?? [];
+    const unwrapIndex = rules.findIndex((r) => r.nodeId === "gen-marks-unwrap-rule");
+    const matchIndex = rules.findIndex((r) => r.matchKind === "match");
+    expect(unwrapIndex).toBeGreaterThanOrEqual(0);
+    expect(matchIndex).toBeGreaterThanOrEqual(0);
+    expect(unwrapIndex).toBeLessThan(matchIndex);
   });
 });

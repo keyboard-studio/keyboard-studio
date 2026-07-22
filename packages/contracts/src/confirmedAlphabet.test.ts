@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  confirmedAlphabetKey,
   deriveConfirmedInventory,
   makeConfirmedAlphabet,
   makeEmptyPlacementWorklist,
@@ -110,5 +111,47 @@ describe("validateConfirmedAlphabet", () => {
     expect(validateConfirmedAlphabet(missing).some((p) => /declared role/.test(p))).toBe(true);
     const declared = makeConfirmedAlphabet({ bases: [pua], declaredRoles: { [pua]: "letter" } });
     expect(validateConfirmedAlphabet(declared)).toEqual([]);
+  });
+});
+
+describe("confirmedAlphabetKey", () => {
+  it("gives content-equal alphabets equal keys regardless of construction order", () => {
+    const a = makeConfirmedAlphabet({
+      bases: ["e", "o"],
+      marks: [ACUTE, GRAVE],
+      attestedStacks: [{ base: "e", marks: [ACUTE] }],
+      declaredRoles: {},
+    });
+    const b: typeof a = {
+      declaredRoles: {},
+      attestedStacks: [{ marks: [ACUTE], base: "e" }],
+      marks: [ACUTE, GRAVE],
+      bases: ["e", "o"],
+    };
+    expect(confirmedAlphabetKey(a)).toBe(confirmedAlphabetKey(b));
+  });
+
+  it("gives declaredRoles entries in a different insertion order equal keys", () => {
+    const pua1 = String.fromCodePoint(0xe000);
+    const pua2 = String.fromCodePoint(0xe001);
+    const a = makeConfirmedAlphabet({
+      bases: [pua1, pua2],
+      declaredRoles: { [pua1]: "letter", [pua2]: "mark" },
+    });
+    const b = makeConfirmedAlphabet({
+      bases: [pua1, pua2],
+      declaredRoles: { [pua2]: "mark", [pua1]: "letter" },
+    });
+    expect(confirmedAlphabetKey(a)).toBe(confirmedAlphabetKey(b));
+  });
+
+  it("distinguishes genuinely different content", () => {
+    const a = makeConfirmedAlphabet({ bases: ["e"], marks: [ACUTE] });
+    const b = makeConfirmedAlphabet({ bases: ["e"], marks: [GRAVE] });
+    expect(confirmedAlphabetKey(a)).not.toBe(confirmedAlphabetKey(b));
+  });
+
+  it("returns a stable key for undefined", () => {
+    expect(confirmedAlphabetKey(undefined)).toBe(confirmedAlphabetKey(undefined));
   });
 });

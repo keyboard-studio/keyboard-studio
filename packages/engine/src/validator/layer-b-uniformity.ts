@@ -20,6 +20,9 @@ import type { KeyboardIR, LintFinding } from "@keyboard-studio/contracts";
 
 export const MARK_NORMALIZATION_UNIFORM_CODE = "KM_LINT_MARK_NORMALIZATION_UNIFORM" as const;
 
+// Deliberately the WIDE Unicode mark class (\p{M} = Mn+Mc+Me, matching
+// codec/nfd-to-nfc.ts), not characterMap's isCombiningMarkChar (\p{Mn}\p{Mc}
+// only) — enclosing marks (Me) count as mark-bearing output here too.
 const COMBINING_MARK = /^\p{M}$/u;
 
 function isCombining(ch: string): boolean {
