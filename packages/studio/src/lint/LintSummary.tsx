@@ -98,7 +98,11 @@ export function LintSummary({ findings }: LintSummaryProps) {
                     gap: 4,
                     fontSize: 12,
                     fontWeight: 600,
-                    color: SEVERITY_COLORS[severity],
+                    // "warning" is deliberately excluded from the colour
+                    // treatment — it renders in the panel's default
+                    // foreground so the badge reads as a calm count, not
+                    // an alarm. fatal/error/hint/info keep their colours.
+                    color: severity === "warning" ? "#e6edf3" : SEVERITY_COLORS[severity],
                   }}
                 >
                   {count} {labelFor(severity, count)}
