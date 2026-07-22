@@ -4,7 +4,7 @@
   "branch": "046-marks-question-series",
   "selectedAt": "2026-07-21T22:43:12.777Z",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -417,6 +417,11 @@
       "decision": "Keep 046 CharacterMapPane edits localized to handleToggle/handleRawSubmit + additive exports so open PR #1291 (km/charmap-jump-to-script) merges cleanly",
       "why": "User flagged PR #1291 must land against this branch; its diff rewrites the pane fetch/filter/scripts-checkbox areas and characterMap.ts script tagging but leaves handleToggle/handleRawSubmit bodies and both predicates (isCombiningMarkChar/isPrivateUseCodePoint) intact",
       "rejected": "Restructuring the pane search path for the decomposition narration (would collide with 1291 matchesQuery/characterSearch.ts)"
+    },
+    {
+      "decision": "Skip the guard hop (guardHopSkipped flag) when an existing match rule already ends in a foreign use()",
+      "why": "kmcmplib allows one trailing use() per rule; chaining a second would corrupt a foreign generator or imported base rule",
+      "rejected": "Chaining a second useGroup or reordering the foreign use()"
     }
   ],
   "step_summaries": {
@@ -692,6 +697,10 @@
     },
     {
       "note": "E2E walk specs updated for the marks series but NOT executed here: the global Playwright CLI is unavailable in this shell (only @playwright/mcp nested alpha). Run npx playwright test in the manual/CD e2e lane before release",
+      "step": "implement"
+    },
+    {
+      "note": "Deferred P1/P2 from review: guard hop wired only to the first using-keys group (acceptable while generated keyboards are single-entry-group; revisit for multi-group Track 2 bases); combining-mark predicate duplicated in layer-b-uniformity vs nfd-to-nfc (deliberate wide \\p{M} semantics, consolidation is a km-simplify follow-up); marks-series station transitions lack aria-live/focus management polish",
       "step": "implement"
     }
   ],
@@ -1055,7 +1064,45 @@
       "command": "vitest src/survey/marks (18 tests)",
       "result": "zero-marks alphabets skip with empty worklist; simple orthography = 2 screens; tonal walk <= 5 screens; worklist coverage invariant verified in engine tests",
       "warnings": []
+    },
+    {
+      "what": "km-verification review pass (post-implement)",
+      "command": "scoped engine/contracts/studio suites + pnpm typecheck",
+      "result": "APPROVE - 57 engine, 437 contracts, 1614 studio tests green; SC-002/SC-005/SC-007 pinned; criteria 149 (40/67/32/10) confirmed",
+      "warnings": []
+    },
+    {
+      "what": "km-qc code-quality review",
+      "command": "review of 046 diff",
+      "result": "PASS 91/100 - 2 P1 (mark-guards idempotency, in-place rule mutation) sent to fix cycle, 3 P2",
+      "warnings": []
+    },
+    {
+      "what": "km-keyman generated-KMN semantics review",
+      "command": "review of mark-guards.ts + layer-b-uniformity.ts",
+      "result": "REQUEST_CHANGES - P0 missing plus-separator in unwrap rule context (invalid emitted .kmn); fixed in review cycle 2. Layer-B severity/level judged correct",
+      "warnings": []
+    },
+    {
+      "what": "km-synthesis integration review",
+      "command": "seam review vs house patterns",
+      "result": "APPROVE WITH NOTES - worklist prop follows placementMap seam, reducer case follows TouchCompleteResult pattern, store split matches snapshot idiom; P1 predicate duplication documented",
+      "warnings": []
+    },
+    {
+      "what": "km-frontend SPA review",
+      "command": "review of marks series UI + stores",
+      "result": "PASS WITH NOTES - no Article IV or D3 violations; P1 JSON.stringify memo key sent to fix cycle; P2 a11y polish (station-change aria-live, focus management) deferred",
+      "warnings": [
+        "a11y polish deferred to follow-up"
+      ]
+    },
+    {
+      "what": "review cycle 2 - P0/P1 fixes re-verified",
+      "command": "engine mark-guards/marks/uniformity suites (53), contracts (441 incl. confirmedAlphabetKey), studio marks+steps (200), pnpm typecheck",
+      "result": "all green after commit d2986ce2: unwrap plus-separator P0 fixed with emit-string assertion; guard-hop idempotency/purity/ordering hardened (guardHopSkipped flag, insertBeforeTerminalRules, raw-use() recognition); canonical confirmedAlphabetKey replaces JSON.stringify memo key; narrowed store subscriptions",
+      "warnings": []
     }
   ],
-  "last_action": "all 37 tasks done - typecheck/lint green; full tests green modulo the 16 pre-existing baseline failures documented at T001; e2e lane pending manual run"
+  "last_action": "PR https://github.com/keyboard-studio/keyboard-studio/pull/1300 opened after km-lead APPROVED review (one P0 fixed in d2986ce2); gates green modulo the documented pre-existing baseline"
 }
