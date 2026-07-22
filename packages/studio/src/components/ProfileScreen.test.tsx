@@ -8,12 +8,18 @@
 // useGoogleAuth at the module boundary; let useIdentitySession run its real
 // composition logic so derived state is honest.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, screen, fireEvent } from "@testing-library/react";
-import { render } from "../test/renderWithI18n.tsx";
+import { render, i18n } from "../test/renderWithI18n.tsx";
+import { messages as frMessages } from "../locales/fr/messages.json?lingui";
+import enCatalogRaw from "../locales/en/messages.json";
+import frCatalogRaw from "../locales/fr/messages.json";
 import { ProfileScreen } from "./ProfileScreen.tsx";
 import { useGitHubAuth, type UseGitHubAuthResult } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth, type UseGoogleAuthResult } from "../hooks/useGoogleAuth.ts";
+
+const enCatalog = enCatalogRaw as Record<string, string>;
+const frCatalog = frCatalogRaw as Record<string, string>;
 
 function renderProfileScreen() {
   return render(<ProfileScreen />);
@@ -235,5 +241,81 @@ describe("ProfileScreen — back navigation", () => {
     renderProfileScreen();
     fireEvent.click(screen.getByRole("button", { name: /Back to studio/i }));
     expect(window.location.hash).toBe("#survey");
+  });
+});
+
+// T012 (spec 046 US1): acceptance check that a fully-translated area renders
+// zero English chrome once `fr` is active — profile.* is 14/14 translated.
+// `englishOnly` is derived from the live catalogs (not hardcoded strings) so a
+// new profile.* id or a translation that regresses to the English value fails
+// loudly here instead of silently leaking English under fr.
+describe("ProfileScreen — locale acceptance (T012: zero English chrome under fr)", () => {
+  const chromeIds = Object.keys(enCatalog).filter((id) => id.startsWith("profile."));
+  const englishOnly = chromeIds
+    .map((id) => enCatalog[id])
+    .filter((text, idx) => text !== frCatalog[chromeIds[idx] as string]);
+
+  beforeAll(() => {
+    // Precondition: every profile.* id must actually have a distinct fr
+    // translation, or this test would compare English against itself.
+    expect(englishOnly).toHaveLength(chromeIds.length);
+    i18n.load("fr", frMessages);
+  });
+
+  afterEach(() => {
+    cleanup();
+    i18n.activate("en");
+  });
+
+  function renderUnderFrench() {
+    i18n.activate("fr");
+    return renderProfileScreen();
+  }
+
+  it("renders the guest state with zero English profile chrome", () => {
+    mockAuth({ status: "idle" });
+    renderUnderFrench();
+
+    for (const text of englishOnly) {
+      expect(screen.queryByText(text)).toBeNull();
+    }
+    // Positive control — the French strings actually rendered, not just that
+    // English disappeared (e.g. from an empty/broken tree).
+    expect(screen.getByRole("main", { name: frCatalog["profile.page.ariaLabel"]! })).toBeTruthy();
+    expect(screen.getByText(frCatalog["profile.guestName"]!)).toBeTruthy();
+    expect(screen.getByText(frCatalog["profile.accountKind.guest"]!)).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: frCatalog["profile.github.linkLabel"]! }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: frCatalog["profile.google.linkLabel"]! }),
+    ).toBeTruthy();
+  });
+
+  it("renders the signed-in (both providers linked) state with zero English profile chrome", () => {
+    mockAuth(
+      { status: "connected", login: "octocat" },
+      { status: "connected", identity: googleIdentity },
+    );
+    renderUnderFrench();
+
+    for (const text of englishOnly) {
+      expect(screen.queryByText(text)).toBeNull();
+    }
+    expect(screen.getByText(frCatalog["profile.accountKind.signedIn"]!)).toBeTruthy();
+    expect(screen.getByRole("button", { name: frCatalog["profile.signOut"]! })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: frCatalog["profile.backToStudio"]! }),
+    ).toBeTruthy();
+  });
+
+  it("renders the verifying state with zero English profile chrome", () => {
+    mockAuth({ status: "verifying" });
+    renderUnderFrench();
+
+    for (const text of englishOnly) {
+      expect(screen.queryByText(text)).toBeNull();
+    }
+    expect(screen.getByRole("status").textContent).toBe(frCatalog["profile.checkingSignIn"]);
   });
 });
