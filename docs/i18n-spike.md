@@ -117,6 +117,40 @@ as `pnpm run i18n-catalog-lint`. It:
 Verified: green when in sync; on an English edit under a stable id it reports
 `[en] source catalog out of date — English changed: welcome.title` and exits 1.
 
+## Translator context for ambiguous ids (spec 046 T036)
+
+Lingui's `t`/`Trans`/`Plural` macros accept a `comment` field, but it does **not**
+survive into the shipped catalog: the `minimal` JSON style is a deliberately bare
+`{id: text}` map (see "Why Lingui, and why explicit IDs" above) with no room for
+metadata, and it is the exact file Crowdin reads (`crowdin.yml`) — so a macro
+`comment` would be extracted, then silently dropped at the catalog-format
+boundary. Confirmed empirically: adding `comment: "…"` to a message descriptor,
+re-running `messages:extract`, and diffing the catalog shows no trace of it.
+Switching catalog styles to preserve comments is a locked-contract change (the
+flat shape is what recovers the drift signal — [contracts/catalog-format.md](../specs/046-i18n-localization/contracts/catalog-format.md)),
+so it's out of scope here.
+
+Crowdin does let a project manager attach context (text or a screenshot) to a
+string directly in its web UI, independent of the source file. The table below
+is the reference for pasting that context in — curated for ids whose bare
+English value is short, jargon-y, or otherwise likely to mislead a translator
+working from the string alone (not exhaustive; extend it as new ambiguous ids
+are spotted):
+
+| id | value | context |
+|---|---|---|
+| `editor.assignLoop.companion.confirmButton` | "Map it" | Confirms assigning the current character to the key/mechanism being configured — not a literal map/cartography sense. |
+| `editor.assignLoop.glyphCell.goTo` | "go to" | Fragment of a cross-reference link ("go to" + a location name rendered separately) — a navigation verb, not a noun phrase. |
+| `editor.assignLoop.infoView.keyEyebrow` | "Key" | Physical/virtual keyboard key (noun) — not "key" as in cryptographic key or a legend/answer key. |
+| `editor.assignLoop.infoView.typesEyebrow` | "types" | Category label heading a list of rule *types* — not related to typing/keystrokes. |
+| `editor.assignLoop.inspector.roleChip.input` / `.output` / `.inOut` | "input" / "output" / "in+out" | Badge on a `.kmn` rule showing which side of the rule (left context vs. produced output) a character participates in — not generic I/O. |
+| `editor.assignLoop.inspector.ruleTypeBadge.direct` | "DIRECT" | Keyman rule-type jargon (a rule producing its output directly, vs. via a deadkey/store) — keep terse, don't expand into a sentence. |
+| `editor.assignLoop.swap.layerBase` / `.layerShift` | "Base" / "Shift" | Keyboard *layer* names (the unshifted layer vs. the Shift-held layer) — "Shift" here is the layer, not an instruction to press Shift. |
+| `editor.trackStep.adaptTitle` / `.copyTitle` | "Adapt" / "Copy" | Names of the two Day-1 authoring tracks (spec §4: adapt an existing keyboard vs. copy-and-edit one) — noun-ish labels, not imperative verbs. |
+| `survey.characterMapPane.tier.main` | "main" | One of the character-map's coverage tiers (its "main"/primary inventory tier) — not "main" as in a main menu or entry point. |
+| `dashboard.flowGraph.badge.gate` / `.stub` / `.lock` / `.entry` / `.engine` | "gate" / "stub" / "lock" / "entry" / "engine" | Node-kind badges in the internal question-flow diagram (dashboard, dev-facing) — each names a `SurveyPhaseResult`/flow-graph node kind, not the everyday-English sense of the word. |
+| `dashboard.strategyTree.rule.else` / `.secondaryChip.if` / `.secondaryPass.addArrow` | "else ↓" / "if {0}" / "→ add" | Pseudocode/diagram fragments in the strategy-decision-tree visualization (dev-facing) — render as-is inside a flowchart node, not as prose. |
+
 ## Locale switcher (implemented)
 
 [LocaleSwitcher.tsx](../packages/studio/src/components/LocaleSwitcher.tsx) in the
