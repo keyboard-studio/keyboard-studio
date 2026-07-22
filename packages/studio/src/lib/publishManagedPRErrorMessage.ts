@@ -4,7 +4,12 @@
 // publishManagedPR THROWS a PublishManagedPRError-shaped plain object on
 // failure; the UI switches on `err.kind` to pick recovery copy. Kept pure +
 // dependency-free so it is testable in isolation and reusable from any surface.
+//
+// Not a React component, so it uses the global `t` macro (`@lingui/core/macro`,
+// compiles to `i18n._()` against the shared default `@lingui/core` instance
+// bootstrapped in lib/i18n.ts) rather than `useLingui()`'s context-bound `t`.
 
+import { t } from "@lingui/core/macro";
 import type { PublishManagedPRError } from "@keyboard-studio/contracts";
 
 /**
@@ -35,23 +40,47 @@ const PUBLISH_MANAGED_PR_ERROR_KINDS = [
 export function publishManagedPRErrorMessage(err: PublishManagedPRError): string {
   switch (err.kind) {
     case "proxy-unavailable":
-      return "The submission service is temporarily unavailable. Please try again later.";
+      return t({
+        id: "output.submit.error.proxyUnavailable",
+        message: "The submission service is temporarily unavailable. Please try again later.",
+      });
     case "rate-limit":
-      return `Too many submissions — please retry in ${err.retryAfterSeconds} seconds.`;
+      return t({
+        id: "output.submit.error.rateLimit",
+        message: `Too many submissions — please retry in ${{ retryAfterSeconds: err.retryAfterSeconds }} seconds.`,
+      });
     case "branch-exists":
-      return "It looks like you already submitted this keyboard. Please try again with a new name.";
+      return t({
+        id: "output.submit.error.branchExists",
+        message: "It looks like you already submitted this keyboard. Please try again with a new name.",
+      });
     case "upstream-failure":
-      return "Submission failed due to an upstream error. Please try again.";
+      return t({
+        id: "output.submit.error.upstreamFailure",
+        message: "Submission failed due to an upstream error. Please try again.",
+      });
     case "proxy-rejected":
-      return `Submission was rejected (${err.httpStatus}). Please check your details and try again.`;
+      return t({
+        id: "output.submit.error.proxyRejected",
+        message: `Submission was rejected (${{ httpStatus: err.httpStatus }}). Please check your details and try again.`,
+      });
     case "network":
-      return "Could not reach the submission service. Please check your connection and try again.";
+      return t({
+        id: "output.submit.error.network",
+        message: "Could not reach the submission service. Please check your connection and try again.",
+      });
     case "unknown":
-      return `Submission failed: ${err.message}`;
+      return t({
+        id: "output.submit.error.unknownKind",
+        message: `Submission failed: ${{ detail: err.message }}`,
+      });
     default: {
       // Exhaustiveness guard: a new error kind must be handled above.
       const _exhaustive: never = err;
-      return `Unexpected submission error.${String(_exhaustive)}`;
+      return t({
+        id: "output.submit.error.unexpectedKind",
+        message: `Unexpected submission error.${{ detail: String(_exhaustive) }}`,
+      });
     }
   }
 }

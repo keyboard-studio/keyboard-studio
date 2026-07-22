@@ -1,12 +1,24 @@
 // Tests for publishManagedPRErrorMessage — exhaustive over the
 // PublishManagedPRError union.
+//
+// The module under test uses the global `t` macro (i18n._() against the
+// shared @lingui/core default instance), so — unlike renderWithI18n-based
+// component tests — this file bootstraps that same singleton directly: no
+// React tree involved here to carry an <I18nProvider>.
 
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect } from "vitest";
+import { i18n } from "@lingui/core";
+import { messages as enMessages } from "../locales/en/messages.json?lingui";
 import type { PublishManagedPRError } from "@keyboard-studio/contracts";
 import {
   publishManagedPRErrorMessage,
   isPublishManagedPRError,
 } from "./publishManagedPRErrorMessage.ts";
+
+beforeAll(() => {
+  i18n.load("en", enMessages);
+  i18n.activate("en");
+});
 
 describe("publishManagedPRErrorMessage", () => {
   it("proxy-unavailable -> temporarily unavailable message", () => {
