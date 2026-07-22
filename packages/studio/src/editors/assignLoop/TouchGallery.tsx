@@ -69,6 +69,7 @@ import { ErrorText } from "../../ui/index.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { promoteOnManualEdit } from "./touchBehavior.ts";
+import { displayChar } from "../../lib/irToCarveNodes.ts";
 import { isMutateSeamEnabled } from "../../flags/mutateFlag.ts";
 import { LintSummary } from "../../lint/index.ts";
 import { useTouchLint } from "../../hooks/useTouchLint.ts";
@@ -282,7 +283,7 @@ function TouchMethodChooser({
           {method !== "longpress_alternates" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
               <Trans id="editor.assignLoop.touch.method.longpress.summary">
-                Hold a key to reveal {currentChar} as a long-press option.
+                Hold a key to reveal {displayChar(currentChar)} as a long-press option.
               </Trans>
             </span>
           )}
@@ -329,7 +330,7 @@ function TouchMethodChooser({
           {method !== "flick_gestures" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
               <Trans id="editor.assignLoop.touch.method.flick.summary">
-                Swipe a key in a direction to produce {currentChar}.
+                Swipe a key in a direction to produce {displayChar(currentChar)}.
               </Trans>
             </span>
           )}
@@ -398,7 +399,7 @@ function TouchMethodChooser({
           {method !== "multitap" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
               <Trans id="editor.assignLoop.touch.method.multitap.summary">
-                Tap a key rapidly more than once to reach {currentChar}.
+                Tap a key rapidly more than once to reach {displayChar(currentChar)}.
               </Trans>
             </span>
           )}
@@ -445,7 +446,7 @@ function TouchMethodChooser({
           {method !== "touch_key_replace" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
               <Trans id="editor.assignLoop.touch.method.replace.summary">
-                Make a key type {currentChar} directly on the touch keyboard.
+                Make a key type {displayChar(currentChar)} directly on the touch keyboard.
               </Trans>
             </span>
           )}
@@ -476,7 +477,7 @@ function TouchMethodChooser({
             </div>
             <p style={{ margin: 0, fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}>
               <Trans id="editor.assignLoop.touch.method.replace.summary">
-                Make a key type {currentChar} directly on the touch keyboard.
+                Make a key type {displayChar(currentChar)} directly on the touch keyboard.
               </Trans>
             </p>
           </div>
@@ -1373,7 +1374,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 style={{ fontSize: 36, fontFamily: "monospace", lineHeight: 1 }}
                 aria-label={`${toUPlusNotation(currentChar)} ${currentChar}`}
               >
-                {currentChar}
+                {displayChar(currentChar)}
               </span>
               <span style={{ fontSize: 13, color: TEXT_DIM }}>
                 {toUPlusNotation(currentChar)}
@@ -1513,7 +1514,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                       {suggestion.hostKey
                         ? hostKeyShortLabel(suggestion.hostKey)
                         : t({ id: "editor.assignLoop.touch.aKeyPlaceholder", message: "a key" })}{" "}
-                      to reach {currentChar}
+                      to reach {displayChar(currentChar)}
                     </Trans>
                   </p>
                   <div style={{ display: "flex", gap: 8 }}>
@@ -1574,7 +1575,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                       {suggestion.hostKey
                         ? hostKeyShortLabel(suggestion.hostKey)
                         : t({ id: "editor.assignLoop.touch.aKeyPlaceholder", message: "a key" })}{" "}
-                      with {currentChar}
+                      with {displayChar(currentChar)}
                     </Trans>
                   </p>
                   <div style={{ display: "flex", gap: 8 }}>
@@ -1631,7 +1632,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                     }}
                   >
                     <Trans id="editor.assignLoop.touch.suggestion.alreadyText">
-                      {currentChar} is already on the touch keyboard. Keep it as is?
+                      {displayChar(currentChar)} is already on the touch keyboard. Keep it as is?
                     </Trans>
                   </p>
                   <div style={{ display: "flex", gap: 8 }}>
@@ -1796,7 +1797,11 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {touchMechanismLabel(c, m, t)}
+                  {/* Visible chip label only — routes the target through
+                      displayChar() so a standalone combining mark shows the
+                      dotted circle; the aria-label above keeps the raw
+                      target (via touchMechanismLabel(c, ...)) untouched. */}
+                  {touchMechanismLabel(displayChar(c), m, t)}
                   <span
                     aria-hidden="true"
                     style={{ fontSize: 11, color: "#56d364", opacity: 0.7 }}

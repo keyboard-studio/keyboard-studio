@@ -231,7 +231,7 @@ export function contextToKeys(context: ContextElement[]): string[] {
   for (const el of context) {
     switch (el.kind) {
       case 'char':
-        keys.push(el.value);
+        keys.push(displayChar(el.value));
         break;
       case 'vkey':
         keys.push(el.name);
@@ -756,7 +756,7 @@ function precedingContextLabel(elements: ContextElement[]): string {
   const parts: string[] = [];
   for (const el of elements) {
     switch (el.kind) {
-      case 'char':       parts.push(`"${el.value}"`); break;
+      case 'char':       parts.push(`"${displayChar(el.value)}"`); break;
       case 'any':        parts.push(`any char from "${el.storeRef}"`); break;
       case 'notany':     parts.push(`any char not in "${el.storeRef}"`); break;
       case 'vkey':       parts.push(`[${el.name}]`); break;
@@ -1101,7 +1101,7 @@ export function triggerKeyLabel(context: ContextElement[]): string | undefined {
   if (!triggerEl) return undefined;
   switch (triggerEl.kind) {
     case 'vkey':    return vkeyLabel(triggerEl.name) ?? triggerEl.name;
-    case 'char':    return `"${triggerEl.value}"`;
+    case 'char':    return `"${displayChar(triggerEl.value)}"`;
     case 'deadkey': return `deadkey ${triggerEl.id}`;
     default:        return undefined;
   }

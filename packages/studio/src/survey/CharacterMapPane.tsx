@@ -669,7 +669,22 @@ export function CharacterMapPane({
                         // for the glyph rather than trusting the OS's own
                         // (inconsistent) missing-glyph rendering. The U+
                         // codepoint label below always renders regardless.
-                        const glyphRenders = isGlyphSupported(display);
+                        //
+                        // Combining marks are EXCLUDED from the box path
+                        // (cell.isCombiningMark gate below), never routed through
+                        // isGlyphSupported at all. Root cause of the regression
+                        // this guards against: a standalone combining mark has
+                        // ~zero advance width of its own (that's how combining
+                        // characters work — they don't move the cursor), so the
+                        // Canvas measureText heuristic in fontSupport.ts ends up
+                        // comparing the DOTTED-CIRCLE PREFIX's width against
+                        // itself across font stacks (the mark contributes
+                        // nothing to the measured width), which trivially
+                        // matches a generic-family baseline and misclassifies
+                        // the cell as "unsupported" even when the font can draw
+                        // the mark fine. A standalone mark must always show the
+                        // dotted circle, never a box.
+                        const glyphRenders = cell.isCombiningMark || isGlyphSupported(display);
                         const actionLabel = selected
                           ? t({ id: "survey.characterMapPane.cell.removeAction", message: "Remove" })
                           : t({ id: "survey.characterMapPane.cell.addAction", message: "Add" });

@@ -213,6 +213,27 @@ describe("CharacterMapPane — data path", () => {
     expect(aButton.textContent).toContain("a");
   });
 
+  it("never boxes a combining-mark cell even when the font-support checker reports it unsupported (regression)", async () => {
+    seedBaseAndLanguage();
+    // The dotted-circle-prefixed display string for the fixture's combining
+    // mark cell (◌ + U+0301) — report it as "unsupported" via the mocked
+    // useFontSupportChecker, exactly the shape of the measureText misfire
+    // fontSupport.ts's isGlyphSupported doc comment describes for a
+    // near-zero-advance-width mark.
+    unsupportedDisplays.set(["◌" + COMBINING_ACUTE]);
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Combining Diacritical Marks characters (loanwords)")).toBeTruthy();
+    });
+    const markGroup = screen.getByLabelText("Combining Diacritical Marks characters (loanwords)");
+    const markButton = within(markGroup).getByRole("button", { name: /Add.*\(U\+0301\)/ });
+
+    // Must still render the dotted-circle glyph, NEVER the box placeholder.
+    expect(markButton.textContent).toContain("◌");
+    expect(markButton.querySelector('[aria-hidden="true"]')).toBeFalsy();
+  });
+
   it("clicking a cell toggles it into the draft store and flips aria-pressed", async () => {
     seedBaseAndLanguage();
     render(<CharacterMapPane />);
