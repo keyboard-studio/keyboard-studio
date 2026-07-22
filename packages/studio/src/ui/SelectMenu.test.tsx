@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { SelectMenu } from "./SelectMenu.tsx";
+import { SelectMenu, type SelectMenuOption } from "./SelectMenu.tsx";
 
 afterEach(() => {
   cleanup();
@@ -10,6 +11,23 @@ const OPTIONS = [
   { value: "a", label: "Alpha" },
   { value: "b", label: "Beta" },
 ];
+
+// SelectMenu is a controlled component (value comes from the caller), so
+// asserting that aria-activedescendant tracks a *changing* selection needs a
+// small stateful wrapper — passing a no-op onChange (as most tests above do)
+// would leave `value` pinned to its initial prop across the ArrowDown.
+function ControlledSelectMenu({
+  id,
+  options,
+  initialValue,
+}: {
+  id?: string;
+  options: SelectMenuOption[];
+  initialValue: string;
+}) {
+  const [value, setValue] = useState(initialValue);
+  return <SelectMenu id={id} options={options} value={value} onChange={setValue} />;
+}
 
 describe("SelectMenu", () => {
   it("renders the selected value's label on the trigger", () => {
@@ -156,5 +174,19 @@ describe("SelectMenu", () => {
     fireEvent.click(screen.getByRole("button"));
     const option = screen.getByRole("option", { name: "Alpha" });
     expect(option.className).toContain("ks-hit-target");
+  });
+
+  it("aria-activedescendant on the open listbox tracks the selected option and updates on ArrowDown", () => {
+    render(<ControlledSelectMenu id="fruit-select" options={OPTIONS} initialValue="a" />);
+    fireEvent.click(screen.getByRole("button"));
+    const listbox = screen.getByRole("listbox");
+    const alpha = screen.getByRole("option", { name: "Alpha" });
+    expect(alpha.id).toBe("fruit-select-option-a");
+    expect(listbox.getAttribute("aria-activedescendant")).toBe(alpha.id);
+
+    fireEvent.keyDown(listbox, { key: "ArrowDown" });
+    const beta = screen.getByRole("option", { name: "Beta" });
+    expect(beta.id).toBe("fruit-select-option-b");
+    expect(listbox.getAttribute("aria-activedescendant")).toBe(beta.id);
   });
 });

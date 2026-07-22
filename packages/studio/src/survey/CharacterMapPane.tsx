@@ -30,6 +30,7 @@ import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
 import { isPrivateUseCodePoint } from "@keyboard-studio/engine";
 import { prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { TextField } from "../ui/index.ts";
+import { useGlyphFontStack } from "./useGlyphFontStack.ts";
 import {
   ACCENT,
   ERROR_RED,
@@ -44,7 +45,6 @@ import {
   chipIndicatorColor,
   primaryButton,
   visuallyHidden,
-  phaseBFontStack,
 } from "./surveyStyles.ts";
 
 // A single cell within a CharacterMapGroup — derived rather than imported by
@@ -140,8 +140,7 @@ export function CharacterMapPane({
   const chars = usePhaseBDraftStore((s) => s.chars);
   const toggle = usePhaseBDraftStore((s) => s.toggle);
   const addChar = usePhaseBDraftStore((s) => s.add);
-  const selectedFont = usePhaseBDraftStore((s) => s.selectedFont);
-  const glyphFontStack = phaseBFontStack(selectedFont);
+  const glyphFontStack = useGlyphFontStack();
 
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [query, setQuery] = useState("");

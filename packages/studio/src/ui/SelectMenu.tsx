@@ -127,6 +127,12 @@ const OPTION_ROW_CLASSNAME = "ks-hit-target";
  * the Tab order) so `handleListKeyDown`'s arrow/Enter/Escape handling
  * actually receives key events — without this the list's onKeyDown is dead
  * code, since focus never leaves the trigger button.
+ *
+ * Active-option announcement: arrow keys commit the selection immediately
+ * (selection-follows-focus, see handleListKeyDown), so the `<ul>` carries
+ * `aria-activedescendant` pointing at the selected option's id and it
+ * updates on every ArrowUp/ArrowDown — assistive tech announces the active
+ * option without a separate highlighted-vs-selected distinction.
  */
 export function SelectMenu({
   options,
@@ -143,6 +149,16 @@ export function SelectMenu({
 
   const selectedOption = options.find((opt) => opt.value === value);
   const listId = id !== undefined ? `${id}-listbox` : undefined;
+  // Arrow-key navigation here commits the selection immediately (see
+  // handleListKeyDown below) — selection-follows-focus — so the "active"
+  // option for a11y purposes IS always the currently-selected option; no
+  // separate highlightedIndex is needed. Guarded on `id` being defined:
+  // without it there is no stable option id to reference, so omit the
+  // attribute rather than emit a broken `undefined-option-...` ref.
+  const activeDescendantId =
+    id !== undefined && selectedOption !== undefined
+      ? `${id}-option-${selectedOption.value}`
+      : undefined;
 
   const close = useCallback(() => {
     setOpen(false);
@@ -263,6 +279,7 @@ export function SelectMenu({
           id={listId}
           role="listbox"
           tabIndex={-1}
+          aria-activedescendant={activeDescendantId}
           style={LIST_STYLE}
           onKeyDown={handleListKeyDown}
         >

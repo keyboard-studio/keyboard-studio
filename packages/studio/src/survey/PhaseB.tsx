@@ -25,6 +25,7 @@ import { buildPlacementSeeds } from "./placementSeeds.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore, type DiscoveryMethod } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { useGlyphFontStack } from "./useGlyphFontStack.ts";
 import { nfcDedup } from "./charNormUtils.ts";
 import { prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { suggestMissingChars } from "../lib/services.ts";
@@ -178,8 +179,7 @@ interface CharChipEditorProps {
 
 function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorProps) {
   const { t } = useLingui();
-  const selectedFont = usePhaseBDraftStore((s) => s.selectedFont);
-  const glyphFontStack = phaseBFontStack(selectedFont);
+  const glyphFontStack = useGlyphFontStack();
   const [inputVal, setInputVal] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -313,8 +313,7 @@ interface SuggestionChipProps {
 
 function SuggestionChip({ char, checked, onToggle }: SuggestionChipProps) {
   const { t } = useLingui();
-  const selectedFont = usePhaseBDraftStore((s) => s.selectedFont);
-  const glyphFontStack = phaseBFontStack(selectedFont);
+  const glyphFontStack = useGlyphFontStack();
   const cp = toUPlusNotation(char);
   const actionLabel = checked
     ? t({ id: "survey.phaseB.suggestionChip.removeAction", message: "Remove" })
