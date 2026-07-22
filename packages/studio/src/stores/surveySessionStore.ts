@@ -125,6 +125,15 @@ export interface SurveySessionState {
    */
   lastNavigation: "advance" | "pop";
 
+  /**
+   * Spec 046 R10 (recorded consequence, not acted on): the designer picked the
+   * base-plus-mark output form while adapting a base whose own content uses
+   * ready-made forms — the base's existing content needs a follow-on
+   * conversion. This flag only RECORDS that the need exists; building the
+   * conversion is out of scope for spec 046.
+   */
+  marksMigrationNeeded: boolean;
+
   /** Identity-lite output from the identity step. Null until the step completes. */
   identityResult: IdentityLiteResult | null;
 
@@ -209,6 +218,9 @@ export interface SurveySessionState {
    * this so history is always the true walked path.
    */
   advance: (stepId: ActiveStepId) => void;
+
+  /** Record the spec 046 R10 migration-need consequence (see marksMigrationNeeded). */
+  setMarksMigrationNeeded: (needed: boolean) => void;
 
   /**
    * Generic back. Pops the last entry off history and sets it as activeStepId.
@@ -303,6 +315,7 @@ type SurveySessionData = Omit<
   | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
   | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
   | "setTouchSeedSource" | "setBaseConfirmed" | "setDiscoveryMethod"
+  | "setMarksMigrationNeeded"
 >;
 
 /**
@@ -323,6 +336,7 @@ const INITIAL_STATE = {
   activeStepId: "identity" as ActiveStepId,
   history: [] as readonly ActiveStepId[],
   lastNavigation: "advance" as const,
+  marksMigrationNeeded: false,
   identityResult: null,
   identityPhaseResult: null,
   surveyContext: {} as SurveyContext,
@@ -384,6 +398,8 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
       history: [] as readonly ActiveStepId[],
     }),
 
+  setMarksMigrationNeeded: (needed) => set({ marksMigrationNeeded: needed }),
+
   setIdentityResult: (r) => set({ identityResult: r }),
   setIdentityPhaseResult: (r) => set({ identityPhaseResult: r }),
   setSurveyContext: (c) => set({ surveyContext: c }),
@@ -429,6 +445,7 @@ export function snapshotTraversal(): TraversalSnapshot {
     activeStepId: s.activeStepId,
     history: s.history,
     lastNavigation: s.lastNavigation,
+    marksMigrationNeeded: s.marksMigrationNeeded,
     identityResult: s.identityResult,
     identityPhaseResult: s.identityPhaseResult,
     surveyContext: s.surveyContext,

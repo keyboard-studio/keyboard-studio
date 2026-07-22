@@ -21,13 +21,14 @@
 // so this file remains boundary-clean. It captures exactly the store actions
 // and lib helpers the reducer needs — nothing more.
 
-import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult, PlacementWorklist } from "@keyboard-studio/contracts";
 import type { BaseKeyboard, RemovalCapability } from "@keyboard-studio/contracts";
 import type { MutateContext } from "../survey/types.ts";
 // DesktopModifications is a type from the engine package (a workspace
 // dependency, not an internal studio/src/ layer) — the steps-layer boundary
 // forbids steps/ -> lib/stores/dashboard/components, not other packages.
-import type { DesktopModifications } from "@keyboard-studio/engine";
+import type { DesktopModifications, OutputForm } from "@keyboard-studio/engine";
+import { applyMarkGuards, detectBaseMarkMechanism } from "@keyboard-studio/engine";
 import { applyMutatePatch } from "./mutateApply.ts";
 import { repropagate } from "./repropagate.ts";
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
@@ -49,6 +50,13 @@ export const MECHANISMS_STEP_ID = "mechanisms" as const;
 
 /** Step id for the Touch (Phase E) step — fires buildTouchLayoutJson on complete. */
 export const TOUCH_STEP_ID = "touch" as const;
+
+/**
+ * Step id for the marks series (spec 046) — applies the generated mark guards
+ * (blocking swallow rules + stepwise backspace-unwrap stores) to the working
+ * IR and records the R10 migration-need flag on complete.
+ */
+export const MARKS_STEP_ID = "marks" as const;
 
 /**
  * Step id for the choose-base step — fires the copy/adapt instantiation on complete.
@@ -97,6 +105,19 @@ export interface TouchCompleteResult {
    * for the same reason as `mods`.
    */
   seedSource?: "import-adapt" | "reseed-from-desktop" | null;
+}
+
+// ---------------------------------------------------------------------------
+// Marks-series completion payload (spec 046) — the SurveyPhaseResult the
+// series step reports, extended with the chosen output form (studio-local
+// payload extension, like TouchCompleteResult; the locked contract types are
+// untouched).
+// ---------------------------------------------------------------------------
+
+export interface MarksCompleteResult extends SurveyPhaseResult {
+  marksWorklist?: PlacementWorklist;
+  /** The S4 whole-keyboard decision ("ready-made" | "base-plus-mark"). */
+  marksOutputForm?: OutputForm;
 }
 
 // ---------------------------------------------------------------------------
@@ -191,6 +212,14 @@ export interface ReducerDeps {
    */
   getWorkingIR?: () => KeyboardIR | null;
   /**
+   * Record the spec-046 R10 consequence: the designer picked the
+   * base-plus-mark output form while adapting a base whose own content uses
+   * ready-made forms — converting that existing content is a follow-on
+   * migration need, recorded here and not acted on. Optional (session-flag
+   * setter injected by the host).
+   */
+  setMarksMigrationNeeded?: (needed: boolean) => void;
+  /**
    * Write the merged IR back to the working copy via the OVERLAY-PRESERVING
    * store setter (`setWorkingIR`, NOT `setIR`). These are incremental patches to
    * the working IR and must preserve the carve-deletion overlay
@@ -277,6 +306,27 @@ export function applyStepCompletion(
   }
 
   switch (stepId) {
+    // Spec 046 — marks-series completion: apply the generated mark guards
+    // (blocking swallow group + stepwise backspace-unwrap stores) to the
+    // working IR, and record the R10 migration-need flag when base-plus-mark
+    // was chosen over a ready-made-form base. All engine-pure; no raw .kmn.
+    case MARKS_STEP_ID: {
+      const payload = result as Partial<MarksCompleteResult>;
+      const worklist = payload.marksWorklist;
+      if (worklist === undefined) break;
+      const ir = deps.getWorkingIR?.() ?? null;
+      if (ir === null) break;
+      const outputForm = payload.marksOutputForm ?? "base-plus-mark";
+      if (outputForm === "base-plus-mark" && detectBaseMarkMechanism(ir) === "precomposed") {
+        deps.setMarksMigrationNeeded?.(true);
+      }
+      const guarded = applyMarkGuards(ir, worklist, outputForm);
+      if (guarded.ir !== ir) {
+        deps.setWorkingIR?.(guarded.ir);
+      }
+      break;
+    }
+
     // R1 — lock gate: fire lockDesktop() after Mechanisms completes.
     case MECHANISMS_STEP_ID: {
       deps.lockDesktop();

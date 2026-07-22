@@ -104,6 +104,7 @@ export interface AdvanceOutcome {
 
 export const STEPS_WITH_APPLY_COMPLETION: ReadonlySet<string> = new Set([
   "characters",
+  "marks",
   "carve",
   "mechanisms",
   "touch",

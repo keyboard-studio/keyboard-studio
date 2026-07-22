@@ -437,6 +437,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // spec-014 US2 (T024): the staleness closure drives touch re-propagation
       // on physical-step completion. Read via getState() (no re-render churn).
       getStaleSteps: () => useWorkingCopyStore.getState().staleSteps,
+      // Spec 046 R10: record (never act on) the base-content migration need
+      // when base-plus-mark output is chosen over a ready-made-form base.
+      setMarksMigrationNeeded: (needed) =>
+        useSurveySessionStore.getState().setMarksMigrationNeeded(needed),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.

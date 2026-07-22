@@ -161,6 +161,8 @@ export { computeMentalModelPrefills, detectBaseMarkMechanism, PRODUCTIVITY_SPREA
 export type { MentalModelPrefill, MentalModelAnswer, BaseMarkMechanism } from "./marks/mental-model-prefill.js";
 export { buildPlacementWorklist, verifyWorklistCoverage } from "./marks/worklist.js";
 export type { WorklistInputs } from "./marks/worklist.js";
+export { applyMarkGuards, MARKS_GUARD_GROUP, MARKS_UNWRAP_FROM_STORE, MARKS_UNWRAP_TO_STORE } from "./pattern-apply/mark-guards.js";
+export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
 export { checkNormalizationUniformity, MARK_NORMALIZATION_UNIFORM_CODE } from "./validator/layer-b-uniformity.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.

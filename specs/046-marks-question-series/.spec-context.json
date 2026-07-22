@@ -315,6 +315,30 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-22T02:04:42.742Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T02:20:54.566Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T02:20:54.801Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T02:20:55.040Z"
     }
   ],
   "telemetryInstanceId": "2fbeb931-cc8e-463b-9a7c-bfa4e0b7a804",
@@ -552,7 +576,7 @@
       "step": "implement"
     }
   ],
-  "currentTask": "T030",
+  "currentTask": "T033",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -798,6 +822,35 @@
       "files": [
         "packages/studio/src/survey/CharacterMapPane.tsx",
         "packages/studio/src/survey/CharacterMapPane.test.tsx"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Blocking-rule generation (applyMarkGuards): generated_marks_guard non-using-keys group with per-blocked-pair swallow rules, entered via match>use() hop from the entry group (key-assignment independent); idempotent; codec round-trip test",
+      "files": [
+        "packages/engine/src/pattern-apply/mark-guards.ts",
+        "packages/engine/src/pattern-apply/mark-guards.test.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Stepwise backspace-unwrap generation: generated_marks_unwrap_from/to store pair (each composed unit paired with its one-mark-shorter predecessor) + any/K_BKSP/index rule, only under ready-made form (native peel under base-plus-mark); 3 tests",
+      "files": [
+        "packages/engine/src/pattern-apply/mark-guards.ts",
+        "packages/engine/src/pattern-apply/mark-guards.test.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "MARKS_STEP_ID reducer case: applyMarkGuards onto working IR via injected getWorkingIR/setWorkingIR, MarksCompleteResult payload carries marksOutputForm, R10 migrationNeeded session flag (setMarksMigrationNeeded dep + surveySessionStore field); 3 reducer tests",
+      "files": [
+        "packages/studio/src/steps/reducer.ts",
+        "packages/studio/src/steps/reducer.test.ts",
+        "packages/studio/src/steps/advance.ts",
+        "packages/studio/src/StudioShell.tsx",
+        "packages/studio/src/stores/surveySessionStore.ts",
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx"
       ]
     }
   }

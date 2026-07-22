@@ -126,9 +126,22 @@ export function classNeedsMentalModelScreen(
   });
 }
 
-/** The series' phase result: reported on completion (or on the S0 skip). */
-function seriesResult(worklist = makeEmptyPlacementWorklist()): SurveyPhaseResult {
-  return { phase: "C", answers: [], marksWorklist: worklist };
+/**
+ * The series' phase result: reported on completion (or on the S0 skip). The
+ * chosen output form rides along as a studio-local payload extension (see
+ * steps/reducer.ts MarksCompleteResult) — the reducer needs it to decide
+ * whether to generate stepwise backspace-unwrap stores.
+ */
+function seriesResult(
+  worklist = makeEmptyPlacementWorklist(),
+  outputForm?: OutputForm,
+): SurveyPhaseResult {
+  return {
+    phase: "C",
+    answers: [],
+    marksWorklist: worklist,
+    ...(outputForm !== undefined ? { marksOutputForm: outputForm } : {}),
+  } as SurveyPhaseResult;
 }
 
 const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
@@ -275,7 +288,7 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
       mentalModel,
       inputOrder,
     });
-    onComplete(seriesResult(worklist));
+    onComplete(seriesResult(worklist, outputForm));
   }
 
   function handleContinue(): void {

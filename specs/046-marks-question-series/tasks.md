@@ -213,14 +213,14 @@ The contract types, the decomposition helper, the shared posture table, and the 
 
 **Wave 1 — independent (different concerns, shared new module dir):**
 
-- [ ] **T031** [P] [US8] Blocking-rule generation over the working-copy IR: for every mark × base left blocked, the mark key path produces no composed result (swallow behavior — the minimal A6 pull-forward, per R7); derived from the same posture/attachment tables as everything else · `packages/engine/src/pattern-apply/` (new blocking-rules module)
-- [ ] **T032** [P] [US8] Stepwise backspace-unwrap store generation per the design-note recipe: enumerate valid combinations from the attachment matrix, pair each composed form with its one-mark-shorter predecessor; shape recognized by `nfd-to-nfc.ts`'s `isUnreachableBackspaceOverride` · `packages/engine/src/pattern-apply/` (new unwrap-stores module)
+- [x] **T031** [P] [US8] Blocking-rule generation over the working-copy IR: for every mark × base left blocked, the mark key path produces no composed result (swallow behavior — the minimal A6 pull-forward, per R7); derived from the same posture/attachment tables as everything else · `packages/engine/src/pattern-apply/` (new blocking-rules module)
+- [x] **T032** [P] [US8] Stepwise backspace-unwrap store generation per the design-note recipe: enumerate valid combinations from the attachment matrix, pair each composed form with its one-mark-shorter predecessor; shape recognized by `nfd-to-nfc.ts`'s `isUnreachableBackspaceOverride` · `packages/engine/src/pattern-apply/` (new unwrap-stores module)
 
 **⟶ Wait for Wave 1 to finish, then:**
 
 **Wave 2 — single task:**
 
-- [ ] **T033** [US8] Wire rule generation into series completion: generated blocking + unwrap rules land in the working-copy IR (never raw `.kmn` text); record the `migrationNeeded` session flag when base-plus-mark is chosen over a ready-made-form base keyboard (R10 — recorded consequence only, no reverse transform) · series-completion path in `packages/studio/src/survey/marks/MarksSeriesStep.tsx` + engine seam
+- [x] **T033** [US8] Wire rule generation into series completion: generated blocking + unwrap rules land in the working-copy IR (never raw `.kmn` text); record the `migrationNeeded` session flag when base-plus-mark is chosen over a ready-made-form base keyboard (R10 — recorded consequence only, no reverse transform) · series-completion path in `packages/studio/src/survey/marks/MarksSeriesStep.tsx` + engine seam
 
 **Checkpoint**: US8 is independently testable — a blocked pair cannot be typed on the produced keyboard; the uniformity check (T019) passes on the generated output.
 
