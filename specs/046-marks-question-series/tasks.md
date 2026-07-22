@@ -238,7 +238,7 @@ The contract types, the decomposition helper, the shared posture table, and the 
 
 **Wave 2 — single task:**
 
-- [ ] **T037** Success-criteria validation + docs sync: run `pnpm typecheck && pnpm -r test && pnpm lint` green; verify SC-001..SC-007 each have a passing mechanical assertion or documented manual check; update the criteria count mentions (148 → 149) in CLAUDE.md and any prose cross-links per the source-of-truth chain · `CLAUDE.md`, `criteria-summary.md` cross-check
+- [x] **T037** Success-criteria validation + docs sync: run `pnpm typecheck && pnpm -r test && pnpm lint` green; verify SC-001..SC-007 each have a passing mechanical assertion or documented manual check; update the criteria count mentions (148 → 149) in CLAUDE.md and any prose cross-links per the source-of-truth chain · `CLAUDE.md`, `criteria-summary.md` cross-check
 
 ---
 

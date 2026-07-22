@@ -4,7 +4,7 @@
   "branch": "046-marks-question-series",
   "selectedAt": "2026-07-21T22:43:12.777Z",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "implemented",
   "history": [
     {
       "step": "specify",
@@ -363,6 +363,21 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-22T02:47:52.174Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T03:01:05.396Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-22T03:01:05.710Z"
     }
   ],
   "telemetryInstanceId": "2fbeb931-cc8e-463b-9a7c-bfa4e0b7a804",
@@ -411,6 +426,9 @@
     },
     "tasks": {
       "summary": "37 tasks in 11 phases: Setup + Foundational (contracts/decompose/posture/store split), one phase per P1 story (US5, US1, US2, US3, US7) then P2 (US4, US6, US8), Polish (retirement, e2e, SC validation); waves 2-3 deep per phase"
+    },
+    "implement": {
+      "summary": "All 37 tasks shipped: three-store ConfirmedAlphabet + PlacementWorklist contracts (zod-mirrored), visible picker decomposition + PUA role prompt, the S0-S5 marks series as a new marks spine step between carve and mechanisms, output-form policy + layer-B uniformity check (criteria 148->149), mark guards (blocking swallow + backspace unwrap) wired via the reducer, gallery worklist seam, 5 questions retired + pb_mark_input_order relocated, e2e helper; gates green, only the 16 pre-existing baseline test failures remain"
     }
   },
   "coverage": {
@@ -419,6 +437,10 @@
       "tasks": [
         "T002",
         "T005"
+      ],
+      "tests": [
+        "packages/contracts/src/confirmedAlphabet.test.ts",
+        "packages/contracts/src/surveySession.test.ts"
       ]
     },
     "FR-002": {
@@ -433,12 +455,19 @@
         "T008",
         "T009",
         "T010"
+      ],
+      "tests": [
+        "packages/studio/src/survey/BuildListView.test.tsx::AlphabetBreakdown",
+        "packages/studio/src/stores/phaseBDraftStore.test.ts"
       ]
     },
     "FR-004": {
       "title": "PUA pick asks letter-or-mark; answer is a permanent declared role",
       "tasks": [
         "T030"
+      ],
+      "tests": [
+        "packages/studio/src/survey/CharacterMapPane.test.tsx::PUA role prompt"
       ]
     },
     "FR-006": {
@@ -446,6 +475,9 @@
       "tasks": [
         "T015",
         "T016"
+      ],
+      "tests": [
+        "packages/engine/src/marks/marks-foundations.test.ts::proposeAttachments"
       ]
     },
     "FR-007": {
@@ -453,6 +485,9 @@
       "tasks": [
         "T015",
         "T016"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::FR-007"
       ]
     },
     "FR-008": {
@@ -460,12 +495,19 @@
       "tasks": [
         "T015",
         "T016"
+      ],
+      "tests": [
+        "packages/engine/src/marks/marks-foundations.test.ts::auto-confirms",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::FR-008"
       ]
     },
     "FR-009": {
       "title": "Case pairs derived from alphabet case data, no separate question",
       "tasks": [
         "T015"
+      ],
+      "tests": [
+        "packages/engine/src/marks/marks-foundations.test.ts::deriveCaseCounterparts"
       ]
     },
     "FR-010": {
@@ -473,6 +515,9 @@
       "tasks": [
         "T014",
         "T024"
+      ],
+      "tests": [
+        "packages/engine/src/marks/marks-foundations.test.ts::groupMarkClasses"
       ]
     },
     "FR-011": {
@@ -480,18 +525,27 @@
       "tasks": [
         "T022",
         "T024"
+      ],
+      "tests": [
+        "packages/engine/src/marks/worklist-and-prefill.test.ts::computeMentalModelPrefills"
       ]
     },
     "FR-012": {
       "title": "Input-order question only when a letter-plus-mark class exists, prefilled from import",
       "tasks": [
         "T025"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::S2/S3 walk"
       ]
     },
     "FR-013": {
       "title": "Output form is one uniform keyboard-wide decision, never mixed",
       "tasks": [
         "T018"
+      ],
+      "tests": [
+        "packages/engine/src/marks/output-form-policy.test.ts"
       ]
     },
     "FR-014": {
@@ -499,6 +553,10 @@
       "tasks": [
         "T018",
         "T020"
+      ],
+      "tests": [
+        "packages/engine/src/marks/output-form-policy.test.ts::FR-014",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::FR-014"
       ]
     },
     "FR-015": {
@@ -506,6 +564,9 @@
       "tasks": [
         "T018",
         "T020"
+      ],
+      "tests": [
+        "packages/engine/src/marks/output-form-policy.test.ts::FR-015"
       ]
     },
     "FR-016": {
@@ -513,6 +574,9 @@
       "tasks": [
         "T018",
         "T029"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::US4 open choice"
       ]
     },
     "FR-017": {
@@ -520,12 +584,18 @@
       "tasks": [
         "T020",
         "T029"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::backspace preview"
       ]
     },
     "FR-018": {
       "title": "Stacking confirmation only on evidence, else two-mark combos stay blocked",
       "tasks": [
         "T026"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::stacking evidence"
       ]
     },
     "FR-019": {
@@ -540,6 +610,10 @@
         "T023",
         "T027",
         "T028"
+      ],
+      "tests": [
+        "packages/engine/src/marks/worklist-and-prefill.test.ts::buildPlacementWorklist",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::worklist handoff"
       ]
     },
     "FR-021": {
@@ -547,6 +621,10 @@
       "tasks": [
         "T031",
         "T033"
+      ],
+      "tests": [
+        "packages/engine/src/pattern-apply/mark-guards.test.ts",
+        "packages/studio/src/steps/reducer.test.ts::marks"
       ]
     },
     "FR-022": {
@@ -554,6 +632,9 @@
       "tasks": [
         "T019",
         "T021"
+      ],
+      "tests": [
+        "packages/engine/src/validator/layer-b-uniformity.test.ts"
       ]
     },
     "FR-023": {
@@ -561,6 +642,9 @@
       "tasks": [
         "T013",
         "T027"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::gate recompute"
       ]
     },
     "FR-024": {
@@ -574,6 +658,10 @@
       "tasks": [
         "T025",
         "T034"
+      ],
+      "tests": [
+        "packages/studio/tests/survey/inputs-writes-coverage.test.ts",
+        "packages/studio/tests/survey/orphan-input-lint.test.ts"
       ]
     },
     "FR-026": {
@@ -587,6 +675,9 @@
       "tasks": [
         "T011",
         "T012"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::S0 skip path"
       ]
     }
   },
@@ -604,7 +695,7 @@
       "step": "implement"
     }
   ],
-  "currentTask": "T036",
+  "currentTask": "T037",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -910,6 +1001,61 @@
         "packages/studio/e2e/touch-derivation-us1.spec.ts",
         "packages/studio/e2e/touch-derivation-us2.spec.ts"
       ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Gates: typecheck 0 errors, lint GREEN (eslint/depcruise/crew/facet/facet-index/adaptation-catalog), full test run - only the 16 pre-existing baseline failures remain (no new failing file); golden-walk fixtures regenerated for the marks hop; criteria-count prose bumped 148->149 in CLAUDE.md/README/spec.md par.11 (spec-trace acknowledged)",
+      "files": [
+        "CLAUDE.md",
+        "README.md",
+        "spec.md",
+        "docs/spec-trace.json",
+        "packages/studio/tests/steps/__fixtures__/goldenWalk/copy.json",
+        "packages/studio/tests/steps/__fixtures__/goldenWalk/adapt.json"
+      ]
     }
-  }
+  },
+  "verified": [
+    {
+      "what": "typecheck all packages",
+      "command": "pnpm typecheck",
+      "result": "0 errors",
+      "warnings": []
+    },
+    {
+      "what": "full lint gate (eslint + depcruise + crew-lint + facet-lint + facet-index-lint + adaptation-catalog-lint)",
+      "command": "pnpm lint",
+      "result": "all GREEN; pre-existing no-console warnings only",
+      "warnings": [
+        "no-console warnings in files not touched by 046"
+      ]
+    },
+    {
+      "what": "full recursive test run",
+      "command": "pnpm -r test",
+      "result": "contracts 437, engine all green incl. 45+ new 046 tests, studio 4104/4122 - the 16 failures are the PRE-EXISTING baseline set (useKeyboardArtifact, browserPatternLibrary, projectWorkingCopyVfs.flagParity, articleIVProbe) documented at T001; zero new failing files",
+      "warnings": [
+        "baseline failures pre-date this feature - see T001 concern"
+      ]
+    },
+    {
+      "what": "SC-003/SC-004 mechanical checkability",
+      "command": "pnpm --filter @keyboard-studio/engine test src/validator/layer-b-uniformity.test.ts src/pattern-apply/mark-guards.test.ts",
+      "result": "13 tests: uniformity check flags mixed forms in the single debounce cycle; blocked pairs generate swallow rules; unwrap stores round-trip through the codec",
+      "warnings": []
+    },
+    {
+      "what": "SC-005 no Unicode/normalization in S4 designer text",
+      "command": "vitest output-form-policy.test.ts + MarksSeriesStep.test.tsx SC-005 cases",
+      "result": "asserted mechanically on the policy explanations, notice rendering, and open-choice rendering",
+      "warnings": []
+    },
+    {
+      "what": "SC-001/SC-002/SC-006/SC-007 walk behavior",
+      "command": "vitest src/survey/marks (18 tests)",
+      "result": "zero-marks alphabets skip with empty worklist; simple orthography = 2 screens; tonal walk <= 5 screens; worklist coverage invariant verified in engine tests",
+      "warnings": []
+    }
+  ],
+  "last_action": "all 37 tasks done - typecheck/lint green; full tests green modulo the 16 pre-existing baseline failures documented at T001; e2e lane pending manual run"
 }

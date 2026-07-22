@@ -72,12 +72,16 @@
   {
     "stepId": "carve",
     "applyStepCompletion": [
-      "carve"
+      "carve",
+      "marks"
     ],
     "storeMutations": [
+      "advance",
       "advance"
     ],
-    "workingCopyMutations": [],
+    "workingCopyMutations": [
+      "recordPhase"
+    ],
     "navigateTo": []
   },
   {

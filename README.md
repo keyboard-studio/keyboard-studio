@@ -14,7 +14,7 @@ Language experts know their language's phonology, orthography, and character inv
 
 ## Status
 
-**Day-1 contract locked; engine + studio now built.** The v1.3.0 spec is signed off. `packages/contracts` holds the locked shared contract — the seven service interfaces (validator / compiler / scaffolder / baseBrowser / patternLibrary / lintEngine / outputService), their mocks, fixtures, and the 148-row triaged criteria catalog. Beyond contracts, the engine (`packages/engine` — codec, scaffolder, validator, compiler, simulator, recognizer, output, …), the Layer-C lint engine (`@keymanapp/keyboard-lint`), the LLM client (`@keyboard-studio/llm`), and the React + Vite studio SPA (`packages/studio`) are all built and under active development. See [`CLAUDE.md`](CLAUDE.md) for the current per-package inventory and the build/test commands.
+**Day-1 contract locked; engine + studio now built.** The v1.3.0 spec is signed off. `packages/contracts` holds the locked shared contract — the seven service interfaces (validator / compiler / scaffolder / baseBrowser / patternLibrary / lintEngine / outputService), their mocks, fixtures, and the 149-row triaged criteria catalog. Beyond contracts, the engine (`packages/engine` — codec, scaffolder, validator, compiler, simulator, recognizer, output, …), the Layer-C lint engine (`@keymanapp/keyboard-lint`), the LLM client (`@keyboard-studio/llm`), and the React + Vite studio SPA (`packages/studio`) are all built and under active development. See [`CLAUDE.md`](CLAUDE.md) for the current per-package inventory and the build/test commands.
 
 ## Repository layout
 
