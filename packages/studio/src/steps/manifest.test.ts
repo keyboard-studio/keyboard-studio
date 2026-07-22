@@ -72,6 +72,7 @@ const EXPECTED_SPINE_ORDER = [
   "track",
   "characters",
   "carve",
+  "marks",
   "mechanisms",
   "sequences",
   "touch",

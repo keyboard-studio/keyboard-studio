@@ -90,6 +90,7 @@ export type ActiveStepId =
   | "project_name"
   | "characters"
   | "carve"
+  | "marks"
   | "mechanisms"
   | "sequences"
   | "touch_seed_source"
@@ -114,6 +115,15 @@ export interface SurveySessionState {
    * (charactersSub stays component-local).
    */
   history: readonly ActiveStepId[];
+
+  /**
+   * Direction of the last traversal move: "advance" (forward) or "pop"
+   * (back-navigation). Lets a computed-gate step (spec 046 "marks": S0 skips
+   * the whole series when the alphabet has no marks) stay TRANSPARENT in both
+   * directions — on a forward entry the skip advances onward, on a back-pop
+   * entry it keeps popping backward instead of bouncing the user forward.
+   */
+  lastNavigation: "advance" | "pop";
 
   /** Identity-lite output from the identity step. Null until the step completes. */
   identityResult: IdentityLiteResult | null;
@@ -312,6 +322,7 @@ export type TraversalSnapshot = SurveySessionData;
 const INITIAL_STATE = {
   activeStepId: "identity" as ActiveStepId,
   history: [] as readonly ActiveStepId[],
+  lastNavigation: "advance" as const,
   identityResult: null,
   identityPhaseResult: null,
   surveyContext: {} as SurveyContext,
@@ -335,6 +346,7 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
     set((s) => ({
       history: [...s.history, s.activeStepId],
       activeStepId: stepId,
+      lastNavigation: "advance",
     })),
 
   popHistory: () =>
@@ -345,6 +357,7 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
       return {
         activeStepId: prev,
         history: s.history.slice(0, -1),
+        lastNavigation: "pop" as const,
       };
     }),
 
@@ -355,12 +368,13 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
         return {
           activeStepId: "touch_seed_source",
           history: s.history.slice(0, -1),
+          lastNavigation: "pop" as const,
         };
       }
       // Fork was skipped this pass — jump without consuming history so
       // "mechanisms" (or whatever is actually on top) stays there for the
       // chooser's own Back.
-      return { activeStepId: "touch_seed_source" };
+      return { activeStepId: "touch_seed_source", lastNavigation: "pop" as const };
     }),
 
   reset: () =>
@@ -414,6 +428,7 @@ export function snapshotTraversal(): TraversalSnapshot {
   return {
     activeStepId: s.activeStepId,
     history: s.history,
+    lastNavigation: s.lastNavigation,
     identityResult: s.identityResult,
     identityPhaseResult: s.identityPhaseResult,
     surveyContext: s.surveyContext,

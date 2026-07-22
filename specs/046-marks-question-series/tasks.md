@@ -78,14 +78,14 @@ The contract types, the decomposition helper, the shared posture table, and the 
 
 **Wave 1 — single task:**
 
-- [ ] **T011** [US1] `MarksSeriesStep.tsx` host skeleton: computes `MarksGateResult` (S0, never rendered); when `marks` is empty, completes the step immediately with an empty `PlacementWorklist`; otherwise sequences stations internally (stations stubbed for now) · `packages/studio/src/survey/marks/MarksSeriesStep.tsx`
+- [x] **T011** [US1] `MarksSeriesStep.tsx` host skeleton: computes `MarksGateResult` (S0, never rendered); when `marks` is empty, completes the step immediately with an empty `PlacementWorklist`; otherwise sequences stations internally (stations stubbed for now) · `packages/studio/src/survey/marks/MarksSeriesStep.tsx`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
 **Wave 2 — independent (different files):**
 
-- [ ] **T012** [P] [US1] Register the new spine step id `marks` between `carve` and `mechanisms`: manifest entry hosting `MarksSeriesStep`, advance policy, and the `expectedSpine` update · `packages/studio/src/steps/manifest.ts`, `packages/studio/src/steps/advance.ts`
-- [ ] **T013** [P] [US1] Gate recompute on alphabet edit: revisiting alphabet confirmation and adding a marked character makes the series reachable on the next advance (US1 AC2; groundwork for FR-023) · `packages/studio/src/survey/marks/MarksSeriesStep.tsx` gate logic + step-state wiring
+- [x] **T012** [P] [US1] Register the new spine step id `marks` between `carve` and `mechanisms`: manifest entry hosting `MarksSeriesStep`, advance policy, and the `expectedSpine` update · `packages/studio/src/steps/manifest.ts`, `packages/studio/src/steps/advance.ts`
+- [x] **T013** [P] [US1] Gate recompute on alphabet edit: revisiting alphabet confirmation and adding a marked character makes the series reachable on the next advance (US1 AC2; groundwork for FR-023) · `packages/studio/src/survey/marks/MarksSeriesStep.tsx` gate logic + step-state wiring
 
 **Checkpoint**: US1 is independently testable — zero-marks alphabets never see a marks screen; marked alphabets route into the (stub) series.
 

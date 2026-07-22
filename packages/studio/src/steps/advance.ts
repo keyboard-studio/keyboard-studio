@@ -32,6 +32,7 @@ type ActiveStepId =
   | "project_name"
   | "characters"
   | "carve"
+  | "marks"
   | "mechanisms"
   | "sequences"
   | "touch_seed_source"
@@ -201,7 +202,10 @@ export function advance(
       return { next: nextSpineStepAfter("characters") }; // carve
 
     case "carve":
-      return { next: nextSpineStepAfter("carve") }; // mechanisms
+      return { next: nextSpineStepAfter("carve") }; // marks (spec 046)
+
+    case "marks":
+      return { next: nextSpineStepAfter("marks") }; // mechanisms
 
     case "mechanisms":
       return { next: nextSpineStepAfter("mechanisms") }; // sequences

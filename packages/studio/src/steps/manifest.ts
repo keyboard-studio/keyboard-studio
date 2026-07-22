@@ -21,6 +21,7 @@
 import { irPath } from "@keyboard-studio/contracts";
 import type { Step } from "./types.ts";
 import { CharactersStep } from "../survey/CharactersStep.tsx";
+import { MarksSeriesStep } from "../survey/marks/MarksSeriesStep.tsx";
 import {
   identityStep,
   chooseBaseStep,
@@ -113,6 +114,21 @@ export const manifest: readonly Step[] = [
   // --- Carve (Phase D: remove unwanted base keys) ---
   carveStep,
 
+  // --- Marks series (spec 046: S0-S5 accent/mark question series) ---
+  // S0 is a computed gate INSIDE the step component: a marks-free alphabet
+  // completes the step immediately (no render), so the spine hop is invisible
+  // for the no-diacritic majority case (FR-005). Emits the PlacementWorklist
+  // the mechanism gallery consumes (session.marksWorklist).
+  {
+    kind: "editor-step",
+    id: "marks",
+    title: "Accents & marks",
+    spine: true,
+    inputs: [],
+    writes: [],
+    component: MarksSeriesStep,
+  } satisfies Step,
+
   // --- Mechanisms (Phase C: physical key assignment) ---
   // The reducer fires lockDesktop() when this step completes (R1).
   {
@@ -165,7 +181,7 @@ export function validateManifestShape(): void {
   // M2 — spine order.
   const expectedSpine = [
     "identity", "choose_base", "track", "characters",
-    "carve", "mechanisms", "sequences", "touch", "help", "package",
+    "carve", "marks", "mechanisms", "sequences", "touch", "help", "package",
   ];
   for (let i = 0; i < expectedSpine.length; i++) {
     const expected = expectedSpine[i];

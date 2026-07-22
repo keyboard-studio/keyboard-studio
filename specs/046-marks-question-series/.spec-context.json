@@ -155,6 +155,30 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-22T01:06:31.879Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:21:32.062Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:21:32.295Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:21:32.526Z"
     }
   ],
   "telemetryInstanceId": "2fbeb931-cc8e-463b-9a7c-bfa4e0b7a804",
@@ -383,7 +407,7 @@
       "step": "implement"
     }
   ],
-  "currentTask": "T010",
+  "currentTask": "T013",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -462,6 +486,33 @@
       "did": "CharactersStep commits ConfirmedAlphabet (draftConfirmedAlphabet) alongside flat confirmedInventory on completion; absent for manual-flow (empty draft)",
       "files": [
         "packages/studio/src/survey/CharactersStep.tsx"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "MarksSeriesStep host: computeMarksGate S0 (never rendered), immediate completion with empty PlacementWorklist on skip, direction-aware transparency via new session lastNavigation flag, series shell + marks-continue for marked alphabets; 6 tests",
+      "files": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx",
+        "packages/studio/src/stores/surveySessionStore.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Spine step 'marks' registered between carve and mechanisms: manifest entry, expectedSpine, advance policy case, ActiveStepId unions; pinned spine oracles updated (advance.test, manifest.test, StudioShell.test)",
+      "files": [
+        "packages/studio/src/steps/manifest.ts",
+        "packages/studio/src/steps/advance.ts",
+        "packages/studio/src/steps/advance.test.ts",
+        "packages/studio/src/steps/manifest.test.ts",
+        "packages/studio/src/StudioShell.test.tsx"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Gate recomputes from session.alphabet via useMemo (US1 AC2: adding a marked char makes series reachable on next advance); back-pop transparency prevents the skip gate trapping Back from mechanisms",
+      "files": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx"
       ]
     }
   }
