@@ -152,11 +152,12 @@ export function checkNormalizationUniformity(ir: KeyboardIR): LintFinding[] {
       severity: "warning",
       layer: "B",
       message:
-        "The keyboard you chose can output a character in two different ways. It would be " +
-        "ideal to choose one or the other. Here are some of the characters involved: " +
+        "Some letters with accents, like é, can be typed two different ways on your " +
+        "keyboard. They look the same on screen, but the computer stores them differently " +
+        "underneath. That means searching for text might not find it, and pressing " +
+        "Backspace might delete more or less than you expect. Try to make your keyboard " +
+        "type each letter the same way every time. For example: " +
         `${examples.join(", ")}.`,
-      hint:
-        "The two ways are a ready-made character versus a letter plus a separate accent mark.",
       ...(line !== undefined
         ? { location: { file: "", line, column: 1 } }
         : {}),

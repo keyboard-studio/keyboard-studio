@@ -763,7 +763,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
             {globalWarnings.map((f, i) => (
               <div key={`${f.code}-${i}`} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: TEXT_MAIN }}>
-                  <span aria-hidden="true">⚠</span> {f.message}
+                  <span aria-hidden="true">⚠</span> Warning: {f.message}
                 </p>
                 {f.hint !== undefined && (
                   <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: TEXT_DIM }}>
