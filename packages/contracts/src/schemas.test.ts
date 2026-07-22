@@ -16,7 +16,6 @@ import {
   toPattern,
 } from "./schemas";
 import { samplePatterns } from "./fixtures/patterns";
-import { ALL_CRITERIA } from "./criteriaData";
 import criteriaJsonRaw from "../data/criteria.json" with { type: "json" };
 
 // -----------------------------------------------------------------------------

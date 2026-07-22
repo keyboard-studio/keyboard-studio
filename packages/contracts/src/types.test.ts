@@ -19,7 +19,6 @@ import type {
 } from "./compileResult";
 import { makeCompileResult } from "./compileResult";
 import type {
-  SurveyPhase,
   SurveyAnswer,
   SurveyPhaseResult,
 } from "./surveyPhaseResult";
