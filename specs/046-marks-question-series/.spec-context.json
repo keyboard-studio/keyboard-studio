@@ -179,6 +179,38 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-22T01:21:32.526Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:28:22.606Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:28:22.865Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:28:23.095Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:28:23.344Z"
     }
   ],
   "telemetryInstanceId": "2fbeb931-cc8e-463b-9a7c-bfa4e0b7a804",
@@ -407,7 +439,7 @@
       "step": "implement"
     }
   ],
-  "currentTask": "T013",
+  "currentTask": "T017",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -513,6 +545,38 @@
       "did": "Gate recomputes from session.alphabet via useMemo (US1 AC2: adding a marked char makes series reachable on next advance); back-pop transparency prevents the skip gate trapping Back from mechanisms",
       "files": [
         "packages/studio/src/survey/marks/MarksSeriesStep.tsx"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "groupMarkClasses: function-bucket (above/below/other) + single-link Jaccard clustering over attested base sets, named ATTACHMENT_SIMILARITY_THRESHOLD constant; deterministic ids/labels",
+      "files": [
+        "packages/engine/src/marks/mark-classes.ts",
+        "packages/engine/src/marks/marks-foundations.test.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "proposeAttachments tri-state (attested prechecked / class-sibling plausible / blocked default) + FR-008 autoConfirmed predicate + deriveCaseCounterparts (FR-009, caseCounterpart reuse); 10 engine tests",
+      "files": [
+        "packages/engine/src/marks/attachment-proposals.ts",
+        "packages/engine/src/marks/marks-foundations.test.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "AttachmentStation S1 card: per-mark rows, plausible dashed-suggested chips, unchecked-means-blocked help text, auto-confirmed details summary, derived case-pair note; testid marks-attachment",
+      "files": [
+        "packages/studio/src/survey/marks/AttachmentStation.tsx"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Station sequencing in the host: visibleStations list with per-station render conditions, Continue advances/completes, in-series Back; simple orthography = one screen (4 new tests)",
+      "files": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx"
       ]
     }
   }

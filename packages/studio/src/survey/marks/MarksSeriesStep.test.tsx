@@ -6,7 +6,7 @@
 // the series shell.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, act } from "@testing-library/react";
+import { render, screen, cleanup, act, fireEvent } from "@testing-library/react";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { MarksSeriesStep, computeMarksGate } from "./MarksSeriesStep.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -106,5 +106,52 @@ describe("MarksSeriesStep — series runs when marks exist", () => {
     });
     expect(screen.getByTestId("marks-series")).toBeTruthy();
     expect(onComplete).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// S1 attachment station (US2, FR-006/007/008)
+// ---------------------------------------------------------------------------
+
+describe("MarksSeriesStep — S1 attachment station", () => {
+  it("renders one row per mark with attested bases pre-checked", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    const station = screen.getByTestId("marks-attachment");
+    expect(station).toBeTruthy();
+    const checkbox = screen.getByLabelText(/e can carry/) as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+  });
+
+  it("renders a single-attested-base mark as an auto-confirmed summary (FR-008)", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    const row = screen.getByTestId("attachment-row-U+0301");
+    expect(row.tagName.toLowerCase()).toBe("details");
+    expect(row.textContent).toContain("confirmed on");
+  });
+
+  it("states the unchecked-means-blocked consequence in the row help text (FR-007)", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    expect(screen.getByTestId("marks-attachment").textContent).toContain(
+      "will not take this mark",
+    );
+  });
+
+  it("simple orthography completes in ONE marks screen via Continue (SC-002)", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    const onComplete = vi.fn();
+    act(() => {
+      render(<MarksSeriesStep onComplete={onComplete} />);
+    });
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
 });

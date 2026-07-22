@@ -101,15 +101,15 @@ The contract types, the decomposition helper, the shared posture table, and the 
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T014** [P] [US2] Mark-class grouping by attachment-set similarity + linguistic function, with per-mark split-out support (FR-010 grouping side) · `packages/engine/src/marks/mark-classes.ts`
-- [ ] **T015** [P] [US2] Attachment proposals: per-mark tri-state over the confirmed bases — attested (from `attestedStacks`, pre-checked), plausible (mark-class heuristics, proposed unchecked), blocked (default); plus the FR-008 auto-confirm predicate (exactly one attested base, no plausible additions) and case-pair derivation from the alphabet's case data (FR-009) · `packages/engine/src/marks/attachment-proposals.ts`
+- [x] **T014** [P] [US2] Mark-class grouping by attachment-set similarity + linguistic function, with per-mark split-out support (FR-010 grouping side) · `packages/engine/src/marks/mark-classes.ts`
+- [x] **T015** [P] [US2] Attachment proposals: per-mark tri-state over the confirmed bases — attested (from `attestedStacks`, pre-checked), plausible (mark-class heuristics, proposed unchecked), blocked (default); plus the FR-008 auto-confirm predicate (exactly one attested base, no plausible additions) and case-pair derivation from the alphabet's case data (FR-009) · `packages/engine/src/marks/attachment-proposals.ts`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
 **Wave 2 — independent (different files):**
 
-- [ ] **T016** [P] [US2] `AttachmentStation.tsx` (S1): one row per mark, pre-population per T015, unchecked-means-blocked consequence stated in row help text (FR-007), auto-confirmed summary rows still openable for edit (FR-008); container testid `marks-attachment` · `packages/studio/src/survey/marks/AttachmentStation.tsx`
-- [ ] **T017** [P] [US2] Station sequencing + screen accounting in the step host: skip every station whose render condition fails, so the single-mark/single-base/ready-made case reaches `mechanisms` after at most two rendered screens (SC-002, SC-006); series continue control testid `marks-continue` · `packages/studio/src/survey/marks/MarksSeriesStep.tsx`
+- [x] **T016** [P] [US2] `AttachmentStation.tsx` (S1): one row per mark, pre-population per T015, unchecked-means-blocked consequence stated in row help text (FR-007), auto-confirmed summary rows still openable for edit (FR-008); container testid `marks-attachment` · `packages/studio/src/survey/marks/AttachmentStation.tsx`
+- [x] **T017** [P] [US2] Station sequencing + screen accounting in the step host: skip every station whose render condition fails, so the single-mark/single-base/ready-made case reaches `mechanisms` after at most two rendered screens (SC-002, SC-006); series continue control testid `marks-continue` · `packages/studio/src/survey/marks/MarksSeriesStep.tsx`
 
 **Checkpoint**: US2 is independently testable — the simple orthography flows through as a confirm, not an interrogation.
 
