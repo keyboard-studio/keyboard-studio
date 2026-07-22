@@ -34,6 +34,7 @@ import { manifest } from "../steps/manifest.ts";
 import { loadModularFlow } from "../survey/loadModularFlow.ts";
 import type { FlowDef } from "../survey/types.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
+import { reserveRegistry } from "../survey/questions/registry.reserve.ts";
 
 // Re-export CHARACTERS_STEP_ID so driftGuardrail and other callers don't need
 // a separate import from manifestProjection.
@@ -309,23 +310,20 @@ export function buildLibrarySection(): LibrarySection {
 // ---------------------------------------------------------------------------
 
 /**
- * buildLeftoverSection — every registered question module that no LIVE flow uses.
+ * buildLeftoverSection — every module physically relocated to the reserve
+ * sub-registry (questions/reserve/, registry.reserve.ts).
  *
- * Parses every flowSources entry once (parseAllSources), collects the union of ids
- * listed in any status:"live" flow, and returns the registry complement as
- * kind:"library-not-in-flow" / region:"leftover" nodes. A question that appears
- * only in a proposed flow is still leftover here (it is not in a LIVE flow) — the
- * Leftover section is the reference bench for anything not currently live.
+ * Sourced DIRECTLY from reserveRegistry — not derived by subtracting the live
+ * flow ids from questionRegistry. The reserve folder/registry IS the Leftover
+ * set: a module lives there if and only if it is demoted, so this always
+ * matches physical reality and can never silently diverge from a live flow's
+ * id list. Every reserveRegistry module renders as a kind:"library-not-in-flow"
+ * / region:"leftover" node (via buildLeftoverNodes with an empty "in-flow" set,
+ * so nothing is excluded).
  *
  * Excluded from the rendered<->runtime bijection by construction: collectRenderedNodeIds
  * never traverses this composition (like the Library section).
  */
 export function buildLeftoverSection(): GraphNode[] {
-  const parsed = parseAllSources();
-  const liveIds = new Set<string>();
-  for (const p of parsed) {
-    if (p.flow === null || p.status !== "live") continue;
-    flowIds(p.flow, liveIds);
-  }
-  return buildLeftoverNodes(questionRegistry, liveIds);
+  return buildLeftoverNodes(reserveRegistry, new Set());
 }

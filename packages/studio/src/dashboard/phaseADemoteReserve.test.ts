@@ -3,13 +3,14 @@
 // spec-016 driftGuardrail.test.ts).
 //
 // The orphaned full non-identity Phase A (15 identity + 15 provenance_*) is
-// demoted to the inert library. Originally (spec 022) this rendered as reserve
-// clog INSIDE the identity-lite drill-down, because identity_lite shared the full
-// phaseARegistry. That has since been moved: identity_lite now keys its drill-down
-// off the il_*-only identityLiteRegistry (steps/flowSources.ts), so its drill-down
-// carries NO reserve nodes, and the demoted battery surfaces in the Flow Map's
-// dedicated Leftover section (buildLeftoverSection) — kept for reference / future
-// reuse, never run by the live survey and never clogging a live flow.
+// physically relocated to the dedicated reserve/ folder and reserveRegistry.
+// Originally (spec 022) this rendered as reserve clog INSIDE the identity-lite
+// drill-down, because identity_lite shared the full phaseARegistry. That has
+// since been moved: identity_lite's phaseARegistry now holds ONLY the il_*
+// modules (steps/flowSources.ts), so its drill-down carries NO reserve nodes,
+// and the demoted battery surfaces in the Flow Map's dedicated Leftover section
+// (buildLeftoverSection, sourced from reserveRegistry) — kept for reference /
+// future reuse, never run by the live survey and never clogging a live flow.
 //
 // This locks:
 //   • every demoted Phase A id renders as a Leftover node — kind:"library-not-in-flow",
@@ -34,7 +35,7 @@ import { DEMOTED_PHASE_A } from "../survey/questions/demotedPhaseA.fixture.ts";
 
 describe("spec 022 — demoted Phase A is Leftover, not clog (FR-001/FR-003/SC-001)", () => {
   // The identity-lite drill-down as wired in PRODUCTION (its real flowSources
-  // registry — now the il_*-only identityLiteRegistry).
+  // registry — now the il_*-only phaseARegistry).
   const identityLite = flowSources["identity_lite"]!;
   const identityGraph = buildModularFlowGraph(
     identityLite.raw,
