@@ -7,6 +7,12 @@
     "Dsrt": "alphabet", "Shaw": "alphabet", "Vith": "alphabet", "Wcho": "alphabet",
     "Medf": "alphabet", "Gara": "alphabet", "Tfng": "alphabet", "Nkoo": "alphabet",
     "Hang": "alphabet", "Bopo": "alphabet", "Mroo": "alphabet", "Thaa": "alphabet",
+    "Lisu": "alphabet", "Mong": "alphabet", "Osma": "alphabet", "Rohg": "alphabet",
+    "Hung": "alphabet", "Avst": "alphabet", "Olck": "alphabet", "Ital": "alphabet",
+    "Sora": "alphabet", "Bass": "alphabet", "Elba": "alphabet", "Lyci": "alphabet",
+    "Lydi": "alphabet", "Hmnp": "alphabet", "Perm": "alphabet", "Orkh": "alphabet",
+    "Pauc": "alphabet", "Todr": "alphabet", "Toto": "alphabet", "Wara": "alphabet",
+    "Yezi": "alphabet",
 
     "Deva": "abugida", "Beng": "abugida", "Guru": "abugida", "Gujr": "abugida",
     "Orya": "abugida", "Taml": "abugida", "Telu": "abugida", "Knda": "abugida",
@@ -19,18 +25,34 @@
     "Phag": "abugida", "Limb": "abugida", "Sylo": "abugida", "Kthi": "abugida",
     "Modi": "abugida", "Tirh": "abugida", "Gran": "abugida", "Shrd": "abugida",
     "Newa": "abugida", "Takr": "abugida", "Ahom": "abugida", "Mahj": "abugida",
-    "Hano": "abugida",
+    "Hano": "abugida", "Gong": "abugida", "Tavt": "abugida", "Bhks": "abugida",
+    "Buhd": "abugida", "Diak": "abugida", "Dogr": "abugida", "Kawi": "abugida",
+    "Khar": "abugida", "Khoj": "abugida", "Sind": "abugida", "Krai": "abugida",
+    "Maka": "abugida", "Marc": "abugida", "Gonm": "abugida", "Mult": "abugida",
+    "Nagm": "abugida", "Nand": "abugida", "Sidd": "abugida", "Lepc": "abugida",
+    "Soyo": "abugida", "Tagb": "abugida", "Zanb": "abugida",
 
     "Arab": "abjad", "Hebr": "abjad", "Syrc": "abjad",
     "Samr": "abjad", "Mand": "abjad", "Phnx": "abjad", "Sogd": "abjad",
     "Phlp": "abjad", "Prti": "abjad", "Armi": "abjad", "Nbat": "abjad",
     "Palm": "abjad", "Hatr": "abjad", "Narb": "abjad", "Sarb": "abjad",
+    "Phli": "abjad", "Mani": "abjad", "Sogo": "abjad", "Ougr": "abjad",
+    "Ugar": "abjad",
 
     "Hira": "syllabary", "Kana": "syllabary", "Yiii": "syllabary", "Vaii": "syllabary",
     "Cans": "syllabary", "Cher": "syllabary", "Linb": "syllabary", "Cprt": "syllabary",
-    "Bamu": "syllabary", "Nshu": "syllabary",
+    "Bamu": "syllabary", "Nshu": "syllabary", "Mend": "syllabary",
 
     "Hani": "logographic", "Hans": "logographic", "Hant": "logographic",
     "Egyp": "logographic", "Tang": "logographic"
+  },
+  "deliberatelyUndetermined": {
+    "Plrd": "Pollard/Miao — contested alphabet/abugida/semisyllabary; no consensus classification (SC-004).",
+    "Cpmn": "Cypro-Minoan — undeciphered script; no classification possible.",
+    "Brai": "Braille — tactile transliteration code, not a writing system with an inherent family.",
+    "Xpeo": "Old Persian — semi-syllabic cuneiform; does not cleanly fit the five families.",
+    "Merc": "Meroitic Cursive — documented alphabetic-syllabic hybrid; no single family fits.",
+    "Mero": "Meroitic Hieroglyphic — documented alphabetic-syllabic hybrid; no single family fits.",
+    "Hmng": "Pahawh Hmong — idiosyncratic onset-rime structure; does not fit the five families."
   }
 }
