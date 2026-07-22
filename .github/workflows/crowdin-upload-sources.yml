@@ -1,14 +1,20 @@
-# Crowdin Tier A first live `upload sources` (spec 046 T023). Manual/one-off:
-# pushes the English source catalog (packages/studio/src/locales/en/messages.json)
-# to the live Crowdin project per crowdin.yml. Credentials only exist as CI
-# secrets, so this has to run here rather than locally.
+# Crowdin Tier A `upload sources` (spec 046 T023 + T037). Pushes the English
+# source catalog (packages/studio/src/locales/en/messages.json) to the live
+# Crowdin project per crowdin.yml. Runs automatically on every merge to main
+# that touches the source catalog or the Crowdin config, plus workflow_dispatch
+# for a manual one-off run. Credentials only exist as CI secrets.
 #
-# NOT the ongoing round-trip -- "upload on merge to main" is tracked separately
-# as T037 and will supersede/extend this trigger when it lands.
+# The download half of the round-trip (scheduled `download` -> translations PR)
+# is the sibling workflow crowdin-download-translations.yml (T038).
 
-name: Crowdin upload sources (manual)
+name: Crowdin upload sources
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/studio/src/locales/en/messages.json"
+      - "crowdin.yml"
   workflow_dispatch: {}
 
 jobs:
