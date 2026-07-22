@@ -12,6 +12,7 @@
 // SC-005: no designer-facing string here may contain the words "Unicode" or
 // "normalization" — asserted mechanically in the station's tests.
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { OutputForm, OutputFormProposal, PosturePair } from "@keyboard-studio/engine";
 import {
   ACCENT,
@@ -55,6 +56,7 @@ export function previewPair(posture: PosturePair[]): PosturePair | undefined {
 }
 
 function BackspacePreview({ pair, form }: { pair: PosturePair; form: OutputForm }) {
+  const { t } = useLingui();
   const steps = backspaceSteps(pair, form);
   return (
     <div
@@ -68,7 +70,9 @@ function BackspacePreview({ pair, form }: { pair: PosturePair; form: OutputForm 
       }}
     >
       <p style={{ margin: "0 0 6px 0", color: TEXT_DIM, fontSize: 12 }}>
-        What backspace does, one press at a time:
+        <Trans id="survey.marks.outputForm.backspacePreviewIntro">
+          What backspace does, one press at a time:
+        </Trans>
       </p>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 20 }}>
         {steps.map((step, i) => (
@@ -83,7 +87,13 @@ function BackspacePreview({ pair, form }: { pair: PosturePair; form: OutputForm 
                 padding: "2px 8px",
               }}
             >
-              {step === "" ? <span style={{ color: TEXT_DIM, fontSize: 12 }}>(empty)</span> : step}
+              {step === "" ? (
+                <span style={{ color: TEXT_DIM, fontSize: 12 }}>
+                  {t({ id: "survey.marks.outputForm.emptyStep", message: "(empty)" })}
+                </span>
+              ) : (
+                step
+              )}
             </span>
           </span>
         ))}
@@ -92,24 +102,47 @@ function BackspacePreview({ pair, form }: { pair: PosturePair; form: OutputForm 
   );
 }
 
-const FORM_LABEL: Record<OutputForm, string> = {
-  "ready-made": "One ready-made character per accented letter",
-  "base-plus-mark": "Letter plus mark, built as you type",
-};
+function useFormLabel(): Record<OutputForm, string> {
+  const { t } = useLingui();
+  return {
+    "ready-made": t({
+      id: "survey.marks.outputForm.formLabel.readyMade",
+      message: "One ready-made character per accented letter",
+    }),
+    "base-plus-mark": t({
+      id: "survey.marks.outputForm.formLabel.basePlusMark",
+      message: "Letter plus mark, built as you type",
+    }),
+  };
+}
 
 /** Per-option consequence text for the FR-016 open choice (plain language). */
-const FORM_CONSEQUENCE: Record<OutputForm, string> = {
-  "base-plus-mark":
-    "Backspace peels one mark off at a time, and typing a mark key after any " +
-    "allowed letter adds the mark.",
-  "ready-made":
-    "Each accented letter is a single unit — backspace removes the whole " +
-    "letter in one step.",
-};
+function useFormConsequence(): Record<OutputForm, string> {
+  const { t } = useLingui();
+  return {
+    "base-plus-mark": t({
+      id: "survey.marks.outputForm.formConsequence.basePlusMark",
+      message:
+        "Backspace peels one mark off at a time, and typing a mark key after any allowed letter adds the mark.",
+    }),
+    "ready-made": t({
+      id: "survey.marks.outputForm.formConsequence.readyMade",
+      message:
+        "Each accented letter is a single unit — backspace removes the whole letter in one step.",
+    }),
+  };
+}
 
 export function OutputFormStation({ posture, proposal, value, onChange }: OutputFormStationProps) {
+  const { t } = useLingui();
+  const formLabel = useFormLabel();
+  const formConsequence = useFormConsequence();
   const pair = previewPair(posture);
   const other: OutputForm = value === "ready-made" ? "base-plus-mark" : "ready-made";
+  const sectionAriaLabel = t({
+    id: "survey.marks.outputForm.sectionAriaLabel",
+    message: "How accented letters are produced",
+  });
 
   if (proposal.presentedAs === "open-choice") {
     // FR-016: both forms are viable — an OPEN choice, recommended option
@@ -120,10 +153,16 @@ export function OutputFormStation({ posture, proposal, value, onChange }: Output
         ? ["ready-made", "base-plus-mark"]
         : ["base-plus-mark", "ready-made"];
     return (
-      <section data-testid="marks-output-form" aria-label="How accented letters are produced">
-        <h3 style={sectionHeading}>How should your keyboard produce accented letters?</h3>
+      <section data-testid="marks-output-form" aria-label={sectionAriaLabel}>
+        <h3 style={sectionHeading}>
+          <Trans id="survey.marks.outputForm.heading">How should your keyboard produce accented letters?</Trans>
+        </h3>
         <p style={mutedParaFlush}>{proposal.explanation}</p>
-        <div role="radiogroup" aria-label="Output form" style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+        <div
+          role="radiogroup"
+          aria-label={t({ id: "survey.marks.outputForm.radiogroupAriaLabel", message: "Output form" })}
+          style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}
+        >
           {recommendedFirst.map((form) => (
             <label
               key={form}
@@ -144,12 +183,14 @@ export function OutputFormStation({ posture, proposal, value, onChange }: Output
                   checked={value === form}
                   onChange={() => onChange(form)}
                 />
-                <strong>{FORM_LABEL[form]}</strong>
+                <strong>{formLabel[form]}</strong>
                 {form === proposal.form && (
-                  <span style={{ fontSize: 11, color: ACCENT }}>recommended</span>
+                  <span style={{ fontSize: 11, color: ACCENT }}>
+                    <Trans id="survey.marks.outputForm.recommendedTag">recommended</Trans>
+                  </span>
                 )}
               </span>
-              <span style={{ ...mutedParaFlush, fontSize: 12 }}>{FORM_CONSEQUENCE[form]}</span>
+              <span style={{ ...mutedParaFlush, fontSize: 12 }}>{formConsequence[form]}</span>
               {pair !== undefined && <BackspacePreview pair={pair} form={form} />}
             </label>
           ))}
@@ -159,8 +200,10 @@ export function OutputFormStation({ posture, proposal, value, onChange }: Output
   }
 
   return (
-    <section data-testid="marks-output-form" aria-label="How accented letters are produced">
-      <h3 style={sectionHeading}>How should your keyboard produce accented letters?</h3>
+    <section data-testid="marks-output-form" aria-label={sectionAriaLabel}>
+      <h3 style={sectionHeading}>
+        <Trans id="survey.marks.outputForm.heading">How should your keyboard produce accented letters?</Trans>
+      </h3>
 
       <div
         style={{
@@ -172,7 +215,7 @@ export function OutputFormStation({ posture, proposal, value, onChange }: Output
         }}
       >
         <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: TEXT_MAIN }}>
-          {FORM_LABEL[value]}
+          {formLabel[value]}
         </p>
         <p style={{ ...mutedParaFlush, margin: "6px 0 0 0" }}>{proposal.explanation}</p>
       </div>
@@ -186,7 +229,10 @@ export function OutputFormStation({ posture, proposal, value, onChange }: Output
           onClick={() => onChange(other)}
           style={secondaryButton}
         >
-          Use {FORM_LABEL[other].toLowerCase()} instead
+          {t({
+            id: "survey.marks.outputForm.useInsteadButton",
+            message: `Use ${{ formLabel: formLabel[other].toLowerCase() }} instead`,
+          })}
         </button>
       </div>
     </section>

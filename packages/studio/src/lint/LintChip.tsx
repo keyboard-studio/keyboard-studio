@@ -6,6 +6,7 @@
 // Severity color map aligns with the five levels in spec.md §10.
 
 import { useState, useId } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { LintFinding } from "@keyboard-studio/contracts";
 import { dispatchNavigateTo } from "./events";
 import { SEVERITY_COLORS } from "./colors";
@@ -21,6 +22,7 @@ function truncate(text: string, max: number): string {
 }
 
 export function LintChip({ finding }: LintChipProps) {
+  const { t } = useLingui();
   const [hintOpen, setHintOpen] = useState(false);
   const hintId = useId();
 
@@ -60,7 +62,10 @@ export function LintChip({ finding }: LintChipProps) {
         onKeyDown={isNavigable ? handleChipKeyDown : undefined}
         aria-label={
           isNavigable
-            ? `Go to ${finding.code} at line ${finding.location!.line}`
+            ? t({
+                id: "lint.chip.navigateAriaLabel",
+                message: `Go to ${{ code: finding.code }} at line ${{ line: finding.location!.line }}`,
+              })
             : undefined
         }
         style={{
@@ -135,7 +140,11 @@ export function LintChip({ finding }: LintChipProps) {
               lineHeight: 1.4,
             }}
           >
-            {hintOpen ? "Hide hint" : "Show hint"}
+            {hintOpen ? (
+              <Trans id="lint.chip.hideHintButton">Hide hint</Trans>
+            ) : (
+              <Trans id="lint.chip.showHintButton">Show hint</Trans>
+            )}
           </button>
         )}
       </div>

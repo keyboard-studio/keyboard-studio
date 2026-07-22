@@ -8,6 +8,7 @@
 // split an individual mark out of its class's answer (the "mixed" path —
 // recorded as per-mark overrides downstream).
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { MarkClass, MentalModelAnswer, MentalModelPrefill } from "@keyboard-studio/engine";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { prefixCombiningMark } from "../../lib/irToCarveNodes.ts";
@@ -34,22 +35,36 @@ function classMarksLabel(markClass: MarkClass): string {
     .join(", ");
 }
 
-const ANSWER_LABEL: Record<MentalModelAnswer, string> = {
-  "own-letter": "Each marked letter is its own letter of the alphabet",
-  "letter-plus-mark": "The mark is added to a letter as you type",
-};
-
 export function MentalModelStation({
   classes,
   prefills,
   answers,
   onChange,
 }: MentalModelStationProps) {
+  const { t } = useLingui();
   const prefillByClass = new Map(prefills.map((p) => [p.classId, p]));
+  const answerLabel: Record<MentalModelAnswer, string> = {
+    "own-letter": t({
+      id: "survey.marks.mentalModel.answerLabel.ownLetter",
+      message: "Each marked letter is its own letter of the alphabet",
+    }),
+    "letter-plus-mark": t({
+      id: "survey.marks.mentalModel.answerLabel.letterPlusMark",
+      message: "The mark is added to a letter as you type",
+    }),
+  };
 
   return (
-    <section data-testid="marks-mental-model" aria-label="How your community thinks of marked letters">
-      <h3 style={sectionHeading}>How does your community think of marked letters?</h3>
+    <section
+      data-testid="marks-mental-model"
+      aria-label={t({
+        id: "survey.marks.mentalModel.sectionAriaLabel",
+        message: "How your community thinks of marked letters",
+      })}
+    >
+      <h3 style={sectionHeading}>
+        <Trans id="survey.marks.mentalModel.heading">How does your community think of marked letters?</Trans>
+      </h3>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         {classes.map((markClass) => {
           const prefill = prefillByClass.get(markClass.id);
@@ -63,8 +78,15 @@ export function MentalModelStation({
               <p style={{ ...mutedParaFlush, margin: "0 0 6px 0", fontSize: 12 }}>
                 {classMarksLabel(markClass)}
               </p>
-              <div role="radiogroup" aria-label={`${markClass.label} — own letter or letter plus mark`} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {(Object.keys(ANSWER_LABEL) as MentalModelAnswer[]).map((answer) => {
+              <div
+                role="radiogroup"
+                aria-label={t({
+                  id: "survey.marks.mentalModel.radiogroupAriaLabel",
+                  message: `${{ classLabel: markClass.label }} — own letter or letter plus mark`,
+                })}
+                style={{ display: "flex", flexDirection: "column", gap: 6 }}
+              >
+                {(Object.keys(answerLabel) as MentalModelAnswer[]).map((answer) => {
                   const disabled = answer === "own-letter" && unaffordable;
                   return (
                     <label
@@ -90,9 +112,12 @@ export function MentalModelStation({
                         onChange={() => onChange(markClass.id, answer)}
                       />
                       <span>
-                        {ANSWER_LABEL[answer]}
+                        {answerLabel[answer]}
                         {answer === prefill?.recommended && (
-                          <span style={{ color: TEXT_DIM, fontSize: 11 }}> (suggested)</span>
+                          <span style={{ color: TEXT_DIM, fontSize: 11 }}>
+                            {" "}
+                            <Trans id="survey.marks.mentalModel.suggestedTag">(suggested)</Trans>
+                          </span>
                         )}
                         {disabled && prefill?.signals.unaffordableReason !== undefined && (
                           <span style={{ display: "block", color: ERROR_RED, fontSize: 11 }}>

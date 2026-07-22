@@ -7,6 +7,7 @@
 // combinations are shown for explicit confirmation — the allowed stack list
 // is never inferred from the individual marks' attachment rows.
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { AttestedStack } from "@keyboard-studio/contracts";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { BORDER, TEXT_MAIN, mutedParaFlush, sectionHeading } from "../surveyStyles.ts";
@@ -36,18 +37,49 @@ export function StackingStation({
   confirmed,
   onConfirmChange,
 }: StackingStationProps) {
+  const { t } = useLingui();
+  const stackingOptions = [
+    {
+      v: true,
+      label: t({
+        id: "survey.marks.stacking.allowedOption.yes",
+        message: "Yes — some letters carry two marks",
+      }),
+    },
+    {
+      v: false,
+      label: t({
+        id: "survey.marks.stacking.allowedOption.no",
+        message: "No — one mark per letter",
+      }),
+    },
+  ];
   return (
-    <section data-testid="marks-stacking" aria-label="Two marks on one letter">
-      <h3 style={sectionHeading}>Can one letter carry two marks at once?</h3>
+    <section
+      data-testid="marks-stacking"
+      aria-label={t({
+        id: "survey.marks.stacking.sectionAriaLabel",
+        message: "Two marks on one letter",
+      })}
+    >
+      <h3 style={sectionHeading}>
+        <Trans id="survey.marks.stacking.heading">Can one letter carry two marks at once?</Trans>
+      </h3>
       <p style={mutedParaFlush}>
-        Your alphabet shows letters that may carry more than one mark. Confirm
-        whether the keyboard should allow that, and exactly which combinations.
+        <Trans id="survey.marks.stacking.intro">
+          Your alphabet shows letters that may carry more than one mark. Confirm
+          whether the keyboard should allow that, and exactly which combinations.
+        </Trans>
       </p>
-      <div role="radiogroup" aria-label="Allow two marks on one letter" style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-        {[
-          { v: true, label: "Yes — some letters carry two marks" },
-          { v: false, label: "No — one mark per letter" },
-        ].map(({ v, label }) => (
+      <div
+        role="radiogroup"
+        aria-label={t({
+          id: "survey.marks.stacking.radiogroupAriaLabel",
+          message: "Allow two marks on one letter",
+        })}
+        style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}
+      >
+        {stackingOptions.map(({ v, label }) => (
           <label
             key={String(v)}
             style={{
@@ -76,10 +108,19 @@ export function StackingStation({
       {allowed && multiMarkStacks.length > 0 && (
         <div style={{ marginTop: 12 }}>
           <p style={{ ...mutedParaFlush, margin: "0 0 6px 0" }}>
-            Tick each combination your language actually uses (only ticked
-            combinations will be typable):
+            <Trans id="survey.marks.stacking.tickCombinationsIntro">
+              Tick each combination your language actually uses (only ticked
+              combinations will be typable):
+            </Trans>
           </p>
-          <div role="group" aria-label="Attested two-mark combinations" style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+          <div
+            role="group"
+            aria-label={t({
+              id: "survey.marks.stacking.attestedGroupAriaLabel",
+              message: "Attested two-mark combinations",
+            })}
+            style={{ display: "flex", flexWrap: "wrap", gap: 10 }}
+          >
             {multiMarkStacks.map((stack) => {
               const key = stackKey(stack);
               return (
@@ -101,7 +142,10 @@ export function StackingStation({
                     type="checkbox"
                     checked={confirmed[key] === true}
                     onChange={(e) => onConfirmChange(key, e.target.checked)}
-                    aria-label={`Allow ${composed(stack)} (${stack.marks.map((m) => toUPlusNotation(m)).join(" + ")})`}
+                    aria-label={t({
+                      id: "survey.marks.stacking.checkboxAriaLabel",
+                      message: `Allow ${{ composed: composed(stack) }} (${{ marks: stack.marks.map((m) => toUPlusNotation(m)).join(" + ") }})`,
+                    })}
                   />
                   <span style={{ fontSize: 18 }}>{composed(stack)}</span>
                 </label>
