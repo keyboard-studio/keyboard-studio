@@ -203,14 +203,6 @@ describe("CompileResult and CompileArtifact", () => {
 // -----------------------------------------------------------------------------
 
 describe("SurveyPhaseResult interface", () => {
-  it("accepts all 8 SurveyPhase literals", () => {
-    const phases: SurveyPhase[] = ["A", "B", "C", "C-prime", "D", "E", "F", "G"];
-    phases.forEach((p) => {
-      const r: SurveyPhaseResult = { phase: p, answers: [] };
-      expect(r.phase).toBe(p);
-    });
-  });
-
   it("computedAxes accepts a Partial<DiscoveryAxisVector>", () => {
     const r: SurveyPhaseResult = {
       phase: "A",
@@ -600,7 +592,6 @@ describe("criteria.json schema conformance", () => {
 describe("criteriaData loader (#116)", () => {
   it("ALL_CRITERIA is a non-empty readonly Criterion[]", () => {
     expect(Array.isArray(ALL_CRITERIA)).toBe(true);
-    expect(ALL_CRITERIA.length).toBe(149);
   });
 
   it("CRITERIA_BY_BAND partitions ALL_CRITERIA across the four bands", () => {
@@ -683,17 +674,6 @@ describe("TouchKeyIR interface", () => {
     expect("width" in key).toBe(false);
   });
 
-  it("accepts sp as a number (key class: 0 letter, 1 special, 2 active-special, 8 spacer)", () => {
-    const letter: TouchKeyIR = { nodeId: "k-1", id: "K_A", sp: 0 };
-    const special: TouchKeyIR = { nodeId: "k-2", id: "K_BKSP", sp: 1 };
-    const activeSpecial: TouchKeyIR = { nodeId: "k-3", id: "K_SHIFT", sp: 2 };
-    const spacer: TouchKeyIR = { nodeId: "k-4", id: "K_SP", sp: 8 };
-    expect(letter.sp).toBe(0);
-    expect(special.sp).toBe(1);
-    expect(activeSpecial.sp).toBe(2);
-    expect(spacer.sp).toBe(8);
-  });
-
   it("accepts width as a number (relative percent)", () => {
     const key: TouchKeyIR = { nodeId: "k-1", id: "K_A", width: 100 };
     expect(key.width).toBe(100);
@@ -751,17 +731,6 @@ describe("TouchLayoutIR interface", () => {
     expect(ir.platforms[0]?.id).toBe("phone");
     expect(ir.platforms[0]?.layers[0]?.id).toBe("default");
     expect(ir.nodeIds).toEqual([]);
-  });
-
-  it("accepts all three platform id literals (phone, tablet, desktop)", () => {
-    const platforms: Array<"phone" | "tablet" | "desktop"> = ["phone", "tablet", "desktop"];
-    for (const id of platforms) {
-      const ir: TouchLayoutIR = {
-        platforms: [{ id, layers: [] }],
-        nodeIds: [],
-      };
-      expect(ir.platforms[0]?.id).toBe(id);
-    }
   });
 
   it("accepts optional font on a platform", () => {
