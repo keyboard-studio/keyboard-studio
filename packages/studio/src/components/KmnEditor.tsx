@@ -3,6 +3,7 @@
 // debounce cycle (spec Decision D3).
 
 import { useState, useEffect, useRef } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { VirtualFS } from "@keyboard-studio/contracts";
 import { useDebounce, DEBOUNCE_MS } from "../hooks/useDebounce.ts";
 import { findKmnPath } from "../lib/findKmnPath.ts";
@@ -17,6 +18,7 @@ export interface KmnEditorProps {
 }
 
 export function KmnEditor({ vfs, onRecompile }: KmnEditorProps) {
+  const { t } = useLingui();
   // Find the primary .kmn file once per render — exclude the tests/ directory.
   const kmnPath = findKmnPath(vfs);
   const initialContent = kmnPath !== undefined
@@ -64,7 +66,7 @@ export function KmnEditor({ vfs, onRecompile }: KmnEditorProps) {
           fontFamily: FONT_MONO,
         }}
       >
-        No .kmn file found in the session VFS.
+        <Trans id="kmnEditor.noFile">No .kmn file found in the session VFS.</Trans>
       </div>
     );
   }
@@ -86,10 +88,10 @@ export function KmnEditor({ vfs, onRecompile }: KmnEditorProps) {
           fontWeight: 700,
         }}
       >
-        Editor — {kmnPath}
+        <Trans id="kmnEditor.heading">Editor — {kmnPath}</Trans>
       </div>
       <textarea
-        aria-label={`Edit ${kmnPath}`}
+        aria-label={t({ id: "kmnEditor.textarea.ariaLabel", message: `Edit ${kmnPath}` })}
         value={text}
         onChange={(e) => { dirtyRef.current = true; setText(e.currentTarget.value); }}
         spellCheck={false}
@@ -117,7 +119,9 @@ export function KmnEditor({ vfs, onRecompile }: KmnEditorProps) {
         }}
         aria-live="polite"
       >
-        Changes compile after {DEBOUNCE_MS} ms pause.
+        <Trans id="kmnEditor.debounceHint">
+          Changes compile after {DEBOUNCE_MS} ms pause.
+        </Trans>
       </div>
     </div>
   );

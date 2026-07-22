@@ -8,6 +8,7 @@
 // elements without PickerPane importing every child component.
 
 import type { ReactNode } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { PreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { MetadataCard } from "./MetadataCard.tsx";
 
@@ -30,11 +31,12 @@ export function PickerPane({
   identityPanelSlot,
   kmnEditorSlot,
 }: PickerPaneProps) {
+  const { t } = useLingui();
   const { baseKeyboard, pickerMode, handlePickerModeChange } = artifact;
 
   return (
     <section
-      aria-label="Picker pane"
+      aria-label={t({ id: "picker.pane.label", message: "Picker pane" })}
       style={{
         flexBasis: `calc(${leftPct}% - ${dividerWidth / 2}px)`,
         flexShrink: 0,
@@ -52,13 +54,15 @@ export function PickerPane({
         Keyboard Studio
       </h1>
       <p style={{ margin: 0, color: "#9aa7b8", fontSize: 13 }}>
-        Pick a base keyboard to start; the right pane shows the compiled result.
+        <Trans id="picker.intro">
+          Pick a base keyboard to start; the right pane shows the compiled result.
+        </Trans>
       </p>
 
       {/* Mode toggle: open base vs. scaffold new */}
       <div
         role="group"
-        aria-label="Keyboard source mode"
+        aria-label={t({ id: "picker.modeToggle.groupLabel", message: "Keyboard source mode" })}
         style={{ display: "flex", gap: 8, marginTop: 4 }}
       >
         <button
@@ -78,7 +82,7 @@ export function PickerPane({
             transition: "background 0.15s",
           }}
         >
-          Open base
+          <Trans id="picker.modeToggle.open">Open base</Trans>
         </button>
         <button
           type="button"
@@ -97,7 +101,7 @@ export function PickerPane({
             transition: "background 0.15s",
           }}
         >
-          New from base
+          <Trans id="picker.modeToggle.scaffold">New from base</Trans>
         </button>
       </div>
 

@@ -1,0 +1,46 @@
+{
+  "workflow": "speckit",
+  "specName": "046-i18n-localization",
+  "branch": "046-i18n-localization",
+  "selectedAt": "2026-07-20T22:29:02.647Z",
+  "currentStep": "implement",
+  "status": "implementing",
+  "history": [
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-21T02:55:19.389Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-21T02:55:25.782Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-21T02:55:25.795Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-21T03:01:55.695Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-21T03:01:55.710Z"
+    }
+  ],
+  "telemetryInstanceId": "ed6efe4a-581e-4076-8160-54e8424a8249"
+}

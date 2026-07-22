@@ -72,7 +72,8 @@
 //   }>
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
+import { screen, fireEvent, cleanup, act } from "@testing-library/react";
+import { render } from "../../src/test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../../src/stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
 

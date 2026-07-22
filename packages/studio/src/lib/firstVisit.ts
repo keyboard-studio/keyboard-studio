@@ -9,17 +9,10 @@
 // Writes are synchronous, so markVisited() called in a WelcomeScreen button
 // handler is durably persisted before connect() redirects to the provider.
 
+import { storageAvailable } from "./storageGuard.ts";
+
 /** localStorage key for the durable first-visit flag. */
 const VISITED_KEY = "ks.visited";
-
-/** True when localStorage is usable (guards SSR / private-mode / disabled). */
-function storageAvailable(): boolean {
-  try {
-    return typeof localStorage !== "undefined";
-  } catch {
-    return false;
-  }
-}
 
 /** True once the browser has entered the app at least once. */
 export function hasVisited(): boolean {

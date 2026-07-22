@@ -42,7 +42,11 @@ import { FlowMapView } from "./dashboard/DashboardView.tsx";
 import { runCompleteness } from "./dashboard/completeness.ts";
 import { PreviewScreen } from "./components/PreviewScreen.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
+import { i18n } from "@lingui/core";
+import { I18nProvider } from "@lingui/react";
+import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
+import { LocaleSwitcher } from "./components/LocaleSwitcher.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
 import { AccountControl } from "./components/AccountControl.tsx";
 import { hasVisited } from "./lib/firstVisit.ts";
@@ -181,8 +185,12 @@ function NavBar({ active }: NavBarProps) {
         })}
       </div>
 
-      {/* Right group — account control (hidden on the welcome route) */}
-      {active !== "welcome" && <AccountControl />}
+      {/* Right group — locale switcher (all routes) + account control
+          (hidden on the welcome route) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <LocaleSwitcher />
+        {active !== "welcome" && <AccountControl />}
+      </div>
     </nav>
   );
 }
@@ -876,20 +884,22 @@ export function StudioShell() {
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        width: "100vw",
-        overflow: "hidden",
-        background: "var(--bg)",
-      }}
-    >
-      <NavBar active={route} />
-      <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-        {content}
+    <I18nProvider i18n={i18n}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100vh",
+          width: "100vw",
+          overflow: "hidden",
+          background: "var(--bg)",
+        }}
+      >
+        <NavBar active={route} />
+        <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+          {content}
+        </div>
       </div>
-    </div>
+    </I18nProvider>
   );
 }

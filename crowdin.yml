@@ -1,0 +1,55 @@
+# crowdin.yml — Crowdin CLI configuration (i18n spike, step 1).
+#
+# Scope of THIS file today:
+#   • Tier A (Studio UI chrome) — ACTIVE. Flat { id: text } JSON catalogs the
+#     Lingui spike already produces. This is Crowdin's ideal case: the id is the
+#     string key, the English is the fingerprinted value (English drift resets
+#     approvals). See docs/i18n-spike.md.
+#   • Tier B (content-owned strings) — DEFERRED, scaffolding only (commented
+#     below). Pointing Crowdin at the raw content records is WRONG: its generic
+#     JSON/YAML parser translates every string value, so control fields
+#     (id, category, answerType, default, firingCondition, lintRuleId, BCP47
+#     tags, …) would be sent to translators. Tier B needs an extraction step —
+#     tracked in the i18n feature spec, not this config.
+#
+# Credentials come from the environment (never commit a token). The CLI reads
+# these named env vars; set them in CI secrets / a local shell:
+#   CROWDIN_PROJECT_ID, CROWDIN_PERSONAL_TOKEN
+"project_id_env": "CROWDIN_PROJECT_ID"
+"api_token_env": "CROWDIN_PERSONAL_TOKEN"
+"base_url": "https://api.crowdin.com"
+
+# All source/translation paths below are relative to the repo root.
+"base_path": "."
+"preserve_hierarchy": true
+
+files:
+  # ── Tier A — Studio UI chrome (engine team; spec §12) ──────────────────────
+  - source: "/packages/studio/src/locales/en/messages.json"
+    translation: "/packages/studio/src/locales/%two_letters_code%/messages.json"
+    # Keep untranslated keys in downloaded files (empty string values). Every
+    # key must exist in every locale file so the loader is stable; the runtime
+    # falls back to the English source via the explicit id, so an empty target
+    # value is harmless, not a gap to prune.
+    skip_untranslated_strings: false
+    # %two_letters_code% (ISO 639-1) suffices while targets are language-only
+    # (fr, es, …). Switch to %locale% / %locale_with_underscore% when a
+    # region-specific target (pt-BR, zh-CN) is added.
+
+  # ── Tier B — Content-owned strings (content team; spec §12) ────────────────
+  # DEFERRED to the i18n feature spec — DO NOT uncomment as-is.
+  #
+  # The translatable prose in these records (title / description / prompt /
+  # elicits / provenanceLabel, and criteria.json `description`) is interleaved
+  # with non-translatable control fields at several nesting levels. Crowdin's
+  # generic parser cannot cleanly whitelist those keys from the CLI config, so
+  # the intended design is a build step that extracts the translatable fields
+  # into flat { id: text } sidecar catalogs (identical shape to Tier A) and
+  # points Crowdin at those instead. criteria.json is additionally gated by its
+  # zod schema (CriterionSchema) and the 148-row count test — a localized copy
+  # must satisfy both, and the count test must keep reading the canonical
+  # English file. Both are feature-spec decisions.
+  #
+  # - source: "/content/i18n/en/*.json"
+  #   translation: "/content/i18n/%two_letters_code%/%original_file_name%"
+  #   skip_untranslated_strings: false

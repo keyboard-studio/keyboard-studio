@@ -12,8 +12,13 @@
 // are mocked so the tests never touch the engine, WASM, or the backend.
 
 import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { ManagedPRSubmitPanel } from "./ManagedPRSubmitPanel.tsx";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
+import { ManagedPRSubmitPanel, type ManagedPRSubmitPanelProps } from "./ManagedPRSubmitPanel.tsx";
+
+function renderPanel(props: ManagedPRSubmitPanelProps) {
+  return render(<ManagedPRSubmitPanel {...props} />);
+}
 
 // ---------------------------------------------------------------------------
 // Mock the async helpers the panel calls at submit time.
@@ -90,21 +95,21 @@ function fillValidForm(
 
 describe("ManagedPRSubmitPanel — form gating", () => {
   it("Submit button is disabled on initial render", () => {
-    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    renderPanel({ canSubmit: true });
     // On initial render the form is incomplete; the aria-label reflects "fill in" copy.
     const btn = screen.getByRole("button", { name: /fill in your name/i });
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("Submit button is disabled when canSubmit is false even with a valid form", () => {
-    render(<ManagedPRSubmitPanel canSubmit={false} />);
+    renderPanel({ canSubmit: false });
     fillValidForm();
     const btn = screen.getByRole("button", { name: /submit unavailable/i });
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("Submit button is disabled when name is empty", () => {
-    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    renderPanel({ canSubmit: true });
     // Fill only email + checkbox, leave name blank.
     const emailInput = screen.getByRole("textbox", { name: /email address/i });
     fireEvent.change(emailInput, { target: { value: "a@b.com" } });
@@ -115,7 +120,7 @@ describe("ManagedPRSubmitPanel — form gating", () => {
   });
 
   it("Submit button is disabled when email is invalid", () => {
-    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    renderPanel({ canSubmit: true });
     const nameInput = screen.getByRole("textbox", { name: /your name/i });
     fireEvent.change(nameInput, { target: { value: "Jane" } });
     fireEvent.blur(nameInput);
@@ -128,7 +133,7 @@ describe("ManagedPRSubmitPanel — form gating", () => {
   });
 
   it("Submit button is disabled when copyright checkbox is unchecked", () => {
-    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    renderPanel({ canSubmit: true });
     const nameInput = screen.getByRole("textbox", { name: /your name/i });
     fireEvent.change(nameInput, { target: { value: "Jane" } });
     fireEvent.blur(nameInput);
@@ -141,7 +146,7 @@ describe("ManagedPRSubmitPanel — form gating", () => {
   });
 
   it("Submit button is enabled when name + email + copyright are valid and canSubmit is true", () => {
-    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    renderPanel({ canSubmit: true });
     fillValidForm();
     const btn = screen.getByRole("button", { name: /submit keyboard to community repository/i });
     expect((btn as HTMLButtonElement).disabled).toBe(false);
@@ -151,26 +156,22 @@ describe("ManagedPRSubmitPanel — form gating", () => {
   // post-Touch-step mechanics edit): the panel must refuse to submit
   // regardless of an otherwise-valid form and canSubmit=true.
   it("Submit button is disabled when outputBlocked is true even with a valid form and canSubmit", () => {
-    render(
-      <ManagedPRSubmitPanel
-        canSubmit={true}
-        outputBlocked={true}
-        outputBlockedReason="the touch layout is out of date"
-      />,
-    );
+    renderPanel({
+      canSubmit: true,
+      outputBlocked: true,
+      outputBlockedReason: "the touch layout is out of date",
+    });
     fillValidForm();
     const btn = screen.getByRole("button", { name: /submit unavailable.*touch layout is out of date/i });
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("Submit button aria-label explains the block reason when outputBlocked is true", () => {
-    render(
-      <ManagedPRSubmitPanel
-        canSubmit={true}
-        outputBlocked={true}
-        outputBlockedReason="the touch layout is out of date"
-      />,
-    );
+    renderPanel({
+      canSubmit: true,
+      outputBlocked: true,
+      outputBlockedReason: "the touch layout is out of date",
+    });
     fillValidForm();
     expect(
       screen.getByRole("button", { name: /submit unavailable — the touch layout is out of date/i }),
@@ -182,13 +183,11 @@ describe("ManagedPRSubmitPanel — form gating", () => {
   // outputBlocked reason, not the generic "submit unavailable until compile
   // completes" canSubmit copy. See aria-label derivation in the component.
   it("aria-label reflects outputBlocked reason when both outputBlocked and !canSubmit are true", () => {
-    render(
-      <ManagedPRSubmitPanel
-        canSubmit={false}
-        outputBlocked={true}
-        outputBlockedReason="the touch layout is out of date"
-      />,
-    );
+    renderPanel({
+      canSubmit: false,
+      outputBlocked: true,
+      outputBlockedReason: "the touch layout is out of date",
+    });
     fillValidForm();
     const btn = screen.getByRole("button", {
       name: /submit unavailable — the touch layout is out of date/i,
@@ -197,14 +196,14 @@ describe("ManagedPRSubmitPanel — form gating", () => {
   });
 
   it("Submit button is enabled when outputBlocked is false (control)", () => {
-    render(<ManagedPRSubmitPanel canSubmit={true} outputBlocked={false} />);
+    renderPanel({ canSubmit: true, outputBlocked: false });
     fillValidForm();
     const btn = screen.getByRole("button", { name: /submit keyboard to community repository/i });
     expect((btn as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("shows name-required error after blurring an empty name field", () => {
-    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    renderPanel({ canSubmit: true });
     const nameInput = screen.getByRole("textbox", { name: /your name/i });
     fireEvent.blur(nameInput);
     // role="alert" elements have their accessible name from their text content.
@@ -214,7 +213,7 @@ describe("ManagedPRSubmitPanel — form gating", () => {
   });
 
   it("shows email-required error after blurring an invalid email field", () => {
-    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    renderPanel({ canSubmit: true });
     const emailInput = screen.getByRole("textbox", { name: /email address/i });
     fireEvent.change(emailInput, { target: { value: "notanemail" } });
     fireEvent.blur(emailInput);
@@ -228,12 +227,10 @@ describe("ManagedPRSubmitPanel — form gating", () => {
 
 describe("ManagedPRSubmitPanel — prefill", () => {
   it("prefills name and email from the prefill prop", () => {
-    render(
-      <ManagedPRSubmitPanel
-        canSubmit={true}
-        prefill={{ displayName: "Alice", email: "alice@example.com" }}
-      />,
-    );
+    renderPanel({
+      canSubmit: true,
+      prefill: { displayName: "Alice", email: "alice@example.com" },
+    });
     const nameInput = screen.getByRole("textbox", { name: /your name/i }) as HTMLInputElement;
     const emailInput = screen.getByRole("textbox", { name: /email address/i }) as HTMLInputElement;
     expect(nameInput.value).toBe("Alice");
@@ -241,9 +238,7 @@ describe("ManagedPRSubmitPanel — prefill", () => {
   });
 
   it("prefills only name when only displayName is provided", () => {
-    render(
-      <ManagedPRSubmitPanel canSubmit={true} prefill={{ displayName: "Bob" }} />,
-    );
+    renderPanel({ canSubmit: true, prefill: { displayName: "Bob" } });
     const nameInput = screen.getByRole("textbox", { name: /your name/i }) as HTMLInputElement;
     const emailInput = screen.getByRole("textbox", { name: /email address/i }) as HTMLInputElement;
     expect(nameInput.value).toBe("Bob");
@@ -261,7 +256,7 @@ describe("ManagedPRSubmitPanel — success state", () => {
     const svc = makeService();
     mockedGetService.mockResolvedValueOnce(svc);
 
-    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    renderPanel({ canSubmit: true });
     fillValidForm();
     const btn = screen.getByRole("button", { name: /submit keyboard to community repository/i });
     fireEvent.click(btn);
@@ -292,7 +287,7 @@ describe("ManagedPRSubmitPanel — error states", () => {
     });
     mockedGetService.mockResolvedValueOnce(svc);
 
-    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    renderPanel({ canSubmit: true });
     fillValidForm();
     fireEvent.click(
       screen.getByRole("button", { name: /submit keyboard to community repository/i }),
@@ -365,7 +360,7 @@ describe("ManagedPRSubmitPanel — error states", () => {
     });
     mockedGetService.mockResolvedValueOnce(svc);
 
-    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    renderPanel({ canSubmit: true });
     fillValidForm();
     fireEvent.click(
       screen.getByRole("button", { name: /submit keyboard to community repository/i }),
@@ -391,7 +386,7 @@ describe("ManagedPRSubmitPanel — error states", () => {
     });
     mockedGetService.mockResolvedValueOnce(svc);
 
-    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    renderPanel({ canSubmit: true });
     fillValidForm();
     fireEvent.click(
       screen.getByRole("button", { name: /submit keyboard to community repository/i }),
@@ -416,7 +411,7 @@ describe("ManagedPRSubmitPanel — error states", () => {
     const svc = makeService();
     mockedGetService.mockResolvedValueOnce(svc);
 
-    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    renderPanel({ canSubmit: true });
     fillValidForm();
     fireEvent.click(
       screen.getByRole("button", { name: /submit keyboard to community repository/i }),
@@ -435,7 +430,7 @@ describe("ManagedPRSubmitPanel — error states", () => {
     mockedProject.mockResolvedValueOnce(null);
     mockedGetService.mockResolvedValueOnce(makeService());
 
-    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    renderPanel({ canSubmit: true });
     fillValidForm();
     fireEvent.click(
       screen.getByRole("button", { name: /submit keyboard to community repository/i }),

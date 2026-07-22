@@ -10,7 +10,8 @@
 //   - the suggestion list is capped (no full ~8k-row datalist).
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, cleanup, waitFor, fireEvent, screen } from "@testing-library/react";
+import { cleanup, waitFor, fireEvent, screen } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import type { LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 
 // Two distinct languages sharing the English name "Ainu" (ain / aib) — the

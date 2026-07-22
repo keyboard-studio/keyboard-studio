@@ -1,6 +1,8 @@
 // Desktop ↔ Touch OSK mode toggle. Wired into the iframe via the
 // SET_OSK_MODE postMessage command (CSS class swap on the iframe body).
 
+import { useLingui } from "@lingui/react/macro";
+
 export type OskMode = "desktop" | "touch";
 
 export interface OskModeToggleProps {
@@ -10,6 +12,7 @@ export interface OskModeToggleProps {
 }
 
 export function OskModeToggle({ value, onChange, disabled }: OskModeToggleProps) {
+  const { t } = useLingui();
   const opt = (mode: OskMode, label: string) => {
     const active = value === mode;
     return (
@@ -38,11 +41,11 @@ export function OskModeToggle({ value, onChange, disabled }: OskModeToggleProps)
   return (
     <div
       role="group"
-      aria-label="OSK rendering mode"
+      aria-label={t({ id: "osk.modeToggle.groupLabel", message: "OSK rendering mode" })}
       style={{ display: "inline-flex", borderRadius: 8, overflow: "hidden" }}
     >
-      {opt("desktop", "Desktop OSK")}
-      {opt("touch", "Mobile KB")}
+      {opt("desktop", t({ id: "osk.modeToggle.desktop", message: "Desktop OSK" }))}
+      {opt("touch", t({ id: "osk.modeToggle.touch", message: "Mobile KB" }))}
     </div>
   );
 }

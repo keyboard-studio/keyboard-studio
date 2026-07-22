@@ -1,0 +1,9 @@
+# Lingui compiled catalogs — build artifacts. The JSON source catalogs under
+# src/locales/**/messages.json are committed; @lingui/vite-plugin compiles them
+# at import time (?lingui), so the compiled .js/.mjs are never checked in.
+src/locales/**/*.js
+src/locales/**/*.mjs
+
+# Local-only: native localStorage backing file used to work around the Node >=22
+# localStorage-shadows-jsdom issue when running studio tests locally.
+.ls-tmp.db*

@@ -22,7 +22,8 @@
 //   - Guards: null base → no-base prompt; empty inventory → survey prompt.
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act, cleanup, waitFor, within } from "@testing-library/react";
+import { screen, fireEvent, act, cleanup, waitFor, within } from "@testing-library/react";
+import { render } from "../../test/renderWithI18n.tsx";
 import { MechanismGallery, PATTERN_SEQUENCE, PATTERN_DEADKEY } from "./MechanismGallery.tsx";
 import { useWorkingCopyStore, bindManifest } from "../../stores/workingCopyStore.ts";
 import {

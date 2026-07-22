@@ -14,6 +14,7 @@
 // overlay controls work in the codebase.
 
 import { useEffect, useRef, useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useIdentitySession } from "../hooks/useIdentitySession.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { GitHubMark, GoogleMark } from "./ProviderMarks.tsx";
@@ -161,6 +162,7 @@ const errorStyle: React.CSSProperties = {
 // ---------------------------------------------------------------------------
 
 export function AccountControl() {
+  const { t } = useLingui();
   const { isSignedIn, isVerifying, displayName, initial, github, google, signOut } =
     useIdentitySession();
 
@@ -221,7 +223,9 @@ export function AccountControl() {
 
   if (isSignedIn) {
     const label =
-      displayName !== null ? `Account: ${displayName}` : "Account menu";
+      displayName !== null
+        ? t({ id: "account.avatar.ariaLabel.named", message: `Account: ${displayName}` })
+        : t({ id: "account.avatar.ariaLabel.generic", message: "Account menu" });
     return (
       <div style={{ position: "relative", flexShrink: 0 }}>
         <button
@@ -257,7 +261,7 @@ export function AccountControl() {
                   close();
                 }}
               >
-                Profile
+                <Trans id="account.menu.profile">Profile</Trans>
               </button>
               <button
                 type="button"
@@ -268,7 +272,7 @@ export function AccountControl() {
                   close();
                 }}
               >
-                Sign out
+                <Trans id="account.menu.signOut">Sign out</Trans>
               </button>
             </div>
           </>
@@ -288,7 +292,7 @@ export function AccountControl() {
         aria-expanded={open}
         aria-haspopup="dialog"
       >
-        Sign in
+        <Trans id="account.signIn.trigger">Sign in</Trans>
       </button>
 
       {open && (
@@ -299,7 +303,7 @@ export function AccountControl() {
           <div
             ref={panelRef}
             role="dialog"
-            aria-label="Sign in options"
+            aria-label={t({ id: "account.signIn.dialogAriaLabel", message: "Sign in options" })}
             aria-modal="true"
             style={panelStyle}
           >
@@ -312,7 +316,7 @@ export function AccountControl() {
               }}
             >
               <GitHubMark />
-              Sign in with GitHub
+              <Trans id="account.signIn.github">Sign in with GitHub</Trans>
             </button>
 
             <button
@@ -324,7 +328,7 @@ export function AccountControl() {
               }}
             >
               <GoogleMark />
-              Sign in with Google
+              <Trans id="account.signIn.google">Sign in with Google</Trans>
             </button>
 
             {github.error !== null && (

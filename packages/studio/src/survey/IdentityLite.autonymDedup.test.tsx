@@ -12,7 +12,8 @@
 // options — not exercise the region-variant reseed path.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, cleanup, waitFor, fireEvent, screen } from "@testing-library/react";
+import { cleanup, waitFor, fireEvent, screen } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import type { LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 
 // NFC-composed and NFD-decomposed spellings of the same Vietnamese name.

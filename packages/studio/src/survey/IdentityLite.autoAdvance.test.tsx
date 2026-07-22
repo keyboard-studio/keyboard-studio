@@ -13,7 +13,8 @@
 // region-ambiguous provenance test skips.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, cleanup, waitFor, fireEvent, screen } from "@testing-library/react";
+import { cleanup, waitFor, fireEvent, screen } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import type { LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 
 // "zz" is unambiguous by region (no regionVariants) and carries a recorded

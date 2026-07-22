@@ -20,7 +20,8 @@
 // sequence of mocked buttons that lead up to it.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
+import { screen, fireEvent, cleanup, act } from "@testing-library/react";
+import { render } from "./test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 

@@ -24,7 +24,8 @@
 // container attribute check on the nearest parent div.
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { render, screen, cleanup, act } from "@testing-library/react";
+import { screen, cleanup, act } from "@testing-library/react";
+import { render } from "../../src/test/renderWithI18n.tsx";
 import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../../src/stores/workingCopyStore.ts";
 import type { ActiveStepId } from "../../src/stores/surveySessionStore.ts";

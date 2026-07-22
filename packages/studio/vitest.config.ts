@@ -1,9 +1,15 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import { lingui } from "@lingui/vite-plugin";
 import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
-  plugins: [react()],
+  // Mirror vite.config.ts's Lingui wiring so the <Trans> macro is transformed
+  // and `?lingui` catalog imports resolve under vitest, not just in the app.
+  plugins: [
+    react({ babel: { plugins: ["@lingui/babel-plugin-lingui-macro"] } }),
+    lingui(),
+  ],
   resolve: {
     alias: {
       "@docs": fileURLToPath(new URL("../../docs", import.meta.url)),

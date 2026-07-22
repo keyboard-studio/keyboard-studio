@@ -17,7 +17,8 @@
 
 import { describe, it, expect, vi, afterEach, beforeAll, beforeEach } from "vitest";
 import { useState } from "react";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render } from "../../test/renderWithI18n.tsx";
 
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { sampleBaseKeyboards } from "@keyboard-studio/contracts/fixtures";

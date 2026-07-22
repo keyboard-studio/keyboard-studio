@@ -33,7 +33,8 @@
 //   - Back from the first flagged character fires onBack.
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { screen, fireEvent, cleanup } from "@testing-library/react";
+import { render } from "../../test/renderWithI18n.tsx";
 import { SequenceGallery } from "./SequenceGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";

@@ -31,6 +31,7 @@
 //   remain in SurveyView. StepHost only decides which container a step renders into.
 
 import type { ReactNode, CSSProperties } from "react";
+import { Trans } from "@lingui/react/macro";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -132,14 +133,16 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     return (
       <div style={TERMINAL_PANEL_STYLE}>
         <h2 style={{ ...TERMINAL_HEADING_STYLE, color: ACCENT }}>
-          Survey complete
+          <Trans id="step.done.heading">Survey complete</Trans>
         </h2>
         <p style={TERMINAL_TEXT_STYLE}>
-          All authoring steps have been completed. Head to Output to download or
-          submit your keyboard.
+          <Trans id="step.done.detail">
+            All authoring steps have been completed. Head to Output to download or
+            submit your keyboard.
+          </Trans>
         </p>
         <button type="button" onClick={onStartOver} style={START_OVER_BTN_STYLE}>
-          Start over
+          <Trans id="step.startOver">Start over</Trans>
         </button>
       </div>
     );
@@ -159,7 +162,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
         <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "flex-start" }}>
           <UnsupportedScriptStub script={identityResult.targetScriptRaw} />
           <button type="button" onClick={onStartOver} style={START_OVER_BTN_STYLE}>
-            Start over
+            <Trans id="step.startOver">Start over</Trans>
           </button>
         </div>
       );
@@ -168,14 +171,16 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     return (
       <div style={TERMINAL_PANEL_STYLE}>
         <h2 style={{ ...TERMINAL_HEADING_STYLE, color: ERROR_RED }}>
-          Script not supported
+          <Trans id="step.unsupported.fallback.heading">Script not supported</Trans>
         </h2>
         <p style={TERMINAL_TEXT_STYLE}>
-          This script is not yet supported in v1. Please start over and choose a
-          different script, or check back in a future release.
+          <Trans id="step.unsupported.fallback.detail">
+            This script is not yet supported in v1. Please start over and choose a
+            different script, or check back in a future release.
+          </Trans>
         </p>
         <button type="button" onClick={onStartOver} style={START_OVER_BTN_STYLE}>
-          Start over
+          <Trans id="step.startOver">Start over</Trans>
         </button>
       </div>
     );

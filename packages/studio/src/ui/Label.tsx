@@ -7,6 +7,7 @@
 // exactly (Decision 2).
 
 import React from "react";
+import { useLingui } from "@lingui/react/macro";
 import { TEXT_MAIN } from "./theme.ts";
 
 export type LabelProps = React.HTMLAttributes<HTMLElement> & {
@@ -53,11 +54,15 @@ export function Label({
   htmlFor,
   ...rest
 }: LabelProps): React.ReactElement {
+  const { t } = useLingui();
   const content = (
     <>
       {children}
       {required === true && (
-        <span aria-label="required" style={{ color: "#e74c3c", marginLeft: 4 }}>
+        <span
+          aria-label={t({ id: "ui.label.required", message: "required" })}
+          style={{ color: "#e74c3c", marginLeft: 4 }}
+        >
           *
         </span>
       )}

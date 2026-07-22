@@ -19,6 +19,7 @@
 //      button instead of hanging blank.
 
 import { useEffect, useState } from "react";
+import { Trans } from "@lingui/react/macro";
 import {
   processOAuthCallbackForProvider,
   redirectTargetForResult,
@@ -142,23 +143,31 @@ export function OAuthCallbackScreen({ provider }: { provider: OAuthProvider }) {
           <>
             <div style={spinnerStyle} aria-hidden="true" />
             <h1 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 8px" }}>
-              Completing {label} sign-in…
+              <Trans id="oauth.callback.working.heading">
+                Completing {label} sign-in…
+              </Trans>
             </h1>
             <p style={{ fontSize: 14, color: "var(--muted)", margin: 0 }}>
-              Just a moment while we finish connecting your account.
+              <Trans id="oauth.callback.working.detail">
+                Just a moment while we finish connecting your account.
+              </Trans>
             </p>
           </>
         ) : (
           <>
             <h1 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 8px" }}>
-              {label} sign-in is taking too long
+              <Trans id="oauth.callback.error.heading">
+                {label} sign-in is taking too long
+              </Trans>
             </h1>
             <p style={{ fontSize: 14, color: "var(--muted)", margin: 0 }}>
-              We couldn’t complete the sign-in. This is usually temporary — please
-              return to the studio and try connecting again.
+              <Trans id="oauth.callback.error.detail">
+                We couldn’t complete the sign-in. This is usually temporary — please
+                return to the studio and try connecting again.
+              </Trans>
             </p>
             <button type="button" style={primaryBtnStyle} onClick={returnToApp}>
-              Return to keyboard studio
+              <Trans id="oauth.callback.error.returnButton">Return to keyboard studio</Trans>
             </button>
           </>
         )}
