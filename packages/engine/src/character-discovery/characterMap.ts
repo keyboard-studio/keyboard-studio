@@ -119,6 +119,13 @@ interface BlockDef {
  * out in a stable, human-sensible order.
  */
 export const CHARACTER_MAP_BLOCKS: Record<string, BlockDef[]> = {
+  // Latin is named comprehensively across every Latin-associated Unicode
+  // block (not just the core ranges) so the "blocks my keyboard uses" filter
+  // is precise: each real sub-block appears only when the keyboard actually
+  // uses a character in THAT block, instead of a coarse "Letters" catch-all
+  // lumping the expanded ranges (Phonetic Extensions, Latin Extended-C/D/E/F/G,
+  // Fullwidth, etc.) together so one stray char surfaces all of them. Ranges
+  // pinned against lib/ucd/Blocks.txt; ascending start-codepoint order.
   Latn: [
     { name: "Basic Latin", start: 0x0020, end: 0x007e },
     { name: "Latin-1 Supplement", start: 0x00a0, end: 0x00ff },
@@ -127,7 +134,22 @@ export const CHARACTER_MAP_BLOCKS: Record<string, BlockDef[]> = {
     { name: "IPA Extensions", start: 0x0250, end: 0x02af },
     { name: "Spacing Modifier Letters", start: 0x02b0, end: 0x02ff },
     { name: "Combining Diacritical Marks", start: 0x0300, end: 0x036f },
+    { name: "Combining Diacritical Marks Extended", start: 0x1ab0, end: 0x1aff },
+    { name: "Phonetic Extensions", start: 0x1d00, end: 0x1d7f },
+    { name: "Phonetic Extensions Supplement", start: 0x1d80, end: 0x1dbf },
+    { name: "Combining Diacritical Marks Supplement", start: 0x1dc0, end: 0x1dff },
     { name: "Latin Extended Additional", start: 0x1e00, end: 0x1eff },
+    { name: "Superscripts and Subscripts", start: 0x2070, end: 0x209f },
+    { name: "Letterlike Symbols", start: 0x2100, end: 0x214f },
+    { name: "Latin Extended-C", start: 0x2c60, end: 0x2c7f },
+    { name: "Modifier Tone Letters", start: 0xa700, end: 0xa71f },
+    { name: "Latin Extended-D", start: 0xa720, end: 0xa7ff },
+    { name: "Latin Extended-E", start: 0xab30, end: 0xab6f },
+    { name: "Alphabetic Presentation Forms", start: 0xfb00, end: 0xfb4f },
+    { name: "Combining Half Marks", start: 0xfe20, end: 0xfe2f },
+    { name: "Halfwidth and Fullwidth Forms", start: 0xff00, end: 0xffef },
+    { name: "Latin Extended-F", start: 0x10780, end: 0x107bf },
+    { name: "Latin Extended-G", start: 0x1df00, end: 0x1dfff },
   ],
   Cyrl: [
     { name: "Combining Diacritical Marks", start: 0x0300, end: 0x036f },
