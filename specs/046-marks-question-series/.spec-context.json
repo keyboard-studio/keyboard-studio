@@ -299,6 +299,22 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-22T01:59:11.091Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T02:04:42.498Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T02:04:42.742Z"
     }
   ],
   "telemetryInstanceId": "2fbeb931-cc8e-463b-9a7c-bfa4e0b7a804",
@@ -536,7 +552,7 @@
       "step": "implement"
     }
   ],
-  "currentTask": "T028",
+  "currentTask": "T030",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -766,6 +782,22 @@
       "files": [
         "packages/studio/src/editors/assignLoop/MechanismGallery.tsx",
         "packages/studio/src/editors/adapters/addPhysicalAdapter.tsx"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "FR-016 open-choice rendering in OutputFormStation: radio with recommended-first + tag, per-option plain-language consequence, backspace preview for BOTH options; SC-005 asserted on the open rendering; 1 walk test",
+      "files": [
+        "packages/studio/src/survey/marks/OutputFormStation.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "PUA role prompt at pick-commit in CharacterMapPane (escape-hatch path): letter/mark asked before any list update, answer recorded as permanent declaredRole via store add(c,{role}); 4 tests updated/added",
+      "files": [
+        "packages/studio/src/survey/CharacterMapPane.tsx",
+        "packages/studio/src/survey/CharacterMapPane.test.tsx"
       ]
     }
   }

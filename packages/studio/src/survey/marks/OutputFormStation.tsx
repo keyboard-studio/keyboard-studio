@@ -97,9 +97,66 @@ const FORM_LABEL: Record<OutputForm, string> = {
   "base-plus-mark": "Letter plus mark, built as you type",
 };
 
+/** Per-option consequence text for the FR-016 open choice (plain language). */
+const FORM_CONSEQUENCE: Record<OutputForm, string> = {
+  "base-plus-mark":
+    "Backspace peels one mark off at a time, and typing a mark key after any " +
+    "allowed letter adds the mark.",
+  "ready-made":
+    "Each accented letter is a single unit — backspace removes the whole " +
+    "letter in one step.",
+};
+
 export function OutputFormStation({ posture, proposal, value, onChange }: OutputFormStationProps) {
   const pair = previewPair(posture);
   const other: OutputForm = value === "ready-made" ? "base-plus-mark" : "ready-made";
+
+  if (proposal.presentedAs === "open-choice") {
+    // FR-016: both forms are viable — an OPEN choice, recommended option
+    // listed first, each option's consequence in plain language, and the
+    // backspace preview shown for BOTH options (US4 AC2).
+    const recommendedFirst: OutputForm[] =
+      proposal.form === "ready-made"
+        ? ["ready-made", "base-plus-mark"]
+        : ["base-plus-mark", "ready-made"];
+    return (
+      <section data-testid="marks-output-form" aria-label="How accented letters are produced">
+        <h3 style={sectionHeading}>How should your keyboard produce accented letters?</h3>
+        <p style={mutedParaFlush}>{proposal.explanation}</p>
+        <div role="radiogroup" aria-label="Output form" style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+          {recommendedFirst.map((form) => (
+            <label
+              key={form}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                padding: "10px 12px",
+                border: `1px solid ${form === value ? ACCENT : BORDER}`,
+                borderRadius: 6,
+                cursor: "pointer",
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: TEXT_MAIN }}>
+                <input
+                  type="radio"
+                  name="marks-output-form"
+                  checked={value === form}
+                  onChange={() => onChange(form)}
+                />
+                <strong>{FORM_LABEL[form]}</strong>
+                {form === proposal.form && (
+                  <span style={{ fontSize: 11, color: ACCENT }}>recommended</span>
+                )}
+              </span>
+              <span style={{ ...mutedParaFlush, fontSize: 12 }}>{FORM_CONSEQUENCE[form]}</span>
+              {pair !== undefined && <BackspacePreview pair={pair} form={form} />}
+            </label>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section data-testid="marks-output-form" aria-label="How accented letters are produced">

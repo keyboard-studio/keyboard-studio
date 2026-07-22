@@ -181,7 +181,7 @@ The contract types, the decomposition helper, the shared posture table, and the 
 
 **Wave 1 — single task:**
 
-- [ ] **T029** [US4] Open-choice branch in the output-form station: radio with recommended option listed first, per-option consequence text, backspace preview demonstrating repeated backspace under **both** options (peel-one-mark vs disappear-in-one-step); still zero "Unicode"/"normalization" in prompt text · `packages/studio/src/survey/marks/OutputFormStation.tsx` (+ FR-016 rows in `packages/engine/src/marks/output-form-policy.ts`)
+- [x] **T029** [US4] Open-choice branch in the output-form station: radio with recommended option listed first, per-option consequence text, backspace preview demonstrating repeated backspace under **both** options (peel-one-mark vs disappear-in-one-step); still zero "Unicode"/"normalization" in prompt text · `packages/studio/src/survey/marks/OutputFormStation.tsx` (+ FR-016 rows in `packages/engine/src/marks/output-form-policy.ts`)
 
 **Checkpoint**: US4 is independently testable — the ambiguous case is asked openly, everything else stays a notice.
 
@@ -197,7 +197,7 @@ The contract types, the decomposition helper, the shared posture table, and the 
 
 **Wave 1 — single task:**
 
-- [ ] **T030** [US6] Inline PUA role prompt at pick-commit (`isPrivateUseCodePoint` gate): asks letter vs mark before adding to any inventory list; answer recorded in `declaredRoles` (permanent, designer-owned; classifiers read it first, Unicode-property fallback only when absent); routes the character to `bases` or `marks` and in/out of series stations accordingly · `packages/studio/src/survey/CharacterMapPane.tsx` + `packages/studio/src/stores/phaseBDraftStore.ts`
+- [x] **T030** [US6] Inline PUA role prompt at pick-commit (`isPrivateUseCodePoint` gate): asks letter vs mark before adding to any inventory list; answer recorded in `declaredRoles` (permanent, designer-owned; classifiers read it first, Unicode-property fallback only when absent); routes the character to `bases` or `marks` and in/out of series stations accordingly · `packages/studio/src/survey/CharacterMapPane.tsx` + `packages/studio/src/stores/phaseBDraftStore.ts`
 
 **Checkpoint**: US6 is independently testable — PUA characters are the only picks that ever ask a question, and the answer sticks.
 

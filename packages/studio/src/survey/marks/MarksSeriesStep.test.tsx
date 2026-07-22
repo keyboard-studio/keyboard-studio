@@ -315,3 +315,59 @@ describe("MarksSeriesStep — worklist handoff (US7)", () => {
     expect(seen.has("marks-stacking")).toBe(true); // overlap evidence (FR-018)
   });
 });
+
+// ---------------------------------------------------------------------------
+// S4 open choice (US4, FR-016)
+// ---------------------------------------------------------------------------
+
+describe("MarksSeriesStep — S4 open choice (US4)", () => {
+  const GRAVE = "̀";
+
+  function seedComposableProductiveAlphabet(): void {
+    // Every pair composes (a/e/i with acute+grave all have ready-made forms)
+    // and the wide spread makes the class letter-plus-mark → FR-016 open case.
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "B",
+      answers: [],
+      alphabet: {
+        bases: ["a", "e", "i"],
+        marks: [ACUTE, GRAVE],
+        attestedStacks: [
+          { base: "a", marks: [ACUTE] },
+          { base: "e", marks: [ACUTE] },
+          { base: "i", marks: [ACUTE] },
+          { base: "a", marks: [GRAVE] },
+          { base: "e", marks: [GRAVE] },
+          { base: "i", marks: [GRAVE] },
+        ],
+        declaredRoles: {},
+      },
+    });
+  }
+
+  function reachStation(id: string): void {
+    for (let i = 0; i < 6 && screen.queryByTestId(id) === null; i++) {
+      fireEvent.click(screen.getByTestId("marks-continue"));
+    }
+  }
+
+  it("renders as an OPEN choice with the recommended option first and previews for both (US4 AC1+AC2)", () => {
+    seedComposableProductiveAlphabet();
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    reachStation("marks-output-form");
+    const station = screen.getByTestId("marks-output-form");
+    const radios = station.querySelectorAll('input[type="radio"]');
+    expect(radios).toHaveLength(2);
+    // Recommended (base-plus-mark for a productive class) listed first + tagged.
+    expect(station.textContent).toContain("recommended");
+    const labels = station.querySelectorAll("label");
+    expect(labels[0]?.textContent).toContain("Letter plus mark");
+    // Both options carry a backspace preview.
+    expect(station.querySelectorAll('[data-testid="backspace-preview"]')).toHaveLength(2);
+    // SC-005 holds on the open-choice rendering too.
+    expect(station.textContent).not.toMatch(/unicode/i);
+    expect(station.textContent).not.toMatch(/normali[sz]/i);
+  });
+});
