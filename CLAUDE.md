@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-Package manager is **pnpm 9** (Node ≥ 20). Run from the repo root unless noted.
+Package manager is **pnpm 9** (Node ≥ 22 — `@lingui/cli` uses `node:fs.globSync`). Run from the repo root unless noted.
 
 | Task | Command |
 |------|---------|
