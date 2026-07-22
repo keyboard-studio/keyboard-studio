@@ -6,7 +6,7 @@
 // NOTE: like LocaleSwitcher.test.tsx, this touches localStorage — on local
 // Node >= 22 that needs NODE_OPTIONS="--localstorage-file=..." (see
 // docs/i18n-spike.md); CI (Node 22, no flag) is unaffected.
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { resolveInitialLocale } from "./i18n.ts";
 
 function setBrowserLanguage(tag: string): void {
@@ -52,5 +52,36 @@ describe("resolveInitialLocale — region-specific fallback chain", () => {
     setBrowserLanguage("pt-BR");
     localStorage.setItem("ks.locale", "fr");
     expect(resolveInitialLocale()).toBe("fr");
+  });
+});
+
+// The `localeReady` failure-swallowing contract (spec 046 T039). A returning
+// non-English visitor whose catalog fetch fails (chunk 404 after a deploy, a
+// transient network error) must NOT get a boot-blocking rejection: English is
+// already active, so `localeReady` resolves regardless. main.tsx awaits it
+// before the first render, so a rejection here would hang the whole app.
+describe("localeReady — swallows a failed catalog fetch", () => {
+  const originalLanguage = navigator.language;
+
+  afterEach(() => {
+    localStorage.clear();
+    setBrowserLanguage(originalLanguage);
+    vi.resetModules();
+    vi.doUnmock("../locales/fr/messages.json?lingui");
+  });
+
+  it("resolves (never rejects) when the target locale's catalog import fails", async () => {
+    // Pick a non-default locale so the bootstrap actually attempts the async
+    // catalog load (the English-only path is a bare Promise.resolve()).
+    localStorage.setItem("ks.locale", "fr");
+    vi.doMock("../locales/fr/messages.json?lingui", () => {
+      throw new Error("simulated chunk load failure");
+    });
+
+    // Re-import the module fresh so its top-level `localeReady` is constructed
+    // under the mock. `.resolves` (not just not-rejecting) is the contract.
+    vi.resetModules();
+    const mod = await import("./i18n.ts");
+    await expect(mod.localeReady).resolves.toBeUndefined();
   });
 });

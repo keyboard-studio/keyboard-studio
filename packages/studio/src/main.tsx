@@ -72,8 +72,19 @@ async function mountApp(): Promise<void> {
   );
 }
 
-function mountCallbackScreen(provider: OAuthProvider): void {
+async function mountCallbackScreen(provider: OAuthProvider): Promise<void> {
   const rootEl = requireRoot();
+
+  // Gate on localeReady for the same reason mountApp() does (T039): the OAuth
+  // callback screen is the FIRST paint for a returning visitor mid-sign-in, and
+  // OAuthCallbackScreen is <Trans>-heavy, so an ungated render flashes English
+  // for a returning non-English visitor before the catalog applies. English
+  // visitors pay nothing (localeReady is already resolved); for a non-English
+  // visitor this awaits a small, already-in-flight catalog fetch that is
+  // guaranteed to resolve (it swallows its own failure and stays on English),
+  // so it can never delay the spinner beyond that fetch or block the exchange.
+  await localeReady;
+
   createRoot(rootEl).render(
     <StrictMode>
       <OAuthCallbackScreen provider={provider} />
@@ -89,7 +100,7 @@ function mountCallbackScreen(provider: OAuthProvider): void {
 // every normal path we mount the app.
 const oauthProvider = detectOAuthCallback();
 if (oauthProvider !== null) {
-  mountCallbackScreen(oauthProvider);
+  void mountCallbackScreen(oauthProvider);
 } else {
   void mountApp();
 }
