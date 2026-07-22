@@ -5,7 +5,7 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 ## Build inputs
 
 - **keyboards**: 927
-- **facets**: added-char-count, caps-handling, casing, combining-mark-repertoire, declared-bcp47-tags, desktop-combo-mechanism, diacritic-mechanism, directionality, encoding, fallback-posture, font-dependency, license-fork-eligibility, mnemonic-vs-positional, normalization-posture, orthography-coverage-ratio, package-completeness, platform-coverage, primary-strategy, reordering-rules, rule-store-compaction, script, script-family, spare-key-budget, strategy-fingerprint, target-mix, touch-combo-mechanism, touch-modifier-layers, touch-number-row, touch-symbol-layer
+- **facets**: added-char-count, caps-handling, casing, combining-mark-repertoire, declared-bcp47-tags, desktop-combo-mechanism, diacritic-mechanism, directionality, encoding, fallback-posture, font-dependency, has-icon, license-fork-eligibility, mnemonic-vs-positional, normalization-posture, orthography-coverage-ratio, package-completeness, platform-coverage, primary-strategy, reordering-rules, rule-store-compaction, script, script-family, spare-key-budget, strategy-fingerprint, target-mix, touch-combo-mechanism, touch-modifier-layers, touch-number-row, touch-symbol-layer
 - **scannerVersion**: `facet-index@1;schema@1;script@3;strategy-fingerprint@1;target-mix@1`
 - **unicodeVersion**: 17.0.0
 - **corpusScope**: `release/**`
@@ -27,6 +27,7 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `encoding` | 881 | 0 | 46 | 0 |
 | `fallback-posture` | 915 | 0 | 12 | 0 |
 | `font-dependency` | 0 | 927 | 0 | 0 |
+| `has-icon` | 0 | 927 | 0 | 0 |
 | `license-fork-eligibility` | 0 | 927 | 0 | 0 |
 | `mnemonic-vs-positional` | 920 | 0 | 7 | 0 |
 | `normalization-posture` | 811 | 0 | 116 | 0 |
@@ -232,6 +233,23 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `anglo_furthorc_english` | system-font-reliant | declared-metadata | fully | 1 |
 | `anii` | self-contained | declared-metadata | fully | 1 |
 | `arabic_flick` | system-font-reliant | declared-metadata | fully | 1 |
+
+## Sample records — `has-icon` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | absent | declared-metadata | fully | 1 |
+| `afghan_turkmen` | absent | declared-metadata | fully | 1 |
+| `ahom_star` | present | declared-metadata | fully | 1 |
+| `akan` | present | declared-metadata | fully | 1 |
+| `akha_lahu` | present | declared-metadata | fully | 1 |
+| `aksarabali_panlex` | present | declared-metadata | fully | 1 |
+| `amazigh_latin` | present | declared-metadata | fully | 1 |
+| `anglish` | present | declared-metadata | fully | 1 |
+| `anglish_dvorak` | present | declared-metadata | fully | 1 |
+| `anglo_furthorc_english` | present | declared-metadata | fully | 1 |
+| `anii` | present | declared-metadata | fully | 1 |
+| `arabic_flick` | present | declared-metadata | fully | 1 |
 
 ## Sample records — `license-fork-eligibility` (first 12 by id)
 

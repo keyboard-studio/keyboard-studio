@@ -63,6 +63,7 @@ import { classifyDirectionality, directionalityFallback } from "./directionality
 import { classifyScriptFamily, scriptFamilyFallback } from "./script-family-classifier.js";
 import { classifyDeclaredBcp47Tags, declaredBcp47TagsFallback } from "./declared-bcp47-tags-classifier.js";
 import { classifyPackageCompleteness, packageCompletenessFallback } from "./package-completeness-classifier.js";
+import { classifyHasIcon, hasIconFallback } from "./has-icon-classifier.js";
 import { deriveScriptFallback, UNDETERMINED } from "./fallback.js";
 import type {
   Categorization,
@@ -209,6 +210,9 @@ export const DEFAULT_CLASSIFIERS: Record<string, ClassifierPair> = {
     classify: classifyPackageCompleteness,
     fallback: packageCompletenessFallback,
   },
+  // Keyboard-icon presence (declared-metadata): &BITMAP header store OR a
+  // bundled .ico/.bmp. Broader than package-completeness's icon member.
+  "has-icon": { classify: classifyHasIcon, fallback: hasIconFallback },
 };
 
 // ---------------------------------------------------------------------------
