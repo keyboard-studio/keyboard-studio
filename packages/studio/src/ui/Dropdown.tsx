@@ -17,6 +17,14 @@ export interface DropdownProps
   options: DropdownOption[];
   /** Called with the new value string on each change. */
   onChange?: (value: string) => void;
+  /**
+   * Whether to render the leading blank "— Select one —" placeholder option
+   * (value `""`). Default `true` to preserve existing callers' behavior.
+   * Set `false` when `value` always holds a valid, defaulted selection —
+   * offering the blank option in that case lets the `<select>` desync from
+   * the bound value (selecting it doesn't match any known option).
+   */
+  includeBlank?: boolean;
 }
 
 const BASE_STYLE: React.CSSProperties = {
@@ -45,6 +53,7 @@ export function Dropdown({
   onChange,
   style,
   className,
+  includeBlank = true,
   ...rest
 }: DropdownProps): React.ReactElement {
   return (
@@ -54,7 +63,7 @@ export function Dropdown({
       style={{ ...BASE_STYLE, ...style }}
       {...rest}
     >
-      <option value="">— Select one —</option>
+      {includeBlank && <option value="">— Select one —</option>}
       {options.map((opt) => (
         <option key={opt.value} value={opt.value}>
           {opt.label}

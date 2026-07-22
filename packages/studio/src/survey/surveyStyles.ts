@@ -169,14 +169,63 @@ export function charChip(checked: boolean): CSSProperties {
   };
 }
 
-/** The chip's large glyph span — `checked` (or "confirmed") selects accent color. */
-export function chipGlyph(checked: boolean): CSSProperties {
+/** Default glyph font stack — used when no `fontStack` override is passed. */
+const DEFAULT_CHIP_GLYPH_FONT_STACK = "system-ui, sans-serif";
+
+/**
+ * The chip's large glyph span — `checked` (or "confirmed") selects accent
+ * color. `fontStack` overrides the rendering font (Phase B font-selection
+ * dropdown, see FONT_OPTIONS below); omitted, it falls back to the original
+ * system-ui stack so existing callers are unaffected.
+ */
+export function chipGlyph(checked: boolean, fontStack?: string): CSSProperties {
   return {
     fontSize: 22,
-    fontFamily: "system-ui, sans-serif",
+    fontFamily: fontStack ?? DEFAULT_CHIP_GLYPH_FONT_STACK,
     lineHeight: 1,
     color: checked ? CHIP_GLYPH_ACCENT : TEXT_DIM,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Phase B character font selection — the dropdown at the top of the
+// build-list step applies one font to every glyph rendered while adding
+// characters (chip editor, suggestion chips, character map). Modeled as a
+// single typed const so the CSS font-family stack lives in one place and both
+// the dropdown options and chipGlyph() draw from it.
+// ---------------------------------------------------------------------------
+
+/** The set of font choices offered on the Phase B build-list step.
+ *
+ * Intentionally independent of the `--ui`/`--serif` tokens (src/index.css)
+ * and `FONT`/`FONT_MONO` (src/ui/theme.ts) — those govern UI chrome
+ * typography, while Noto Sans / Charis SIL are chosen for glyph coverage of
+ * the characters being added, not chrome consistency. Do not consolidate. */
+export type PhaseBFontValue = "noto-sans" | "charis-sil";
+
+export interface PhaseBFontOption {
+  value: PhaseBFontValue;
+  label: string;
+  /** CSS font-family stack, always ending in a generic fallback. */
+  stack: string;
+}
+
+export const FONT_OPTIONS: PhaseBFontOption[] = [
+  { value: "noto-sans", label: "Noto Sans", stack: "'Noto Sans', system-ui, sans-serif" },
+  { value: "charis-sil", label: "Charis SIL", stack: "'Charis SIL', serif" },
+];
+
+/** Default font selection — Noto Sans. */
+export const DEFAULT_PHASE_B_FONT: PhaseBFontValue = "noto-sans";
+
+/** Resolve a `PhaseBFontValue` to its CSS font-family stack, falling back to the default. */
+export function phaseBFontStack(value: string): string {
+  return FONT_OPTIONS.find((o) => o.value === value)?.stack ?? FONT_OPTIONS[0]!.stack;
+}
+
+/** Type guard — is `value` one of the known Phase B font choices? */
+export function isPhaseBFontValue(value: unknown): value is PhaseBFontValue {
+  return typeof value === "string" && FONT_OPTIONS.some((o) => o.value === value);
 }
 
 /** The chip's small U+XXXX codepoint label — identical in both chip variants. */

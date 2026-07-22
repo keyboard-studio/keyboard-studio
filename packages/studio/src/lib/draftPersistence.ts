@@ -33,6 +33,7 @@ import {
   usePhaseBDraftStore,
   type PhaseBDraftSnapshot,
 } from "../stores/phaseBDraftStore.ts";
+import { DEFAULT_PHASE_B_FONT, isPhaseBFontValue } from "../survey/surveyStyles.ts";
 
 // ---------------------------------------------------------------------------
 // Key scheme (T004) — per-project, versioned localStorage keys.
@@ -356,10 +357,17 @@ export function loadDraft(projectKey: string): boolean {
     // than discarding an otherwise-good record, since it's not load-bearing
     // for working-copy/traversal correctness the way `traversal`'s shape is.
     // Either case restores to an empty alphabet, same as today's behaviour.
+    // `selectedFont` (font-selection dropdown addition) is validated the same
+    // tolerant way — a pre-this-change record has no such field, and an
+    // unrecognized value falls back to the default rather than discarding the
+    // record.
     const restoredChars = Array.isArray(envelope.phaseBDraft?.chars)
       ? envelope.phaseBDraft.chars
       : [];
-    applyPhaseBDraftSnapshot({ chars: restoredChars });
+    const restoredFont = isPhaseBFontValue(envelope.phaseBDraft?.selectedFont)
+      ? envelope.phaseBDraft.selectedFont
+      : DEFAULT_PHASE_B_FONT;
+    applyPhaseBDraftSnapshot({ chars: restoredChars, selectedFont: restoredFont });
 
     _draftRestoredThisBoot = true;
     return true;

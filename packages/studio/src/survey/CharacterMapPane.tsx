@@ -44,6 +44,7 @@ import {
   chipIndicatorColor,
   primaryButton,
   visuallyHidden,
+  phaseBFontStack,
 } from "./surveyStyles.ts";
 
 // A single cell within a CharacterMapGroup — derived rather than imported by
@@ -139,6 +140,8 @@ export function CharacterMapPane({
   const chars = usePhaseBDraftStore((s) => s.chars);
   const toggle = usePhaseBDraftStore((s) => s.toggle);
   const addChar = usePhaseBDraftStore((s) => s.add);
+  const selectedFont = usePhaseBDraftStore((s) => s.selectedFont);
+  const glyphFontStack = phaseBFontStack(selectedFont);
 
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [query, setQuery] = useState("");
@@ -448,7 +451,7 @@ export function CharacterMapPane({
                         aria-label={`${actionLabel} ${cell.char} (${cp})`}
                         style={charChip(selected)}
                       >
-                        <span style={chipGlyph(selected)}>{display}</span>
+                        <span style={chipGlyph(selected, glyphFontStack)}>{display}</span>
                         <span style={chipCodepoint}>{cp}</span>
                         {/* Non-color selected indicator (colorblind-safe) — shared
                             helper with SuggestionChip's "[x]"/"+" pattern in

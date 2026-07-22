@@ -29,7 +29,7 @@ import { nfcDedup } from "./charNormUtils.ts";
 import { prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { suggestMissingChars } from "../lib/services.ts";
 import type { MissingCharSuggestions } from "../lib/services.ts";
-import { RadioGroup } from "../ui/index.ts";
+import { RadioGroup, Dropdown, Label } from "../ui/index.ts";
 import {
   BG_PAGE,
   BORDER,
@@ -54,6 +54,8 @@ import {
   chipIndicatorText,
   chipIndicatorColor,
   visuallyHidden,
+  FONT_OPTIONS,
+  phaseBFontStack,
 } from "./surveyStyles.ts";
 
 // Vite ?raw import — typed via the `*.yaml?raw` declaration in src/vite-env.d.ts.
@@ -176,6 +178,8 @@ interface CharChipEditorProps {
 
 function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorProps) {
   const { t } = useLingui();
+  const selectedFont = usePhaseBDraftStore((s) => s.selectedFont);
+  const glyphFontStack = phaseBFontStack(selectedFont);
   const [inputVal, setInputVal] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -281,7 +285,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
                 })}
                 style={charChip(false)}
               >
-                <span style={chipGlyph(true)}>
+                <span style={chipGlyph(true, glyphFontStack)}>
                   {c}
                 </span>
                 <span style={chipCodepoint}>
@@ -309,6 +313,8 @@ interface SuggestionChipProps {
 
 function SuggestionChip({ char, checked, onToggle }: SuggestionChipProps) {
   const { t } = useLingui();
+  const selectedFont = usePhaseBDraftStore((s) => s.selectedFont);
+  const glyphFontStack = phaseBFontStack(selectedFont);
   const cp = toUPlusNotation(char);
   const actionLabel = checked
     ? t({ id: "survey.phaseB.suggestionChip.removeAction", message: "Remove" })
@@ -321,7 +327,7 @@ function SuggestionChip({ char, checked, onToggle }: SuggestionChipProps) {
       aria-pressed={checked}
       style={charChip(checked)}
     >
-      <span style={chipGlyph(checked)}>
+      <span style={chipGlyph(checked, glyphFontStack)}>
         {char}
       </span>
       <span style={chipCodepoint}>{cp}</span>
@@ -622,6 +628,8 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   const { t } = useLingui();
   const chars = usePhaseBDraftStore((s) => s.chars);
   const setAll = usePhaseBDraftStore((s) => s.setAll);
+  const selectedFont = usePhaseBDraftStore((s) => s.selectedFont);
+  const setSelectedFont = usePhaseBDraftStore((s) => s.setSelectedFont);
   const doneDisabled = chars.length === 0;
 
   return (
@@ -648,6 +656,26 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
       <h2 style={phaseHeadingFlush}>
         <Trans id="survey.phaseB.buildList.heading">Phase B — Add your whole alphabet</Trans>
       </h2>
+
+      {/* Font selection — applies to every character glyph rendered on this
+          step, including the character map (CharacterMapPane.tsx, right
+          pane) — see phaseBDraftStore.selectedFont. */}
+      <div style={{ maxWidth: 280 }}>
+        <Label htmlFor="phase-b-font-select">
+          <Trans id="survey.phaseB.buildList.fontSelectLabel">Font for characters</Trans>
+        </Label>
+        <Dropdown
+          id="phase-b-font-select"
+          data-testid="phase-b-font-select"
+          value={selectedFont}
+          includeBlank={false}
+          options={FONT_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+          onChange={(value) => {
+            const opt = FONT_OPTIONS.find((o) => o.value === value);
+            if (opt) setSelectedFont(opt.value);
+          }}
+        />
+      </div>
 
       {/* Instructions */}
       <div

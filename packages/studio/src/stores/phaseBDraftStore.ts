@@ -47,6 +47,7 @@ import type { AttestedStack, ConfirmedAlphabet, DeclaredRole } from "@keyboard-s
 import { makeConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { decomposeGrapheme, isCombiningMarkChar, isPrivateUseCodePoint } from "@keyboard-studio/engine";
 import { nfcDedup } from "../survey/charNormUtils.ts";
+import { DEFAULT_PHASE_B_FONT, type PhaseBFontValue } from "../survey/surveyStyles.ts";
 
 /** One designer pick: a whole grapheme, plus the declared role for PUA picks. */
 interface DraftPick {
@@ -74,12 +75,23 @@ export interface PhaseBDraftState {
   lastPick: LastPickContribution | null;
 
   /**
+<<<<<<< HEAD
    * Add one whole-grapheme pick (NFC-normalized, deduped). A decomposable pick
    * visibly contributes its base, its mark(s), and the attested stack; a
    * private-use pick should carry the designer's declared `role` (FR-004) —
    * without one it is treated as a letter until classified.
    */
   add: (c: string, opts?: { role?: DeclaredRole }) => void;
+=======
+   * The font applied to every character glyph rendered while building the
+   * alphabet (chip editor, suggestion chips, character map) — set via the
+   * font-selection dropdown at the top of the Phase B build-list step.
+   */
+  selectedFont: PhaseBFontValue;
+
+  /** Add one character (NFC-normalized, deduped against the existing list). */
+  add: (c: string) => void;
+>>>>>>> a05563e (feat(studio): font picker for Phase B add-characters step)
 
   /** Remove one pick (NFC-normalized before comparison). Derived stores recompute. */
   remove: (c: string) => void;
@@ -90,7 +102,10 @@ export interface PhaseBDraftState {
   /** Replace the whole list wholesale (drop-in for the old setChars callers). */
   setAll: (next: string[]) => void;
 
-  /** Clear back to an empty alphabet. */
+  /** Set the font applied to all Phase B character glyphs. */
+  setSelectedFont: (font: PhaseBFontValue) => void;
+
+  /** Clear back to an empty alphabet (font selection is left untouched). */
   reset: () => void;
 }
 
@@ -213,6 +228,7 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
   attestedStacks: [],
   declaredRoles: {},
   lastPick: null,
+  selectedFont: DEFAULT_PHASE_B_FONT,
 
   add: (c, opts) => {
     const nfc = c.normalize("NFC");
@@ -261,6 +277,8 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
     set({ ...deriveStores(picks), chars: next, lastPick: null });
   },
 
+  setSelectedFont: (font) => set({ selectedFont: font }),
+
   reset: () => {
     picks = [];
     set({
@@ -295,25 +313,28 @@ export function draftConfirmedAlphabet(): ConfirmedAlphabet {
 // its PUA classifications; old snapshots without the field restore fine.
 // ---------------------------------------------------------------------------
 
-/** Serializable snapshot of this store's accumulating alphabet. */
+/** Serializable snapshot of this store's accumulating alphabet + font choice. */
 export interface PhaseBDraftSnapshot {
   chars: string[];
   declaredRoles?: Record<string, DeclaredRole>;
+  selectedFont: PhaseBFontValue;
 }
 
 /** Build a serializable snapshot of the CURRENT phase-B draft alphabet. */
 export function snapshotPhaseBDraft(): PhaseBDraftSnapshot {
   const s = usePhaseBDraftStore.getState();
-  return { chars: s.chars, declaredRoles: s.declaredRoles };
+  return { chars: s.chars, declaredRoles: s.declaredRoles, selectedFont: s.selectedFont };
 }
 
 /**
  * Patch a `PhaseBDraftSnapshot` directly into the phase-B draft store. Restores
  * declared roles first so the pick rebuild keeps PUA classifications, then
  * flows the char list through the same `setAll` replace path
- * BuildListView/CharacterMapPane already call.
+ * BuildListView/CharacterMapPane already call, and restores the font choice via
+ * `setSelectedFont`.
  */
 export function applyPhaseBDraftSnapshot(snapshot: PhaseBDraftSnapshot): void {
   usePhaseBDraftStore.setState({ declaredRoles: snapshot.declaredRoles ?? {} });
   usePhaseBDraftStore.getState().setAll(snapshot.chars);
+  usePhaseBDraftStore.getState().setSelectedFont(snapshot.selectedFont);
 }
