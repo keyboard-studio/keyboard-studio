@@ -108,17 +108,17 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 
 ### Tests for User Story 3
 
-- [ ] T032 [P] [US3] Region-resolution test (`pt-BR` → `pt` → `en`) for `lib/i18n.ts` (#1271)
-- [ ] T033 [P] [US3] Playwright E2E locale-switch walk in `packages/studio/e2e` (#1272)
+- [x] T032 [P] [US3] Region-resolution test (`pt-BR` → `pt` → `en`) for `lib/i18n.ts` (#1271)
+- [x] T033 [P] [US3] Playwright E2E locale-switch walk in `packages/studio/e2e` (#1272)
 
 ### Implementation for User Story 3
 
-- [ ] T034 [P] [US3] Region-specific locale resolution (`pt-BR` → `pt` → `en`) in [lib/i18n.ts](../../packages/studio/src/lib/i18n.ts) + switch to `%locale%` token in [crowdin.yml](../../crowdin.yml) (#1273)
-- [ ] T035 [P] [US3] ICU plural audit; convert count-dependent strings to the `plural` macro (#1274)
-- [ ] T036 [P] [US3] Add translator context (message comments / screenshots) for ambiguous ids (#1275)
-- [ ] T037 [US3] CI: `upload sources` on merge to `main` (`.github/workflows`) (#1276)
-- [ ] T038 [US3] CI: scheduled/webhook `download` → open a translations PR through the km-triage gate (#1277)
-- [ ] T039 [P] [US3] Remove the first-paint English flash: pre-resolve persisted/detected locale before initial render (#1278)
+- [x] T034 [P] [US3] Region-specific locale resolution (`pt-BR` → `pt` → `en`) in [lib/i18n.ts](../../packages/studio/src/lib/i18n.ts) + switch to `%locale%` token in [crowdin.yml](../../crowdin.yml) (#1273)
+- [x] T035 [P] [US3] ICU plural audit; convert count-dependent strings to the `plural` macro (#1274)
+- [x] T036 [P] [US3] Add translator context (message comments / screenshots) for ambiguous ids (#1275)
+- [x] T037 [US3] CI: `upload sources` on merge to `main` (`.github/workflows`) (#1276)
+- [x] T038 [US3] CI: scheduled/webhook `download` → open a translations PR through the km-triage gate (#1277)
+- [x] T039 [P] [US3] Remove the first-paint English flash: pre-resolve persisted/detected locale before initial render (#1278)
 
 **Checkpoint**: All stories independently functional; translation stays current with low toil.
 

@@ -11,6 +11,7 @@ import {
 import { rehydrateWorkingCopyFromSession } from "./lib/persistWorkingCopy.ts";
 import { installE2eHook } from "./lib/e2eHook.ts";
 import { loadDraft, resolveActiveProjectKey } from "./lib/draftPersistence.ts";
+import { localeReady } from "./lib/i18n.ts";
 
 function requireRoot(): HTMLElement {
   const rootEl = document.getElementById("root");
@@ -20,8 +21,14 @@ function requireRoot(): HTMLElement {
   return rootEl;
 }
 
-function mountApp(): void {
+async function mountApp(): Promise<void> {
   const rootEl = requireRoot();
+
+  // Pre-resolve the persisted/detected locale's catalog before the first
+  // render (spec 046 T039) — otherwise a returning non-English visitor briefly
+  // sees English chrome while the catalog loads async, then flips. English
+  // visitors (the common case) pay nothing: localeReady is already resolved.
+  await localeReady;
 
   // Flag-gated E2E test hook (window.__ksE2E__) — no-op unless VITE_E2E=1 or
   // ?e2e=1. See lib/e2eHook.ts.
@@ -84,5 +91,5 @@ const oauthProvider = detectOAuthCallback();
 if (oauthProvider !== null) {
   mountCallbackScreen(oauthProvider);
 } else {
-  mountApp();
+  void mountApp();
 }

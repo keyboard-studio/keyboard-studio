@@ -177,7 +177,8 @@ function buildPendingCascade({
  * plural batch), switched via `plural`; the non-anyNeeded copy was already
  * identical in both.
  */
-function CollateralWarning({ collateral, plural }: { collateral: CoordinatedCollateralChar[]; plural: boolean }) {
+function CollateralWarning({ collateral, isBulk }: { collateral: CoordinatedCollateralChar[]; isBulk: boolean }) {
+  const { t } = useLingui();
   const anyNeeded = collateral.some((c) => c.isNeeded);
   return (
     <div
@@ -196,10 +197,10 @@ function CollateralWarning({ collateral, plural }: { collateral: CoordinatedColl
     >
       <b>
         {anyNeeded
-          ? plural
-            ? '⚠ This will also remove characters you need, from paired stores:'
-            : '⚠ This will also remove a character you need, from a paired store:'
-          : 'Removing this will also remove from paired stores:'}
+          ? isBulk
+            ? t({ id: "editor.carve.collateralWarning.anyNeededPlural", message: "⚠ This will also remove characters you need, from paired stores:" })
+            : t({ id: "editor.carve.collateralWarning.anyNeededSingular", message: "⚠ This will also remove a character you need, from a paired store:" })
+          : t({ id: "editor.carve.collateralWarning.removing", message: "Removing this will also remove from paired stores:" })}
       </b>{' '}
       {collateral.map((c, i) => (
         <span key={i}>
@@ -878,7 +879,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
                   silent: shown for every collateral char, with a needed one
                   flagged prominently so the author can back out via Cancel. */}
               {!isRestore && pendingCascade.collateral.length > 0 && (
-                <CollateralWarning collateral={pendingCascade.collateral} plural={false} />
+                <CollateralWarning collateral={pendingCascade.collateral} isBulk={false} />
               )}
               {pendingCascade.contributors.blocked.length > 0 && (
                 <div
@@ -921,22 +922,38 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
           handleSetManyGlyphs above. */}
       {pendingBulkCascade !== null && (() => {
         const n = pendingBulkCascade.gids.length;
+        const collateralCount = pendingBulkCascade.collateral.length;
+        const selectedLabel = t({
+          id: "editor.carve.bulkCascade.selectedCount",
+          message: plural(n, {
+            one: "# selected character",
+            other: "# selected characters",
+          }),
+        });
+        const collateralLabel = t({
+          id: "editor.carve.bulkCascade.collateralCount",
+          message: plural(collateralCount, {
+            one: "# paired character",
+            other: "# paired characters",
+          }),
+        });
         return (
           <ConfirmDialog
             open={true}
-            title="Remove everywhere?"
+            title={t({ id: "editor.carve.bulkCascade.title", message: "Remove everywhere?" })}
             body={
               <div>
                 <p style={{ margin: '0 0 10px' }}>
-                  Removing {n} selected character{n !== 1 ? 's' : ''} will also drop the following
-                  paired character{pendingBulkCascade.collateral.length !== 1 ? 's' : ''} from linked stores.
+                  <Trans id="editor.carve.bulkCascade.body">
+                    Removing {selectedLabel} will also drop the following {collateralLabel} from linked stores.
+                  </Trans>
                 </p>
-                <CollateralWarning collateral={pendingBulkCascade.collateral} plural={true} />
+                <CollateralWarning collateral={pendingBulkCascade.collateral} isBulk={true} />
               </div>
             }
-            primaryLabel="Yes, remove everywhere"
+            primaryLabel={t({ id: "editor.carve.cascade.removePrimaryButton", message: "Yes, remove everywhere" })}
             onPrimary={handleBulkCascadePrimary}
-            secondaryLabel="Cancel"
+            secondaryLabel={t({ id: "editor.carve.cascade.cancelButton", message: "Cancel" })}
             onSecondary={handleBulkCascadeCancel}
           />
         );
