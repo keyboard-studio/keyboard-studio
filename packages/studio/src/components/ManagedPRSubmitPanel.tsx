@@ -195,7 +195,7 @@ export function ManagedPRSubmitPanel({
   outputBlockedReason,
   prefill,
 }: ManagedPRSubmitPanelProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const nameId = useId();
   const emailId = useId();
   const copyrightId = useId();
@@ -292,7 +292,7 @@ export function ManagedPRSubmitPanel({
     } catch (err: unknown) {
       let message: string;
       if (isPublishManagedPRError(err)) {
-        message = publishManagedPRErrorMessage(err as PublishManagedPRError);
+        message = publishManagedPRErrorMessage(err as PublishManagedPRError, i18n);
       } else {
         message =
           err instanceof Error
@@ -304,7 +304,7 @@ export function ManagedPRSubmitPanel({
       }
       setSubmitState({ kind: "error", message });
     }
-  }, [submitEnabled, authorName, email, t]);
+  }, [submitEnabled, authorName, email, t, i18n]);
 
   // ---------------------------------------------------------------------------
   // Success state — show PR link, no git jargon.
