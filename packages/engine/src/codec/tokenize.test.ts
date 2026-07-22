@@ -134,22 +134,22 @@ describe("tokenize", () => {
 
   it("recognizes begin directive", () => {
     const tokens = tokenize("begin Unicode > use(main)\n");
-    expect(tokens.find(t => t.kind === "begin")).toBeDefined();
+    expect(tokens.find(t => t.kind === "begin")?.kind).toBe("begin");
   });
 
   it("recognizes group directive", () => {
     const tokens = tokenize("group(main) using keys\n");
-    expect(tokens.find(t => t.kind === "group")).toBeDefined();
+    expect(tokens.find(t => t.kind === "group")?.kind).toBe("group");
   });
 
   it("recognizes match directive", () => {
     const tokens = tokenize("match > use(deadkeys)\n");
-    expect(tokens.find(t => t.kind === "match")).toBeDefined();
+    expect(tokens.find(t => t.kind === "match")?.kind).toBe("match");
   });
 
   it("recognizes nomatch directive", () => {
     const tokens = tokenize("nomatch > use(fallback)\n");
-    expect(tokens.find(t => t.kind === "nomatch")).toBeDefined();
+    expect(tokens.find(t => t.kind === "nomatch")?.kind).toBe("nomatch");
   });
 
   it("strips BOM from input", () => {
@@ -163,7 +163,7 @@ describe("tokenize", () => {
   it("produces blank tokens for empty lines", () => {
     const tokens = tokenize("c comment\n\nc comment2\n");
     const blank = tokens.find(t => t.kind === "blank");
-    expect(blank).toBeDefined();
+    expect(blank?.kind).toBe("blank");
   });
 
   it("tokenizes double-quote store value", () => {

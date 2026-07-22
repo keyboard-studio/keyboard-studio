@@ -124,8 +124,12 @@ describe("renameFilesInVfs — scoped content rewriting", () => {
       vfs.set("source/base_id.htm", "<html>help</html>");
       vfs.set("source/base_id.js", "var x = 1;");
       renameFilesInVfs(vfs, "base_id", "my_keyboard");
-      expect(vfs.get("source/my_keyboard.htm")).not.toBeUndefined();
-      expect(vfs.get("source/my_keyboard.js")).not.toBeUndefined();
+      const renamedHtm = vfs.get("source/my_keyboard.htm");
+      expect(renamedHtm).not.toBeUndefined();
+      expect(renamedHtm?.content).toBe("<html>help</html>");
+      const renamedJs = vfs.get("source/my_keyboard.js");
+      expect(renamedJs).not.toBeUndefined();
+      expect(renamedJs?.content).toBe("var x = 1;");
       expect(vfs.get("source/base_id.htm")).toBeUndefined();
       expect(vfs.get("source/base_id.js")).toBeUndefined();
     });
@@ -136,8 +140,12 @@ describe("renameFilesInVfs — scoped content rewriting", () => {
       vfs.set("source/help/kb.css", ".help { padding: 4px; }");
       renameFilesInVfs(vfs, "base_id", "my_keyboard");
       // Untouched: paths that don't match `source/<baseId>.<ext>`.
-      expect(vfs.get("source/welcome/welcome.htm")).not.toBeUndefined();
-      expect(vfs.get("source/help/kb.css")).not.toBeUndefined();
+      const welcomeHtm = vfs.get("source/welcome/welcome.htm");
+      expect(welcomeHtm).not.toBeUndefined();
+      expect(welcomeHtm?.content).toBe("<html>welcome</html>");
+      const kbCss = vfs.get("source/help/kb.css");
+      expect(kbCss).not.toBeUndefined();
+      expect(kbCss?.content).toBe(".help { padding: 4px; }");
     });
   });
 
@@ -172,7 +180,11 @@ describe("renameFilesInVfs — scoped content rewriting", () => {
       vfs.set("base_id.kpj", KPJ("base_id"));
       renameFilesInVfs(vfs, "base_id", "my_keyboard");
       expect(vfs.get("base_id.kpj")).toBeUndefined();
-      expect(vfs.get("my_keyboard.kpj")).not.toBeUndefined();
+      const renamed = vfs.get("my_keyboard.kpj");
+      expect(renamed).not.toBeUndefined();
+      // Verify that the file content is preserved (not just existence)
+      expect(renamed!.content).toContain("<KeymanDeveloperProject>");
+      expect(renamed!.content).toContain("<CompilerWarningsAsErrors>True</CompilerWarningsAsErrors>");
     });
 
     it("keeps the base keyboard's compiler flags at the new path (not defaults)", () => {

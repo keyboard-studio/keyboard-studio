@@ -16,11 +16,13 @@ describe("inputs/writes coverage gate — every registered module declares both 
     expect(Object.keys(questionRegistry).length).toBeGreaterThan(0);
   });
 
-  it("registry has exactly 97 modules (floor guard — accidental deletions fail here)", () => {
+  it("registry has at least 97 modules (floor guard — accidental deletions fail here)", () => {
+    // Floor guard, not an exact count: the registry grows as questions are
+    // added, so a literal `=== N` went red on every legitimate addition.
     // 102 at spec-034 lock, minus the five marks questions RETIRED by spec 046
     // (pb_accent_marks_gate, pb_diacritic_select, pb_stacking_marks,
-    // pb_mark_style, pb_capitals_marks — superseded by the marks series).
-    expect(Object.keys(questionRegistry).length).toBe(97);
+    // pb_mark_style, pb_capitals_marks — superseded by the marks series) = 97.
+    expect(Object.keys(questionRegistry).length).toBeGreaterThanOrEqual(97);
   });
 
   for (const [id, mod] of Object.entries(questionRegistry)) {

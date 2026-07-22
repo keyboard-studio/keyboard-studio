@@ -35,12 +35,14 @@ describe("mockBaseBrowser", () => {
   it("listAll result contains elements with required BaseKeyboard shape", async () => {
     const all = await mockBaseBrowser.listAll();
     const first = all[0]!;
-    expect(typeof first.id).toBe("string");
-    expect(typeof first.path).toBe("string");
-    expect(typeof first.script).toBe("string");
-    expect(Array.isArray(first.targets)).toBe(true);
-    expect(typeof first.displayName).toBe("string");
-    expect(typeof first.version).toBe("string");
+    expect(first).toMatchObject({
+      id: expect.any(String),
+      path: expect.any(String),
+      script: expect.any(String),
+      targets: expect.any(Array),
+      displayName: expect.any(String),
+      version: expect.any(String),
+    });
   });
 
   it("getById('basic_kbdus') returns the basic_kbdus fixture", async () => {
@@ -107,14 +109,16 @@ describe("mockPatternLibrary", () => {
   it("listAll result elements have required Pattern shape", async () => {
     const all = await mockPatternLibrary.listAll();
     const first = all[0]!;
-    expect(typeof first.id).toBe("string");
-    expect(typeof first.title).toBe("string");
-    expect(typeof first.description).toBe("string");
+    expect(first).toMatchObject({
+      id: expect.any(String),
+      title: expect.any(String),
+      description: expect.any(String),
+      kmnFragment: expect.any(String),
+      appliesTo: expect.any(Array),
+      questions: expect.any(Array),
+      tests: expect.any(Array),
+    });
     expect(["desktop", "touch", "reorder"]).toContain(first.category);
-    expect(Array.isArray(first.appliesTo)).toBe(true);
-    expect(Array.isArray(first.questions)).toBe(true);
-    expect(typeof first.kmnFragment).toBe("string");
-    expect(Array.isArray(first.tests)).toBe(true);
   });
 
   it("getById('latin_deadkey_acute_single') returns the spec §6 worked example", async () => {

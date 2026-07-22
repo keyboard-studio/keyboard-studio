@@ -120,25 +120,25 @@ describe("scaffoldTouchLayout", () => {
       const result = scaffoldTouchLayout(ir);
 
       const phone = result.platforms.find((p) => p.id === "phone");
-      expect(phone).toBeDefined();
+      expect(phone?.id).toBe("phone");
     });
 
     it("the phone platform has a default layer", () => {
       const ir = makeMinimalIR();
       const result = scaffoldTouchLayout(ir);
-      expect(getLayer(result, "default")).toBeDefined();
+      expect(getLayer(result, "default")?.id).toBe("default");
     });
 
     it("the phone platform has a shift layer", () => {
       const ir = makeMinimalIR();
       const result = scaffoldTouchLayout(ir);
-      expect(getLayer(result, "shift")).toBeDefined();
+      expect(getLayer(result, "shift")?.id).toBe("shift");
     });
 
     it("the phone platform has a numeric layer", () => {
       const ir = makeMinimalIR();
       const result = scaffoldTouchLayout(ir);
-      expect(getLayer(result, "numeric")).toBeDefined();
+      expect(getLayer(result, "numeric")?.id).toBe("numeric");
     });
 
     it("the phone platform has exactly 3 layers (default + shift + numeric) when no RALT rules", () => {
@@ -706,7 +706,7 @@ describe("scaffoldTouchLayout", () => {
       const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
 
       const result = scaffoldTouchLayout(ir);
-      expect(getLayer(result, "altgr")).toBeDefined();
+      expect(getLayer(result, "altgr")?.id).toBe("altgr");
     });
 
     it("altgr layer carries the correct output for the RALT key", () => {

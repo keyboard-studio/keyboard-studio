@@ -48,6 +48,7 @@ describe("US2 longpress → flick — exception preservation (T020 / SC-004)", (
     const p = proposal as TransformProposal;
     expect(p.previewKind).toBe("ux-description");
     expect(p.namedLosses.join(" ")).toMatch(/discoverab/i);
+    // TODO(test-strengthen): assert actual value of derivedParameterReview, not just existence
     expect(p.derivedParameterReview, "flick-direction review table").toBeDefined();
 
     // Principled-split preserved by default; gap offered as a fix (SC-004).
@@ -63,13 +64,16 @@ describe("US2 longpress → flick — exception preservation (T020 / SC-004)", (
 
     const next = result.nextIr;
     // Dominant key converted to flick.
+    // TODO(test-strengthen): assert actual flick value shape, not just existence
     expect(findKey(next, "k_dom").flick).toBeDefined();
     expect(findKey(next, "k_dom").sk).toBeUndefined();
     expect(findKey(next, "k_dom").provenance).toBe("physical-suggested");
     // Principled-split preserved (still a longpress).
+    // TODO(test-strengthen): assert actual sk value shape for k_split, not just existence
     expect(findKey(next, "k_split").sk).toBeDefined();
     expect(findKey(next, "k_split").flick).toBeUndefined();
     // Over-budget key refused per-site with a reason (never truncated).
+    // TODO(test-strengthen): assert actual sk value shape for k_over, not just existence
     expect(findKey(next, "k_over").sk).toBeDefined();
     const refused = result.ledger.find((l) => l.outcome === "refused");
     expect(refused?.reason).toMatch(/budget/i);

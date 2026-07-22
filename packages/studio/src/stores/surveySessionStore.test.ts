@@ -77,7 +77,7 @@ describe("surveySessionStore", () => {
     expect(getStore().activeStepId).toBe("track");
     expect(getStore().history.length).toBe(2);
     expect(getStore().selectedTrack).toBe("copy");
-    expect(getStore().scaffoldSpec).not.toBeNull();
+    expect(getStore().scaffoldSpec).toMatchObject({ keyboardId: "test_kb", displayName: "Test Keyboard" });
 
     getStore().reset();
 
