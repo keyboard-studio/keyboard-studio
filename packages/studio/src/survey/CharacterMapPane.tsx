@@ -585,7 +585,17 @@ export function CharacterMapPane({
                 aria-label={groupAriaLabel}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <h3 style={sectionHeading}>
+                  {/* flex: "0 0 auto" (no grow, no shrink) overrides the flex
+                      default flex-shrink:1 — without it, when the block name
+                      + tier label is too wide for the remaining row space,
+                      Chrome/Firefox force this h3 to wrap onto two lines AND
+                      expand to fill the row's full remaining width (the
+                      "shrink-to-fit" fallback stops applying once wrapping
+                      is needed), pushing the Hide/Show button far past the
+                      end of the visible first line. Pinning the basis to the
+                      heading's own content keeps it single-line-sized so the
+                      button sits flush after it. */}
+                  <h3 style={{ ...sectionHeading, flex: "0 0 auto" }}>
                     {group.block}
                     {label !== null && (
                       <span style={{ fontWeight: 400, color: TEXT_DIM, fontSize: 11 }}>
