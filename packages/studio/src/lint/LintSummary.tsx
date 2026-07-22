@@ -2,6 +2,8 @@
 // Empty state shows a "No issues found" message in green.
 // Ordering of findings is preserved from the props array (caller controls sort).
 
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import type { LintFinding, LintSeverity } from "@keyboard-studio/contracts";
 import { LintChip } from "./LintChip";
 import { SEVERITY_COLORS, SEVERITY_ORDER } from "./colors";
@@ -10,14 +12,40 @@ export interface LintSummaryProps {
   findings: LintFinding[];
 }
 
-/** Pluralise a severity label for the badge (e.g. "error" -> "errors"). */
-function labelFor(severity: LintSeverity, count: number): string {
-  if (count === 1) return severity;
-  // "info" is already a noun; all others take a plain -s suffix.
-  return severity === "info" ? severity : `${severity}s`;
-}
-
 export function LintSummary({ findings }: LintSummaryProps) {
+  const { t } = useLingui();
+
+  /** Pluralise a severity label for the badge (e.g. "1 error" / "2 errors"). */
+  function labelFor(severity: LintSeverity, count: number): string {
+    switch (severity) {
+      case "fatal":
+        return t({
+          id: "lint.summary.severityLabel.fatal",
+          message: plural(count, { one: "# fatal", other: "# fatals" }),
+        });
+      case "error":
+        return t({
+          id: "lint.summary.severityLabel.error",
+          message: plural(count, { one: "# error", other: "# errors" }),
+        });
+      case "warning":
+        return t({
+          id: "lint.summary.severityLabel.warning",
+          message: plural(count, { one: "# warning", other: "# warnings" }),
+        });
+      case "hint":
+        return t({
+          id: "lint.summary.severityLabel.hint",
+          message: plural(count, { one: "# hint", other: "# hints" }),
+        });
+      case "info":
+        return t({
+          id: "lint.summary.severityLabel.info",
+          message: plural(count, { one: "# info", other: "# infos" }),
+        });
+    }
+  }
+
   // Count per severity for the header badges.
   const counts = new Map<LintSeverity, number>();
   for (const f of findings) {
@@ -55,8 +83,14 @@ export function LintSummary({ findings }: LintSummaryProps) {
         }}
       >
         {findings.length > 0
-          ? `${findings.length} lint issue${findings.length === 1 ? "" : "s"}`
-          : "No issues found"}
+          ? t({
+              id: "lint.summary.liveRegion.issueCount",
+              message: plural(findings.length, {
+                one: "# lint issue",
+                other: "# lint issues",
+              }),
+            })
+          : t({ id: "lint.summary.noIssuesFound", message: "No issues found" })}
       </span>
 
       {/* Header row */}
@@ -84,7 +118,7 @@ export function LintSummary({ findings }: LintSummaryProps) {
             <span aria-hidden="true" style={{ fontWeight: 700 }}>
               [OK]
             </span>
-            No issues found
+            <Trans id="lint.summary.noIssuesFound">No issues found</Trans>
           </span>
         ) : (
           activeSeverities.map((severity, idx) => {
@@ -101,7 +135,7 @@ export function LintSummary({ findings }: LintSummaryProps) {
                     color: SEVERITY_COLORS[severity],
                   }}
                 >
-                  {count} {labelFor(severity, count)}
+                  {labelFor(severity, count)}
                 </span>
                 {/* Separator dot between badges, not after the last one */}
                 {idx < activeSeverities.length - 1 && (
@@ -118,7 +152,7 @@ export function LintSummary({ findings }: LintSummaryProps) {
       {/* Scrollable findings list */}
       {findings.length > 0 && (
         <ul
-          aria-label="Lint findings"
+          aria-label={t({ id: "lint.summary.findingsListAriaLabel", message: "Lint findings" })}
           style={{
             margin: 0,
             padding: 0,

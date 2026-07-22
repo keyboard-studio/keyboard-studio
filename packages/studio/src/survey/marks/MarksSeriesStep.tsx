@@ -23,6 +23,8 @@
 // reducer path (StepHost.handleComplete → recordPhase) owns the session merge.
 
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import type {
   AttestedStack,
   ConfirmedAlphabet,
@@ -151,6 +153,7 @@ function seriesResult(
 }
 
 const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
+  const { t } = useLingui();
   const alphabet = useWorkingCopyStore((s) => s.session.alphabet);
   const importedOrder = useWorkingCopyStore((s) => s.session.axes.markInputOrder);
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
@@ -319,13 +322,19 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
       style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 640, fontFamily: FONT, color: TEXT_MAIN, padding: 16, overflow: "auto" }}
     >
       <button type="button" onClick={handleStationBack} style={{ alignSelf: "flex-start", ...secondaryButton }}>
-        Back
+        <Trans id="survey.marks.series.backButton">Back</Trans>
       </button>
-      <h2 style={{ ...phaseHeadingFlush, color: ACCENT }}>Accents &amp; marks</h2>
+      <h2 style={{ ...phaseHeadingFlush, color: ACCENT }}>
+        <Trans id="survey.marks.series.heading">Accents &amp; marks</Trans>
+      </h2>
       <p style={mutedParaFlush}>
-        Your alphabet includes {gate.alphabet.marks.length} mark
-        {gate.alphabet.marks.length === 1 ? "" : "s"}. Confirm how they attach to
-        your letters before placing keys.
+        {t({
+          id: "survey.marks.series.intro",
+          message: plural(gate.alphabet.marks.length, {
+            one: "Your alphabet includes # mark. Confirm how they attach to your letters before placing keys.",
+            other: "Your alphabet includes # marks. Confirm how they attach to your letters before placing keys.",
+          }),
+        })}
       </p>
 
       {currentStation === "marks_attachment" && (
@@ -390,7 +399,7 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
           onClick={handleContinue}
           style={primaryButton(false)}
         >
-          Continue
+          <Trans id="survey.marks.series.continueButton">Continue</Trans>
         </button>
       </div>
     </div>
