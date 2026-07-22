@@ -20,13 +20,23 @@ function ControlledSelectMenu({
   id,
   options,
   initialValue,
+  onChangeSpy,
 }: {
   id?: string;
   options: SelectMenuOption[];
   initialValue: string;
+  /** Optional spy invoked alongside the internal state update, so a test can
+   * assert on successive onChange calls while still letting the component
+   * observe each new value (needed for wraparound: the second arrow press
+   * must navigate relative to the value the first arrow press committed). */
+  onChangeSpy?: (value: string) => void;
 }) {
   const [value, setValue] = useState(initialValue);
-  return <SelectMenu id={id} options={options} value={value} onChange={setValue} />;
+  const handleChange = (next: string): void => {
+    setValue(next);
+    onChangeSpy?.(next);
+  };
+  return <SelectMenu id={id} options={options} value={value} onChange={handleChange} />;
 }
 
 describe("SelectMenu", () => {
@@ -188,5 +198,35 @@ describe("SelectMenu", () => {
     const beta = screen.getByRole("option", { name: "Beta" });
     expect(beta.id).toBe("fruit-select-option-b");
     expect(listbox.getAttribute("aria-activedescendant")).toBe(beta.id);
+  });
+
+  it("renders an empty listbox with zero options and does not crash", () => {
+    render(<SelectMenu options={[]} value="" onChange={() => undefined} />);
+    fireEvent.click(screen.getByRole("button"));
+    expect(screen.getByRole("listbox")).toBeDefined();
+    expect(screen.queryAllByRole("option")).toHaveLength(0);
+  });
+
+  it("ArrowDown/ArrowUp wrap around the ends of the option list (selection-follows-focus)", () => {
+    const onChangeSpy = vi.fn();
+    render(
+      <ControlledSelectMenu
+        id="wrap-select"
+        options={OPTIONS}
+        initialValue="b"
+        onChangeSpy={onChangeSpy}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button"));
+    const listbox = screen.getByRole("listbox");
+
+    // ArrowDown from the LAST option ("b") wraps to the FIRST option's value.
+    fireEvent.keyDown(listbox, { key: "ArrowDown" });
+    expect(onChangeSpy).toHaveBeenLastCalledWith("a");
+
+    // ArrowUp from the FIRST option ("a", just committed above) wraps back
+    // to the LAST option's value.
+    fireEvent.keyDown(listbox, { key: "ArrowUp" });
+    expect(onChangeSpy).toHaveBeenLastCalledWith("b");
   });
 });
