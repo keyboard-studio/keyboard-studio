@@ -157,6 +157,10 @@ export { proposeAttachments, deriveCaseCounterparts } from "./marks/attachment-p
 export type { AttachmentProposal, ProposedAttachmentState } from "./marks/attachment-proposals.js";
 export { resolveOutputFormProposal, hasDecidablePairs } from "./marks/output-form-policy.js";
 export type { OutputForm, OutputFormProposal } from "./marks/output-form-policy.js";
+export { computeMentalModelPrefills, detectBaseMarkMechanism, PRODUCTIVITY_SPREAD_THRESHOLD } from "./marks/mental-model-prefill.js";
+export type { MentalModelPrefill, MentalModelAnswer, BaseMarkMechanism } from "./marks/mental-model-prefill.js";
+export { buildPlacementWorklist, verifyWorklistCoverage } from "./marks/worklist.js";
+export type { WorklistInputs } from "./marks/worklist.js";
 export { checkNormalizationUniformity, MARK_NORMALIZATION_UNIFORM_CODE } from "./validator/layer-b-uniformity.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.

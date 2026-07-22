@@ -149,8 +149,8 @@ The contract types, the decomposition helper, the shared posture table, and the 
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T022** [P] [US7] Mental-model prefill from the three FR-011 signals: productivity spread (attested base count per mark), base keyboard's deadkey-vs-direct mechanism (sibling detector next to `import-mark-order.ts`, informed by the `diacritic-mechanism` facet approach), and spare-key affordability (reusing `spare-key-budget` classifier logic; over-budget renders own-letter as unaffordable with the reason). Thresholds as named constants · `packages/engine/src/marks/mental-model-prefill.ts`
-- [ ] **T023** [P] [US7] Worklist builder `buildPlacementWorklist(...)`: series decisions → `{ ownLetterUnits, markUnits (with inputOrder), blockedCombinations }`, with the SC-007 invariant (every base and mark classified exactly once) asserted in tests; empty worklist for the skip path · `packages/engine/src/marks/worklist.ts`
+- [x] **T022** [P] [US7] Mental-model prefill from the three FR-011 signals: productivity spread (attested base count per mark), base keyboard's deadkey-vs-direct mechanism (sibling detector next to `import-mark-order.ts`, informed by the `diacritic-mechanism` facet approach), and spare-key affordability (reusing `spare-key-budget` classifier logic; over-budget renders own-letter as unaffordable with the reason). Thresholds as named constants · `packages/engine/src/marks/mental-model-prefill.ts`
+- [x] **T023** [P] [US7] Worklist builder `buildPlacementWorklist(...)`: series decisions → `{ ownLetterUnits, markUnits (with inputOrder), blockedCombinations }`, with the SC-007 invariant (every base and mark classified exactly once) asserted in tests; empty worklist for the skip path · `packages/engine/src/marks/worklist.ts`
 
 **⟶ Wait for Wave 1 to finish, then:**
 

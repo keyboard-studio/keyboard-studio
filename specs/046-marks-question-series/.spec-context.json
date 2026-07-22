@@ -243,6 +243,22 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-22T01:46:32.226Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:50:22.573Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:50:22.800Z"
     }
   ],
   "telemetryInstanceId": "2fbeb931-cc8e-463b-9a7c-bfa4e0b7a804",
@@ -480,7 +496,7 @@
       "step": "implement"
     }
   ],
-  "currentTask": "T021",
+  "currentTask": "T023",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -655,6 +671,23 @@
         "packages/contracts/src/types.test.ts",
         "packages/contracts/src/schemas.test.ts",
         "packages/contracts/data/criteria-summary.md"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "computeMentalModelPrefills (spread/base-mechanism/spare-key signals, PRODUCTIVITY_SPREAD_THRESHOLD const, unaffordable reason) + detectBaseMarkMechanism sibling detector; 6 tests",
+      "files": [
+        "packages/engine/src/marks/mental-model-prefill.ts",
+        "packages/engine/src/marks/worklist-and-prefill.test.ts"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "buildPlacementWorklist (own-letter units incl composed pairs, mark units with inputOrder, blocked = every unchecked pair) + verifyWorklistCoverage SC-007 invariant + per-mark override support; 3 tests",
+      "files": [
+        "packages/engine/src/marks/worklist.ts",
+        "packages/engine/src/marks/worklist-and-prefill.test.ts",
+        "packages/engine/src/index.ts"
       ]
     }
   }
