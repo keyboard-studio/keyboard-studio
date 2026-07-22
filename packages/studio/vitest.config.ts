@@ -27,5 +27,12 @@ export default defineConfig({
     exclude: ["**/node_modules/**", "**/dist/**", "e2e/**"],
     // Include both colocated src tests and the mirror tests/ tree (FR-009).
     include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
+    // The first dynamic import of a test module that vi.mock()s
+    // @keyboard-studio/engine loads the whole engine dist (including the
+    // >500 KB generated langtags index) through importOriginal(), which can
+    // exceed the 5 s default on slower Windows checkouts. A timed-out first
+    // test then aborts mid-import and poisons sibling tests' one-shot mocks.
+    // Fake-timer tests are unaffected (the timeout counts real time).
+    testTimeout: 30_000,
   },
 });
