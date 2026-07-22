@@ -254,3 +254,21 @@ entry is a **hard failure** — promotion must be explicit.
 
 **Demotion** is the exact reverse. Either direction, the spec-022 no-delete guardrail keeps
 every module registered + on-disk + test-covered — demotion is never deletion.
+
+## Leftover section (Flow Map)
+
+The Flow Map has a dedicated **Leftover questions** section: every registered question
+module that **no live flow uses**, listed flat and clearly labelled *kept for reference /
+possible reuse, never run by the live survey*. This is where the demoted Phase A battery
+surfaces — it is **not** rendered as reserve clog inside a live drill-down.
+
+Concretely, the live `identity_lite` drill-down keys off the `il_*`-only
+`identityLiteRegistry` (not the full `phaseARegistry`), so its drill-down shows only its
+own questions. The demoted modules stay registered (no-delete) and appear in the Leftover
+section — and, in their authored order, in the Library section as the `phase_a_identity`
+proposed flow.
+
+To **reuse** a leftover question, re-add its id to a live flow's `questions:` list (e.g.
+`identity_lite.modular.yaml`) — it then renders live and drops out of Leftover
+automatically (the Leftover set is derived, not a hand-maintained list). See the promotion
+runbook above for turning a whole *proposed flow* live.

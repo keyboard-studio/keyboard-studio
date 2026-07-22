@@ -26,7 +26,7 @@
 // resolveNext (SurveyRunner.tsx -> stores/debugPinsStore.ts): runtime-reach
 // traversal lives in the depcruise-excluded guardrail test, not here.
 
-import { buildModularFlowGraph, buildProposedFlowGraphFromFlow, buildLibraryReserveNodes } from "./buildStepGraph.ts";
+import { buildModularFlowGraph, buildProposedFlowGraphFromFlow, buildLibraryReserveNodes, buildLeftoverNodes } from "./buildStepGraph.ts";
 import { buildManifestProjection, attachDrillDowns, CHARACTERS_STEP_ID as _CHARACTERS_STEP_ID } from "./manifestProjection.ts";
 import type { FlowGraph, GraphNode } from "./model.ts";
 import { flowSources } from "../steps/flowSources.ts";
@@ -296,4 +296,36 @@ export function buildLibrarySection(): LibrarySection {
   const reserve = buildLibraryReserveNodes(questionRegistry, inAnyFlow);
 
   return { proposed, reserve, dualReferenced };
+}
+
+// ---------------------------------------------------------------------------
+// Leftover section — registered questions used by NO live flow.
+//
+// Kept for reference / future reuse (spec-022 no-delete: still registered, on
+// disk, and test-covered), but never run by the live survey and never rendered as
+// reserve clog inside a live drill-down. This is a SEPARATE composition from the
+// live drill-downs (buildFlowSources) and from the Library section
+// (buildLibrarySection) — the Flow Map paints it under its own heading.
+// ---------------------------------------------------------------------------
+
+/**
+ * buildLeftoverSection — every registered question module that no LIVE flow uses.
+ *
+ * Parses every flowSources entry once (parseAllSources), collects the union of ids
+ * listed in any status:"live" flow, and returns the registry complement as
+ * kind:"library-not-in-flow" / region:"leftover" nodes. A question that appears
+ * only in a proposed flow is still leftover here (it is not in a LIVE flow) — the
+ * Leftover section is the reference bench for anything not currently live.
+ *
+ * Excluded from the rendered<->runtime bijection by construction: collectRenderedNodeIds
+ * never traverses this composition (like the Library section).
+ */
+export function buildLeftoverSection(): GraphNode[] {
+  const parsed = parseAllSources();
+  const liveIds = new Set<string>();
+  for (const p of parsed) {
+    if (p.flow === null || p.status !== "live") continue;
+    flowIds(p.flow, liveIds);
+  }
+  return buildLeftoverNodes(questionRegistry, liveIds);
 }

@@ -88,3 +88,24 @@ export const phaseARegistry: Readonly<Record<string, QuestionModule>> = {
   il_target_script,
   il_script_not_supported,
 } as const;
+
+/**
+ * Identity-lite sub-registry — ONLY the il_* modules the live identity_lite flow
+ * lists.
+ *
+ * The identity_lite FlowSource keys its Flow-Map drill-down off THIS registry (not
+ * the full phaseARegistry), so computeReserveNodes yields nothing for it: the
+ * demoted Phase A battery is no longer surfaced as reserve clog under the live
+ * identity flow. Those demoted modules remain registered in phaseARegistry /
+ * questionRegistry (spec-022 no-delete guardrail) and surface instead in the Flow
+ * Map's dedicated Leftover section (kept for reference / future reuse, never run by
+ * the live survey).
+ */
+export const identityLiteRegistry: Readonly<Record<string, QuestionModule>> = {
+  il_language_autonym,
+  il_language_english,
+  il_language_code,
+  il_language_region,
+  il_target_script,
+  il_script_not_supported,
+} as const;
