@@ -22,9 +22,13 @@ modality: both
 
 derivations:
   - kind: computed
-    source: "planned:nfc-posture-of-inventory"
-    sourceStatus: planned
-    notes: Per-pair NFC existence check over orth.inventory-delta's output; small pure function.
+    source: "engine:nfc-posture-of-inventory"
+    sourceStatus: available
+    notes: >
+      Implemented as nfcPostureOfInventory() in
+      packages/engine/src/marks/nfc-posture-of-inventory.ts (spec 046): per-pair
+      NFC existence check over the confirmed alphabet's attested stacks,
+      aggregated by aggregateInventoryPosture().
   - kind: asked
     source: "question:pb_mark_style"
     sourceStatus: available

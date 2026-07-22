@@ -99,6 +99,30 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-22T00:47:47.098Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T00:53:48.954Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T00:53:49.187Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T00:53:49.416Z"
     }
   ],
   "telemetryInstanceId": "2fbeb931-cc8e-463b-9a7c-bfa4e0b7a804",
@@ -327,7 +351,7 @@
       "step": "implement"
     }
   ],
-  "currentTask": "T003",
+  "currentTask": "T006",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -349,6 +373,32 @@
         "packages/engine/src/character-discovery/decompose.ts",
         "packages/engine/src/character-discovery/decompose.test.ts",
         "packages/engine/src/character-discovery/characterMap.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Zod mirrors (DeclaredRole/AttestedStack/ConfirmedAlphabet/AttachmentState/MarkInputOrder/MarkUnit/BlockedCombination/PlacementWorklist) + 7 compile-time drift guards",
+      "files": [
+        "packages/contracts/src/schemas.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Additive alphabet?/marksWorklist? on SurveyPhaseResult+SurveySession; store-wise mergeAlphabets (dedupe, order-preserving stacks, last-wins roles), last-wins worklist, derived projection folded into confirmedInventory; 6 merge tests",
+      "files": [
+        "packages/contracts/src/surveyPhaseResult.ts",
+        "packages/contracts/src/surveySession.ts",
+        "packages/contracts/src/surveySession.test.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "nfcPostureOfInventory + aggregateInventoryPosture pure functions (9 tests); facet YAML derivation flipped planned->available (facet-lint green)",
+      "files": [
+        "packages/engine/src/marks/nfc-posture-of-inventory.ts",
+        "packages/engine/src/marks/nfc-posture-of-inventory.test.ts",
+        "content/facets/orth/mark-composition-posture.yaml",
         "packages/engine/src/index.ts"
       ]
     }

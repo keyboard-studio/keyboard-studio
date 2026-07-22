@@ -31,9 +31,9 @@ The contract types, the decomposition helper, the shared posture table, and the 
 
 **Wave 2 — independent (different files, all depend on T002):**
 
-- [ ] **T004** [P] Zod mirrors for every new type from T002 with compile-time drift guards, per the locked-contract convention (schema and type change in the same commit) · `packages/contracts/src/schemas.ts`
-- [ ] **T005** [P] Additive optional fields `alphabet?: ConfirmedAlphabet` and `marksWorklist?: PlacementWorklist` on `SurveyPhaseResult` and `SurveySession`, merge semantics in the session merge logic, and the derivation `ConfirmedAlphabet → confirmedInventory` (NFC graphemes, first-appearance order) so every existing consumer keeps working (FR-001) · `packages/contracts/src/surveyPhaseResult.ts`, `packages/contracts/src/surveySession.ts`
-- [ ] **T006** [P] Shared posture table `nfcPostureOfInventory(alphabet): PosturePair[]` (per attested/accepted stack: has-ready-made-form + the form), and flip the facet derivation `planned:nfc-posture-of-inventory` → implemented · `packages/engine/src/marks/nfc-posture-of-inventory.ts`, `content/facets/orth/mark-composition-posture.yaml`
+- [x] **T004** [P] Zod mirrors for every new type from T002 with compile-time drift guards, per the locked-contract convention (schema and type change in the same commit) · `packages/contracts/src/schemas.ts`
+- [x] **T005** [P] Additive optional fields `alphabet?: ConfirmedAlphabet` and `marksWorklist?: PlacementWorklist` on `SurveyPhaseResult` and `SurveySession`, merge semantics in the session merge logic, and the derivation `ConfirmedAlphabet → confirmedInventory` (NFC graphemes, first-appearance order) so every existing consumer keeps working (FR-001) · `packages/contracts/src/surveyPhaseResult.ts`, `packages/contracts/src/surveySession.ts`
+- [x] **T006** [P] Shared posture table `nfcPostureOfInventory(alphabet): PosturePair[]` (per attested/accepted stack: has-ready-made-form + the form), and flip the facet derivation `planned:nfc-posture-of-inventory` → implemented · `packages/engine/src/marks/nfc-posture-of-inventory.ts`, `content/facets/orth/mark-composition-posture.yaml`
 
 **⟶ Wait for Wave 2 to finish, then:**
 

@@ -146,6 +146,12 @@ export type { CharacterMapTier, CharacterMapCell, CharacterMapGroup } from "./ch
 export { decomposeGrapheme } from "./character-discovery/decompose.js";
 export type { GraphemeDecomposition } from "./character-discovery/decompose.js";
 
+// Marks question series (spec 046): pure engine functions behind the S0-S5
+// stations — the shared posture table is the single source the facet, the S4
+// proposal, the unwrap stores, and the blocking rules all read.
+export { nfcPostureOfInventory, aggregateInventoryPosture } from "./marks/nfc-posture-of-inventory.js";
+export type { PosturePair, InventoryPosture } from "./marks/nfc-posture-of-inventory.js";
+
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
 export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, describeStorePairing, analyzeStores, parseSlotId, collectCharContributors, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap, isPlusSeparator } from "./pattern-apply/index.js";
 export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, DesktopModifications, ApplyDesktopModificationsResult, ApplyDesktopModificationsToRawJsonResult, PropagateDesktopLayersToTouchResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, StorePairingDescription, StoreAnalysis, CharContributors, ShiftAssignmentPlan, ModifierToken } from "./pattern-apply/index.js";

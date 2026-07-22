@@ -296,3 +296,136 @@ describe("updateIrAxes()", () => {
     expect(updated.axes.scale).toBe("tiny");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Three-store alphabet + marks worklist merge (spec 046)
+// ---------------------------------------------------------------------------
+
+describe("mergePhaseResults() — alphabet + marksWorklist (spec 046)", () => {
+  const ACUTE = "́";
+  const GRAVE = "̀";
+
+  it("omits alphabet and marksWorklist when no phase carries them (pre-046 shape)", () => {
+    const session = mergePhaseResults({}, [{ phase: "B", answers: [] }]);
+    expect("alphabet" in session).toBe(false);
+    expect("marksWorklist" in session).toBe(false);
+  });
+
+  it("merges alphabets store-wise across phases, deduped, first-appearance order", () => {
+    const phases: SurveyPhaseResult[] = [
+      {
+        phase: "B",
+        answers: [],
+        alphabet: {
+          bases: ["e", "c"],
+          marks: [ACUTE],
+          attestedStacks: [{ base: "e", marks: [ACUTE] }],
+          declaredRoles: {},
+        },
+      },
+      {
+        phase: "C",
+        answers: [],
+        alphabet: {
+          bases: ["c", "a"],
+          marks: [ACUTE, GRAVE],
+          attestedStacks: [
+            { base: "e", marks: [ACUTE] }, // duplicate — dropped
+            { base: "a", marks: [GRAVE] },
+          ],
+          declaredRoles: {},
+        },
+      },
+    ];
+    const session = mergePhaseResults({}, phases);
+    expect(session.alphabet?.bases).toEqual(["e", "c", "a"]);
+    expect(session.alphabet?.marks).toEqual([ACUTE, GRAVE]);
+    expect(session.alphabet?.attestedStacks).toEqual([
+      { base: "e", marks: [ACUTE] },
+      { base: "a", marks: [GRAVE] },
+    ]);
+  });
+
+  it("keeps stacks with the same marks in a different order as distinct", () => {
+    const phases: SurveyPhaseResult[] = [
+      {
+        phase: "B",
+        answers: [],
+        alphabet: {
+          bases: ["a"],
+          marks: [ACUTE, GRAVE],
+          attestedStacks: [
+            { base: "a", marks: [ACUTE, GRAVE] },
+            { base: "a", marks: [GRAVE, ACUTE] },
+          ],
+          declaredRoles: {},
+        },
+      },
+    ];
+    const session = mergePhaseResults({}, phases);
+    expect(session.alphabet?.attestedStacks).toHaveLength(2);
+  });
+
+  it("declared roles merge last-wins", () => {
+    const pua = String.fromCodePoint(0xe000);
+    const phases: SurveyPhaseResult[] = [
+      {
+        phase: "B",
+        answers: [],
+        alphabet: { bases: [], marks: [pua], attestedStacks: [], declaredRoles: { [pua]: "mark" } },
+      },
+      {
+        phase: "C",
+        answers: [],
+        alphabet: { bases: [pua], marks: [], attestedStacks: [], declaredRoles: { [pua]: "letter" } },
+      },
+    ];
+    const session = mergePhaseResults({}, phases);
+    expect(session.alphabet?.declaredRoles[pua]).toBe("letter");
+  });
+
+  it("folds the merged alphabet's projection into confirmedInventory (deduped)", () => {
+    const phases: SurveyPhaseResult[] = [
+      {
+        phase: "B",
+        answers: [],
+        confirmedInventory: ["e"],
+        alphabet: {
+          bases: ["e"],
+          marks: [ACUTE],
+          attestedStacks: [{ base: "e", marks: [ACUTE] }],
+          declaredRoles: {},
+        },
+      },
+    ];
+    const session = mergePhaseResults({}, phases);
+    expect(session.confirmedInventory).toContain("e");
+    expect(session.confirmedInventory).toContain("é"); // é composed from the stack
+    expect(session.confirmedInventory.filter((g) => g === "e")).toHaveLength(1);
+  });
+
+  it("marksWorklist is last-wins across phases; an empty worklist still counts", () => {
+    const phases: SurveyPhaseResult[] = [
+      {
+        phase: "B",
+        answers: [],
+        marksWorklist: {
+          ownLetterUnits: ["é"],
+          markUnits: [],
+          blockedCombinations: [],
+        },
+      },
+      {
+        phase: "C",
+        answers: [],
+        marksWorklist: { ownLetterUnits: [], markUnits: [], blockedCombinations: [] },
+      },
+    ];
+    const session = mergePhaseResults({}, phases);
+    expect(session.marksWorklist).toEqual({
+      ownLetterUnits: [],
+      markUnits: [],
+      blockedCombinations: [],
+    });
+  });
+});
