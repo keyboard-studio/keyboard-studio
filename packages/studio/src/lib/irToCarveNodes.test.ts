@@ -21,6 +21,9 @@ import {
   recommendedRemovalChars,
   isSimpleRemovableRule,
   coordinatedCollateralForSlots,
+  isCombining,
+  prefixCombiningMark,
+  displayChar,
 } from './irToCarveNodes.ts';
 
 // ---------------------------------------------------------------------------
@@ -2433,5 +2436,60 @@ describe('coordinatedCollateralForSlots', () => {
     const collateral = coordinatedCollateralForSlots(['store#blk#0'], ir, new Set(['a']));
 
     expect(collateral).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isCombining / prefixCombiningMark / displayChar — General_Category M
+// (Mn/Mc/Me) dotted-circle rendering, incl. the Sk exclusion and the
+// double-span (U+0360-0362) two-circle form (spec 046 follow-up, km-domain
+// guidance: General_Category is the correct test, NOT canonical combining
+// class — several Mc marks have ccc=0 and would be missed by a ccc test).
+// ---------------------------------------------------------------------------
+
+describe('isCombining / prefixCombiningMark / displayChar — Mark category (Mn/Mc/Me)', () => {
+  it('flags Mn (non-spacing) marks — e.g. U+0300 COMBINING GRAVE ACCENT', () => {
+    expect(isCombining('̀')).toBe(true);
+  });
+
+  it('flags Mc (spacing combining) marks — e.g. U+093E DEVANAGARI VOWEL SIGN AA (ccc=0, would be missed by a ccc-based test)', () => {
+    expect(isCombining('ा')).toBe(true);
+  });
+
+  it('flags Me (enclosing) marks — e.g. U+20DD COMBINING ENCLOSING CIRCLE', () => {
+    expect(isCombining('⃝')).toBe(true);
+  });
+
+  it('does NOT flag Sk modifier symbols — e.g. U+00B4 ACUTE ACCENT (free-standing, not a mark that attaches to a base)', () => {
+    expect(isCombining('´')).toBe(false);
+  });
+
+  it('prefixCombiningMark: single dotted circle for an ordinary Mn/Mc/Me mark', () => {
+    expect(prefixCombiningMark('̀', true)).toBe('◌̀');
+    expect(prefixCombiningMark('ा', true)).toBe('◌ा');
+  });
+
+  it('prefixCombiningMark: does not prefix when isCombiningMark is false, regardless of the char', () => {
+    expect(prefixCombiningMark('̀', false)).toBe('̀');
+  });
+
+  it('prefixCombiningMark: double-span marks (U+0360-0362) get a dotted circle on BOTH sides', () => {
+    for (const ch of ['͠', '͡', '͢']) {
+      expect(prefixCombiningMark(ch, true)).toBe(`◌${ch}◌`);
+    }
+  });
+
+  it('displayChar: renders Mc/Me marks over a dotted circle (widened from the old Mn-only test)', () => {
+    expect(displayChar('ा')).toBe('◌ा');
+    expect(displayChar('⃝')).toBe('◌⃝');
+  });
+
+  it('displayChar: does not circle a plain letter or an Sk modifier symbol', () => {
+    expect(displayChar('a')).toBe('a');
+    expect(displayChar('´')).toBe('´');
+  });
+
+  it('displayChar: double-span mark renders circle+mark+circle end to end', () => {
+    expect(displayChar('͡')).toBe('◌͡◌');
   });
 });

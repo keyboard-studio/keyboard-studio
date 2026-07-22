@@ -187,6 +187,26 @@ export function chipGlyph(checked: boolean, fontStack?: string): CSSProperties {
   };
 }
 
+/**
+ * Deterministic box placeholder shown in place of a glyph the selected
+ * Phase B font can't render (see fontSupport.ts) — a fixed-size bordered box,
+ * NOT reliance on the browser/OS's own missing-glyph ("tofu") rendering,
+ * which is inconsistent across systems (some draw a visible box, some draw
+ * blank). Sized to roughly match chipGlyph's 22px glyph footprint so the chip
+ * layout doesn't jump between glyph and box cells. `checked` mirrors
+ * chipGlyph's accent-color selection.
+ */
+export function chipGlyphMissingBox(checked: boolean): CSSProperties {
+  return {
+    display: "inline-block",
+    width: 16,
+    height: 16,
+    boxSizing: "border-box",
+    border: `1.5px solid ${checked ? CHIP_GLYPH_ACCENT : TEXT_DIM}`,
+    borderRadius: 2,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Phase B character font selection — the dropdown at the top of the
 // build-list step applies one font to every glyph rendered while adding

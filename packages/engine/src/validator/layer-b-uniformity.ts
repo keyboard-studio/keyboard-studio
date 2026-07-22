@@ -21,8 +21,9 @@ import type { KeyboardIR, LintFinding } from "@keyboard-studio/contracts";
 export const MARK_NORMALIZATION_UNIFORM_CODE = "KM_LINT_MARK_NORMALIZATION_UNIFORM" as const;
 
 // Deliberately the WIDE Unicode mark class (\p{M} = Mn+Mc+Me, matching
-// codec/nfd-to-nfc.ts), not characterMap's isCombiningMarkChar (\p{Mn}\p{Mc}
-// only) — enclosing marks (Me) count as mark-bearing output here too.
+// codec/nfd-to-nfc.ts and characterMap's isCombiningMarkChar, which was
+// widened to the same \p{M} test) — enclosing marks (Me) count as
+// mark-bearing output here too.
 const COMBINING_MARK = /^\p{M}$/u;
 
 // Standard Unicode convention for showing a combining mark in isolation:

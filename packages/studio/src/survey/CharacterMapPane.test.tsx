@@ -30,9 +30,10 @@ import type { CharacterMapGroup } from "../lib/services.ts";
 // counter so the short-circuit tests can assert the service was NOT invoked.
 // ---------------------------------------------------------------------------
 
-const { getGroupsResult, callCount } = vi.hoisted(() => {
+const { getGroupsResult, callCount, unsupportedDisplays } = vi.hoisted(() => {
   let _result: CharacterMapGroup[] = [];
   let _calls = 0;
+  let _unsupported = new Set<string>();
   return {
     getGroupsResult: {
       get: () => _result,
@@ -42,6 +43,14 @@ const { getGroupsResult, callCount } = vi.hoisted(() => {
       get: () => _calls,
       reset: () => { _calls = 0; },
       bump: () => { _calls += 1; },
+    },
+    // Font-support box-fallback test double: displays named here report as
+    // "not supported by the selected font", exercising the box-placeholder
+    // render path without depending on real Canvas 2D metrics (unavailable
+    // in jsdom — see fontSupport.test.ts for that module's own coverage).
+    unsupportedDisplays: {
+      set: (displays: string[]) => { _unsupported = new Set(displays); },
+      has: (display: string) => _unsupported.has(display),
     },
   };
 });
@@ -57,6 +66,10 @@ vi.mock("../lib/services.ts", () => ({
     callCount.bump();
     return getGroupsResult.get();
   },
+}));
+
+vi.mock("./useFontSupportChecker.ts", () => ({
+  useFontSupportChecker: (_fontStack: string) => (display: string) => !unsupportedDisplays.has(display),
 }));
 
 // ---------------------------------------------------------------------------
@@ -120,6 +133,7 @@ beforeEach(() => {
   usePhaseBDraftStore.getState().reset();
   getGroupsResult.set(twoGroupFixture());
   callCount.reset();
+  unsupportedDisplays.set([]);
 });
 
 afterEach(() => {
@@ -170,6 +184,33 @@ describe("CharacterMapPane — data path", () => {
     const markButton = within(markGroup).getByRole("button", { name: /Add.*\(U\+0301\)/ });
     // Dotted circle (U+25CC) prefixes the bare combining mark so it renders visibly standalone.
     expect(markButton.textContent).toContain("◌");
+  });
+
+  it("renders a deterministic box placeholder (not the glyph) when the selected font can't render a cell — codepoint label and click/aria behavior stay unchanged (Requirement 1)", async () => {
+    seedBaseAndLanguage();
+    unsupportedDisplays.set(["b"]);
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+    const bButton = within(latinGroup).getByRole("button", { name: /Add b \(U\+0062\)/ });
+
+    // Box fallback: no visible "b" glyph text in the button, but the U+
+    // codepoint label and the aria-label both stay exactly as before.
+    expect(bButton.textContent).not.toContain("b");
+    expect(bButton.textContent).toContain("U+0062");
+    expect(bButton.querySelector('[aria-hidden="true"]')).toBeTruthy();
+
+    // Still toggleable exactly like a normal (glyph-rendering) cell.
+    fireEvent.click(bButton);
+    expect(usePhaseBDraftStore.getState().chars).toContain("b");
+    expect(bButton.getAttribute("aria-pressed")).toBe("true");
+
+    // The unaffected "a" cell still renders its real glyph.
+    const aButton = within(latinGroup).getByRole("button", { name: /Add a \(U\+0061\)/ });
+    expect(aButton.textContent).toContain("a");
   });
 
   it("clicking a cell toggles it into the draft store and flips aria-pressed", async () => {

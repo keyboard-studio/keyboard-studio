@@ -214,14 +214,20 @@ function isGuardrailExcluded(ch: string): boolean {
 }
 
 /**
- * Approximates General_Category Mn/Mc (combining marks). No full UCD property
- * table is available, but JS's native \p{Mn}/\p{Mc} Unicode property escapes
- * cover this cheaply and precisely — no hardcoded range table needed beyond
- * what the browsing-block table already carries (e.g. Combining Diacritical
- * Marks, U+0300–036F).
+ * General_Category M — Mn (non-spacing), Mc (spacing combining), and Me
+ * (enclosing) marks, exactly the set that must render on a dotted circle
+ * when shown standalone (km-domain guidance). JS's native \p{Mn}/\p{Mc}/\p{Me}
+ * Unicode property escapes cover this cheaply and precisely — no hardcoded
+ * range table needed beyond what the browsing-block table already carries
+ * (e.g. Combining Diacritical Marks, U+0300-036F). Deliberately does NOT use
+ * canonical combining class (ccc): several Mc marks (e.g. Devanagari vowel
+ * signs) have ccc=0 and would be missed by a ccc-based test. Also
+ * deliberately excludes \p{Sk} modifier symbols (U+00B4 ACUTE ACCENT,
+ * U+02CA, U+02DC, etc.) — those are free-standing, not marks that attach to
+ * a base.
  */
 export function isCombiningMarkChar(ch: string): boolean {
-  return /^[\p{Mn}\p{Mc}]$/u.test(ch);
+  return /^\p{M}$/u.test(ch);
 }
 
 // ---------------------------------------------------------------------------

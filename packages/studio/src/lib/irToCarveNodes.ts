@@ -12,7 +12,7 @@ import type {
   StoreItem,
 } from '@keyboard-studio/contracts';
 import { buildProducedSet } from '@keyboard-studio/contracts';
-import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, isCharCoveredForLocale, collectCharContributors, isPlusSeparator, parseSlotId } from '@keyboard-studio/engine';
+import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, isCharCoveredForLocale, collectCharContributors, isPlusSeparator, parseSlotId, isCombiningMarkChar } from '@keyboard-studio/engine';
 import type { StoreSlotBlockReason, StoreSlotEditMode, StoreAnalysis, CharContributors } from '@keyboard-studio/engine';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 
@@ -127,22 +127,44 @@ export function modifierLabel(rule: IRRule): string {
 }
 
 // ---------------------------------------------------------------------------
-// isCombining — true for Unicode non-spacing marks (Mn category, all scripts)
+// isCombining — true for the full Unicode Mark category (Mn/Mc/Me, all
+// scripts). General_Category M is the correct test (km-domain, spec 046
+// follow-up): many Mc marks (e.g. Devanagari vowel signs) have canonical
+// combining class (ccc) 0, so a ccc-based test under-detects — General_Category
+// is required, not ccc. Sk "modifier symbol" characters (U+00B4 ACUTE ACCENT,
+// U+02CA, U+02DC, etc.) are DELIBERATELY EXCLUDED: they are free-standing
+// spacing characters, not marks that attach to a base, and must never get a
+// dotted-circle prefix.
+//
+// Thin alias over the engine's isCombiningMarkChar (characterMap.ts) — both
+// predicates test the same \p{M} class, so there is no reason to keep a
+// separate studio-local regex. Kept as a local name (rather than updating
+// every call site to import isCombiningMarkChar directly) to minimize churn.
 // ---------------------------------------------------------------------------
 
 export const isCombining = (ch: string) => {
-  return /^\p{Mn}$/u.test(ch ?? '');
+  return isCombiningMarkChar(ch ?? '');
 };
+
+// Double-span combining marks (U+0360-0362) visually span TWO base
+// characters (e.g. U+0361 COMBINING DOUBLE INVERTED BREVE ties two letters
+// together) — a single leading dotted circle misrepresents them, since the
+// mark has nothing to "attach to" on its right. Rendered standalone as
+// circle + mark + circle instead (km-domain guidance).
+const DOUBLE_SPAN_MARKS = new Set(['͠', '͡', '͢']);
 
 // Prefix a combining mark with U+25CC DOTTED CIRCLE so it's visible standalone
 // (Unicode's standard convention for showing a combining mark in isolation).
+// Double-span marks (see DOUBLE_SPAN_MARKS) get a circle on BOTH sides.
 // Parameterized on the caller's own combining-ness test rather than computing
-// it internally: displayChar() keys off isCombining() (Mn-only), while the
-// character-map pane keys off its cell.isCombiningMark (Mn-or-Mc, needed for
-// Devanagari matras) — the two callers disagree on what counts as combining,
-// so the boolean is theirs to decide.
+// it internally: displayChar() keys off isCombining() (now a thin alias for
+// the engine's isCombiningMarkChar), and the character-map pane keys off its
+// cell.isCombiningMark (also isCombiningMarkChar, computed engine-side) — both
+// callers agree on the same \p{M} test today; the parameter is kept so a
+// caller could still special-case it without touching this helper.
 export function prefixCombiningMark(ch: string, isCombiningMark: boolean): string {
-  return isCombiningMark ? '◌' + ch : ch;
+  if (!isCombiningMark) return ch;
+  return DOUBLE_SPAN_MARKS.has(ch) ? '◌' + ch + '◌' : '◌' + ch;
 }
 
 // Render-ready character: prefix combining marks with a dotted circle so they're visible standalone.

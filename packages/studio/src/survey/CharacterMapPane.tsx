@@ -28,10 +28,11 @@ import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
 import { isPrivateUseCodePoint } from "@keyboard-studio/engine";
-import { prefixCombiningMark } from "../lib/irToCarveNodes.ts";
+import { isCombining, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { matchesQuery } from "./characterSearch.ts";
 import { TextField, Checkbox } from "../ui/index.ts";
 import { useGlyphFontStack } from "./useGlyphFontStack.ts";
+import { useFontSupportChecker } from "./useFontSupportChecker.ts";
 import {
   ACCENT,
   ERROR_RED,
@@ -40,6 +41,7 @@ import {
   sectionHeading,
   charChip,
   chipGlyph,
+  chipGlyphMissingBox,
   chipCodepoint,
   chipIndicator,
   chipIndicatorText,
@@ -64,7 +66,14 @@ type LoadState =
 // (Unicode's standard convention). The U+25CC prefixing is the shared
 // prefixCombiningMark() helper (irToCarveNodes.ts) — same formatter the carve
 // GlyphCell/InfoView/etc. use — parameterized here on cell.isCombiningMark
-// (Mn-or-Mc) rather than that helper's default Mn-only isCombining() test.
+// (the engine's General_Category Mn/Mc/Me test) rather than computing its own.
+//
+// Every listed character must render even when the selected Phase B font
+// can't draw its glyph — rather than trusting the OS's inconsistent tofu
+// (some systems draw a blank instead of a box), an unsupported glyph is
+// swapped for a deterministic bordered box (chipGlyphMissingBox,
+// surveyStyles.ts) via useFontSupportChecker (fontSupport.ts). The U+
+// codepoint label always stays, regardless of glyph-vs-box.
 
 // tierLabel is defined INSIDE CharacterMapPane (below), closing over the
 // component's own `t` from useLingui() directly, rather than taking `t` as a
@@ -162,6 +171,7 @@ export function CharacterMapPane({
   const toggle = usePhaseBDraftStore((s) => s.toggle);
   const addChar = usePhaseBDraftStore((s) => s.add);
   const glyphFontStack = useGlyphFontStack();
+  const isGlyphSupported = useFontSupportChecker(glyphFontStack);
 
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [query, setQuery] = useState("");
@@ -310,8 +320,13 @@ export function CharacterMapPane({
     const actionWord = wasSelected
       ? t({ id: "survey.characterMapPane.announce.removed", message: "Removed" })
       : t({ id: "survey.characterMapPane.announce.added", message: "Added" });
+    // A bare combining mark in this aria-live string has nothing to attach
+    // to (unlike the visible grid cell, which is prefixed via `display`) —
+    // dotted-circle it here too so the screen-reader announcement isn't a
+    // silently-dropped or garbled zero-width character.
+    const announcedChar = prefixCombiningMark(cell.char, cell.isCombiningMark);
     setAnnouncement(
-      `${actionWord} ${cell.char} (${toUPlusNotation(cell.char)})${
+      `${actionWord} ${announcedChar} (${toUPlusNotation(cell.char)})${
         wasSelected ? "" : describeContribution(cell.char)
       }`,
     );
@@ -347,7 +362,10 @@ export function CharacterMapPane({
     }
     addChar(char);
     const addedLabel = t({ id: "survey.characterMapPane.announce.added", message: "Added" });
-    setAnnouncement(`${addedLabel} ${char} (${toUPlusNotation(char)})${describeContribution(char)}`);
+    // Same bare-combining-mark concern as handleToggle's announcement — the
+    // U+XXXX escape hatch can add a standalone mark directly.
+    const announcedChar = prefixCombiningMark(char, isCombining(char));
+    setAnnouncement(`${addedLabel} ${announcedChar} (${toUPlusNotation(char)})${describeContribution(char)}`);
     setRawInput("");
     setRawError(null);
   }
@@ -645,6 +663,13 @@ export function CharacterMapPane({
                         const selected = chars.includes(cell.char.normalize("NFC"));
                         const cp = toUPlusNotation(cell.char);
                         const display = prefixCombiningMark(cell.char, cell.isCombiningMark);
+                        // Font-support box fallback (Requirement 1): every listed
+                        // character must render, even ones the selected font
+                        // can't draw — a deterministic bordered box stands in
+                        // for the glyph rather than trusting the OS's own
+                        // (inconsistent) missing-glyph rendering. The U+
+                        // codepoint label below always renders regardless.
+                        const glyphRenders = isGlyphSupported(display);
                         const actionLabel = selected
                           ? t({ id: "survey.characterMapPane.cell.removeAction", message: "Remove" })
                           : t({ id: "survey.characterMapPane.cell.addAction", message: "Add" });
@@ -657,7 +682,11 @@ export function CharacterMapPane({
                             aria-label={`${actionLabel} ${cell.char} (${cp})`}
                             style={charChip(selected)}
                           >
-                            <span style={chipGlyph(selected, glyphFontStack)}>{display}</span>
+                            {glyphRenders ? (
+                              <span style={chipGlyph(selected, glyphFontStack)}>{display}</span>
+                            ) : (
+                              <span style={chipGlyphMissingBox(selected)} aria-hidden="true" />
+                            )}
                             <span style={chipCodepoint}>{cp}</span>
                             {/* Non-color selected indicator (colorblind-safe) — shared
                                 helper with SuggestionChip's "[x]"/"+" pattern in

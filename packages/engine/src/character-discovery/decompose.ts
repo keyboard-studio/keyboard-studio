@@ -1,7 +1,8 @@
 // Grapheme decomposition for the three-store confirmed alphabet
 // (specs/046-marks-question-series, FR-003). Generalises the single-mark
 // U+0300–036F test in contracts charUtils.isDecomposableAccented to multi-mark
-// stacks and the full \p{Mn}\p{Mc} range: a whole-grapheme pick in the
+// stacks and the full \p{Mn}\p{Mc}\p{Me} range (General_Category M — see
+// isCombiningMarkChar in characterMap.ts): a whole-grapheme pick in the
 // character picker decomposes into exactly one base plus an ordered run of
 // combining marks (closest to the base first, i.e. NFD order preserved).
 
