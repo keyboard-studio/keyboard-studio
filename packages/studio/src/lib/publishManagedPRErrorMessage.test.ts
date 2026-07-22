@@ -1,24 +1,23 @@
 // Tests for publishManagedPRErrorMessage — exhaustive over the
 // PublishManagedPRError union.
 //
-// The module under test uses the global `t` macro (i18n._() against the
-// shared @lingui/core default instance), so — unlike renderWithI18n-based
-// component tests — this file bootstraps that same singleton directly: no
-// React tree involved here to carry an <I18nProvider>.
+// The module under test resolves its msg() descriptors via resolveMessage
+// (lib/i18nResolve.ts): called with no `i18n` argument, it falls back to the
+// English text baked into the descriptor by the macro — no bootstrapped
+// singleton or React tree required for that path, which is what most of the
+// tests below exercise. The "resolves through a real I18n instance" test
+// below constructs its own `I18n` (the same object a component would get
+// from `useLingui()`) to prove the non-fallback path too.
 
-import { beforeAll, describe, it, expect } from "vitest";
-import { i18n } from "@lingui/core";
+import { describe, it, expect } from "vitest";
+import { I18n } from "@lingui/core";
 import { messages as enMessages } from "../locales/en/messages.json?lingui";
+import { messages as frMessages } from "../locales/fr/messages.json?lingui";
 import type { PublishManagedPRError } from "@keyboard-studio/contracts";
 import {
   publishManagedPRErrorMessage,
   isPublishManagedPRError,
 } from "./publishManagedPRErrorMessage.ts";
-
-beforeAll(() => {
-  i18n.load("en", enMessages);
-  i18n.activate("en");
-});
 
 describe("publishManagedPRErrorMessage", () => {
   it("proxy-unavailable -> temporarily unavailable message", () => {
@@ -81,6 +80,18 @@ describe("publishManagedPRErrorMessage", () => {
     };
     expect(publishManagedPRErrorMessage(err)).toContain(
       "something weird happened",
+    );
+  });
+
+  it("resolves through a real I18n instance — fr active translates, interpolation still works", () => {
+    const testI18n = new I18n({ locale: "fr", messages: { fr: frMessages } });
+    const err: PublishManagedPRError = {
+      kind: "rate-limit",
+      message: "slow down",
+      retryAfterSeconds: 42,
+    };
+    expect(publishManagedPRErrorMessage(err, testI18n)).toBe(
+      "Trop de soumissions — veuillez réessayer dans 42 secondes.",
     );
   });
 });
