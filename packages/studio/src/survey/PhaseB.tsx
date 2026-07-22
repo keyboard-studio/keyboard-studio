@@ -29,7 +29,7 @@ import { nfcDedup } from "./charNormUtils.ts";
 import { prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { suggestMissingChars } from "../lib/services.ts";
 import type { MissingCharSuggestions } from "../lib/services.ts";
-import { RadioGroup, Dropdown, Label } from "../ui/index.ts";
+import { RadioGroup, SelectMenu } from "../ui/index.ts";
 import {
   BG_PAGE,
   BORDER,
@@ -657,21 +657,25 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         <Trans id="survey.phaseB.buildList.heading">Phase B — Add your whole alphabet</Trans>
       </h2>
 
-      {/* Font selection — applies to every character glyph rendered on this
-          step, including the character map (CharacterMapPane.tsx, right
-          pane) — see phaseBDraftStore.selectedFont. */}
-      <div style={{ maxWidth: 280 }}>
-        <Label htmlFor="phase-b-font-select">
+      {/* Font selection — custom SelectMenu (webview-safe dropdown): native
+          <select> popups don't open in the VS Code Simple Browser, so this is
+          a DOM-rendered menu. Applies to every character glyph on this step,
+          incl. the character map — see phaseBDraftStore.selectedFont. */}
+      <div style={{ maxWidth: 280 }} data-testid="phase-b-font-select">
+        <label id="phase-b-font-select-label"
+               style={{ display: "block", margin: "0 0 8px 0", fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>
           <Trans id="survey.phaseB.buildList.fontSelectLabel">Font for characters</Trans>
-        </Label>
-        <Dropdown
-          id="phase-b-font-select"
-          data-testid="phase-b-font-select"
+        </label>
+        <SelectMenu
+          id="phase-b-font-select-control"
           value={selectedFont}
-          includeBlank={false}
           options={FONT_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
-          onChange={(value) => {
-            const opt = FONT_OPTIONS.find((o) => o.value === value);
+          ariaLabelledby="phase-b-font-select-label"
+          renderOptionLabel={(opt) => (
+            <span style={{ fontFamily: phaseBFontStack(opt.value) }}>{opt.label}</span>
+          )}
+          onChange={(v) => {
+            const opt = FONT_OPTIONS.find((o) => o.value === v);
             if (opt) setSelectedFont(opt.value);
           }}
         />
