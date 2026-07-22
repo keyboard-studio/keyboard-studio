@@ -200,13 +200,13 @@ export function advance(
       return { next: "characters", setCharactersSubStage: "prefill" };
 
     case "characters":
-      return { next: nextSpineStepAfter("characters") }; // carve
-
-    case "carve":
-      return { next: nextSpineStepAfter("carve") }; // marks (spec 046)
+      return { next: nextSpineStepAfter("characters") }; // marks (spec 046)
 
     case "marks":
-      return { next: nextSpineStepAfter("marks") }; // mechanisms
+      return { next: nextSpineStepAfter("marks") }; // carve
+
+    case "carve":
+      return { next: nextSpineStepAfter("carve") }; // mechanisms
 
     case "mechanisms":
       return { next: nextSpineStepAfter("mechanisms") }; // sequences

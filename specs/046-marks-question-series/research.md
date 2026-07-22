@@ -22,6 +22,11 @@ gallery + strategy + facet-transform + validator).
   The design note places the series "between Act 3b and Act 6"; in the current spine that
   seam is after `carve` (carve operates on the base's existing content, marks on the new
   alphabet — carve's output does not feed the series).
+  **Amended 2026-07-22**: the step was reordered to sit between `characters` and `carve`
+  (immediately after alphabet confirmation) — how the author thinks of the combined
+  letters must be known before any key work begins. The original after-carve placement
+  was arbitrary by this section's own rationale (carve's output does not feed the
+  series), so the reorder is a pure manifest/oracle change.
 - **Alternatives considered**: (a) Extending the Phase B sub-flow with more
   `pb_*` FlowQuestions — rejected: cannot express S1/S2 dynamic content, and would bury a
   multi-station series inside the characters step, breaking the "alphabet confirmed first,

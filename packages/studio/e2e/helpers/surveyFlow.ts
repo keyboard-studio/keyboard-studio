@@ -301,10 +301,16 @@ export async function buildOneCharacterList(
     timeout: 5_000,
   });
   await page.click('[data-testid="phase-b-done"]');
+
+  // The marks series (spec 046) sits immediately after alphabet confirmation,
+  // BEFORE carve — a mark-bearing charToAdd (e.g. "é") makes it render here.
+  // A marks-free alphabet auto-skips it (S0 gate) and this is a no-op.
+  await driveMarksSeries(page);
 }
 
 /**
- * Marks series step (spec 046) — sits between carve and mechanisms.
+ * Marks series step (spec 046) — sits between characters and carve (the
+ * combined-letter answers must be known before any key work begins).
  *
  * Its S0 gate is computed, never rendered: an alphabet with NO marks skips
  * the whole series (no screen appears — this helper returns immediately).
@@ -336,10 +342,8 @@ export async function driveMarksSeries(page: Page): Promise<void> {
  * to add." message appears with a "mechanisms-continue" button.
  */
 export async function confirmMechanismsEmpty(page: Page): Promise<void> {
-  // Defensive spec-046 pass-through: if the walk's alphabet implied marks,
-  // the marks series renders before the gallery — drive it first.
-  await driveMarksSeries(page);
-
+  // The marks series (spec 046) now runs before carve and is driven inside
+  // buildOneCharacterList — nothing marks-related can render here.
   const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
   if (await startButton.isVisible().catch(() => false)) {
     await startButton.click();

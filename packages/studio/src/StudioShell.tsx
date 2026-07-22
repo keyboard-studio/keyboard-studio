@@ -205,7 +205,7 @@ function NavBar({ active }: NavBarProps) {
 // by the SurveyRunner, legitimately not promoted to manifest steps).
 //
 // Manifest spine order (FR-012, M2):
-//   identity → choose_base → track → characters → carve →
+//   identity → choose_base → track → characters → marks → carve →
 //   mechanisms[lock:physical] → sequences →
 //   touch[lock:touch] → help → package[reserved]
 //

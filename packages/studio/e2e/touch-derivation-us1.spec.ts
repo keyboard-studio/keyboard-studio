@@ -61,7 +61,6 @@ import {
   chooseAdaptTrack,
   confirmPrefill,
   buildOneCharacterList,
-  driveMarksSeries,
   driveHelpPhase,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
@@ -172,10 +171,8 @@ async function carveCharacters(page: Page, chars: readonly string[]): Promise<vo
  * role/name instead.
  */
 async function driveMechanismsPlaceLetter(page: Page, char: string): Promise<void> {
-  // Spec 046: the marks series sits between carve and mechanisms; an accented
-  // walk character (e.g. "é") makes it render — accept its proposals first.
-  await driveMarksSeries(page);
-
+  // Spec 046 reorder: the marks series now runs between characters and carve
+  // (driven inside buildOneCharacterList) — nothing marks-related renders here.
   const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
   if (await startButton.isVisible().catch(() => false)) {
     await startButton.click();

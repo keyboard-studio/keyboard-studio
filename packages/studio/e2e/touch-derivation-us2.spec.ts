@@ -75,7 +75,6 @@ import {
   chooseAdaptTrack,
   confirmPrefill,
   buildOneCharacterList,
-  driveMarksSeries,
   driveHelpPhase,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
@@ -250,10 +249,8 @@ async function carveCharacters(
  * instead of the testid the "identical" touch-derivation-us1.spec.ts helper
  * uses (same latent bug there, out of scope for this walk). */
 async function driveMechanismsPlaceLetter(page: Page, char: string): Promise<void> {
-  // Spec 046: the marks series sits between carve and mechanisms; an accented
-  // walk character (e.g. "é") makes it render — accept its proposals first.
-  await driveMarksSeries(page);
-
+  // Spec 046 reorder: the marks series now runs between characters and carve
+  // (driven inside buildOneCharacterList) — nothing marks-related renders here.
   const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
   if (await startButton.isVisible().catch(() => false)) {
     await startButton.click();
@@ -379,8 +376,9 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     await confirmPrefill(page);
     await addPlacedCharacterToInventory(page, PLACED_CHAR);
 
-    // Manifest spine order (StudioShell.tsx): characters -> carve ->
-    // mechanisms -> touch_seed_source -> touch -> help.
+    // Manifest spine order (StudioShell.tsx): characters -> marks -> carve ->
+    // mechanisms -> touch_seed_source -> touch -> help. The marks series for
+    // the accented PLACED_CHAR was driven inside addPlacedCharacterToInventory.
     await carveCharacters(page, PIAROA_CARVED_CHARS, PIAROA_SURVIVOR_CHAR);
     await driveMechanismsPlaceLetter(page, PLACED_CHAR);
     await confirmReseedDefault(page);

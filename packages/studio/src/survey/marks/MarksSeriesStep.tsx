@@ -1,9 +1,11 @@
 // MarksSeriesStep — the S0-S5 marks question series host (spec 046).
 //
-// One spine EditorStep between "carve" and "mechanisms". S0 is a COMPUTED gate
-// that never renders (FR-005): when the confirmed alphabet's marks store is
-// empty, the step completes immediately with an EMPTY placement worklist and
-// the designer lands straight on the mechanism gallery — no marks screen is
+// One spine EditorStep between "characters" and "carve" — the series runs
+// immediately after alphabet confirmation so how the author thinks of the
+// combined letters is known before any key work (carve, mechanisms) begins.
+// S0 is a COMPUTED gate that never renders (FR-005): when the confirmed
+// alphabet's marks store is empty, the step completes immediately with an
+// EMPTY placement worklist and the designer proceeds with no marks screen
 // ever shown. When marks exist, stations S1-S5 are sequenced internally
 // (skip logic stays local to this host, spec 046 R1); every station's content
 // is derived from the alphabet already confirmed at this point (FR-024). Each

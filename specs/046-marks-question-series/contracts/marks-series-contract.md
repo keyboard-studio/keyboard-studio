@@ -125,13 +125,16 @@ Criteria: one new `layer-c-enforce` row carrying
 
 ## UI contract (routes / testids consumers and e2e code against)
 
-- New spine step id: `marks` (manifest + `advance.ts` + `expectedSpine`), between `carve`
-  and `mechanisms`.
+- New spine step id: `marks` (manifest + `advance.ts` + `expectedSpine`), between
+  `characters` and `carve`. (Originally shipped between `carve` and `mechanisms`;
+  reordered 2026-07-22 — how the author thinks of the combined letters must be known
+  before any key work, carve included, begins.)
 - Forward control follows the survey convention `data-testid="survey-advance"`; station
   container testids: `marks-attachment`, `marks-mental-model`, `marks-input-order`,
   `marks-output-form`, `marks-stacking`; series continue control: `marks-continue`.
 - E2E helper: `driveMarksSeries(page, ...)` in `packages/studio/e2e/helpers/surveyFlow.ts`,
-  slotted between the characters helpers and `confirmMechanismsEmpty`.
+  driven at the end of `buildOneCharacterList` (the series renders immediately after
+  Phase B completes; a marks-free alphabet makes it a no-op).
 - `MechanismGallery` accepts the worklist as an **optional prop** (`worklist?:
   PlacementWorklist`); absent ⇒ existing flat `lettersToAdd` behavior.
 

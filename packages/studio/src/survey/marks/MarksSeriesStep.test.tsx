@@ -83,10 +83,11 @@ describe("MarksSeriesStep — S0 skip path", () => {
   it("pops backward instead of completing when entered via back-navigation", () => {
     const onComplete = vi.fn();
     const onBack = vi.fn();
-    // Simulate the Back press that landed here: last traversal move was a pop.
+    // Simulate the Back press that landed here (back from carve into marks):
+    // last traversal move was a pop.
     act(() => {
-      useSurveySessionStore.getState().advance("carve");
       useSurveySessionStore.getState().advance("marks");
+      useSurveySessionStore.getState().advance("carve");
       useSurveySessionStore.getState().popHistory();
     });
     act(() => {
