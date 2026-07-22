@@ -11,6 +11,7 @@ import { loadModularFlow } from "../survey/loadModularFlow.ts";
 import { phaseARegistry } from "../survey/questions/registry.a.ts";
 import { phaseBRegistry } from "../survey/questions/registry.b.ts";
 import { phaseFRegistry } from "../survey/questions/registry.f.ts";
+import { reserveRegistry } from "../survey/questions/registry.reserve.ts";
 import type { FlowDef } from "../survey/types.ts";
 import { manifest } from "../steps/manifest.ts";
 
@@ -43,8 +44,10 @@ function assertLiveNodeSetEqualsManifest(
 // ---------------------------------------------------------------------------
 
 const ALL_FLOWS = [
+  // identity_lite keys off the il_*-only phaseARegistry in production (steps/flowSources.ts).
   { raw: identityLiteModularRaw, title: "Identity-lite", registry: phaseARegistry },
-  { raw: phaseAModularRaw, title: "Phase A", registry: phaseARegistry },
+  // phase_a_identity (the demoted battery) keys off reserveRegistry in production.
+  { raw: phaseAModularRaw, title: "Phase A", registry: reserveRegistry },
   { raw: phaseBModularRaw, title: "Phase B", registry: phaseBRegistry },
   { raw: phaseFModularRaw, title: "Phase F", registry: phaseFRegistry },
 ];
@@ -90,8 +93,11 @@ describe("buildModularFlowGraph — every shipped flow (INV-1)", () => {
   }
 
   const reserveTestCases = [
-    { raw: phaseAModularRaw, title: "Phase A", registry: phaseARegistry, includeProvenance: true },
+    { raw: phaseAModularRaw, title: "Phase A", registry: reserveRegistry, includeProvenance: true },
     { raw: phaseFModularRaw, title: "Phase F", registry: phaseFRegistry, includeProvenance: false },
+    // identity-lite keys off the il_*-only phaseARegistry in production, so its
+    // reserve set is empty (the demoted battery is Leftover, not drill-down clog —
+    // spec 022 / phaseADemoteReserve.test.ts). expectedReserve computes to {} here.
     { raw: identityLiteModularRaw, title: "identity-lite", registry: phaseARegistry, includeProvenance: false },
   ];
 
