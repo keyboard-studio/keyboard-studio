@@ -59,8 +59,8 @@ describe("M5 — all step ids are unique", () => {
 // ---------------------------------------------------------------------------
 // M2 — spine order
 //
-// FR-012: Identity → choose_base → track → Characters → Carve → Mechanisms →
-//         (lock:physical on mechanisms) → Sequences →
+// FR-012: Identity → choose_base → track → Characters → Marks → Carve →
+//         Mechanisms → (lock:physical on mechanisms) → Sequences →
 //         touch carve+add → (lock:touch) → Help → Package
 //
 // track is a real spine step (P0 fix). project_name is spine:false (CYOA fork).
@@ -71,6 +71,7 @@ const EXPECTED_SPINE_ORDER = [
   "choose_base",
   "track",
   "characters",
+  "marks",
   "carve",
   "mechanisms",
   "sequences",
@@ -118,6 +119,12 @@ describe("M2 — spine order matches FR-012", () => {
 
   it("'characters' appears before 'carve' on the spine", () => {
     assertStepOrder(spineSteps(manifest), "characters", "carve");
+  });
+
+  it("'marks' sits between 'characters' and 'carve' on the spine (spec 046 reorder — combined-letter answers precede all key work)", () => {
+    const spine = spineSteps(manifest);
+    assertStepOrder(spine, "characters", "marks");
+    assertStepOrder(spine, "marks", "carve");
   });
 
   it("'help' appears before 'package' on the spine", () => {

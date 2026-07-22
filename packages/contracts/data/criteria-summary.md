@@ -1,6 +1,6 @@
 # criteria.md triage summary
 
-> **Canonical per-band recompute.** The numbers below are recomputed directly from `criteria.json`. The total and per-band split (148; 40/66/32/10) are **enforced** by `packages/contracts/src/{types,schemas}.test.ts` — a change to `criteria.json` that breaks the count fails the build. Prose mentions elsewhere (spec.md §11, CLAUDE.md, README) cross-link here; update this file when the data changes.
+> **Canonical per-band recompute.** The numbers below are recomputed directly from `criteria.json`. The total and per-band split (149; 40/67/32/10) are **enforced** by `packages/contracts/src/{types,schemas}.test.ts` — a change to `criteria.json` that breaks the count fails the build. Prose mentions elsewhere (spec.md §11, CLAUDE.md, README) cross-link here; update this file when the data changes.
 
 This document records the triage outcome for all criteria drawn from `docs/criteria.md`, performed as part of Day-1 issue #6. Each criterion was assigned to one of four enforcement bands defined in spec.md Section 14, Decision D4: `scaffolder-bake` (enforced at scaffold time), `layer-c-enforce` (blocked by the lint engine), `yellow-survey` (surfaced as a plain-language survey question), and `red-checklist` (manual pre-submit checklist item). The result is encoded in `packages/contracts/data/criteria.json` as a `Criterion[]` array conforming to the interface in `packages/contracts/src/criteria.ts`, as described in spec.md Section 11's example triage table.
 
@@ -9,12 +9,12 @@ This document records the triage outcome for all criteria drawn from `docs/crite
 | Band | Count | % of total |
 |------|-------|-----------|
 | scaffolder-bake | 40 | 27% |
-| layer-c-enforce | 66 | 45% |
+| layer-c-enforce | 67 | 45% |
 | yellow-survey | 32 | 22% |
 | red-checklist | 10 | 7% |
-| **Total** | **148** | **100%** |
+| **Total** | **149** | **100%** |
 
-Counts recomputed directly from `criteria.json` array length and per-band occurrence counts. 133 of the original 145 are the original repo-hygiene criteria, accounting for all 133 colored criterion spans in `docs/criteria.md` (the 136-span count cited in earlier passes included the 3 legend-definition spans at lines 6-8, which are not criteria; see "Omitted rows" below). The remaining 12 are the **section-18 "Design heuristics (DISCUS)"** rows added to operationalize the keyboard-design principles in [docs/keyboard-design-principles.md](../../../docs/keyboard-design-principles.md) — 7 `layer-c-enforce` (auto-checkable on the first-draft touch layout / output coverage), 3 `yellow-survey` (judgement-dependent), and 2 `red-checklist` (inherently human). The total is now **148**: 146 following the issue #120 re-review (which added the 7.7a split row and re-banded seven existing rows), plus two section-19 import-output criteria (19.1 PR-body attribution block; 19.2 HISTORY.md attribution bullet, D14 mandatory carrier). See [docs/discus-principles-integration.md](../../../docs/discus-principles-integration.md) for the full DISCUS → programmability mapping.
+Counts recomputed directly from `criteria.json` array length and per-band occurrence counts. 133 of the original 145 are the original repo-hygiene criteria, accounting for all 133 colored criterion spans in `docs/criteria.md` (the 136-span count cited in earlier passes included the 3 legend-definition spans at lines 6-8, which are not criteria; see "Omitted rows" below). The remaining 13 are the **section-18 "Design heuristics (DISCUS)"** rows added to operationalize the keyboard-design principles in [docs/keyboard-design-principles.md](../../../docs/keyboard-design-principles.md) — 8 `layer-c-enforce` (auto-checkable on the first-draft touch layout / output coverage — 7 at Day-1 lock plus the spec-046 `18.13-mark-normalization-uniform` row carrying `KM_LINT_MARK_NORMALIZATION_UNIFORM`), 3 `yellow-survey` (judgement-dependent), and 2 `red-checklist` (inherently human). The total is now **149**: 146 following the issue #120 re-review (which added the 7.7a split row and re-banded seven existing rows), plus two section-19 import-output criteria (19.1 PR-body attribution block; 19.2 HISTORY.md attribution bullet, D14 mandatory carrier), plus the spec-046 mark-normalization uniformity row. See [docs/discus-principles-integration.md](../../../docs/discus-principles-integration.md) for the full DISCUS → programmability mapping.
 
 ## Re-review outcomes (issue #120)
 

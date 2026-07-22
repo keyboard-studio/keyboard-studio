@@ -24,6 +24,7 @@ import {
   type TouchCompleteResult,
 } from "./reducer.ts";
 import type { BaseKeyboard, KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { repropagate as mockRepropagate } from "./repropagate.ts";
 
@@ -551,5 +552,100 @@ describe("spec 034 T006 — choose_base yields a live working copy via the real 
     const st = useWorkingCopyStore.getState();
     // Track 2 keeps identity from the loaded keyboard (Track 1 would null it).
     expect(st.identity?.keyboardId).toBe(base.id);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 046 — marks-series completion applies the mark guards
+// ---------------------------------------------------------------------------
+
+describe("applyStepCompletion — marks (spec 046, US8)", () => {
+  const ACUTE = "́";
+
+  function marksDeps() {
+    let ir: KeyboardIR | null = null;
+    const deps = {
+      ...makeDepsMock(),
+      getWorkingIR: () => ir,
+      setWorkingIR: (next: KeyboardIR) => {
+        ir = next;
+      },
+      setMarksMigrationNeeded: vi.fn(),
+    };
+    return {
+      deps,
+      seed: (next: KeyboardIR) => {
+        ir = next;
+      },
+      current: () => ir,
+    };
+  }
+
+  function irWithRule(output: string): KeyboardIR {
+    return makeTestIR([
+      {
+        nodeId: "g-main",
+        name: "main",
+        usingKeys: true,
+        rules: [
+          {
+            nodeId: "r1",
+            context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
+            output: [{ kind: "char", value: output }],
+          },
+        ],
+      },
+    ]);
+  }
+
+  it("applies blocking guard rules to the working IR (FR-021)", () => {
+    const { deps, seed, current } = marksDeps();
+    seed(irWithRule("a"));
+    applyStepCompletion(
+      "marks",
+      {
+        phase: "C",
+        answers: [],
+        marksWorklist: {
+          ownLetterUnits: ["a", "k"],
+          markUnits: [{ mark: ACUTE, inputOrder: "postfix" }],
+          blockedCombinations: [{ base: "k", mark: ACUTE }],
+        },
+        marksOutputForm: "base-plus-mark",
+      },
+      deps,
+    );
+    const guard = current()?.groups.find((g) => g.name === "generated_marks_guard");
+    expect(guard?.rules).toHaveLength(1);
+  });
+
+  it("records the R10 migration flag when base-plus-mark is chosen over a precomposed base", () => {
+    const { deps, seed } = marksDeps();
+    seed(irWithRule("é")); // base emits ready-made forms
+    applyStepCompletion(
+      "marks",
+      {
+        phase: "C",
+        answers: [],
+        marksWorklist: {
+          ownLetterUnits: [],
+          markUnits: [],
+          blockedCombinations: [],
+        },
+        marksOutputForm: "base-plus-mark",
+      },
+      deps,
+    );
+    expect(deps.setMarksMigrationNeeded).toHaveBeenCalledWith(true);
+  });
+
+  it("does nothing without a worklist or without a working IR", () => {
+    const { deps } = marksDeps(); // ir stays null
+    applyStepCompletion(
+      "marks",
+      { phase: "C", answers: [], marksWorklist: { ownLetterUnits: [], markUnits: [], blockedCombinations: [] } },
+      deps,
+    );
+    expect(deps.setMarksMigrationNeeded).not.toHaveBeenCalled();
   });
 });

@@ -216,14 +216,14 @@ describe("CriterionSchema (spec §11)", () => {
     const result = CriterionSchema.array().safeParse(criteriaJsonRaw);
     expect(result.success, result.success ? "" : JSON.stringify(result.error?.issues?.slice(0, 5))).toBe(true);
     if (result.success) {
-      expect(result.data.length).toBe(148);
+      expect(result.data.length).toBe(149);
     }
   });
 
   it("is the same catalog ALL_CRITERIA exposes (parsed at module load)", () => {
     // ALL_CRITERIA is produced by CriterionSchema.array().parse at import time;
     // if criteria.json had drifted, importing this module would already throw.
-    expect(ALL_CRITERIA.length).toBe(148);
+    expect(ALL_CRITERIA.length).toBe(149);
   });
 
   it("accepts each band variant with its own hook", () => {

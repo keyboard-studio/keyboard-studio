@@ -13,7 +13,7 @@
 // SurveyPhaseResult.confirmedInventory (additive contract field). The gallery
 // reads this via session.confirmedInventory (mergePhaseResults union).
 
-import { useCallback, useMemo, useState, useRef, useEffect } from "react";
+import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { SurveyAnswer, SurveyPhaseResult, LintFinding, PlacementMap } from "@keyboard-studio/contracts";
@@ -26,6 +26,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore, type DiscoveryMethod } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { nfcDedup } from "./charNormUtils.ts";
+import { prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { suggestMissingChars } from "../lib/services.ts";
 import type { MissingCharSuggestions } from "../lib/services.ts";
 import { RadioGroup } from "../ui/index.ts";
@@ -520,6 +521,88 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
 }
 
 // ---------------------------------------------------------------------------
+// AlphabetBreakdown — the visible three-store decomposition (spec 046, US5)
+//
+// Renders only once the draft alphabet implies at least one mark or attested
+// combination: picking a whole accented character (one action, one unit of
+// selection) visibly lands its base in Letters and its mark in Marks, teaching
+// the underlying model without an interrupting question (FR-003). Chips here
+// are a VIEW of the derived stores, not remove buttons — removal stays on the
+// pick chips above (removing a pick automatically retracts what it implied).
+// ---------------------------------------------------------------------------
+
+function AlphabetBreakdown() {
+  const bases = usePhaseBDraftStore((s) => s.bases);
+  const marks = usePhaseBDraftStore((s) => s.marks);
+  const attestedStacks = usePhaseBDraftStore((s) => s.attestedStacks);
+  const lastPick = usePhaseBDraftStore((s) => s.lastPick);
+
+  if (marks.length === 0 && attestedStacks.length === 0) return null;
+
+  const composedStack = (stack: { base: string; marks: string[] }): string =>
+    (stack.base + stack.marks.join("")).normalize("NFC");
+  const justAddedBases = new Set(lastPick?.addedBases ?? []);
+  const justAddedMarks = new Set(lastPick?.addedMarks ?? []);
+  const justAddedStack =
+    lastPick?.addedStack != null ? composedStack(lastPick.addedStack) : null;
+
+  const chip = (glyph: string, display: string, justAdded: boolean) => (
+    <span
+      key={glyph}
+      aria-label={`${display} (${toUPlusNotation(glyph)})${justAdded ? " — just added" : ""}`}
+      style={charChip(false)}
+    >
+      <span style={chipGlyph(true)}>{display}</span>
+      <span style={chipCodepoint}>{toUPlusNotation(glyph)}</span>
+      {justAdded && <span style={chipIndicator(ACCENT)}>new</span>}
+    </span>
+  );
+
+  const section = (
+    testid: string,
+    title: string,
+    note: string,
+    children: ReactNode,
+  ) => (
+    <div data-testid={testid} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>{title}</p>
+      <p style={{ ...mutedParaFlush, margin: 0, fontSize: 12 }}>{note}</p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{children}</div>
+    </div>
+  );
+
+  return (
+    <section aria-label="How your alphabet breaks down" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <h3 style={sectionHeading}>How your alphabet breaks down</h3>
+      {bases.length > 0 &&
+        section(
+          "alphabet-letters",
+          `Letters (${bases.length})`,
+          "Letters that stand on their own.",
+          bases.map((b) => chip(b, b, justAddedBases.has(b))),
+        )}
+      {marks.length > 0 &&
+        section(
+          "alphabet-marks",
+          `Marks (${marks.length})`,
+          "Accents and other marks that attach to a letter.",
+          marks.map((m) => chip(m, prefixCombiningMark(m, true), justAddedMarks.has(m))),
+        )}
+      {attestedStacks.length > 0 &&
+        section(
+          "alphabet-accented",
+          `Accented letters (${attestedStacks.length})`,
+          "Letter-plus-mark combinations your language uses.",
+          attestedStacks.map((s) => {
+            const composed = composedStack(s);
+            return chip(composed, composed, justAddedStack === composed);
+          }),
+        )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // BuildListView — unified "add your whole alphabet" method
 //
 // The alphabet accumulated here is shared with CharacterMapPane (the right-pane
@@ -622,7 +705,11 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         <CharChipEditor chars={chars} onChange={setAll} autoFocus={false} />
       </section>
 
-      {/* Section 3 (character grid) has moved to the right pane —
+      {/* Section 3: visible three-store decomposition (spec 046 US5) —
+          renders only when the alphabet implies marks or accented letters. */}
+      <AlphabetBreakdown />
+
+      {/* The character grid has moved to the right pane —
           see CharacterMapPane.tsx, rendered by StudioShell's SurveyView. */}
 
       {/* Footer: Done */}

@@ -48,12 +48,15 @@
   {
     "stepId": "characters/B",
     "applyStepCompletion": [
-      "characters"
+      "characters",
+      "marks"
     ],
     "storeMutations": [
+      "advance",
       "advance"
     ],
     "workingCopyMutations": [
+      "recordPhase",
       "recordPhase"
     ],
     "navigateTo": []

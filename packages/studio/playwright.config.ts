@@ -1,10 +1,11 @@
 // Playwright configuration for the studio SPA.
 //
-// RUNNER: global Playwright CLI only — invoke with `npx playwright test`.
-//   @playwright/test is NOT a devDependency (by design); the global CLI binary
-//   resolves the runtime import. Specs and this file import from "playwright/test"
-//   (the "@playwright/test" specifier does not resolve to the global CLI in this
-//   environment). Do NOT add @playwright/test to package.json.
+// RUNNER: the `playwright` devDependency of this package — invoke with
+//   `npx playwright test` from packages/studio, which resolves to the local
+//   node_modules binary. Specs and this file import from "playwright/test"
+//   (the `playwright` package's test entry). Do NOT add @playwright/test as a
+//   second dependency — one runner package only; "playwright/test" is the
+//   canonical import specifier throughout e2e/**.
 //
 // CI LANES: this file and e2e/** are intentionally EXCLUDED from both:
 //   - vitest (packages/studio/vitest.config.ts exclude: ["e2e/**"])

@@ -333,7 +333,7 @@ describe("CharacterMapPane — raw code point entry", () => {
     expect(usePhaseBDraftStore.getState().chars).toEqual([]);
   });
 
-  it("allows a PUA code point (the escape hatch's whole point)", async () => {
+  it("allows a PUA code point after the role prompt (the escape hatch's whole point, spec 046 FR-004)", async () => {
     seedBaseAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
@@ -344,7 +344,64 @@ describe("CharacterMapPane — raw code point entry", () => {
     fireEvent.change(input, { target: { value: "U+E000" } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
+    // FR-004: nothing is added until the designer answers letter-or-mark.
+    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(screen.getByTestId("pua-role-prompt")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("pua-role-letter"));
+
     expect(usePhaseBDraftStore.getState().chars).toContain("\u{E000}");
+  });
+
+  it("PUA answered 'mark' lands in the Marks store with a permanent declared role (US6 AC2)", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const input = screen.getByLabelText("Add a character by Unicode code point");
+    fireEvent.change(input, { target: { value: "U+E001" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.click(screen.getByTestId("pua-role-mark"));
+
+    const state = usePhaseBDraftStore.getState();
+    expect(state.marks).toContain("\u{E001}");
+    expect(state.bases).not.toContain("\u{E001}");
+    expect(state.declaredRoles["\u{E001}"]).toBe("mark");
+  });
+
+  it("PUA answered 'letter' lands in the Letters store and never in Marks (US6 AC3)", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const input = screen.getByLabelText("Add a character by Unicode code point");
+    fireEvent.change(input, { target: { value: "U+E002" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.click(screen.getByTestId("pua-role-letter"));
+
+    const state = usePhaseBDraftStore.getState();
+    expect(state.bases).toContain("\u{E002}");
+    expect(state.marks).not.toContain("\u{E002}");
+    expect(state.declaredRoles["\u{E002}"]).toBe("letter");
+  });
+
+  it("cancelling the PUA role prompt adds nothing", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const input = screen.getByLabelText("Add a character by Unicode code point");
+    fireEvent.change(input, { target: { value: "U+E003" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(screen.queryByTestId("pua-role-prompt")).toBeNull();
   });
 
   it("clears a stale error as soon as the field is edited again", async () => {

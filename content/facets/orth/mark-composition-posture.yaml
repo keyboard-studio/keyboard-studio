@@ -22,17 +22,18 @@ modality: both
 
 derivations:
   - kind: computed
-    source: "planned:nfc-posture-of-inventory"
-    sourceStatus: planned
-    notes: Per-pair NFC existence check over orth.inventory-delta's output; small pure function.
-  - kind: asked
-    source: "question:pb_mark_style"
+    source: "engine:nfc-posture-of-inventory"
     sourceStatus: available
-    notes: Retained only for the mixed case, scoped to the ambiguous pairs.
+    notes: >
+      Implemented as nfcPostureOfInventory() in
+      packages/engine/src/marks/nfc-posture-of-inventory.ts (spec 046): per-pair
+      NFC existence check over the confirmed alphabet's attested stacks,
+      aggregated by aggregateInventoryPosture().
 
 consumers:
-  prefills:
-    - pb_mark_style
+  # pb_mark_style is retired (spec 046) — the S4 output-form station consumes
+  # this facet's computed posture directly.
+  prefills: []
   proposes:
     - "mechanism-gallery:deadkey-vs-direct"
     - "pattern:nfd-latin:outputForm"

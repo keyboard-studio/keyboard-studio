@@ -219,8 +219,15 @@ describe("orphan-input lint — every manifested input has a prior producer", ()
     // Documents the current state: every registry entry appears in a manifest.
     // If a library/reserve module is intentionally added without a manifest
     // entry, move it to an explicit allowlist and update this assertion.
+    // spec 046: pb_mark_input_order is intentionally NON-manifested — its
+    // content is RELOCATED into the marks series' S3 station
+    // (survey/marks/InputOrderStation.tsx reads the module's definition), so
+    // the module stays registered/on disk but off every flow manifest.
+    const RELOCATED_EXEMPT = new Set(["pb_mark_input_order"]);
     const registryIds = Object.keys(questionRegistry);
-    const nonManifested = registryIds.filter((id) => !manifestedIds.has(id));
+    const nonManifested = registryIds.filter(
+      (id) => !manifestedIds.has(id) && !RELOCATED_EXEMPT.has(id),
+    );
     expect(
       nonManifested,
       `Registry modules not referenced by any manifest: [${nonManifested.join(", ")}]. ` +

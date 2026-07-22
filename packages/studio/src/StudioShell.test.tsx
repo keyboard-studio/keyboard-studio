@@ -3,8 +3,10 @@
 // Coverage:
 //   T028 — manifest-driven SurveyView: forward and back transitions driven by the
 //           manifest step order (identity → choose_base → track → [project_name] →
-//           characters → carve → mechanisms → sequences → touch →
-//           help → done). No SurveyStage union.
+//           characters → marks → carve → mechanisms → sequences → touch →
+//           help → done). No SurveyStage union. The marks step (spec 046) is
+//           NOT mocked — the marks-free test alphabet makes its S0 gate
+//           auto-complete without rendering, so walks hop it invisibly.
 //   T029 — no SurveyStage symbol; runtime step order matches manifest; applyStepCompletion
 //           is wired for side-effecting steps.
 //
@@ -626,7 +628,8 @@ function advanceToB() {
 
 /**
  * Drive from "identity" to "carve".
- * New order (issue #508): prefill → B → carve (phaseB-complete lands on carve).
+ * New order (issue #508): prefill → B → carve — phaseB-complete lands on carve
+ * via the marks step's S0 auto-skip (spec 046; marks-free test alphabet).
  */
 function advanceToCarve() {
   advanceToB();
@@ -1338,7 +1341,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → choose_base → track → characters → carve → mechanisms → sequences → touch → help → package (M2, P0 fix)", () => {
+  it("manifest spine order is: identity → choose_base → track → characters → marks → carve → mechanisms → sequences → touch → help → package (M2, spec 046)", () => {
     // track is now a real manifest step (P0 fix); project_name is spine:false.
     const spineIds = manifest
       .filter((s) => s.spine !== false)
@@ -1348,6 +1351,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
       "choose_base",
       "track",
       "characters",
+      "marks",
       "carve",
       "mechanisms",
       "sequences",
@@ -1388,7 +1392,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
 });
 
 describe("T029 — runtime step order matches manifest spine order", () => {
-  it("survey advances: identity → choose_base → track (manifest step) → project_name (copy, spine:false) → characters (prefill) → B → carve → mechanisms → sequences → touch → help", async () => {
+  it("survey advances: identity → choose_base → track (manifest step) → project_name (copy, spine:false) → characters (prefill) → B → marks (S0 auto-skip) → carve → mechanisms → sequences → touch → help", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -1421,7 +1425,9 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("prefill-confirm"));
     expect(screen.getByTestId("stage-B")).toBeTruthy();
 
-    // → carve (next spine step after characters, per manifest)
+    // → marks (next spine step after characters, spec 046) → carve. The
+    // test alphabet has no marks, so the S0 gate auto-completes the marks
+    // step without rendering and the walk lands directly on carve.
     fireEvent.click(screen.getByTestId("phaseB-complete"));
     expect(screen.getByTestId("stage-carve")).toBeTruthy();
 
@@ -1470,7 +1476,8 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     advanceToB();
     expect(screen.getByTestId("stage-B")).toBeTruthy();
 
-    // phaseB-complete must go to carve (next spine step after characters).
+    // phaseB-complete must land on carve (via the marks step's S0 auto-skip
+    // — the marks-free test alphabet completes marks without rendering).
     fireEvent.click(screen.getByTestId("phaseB-complete"));
     expect(screen.getByTestId("stage-carve")).toBeTruthy();
     expect(screen.queryByTestId("stage-mechanisms")).toBeNull();

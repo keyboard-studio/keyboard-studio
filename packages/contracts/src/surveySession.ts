@@ -6,6 +6,8 @@ import type { AxisFill } from "./axisFill";
 import type { SurveyPhaseResult } from "./surveyPhaseResult";
 import type { MechanismAssignment } from "./assignmentMap";
 import { mergeAssignments } from "./assignmentMap";
+import type { ConfirmedAlphabet, PlacementWorklist } from "./confirmedAlphabet";
+import { deriveConfirmedInventory, makeConfirmedAlphabet } from "./confirmedAlphabet";
 
 /**
  * Session-level running state across all survey phases.
@@ -95,6 +97,21 @@ export interface SurveySession {
    * `confirmedInventory: []`.
    */
   confirmedInventory: string[];
+  /**
+   * Store-wise merged three-store alphabet across all phases (spec 046):
+   * deduped union of `bases`/`marks` (NFC/NFD-normalised respectively,
+   * first-appearance order), deduped order-preserving union of
+   * `attestedStacks`, last-wins `declaredRoles`. **Additive optional** —
+   * absent when no phase carried an `alphabet`; when present, the session's
+   * `confirmedInventory` also contains its derived projection.
+   */
+  alphabet?: ConfirmedAlphabet;
+  /**
+   * Marks-series exit state (spec 046): last phase carrying a worklist wins.
+   * **Additive optional** — absent until the marks series completes (or is
+   * skipped, which produces an *empty* worklist, not an absent one).
+   */
+  marksWorklist?: PlacementWorklist;
 }
 
 /**
@@ -124,15 +141,32 @@ export function mergePhaseResults(
   // Deduped union across phases: NFC-normalise, drop empties/whitespace, first-appearance order.
   const seen = new Set<string>();
   const confirmedInventory: string[] = [];
-  for (const phase of phaseResults) {
-    for (const raw of phase.confirmedInventory ?? []) {
-      const g = raw.normalize("NFC").trim();
-      if (g.length > 0 && !seen.has(g)) {
-        seen.add(g);
-        confirmedInventory.push(g);
-      }
+  const pushInventory = (raw: string): void => {
+    const g = raw.normalize("NFC").trim();
+    if (g.length > 0 && !seen.has(g)) {
+      seen.add(g);
+      confirmedInventory.push(g);
     }
+  };
+  for (const phase of phaseResults) {
+    for (const raw of phase.confirmedInventory ?? []) pushInventory(raw);
   }
+
+  // Three-store alphabet (spec 046): store-wise deduped union across phases;
+  // stacks dedupe on their exact ordered shape; declared roles are last-wins.
+  const alphabet = mergeAlphabets(phaseResults.map((p) => p.alphabet));
+  if (alphabet !== undefined) {
+    // The flat inventory always contains the stores' projection, so pre-046
+    // consumers see alphabet-only contributions too (dedupe absorbs overlap).
+    for (const g of deriveConfirmedInventory(alphabet)) pushInventory(g);
+  }
+
+  // Marks-series exit state: the last phase that carried a worklist wins.
+  let marksWorklist: PlacementWorklist | undefined;
+  for (const phase of phaseResults) {
+    if (phase.marksWorklist !== undefined) marksWorklist = phase.marksWorklist;
+  }
+
   return {
     axes,
     irAxes: { ...irAxes },
@@ -140,7 +174,51 @@ export function mergePhaseResults(
     selectedPatternIds,
     assignments,
     confirmedInventory,
+    ...(alphabet !== undefined ? { alphabet } : {}),
+    ...(marksWorklist !== undefined ? { marksWorklist } : {}),
   };
+}
+
+/**
+ * Store-wise merge of per-phase alphabets: deduped union of `bases` and
+ * `marks` (first-appearance order), deduped union of `attestedStacks` keyed on
+ * their exact ordered shape (order-preserving — the same marks in a different
+ * order are a distinct stack), last-wins `declaredRoles`. Returns `undefined`
+ * when no phase carried an alphabet, so pre-046 sessions stay shape-identical.
+ */
+function mergeAlphabets(
+  alphabets: (ConfirmedAlphabet | undefined)[]
+): ConfirmedAlphabet | undefined {
+  const present = alphabets.filter((a): a is ConfirmedAlphabet => a !== undefined);
+  if (present.length === 0) return undefined;
+  const merged = makeConfirmedAlphabet();
+  const baseSeen = new Set<string>();
+  const markSeen = new Set<string>();
+  const stackSeen = new Set<string>();
+  for (const a of present) {
+    for (const b of a.bases) {
+      const g = b.normalize("NFC");
+      if (!baseSeen.has(g)) {
+        baseSeen.add(g);
+        merged.bases.push(g);
+      }
+    }
+    for (const m of a.marks) {
+      if (!markSeen.has(m)) {
+        markSeen.add(m);
+        merged.marks.push(m);
+      }
+    }
+    for (const s of a.attestedStacks) {
+      const key = `${s.base} ${s.marks.join(" ")}`;
+      if (!stackSeen.has(key)) {
+        stackSeen.add(key);
+        merged.attestedStacks.push({ base: s.base, marks: [...s.marks] });
+      }
+    }
+    Object.assign(merged.declaredRoles, a.declaredRoles);
+  }
+  return merged;
 }
 
 /**

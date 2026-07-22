@@ -32,6 +32,7 @@ type ActiveStepId =
   | "project_name"
   | "characters"
   | "carve"
+  | "marks"
   | "mechanisms"
   | "sequences"
   | "touch_seed_source"
@@ -103,6 +104,7 @@ export interface AdvanceOutcome {
 
 export const STEPS_WITH_APPLY_COMPLETION: ReadonlySet<string> = new Set([
   "characters",
+  "marks",
   "carve",
   "mechanisms",
   "touch",
@@ -198,7 +200,10 @@ export function advance(
       return { next: "characters", setCharactersSubStage: "prefill" };
 
     case "characters":
-      return { next: nextSpineStepAfter("characters") }; // carve
+      return { next: nextSpineStepAfter("characters") }; // marks (spec 046)
+
+    case "marks":
+      return { next: nextSpineStepAfter("marks") }; // carve
 
     case "carve":
       return { next: nextSpineStepAfter("carve") }; // mechanisms

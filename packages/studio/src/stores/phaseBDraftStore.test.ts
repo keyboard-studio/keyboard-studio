@@ -14,8 +14,13 @@
 // quietly turn an "NFD vs NFC" test into a same-string no-op. \u escapes are
 // unambiguous at the byte level regardless of tool/editor normalization.
 
-import { describe, it, expect, afterEach } from "vitest";
-import { usePhaseBDraftStore } from "./phaseBDraftStore.ts";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import {
+  usePhaseBDraftStore,
+  draftConfirmedAlphabet,
+  snapshotPhaseBDraft,
+  applyPhaseBDraftSnapshot,
+} from "./phaseBDraftStore.ts";
 
 // e-acute: precomposed (NFC, 1 codepoint) vs decomposed (NFD, "e" + combining
 // acute U+0301, 2 codepoints). Same grapheme, different encodings.
@@ -157,5 +162,110 @@ describe("phaseBDraftStore — reset", () => {
     usePhaseBDraftStore.getState().reset();
     usePhaseBDraftStore.getState().reset();
     expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Three-store split (spec 046): bases / marks / attestedStacks / declaredRoles
+// derive from the picks; removing a pick never leaves an orphaned mark.
+// ---------------------------------------------------------------------------
+
+describe("phaseBDraftStore — three-store split (spec 046)", () => {
+  const ACUTE = "́";
+
+  beforeEach(() => {
+    usePhaseBDraftStore.getState().reset();
+  });
+
+  it("a precomposed pick contributes base, mark, and attested stack; chars keeps the whole grapheme", () => {
+    usePhaseBDraftStore.getState().add("é");
+    const s = usePhaseBDraftStore.getState();
+    expect(s.chars).toEqual(["é"]);
+    expect(s.bases).toEqual(["e"]);
+    expect(s.marks).toEqual([ACUTE]);
+    expect(s.attestedStacks).toEqual([{ base: "e", marks: [ACUTE] }]);
+  });
+
+  it("reports the pick's contribution for the just-added highlight", () => {
+    usePhaseBDraftStore.getState().add("e");
+    usePhaseBDraftStore.getState().add("é");
+    const { lastPick } = usePhaseBDraftStore.getState();
+    expect(lastPick?.grapheme).toBe("é");
+    expect(lastPick?.addedBases).toEqual([]); // "e" was already present
+    expect(lastPick?.addedMarks).toEqual([ACUTE]);
+    expect(lastPick?.addedStack).toEqual({ base: "e", marks: [ACUTE] });
+  });
+
+  it("does not duplicate an already-present base or mark (edge case)", () => {
+    usePhaseBDraftStore.getState().add("é");
+    usePhaseBDraftStore.getState().add("á");
+    const s = usePhaseBDraftStore.getState();
+    expect(s.marks).toEqual([ACUTE]);
+    expect(s.attestedStacks).toHaveLength(2);
+  });
+
+  it("a plain letter lands only in bases; a lone combining mark only in marks", () => {
+    usePhaseBDraftStore.getState().add("k");
+    usePhaseBDraftStore.getState().add(ACUTE);
+    const s = usePhaseBDraftStore.getState();
+    expect(s.bases).toEqual(["k"]);
+    expect(s.marks).toEqual([ACUTE]);
+    expect(s.attestedStacks).toEqual([]);
+  });
+
+  it("removing the only accented pick removes its stack AND its now-orphaned mark", () => {
+    usePhaseBDraftStore.getState().add("é");
+    usePhaseBDraftStore.getState().remove("é");
+    const s = usePhaseBDraftStore.getState();
+    expect(s.chars).toEqual([]);
+    expect(s.marks).toEqual([]);
+    expect(s.attestedStacks).toEqual([]);
+  });
+
+  it("a PUA pick with a declared role lands in the right store and records the role", () => {
+    const pua = String.fromCodePoint(0xe000);
+    usePhaseBDraftStore.getState().add(pua, { role: "mark" });
+    const s = usePhaseBDraftStore.getState();
+    expect(s.marks).toEqual([pua]);
+    expect(s.bases).toEqual([]);
+    expect(s.declaredRoles[pua]).toBe("mark");
+  });
+
+  it("an unclassified PUA pick behaves as a letter until asked", () => {
+    const pua = String.fromCodePoint(0xe001);
+    usePhaseBDraftStore.getState().add(pua);
+    const s = usePhaseBDraftStore.getState();
+    expect(s.bases).toEqual([pua]);
+    expect(s.declaredRoles[pua]).toBe("letter");
+  });
+
+  it("setAll rebuilds the stores from a normalized pick list while chars stays verbatim", () => {
+    usePhaseBDraftStore.getState().setAll(["é", "é", "k"]);
+    const s = usePhaseBDraftStore.getState();
+    expect(s.chars).toEqual(["é", "é", "k"]); // pinned verbatim contract
+    expect(s.bases).toEqual(["e", "k"]);
+    expect(s.marks).toEqual([ACUTE]);
+    expect(s.attestedStacks).toEqual([{ base: "e", marks: [ACUTE] }]);
+  });
+
+  it("draftConfirmedAlphabet() resolves the current draft to a ConfirmedAlphabet", () => {
+    usePhaseBDraftStore.getState().add("é");
+    expect(draftConfirmedAlphabet()).toEqual({
+      bases: ["e"],
+      marks: [ACUTE],
+      attestedStacks: [{ base: "e", marks: [ACUTE] }],
+      declaredRoles: {},
+    });
+  });
+
+  it("snapshot round-trip preserves declared roles", () => {
+    const pua = String.fromCodePoint(0xe000);
+    usePhaseBDraftStore.getState().add(pua, { role: "mark" });
+    const snap = snapshotPhaseBDraft();
+    usePhaseBDraftStore.getState().reset();
+    applyPhaseBDraftSnapshot(snap);
+    const s = usePhaseBDraftStore.getState();
+    expect(s.marks).toEqual([pua]);
+    expect(s.declaredRoles[pua]).toBe("mark");
   });
 });

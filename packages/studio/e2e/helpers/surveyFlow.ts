@@ -301,6 +301,35 @@ export async function buildOneCharacterList(
     timeout: 5_000,
   });
   await page.click('[data-testid="phase-b-done"]');
+
+  // The marks series (spec 046) sits immediately after alphabet confirmation,
+  // BEFORE carve — a mark-bearing charToAdd (e.g. "é") makes it render here.
+  // A marks-free alphabet auto-skips it (S0 gate) and this is a no-op.
+  await driveMarksSeries(page);
+}
+
+/**
+ * Marks series step (spec 046) — sits between characters and carve (the
+ * combined-letter answers must be known before any key work begins).
+ *
+ * Its S0 gate is computed, never rendered: an alphabet with NO marks skips
+ * the whole series (no screen appears — this helper returns immediately).
+ * When the alphabet carries marks (e.g. buildOneCharacterList(page, "é")),
+ * stations S1-S5 render in sequence, everything prefilled propose-then-confirm;
+ * each click of data-testid="marks-continue" accepts the current station's
+ * proposal and advances, and the last one completes the step. The station
+ * count varies with the alphabet (at most 5, SC-006), so this loops rather
+ * than assuming a fixed count.
+ */
+export async function driveMarksSeries(page: Page): Promise<void> {
+  const continueBtn = page.getByTestId("marks-continue");
+  for (let i = 0; i < 6; i++) {
+    const visible = await continueBtn
+      .isVisible({ timeout: i === 0 ? 5_000 : 2_000 })
+      .catch(() => false);
+    if (!visible) return; // gate skipped the series, or it just completed
+    await continueBtn.click();
+  }
 }
 
 /**
@@ -313,6 +342,8 @@ export async function buildOneCharacterList(
  * to add." message appears with a "mechanisms-continue" button.
  */
 export async function confirmMechanismsEmpty(page: Page): Promise<void> {
+  // The marks series (spec 046) now runs before carve and is driven inside
+  // buildOneCharacterList — nothing marks-related can render here.
   const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
   if (await startButton.isVisible().catch(() => false)) {
     await startButton.click();

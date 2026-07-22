@@ -90,6 +90,7 @@ export type ActiveStepId =
   | "project_name"
   | "characters"
   | "carve"
+  | "marks"
   | "mechanisms"
   | "sequences"
   | "touch_seed_source"
@@ -114,6 +115,24 @@ export interface SurveySessionState {
    * (charactersSub stays component-local).
    */
   history: readonly ActiveStepId[];
+
+  /**
+   * Direction of the last traversal move: "advance" (forward) or "pop"
+   * (back-navigation). Lets a computed-gate step (spec 046 "marks": S0 skips
+   * the whole series when the alphabet has no marks) stay TRANSPARENT in both
+   * directions — on a forward entry the skip advances onward, on a back-pop
+   * entry it keeps popping backward instead of bouncing the user forward.
+   */
+  lastNavigation: "advance" | "pop";
+
+  /**
+   * Spec 046 R10 (recorded consequence, not acted on): the designer picked the
+   * base-plus-mark output form while adapting a base whose own content uses
+   * ready-made forms — the base's existing content needs a follow-on
+   * conversion. This flag only RECORDS that the need exists; building the
+   * conversion is out of scope for spec 046.
+   */
+  marksMigrationNeeded: boolean;
 
   /** Identity-lite output from the identity step. Null until the step completes. */
   identityResult: IdentityLiteResult | null;
@@ -199,6 +218,9 @@ export interface SurveySessionState {
    * this so history is always the true walked path.
    */
   advance: (stepId: ActiveStepId) => void;
+
+  /** Record the spec 046 R10 migration-need consequence (see marksMigrationNeeded). */
+  setMarksMigrationNeeded: (needed: boolean) => void;
 
   /**
    * Generic back. Pops the last entry off history and sets it as activeStepId.
@@ -293,6 +315,7 @@ type SurveySessionData = Omit<
   | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
   | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
   | "setTouchSeedSource" | "setBaseConfirmed" | "setDiscoveryMethod"
+  | "setMarksMigrationNeeded"
 >;
 
 /**
@@ -312,6 +335,8 @@ export type TraversalSnapshot = SurveySessionData;
 const INITIAL_STATE = {
   activeStepId: "identity" as ActiveStepId,
   history: [] as readonly ActiveStepId[],
+  lastNavigation: "advance" as const,
+  marksMigrationNeeded: false,
   identityResult: null,
   identityPhaseResult: null,
   surveyContext: {} as SurveyContext,
@@ -335,6 +360,7 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
     set((s) => ({
       history: [...s.history, s.activeStepId],
       activeStepId: stepId,
+      lastNavigation: "advance",
     })),
 
   popHistory: () =>
@@ -345,6 +371,7 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
       return {
         activeStepId: prev,
         history: s.history.slice(0, -1),
+        lastNavigation: "pop" as const,
       };
     }),
 
@@ -355,12 +382,13 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
         return {
           activeStepId: "touch_seed_source",
           history: s.history.slice(0, -1),
+          lastNavigation: "pop" as const,
         };
       }
       // Fork was skipped this pass — jump without consuming history so
       // "mechanisms" (or whatever is actually on top) stays there for the
       // chooser's own Back.
-      return { activeStepId: "touch_seed_source" };
+      return { activeStepId: "touch_seed_source", lastNavigation: "pop" as const };
     }),
 
   reset: () =>
@@ -369,6 +397,8 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
       // Re-initialize array so mutations do not bleed across resets.
       history: [] as readonly ActiveStepId[],
     }),
+
+  setMarksMigrationNeeded: (needed) => set({ marksMigrationNeeded: needed }),
 
   setIdentityResult: (r) => set({ identityResult: r }),
   setIdentityPhaseResult: (r) => set({ identityPhaseResult: r }),
@@ -414,6 +444,8 @@ export function snapshotTraversal(): TraversalSnapshot {
   return {
     activeStepId: s.activeStepId,
     history: s.history,
+    lastNavigation: s.lastNavigation,
+    marksMigrationNeeded: s.marksMigrationNeeded,
     identityResult: s.identityResult,
     identityPhaseResult: s.identityPhaseResult,
     surveyContext: s.surveyContext,

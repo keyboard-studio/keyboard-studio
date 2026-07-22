@@ -7,7 +7,7 @@
 //
 // SPINE ORDER (FR-012, M2):
 //   Identity → choose base → Track → [project_name (spine:false)] →
-//   Characters (Phase A/B questions) → Carve → Mechanisms → [lock: "physical"] →
+//   Characters (Phase A/B questions) → Marks → Carve → Mechanisms → [lock: "physical"] →
 //   Sequences → touch_seed_source (spine:false) → touch →
 //   [lock: "touch"] → Help → Package (reserved)
 //
@@ -21,6 +21,7 @@
 import { irPath } from "@keyboard-studio/contracts";
 import type { Step } from "./types.ts";
 import { CharactersStep } from "../survey/CharactersStep.tsx";
+import { MarksSeriesStep } from "../survey/marks/MarksSeriesStep.tsx";
 import {
   identityStep,
   chooseBaseStep,
@@ -80,8 +81,8 @@ const charactersStep: Step = {
 // Manifest: the ordered Step[] (FR-008, FR-012)
 //
 // Rules encoded here:
-//   M2 — spine order: Identity → choose_base → track → Characters → Carve →
-//         Mechanisms → (lock physical) → Sequences → touch →
+//   M2 — spine order: Identity → choose_base → track → Characters → Marks →
+//         Carve → Mechanisms → (lock physical) → Sequences → touch →
 //         (lock touch) → Help → Package
 //   M3 — exactly one lock:"physical" and one lock:"touch", in that order.
 //   M4 — touch_seed_source is spine:false with joinTarget resolving to "touch".
@@ -109,6 +110,23 @@ export const manifest: readonly Step[] = [
 
   // --- Character inventory (Phase A / Phase B question battery) ---
   charactersStep,
+
+  // --- Marks series (spec 046: S0-S5 accent/mark question series) ---
+  // Runs immediately after alphabet confirmation, BEFORE carve: how the author
+  // thinks of the combined letters must be known before any key work begins.
+  // S0 is a computed gate INSIDE the step component: a marks-free alphabet
+  // completes the step immediately (no render), so the spine hop is invisible
+  // for the no-diacritic majority case (FR-005). Emits the PlacementWorklist
+  // the mechanism gallery consumes (session.marksWorklist).
+  {
+    kind: "editor-step",
+    id: "marks",
+    title: "Accents & marks",
+    spine: true,
+    inputs: [],
+    writes: [],
+    component: MarksSeriesStep,
+  } satisfies Step,
 
   // --- Carve (Phase D: remove unwanted base keys) ---
   carveStep,
@@ -165,7 +183,7 @@ export function validateManifestShape(): void {
   // M2 — spine order.
   const expectedSpine = [
     "identity", "choose_base", "track", "characters",
-    "carve", "mechanisms", "sequences", "touch", "help", "package",
+    "marks", "carve", "mechanisms", "sequences", "touch", "help", "package",
   ];
   for (let i = 0; i < expectedSpine.length; i++) {
     const expected = expectedSpine[i];

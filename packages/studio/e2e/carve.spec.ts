@@ -115,9 +115,9 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     await confirmPrefill(page);
     await buildOneCharacterList(page, "᙮");
 
-    // Manifest spine order (StudioShell.tsx) is characters -> carve ->
-    // mechanisms -> sequences -> touch -> help; carve comes immediately after
-    // Phase B, BEFORE mechanisms/sequences/touch.
+    // Manifest spine order (StudioShell.tsx) is characters -> marks -> carve ->
+    // mechanisms -> sequences -> touch -> help; the marks-free alphabet ("᙮")
+    // auto-skips the marks step, so carve renders right after Phase B.
 
     // ---------------------------------------------------------------------
     // Carve gallery

@@ -548,3 +548,53 @@ describe("BuildListView — Back navigation", () => {
     expect(screen.queryByText(/Phase B — Character discovery/i)).not.toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// AlphabetBreakdown — visible three-store decomposition (spec 046, US5)
+// ---------------------------------------------------------------------------
+
+describe("AlphabetBreakdown — visible decomposition (spec 046)", () => {
+  const ACUTE = "́";
+
+  it("does not render while the alphabet has no marks and no accented letters", async () => {
+    await renderBuildListView();
+    act(() => {
+      usePhaseBDraftStore.getState().add("a");
+    });
+    expect(screen.queryByTestId("alphabet-marks")).toBeNull();
+    expect(screen.queryByTestId("alphabet-accented")).toBeNull();
+  });
+
+  it("a precomposed pick populates Letters, Marks, and Accented letters visibly", async () => {
+    await renderBuildListView();
+    act(() => {
+      usePhaseBDraftStore.getState().add("é");
+    });
+    const letters = screen.getByTestId("alphabet-letters");
+    const marks = screen.getByTestId("alphabet-marks");
+    const accented = screen.getByTestId("alphabet-accented");
+    expect(letters.textContent).toContain("e");
+    expect(marks.textContent).toContain("U+0301");
+    expect(accented.textContent).toContain("é");
+  });
+
+  it("marks the just-added base and mark as new (US5 AC2)", async () => {
+    await renderBuildListView();
+    act(() => {
+      usePhaseBDraftStore.getState().add("é");
+    });
+    const justAdded = screen.getAllByLabelText(/just added/);
+    const labels = justAdded.map((el) => el.getAttribute("aria-label") ?? "");
+    expect(labels.some((l) => l.includes("U+0065"))).toBe(true); // base e
+    expect(labels.some((l) => l.includes("U+0301"))).toBe(true); // combining acute
+  });
+
+  it("a lone combining-mark pick renders in Marks on a dotted-circle carrier", async () => {
+    await renderBuildListView();
+    act(() => {
+      usePhaseBDraftStore.getState().add(ACUTE);
+    });
+    const marks = screen.getByTestId("alphabet-marks");
+    expect(marks.textContent).toContain("◌");
+  });
+});

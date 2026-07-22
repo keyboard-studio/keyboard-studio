@@ -23,6 +23,15 @@ import type { Criterion } from "./criteria";
 import type { RemovalCapability } from "./removalCapability";
 import type { TouchKeyProvenance, TouchKeyIR, TouchLayoutIR } from "./keyboard-ir";
 import type { AxisFill, AxisFillSource } from "./axisFill";
+import type {
+  AttachmentState,
+  AttestedStack,
+  BlockedCombination,
+  ConfirmedAlphabet,
+  DeclaredRole,
+  MarkUnit,
+  PlacementWorklist,
+} from "./confirmedAlphabet";
 import type { Scale, ScriptClass } from "./axes";
 import type { StrategyId } from "./strategy";
 
@@ -475,6 +484,48 @@ export function toPattern(data: RawPattern): Pattern {
 }
 
 // ---------------------------------------------------------------------------
+// ConfirmedAlphabet + PlacementWorklist (spec 046 marks question series).
+// Mirrors of the additive contract types in confirmedAlphabet.ts — the
+// three-store alphabet model and the mechanism-gallery handoff. Validated at
+// the session/phase-result boundaries where the stores are persisted.
+// ---------------------------------------------------------------------------
+
+export const DeclaredRoleSchema = z.enum(["letter", "mark"]);
+
+export const AttestedStackSchema = z.object({
+  base: z.string().min(1),
+  // Order-preserving: closest-to-base first; at least one mark per stack.
+  marks: z.array(z.string().min(1)).min(1),
+});
+
+export const ConfirmedAlphabetSchema = z.object({
+  bases: z.array(z.string().min(1)),
+  marks: z.array(z.string().min(1)),
+  attestedStacks: z.array(AttestedStackSchema),
+  declaredRoles: z.record(z.string(), DeclaredRoleSchema),
+});
+
+export const AttachmentStateSchema = z.enum(["attested", "plausible-accepted", "blocked"]);
+
+export const MarkInputOrderSchema = z.enum(["prefix", "postfix"]);
+
+export const MarkUnitSchema = z.object({
+  mark: z.string().min(1),
+  inputOrder: MarkInputOrderSchema,
+});
+
+export const BlockedCombinationSchema = z.object({
+  base: z.string().min(1),
+  mark: z.string().min(1),
+});
+
+export const PlacementWorklistSchema = z.object({
+  ownLetterUnits: z.array(z.string()),
+  markUnits: z.array(MarkUnitSchema),
+  blockedCombinations: z.array(BlockedCombinationSchema),
+});
+
+// ---------------------------------------------------------------------------
 // Compile-time drift guards.
 //
 // Each canonical schema's inferred type must stay assignable to the locked
@@ -534,6 +585,23 @@ type _TouchKeyProvenanceGuard = Expect<
 // (you cannot widen the annotation without also widening `LooseOptional<TouchKeyIR>`,
 // which is pinned to the contract). These aliases pin the inferred OUTPUT back
 // to the contract as belt-and-braces.
+// ConfirmedAlphabet + PlacementWorklist (spec 046) — the three-store alphabet
+// model and the gallery handoff must stay in lockstep with confirmedAlphabet.ts.
+type _DeclaredRoleGuard = Expect<AssignableTo<z.infer<typeof DeclaredRoleSchema>, DeclaredRole>>;
+type _AttestedStackGuard = Expect<AssignableTo<z.infer<typeof AttestedStackSchema>, AttestedStack>>;
+type _ConfirmedAlphabetGuard = Expect<
+  AssignableTo<z.infer<typeof ConfirmedAlphabetSchema>, ConfirmedAlphabet>
+>;
+type _AttachmentStateGuard = Expect<
+  AssignableTo<z.infer<typeof AttachmentStateSchema>, AttachmentState>
+>;
+type _MarkUnitGuard = Expect<AssignableTo<z.infer<typeof MarkUnitSchema>, MarkUnit>>;
+type _BlockedCombinationGuard = Expect<
+  AssignableTo<z.infer<typeof BlockedCombinationSchema>, BlockedCombination>
+>;
+type _PlacementWorklistGuard = Expect<
+  AssignableTo<z.infer<typeof PlacementWorklistSchema>, PlacementWorklist>
+>;
 type _TouchKeyIRGuard = Expect<AssignableTo<z.infer<typeof TouchKeyIRSchema>, TouchKeyIR>>;
 // TouchLayoutIR is guarded on its `platforms` slice (the touch-key + provenance
 // payload — the spec-014 durability target). `nodeIds` is intentionally not run

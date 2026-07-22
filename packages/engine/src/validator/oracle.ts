@@ -32,6 +32,8 @@ import {
 } from "./wasmLoader.js";
 import { OracleLoadError } from "./OracleLoadError.js";
 import { runLexicalChecks, runReferenceChecks } from "./index.js";
+import { checkNormalizationUniformity } from "./layer-b-uniformity.js";
+import { parse } from "../codec/parse.js";
 
 function severityRank(s: LintFinding["severity"]): number {
   switch (s) {
@@ -154,6 +156,15 @@ function makeOracle(load: LoadHandle): OracleInstance {
         // TS half of `reference` (#5/#6/#8/#9). The WASM half (#13/#14) flows
         // through wasmTask; the two sets emit disjoint codes, so no duplicates.
         out.push(...runReferenceChecks(source));
+        // Layer B mark-normalization uniformity (spec 046 FR-022): IR-aware —
+        // runs inside this same TS task (same single debounce cycle, D3). A
+        // source the codec cannot parse simply skips the check; Layer A owns
+        // reporting parse-level problems.
+        try {
+          out.push(...checkNormalizationUniformity(parse(source, "uniformity-check").ir));
+        } catch {
+          // Unparseable source: no IR to check — not this check's finding.
+        }
       }
       return out;
     })();

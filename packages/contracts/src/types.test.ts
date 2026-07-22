@@ -469,7 +469,7 @@ describe("criteria.json schema conformance", () => {
     expect(unique.size).toBe(ids.length);
   });
 
-  it("matches the expected per-band counts (40/66/32/10 after the flagged-criteria re-review + 2 section-19 import-output rows)", () => {
+  it("matches the expected per-band counts (40/67/32/10 after the flagged-criteria re-review + 2 section-19 import-output rows + the spec-046 uniformity row)", () => {
     const counts = records.reduce<Record<string, number>>((acc, c) => {
       acc[c.band] = (acc[c.band] ?? 0) + 1;
       return acc;
@@ -480,10 +480,11 @@ describe("criteria.json schema conformance", () => {
     });
     // 133 original repo-hygiene criteria + 12 section-18 DISCUS design
     // heuristics + 1 split row (7.7a) from the flagged-criteria re-review
-    // + 2 section-19 import-output criteria = 148 total.
-    expect(records.length).toBe(148);
+    // + 2 section-19 import-output criteria + 1 spec-046 mark-normalization
+    // uniformity row = 149 total.
+    expect(records.length).toBe(149);
     expect(counts["scaffolder-bake"]).toBe(40);
-    expect(counts["layer-c-enforce"]).toBe(66);
+    expect(counts["layer-c-enforce"]).toBe(67);
     expect(counts["yellow-survey"]).toBe(32);
     expect(counts["red-checklist"]).toBe(10);
   });
@@ -500,14 +501,16 @@ describe("criteria.json schema conformance", () => {
     const section18 = records.filter((c) =>
       c.section.startsWith("18.")
     );
-    expect(section18.length).toBe(12);
+    // 12 at Day-1 lock + the spec-046 mark-normalization uniformity row.
+    expect(section18.length).toBe(13);
     section18.forEach((c) => {
       expect(validPrinciples, `${c.id}.principle`).toContain(c.principle);
     });
-    // The seven auto-checkable heuristics are layer-c-enforce.
+    // The seven auto-checkable heuristics + the spec-046 uniformity row
+    // are layer-c-enforce.
     expect(
       section18.filter((c) => c.band === "layer-c-enforce").length
-    ).toBe(7);
+    ).toBe(8);
   });
 
   it("every principle-tagged record uses a valid DiscusPrinciple value", () => {
@@ -597,7 +600,7 @@ describe("criteria.json schema conformance", () => {
 describe("criteriaData loader (#116)", () => {
   it("ALL_CRITERIA is a non-empty readonly Criterion[]", () => {
     expect(Array.isArray(ALL_CRITERIA)).toBe(true);
-    expect(ALL_CRITERIA.length).toBe(148);
+    expect(ALL_CRITERIA.length).toBe(149);
   });
 
   it("CRITERIA_BY_BAND partitions ALL_CRITERIA across the four bands", () => {

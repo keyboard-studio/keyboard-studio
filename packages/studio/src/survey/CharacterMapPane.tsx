@@ -27,6 +27,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
+import { isPrivateUseCodePoint } from "@keyboard-studio/engine";
 import { prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { TextField } from "../ui/index.ts";
 import {
@@ -144,6 +145,10 @@ export function CharacterMapPane({
   const [announcement, setAnnouncement] = useState("");
   const [rawInput, setRawInput] = useState("");
   const [rawError, setRawError] = useState<string | null>(null);
+  // Private-use pick awaiting its role answer (spec 046 FR-004): no linguistic
+  // data exists for PUA characters, so the designer says letter-or-mark AT the
+  // point of picking — the character is not added to any list until answered.
+  const [pendingPuaChar, setPendingPuaChar] = useState<string | null>(null);
 
   // No base IR / no BCP47 yet — short-circuit BEFORE the fetch, mirroring
   // SuggestionPanel's own `!bcp47 || baseIr === null` guard (PhaseB.tsx). Without
@@ -193,6 +198,28 @@ export function CharacterMapPane({
     return null;
   }
 
+  // Visible decomposition at the point of picking (spec 046 US5/FR-003): a
+  // whole-grapheme pick contributes its base to Letters and its mark(s) to
+  // Marks; the announcement narrates that three-way update so the pick itself
+  // is the teaching moment — no interrupting question.
+  function describeContribution(char: string): string {
+    const lastPick = usePhaseBDraftStore.getState().lastPick;
+    if (lastPick === null || lastPick.grapheme !== char.normalize("NFC")) return "";
+    const parts: string[] = [];
+    if (lastPick.addedBases.length > 0) {
+      parts.push(`${lastPick.addedBases.join(", ")} added to Letters`);
+    }
+    if (lastPick.addedMarks.length > 0) {
+      parts.push(
+        `${lastPick.addedMarks.map((m) => prefixCombiningMark(m, true)).join(", ")} added to Marks`,
+      );
+    }
+    if (lastPick.addedStack !== null && parts.length > 0) {
+      parts.push("combination recorded");
+    }
+    return parts.length > 0 ? ` — ${parts.join(", ")}` : "";
+  }
+
   function handleToggle(cell: CharacterMapCell): void {
     const nfc = cell.char.normalize("NFC");
     const wasSelected = chars.includes(nfc);
@@ -200,7 +227,11 @@ export function CharacterMapPane({
     const actionWord = wasSelected
       ? t({ id: "survey.characterMapPane.announce.removed", message: "Removed" })
       : t({ id: "survey.characterMapPane.announce.added", message: "Added" });
-    setAnnouncement(`${actionWord} ${cell.char} (${toUPlusNotation(cell.char)})`);
+    setAnnouncement(
+      `${actionWord} ${cell.char} (${toUPlusNotation(cell.char)})${
+        wasSelected ? "" : describeContribution(cell.char)
+      }`,
+    );
   }
 
   // "All options" escape hatch: add a character by raw code point, bypassing
@@ -222,11 +253,33 @@ export function CharacterMapPane({
       return;
     }
     const char = result.char.normalize("NFC");
+    // FR-004: a private-use character has no data to infer a role from — ask
+    // letter-or-mark BEFORE adding it to any inventory list.
+    const cp = char.codePointAt(0);
+    if (cp !== undefined && isPrivateUseCodePoint(cp)) {
+      setPendingPuaChar(char);
+      setRawInput("");
+      setRawError(null);
+      return;
+    }
     addChar(char);
     const addedLabel = t({ id: "survey.characterMapPane.announce.added", message: "Added" });
-    setAnnouncement(`${addedLabel} ${char} (${toUPlusNotation(char)})`);
+    setAnnouncement(`${addedLabel} ${char} (${toUPlusNotation(char)})${describeContribution(char)}`);
     setRawInput("");
     setRawError(null);
+  }
+
+  // Resolve the pending PUA pick with the designer's declared role — recorded
+  // permanently on the draft (classifiers read it first; FR-004).
+  function handlePuaRole(role: "letter" | "mark"): void {
+    if (pendingPuaChar === null) return;
+    addChar(pendingPuaChar, { role });
+    setAnnouncement(
+      `Added ${pendingPuaChar} (${toUPlusNotation(pendingPuaChar)}) as a ${
+        role === "mark" ? "mark" : "letter"
+      }`,
+    );
+    setPendingPuaChar(null);
   }
 
   return (
@@ -270,6 +323,41 @@ export function CharacterMapPane({
       {rawError !== null && (
         <div id="char-map-raw-codepoint-error" role="alert" style={{ fontSize: 12, color: ERROR_RED }}>
           {rawError}
+        </div>
+      )}
+      {pendingPuaChar !== null && (
+        <div
+          data-testid="pua-role-prompt"
+          role="group"
+          aria-label={`Is ${pendingPuaChar} a letter or a mark?`}
+          style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: TEXT_DIM }}
+        >
+          <span>
+            {pendingPuaChar} ({toUPlusNotation(pendingPuaChar)}) is a private-use
+            character, so there is no data to say what it is. Is it a letter of
+            your alphabet, or a mark that attaches to a letter?
+          </span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              data-testid="pua-role-letter"
+              onClick={() => handlePuaRole("letter")}
+              style={primaryButton(false)}
+            >
+              A letter
+            </button>
+            <button
+              type="button"
+              data-testid="pua-role-mark"
+              onClick={() => handlePuaRole("mark")}
+              style={primaryButton(false)}
+            >
+              A mark
+            </button>
+            <button type="button" onClick={() => setPendingPuaChar(null)} style={{ fontSize: 12 }}>
+              Cancel
+            </button>
+          </div>
         </div>
       )}
       <TextField

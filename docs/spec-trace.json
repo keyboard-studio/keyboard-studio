@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-07-21",
+  "lastUpdated": "2026-07-22",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -146,7 +146,7 @@
     },
     "§11": {
       "title": "11. criteria.md compliance",
-      "hash": "sha256:6aa6972138b421d3",
+      "hash": "sha256:c88a4687ad623fd7",
       "status": "implemented",
       "implements": [
         "packages/contracts/data/criteria.json",
