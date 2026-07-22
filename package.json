@@ -25,9 +25,12 @@
     "facet-index-lint": "node utilities/facet-index-lint/index.js",
     "adaptation-catalog-lint": "node utilities/adaptation-catalog-lint/index.js",
     "i18n-catalog-lint": "node utilities/i18n-catalog-lint/index.js",
-    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,json,md}\""
+    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,json,md}\"",
+    "crowdin:upload": "crowdin upload sources -b main",
+    "crowdin:download": "crowdin download -b main"
   },
   "devDependencies": {
+    "@crowdin/cli": "^4.14.4",
     "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^8.60.1",
     "@typescript-eslint/parser": "^8.60.1",
