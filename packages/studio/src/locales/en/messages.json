@@ -286,6 +286,7 @@
   "editor.assignLoop.flaggedForSequencesHeading": "Flagged for sequences",
   "editor.assignLoop.touch.flickDirectionAriaLabel": "Flick direction",
   "dashboard.flowMap.title": "Flow Map",
+  "survey.phaseB.buildList.fontSelectLabel": "Font for characters",
   "editor.assignLoop.touch.headerDescription": "For each character, choose how it appears on the touch keyboard. Your desktop layout is locked — these apply to phone and tablet only.",
   "survey.phaseB.suggestionPanel.fromCldr": "from CLDR exemplars — tick to add",
   "dashboard.flowGraph.badge.gate": "gate",
