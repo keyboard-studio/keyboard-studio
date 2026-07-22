@@ -1,0 +1,33 @@
+# Crowdin Tier A first live `upload sources` (spec 046 T023). Manual/one-off:
+# pushes the English source catalog (packages/studio/src/locales/en/messages.json)
+# to the live Crowdin project per crowdin.yml. Credentials only exist as CI
+# secrets, so this has to run here rather than locally.
+#
+# NOT the ongoing round-trip -- "upload on merge to main" is tracked separately
+# as T037 and will supersede/extend this trigger when it lands.
+
+name: Crowdin upload sources (manual)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Upload sources to Crowdin
+        uses: crowdin/github-action@v2
+        with:
+          config: crowdin.yml
+          upload_sources: true
+          upload_translations: false
+          download_translations: false
+        env:
+          CROWDIN_PROJECT_ID: ${{ secrets.CROWDIN_PROJECT_ID }}
+          CROWDIN_PERSONAL_TOKEN: ${{ secrets.CROWDIN_PERSONAL_TOKEN }}
