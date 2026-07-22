@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { KeyboardIR } from "@keyboard-studio/contracts";
+import type { IRGroup, KeyboardIR } from "@keyboard-studio/contracts";
 import type { CldrFullLoader } from "./cldr.js";
 import { buildCharacterMap, CHARACTER_MAP_BLOCKS } from "./characterMap.js";
 
@@ -7,7 +7,7 @@ import { buildCharacterMap, CHARACTER_MAP_BLOCKS } from "./characterMap.js";
 // Fixtures
 // ---------------------------------------------------------------------------
 
-function makeIR(bcp47: string[] = []): KeyboardIR {
+function makeIR(bcp47: string[] = [], groups: IRGroup[] = []): KeyboardIR {
   return {
     origin: "imported",
     header: {
@@ -20,11 +20,27 @@ function makeIR(bcp47: string[] = []): KeyboardIR {
       storeDirectives: [],
     },
     stores: [],
-    groups: [],
+    groups,
     comments: [],
     raw: [],
     recognizedPatterns: [],
   } as KeyboardIR;
+}
+
+/** A minimal group/rule producing the given literal char output — used to
+ * give a fixture IR a non-empty producedGlyphs() set for usedByBase tests. */
+function makeProducingGroup(chars: readonly string[]): IRGroup {
+  return {
+    nodeId: "group#produces",
+    name: "main",
+    usingKeys: true,
+    readonly: false,
+    rules: chars.map((ch, i) => ({
+      nodeId: `rule#${i}`,
+      context: [{ kind: "vkey", name: `K_${i}`, modifiers: [] }],
+      output: [{ kind: "char", value: ch }],
+    })),
+  };
 }
 
 // Bambara-ish fixture: main exemplars include ASCII + IPA-Extensions letters
@@ -513,6 +529,43 @@ describe("buildCharacterMap", () => {
     const cells = allCells(groups);
     const combiningAcute = cells.find((c) => c.char === "́");
     expect(combiningAcute?.name).toBe("COMBINING ACUTE ACCENT");
+  });
+
+  // ---------------------------------------------------------------------------
+  // usedByBase (studio's "blocks my keyboard uses" filter)
+  // ---------------------------------------------------------------------------
+
+  it("tags groups containing a produced char usedByBase: true, groups with none usedByBase: false", async () => {
+    // The fixture keyboard produces "ĳ" (U+0133, Latin Extended-A) and "0"
+    // (Common-scoped ASCII digit) but nothing from Latin Extended Additional
+    // or the punctuation tier.
+    const groups = await buildCharacterMap(
+      makeIR(["xx-Latn"], [makeProducingGroup(["ĳ", "0"])]),
+      undefined,
+      undefined,
+      { loader: async () => null },
+    );
+    const latinExtendedA = groups.find(
+      (g) => g.tier === "block" && g.block === "Latin Extended-A" && g.script === "Latn",
+    );
+    expect(latinExtendedA?.usedByBase).toBe(true);
+
+    const digits = groups.find((g) => g.tier === "digits" && g.script === "Common");
+    expect(digits?.usedByBase).toBe(true);
+
+    const latinExtendedAdditional = groups.find(
+      (g) => g.tier === "block" && g.block === "Latin Extended Additional" && g.script === "Latn",
+    );
+    expect(latinExtendedAdditional?.usedByBase).toBe(false);
+
+    const punctuation = groups.find((g) => g.tier === "punctuation" && g.script === "Common");
+    expect(punctuation?.usedByBase).toBe(false);
+  });
+
+  it("tags every group usedByBase: false when baseIr is null", async () => {
+    const groups = await buildCharacterMap(null, "xx-Latn", undefined, { loader: async () => null });
+    expect(groups.length).toBeGreaterThan(0);
+    expect(groups.every((g) => g.usedByBase === false)).toBe(true);
   });
 
   it("degrades to name: undefined (no throw) for a codepoint absent from the name table", async () => {

@@ -155,7 +155,7 @@ export function CharacterMapPane({
 
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [query, setQuery] = useState("");
-  const [scriptsOnly, setScriptsOnly] = useState(true);
+  const [blocksOnly, setBlocksOnly] = useState(true);
   const [announcement, setAnnouncement] = useState("");
   const [rawInput, setRawInput] = useState("");
   const [rawError, setRawError] = useState<string | null>(null);
@@ -175,8 +175,10 @@ export function CharacterMapPane({
 
   // The base keyboard's own script(s) — its primary `script` field plus any
   // script subtag parsed out of its `.kps` `languages` list (e.g.
-  // "lif-Deva" -> "Deva"). This is the "my keyboard's scripts" set the
-  // scripts-only checkbox narrows the grid to.
+  // "lif-Deva" -> "Deva"). Forwarded to buildCharacterMap's opts.baseScripts
+  // so the base keyboard's script(s) are enumerated alongside the target
+  // script — this only drives WHICH groups are built, not the "blocks my
+  // keyboard uses" filter below (that filter narrows by usedByBase instead).
   const baseScripts = useMemo<string[]>(() => {
     const set = new Set<string>();
     if (baseKeyboard?.script) set.add(baseKeyboard.script);
@@ -214,48 +216,27 @@ export function CharacterMapPane({
     };
   }, [noBaseOrLanguage, baseIr, bcp47, languageName, baseKeyboard, baseScripts]);
 
-  // char -> script lookup built from the loaded groups, so the "auto-unhide"
-  // logic below can find the script of any grid character without
-  // duplicating the engine's own script-classification logic.
-  const charScript = useMemo(() => {
-    const m = new Map<string, string>();
-    if (loadState.status === "done") {
-      for (const g of loadState.groups) {
-        for (const c of g.cells) {
-          m.set(c.char, g.script);
-        }
-      }
-    }
-    return m;
-  }, [loadState]);
-
-  // Scripts the "show only my keyboard's scripts" checkbox lets through.
-  // "Common" (the curated, genuinely script-neutral folds — ASCII digits,
-  // ordinary punctuation/currency, Common spacing modifier letters) is always
-  // allowed. Every other group (including combining marks and punctuation
-  // gathered while enumerating a specific script — see the engine's
-  // buildCharacterMap) is tagged with the script that surfaced it, so it
-  // hides along with that script unless it's also a base script. Any script
-  // already represented in the author's accumulating alphabet (`chars`, from
-  // phaseBDraftStore) is also allowed — this is the auto-unhide mechanism:
-  // adding a character from a hidden script (via search, or the raw code
-  // point field) unhides that character's whole script group, even while the
-  // checkbox stays checked.
-  const allowedScripts = useMemo(() => {
-    const s = new Set<string>(baseScripts);
-    s.add("Common");
-    for (const ch of chars) {
-      const sc = charScript.get(ch);
-      if (sc !== undefined) s.add(sc);
-    }
-    return s;
-  }, [baseScripts, chars, charScript]);
+  // Whether the loaded groups actually carry a known produced set — the
+  // engine only sets `usedByBase: true` on any group when it had a baseIr to
+  // derive producedGlyphs() from (see buildCharacterMap). Without at least
+  // one usedByBase group the "blocks my keyboard uses" filter is meaningless,
+  // so it stays hidden and every group shows regardless of `blocksOnly`.
+  const hasKnownBlocks = useMemo(
+    () => loadState.status === "done" && loadState.groups.some((g) => g.usedByBase),
+    [loadState],
+  );
 
   // Client-side filter — plain array filter, no timer of any kind. Search is
   // ALWAYS whole-set: when a query is present it searches every loaded group
-  // regardless of the scripts-only checkbox, so a query can surface a
-  // character from a currently-hidden script. Only when there's no query
-  // does the scripts-only checkbox narrow the grid.
+  // regardless of the "blocks my keyboard uses" checkbox, so a query can
+  // surface a character from a currently-hidden block. Only when there's no
+  // query does the checkbox narrow the grid — and only when we actually know
+  // which blocks the base keyboard uses (hasKnownBlocks). A block already
+  // represented in the author's accumulating alphabet (`chars`, from
+  // phaseBDraftStore) is also allowed even if the base doesn't produce it —
+  // this is the auto-unhide mechanism: adding a character from a hidden block
+  // (via search, or the raw code point field) unhides that block, even while
+  // the checkbox stays checked.
   const filteredGroups = useMemo(() => {
     if (loadState.status !== "done") return [];
     const q = query.trim();
@@ -264,11 +245,13 @@ export function CharacterMapPane({
         .map((g) => ({ ...g, cells: g.cells.filter((c) => matchesQuery(c, q)) }))
         .filter((g) => g.cells.length > 0);
     }
-    if (scriptsOnly) {
-      return loadState.groups.filter((g) => allowedScripts.has(g.script));
+    if (blocksOnly && hasKnownBlocks) {
+      return loadState.groups.filter(
+        (g) => g.usedByBase || g.cells.some((c) => chars.includes(c.char.normalize("NFC"))),
+      );
     }
     return loadState.groups;
-  }, [loadState, query, scriptsOnly, allowedScripts]);
+  }, [loadState, query, blocksOnly, hasKnownBlocks, chars]);
 
   // Defined here (not at module scope) so its `t()` calls close over this
   // component's own `t` binding directly — see the note above CodepointParseResult.
@@ -364,19 +347,19 @@ export function CharacterMapPane({
     setPendingPuaChar(null);
   }
 
-  // Toggles the scripts-only filter — reuses the existing announcement live
-  // region rather than adding a second one.
-  function handleToggleScriptsOnly(next: boolean): void {
-    setScriptsOnly(next);
+  // Toggles the "blocks my keyboard uses" filter — reuses the existing
+  // announcement live region rather than adding a second one.
+  function handleToggleBlocksOnly(next: boolean): void {
+    setBlocksOnly(next);
     setAnnouncement(
       next
         ? t({
-            id: "survey.characterMapPane.scriptsOnly.announceOn",
-            message: "Showing only your keyboard's scripts",
+            id: "survey.characterMapPane.blocksOnly.announceOn",
+            message: "Showing only blocks your keyboard uses",
           })
         : t({
-            id: "survey.characterMapPane.scriptsOnly.announceOff",
-            message: "Showing all scripts",
+            id: "survey.characterMapPane.blocksOnly.announceOff",
+            message: "Showing all blocks",
           }),
     );
   }
@@ -465,7 +448,7 @@ export function CharacterMapPane({
         placeholder={t({ id: "survey.characterMapPane.search.placeholder", message: "Search characters" })}
         aria-label={t({ id: "survey.characterMapPane.search.ariaLabel", message: "Search the character map" })}
       />
-      {!noBaseOrLanguage && (
+      {!noBaseOrLanguage && hasKnownBlocks && (
         <label
           style={{
             display: "flex",
@@ -477,15 +460,15 @@ export function CharacterMapPane({
           }}
         >
           <Checkbox
-            checked={scriptsOnly}
-            onChange={(e) => handleToggleScriptsOnly(e.target.checked)}
+            checked={blocksOnly}
+            onChange={(e) => handleToggleBlocksOnly(e.target.checked)}
             aria-label={t({
-              id: "survey.characterMapPane.scriptsOnly.ariaLabel",
-              message: "Show only my keyboard's scripts",
+              id: "survey.characterMapPane.blocksOnly.ariaLabel",
+              message: "Show only blocks my keyboard uses",
             })}
           />
-          <Trans id="survey.characterMapPane.scriptsOnly.label">
-            Show only my keyboard's scripts
+          <Trans id="survey.characterMapPane.blocksOnly.label">
+            Show only blocks my keyboard uses
           </Trans>
         </label>
       )}

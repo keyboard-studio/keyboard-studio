@@ -77,6 +77,7 @@ function twoGroupFixture(): CharacterMapGroup[] {
       block: "Latin",
       tier: "main",
       script: "Latn",
+      usedByBase: false,
       cells: [
         { char: "a", isCombiningMark: false },
         { char: "b", isCombiningMark: false },
@@ -86,6 +87,7 @@ function twoGroupFixture(): CharacterMapGroup[] {
       block: "Combining Diacritical Marks",
       tier: "auxiliary",
       script: "Latn",
+      usedByBase: false,
       cells: [{ char: COMBINING_ACUTE, isCombiningMark: true }],
     },
   ];
@@ -458,12 +460,14 @@ describe("CharacterMapPane — digits & punctuation tiers", () => {
         block: "Digits",
         tier: "digits",
         script: "Common",
+        usedByBase: false,
         cells: [{ char: "0", isCombiningMark: false }],
       },
       {
         block: "Punctuation",
         tier: "punctuation",
         script: "Common",
+        usedByBase: false,
         cells: [{ char: ".", isCombiningMark: false }],
       },
     ]);
@@ -523,6 +527,7 @@ describe("CharacterMapPane — search filter", () => {
         block: "Combining Diacritical Marks",
         tier: "auxiliary",
         script: "Latn",
+        usedByBase: false,
         cells: [{ char: COMBINING_ACUTE, isCombiningMark: true, name: "COMBINING ACUTE ACCENT" }],
       },
     ]);
@@ -546,6 +551,7 @@ describe("CharacterMapPane — search filter", () => {
         block: "Basic Latin",
         tier: "main",
         script: "Latn",
+        usedByBase: false,
         cells: [
           { char: "A", isCombiningMark: false }, // U+0041
           { char: "0", isCombiningMark: false }, // U+0030
@@ -580,6 +586,7 @@ describe("CharacterMapPane — search filter", () => {
         block: "Latin",
         tier: "main",
         script: "Latn",
+        usedByBase: false,
         cells: [
           { char: "o", isCombiningMark: false, name: "LATIN SMALL LETTER O" },
           { char: "ó", isCombiningMark: false, name: "LATIN SMALL LETTER O WITH ACUTE" },
@@ -599,29 +606,6 @@ describe("CharacterMapPane — search filter", () => {
     expect(within(group).queryByRole("button", { name: /ó \(U\+00F3\)/ })).toBeTruthy();
     expect(within(group).queryByRole("button", { name: /ø \(U\+00F8\)/ })).toBeTruthy();
     expect(within(group).queryByRole("button", { name: /Add b \(U\+0062\)/ })).toBeNull();
-  });
-
-  it("search is whole-set: finds a hidden-script character even while 'scripts only' is checked", async () => {
-    seedBaseAndLanguage(); // TEST_BASE.script === "Latn"
-    getGroupsResult.set([
-      { block: "Latin", tier: "main", script: "Latn", cells: [{ char: "a", isCombiningMark: false }] },
-      {
-        block: "Greek",
-        tier: "block",
-        script: "Grek",
-        cells: [{ char: "α", isCombiningMark: false, name: "GREEK SMALL LETTER ALPHA" }],
-      },
-    ]);
-    render(<CharacterMapPane />);
-
-    await waitFor(() => {
-      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
-    });
-    // Scripts-only is checked by default — Greek is hidden until searched.
-    expect(screen.queryByLabelText("Greek characters")).toBeNull();
-
-    fireEvent.change(screen.getByLabelText("Search the character map"), { target: { value: "alpha" } });
-    expect(screen.getByLabelText("Greek characters")).toBeTruthy();
   });
 });
 
@@ -651,7 +635,7 @@ describe("CharacterMapPane — per-group render cap", () => {
   it("renders an at-cap group in full — no 'Showing N of M' truncation note", async () => {
     seedBaseAndLanguage();
     getGroupsResult.set([
-      { block: "Synthetic", tier: "main", script: "Latn", cells: syntheticCells(TEST_CAP) },
+      { block: "Synthetic", tier: "main", script: "Latn", usedByBase: false, cells: syntheticCells(TEST_CAP) },
     ]);
     render(<CharacterMapPane maxCellsPerGroup={TEST_CAP} />);
 
@@ -667,7 +651,7 @@ describe("CharacterMapPane — per-group render cap", () => {
     seedBaseAndLanguage();
     const over = TEST_CAP + 5;
     getGroupsResult.set([
-      { block: "Synthetic", tier: "main", script: "Latn", cells: syntheticCells(over) },
+      { block: "Synthetic", tier: "main", script: "Latn", usedByBase: false, cells: syntheticCells(over) },
     ]);
     render(<CharacterMapPane maxCellsPerGroup={TEST_CAP} />);
 
@@ -689,121 +673,68 @@ describe("CharacterMapPane — per-group render cap", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scripts-only filter — a checkbox (checked by default) that narrows the
-// grid to the base keyboard's own script(s) plus the always-shown "Common"
-// sentinel bucket (the curated, genuinely script-neutral folds — ASCII
-// digits, ordinary punctuation/currency), with the "auto-unhide" mechanism:
-// any script represented in the author's accumulating alphabet is folded
-// into the allowed set too, so adding a character from a hidden script
-// unhides that character's whole script group even while the checkbox stays
-// checked. A combining mark or punctuation mark gathered while enumerating a
-// specific script (e.g. Latin's own combining marks tagged "Latn", or
-// Arabic's comma/marks tagged "Arab") hides along with that script — it is
-// NOT a separate always-shown sentinel bucket.
+// Blocks-my-keyboard-uses filter — a checkbox (checked by default) that
+// narrows the grid to only the groups the engine tagged usedByBase: true
+// (the Unicode blocks the base keyboard actually produces, via
+// producedGlyphs — see packages/engine/.../characterMap.ts), with the
+// "auto-unhide" mechanism: any group already represented in the author's
+// accumulating alphabet is shown too, so adding a character from a hidden
+// block unhides that whole block even while the checkbox stays checked. The
+// checkbox itself only renders once we actually know the base's blocks (at
+// least one loaded group is usedByBase: true) — otherwise the filter would
+// be meaningless, so every group shows.
 // ---------------------------------------------------------------------------
 
-function scriptsFixture(): CharacterMapGroup[] {
+function blocksFixture(): CharacterMapGroup[] {
   return [
-    { block: "Latin", tier: "main", script: "Latn", cells: [{ char: "a", isCombiningMark: false }] },
+    {
+      block: "Latin",
+      tier: "main",
+      script: "Latn",
+      usedByBase: true,
+      cells: [{ char: "a", isCombiningMark: false }],
+    },
     {
       block: "Combining Diacritical Marks",
       tier: "auxiliary",
       script: "Latn",
+      usedByBase: true,
       cells: [{ char: COMBINING_ACUTE, isCombiningMark: true }],
     },
     {
       block: "Greek",
       tier: "block",
       script: "Grek",
+      usedByBase: false,
       cells: [{ char: "α", isCombiningMark: false, name: "GREEK SMALL LETTER ALPHA" }],
     },
   ];
 }
 
-// Arabic comma (U+060C) and an Arabic combining mark (U+064B) — both
-// script-shared chars (Script=Common/Inherited by PRIMARY Unicode Script)
-// that the engine now attributes to "Arab" (the enumerating script), the
-// confirmed bug this fix addresses: they must hide with the Arabic script
-// under a Latin base's scripts-only filter, not always show via a
-// Common/Inherited sentinel.
-const ARABIC_COMMA = "،";
-const ARABIC_MARK = "ً";
-
-function scriptFilterFixtureWithArabic(): CharacterMapGroup[] {
-  return [
-    { block: "Latin", tier: "main", script: "Latn", cells: [{ char: "a", isCombiningMark: false }] },
-    {
-      block: "Combining Diacritical Marks",
-      tier: "block",
-      script: "Latn",
-      cells: [{ char: COMBINING_ACUTE, isCombiningMark: true }],
-    },
-    {
-      block: "Punctuation",
-      tier: "punctuation",
-      script: "Common",
-      cells: [
-        { char: "0", isCombiningMark: false },
-        { char: ".", isCombiningMark: false },
-      ],
-    },
-    {
-      block: "Arabic",
-      tier: "block",
-      script: "Arab",
-      cells: [
-        { char: ARABIC_COMMA, isCombiningMark: false },
-        { char: ARABIC_MARK, isCombiningMark: true },
-      ],
-    },
-  ];
-}
-
-describe("CharacterMapPane — scripts-only filter", () => {
-  it("is checked by default; shows the base's script(s) plus Common, hides other scripts", async () => {
-    seedBaseAndLanguage(); // TEST_BASE.script === "Latn"
-    getGroupsResult.set(scriptsFixture());
+describe("CharacterMapPane — blocks-my-keyboard-uses filter", () => {
+  it("is checked by default; shows usedByBase groups, hides the non-used Greek group", async () => {
+    seedBaseAndLanguage();
+    getGroupsResult.set(blocksFixture());
     render(<CharacterMapPane />);
 
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
     });
-    const checkbox = screen.getByRole("checkbox", { name: "Show only my keyboard's scripts" });
+    const checkbox = screen.getByRole("checkbox", { name: "Show only blocks my keyboard uses" });
     expect((checkbox as HTMLInputElement).checked).toBe(true);
 
-    // Latn (base script, including its own combining marks) shows...
+    // usedByBase groups show...
     expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
     expect(
       screen.getByLabelText("Combining Diacritical Marks characters (loanwords)"),
     ).toBeTruthy();
-    // ...but Grek (not the base's script, and not yet in the author's alphabet) is hidden.
+    // ...but the non-used Greek group is hidden.
     expect(screen.queryByLabelText("Greek characters")).toBeNull();
   });
 
-  it("hides an Arab-tagged group (comma + combining mark) with a Latin base while checked, but shows Common and Latn (incl. Latin combining marks)", async () => {
-    seedBaseAndLanguage(); // TEST_BASE.script === "Latn"
-    getGroupsResult.set(scriptFilterFixtureWithArabic());
-    render(<CharacterMapPane />);
-
-    await waitFor(() => {
-      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
-    });
-    const checkbox = screen.getByRole("checkbox", { name: "Show only my keyboard's scripts" });
-    expect((checkbox as HTMLInputElement).checked).toBe(true);
-
-    // Common (universal ASCII digit/punctuation fold) and Latn (incl. its
-    // own combining marks) show...
-    expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
-    expect(screen.getByLabelText("Combining Diacritical Marks characters")).toBeTruthy();
-    expect(screen.getByLabelText("Punctuation characters (Punctuation & symbols)")).toBeTruthy();
-    // ...but the Arab-tagged group (Arabic comma + combining mark) is hidden.
-    expect(screen.queryByLabelText("Arabic characters")).toBeNull();
-    expect(screen.queryByRole("button", { name: new RegExp(`\\(U\\+060C\\)`) })).toBeNull();
-  });
-
-  it("unchecking shows all scripts, including the previously-hidden Greek group", async () => {
+  it("unchecking shows all groups, including the previously-hidden Greek group", async () => {
     seedBaseAndLanguage();
-    getGroupsResult.set(scriptsFixture());
+    getGroupsResult.set(blocksFixture());
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -811,16 +742,16 @@ describe("CharacterMapPane — scripts-only filter", () => {
     });
     expect(screen.queryByLabelText("Greek characters")).toBeNull();
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Show only my keyboard's scripts" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Show only blocks my keyboard uses" }));
 
     expect(screen.getByLabelText("Greek characters")).toBeTruthy();
-    const checkbox = screen.getByRole("checkbox", { name: "Show only my keyboard's scripts" });
+    const checkbox = screen.getByRole("checkbox", { name: "Show only blocks my keyboard uses" });
     expect((checkbox as HTMLInputElement).checked).toBe(false);
   });
 
-  it("adding a character from a hidden script (reached via search) unhides that script's group while the checkbox stays checked", async () => {
+  it("adding a character from a hidden block (reached via search) unhides that block while the checkbox stays checked", async () => {
     seedBaseAndLanguage();
-    getGroupsResult.set(scriptsFixture());
+    getGroupsResult.set(blocksFixture());
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -829,41 +760,24 @@ describe("CharacterMapPane — scripts-only filter", () => {
     expect(screen.queryByLabelText("Greek characters")).toBeNull();
 
     // Reach the hidden Greek cell via search (whole-set, so it's reachable
-    // even while scripts-only is hiding its group from the plain browse view).
+    // even while the box is hiding its group from the plain browse view).
     fireEvent.change(screen.getByLabelText("Search the character map"), { target: { value: "alpha" } });
     const greekGroup = screen.getByLabelText("Greek characters");
     fireEvent.click(within(greekGroup).getByRole("button", { name: /Add α/ }));
 
-    // Clear the search — scripts-only is STILL checked, but the Greek group
-    // now stays visible because "α" is in the author's alphabet.
+    // Clear the search — the box is STILL checked, but the Greek group now
+    // stays visible because "α" is in the author's alphabet.
     fireEvent.change(screen.getByLabelText("Search the character map"), { target: { value: "" } });
 
-    const checkbox = screen.getByRole("checkbox", { name: "Show only my keyboard's scripts" });
+    const checkbox = screen.getByRole("checkbox", { name: "Show only blocks my keyboard uses" });
     expect((checkbox as HTMLInputElement).checked).toBe(true);
     expect(screen.getByLabelText("Greek characters")).toBeTruthy();
     expect(usePhaseBDraftStore.getState().chars).toContain("α");
   });
 
-  it("announces the filter state via the aria-live region on toggle", async () => {
+  it("search is whole-set: finds a hidden-block character even while the box is checked", async () => {
     seedBaseAndLanguage();
-    getGroupsResult.set(scriptsFixture());
-    render(<CharacterMapPane />);
-
-    await waitFor(() => {
-      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
-    });
-    const checkbox = screen.getByRole("checkbox", { name: "Show only my keyboard's scripts" });
-
-    fireEvent.click(checkbox);
-    expect(screen.getByText("Showing all scripts")).toBeTruthy();
-
-    fireEvent.click(checkbox);
-    expect(screen.getByText("Showing only your keyboard's scripts")).toBeTruthy();
-  });
-
-  it("resets scriptsOnly's effect for the new base scripts when a new language/base is set", async () => {
-    seedBaseAndLanguage();
-    getGroupsResult.set(scriptsFixture());
+    getGroupsResult.set(blocksFixture());
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -871,39 +785,60 @@ describe("CharacterMapPane — scripts-only filter", () => {
     });
     expect(screen.queryByLabelText("Greek characters")).toBeNull();
 
-    // Re-base onto a keyboard whose script IS Greek — the same fixture's
-    // Greek group is now allowed without touching the checkbox.
-    act(() => {
-      useWorkingCopyStore.getState().instantiateFromBase(
-        { ...TEST_BASE, id: "test_kb_grek", script: "Grek" },
-        { vfs: { files: new Map() }, ir: makeTestIR([]) },
-      );
-    });
+    fireEvent.change(screen.getByLabelText("Search the character map"), { target: { value: "alpha" } });
+    expect(screen.getByLabelText("Greek characters")).toBeTruthy();
+  });
+
+  it("announces the filter state via the aria-live region on toggle", async () => {
+    seedBaseAndLanguage();
+    getGroupsResult.set(blocksFixture());
+    render(<CharacterMapPane />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Greek characters")).toBeTruthy();
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
     });
+    const checkbox = screen.getByRole("checkbox", { name: "Show only blocks my keyboard uses" });
+
+    fireEvent.click(checkbox);
+    expect(screen.getByText("Showing all blocks")).toBeTruthy();
+
+    fireEvent.click(checkbox);
+    expect(screen.getByText("Showing only blocks your keyboard uses")).toBeTruthy();
+  });
+
+  it("hides the checkbox entirely when no loaded group is usedByBase (e.g. no producedGlyphs known), and shows every group", async () => {
+    seedBaseAndLanguage();
+    getGroupsResult.set([
+      { block: "Latin", tier: "main", script: "Latn", usedByBase: false, cells: [{ char: "a", isCombiningMark: false }] },
+      { block: "Greek", tier: "block", script: "Grek", usedByBase: false, cells: [{ char: "α", isCombiningMark: false }] },
+    ]);
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    expect(screen.queryByRole("checkbox", { name: "Show only blocks my keyboard uses" })).toBeNull();
+    // No known blocks — the filter is meaningless, so every group shows.
+    expect(screen.getByLabelText("Greek characters")).toBeTruthy();
   });
 
   it("renders same-block groups from different scripts without a React key collision", async () => {
     // Uncurated scripts share generic fallback block names ("Letters"), so two
     // groups can be tier:"block"/block:"Letters" and differ only by script.
-    // groupKey() must include script or React drops one of them.
+    // groupKey() must include script or React drops one of them. Neither
+    // group is usedByBase, so the filter is inactive (checkbox hidden) and
+    // both render without needing to be toggled.
     seedBaseAndLanguage();
     getGroupsResult.set([
-      { block: "Letters", tier: "block", script: "Grek", cells: [{ char: "α", isCombiningMark: false }] },
-      { block: "Letters", tier: "block", script: "Cher", cells: [{ char: "Ꭰ", isCombiningMark: false }] },
+      { block: "Letters", tier: "block", script: "Grek", usedByBase: false, cells: [{ char: "α", isCombiningMark: false }] },
+      { block: "Letters", tier: "block", script: "Cher", usedByBase: false, cells: [{ char: "Ꭰ", isCombiningMark: false }] },
     ]);
     render(<CharacterMapPane />);
 
-    // Show all scripts so both same-block groups are on screen at once.
     await waitFor(() => {
-      expect(screen.getByRole("checkbox", { name: "Show only my keyboard's scripts" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /Add α \(U\+03B1\)/ })).toBeTruthy();
     });
-    fireEvent.click(screen.getByRole("checkbox", { name: "Show only my keyboard's scripts" }));
-
     // Both cells render — neither same-key section was dropped/merged.
-    expect(screen.getByRole("button", { name: /Add α \(U\+03B1\)/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Add Ꭰ \(U\+13A0\)/ })).toBeTruthy();
   });
 });

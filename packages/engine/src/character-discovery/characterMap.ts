@@ -47,6 +47,7 @@ import { createFetchCldrFullLoader, loadExemplarsFromFull } from "./cldr.js";
 import { isBidiControlCodePoint } from "./CharacterDiscoveryServiceImpl.js";
 import { getLanguageDefaults } from "../langtags/index.js";
 import { loadCharNames } from "./charNames.js";
+import { producedGlyphs } from "../inventory/producedGlyphs.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -83,6 +84,12 @@ export interface CharacterMapGroup {
    * filter/jump the character map by script.
    */
   script: string;
+  /**
+   * true when this group's block contains at least one character the base
+   * keyboard actually produces (via producedGlyphs); the studio's "blocks my
+   * keyboard uses" filter shows only usedByBase groups.
+   */
+  usedByBase: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -593,6 +600,7 @@ function groupByBlock(
   tier: CharacterMapTier,
   script: string,
   names: ReadonlyMap<number, string>,
+  produced: ReadonlySet<string>,
 ): CharacterMapGroup[] {
   const groups = new Map<string, CharacterMapCell[]>();
   for (const ch of chars) {
@@ -610,7 +618,13 @@ function groupByBlock(
       groups.set(blockName, [cell]);
     }
   }
-  return [...groups.entries()].map(([block, cells]) => ({ block, tier, cells, script }));
+  return [...groups.entries()].map(([block, cells]) => ({
+    block,
+    tier,
+    cells,
+    script,
+    usedByBase: cells.some((c) => produced.has(c.char.normalize("NFC"))),
+  }));
 }
 
 /**
@@ -629,6 +643,7 @@ function groupTierByScript(
   tier: CharacterMapTier,
   scriptOrder: readonly string[],
   names: ReadonlyMap<number, string>,
+  produced: ReadonlySet<string>,
 ): CharacterMapGroup[] {
   const byScript = new Map<string, string[]>();
   for (const { char, script } of chars) {
@@ -646,13 +661,13 @@ function groupTierByScript(
     const bucket = byScript.get(s);
     if (bucket === undefined || emitted.has(s)) continue;
     emitted.add(s);
-    out.push(...groupByBlock(bucket, tier, s, names));
+    out.push(...groupByBlock(bucket, tier, s, names, produced));
   }
   for (const s of [...byScript.keys()].sort()) {
     if (emitted.has(s)) continue;
     const bucket = byScript.get(s);
     if (bucket === undefined) continue;
-    out.push(...groupByBlock(bucket, tier, s, names));
+    out.push(...groupByBlock(bucket, tier, s, names, produced));
   }
   return out;
 }
@@ -717,6 +732,14 @@ export async function buildCharacterMap(
     names = new Map<number, string>();
   }
 
+  // Static extraction of the base keyboard's own produced glyphs — drives
+  // each group's `usedByBase` flag (see CharacterMapGroup), which the
+  // studio's "blocks my keyboard uses" filter narrows to. Empty (not
+  // computed) when there's no base to derive it from.
+  const produced = new Set<string>(
+    baseIr === null ? [] : producedGlyphs(baseIr).map((c) => c.normalize("NFC")),
+  );
+
   const effectiveBcp47 = bcp47 ?? baseIr?.header.bcp47[0];
   const targetScript = resolveScript(effectiveBcp47);
 
@@ -780,10 +803,10 @@ export async function buildCharacterMap(
   const punctuationChars = dedupe(punctuationRaw);
 
   return [
-    ...groupTierByScript(mainChars, "main", scriptGroupOrder, names),
-    ...groupTierByScript(auxChars, "auxiliary", scriptGroupOrder, names),
-    ...groupTierByScript(blockChars, "block", scriptGroupOrder, names),
-    ...groupTierByScript(digitsChars, "digits", scriptGroupOrder, names),
-    ...groupTierByScript(punctuationChars, "punctuation", scriptGroupOrder, names),
+    ...groupTierByScript(mainChars, "main", scriptGroupOrder, names, produced),
+    ...groupTierByScript(auxChars, "auxiliary", scriptGroupOrder, names, produced),
+    ...groupTierByScript(blockChars, "block", scriptGroupOrder, names, produced),
+    ...groupTierByScript(digitsChars, "digits", scriptGroupOrder, names, produced),
+    ...groupTierByScript(punctuationChars, "punctuation", scriptGroupOrder, names, produced),
   ];
 }
