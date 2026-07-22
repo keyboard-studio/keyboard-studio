@@ -53,7 +53,7 @@ import { hasVisited } from "./lib/firstVisit.ts";
 import { manifest, validateManifestShape } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { StepHost } from "./components/StepHost.tsx";
-import { TEXT_MAIN, FONT } from "./survey/surveyStyles.ts";
+import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
 import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
 
@@ -617,6 +617,19 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     setValidatorFindings(findings);
   }, [findings, setValidatorFindings]);
   const globalFindings = useMemo(() => selectUnmappedFindings(findings), [findings]);
+  // Warning-severity global findings (e.g. the spec-046 mark-normalization
+  // uniformity check) render as a bare advisory line above the step content
+  // — no card background/border/code-badge/hint-button/location chrome; see
+  // the survey-pane render below. Non-warning severities keep the existing
+  // boxed LintSummary treatment untouched.
+  const globalWarnings = useMemo(
+    () => globalFindings.filter((f) => f.severity === "warning"),
+    [globalFindings],
+  );
+  const globalNonWarnings = useMemo(
+    () => globalFindings.filter((f) => f.severity !== "warning"),
+    [globalFindings],
+  );
 
   // ---------------------------------------------------------------------------
   // Start over — reset session store first (clears all traversal slots + history),
@@ -733,8 +746,24 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     >
       {/* Left pane: survey questions (StepHost renders pane content) */}
       <section aria-label="Survey questions" style={questionsPaneStyle}>
-        {globalFindings.length > 0 && (
-          <LintSummary findings={globalFindings} />
+        {globalWarnings.length > 0 && (
+          <div role="status" aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+            {globalWarnings.map((f, i) => (
+              <div key={`${f.code}-${i}`} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: TEXT_MAIN }}>
+                  <span aria-hidden="true">⚠</span> Warning: {f.message}
+                </p>
+                {f.hint !== undefined && (
+                  <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: TEXT_DIM }}>
+                    {f.hint}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {globalNonWarnings.length > 0 && (
+          <LintSummary findings={globalNonWarnings} />
         )}
         {stepHost}
       </section>

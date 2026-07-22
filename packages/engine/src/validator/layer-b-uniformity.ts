@@ -120,14 +120,13 @@ export function checkNormalizationUniformity(ir: KeyboardIR): LintFinding[] {
       severity: "warning",
       layer: "B",
       message:
-        `Mark-bearing output mixes forms: ${evidence.composed} ready-made ` +
-        `character${evidence.composed === 1 ? "" : "s"} and ${evidence.decomposed} ` +
-        `letter-plus-mark sequence${evidence.decomposed === 1 ? "" : "s"}. ` +
-        `A keyboard should produce all its accented letters one way or the other, ` +
-        `so search and backspace behave the same for every letter.`,
+        "Your keyboard builds accented letters two different ways — pick one and fix the rest.",
       hint:
-        "Pick one output form for the whole keyboard (the marks step proposes one) " +
-        "and convert the outliers.",
+        "Right now some accented letters (like é) come out as one ready-made character, " +
+        "while others come out as a plain letter plus a separate accent mark stuck onto it. " +
+        "Even though they look the same, that mix can break search, make backspace behave " +
+        "oddly, and confuse other programs — so choose one way and update the few that " +
+        "don't match.",
       ...(line !== undefined
         ? { location: { file: "", line, column: 1 } }
         : {}),
