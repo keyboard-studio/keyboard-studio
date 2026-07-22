@@ -403,7 +403,8 @@ describe('capabilityHint distinctness', () => {
 
 import React from 'react';
 import { afterEach, beforeEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { screen, cleanup } from '@testing-library/react';
+import { render } from '../../../test/renderWithI18n.tsx';
 import { InfoView } from './InfoView.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 

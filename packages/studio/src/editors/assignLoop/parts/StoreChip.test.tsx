@@ -12,7 +12,8 @@
 // than clearing it.
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, fireEvent } from '@testing-library/react';
+import { cleanup, fireEvent } from '@testing-library/react';
+import { render } from '../../../test/renderWithI18n.tsx';
 import { StoreChip } from './StoreChip.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 import type { StoreCharChip } from '../../../lib/irToCarveNodes.ts';

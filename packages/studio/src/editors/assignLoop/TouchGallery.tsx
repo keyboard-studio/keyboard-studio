@@ -55,6 +55,7 @@
 // Single 300 ms debounce contract upheld — no second timer introduced.
 
 import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { TouchAssignment, MechanismRef, TouchLayoutIR } from "@keyboard-studio/contracts";
 import { createVirtualFS, toUPlusNotation, isDecomposableAccented, formatUncoveredTouchMessage } from "@keyboard-studio/contracts";
 import type { DesktopModifications } from "@keyboard-studio/engine";
@@ -109,18 +110,30 @@ function dirArrow(dir: string): string {
 }
 
 /** Produce a human-readable label for a single configured mechanism chip. */
-function touchMechanismLabel(target: string, m: MechanismRef): string {
+function touchMechanismLabel(
+  target: string,
+  m: MechanismRef,
+  t: (descriptor: { id: string; message: string }) => string,
+): string {
   const patternId = m.patternId;
   const sv = m.slotValues ?? {};
   const hkShort = sv["hostKey"] ? hostKeyShortLabel(sv["hostKey"]) : "";
-  if (patternId === "touch_inherited") return `${target} · inherited`;
-  if (patternId === "longpress_alternates") return `${target} · long-press ${hkShort}`;
+  if (patternId === "touch_inherited") {
+    return `${target} · ${t({ id: "editor.assignLoop.touch.mechanismLabel.inherited", message: "inherited" })}`;
+  }
+  if (patternId === "longpress_alternates") {
+    return `${target} · ${t({ id: "editor.assignLoop.touch.mechanismLabel.longpress", message: "long-press" })} ${hkShort}`;
+  }
   if (patternId === "flick_gestures") {
     const dir = sv["direction"] ?? "";
-    return `${target} · flick ${hkShort} ${dirArrow(dir)}`.trimEnd();
+    return `${target} · ${t({ id: "editor.assignLoop.touch.mechanismLabel.flick", message: "flick" })} ${hkShort} ${dirArrow(dir)}`.trimEnd();
   }
-  if (patternId === "multitap") return `${target} · multitap ${hkShort}`;
-  if (patternId === "touch_key_replace") return `${target} · replace ${hkShort}`;
+  if (patternId === "multitap") {
+    return `${target} · ${t({ id: "editor.assignLoop.touch.mechanismLabel.multitap", message: "multitap" })} ${hkShort}`;
+  }
+  if (patternId === "touch_key_replace") {
+    return `${target} · ${t({ id: "editor.assignLoop.touch.mechanismLabel.replace", message: "replace" })} ${hkShort}`;
+  }
   return target;
 }
 
@@ -214,13 +227,19 @@ interface TouchMethodChooserProps {
   onFlickDirectionChange: (v: string) => void;
 }
 
-const FLICK_DIRECTIONS: ReadonlyArray<{ value: string; label: string }> = [
-  { value: "",  label: "-- choose direction --" },
-  { value: "n", label: "Up (north)" },
-  { value: "s", label: "Down (south)" },
-  { value: "e", label: "Right (east)" },
-  { value: "w", label: "Left (west)" },
-];
+// Chrome (option labels); built per-render from t() below since this needs an
+// active useLingui() context — see buildFlickDirections.
+function buildFlickDirections(
+  t: (descriptor: { id: string; message: string }) => string,
+): ReadonlyArray<{ value: string; label: string }> {
+  return [
+    { value: "", label: t({ id: "editor.assignLoop.touch.flickChoosePlaceholder", message: "-- choose direction --" }) },
+    { value: "n", label: t({ id: "editor.assignLoop.touch.flickUp", message: "Up (north)" }) },
+    { value: "s", label: t({ id: "editor.assignLoop.touch.flickDown", message: "Down (south)" }) },
+    { value: "e", label: t({ id: "editor.assignLoop.touch.flickRight", message: "Right (east)" }) },
+    { value: "w", label: t({ id: "editor.assignLoop.touch.flickLeft", message: "Left (west)" }) },
+  ];
+}
 
 function TouchMethodChooser({
   currentChar,
@@ -233,6 +252,8 @@ function TouchMethodChooser({
   flickDirection,
   onFlickDirectionChange,
 }: TouchMethodChooserProps) {
+  const { t } = useLingui();
+  const flickDirections = buildFlickDirections(t);
   const cardStyle = (active: boolean): CSSProperties => ({
     borderRadius: 8,
     border: `1px solid ${active ? ACCENT : BORDER}`,
@@ -244,7 +265,7 @@ function TouchMethodChooser({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-        How to reach it on touch:
+        <Trans id="editor.assignLoop.touch.howToReachIt">How to reach it on touch:</Trans>
       </p>
 
       {/* 1. Long-press on a key */}
@@ -256,11 +277,13 @@ function TouchMethodChooser({
           style={headerBtnStyle}
         >
           <span style={{ fontWeight: 600, color: method === "longpress_alternates" ? ACCENT : TEXT_MAIN }}>
-            Long-press on a key
+            <Trans id="editor.assignLoop.touch.method.longpress.title">Long-press on a key</Trans>
           </span>
           {method !== "longpress_alternates" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              Hold a key to reveal {currentChar} as a long-press option.
+              <Trans id="editor.assignLoop.touch.method.longpress.summary">
+                Hold a key to reveal {currentChar} as a long-press option.
+              </Trans>
             </span>
           )}
         </button>
@@ -277,15 +300,15 @@ function TouchMethodChooser({
                 flexWrap: "wrap",
               }}
             >
-              <span>Host key:</span>
+              <span><Trans id="editor.assignLoop.touch.hostKeyLabel">Host key:</Trans></span>
               <KeyPickerField
                 value={hostKey}
                 onChange={onHostKeyChange}
                 customChar={hostKeyCustomChar}
                 onCustomCharChange={onHostKeyCustomCharChange}
                 options={KEY_OPTIONS}
-                selectAriaLabel="Host key for long-press"
-                customInputAriaLabel="Custom character for long-press host key"
+                selectAriaLabel={t({ id: "editor.assignLoop.touch.longpress.hostKeySelectAriaLabel", message: "Host key for long-press" })}
+                customInputAriaLabel={t({ id: "editor.assignLoop.touch.longpress.hostKeyCustomAriaLabel", message: "Custom character for long-press host key" })}
               />
             </div>
           </div>
@@ -301,11 +324,13 @@ function TouchMethodChooser({
           style={headerBtnStyle}
         >
           <span style={{ fontWeight: 600, color: method === "flick_gestures" ? ACCENT : TEXT_MAIN }}>
-            Swipe a key (flick)
+            <Trans id="editor.assignLoop.touch.method.flick.title">Swipe a key (flick)</Trans>
           </span>
           {method !== "flick_gestures" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              Swipe a key in a direction to produce {currentChar}.
+              <Trans id="editor.assignLoop.touch.method.flick.summary">
+                Swipe a key in a direction to produce {currentChar}.
+              </Trans>
             </span>
           )}
         </button>
@@ -322,15 +347,15 @@ function TouchMethodChooser({
                 flexWrap: "wrap",
               }}
             >
-              <span>Host key:</span>
+              <span><Trans id="editor.assignLoop.touch.hostKeyLabel">Host key:</Trans></span>
               <KeyPickerField
                 value={hostKey}
                 onChange={onHostKeyChange}
                 customChar={hostKeyCustomChar}
                 onCustomCharChange={onHostKeyCustomCharChange}
                 options={KEY_OPTIONS}
-                selectAriaLabel="Host key for flick"
-                customInputAriaLabel="Custom character for flick host key"
+                selectAriaLabel={t({ id: "editor.assignLoop.touch.flick.hostKeySelectAriaLabel", message: "Host key for flick" })}
+                customInputAriaLabel={t({ id: "editor.assignLoop.touch.flick.hostKeyCustomAriaLabel", message: "Custom character for flick host key" })}
               />
             </div>
             <label
@@ -343,14 +368,14 @@ function TouchMethodChooser({
                 fontFamily: FONT,
               }}
             >
-              Direction:
+              <Trans id="editor.assignLoop.touch.directionLabel">Direction:</Trans>
               <select
                 value={flickDirection}
                 onChange={(e) => onFlickDirectionChange(e.target.value)}
-                aria-label="Flick direction"
+                aria-label={t({ id: "editor.assignLoop.touch.flickDirectionAriaLabel", message: "Flick direction" })}
                 style={selectStyle}
               >
-                {FLICK_DIRECTIONS.map((o) => (
+                {flickDirections.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
@@ -368,11 +393,13 @@ function TouchMethodChooser({
           style={headerBtnStyle}
         >
           <span style={{ fontWeight: 600, color: method === "multitap" ? ACCENT : TEXT_MAIN }}>
-            Tap multiple times (multitap)
+            <Trans id="editor.assignLoop.touch.method.multitap.title">Tap multiple times (multitap)</Trans>
           </span>
           {method !== "multitap" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              Tap a key rapidly more than once to reach {currentChar}.
+              <Trans id="editor.assignLoop.touch.method.multitap.summary">
+                Tap a key rapidly more than once to reach {currentChar}.
+              </Trans>
             </span>
           )}
         </button>
@@ -389,15 +416,15 @@ function TouchMethodChooser({
                 flexWrap: "wrap",
               }}
             >
-              <span>Host key:</span>
+              <span><Trans id="editor.assignLoop.touch.hostKeyLabel">Host key:</Trans></span>
               <KeyPickerField
                 value={hostKey}
                 onChange={onHostKeyChange}
                 customChar={hostKeyCustomChar}
                 onCustomCharChange={onHostKeyCustomCharChange}
                 options={KEY_OPTIONS}
-                selectAriaLabel="Host key for multitap"
-                customInputAriaLabel="Custom character for multitap host key"
+                selectAriaLabel={t({ id: "editor.assignLoop.touch.multitap.hostKeySelectAriaLabel", message: "Host key for multitap" })}
+                customInputAriaLabel={t({ id: "editor.assignLoop.touch.multitap.hostKeyCustomAriaLabel", message: "Custom character for multitap host key" })}
               />
             </div>
           </div>
@@ -413,11 +440,13 @@ function TouchMethodChooser({
           style={headerBtnStyle}
         >
           <span style={{ fontWeight: 600, color: method === "touch_key_replace" ? ACCENT : TEXT_MAIN }}>
-            Replace a key
+            <Trans id="editor.assignLoop.touch.method.replace.title">Replace a key</Trans>
           </span>
           {method !== "touch_key_replace" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              Make a key type {currentChar} directly on the touch keyboard.
+              <Trans id="editor.assignLoop.touch.method.replace.summary">
+                Make a key type {currentChar} directly on the touch keyboard.
+              </Trans>
             </span>
           )}
         </button>
@@ -434,19 +463,21 @@ function TouchMethodChooser({
                 flexWrap: "wrap",
               }}
             >
-              <span>Host key:</span>
+              <span><Trans id="editor.assignLoop.touch.hostKeyLabel">Host key:</Trans></span>
               <KeyPickerField
                 value={hostKey}
                 onChange={onHostKeyChange}
                 customChar={hostKeyCustomChar}
                 onCustomCharChange={onHostKeyCustomCharChange}
                 options={KEY_OPTIONS}
-                selectAriaLabel="Host key to replace"
-                customInputAriaLabel="Custom character for the key to replace"
+                selectAriaLabel={t({ id: "editor.assignLoop.touch.replace.hostKeySelectAriaLabel", message: "Host key to replace" })}
+                customInputAriaLabel={t({ id: "editor.assignLoop.touch.replace.hostKeyCustomAriaLabel", message: "Custom character for the key to replace" })}
               />
             </div>
             <p style={{ margin: 0, fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}>
-              Make a key type {currentChar} directly on the touch keyboard.
+              <Trans id="editor.assignLoop.touch.method.replace.summary">
+                Make a key type {currentChar} directly on the touch keyboard.
+              </Trans>
             </p>
           </div>
         )}
@@ -476,6 +507,7 @@ export interface TouchGalleryProps {
 }
 
 export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
+  const { t } = useLingui();
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const identity = useWorkingCopyStore((s) => s.identity);
@@ -1216,10 +1248,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
           <button
             type="button"
             onClick={onBack}
-            aria-label="Back to mechanisms"
+            aria-label={t({ id: "editor.assignLoop.touch.backToMechanismsAriaLabel", message: "Back to mechanisms" })}
             style={ghostBtn}
           >
-            &larr; Back
+            <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
           </button>
           <div
             style={{
@@ -1229,8 +1261,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             }}
           >
             <p style={{ fontSize: 15 }}>
-              No characters in inventory yet. Complete the Survey (Phase B) to
-              confirm which characters your keyboard must produce.
+              <Trans id="editor.assignLoop.touch.noInventory">
+                No characters in inventory yet. Complete the Survey (Phase B) to
+                confirm which characters your keyboard must produce.
+              </Trans>
             </p>
           </div>
         </div>
@@ -1245,30 +1279,34 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   if (showIntro) {
     return (
       <GalleryIntroSplash
-        eyebrow="Next step · Touch"
-        title="Welcome to the Touch Gallery"
+        eyebrow={t({ id: "editor.assignLoop.touch.intro.eyebrow", message: "Next step · Touch" })}
+        title={t({ id: "editor.assignLoop.touch.intro.title", message: "Welcome to the Touch Gallery" })}
         body={
-          <>
+          <Trans id="editor.assignLoop.touch.intro.body">
             Your desktop layout is locked in. Now you&rsquo;ll set how each
             character is reached on phones and tablets, where there is no
             physical keyboard.
-          </>
+          </Trans>
         }
         bullets={[
-          <>You&rsquo;ll go character by character, just like the desktop gallery.</>,
-          <>
+          <Trans id="editor.assignLoop.touch.intro.bullet1" key="bullet1">
+            You&rsquo;ll go character by character, just like the desktop gallery.
+          </Trans>,
+          <Trans id="editor.assignLoop.touch.intro.bullet2" key="bullet2">
             Pick a touch method &mdash; long-press, flick, multitap, or replace
             &mdash; or Skip characters that already work.
-          </>,
-          <>These choices apply to touch only and never change your desktop layout.</>,
+          </Trans>,
+          <Trans id="editor.assignLoop.touch.intro.bullet3" key="bullet3">
+            These choices apply to touch only and never change your desktop layout.
+          </Trans>,
         ]}
-        startAriaLabel="Start the touch gallery"
+        startAriaLabel={t({ id: "editor.assignLoop.touch.intro.startAriaLabel", message: "Start the touch gallery" })}
         onStart={() => {
           markGalleryIntroSeen("touch");
           setShowIntro(false);
         }}
         onBack={onBack}
-        backAriaLabel="Back to mechanisms (Phase C)"
+        backAriaLabel={t({ id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel", message: "Back to mechanisms (Phase C)" })}
       />
     );
   }
@@ -1293,10 +1331,15 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       <p
         role="status"
         aria-live="polite"
-        aria-label={`${charTouch.size} of ${totalChars} characters configured`}
+        aria-label={t({
+          id: "editor.assignLoop.touch.coverageAriaLabel",
+          message: `${{ configured: charTouch.size }} of ${{ total: totalChars }} characters configured`,
+        })}
         style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
       >
-        {charTouch.size} of {totalChars} configured
+        <Trans id="editor.assignLoop.touch.coverageLine">
+          {charTouch.size} of {totalChars} configured
+        </Trans>
       </p>
 
       {/* Per-char UI */}
@@ -1323,7 +1366,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 letterSpacing: "0.06em",
               }}
             >
-              Touch mapping
+              <Trans id="editor.assignLoop.touch.mappingEyebrow">Touch mapping</Trans>
             </p>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
               <span
@@ -1357,12 +1400,12 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               onClick={handleBack}
               aria-label={
                 currentIdx <= 0
-                  ? "Back to mechanisms (Phase C)"
-                  : "Back to previous character"
+                  ? t({ id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel", message: "Back to mechanisms (Phase C)" })
+                  : t({ id: "editor.assignLoop.touch.backToPreviousCharacterAriaLabel", message: "Back to previous character" })
               }
               style={ghostBtn}
             >
-              &larr; Back
+              <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
             </button>
             <div
               style={{
@@ -1385,7 +1428,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 data-testid="touch-prev-char"
                 onClick={handlePreviousChar}
                 disabled={currentIdx <= 0}
-                aria-label="Previous character"
+                aria-label={t({ id: "editor.assignLoop.previousCharacterAriaLabel", message: "Previous character" })}
                 style={{
                   ...ghostBtn,
                   fontSize: 13,
@@ -1394,14 +1437,18 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                     : {}),
                 }}
               >
-                &laquo; Previous character
+                <Trans id="editor.assignLoop.previousCharacterButton">&laquo; Previous character</Trans>
               </button>
               <button
                 type="button"
                 data-testid="touch-continue"
                 onClick={handleNext}
                 disabled={!canGoNext}
-                aria-label={hasAnotherCharAfterCurrent ? "Next character" : "Done"}
+                aria-label={
+                  hasAnotherCharAfterCurrent
+                    ? t({ id: "editor.assignLoop.nextCharacterAriaLabel", message: "Next character" })
+                    : t({ id: "editor.assignLoop.doneButton", message: "Done" })
+                }
                 style={{
                   padding: "9px 20px",
                   background: canGoNext ? "#238636" : "#21262d",
@@ -1414,7 +1461,9 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                   fontFamily: FONT,
                 }}
               >
-                {hasAnotherCharAfterCurrent ? "Next character →" : "Done"}
+                {hasAnotherCharAfterCurrent
+                  ? t({ id: "editor.assignLoop.nextCharacterButton", message: "Next character →" })
+                  : t({ id: "editor.assignLoop.doneButton", message: "Done" })}
               </button>
             </div>
           </div>
@@ -1426,7 +1475,9 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               WARNING color (#d29922), matching other gate-message sites. */}
           {uncoveredMessage !== null && (
             <ErrorText tone="warning">
-              Cannot finish yet — {uncoveredMessage}.
+              <Trans id="editor.assignLoop.touch.cannotFinishYet">
+                Cannot finish yet — {uncoveredMessage}.
+              </Trans>
             </ErrorText>
           )}
 
@@ -1435,7 +1486,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
           {!showChooser && (
             <div
               role="note"
-              aria-label="Touch access method suggestion"
+              aria-label={t({ id: "editor.assignLoop.touch.suggestion.ariaLabel", message: "Touch access method suggestion" })}
               style={{
                 background: "#0d2218",
                 border: "1px solid #238636",
@@ -1457,15 +1508,22 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                       fontWeight: 600,
                     }}
                   >
-                    Suggested: long-press{" "}
-                    {suggestion.hostKey ? hostKeyShortLabel(suggestion.hostKey) : "a key"}{" "}
-                    to reach {currentChar}
+                    <Trans id="editor.assignLoop.touch.suggestion.longpressText">
+                      Suggested: long-press{" "}
+                      {suggestion.hostKey
+                        ? hostKeyShortLabel(suggestion.hostKey)
+                        : t({ id: "editor.assignLoop.touch.aKeyPlaceholder", message: "a key" })}{" "}
+                      to reach {currentChar}
+                    </Trans>
                   </p>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
                       type="button"
                       onClick={handleUseSuggestion}
-                      aria-label={`Use suggested long-press method for ${toUPlusNotation(currentChar)} ${currentChar}`}
+                      aria-label={t({
+                        id: "editor.assignLoop.touch.suggestion.useLongpressAriaLabel",
+                        message: `Use suggested long-press method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+                      })}
                       style={{
                         padding: "5px 14px",
                         background: "#238636",
@@ -1478,12 +1536,12 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                         fontFamily: FONT,
                       }}
                     >
-                      Accept
+                      <Trans id="editor.assignLoop.suggestion.acceptButton">Accept</Trans>
                     </button>
                     <button
                       type="button"
                       onClick={handleSuggestionChange}
-                      aria-label="Choose a different touch method"
+                      aria-label={t({ id: "editor.assignLoop.touch.chooseDifferentMethodAriaLabel", message: "Choose a different touch method" })}
                       style={{
                         padding: "5px 14px",
                         background: "transparent",
@@ -1495,7 +1553,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                         fontFamily: FONT,
                       }}
                     >
-                      Deny
+                      <Trans id="editor.assignLoop.suggestion.denyButton">Deny</Trans>
                     </button>
                   </div>
                 </>
@@ -1511,15 +1569,22 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                       fontWeight: 600,
                     }}
                   >
-                    Suggested: replace{" "}
-                    {suggestion.hostKey ? hostKeyShortLabel(suggestion.hostKey) : "a key"}{" "}
-                    with {currentChar}
+                    <Trans id="editor.assignLoop.touch.suggestion.replaceText">
+                      Suggested: replace{" "}
+                      {suggestion.hostKey
+                        ? hostKeyShortLabel(suggestion.hostKey)
+                        : t({ id: "editor.assignLoop.touch.aKeyPlaceholder", message: "a key" })}{" "}
+                      with {currentChar}
+                    </Trans>
                   </p>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
                       type="button"
                       onClick={handleUseSuggestion}
-                      aria-label={`Use suggested replace method for ${toUPlusNotation(currentChar)} ${currentChar}`}
+                      aria-label={t({
+                        id: "editor.assignLoop.touch.suggestion.useReplaceAriaLabel",
+                        message: `Use suggested replace method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+                      })}
                       style={{
                         padding: "5px 14px",
                         background: "#238636",
@@ -1532,12 +1597,12 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                         fontFamily: FONT,
                       }}
                     >
-                      Accept
+                      <Trans id="editor.assignLoop.suggestion.acceptButton">Accept</Trans>
                     </button>
                     <button
                       type="button"
                       onClick={handleSuggestionChange}
-                      aria-label="Choose a different touch method"
+                      aria-label={t({ id: "editor.assignLoop.touch.chooseDifferentMethodAriaLabel", message: "Choose a different touch method" })}
                       style={{
                         padding: "5px 14px",
                         background: "transparent",
@@ -1549,7 +1614,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                         fontFamily: FONT,
                       }}
                     >
-                      Deny
+                      <Trans id="editor.assignLoop.suggestion.denyButton">Deny</Trans>
                     </button>
                   </div>
                 </>
@@ -1565,13 +1630,18 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                       fontWeight: 600,
                     }}
                   >
-                    {currentChar} is already on the touch keyboard. Keep it as is?
+                    <Trans id="editor.assignLoop.touch.suggestion.alreadyText">
+                      {currentChar} is already on the touch keyboard. Keep it as is?
+                    </Trans>
                   </p>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
                       type="button"
                       onClick={handleSuggestionAccept}
-                      aria-label={`Keep ${toUPlusNotation(currentChar)} ${currentChar} as already in touch layout`}
+                      aria-label={t({
+                        id: "editor.assignLoop.touch.suggestion.keepAlreadyAriaLabel",
+                        message: `Keep ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }} as already in touch layout`,
+                      })}
                       style={{
                         padding: "5px 14px",
                         background: "#238636",
@@ -1584,12 +1654,12 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                         fontFamily: FONT,
                       }}
                     >
-                      Accept
+                      <Trans id="editor.assignLoop.suggestion.acceptButton">Accept</Trans>
                     </button>
                     <button
                       type="button"
                       onClick={handleSuggestionChange}
-                      aria-label="Make changes to touch method"
+                      aria-label={t({ id: "editor.assignLoop.touch.makeChangesAriaLabel", message: "Make changes to touch method" })}
                       style={{
                         padding: "5px 14px",
                         background: "transparent",
@@ -1601,7 +1671,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                         fontFamily: FONT,
                       }}
                     >
-                      Deny
+                      <Trans id="editor.assignLoop.suggestion.denyButton">Deny</Trans>
                     </button>
                   </div>
                 </>
@@ -1634,7 +1704,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 type="button"
                 onClick={handleApply}
                 disabled={!canApply}
-                aria-label={`Apply touch method for ${toUPlusNotation(currentChar)} ${currentChar}`}
+                aria-label={t({
+                  id: "editor.assignLoop.touch.applyMethodAriaLabel",
+                  message: `Apply touch method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+                })}
                 style={{
                   padding: "9px 20px",
                   background: canApply ? BLUE_ACTION : "#21262d",
@@ -1647,13 +1720,16 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                   fontFamily: FONT,
                 }}
               >
-                Apply method
+                <Trans id="editor.assignLoop.applyMethodButton">Apply method</Trans>
               </button>
             )}
             <button
               type="button"
               onClick={handleNext}
-              aria-label={`Skip this character (${toUPlusNotation(currentChar)} ${currentChar})`}
+              aria-label={t({
+                id: "editor.assignLoop.skipCharacterAriaLabel",
+                message: `Skip this character (${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }})`,
+              })}
               style={{
                 background: "transparent",
                 border: "none",
@@ -1665,7 +1741,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 textDecoration: "underline",
               }}
             >
-              Skip this character
+              <Trans id="editor.assignLoop.skipCharacterButton">Skip this character</Trans>
             </button>
           </div>
         </>
@@ -1683,11 +1759,11 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               letterSpacing: "0.05em",
             }}
           >
-            Configured
+            <Trans id="editor.assignLoop.touch.configuredHeading">Configured</Trans>
           </p>
           <div
             role="group"
-            aria-label="Configured characters — click to remove"
+            aria-label={t({ id: "editor.assignLoop.touch.configuredGroupAriaLabel", message: "Configured characters — click to remove" })}
             style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
           >
             {[...charTouch.entries()].flatMap(([c, assignment]) =>
@@ -1696,8 +1772,14 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                   key={`${c}-${i}`}
                   type="button"
                   onClick={() => handleRemoveMechanism(c, i)}
-                  aria-label={`Remove ${toUPlusNotation(c)} ${touchMechanismLabel(c, m)}`}
-                  title={`${toUPlusNotation(c)} — click to remove`}
+                  aria-label={t({
+                    id: "editor.assignLoop.touch.removeMechanismAriaLabel",
+                    message: `Remove ${{ notation: toUPlusNotation(c) }} ${{ label: touchMechanismLabel(c, m, t) }}`,
+                  })}
+                  title={t({
+                    id: "editor.assignLoop.removeCharacterTitle",
+                    message: `${{ notation: toUPlusNotation(c) }} — click to remove`,
+                  })}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -1714,7 +1796,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {touchMechanismLabel(c, m)}
+                  {touchMechanismLabel(c, m, t)}
                   <span
                     aria-hidden="true"
                     style={{ fontSize: 11, color: "#56d364", opacity: 0.7 }}
@@ -1740,8 +1822,8 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             fontFamily: FONT,
           }}
         >
-          Touch layout checks
-          {touchLintRunning ? " (running...)" : ""}
+          <Trans id="editor.assignLoop.touch.layoutChecksHeading">Touch layout checks</Trans>
+          {touchLintRunning ? ` ${t({ id: "editor.assignLoop.touch.runningSuffix", message: "(running...)" })}` : ""}
         </p>
         <LintSummary findings={touchFindings} />
       </div>
@@ -1756,7 +1838,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     <>
       {totalChars > 0 && (
         <span
-          aria-label={`Character ${currentIdx + 1} of ${totalChars}`}
+          aria-label={t({
+            id: "editor.assignLoop.touch.characterCounterAriaLabel",
+            message: `Character ${{ n: currentIdx + 1 }} of ${{ total: totalChars }}`,
+          })}
           style={{
             fontSize: 12,
             color: TEXT_DIM,
@@ -1765,7 +1850,9 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             flexShrink: 0,
           }}
         >
-          Character {Math.max(currentIdx + 1, 1)} of {totalChars}
+          <Trans id="editor.assignLoop.touch.characterCounter">
+            Character {Math.max(currentIdx + 1, 1)} of {totalChars}
+          </Trans>
         </span>
       )}
       <span
@@ -1777,16 +1864,18 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
           minWidth: 0,
         }}
       >
-        For each character, choose how it appears on the touch keyboard. Your
-        desktop layout is locked — these apply to phone and tablet only.
+        <Trans id="editor.assignLoop.touch.headerDescription">
+          For each character, choose how it appears on the touch keyboard. Your
+          desktop layout is locked — these apply to phone and tablet only.
+        </Trans>
       </span>
     </>
   );
 
   return (
     <AssignLoopShell
-      headingText="Touch Gallery"
-      modalityLabel="Touch"
+      headingText={t({ id: "editor.assignLoop.touchGalleryHeading", message: "Touch Gallery" })}
+      modalityLabel={t({ id: "editor.assignLoop.modality.touch", message: "Touch" })}
       modalityLabelPlacement="inline"
       headerExtras={headerExtras}
       leftContent={leftContent}
@@ -1797,8 +1886,8 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
           retry={retry}
           {...(handleKeyTap !== undefined ? { onKeyTap: handleKeyTap } : {})}
           defaultOskMode="touch"
-          heading="Touch preview"
-          warningLabel="Preview warnings:"
+          heading={t({ id: "editor.assignLoop.touch.previewHeading", message: "Touch preview" })}
+          warningLabel={t({ id: "editor.assignLoop.touch.previewWarnings", message: "Preview warnings:" })}
         />
       }
     />

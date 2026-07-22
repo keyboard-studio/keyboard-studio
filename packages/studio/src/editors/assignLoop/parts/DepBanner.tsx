@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { WarnIcon } from './carveShared.tsx';
 
 export interface DepNode { nodeId: string; name: string }
@@ -32,6 +33,7 @@ function BannerItem({ node, message, buttonLabel, onRemove }: BannerRow & { onRe
 }
 
 export function DepBanner({ orphanedNodes, unusedStoreNodes, onRemoveNode }: DepBannerProps) {
+  const { t } = useLingui();
   if (orphanedNodes.length === 0 && unusedStoreNodes.length === 0) return null;
   return (
     <div style={{
@@ -44,8 +46,11 @@ export function DepBanner({ orphanedNodes, unusedStoreNodes, onRemoveNode }: Dep
         <BannerItem
           key={n.nodeId}
           node={n}
-          message="has no outputs left. Its trigger key will silently swallow the input, blocking the normal keystroke. Remove the rule too to restore default key behavior."
-          buttonLabel="Remove trigger key too"
+          message={t({
+            id: "editor.assignLoop.depBanner.orphanedMessage",
+            message: "has no outputs left. Its trigger key will silently swallow the input, blocking the normal keystroke. Remove the rule too to restore default key behavior.",
+          })}
+          buttonLabel={t({ id: "editor.assignLoop.depBanner.orphanedButton", message: "Remove trigger key too" })}
           onRemove={onRemoveNode}
         />
       ))}
@@ -53,8 +58,11 @@ export function DepBanner({ orphanedNodes, unusedStoreNodes, onRemoveNode }: Dep
         <BannerItem
           key={n.nodeId}
           node={n}
-          message="is no longer referenced and can be removed too."
-          buttonLabel="Remove store too"
+          message={t({
+            id: "editor.assignLoop.depBanner.unusedStoreMessage",
+            message: "is no longer referenced and can be removed too.",
+          })}
+          buttonLabel={t({ id: "editor.assignLoop.depBanner.unusedStoreButton", message: "Remove store too" })}
           onRemove={onRemoveNode}
         />
       ))}

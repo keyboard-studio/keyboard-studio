@@ -11,6 +11,8 @@
 // Flat this cycle — no type-grouping (deferred; see the task's Part B scope).
 
 import { useState } from 'react';
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import type { RecommendedRemovalChar } from '../../../lib/irToCarveNodes.ts';
 import { displayChar, invisibleCharLabel } from '../../../lib/irToCarveNodes.ts';
 import { ChevronIcon, CheckIcon } from './carveShared.tsx';
@@ -31,6 +33,7 @@ function charCodepointLabel(ch: string): string {
 }
 
 export function RemovalBanner({ recommended, languageLabel, onRemoveSelected }: RemovalBannerProps) {
+  const { t } = useLingui();
   const [dismissed, setDismissed] = useState(false);
   const [open, setOpen] = useState(false);
   // Tracks characters the author has explicitly UNCHECKED. Every character in
@@ -55,7 +58,7 @@ export function RemovalBanner({ recommended, languageLabel, onRemoveSelected }: 
   return (
     <div
       role="region"
-      aria-label="Removal recommendation"
+      aria-label={t({ id: "editor.assignLoop.removalBanner.regionAriaLabel", message: "Removal recommendation" })}
       style={{
         flexShrink: 0,
         borderBottom: '1px solid color-mix(in srgb, var(--sil-green) 35%, transparent)',
@@ -76,27 +79,33 @@ export function RemovalBanner({ recommended, languageLabel, onRemoveSelected }: 
         >
           <span style={{ display: 'inline-flex', flexShrink: 0 }}><ChevronIcon open={open} size={13} /></span>
           <span style={{ color: 'var(--app-text)', fontWeight: 500 }}>
-            We recommend removing {recommended.length} character{recommended.length !== 1 ? 's' : ''} not needed for {languageLabel}. Feel free to look around — but our recommendation is to remove these.
+            {t({
+              id: "editor.assignLoop.removalBanner.recommendText",
+              message: plural(recommended.length, {
+                one: `We recommend removing # character not needed for ${languageLabel}. Feel free to look around — but our recommendation is to remove these.`,
+                other: `We recommend removing # characters not needed for ${languageLabel}. Feel free to look around — but our recommendation is to remove these.`,
+              }),
+            })}
           </span>
         </button>
         <button
           type="button"
           onClick={() => setDismissed(true)}
-          aria-label="Dismiss removal recommendation"
+          aria-label={t({ id: "editor.assignLoop.removalBanner.dismissAriaLabel", message: "Dismiss removal recommendation" })}
           style={{
             flexShrink: 0, font: '600 12px var(--app-font)', cursor: 'pointer',
             color: 'var(--app-text-subtle)', background: 'transparent',
             border: '1px solid var(--app-border-strong)', borderRadius: 7, padding: '4px 9px',
           }}
         >
-          Dismiss
+          <Trans id="editor.assignLoop.removalBanner.dismissButton">Dismiss</Trans>
         </button>
       </div>
 
       {open && (
         <div id="removal-banner-checklist" style={{ padding: '0 22px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <ul
-            aria-label="Recommended characters to remove"
+            aria-label={t({ id: "editor.assignLoop.removalBanner.checklistAriaLabel", message: "Recommended characters to remove" })}
             style={{
               margin: 0, padding: 0, listStyle: 'none',
               display: 'flex', flexWrap: 'wrap', gap: 8,
@@ -118,7 +127,7 @@ export function RemovalBanner({ recommended, languageLabel, onRemoveSelected }: 
                       type="checkbox"
                       checked={isChecked}
                       onChange={() => toggle(ch)}
-                      aria-label={`Remove ${codepoint}`}
+                      aria-label={t({ id: "editor.assignLoop.removalBanner.removeCheckboxAriaLabel", message: `Remove ${{ codepoint }}` })}
                       style={{ cursor: 'pointer' }}
                     />
                     <span style={{ font: "400 16px/1 'Lora', serif", color: 'var(--app-text)' }}>
@@ -145,7 +154,9 @@ export function RemovalBanner({ recommended, languageLabel, onRemoveSelected }: 
               }}
             >
               <CheckIcon size={12} />
-              Remove all selected ({selected.length})
+              <Trans id="editor.assignLoop.removalBanner.removeAllSelected">
+                Remove all selected ({selected.length})
+              </Trans>
             </button>
           </div>
         </div>

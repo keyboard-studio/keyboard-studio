@@ -1,4 +1,5 @@
 import type { MouseEvent } from 'react';
+import { useLingui } from "@lingui/react/macro";
 
 interface ToggleBoxProps {
   glyph?: string | undefined;
@@ -8,13 +9,14 @@ interface ToggleBoxProps {
 }
 
 export function ToggleBox({ glyph, state, size = 30, onClick }: ToggleBoxProps) {
+  const { t } = useLingui();
   const off = state === 'off';
   const partial = state === 'partial';
   const badge = Math.round(size * 0.5);
   return (
     <button
       onClick={onClick}
-      aria-label={off ? 'Keep' : 'Remove'}
+      aria-label={off ? t({ id: "editor.assignLoop.toggleBox.keep", message: "Keep" }) : t({ id: "editor.assignLoop.toggleBox.remove", message: "Remove" })}
       style={{
         position: 'relative', width: size, height: size, flex: '0 0 auto',
         borderRadius: Math.round(size * 0.27), cursor: 'pointer', padding: 0,

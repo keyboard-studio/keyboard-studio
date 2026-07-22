@@ -19,6 +19,7 @@
 //     change it before submitting to the community repo).
 
 import { useEffect, useRef, useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { validateKeyboardId } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { TextField, Label, ErrorText } from "../../ui/index.ts";
@@ -29,6 +30,7 @@ import { CARD_BORDER, TEXT_DIM, WARNING } from "../../ui/theme.ts";
 // ---------------------------------------------------------------------------
 
 export function TrackOneIdentityPanel() {
+  const { t } = useLingui();
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
   const identity = useWorkingCopyStore((s) => s.identity);
@@ -67,7 +69,7 @@ export function TrackOneIdentityPanel() {
   }
 
   const idValidation = validateKeyboardId(keyboardId.trim());
-  const idError = idValidation.valid ? null : (idValidation.reason ?? "invalid keyboard id");
+  const idError = idValidation.valid ? null : (idValidation.reason ?? t({ id: "editor.trackOneIdentity.invalidKeyboardId", message: "invalid keyboard id" }));
   const isIdValid = idValidation.valid;
   const isIdUntouched = keyboardId.trim() === baseKeyboard.id;
 
@@ -100,7 +102,7 @@ export function TrackOneIdentityPanel() {
 
   return (
     <section
-      aria-label="Name your keyboard"
+      aria-label={t({ id: "editor.trackOneIdentity.heading", message: "Name your keyboard" })}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -120,7 +122,7 @@ export function TrackOneIdentityPanel() {
           fontWeight: 700,
         }}
       >
-        Name your keyboard
+        <Trans id="editor.trackOneIdentity.heading">Name your keyboard</Trans>
       </div>
 
       {/* Display name */}
@@ -130,14 +132,14 @@ export function TrackOneIdentityPanel() {
           htmlFor="identity-display-name"
           style={{ fontSize: 12, color: TEXT_DIM, fontWeight: 600, marginBottom: 0 }}
         >
-          Display name
+          <Trans id="editor.trackOneIdentity.displayNameLabel">Display name</Trans>
         </Label>
         {/* one-off: input border CARD_BORDER — TextField BORDER is #30363d; override via style passthrough */}
         <TextField
           id="identity-display-name"
           value={displayName}
           onChange={handleDisplayNameChange}
-          placeholder="e.g. Hausa (SIL)"
+          placeholder={t({ id: "editor.trackOneIdentity.displayNamePlaceholder", message: "e.g. Hausa (SIL)" })}
           autoComplete="off"
           aria-describedby="identity-display-name-hint"
           style={{ border: `1px solid ${CARD_BORDER}`, fontSize: 13 }}
@@ -147,7 +149,9 @@ export function TrackOneIdentityPanel() {
           id="identity-display-name-hint"
           style={{ fontSize: 11, color: TEXT_DIM, lineHeight: 1.4 }}
         >
-          Shown on the spacebar in the on-screen keyboard.
+          <Trans id="editor.trackOneIdentity.displayNameHint">
+            Shown on the spacebar in the on-screen keyboard.
+          </Trans>
         </div>
       </div>
 
@@ -158,7 +162,7 @@ export function TrackOneIdentityPanel() {
           htmlFor="identity-keyboard-id"
           style={{ fontSize: 12, color: TEXT_DIM, fontWeight: 600, marginBottom: 0 }}
         >
-          Keyboard ID
+          <Trans id="editor.trackOneIdentity.keyboardIdLabel">Keyboard ID</Trans>
         </Label>
         {/* one-off: input border CARD_BORDER — TextField BORDER is #30363d; override via style passthrough */}
         <TextField
@@ -168,7 +172,7 @@ export function TrackOneIdentityPanel() {
           value={keyboardId}
           onChange={handleKeyboardIdChange}
           onBlur={() => setIdTouched(true)}
-          placeholder="e.g. ha_sil"
+          placeholder={t({ id: "editor.trackOneIdentity.keyboardIdPlaceholder", message: "e.g. ha_sil" })}
           autoComplete="off"
           spellCheck={false}
           aria-describedby={
@@ -198,8 +202,10 @@ export function TrackOneIdentityPanel() {
             aria-live="polite"
             style={{ fontSize: 12, color: WARNING, lineHeight: 1.4 }}
           >
-            [WARN] This is still the base keyboard&rsquo;s id. Set a unique id
-            before submitting to the community repository.
+            <Trans id="editor.trackOneIdentity.baseIdWarning">
+              [WARN] This is still the base keyboard&rsquo;s id. Set a unique id
+              before submitting to the community repository.
+            </Trans>
           </div>
         ) : (
           // one-off: hint TEXT_DIM — ErrorText hint renders var(--app-text-muted), not TEXT_DIM
@@ -207,8 +213,10 @@ export function TrackOneIdentityPanel() {
             id="identity-id-hint"
             style={{ fontSize: 11, color: TEXT_DIM, lineHeight: 1.4 }}
           >
-            1&ndash;255 chars; no spaces, parens, brackets, or commas. Used as
-            the zip filename.
+            <Trans id="editor.trackOneIdentity.keyboardIdHint">
+              1&ndash;255 chars; no spaces, parens, brackets, or commas. Used as
+              the zip filename.
+            </Trans>
           </div>
         )}
       </div>

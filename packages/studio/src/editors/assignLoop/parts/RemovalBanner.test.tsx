@@ -8,7 +8,8 @@
 //   - Dismiss hides the banner entirely (returns null)
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, fireEvent, screen } from '@testing-library/react';
+import { cleanup, fireEvent, screen } from '@testing-library/react';
+import { render } from '../../../test/renderWithI18n.tsx';
 import { RemovalBanner } from './RemovalBanner.tsx';
 import type { RecommendedRemovalChar } from '../../../lib/irToCarveNodes.ts';
 import type { CharContributors } from '@keyboard-studio/engine';

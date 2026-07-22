@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import type { CardKind } from '../../../lib/irToCarveNodes.ts';
 export type { CardKind } from '../../../lib/irToCarveNodes.ts';
 
@@ -8,18 +9,27 @@ export const KIND_COLOR: Record<CardKind, string> = {
   raw:     '#b90529',
 };
 
-const KIND_LABEL: Record<CardKind, string> = {
-  pattern: 'Pattern',
-  group:   'Group',
-  store:   'Store',
-  raw:     'Advanced',
-};
+// Chrome (human-readable category labels) — built per-render from t() since
+// this needs an active useLingui() context; see buildKindLabel below.
+function buildKindLabel(
+  kind: CardKind,
+  t: (descriptor: { id: string; message: string }) => string,
+): string {
+  switch (kind) {
+    case 'pattern': return t({ id: "editor.assignLoop.kindBadge.pattern", message: "Pattern" });
+    case 'group': return t({ id: "editor.assignLoop.kindBadge.group", message: "Group" });
+    case 'store': return t({ id: "editor.assignLoop.kindBadge.store", message: "Store" });
+    case 'raw': return t({ id: "editor.assignLoop.kindBadge.raw", message: "Advanced" });
+    default: return kind;
+  }
+}
 
 interface KindBadgeProps { kind: CardKind }
 
 export function KindBadge({ kind }: KindBadgeProps) {
+  const { t } = useLingui();
   const color = KIND_COLOR[kind];
-  const label = KIND_LABEL[kind];
+  const label = buildKindLabel(kind, t);
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',

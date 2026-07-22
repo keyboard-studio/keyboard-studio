@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useLingui } from "@lingui/react/macro";
 import type { CarveNode } from '../../../lib/irToCarveNodes.ts';
 import { nodeState, MOD_GROUP_DEFS } from '../../../lib/irToCarveNodes.ts';
 import { KIND_COLOR } from './KindBadge.tsx';
@@ -12,12 +13,16 @@ interface RailSection {
   kind: CarveNode['kind'];
 }
 
-const SECTIONS: RailSection[] = [
-  { label: 'Patterns', kind: 'pattern' },
-  { label: 'Groups',   kind: 'group' },
-  { label: 'Stores',   kind: 'store' },
-  { label: 'Advanced', kind: 'raw' },
-];
+// Chrome (section headings); built per-render from t() below since this
+// needs an active useLingui() context — see buildSections.
+function buildSections(t: (descriptor: { id: string; message: string }) => string): RailSection[] {
+  return [
+    { label: t({ id: "editor.assignLoop.rail.section.patterns", message: "Patterns" }), kind: 'pattern' },
+    { label: t({ id: "editor.assignLoop.rail.section.groups", message: "Groups" }), kind: 'group' },
+    { label: t({ id: "editor.assignLoop.rail.section.stores", message: "Stores" }), kind: 'store' },
+    { label: t({ id: "editor.assignLoop.rail.section.advanced", message: "Advanced" }), kind: 'raw' },
+  ];
+}
 
 type StoreSubGroup = 'input' | 'output' | 'both' | 'pattern' | 'unused';
 
@@ -31,13 +36,20 @@ function storeSubGroup(node: CarveNode): StoreSubGroup {
   return 'unused';
 }
 
-const STORE_SUBS: { key: StoreSubGroup; label: string; chip: string; color: string }[] = [
-  { key: 'input',   label: 'Input',          chip: 'in',     color: 'var(--app-accent-text)' },
-  { key: 'output',  label: 'Output',         chip: 'out',    color: '#7dbf8e' },
-  { key: 'both',    label: 'Input + Output', chip: 'in+out', color: '#c8b0e8' },
-  { key: 'pattern', label: 'Pattern',        chip: '',       color: KIND_COLOR.pattern },
-  { key: 'unused',  label: 'Unused',         chip: '',       color: 'var(--app-text-subtle)' },
-];
+// Chrome (sub-section headings + chip abbreviations); built per-render from
+// t() below since this needs an active useLingui() context — see
+// buildStoreSubs.
+function buildStoreSubs(
+  t: (descriptor: { id: string; message: string }) => string,
+): { key: StoreSubGroup; label: string; chip: string; color: string }[] {
+  return [
+    { key: 'input', label: t({ id: "editor.assignLoop.rail.storeSub.input", message: "Input" }), chip: t({ id: "editor.assignLoop.rail.storeSub.inputChip", message: "in" }), color: 'var(--app-accent-text)' },
+    { key: 'output', label: t({ id: "editor.assignLoop.rail.storeSub.output", message: "Output" }), chip: t({ id: "editor.assignLoop.rail.storeSub.outputChip", message: "out" }), color: '#7dbf8e' },
+    { key: 'both', label: t({ id: "editor.assignLoop.rail.storeSub.both", message: "Input + Output" }), chip: t({ id: "editor.assignLoop.rail.storeSub.bothChip", message: "in+out" }), color: '#c8b0e8' },
+    { key: 'pattern', label: t({ id: "editor.assignLoop.rail.storeSub.pattern", message: "Pattern" }), chip: '', color: KIND_COLOR.pattern },
+    { key: 'unused', label: t({ id: "editor.assignLoop.rail.storeSub.unused", message: "Unused" }), chip: '', color: 'var(--app-text-subtle)' },
+  ];
+}
 
 interface RailProps {
   nodes: CarveNode[];
@@ -59,6 +71,9 @@ function SectionHeader({ tone, label, count }: { tone: string; label: string; co
 }
 
 export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, onSetManyGlyphs, onToggleNode }: RailProps) {
+  const { t } = useLingui();
+  const SECTIONS = buildSections(t);
+  const STORE_SUBS = buildStoreSubs(t);
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
 
@@ -165,7 +180,7 @@ export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, on
                     <span style={{ font: '600 9px/1 var(--app-font-mono)', color: chipColor, border: '1px solid currentColor', borderRadius: 3, padding: '1px 4px', opacity: 0.85 }}>{chipLabel}</span>
                   )}
                   {node.loadBearing === true && (
-                    <span aria-label="load-bearing" style={{ color: 'var(--sil-orange)', display: 'inline-flex' }}>
+                    <span aria-label={t({ id: "editor.assignLoop.rail.loadBearingAriaLabel", message: "load-bearing" })} style={{ color: 'var(--sil-orange)', display: 'inline-flex' }}>
                       <WarnIcon size={11} />
                     </span>
                   )}

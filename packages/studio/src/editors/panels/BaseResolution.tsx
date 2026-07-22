@@ -6,6 +6,7 @@
 // The chosen base then back-fills the prefill confirmations. refs #369.
 
 import { useEffect, useMemo, useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { getBaseBrowserService } from "../../lib/services.ts";
 import { suggestBases, type SuggestTarget } from "../../lib/suggestBase.ts";
@@ -20,14 +21,27 @@ import { BaseKeyboardPicker } from "../../components/BaseKeyboardPicker.tsx";
 import { Badge, Button } from "../../ui/index.ts";
 import type { BadgeTone } from "../../ui/Badge.tsx";
 
-const REASON_LABEL: Record<ResolvedReason, string> = {
-  "language-match-monolingual": "Dedicated to your language",
-  "language-match-multilingual": "Already supports your language",
-  genealogical: "Related language, same script",
-  "script-match": "Matches your script",
-  "language-cross-script": "Supports your language, different script",
-  "us-qwerty-fallback": "Start blank (US QWERTY)",
-};
+// Chrome (badge labels); built per-render from t() below since this needs an
+// active useLingui() context — see buildReasonLabel.
+function buildReasonLabel(
+  reason: ResolvedReason,
+  t: (descriptor: { id: string; message: string }) => string,
+): string {
+  switch (reason) {
+    case "language-match-monolingual":
+      return t({ id: "editor.baseResolution.reason.monolingual", message: "Dedicated to your language" });
+    case "language-match-multilingual":
+      return t({ id: "editor.baseResolution.reason.multilingual", message: "Already supports your language" });
+    case "genealogical":
+      return t({ id: "editor.baseResolution.reason.genealogical", message: "Related language, same script" });
+    case "script-match":
+      return t({ id: "editor.baseResolution.reason.scriptMatch", message: "Matches your script" });
+    case "language-cross-script":
+      return t({ id: "editor.baseResolution.reason.crossScript", message: "Supports your language, different script" });
+    case "us-qwerty-fallback":
+      return t({ id: "editor.baseResolution.reason.usQwertyFallback", message: "Start blank (US QWERTY)" });
+  }
+}
 
 // Token-mapped reason tones for Badge, in descending strength:
 //   language-match-monolingual  → Badge "success" (var(--sil-green)) — dedicated
@@ -75,6 +89,7 @@ export function BaseResolution({
   previewStatus,
   onBack,
 }: BaseResolutionProps) {
+  const { t } = useLingui();
   const [bases, setBases] = useState<BaseKeyboard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,7 +115,7 @@ export function BaseResolution({
         (err) => {
           if (!live) return;
           console.error("[BaseResolution] listAll() failed:", err);
-          setError("Could not load base keyboards.");
+          setError(t({ id: "editor.baseResolution.loadError", message: "Could not load base keyboards." }));
           setLoading(false);
         },
       );
@@ -174,12 +189,12 @@ export function BaseResolution({
     fontFamily: "var(--app-font)",
   };
 
-  if (loading) return <div role="status" style={{ color: "var(--app-text-muted)", fontFamily: "var(--app-font)" }}>Loading base keyboards...</div>;
+  if (loading) return <div role="status" style={{ color: "var(--app-text-muted)", fontFamily: "var(--app-font)" }}><Trans id="base.picker.loading">Loading base keyboards...</Trans></div>;
   if (error !== null) return <div style={{ color: "var(--danger)", fontFamily: "var(--app-font)" }}>{error}</div>;
   if (bases.length === 0)
     return (
       <div role="status" style={{ color: "var(--app-text-muted)", fontSize: 13, fontFamily: "var(--app-font)" }}>
-        No base keyboards found. Check your connection and try again.
+        <Trans id="base.picker.emptyCatalog">No base keyboards found. Check your connection and try again.</Trans>
       </div>
     );
 
@@ -195,13 +210,15 @@ export function BaseResolution({
           // margin now that the button sits at the top with the search bar.
           style={{ marginTop: 0, marginBottom: 12 }}
         >
-          &larr; Back
+          <Trans id="editor.baseResolution.backButton">&larr; Back</Trans>
         </Button>
       )}
-      <h2 style={heading}>Choose a starting keyboard</h2>
+      <h2 style={heading}><Trans id="editor.baseResolution.heading">Choose a starting keyboard</Trans></h2>
       <p style={subtle}>
-        Based on your language and chosen script, here are the closest starting
-        points. Search above or pick a suggestion below.
+        <Trans id="editor.baseResolution.intro">
+          Based on your language and chosen script, here are the closest starting
+          points. Search above or pick a suggestion below.
+        </Trans>
       </p>
 
       {/* Search — at the top, scoped to the suggestions by default with a
@@ -209,11 +226,11 @@ export function BaseResolution({
       <div style={{ marginBottom: 20 }}>
         <div
           role="group"
-          aria-label="Search scope"
+          aria-label={t({ id: "editor.baseResolution.searchScopeAriaLabel", message: "Search scope" })}
           style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}
         >
           <span style={{ fontSize: 12, color: "var(--app-text-muted)", fontFamily: "var(--app-font)" }}>
-            Search in:
+            <Trans id="editor.baseResolution.searchInLabel">Search in:</Trans>
           </span>
           {(["suggested", "all"] as const).map((scope) => {
             const active = searchScope === scope;
@@ -235,7 +252,9 @@ export function BaseResolution({
                   fontFamily: "var(--app-font)",
                 }}
               >
-                {scope === "suggested" ? "Suggested" : "All keyboards"}
+                {scope === "suggested"
+                  ? t({ id: "editor.baseResolution.scopeSuggested", message: "Suggested" })
+                  : t({ id: "editor.baseResolution.scopeAll", message: "All keyboards" })}
               </Button>
             );
           })}
@@ -244,7 +263,7 @@ export function BaseResolution({
           value={previewedBase}
           onChange={onPreview}
           target={target}
-          label="Search keyboards"
+          label={t({ id: "editor.baseResolution.searchKeyboardsLabel", message: "Search keyboards" })}
           scopeIds={searchScope === "suggested" ? suggestedIds : undefined}
           onSearchAll={() => setSearchScope("all")}
         />
@@ -274,12 +293,14 @@ export function BaseResolution({
             fontFamily: "var(--app-font)",
           }}
         >
-          {previewStatus === "loading" ? "Preparing preview…" : "Choose this keyboard"}
+          {previewStatus === "loading"
+            ? t({ id: "editor.baseResolution.preparingPreview", message: "Preparing preview…" })
+            : t({ id: "editor.baseResolution.chooseThisKeyboard", message: "Choose this keyboard" })}
         </Button>
       </div>
 
       <div style={{ borderTop: "1px solid var(--app-border)", paddingTop: 16 }}>
-        <p style={{ ...subtle, marginBottom: 8 }}>Suggested for you:</p>
+        <p style={{ ...subtle, marginBottom: 8 }}><Trans id="editor.baseResolution.suggestedForYou">Suggested for you:</Trans></p>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {suggestions.map(({ base, reason, relative }) => {
             const isSelected = base.id === previewedBase?.id;
@@ -319,12 +340,15 @@ export function BaseResolution({
               {reason === "genealogical" && relative !== undefined ? (
                 <Badge
                   tone={REASON_TONE[reason]}
-                  title={`Genealogical distance ${relative.distance} — total steps to ${relative.name} across both branches (up to the nearest common ancestor, then down); smaller is closer`}
+                  title={t({
+                    id: "editor.baseResolution.genealogicalDistanceTitle",
+                    message: `Genealogical distance ${{ distance: relative.distance }} — total steps to ${{ name: relative.name }} across both branches (up to the nearest common ancestor, then down); smaller is closer`,
+                  })}
                 >
-                  Related: {relative.name}, same script
+                  <Trans id="editor.baseResolution.relatedBadge">Related: {relative.name}, same script</Trans>
                 </Badge>
               ) : (
-                <Badge tone={REASON_TONE[reason]}>{REASON_LABEL[reason]}</Badge>
+                <Badge tone={REASON_TONE[reason]}>{buildReasonLabel(reason, t)}</Badge>
               )}
             </Button>
             );

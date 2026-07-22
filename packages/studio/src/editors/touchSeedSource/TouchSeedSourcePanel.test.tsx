@@ -10,7 +10,8 @@
 //     DIFFERENT selection than the recorded choice, while a touch draft exists
 
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { screen, fireEvent, cleanup } from "@testing-library/react";
+import { render } from "../../test/renderWithI18n.tsx";
 import { TouchSeedSourcePanel } from "./TouchSeedSourcePanel.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
