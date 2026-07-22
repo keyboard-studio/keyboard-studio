@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useLingui } from "@lingui/react/macro";
 import type { RemovalCapability } from '@keyboard-studio/contracts';
 import type { GlyphOwner, CharLocation } from '../../../lib/irToCarveNodes.ts';
 import { displayChar } from '../../../lib/irToCarveNodes.ts';
@@ -39,6 +40,7 @@ interface GlyphCellProps {
 export const GlyphCell = memo(function GlyphCell({
   gid, ch, keys, off, color, onToggle, modifierLabel, capability, owners, webLocations, onWebTag, onCascadeDelete,
 }: GlyphCellProps) {
+  const { t } = useLingui();
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
   const display = displayChar(ch);
@@ -87,7 +89,10 @@ export const GlyphCell = memo(function GlyphCell({
       >
         {isNotRemovable && (
           <span
-            aria-label={`not removable: ${capability.replace('not-removable:', '')}`}
+            aria-label={t({
+              id: "editor.assignLoop.glyphCell.notRemovableAriaLabel",
+              message: `not removable: ${capability.replace('not-removable:', '')}`,
+            })}
             style={{
               position: 'absolute', top: 4, left: 5,
               font: '600 8px/1 var(--app-font-mono)', letterSpacing: '.04em',
@@ -117,7 +122,11 @@ export const GlyphCell = memo(function GlyphCell({
               <button
                 key={k}
                 type="button"
-                aria-label={`${k} — ${count === 1 ? 'go to' : `${count} places`}`}
+                aria-label={`${k} — ${
+                  count === 1
+                    ? t({ id: "editor.assignLoop.glyphCell.goTo", message: "go to" })
+                    : t({ id: "editor.assignLoop.glyphCell.placesCount", message: `${count} places` })
+                }`}
                 onClick={(e) => { e.stopPropagation(); onWebTag?.(ch, locations); }}
                 style={{
                   font: '600 9px/1 var(--app-font-mono)', letterSpacing: '.04em',

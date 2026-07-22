@@ -67,6 +67,8 @@
 // (decision D3 / spec §8 — one 300 ms debounce cycle).
 
 import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import type { BaseKeyboard, MechanismAssignment, MechanismRef, Pattern } from "@keyboard-studio/contracts";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -108,12 +110,21 @@ const SEQ_CONTENT_RESOLVE_OPTIONS: ResolveCharInputOptions = {
 // Indicator ("seqSecond") — a single keystroke. singleGrapheme is
 // grapheme-aware (Intl.Segmenter), so a lone combining mark typed as the
 // indicator is NOT hard-rejected — only more than one grapheme is.
-const SEQ_INDICATOR_RESOLVE_OPTIONS: ResolveCharInputOptions = {
-  multiToken: true,
-  singleGrapheme: true,
-  blockDelimiters: true,
-  singleGraphemeReason: "Enter one indicator character.",
-};
+//
+// singleGraphemeReason is user-facing chrome (an error string), but this
+// object is constructed at module scope where no useLingui() is available —
+// buildSeqIndicatorResolveOptions(t) below builds the localized version
+// per-render, called from the component (which has a live t()).
+function buildSeqIndicatorResolveOptions(
+  t: (descriptor: { id: string; message: string }) => string,
+): ResolveCharInputOptions {
+  return {
+    multiToken: true,
+    singleGrapheme: true,
+    blockDelimiters: true,
+    singleGraphemeReason: t({ id: "editor.sequences.indicatorSingleGraphemeReason", message: "Enter one indicator character." }),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Shared styles — ghostBtn/inputStyle/forwardBtnStyle are imported (aliased)
@@ -177,6 +188,8 @@ export function SequenceGallery({
   onComplete,
   onBack,
 }: SequenceGalleryProps) {
+  const { t } = useLingui();
+  const seqIndicatorResolveOptions = useMemo(() => buildSeqIndicatorResolveOptions(t), [t]);
   const sequenceFlaggedChars = useWorkingCopyStore((s) => s.sequenceFlaggedChars);
 
   // currentChar: explicit state, kept in sync with sequenceFlaggedChars.
@@ -252,9 +265,9 @@ export function SequenceGallery({
   }, [currentChar]);
 
   const contentResolved = resolveCharInput(content, SEQ_CONTENT_RESOLVE_OPTIONS);
-  const indicatorResolved = resolveCharInput(indicator, SEQ_INDICATOR_RESOLVE_OPTIONS);
+  const indicatorResolved = resolveCharInput(indicator, seqIndicatorResolveOptions);
   const contentReflection = reflectCharInput(content, SEQ_CONTENT_RESOLVE_OPTIONS);
-  const indicatorReflection = reflectCharInput(indicator, SEQ_INDICATOR_RESOLVE_OPTIONS);
+  const indicatorReflection = reflectCharInput(indicator, seqIndicatorResolveOptions);
 
   // Indicator vkey-resolvability (P1) — the emitted rule is a `using keys`
   // group whose rightmost item is the Indicator; kmcmplib requires that item
@@ -299,7 +312,7 @@ export function SequenceGallery({
     // leaving `target` un-normalized).
     const char = currentChar.normalize("NFC");
     const contentValue = resolveCharInput(content, SEQ_CONTENT_RESOLVE_OPTIONS);
-    const indicatorValue = resolveCharInput(indicator, SEQ_INDICATOR_RESOLVE_OPTIONS);
+    const indicatorValue = resolveCharInput(indicator, seqIndicatorResolveOptions);
     if (!contentValue.ok || !indicatorValue.ok) return;
     // Re-check vkey resolvability here too (not just via canApply) — never
     // silently record an Indicator that can't be wired to a physical key.
@@ -344,7 +357,7 @@ export function SequenceGallery({
     // next sequence, whether or not this one was a new addition.
     setContent("");
     setIndicator("");
-  }, [currentChar, canApply, content, indicator, sessionAssignments, recordAssignments]);
+  }, [currentChar, canApply, content, indicator, sessionAssignments, recordAssignments, seqIndicatorResolveOptions]);
 
   // ---------------------------------------------------------------------------
   // Remove a single recorded sequence (by its index within
@@ -481,7 +494,7 @@ export function SequenceGallery({
           fontFamily: FONT,
         }}
       >
-        Sequence Gallery
+        <Trans id="editor.sequences.heading">Sequence Gallery</Trans>
       </h1>
       <span
         style={{
@@ -492,7 +505,7 @@ export function SequenceGallery({
           letterSpacing: "0.06em",
         }}
       >
-        Desktop
+        {t({ id: "editor.assignLoop.modality.desktop", message: "Desktop" })}
       </span>
     </div>
   );
@@ -521,8 +534,10 @@ export function SequenceGallery({
           }}
         >
           <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: TEXT_DIM }}>
-            No characters flagged for sequences. Flag characters in the
-            Mechanism Gallery to define their sequences here.
+            <Trans id="editor.sequences.noFlaggedChars">
+              No characters flagged for sequences. Flag characters in the
+              Mechanism Gallery to define their sequences here.
+            </Trans>
           </p>
         </div>
         <div
@@ -543,7 +558,7 @@ export function SequenceGallery({
               onClick={onBack}
               style={ghostBtn}
             >
-              &larr; Back
+              <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
             </button>
           ) : (
             <span />
@@ -553,10 +568,10 @@ export function SequenceGallery({
               type="button"
               data-testid="sequences-continue"
               onClick={onComplete}
-              aria-label="Continue (sequence gallery)"
+              aria-label={t({ id: "editor.sequences.continueAriaLabel", message: "Continue (sequence gallery)" })}
               style={forwardBtnStyle}
             >
-              Continue &rarr;
+              <Trans id="editor.sequences.continueButton">Continue &rarr;</Trans>
             </button>
           )}
         </div>
@@ -582,7 +597,7 @@ export function SequenceGallery({
               onClick={onBack}
               style={ghostBtn}
             >
-              &larr; Back
+              <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
             </button>
           )}
           <div
@@ -594,7 +609,9 @@ export function SequenceGallery({
             }}
           >
             <p style={{ fontSize: 15 }}>
-              No base keyboard selected. Go back to choose a starting point.
+              <Trans id="editor.assignLoop.noBaseKeyboardSelected">
+                No base keyboard selected. Go back to choose a starting point.
+              </Trans>
             </p>
           </div>
         </div>
@@ -619,10 +636,12 @@ export function SequenceGallery({
 
   const canGoNext = currentChar !== null && existingSequenceMechanisms.length > 0;
 
-  const forwardLabel = hasAnotherCharAfterCurrent ? "Next character →" : "Done";
+  const forwardLabel = hasAnotherCharAfterCurrent
+    ? t({ id: "editor.assignLoop.nextCharacterButton", message: "Next character →" })
+    : t({ id: "editor.assignLoop.doneButton", message: "Done" });
   const forwardAriaLabel = hasAnotherCharAfterCurrent
-    ? "Next character"
-    : "Continue (sequence gallery)";
+    ? t({ id: "editor.assignLoop.nextCharacterAriaLabel", message: "Next character" })
+    : t({ id: "editor.sequences.continueAriaLabel", message: "Continue (sequence gallery)" });
 
   // ---------------------------------------------------------------------------
   // Left pane
@@ -643,10 +662,15 @@ export function SequenceGallery({
       <p
         role="status"
         aria-live="polite"
-        aria-label={`${currentIdx + 1} of ${sequenceFlaggedChars.length}`}
+        aria-label={t({
+          id: "editor.sequences.coverageAriaLabel",
+          message: `${{ current: currentIdx + 1 }} of ${{ total: sequenceFlaggedChars.length }}`,
+        })}
         style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
       >
-        {currentIdx + 1} of {sequenceFlaggedChars.length}
+        <Trans id="editor.sequences.coverageLine">
+          {currentIdx + 1} of {sequenceFlaggedChars.length}
+        </Trans>
       </p>
 
       {/* Top toolbar row — Back (left) + Previous/Next-or-Done (right). */}
@@ -665,7 +689,7 @@ export function SequenceGallery({
             onClick={handleBack}
             style={{ ...ghostBtn, fontSize: 13 }}
           >
-            &larr; Back
+            <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
           </button>
         )}
 
@@ -682,7 +706,7 @@ export function SequenceGallery({
             data-testid="sequences-prev-char"
             onClick={handlePreviousChar}
             disabled={currentIdx <= 0}
-            aria-label="Previous character"
+            aria-label={t({ id: "editor.assignLoop.previousCharacterAriaLabel", message: "Previous character" })}
             style={{
               ...ghostBtn,
               fontSize: 13,
@@ -691,7 +715,7 @@ export function SequenceGallery({
                 : {}),
             }}
           >
-            &laquo; Previous character
+            <Trans id="editor.assignLoop.previousCharacterButton">&laquo; Previous character</Trans>
           </button>
 
           <button
@@ -735,7 +759,7 @@ export function SequenceGallery({
                 letterSpacing: "0.06em",
               }}
             >
-              Define a sequence
+              <Trans id="editor.sequences.defineSequenceEyebrow">Define a sequence</Trans>
             </p>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
               <span
@@ -769,10 +793,12 @@ export function SequenceGallery({
               htmlFor="sequences-content-input"
               style={{ fontSize: 13, fontWeight: 600, color: TEXT_MAIN, fontFamily: FONT }}
             >
-              Content
+              <Trans id="editor.sequences.contentLabel">Content</Trans>
             </label>
             <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-              The characters that come first — what you type before the indicator.
+              <Trans id="editor.sequences.contentHint">
+                The characters that come first — what you type before the indicator.
+              </Trans>
             </p>
             <input
               id="sequences-content-input"
@@ -810,11 +836,13 @@ export function SequenceGallery({
               htmlFor="sequences-indicator-input"
               style={{ fontSize: 13, fontWeight: 600, color: TEXT_MAIN, fontFamily: FONT }}
             >
-              Indicator
+              <Trans id="editor.sequences.indicatorLabel">Indicator</Trans>
             </label>
             <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-              The single character that triggers the combination — typing it after the
-              content produces {currentChar}.
+              <Trans id="editor.sequences.indicatorHint">
+                The single character that triggers the combination — typing it after the
+                content produces {currentChar}.
+              </Trans>
             </p>
             <input
               id="sequences-indicator-input"
@@ -840,17 +868,19 @@ export function SequenceGallery({
             )}
             {indicatorUnresolvable && (
               <span role="alert" style={{ fontSize: 10, color: "#f85149", opacity: 0.85, fontFamily: FONT }}>
-                '{indicatorResolved.ok ? indicatorResolved.value : ""}' isn't a key on
-                this layout — pick a character that maps to a physical key.
+                <Trans id="editor.sequences.indicatorUnresolvableWarning">
+                  '{indicatorResolved.ok ? indicatorResolved.value : ""}' isn't a key on
+                  this layout — pick a character that maps to a physical key.
+                </Trans>
               </span>
             )}
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <span style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
-              {content !== "" ? content : "[content]"}
+              {content !== "" ? content : t({ id: "editor.sequences.contentPlaceholder", message: "[content]" })}
               {" + "}
-              {indicator !== "" ? indicator : "[indicator]"}
+              {indicator !== "" ? indicator : t({ id: "editor.sequences.indicatorPlaceholder", message: "[indicator]" })}
               {" "}
               &rarr;{" "}
               <span style={{ color: TEXT_MAIN, fontFamily: "monospace", fontSize: 16 }}>
@@ -865,7 +895,10 @@ export function SequenceGallery({
               data-testid="sequences-apply"
               onClick={handleApply}
               disabled={!canApply}
-              aria-label={`Apply sequence for ${toUPlusNotation(currentChar)} ${currentChar}`}
+              aria-label={t({
+                id: "editor.sequences.applyAriaLabel",
+                message: `Apply sequence for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+              })}
               style={{
                 padding: "7px 16px",
                 background: canApply ? BLUE_ACTION : "#21262d",
@@ -878,13 +911,16 @@ export function SequenceGallery({
                 fontFamily: FONT,
               }}
             >
-              Apply
+              <Trans id="editor.sequences.applyButton">Apply</Trans>
             </button>
             <button
               type="button"
               data-testid="sequences-skip"
               onClick={handleNext}
-              aria-label={`Skip this character (${toUPlusNotation(currentChar)} ${currentChar})`}
+              aria-label={t({
+                id: "editor.assignLoop.skipCharacterAriaLabel",
+                message: `Skip this character (${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }})`,
+              })}
               style={{
                 background: "transparent",
                 border: "none",
@@ -896,7 +932,7 @@ export function SequenceGallery({
                 textDecoration: "underline",
               }}
             >
-              Skip this character
+              <Trans id="editor.assignLoop.skipCharacterButton">Skip this character</Trans>
             </button>
             {existingSequenceMechanisms.length > 0 && (
               <span
@@ -904,9 +940,13 @@ export function SequenceGallery({
                 aria-live="polite"
                 style={{ fontSize: 12, color: "#56d364", fontFamily: FONT }}
               >
-                {existingSequenceMechanisms.length === 1
-                  ? "Sequence recorded"
-                  : `${existingSequenceMechanisms.length} sequences recorded`}
+                {t({
+                  id: "editor.sequences.recordedCount",
+                  message: plural(existingSequenceMechanisms.length, {
+                    one: "Sequence recorded",
+                    other: "# sequences recorded",
+                  }),
+                })}
               </span>
             )}
           </div>
@@ -937,7 +977,7 @@ export function SequenceGallery({
                   letterSpacing: "0.06em",
                 }}
               >
-                Recorded sequences
+                <Trans id="editor.sequences.recordedSequencesHeading">Recorded sequences</Trans>
               </p>
               {existingSequenceMechanisms.map((m, idx) => {
                 const seqContent = m.slotValues?.["firstLetterOut"] ?? "";
@@ -968,7 +1008,10 @@ export function SequenceGallery({
                       type="button"
                       data-testid={`sequences-remove-${idx}`}
                       onClick={() => handleRemoveSequence(idx)}
-                      aria-label={`Remove sequence ${seqContent} + ${seqIndicator} for ${toUPlusNotation(currentChar)} ${currentChar}`}
+                      aria-label={t({
+                        id: "editor.sequences.removeSequenceAriaLabel",
+                        message: `Remove sequence ${{ content: seqContent }} + ${{ indicator: seqIndicator }} for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+                      })}
                       style={{
                         background: "transparent",
                         border: `1px solid ${BORDER}`,
@@ -980,7 +1023,7 @@ export function SequenceGallery({
                         padding: "3px 8px",
                       }}
                     >
-                      Remove
+                      <Trans id="editor.sequences.removeButton">Remove</Trans>
                     </button>
                   </div>
                 );
@@ -1004,7 +1047,9 @@ export function SequenceGallery({
             fontFamily: FONT,
           }}
         >
-          Pattern load error — preview transform may be incomplete.
+          <Trans id="editor.assignLoop.patternLoadError">
+            Pattern load error — preview transform may be incomplete.
+          </Trans>
           <br />
           <span style={{ fontSize: 11, color: TEXT_DIM }}>{loadError}</span>
         </div>
@@ -1060,12 +1105,12 @@ export function SequenceGallery({
               stage={artifactStage}
               retry={artifactRetry}
               defaultOskMode="desktop"
-              heading="Live preview"
-              warningLabel="Apply warnings:"
+              heading={t({ id: "editor.assignLoop.preview.heading", message: "Live preview" })}
+              warningLabel={t({ id: "editor.assignLoop.preview.applyWarnings", message: "Apply warnings:" })}
             />
           ) : patternsLoading ? (
             <p style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
-              Loading patterns...
+              <Trans id="editor.assignLoop.loadingPatterns">Loading patterns...</Trans>
             </p>
           ) : null}
         </div>

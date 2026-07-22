@@ -16,6 +16,7 @@
 // custom mode, since custom mode is purely `value === CUSTOM_KEY_OPTION_VALUE`.
 
 import type { CSSProperties } from "react";
+import { Trans } from "@lingui/react/macro";
 import { CUSTOM_KEY_OPTION, CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 import {
   resolveKeyPickerSelection,
@@ -23,11 +24,6 @@ import {
   type KeyPickerResolveOptions,
 } from "../../lib/charInput.ts";
 import { BG_PAGE, BORDER, TEXT_MAIN, TEXT_DIM, FONT } from "../../lib/galleryTheme.ts";
-
-/** Shared one-line guidance shown only while a picker's custom-character
- *  input is active — see Fix 1 (placeholders removed from every custom
- *  input; guidance moved here instead of living inside the box). */
-const CUSTOM_INPUT_HELP_TEXT = "Type a character directly, or a Unicode value like U+00E9.";
 
 const selectStyle: CSSProperties = {
   background: BG_PAGE,
@@ -110,7 +106,9 @@ export function KeyPickerField({
       {isCustom && (
         <span style={{ display: "inline-flex", flexDirection: "column", gap: 2 }}>
           <span style={{ fontSize: 10, color: TEXT_DIM, fontFamily: FONT }}>
-            {CUSTOM_INPUT_HELP_TEXT}
+            <Trans id="editor.assignLoop.customInputHelp">
+              Type a character directly, or a Unicode value like U+00E9.
+            </Trans>
           </span>
           <input
             type="text"

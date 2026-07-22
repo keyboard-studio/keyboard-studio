@@ -14,7 +14,8 @@
 // Inspector, ConfirmDialog) runs for real — this is a render-based test.
 
 import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from 'vitest';
-import { render, cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { render } from '../../test/renderWithI18n.tsx';
 import type { IRRule, IRGroup, IRStore, KeyboardIR, RemovalCapability } from '@keyboard-studio/contracts';
 import { createVirtualFS } from '@keyboard-studio/contracts';
 import { basicKbdus } from '@keyboard-studio/contracts/fixtures';

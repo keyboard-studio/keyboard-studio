@@ -24,6 +24,7 @@
 // (already wired) — this panel only decides whether to show the warning.
 
 import { useMemo, useState, type CSSProperties } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore, type TouchSeedSource } from "../../stores/surveySessionStore.ts";
@@ -193,6 +194,7 @@ const confirmBtnStyle = (warn: boolean): CSSProperties => ({
 // ---------------------------------------------------------------------------
 
 export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
+  const { t } = useLingui();
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
   const touchDraft = useWorkingCopyStore((s) => s.touchDraft);
   const storedSeedSource = useSurveySessionStore((s) => s.touchSeedSource);
@@ -231,11 +233,11 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
           <button
             type="button"
             onClick={onBack}
-            aria-label="Back to mechanisms (Phase C)"
+            aria-label={t({ id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel", message: "Back to mechanisms (Phase C)" })}
             data-testid="seed-source-back"
             style={ghostBtn}
           >
-            &larr; Back
+            <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
           </button>
         )}
 
@@ -249,11 +251,13 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
             fontFamily: FONT,
           }}
         >
-          Choose your touch layout starting point
+          <Trans id="editor.touchSeed.heading">Choose your touch layout starting point</Trans>
         </h1>
         <p style={{ margin: "0 0 20px 0", fontSize: 13, color: TEXT_DIM, fontFamily: FONT }}>
-          This choice seeds the mobile/touch layout. Individual characters can
-          still be reviewed and adjusted afterward in the Touch Layout step.
+          <Trans id="editor.touchSeed.intro">
+            This choice seeds the mobile/touch layout. Individual characters can
+            still be reviewed and adjusted afterward in the Touch Layout step.
+          </Trans>
         </p>
 
         {/* Preview */}
@@ -268,12 +272,15 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
               fontFamily: FONT,
             }}
           >
-            Base touch layout
+            <Trans id="editor.touchSeed.baseLayoutEyebrow">Base touch layout</Trans>
           </p>
           {preview !== null ? (
             <>
               <p style={{ margin: "0 0 10px 0", fontSize: 13, color: TEXT_MAIN, fontFamily: FONT }}>
-                {`Ships: ${preview.platformIds.join(", ")} (showing "${preview.previewPlatformId}" default layer)`}
+                {t({
+                  id: "editor.touchSeed.shipsLine",
+                  message: `Ships: ${{ platforms: preview.platformIds.join(", ") }} (showing "${{ previewPlatform: preview.previewPlatformId }}" default layer)`,
+                })}
               </p>
               <div>
                 {preview.rows.map((row, i) => (
@@ -291,7 +298,7 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
                   data-testid="seed-source-no-phone-warn"
                   style={{ margin: "10px 0 0 0", fontSize: 12, color: "#d29922", fontFamily: FONT }}
                 >
-                  [WARN] this layout has no phone platform.
+                  <Trans id="editor.touchSeed.noPhonePlatformWarning">[WARN] this layout has no phone platform.</Trans>
                 </p>
               )}
             </>
@@ -301,8 +308,8 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
               style={{ margin: 0, fontSize: 13, color: TEXT_DIM, fontFamily: FONT }}
             >
               {isMalformed
-                ? "This base's touch layout could not be read (malformed JSON) — treated as no layout."
-                : "This base ships no touch layout."}
+                ? <Trans id="editor.touchSeed.malformedNote">This base's touch layout could not be read (malformed JSON) — treated as no layout.</Trans>
+                : <Trans id="editor.touchSeed.absentNote">This base ships no touch layout.</Trans>}
             </p>
           )}
         </div>
@@ -323,12 +330,12 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
                 color: selected === "import-adapt" ? ACCENT : TEXT_MAIN,
               }}
             >
-              Import &amp; adapt
+              <Trans id="editor.touchSeed.importAdaptTitle">Import &amp; adapt</Trans>
             </span>
             <span style={{ fontSize: 12, color: TEXT_DIM }}>
               {hasUsableBaseLayout
-                ? "Keep the base's shipped touch layout and carry your desktop work onto it."
-                : "There is no base touch layout to import — this option starts from an empty layout."}
+                ? <Trans id="editor.touchSeed.importAdaptUsable">Keep the base's shipped touch layout and carry your desktop work onto it.</Trans>
+                : <Trans id="editor.touchSeed.importAdaptUnusable">There is no base touch layout to import — this option starts from an empty layout.</Trans>}
             </span>
           </button>
 
@@ -346,13 +353,15 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
                 color: selected === "reseed-from-desktop" ? ACCENT : TEXT_MAIN,
               }}
             >
-              Reseed from desktop
+              <Trans id="editor.touchSeed.reseedTitle">Reseed from desktop</Trans>
             </span>
             <span style={{ fontSize: 12, color: TEXT_DIM }}>
-              {"Derive a fresh phone layout from your desktop key assignments."}
-              {hasOtherPlatforms
-                ? " Choosing this discards the base's shipped tablet/desktop touch platforms — only a phone layout is produced."
-                : ""}
+              <Trans id="editor.touchSeed.reseedDescription">Derive a fresh phone layout from your desktop key assignments.</Trans>
+              {hasOtherPlatforms && (
+                <Trans id="editor.touchSeed.reseedDiscardsPlatforms">
+                  {" "}Choosing this discards the base's shipped tablet/desktop touch platforms — only a phone layout is produced.
+                </Trans>
+              )}
             </span>
           </button>
         </div>
@@ -362,7 +371,9 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
             data-testid="seed-source-draft-warning"
             style={{ margin: "0 0 14px 0", fontSize: 12, color: "#f0a0a0", fontFamily: FONT }}
           >
-            [WARN] Changing the seed source will discard your in-progress touch edits.
+            <Trans id="editor.touchSeed.draftWarning">
+              [WARN] Changing the seed source will discard your in-progress touch edits.
+            </Trans>
           </p>
         )}
 
@@ -372,7 +383,9 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
           onClick={handleConfirm}
           style={confirmBtnStyle(showDraftWarning)}
         >
-          {showDraftWarning ? "Discard touch edits & confirm" : "Confirm"}
+          {showDraftWarning
+            ? t({ id: "editor.touchSeed.discardAndConfirmButton", message: "Discard touch edits & confirm" })
+            : t({ id: "editor.touchSeed.confirmButton", message: "Confirm" })}
         </button>
       </div>
     </div>

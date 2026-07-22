@@ -29,7 +29,13 @@ The interface between the studio source, the committed catalogs, and Crowdin.
 - JSX text → `<Trans id="…">English</Trans>` (`@lingui/react/macro`). Interpolate
   variables inside `Trans`; never concatenate translated fragments.
 - Attribute / non-JSX strings → the `t` macro (prefer `const { t } = useLingui()`
-  from `@lingui/react/macro` for context-bound reactivity).
+  from `@lingui/react/macro` for context-bound reactivity). Interpolate variables
+  directly in the `message` template literal using the labeled-expression form
+  `${{ name: expr }}` (or bare `${{ name }}` when the variable is already named
+  `name`) — e.g. `` t({ id: "…", message: `Remove ${{ char }}` }) ``. There is no
+  `values:` property on the macro descriptor; a bare `${expr}` for anything other
+  than a plain identifier extracts as an unhelpful positional placeholder
+  (`{0}`), so always label non-trivial expressions.
 - Counts → the ICU `plural` macro, not `n === 1 ? … : …`.
 - Do **not** wrap: code identifiers, test ids, technical tokens/paths, format
   examples (e.g. `you@example.com`), or values that are already data (echoed ids,

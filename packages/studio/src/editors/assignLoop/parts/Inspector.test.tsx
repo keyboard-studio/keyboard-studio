@@ -140,7 +140,8 @@ describe('storePairDescription variant distinctness', () => {
 // ---------------------------------------------------------------------------
 
 import React from 'react';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { screen, fireEvent, cleanup } from '@testing-library/react';
+import { render } from '../../../test/renderWithI18n.tsx';
 import { Inspector } from './Inspector.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 

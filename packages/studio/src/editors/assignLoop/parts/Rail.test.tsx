@@ -16,7 +16,8 @@
 //     onSetManyGlyphs.
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, fireEvent, screen } from '@testing-library/react';
+import { cleanup, fireEvent, screen } from '@testing-library/react';
+import { render } from '../../../test/renderWithI18n.tsx';
 import { Rail } from './Rail.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 import type { CarveNode, StoreCharChip } from '../../../lib/irToCarveNodes.ts';

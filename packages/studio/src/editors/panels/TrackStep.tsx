@@ -4,6 +4,7 @@
 // spec §8 v1.3.0: two authoring tracks.
 
 import { useState } from "react";
+import { Trans } from "@lingui/react/macro";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { Button, Card } from "../../ui/index.ts";
 import { TEXT_DIM } from "../../ui/theme.ts";
@@ -38,9 +39,11 @@ export function TrackStep({ base, onNext, onBack }: TrackStepProps) {
 
   return (
     <div style={{ color: "#e6edf3", fontFamily: "system-ui, sans-serif" }}>
-      <h2 style={HEADING}>How do you want to use this base?</h2>
+      <h2 style={HEADING}><Trans id="editor.trackStep.heading">How do you want to use this base?</Trans></h2>
       <p style={SUBTLE}>
-        You chose <strong>{base.displayName}</strong>. Pick how you want to work with it.
+        <Trans id="editor.trackStep.intro">
+          You chose <strong>{base.displayName}</strong>. Pick how you want to work with it.
+        </Trans>
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
@@ -51,9 +54,11 @@ export function TrackStep({ base, onNext, onBack }: TrackStepProps) {
           data-testid="track-copy"
           onClick={() => setTrack("copy")}
         >
-          <span style={{ fontWeight: 600, fontSize: 14 }}>Copy</span>
+          <span style={{ fontWeight: 600, fontSize: 14 }}><Trans id="editor.trackStep.copyTitle">Copy</Trans></span>
           <span style={{ fontSize: 12, color: TEXT_DIM }}>
-            Start a new keyboard based on this layout. You&apos;ll give it a new name and ID.
+            <Trans id="editor.trackStep.copyDescription">
+              Start a new keyboard based on this layout. You&apos;ll give it a new name and ID.
+            </Trans>
           </span>
         </Card>
 
@@ -63,9 +68,11 @@ export function TrackStep({ base, onNext, onBack }: TrackStepProps) {
           aria-checked={track === "adapt"}
           onClick={() => setTrack("adapt")}
         >
-          <span style={{ fontWeight: 600, fontSize: 14 }}>Adapt</span>
+          <span style={{ fontWeight: 600, fontSize: 14 }}><Trans id="editor.trackStep.adaptTitle">Adapt</Trans></span>
           <span style={{ fontSize: 12, color: TEXT_DIM }}>
-            Modify this keyboard in place, keeping its name and ID.
+            <Trans id="editor.trackStep.adaptDescription">
+              Modify this keyboard in place, keeping its name and ID.
+            </Trans>
           </span>
         </Card>
       </div>
@@ -77,12 +84,12 @@ export function TrackStep({ base, onNext, onBack }: TrackStepProps) {
           data-testid="track-next"
           onClick={handleNext}
         >
-          Next
+          <Trans id="editor.trackStep.nextButton">Next</Trans>
         </Button>
       </div>
 
       <Button variant="back" data-testid="track-back" onClick={onBack}>
-        {"←"} Back
+        <Trans id="editor.trackStep.backButton">{"←"} Back</Trans>
       </Button>
     </div>
   );

@@ -39,6 +39,8 @@ import {
   useMemo,
   type CSSProperties,
 } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import { useShallow } from "zustand/react/shallow";
 import type {
   BaseKeyboard,
@@ -112,13 +114,25 @@ export { PATTERN_SEQUENCE, PATTERN_DEADKEY, PATTERN_SWAP, PATTERN_RALT };
 // deadkeyBaseLetter stays single-grapheme — a multi-base deadkey needs a
 // paired accented-output list, which is a separate future change (relaxing
 // this alone is a hard compile error via Layer-A Check #9).
-const DEADKEY_BASE_LETTER_RESOLVE_OPTIONS: ResolveCharInputOptions = {
-  multiToken: true,
-  singleGrapheme: true,
-  blockDelimiters: true,
-  singleGraphemeReason:
-    "Enter one base character. (Covering several base letters with one dead key is coming later.)",
-};
+//
+// singleGraphemeReason is user-facing chrome (an error string), but this
+// object is constructed at module scope where no useLingui() is available —
+// buildDeadkeyBaseLetterResolveOptions(t) below builds the localized version
+// per-render; each component that needs it calls that with its own t().
+function buildDeadkeyBaseLetterResolveOptions(
+  t: (descriptor: { id: string; message: string }) => string,
+): ResolveCharInputOptions {
+  return {
+    multiToken: true,
+    singleGrapheme: true,
+    blockDelimiters: true,
+    singleGraphemeReason: t({
+      id: "editor.assignLoop.deadkeySingleGraphemeReason",
+      message:
+        "Enter one base character. (Covering several base letters with one dead key is coming later.)",
+    }),
+  };
+}
 
 // The S-02 deadkey trigger's resolved custom character is reused as
 // `accentChar` — the deadkey's own literal output — so it needs the same
@@ -127,14 +141,6 @@ const DEADKEY_BASE_LETTER_RESOLVE_OPTIONS: ResolveCharInputOptions = {
 const TRIGGER_KEY_RESOLVE_OPTIONS: KeyPickerResolveOptions = {
   blockDelimiters: true,
 };
-
-// Fix 1 — a single, unobtrusive help line for the character boxes
-// (deadkeyBaseLetter), shown once near the method chooser rather than as
-// in-box placeholder text repeated under every box. KeyPickerField carries
-// its own version of this line, shown only while its custom-input mode is
-// active.
-const CHAR_BOX_HELP_TEXT =
-  "Type a character, or a Unicode value like U+00E9. Combine composed parts with spaces, e.g. U+006E U+0303.";
 
 /** Display label per ModifierToken for the S-08 covered-chip badge (methodLabel). */
 const MODIFIER_TOKEN_LABELS: Record<string, string> = {
@@ -149,16 +155,22 @@ const MODIFIER_TOKEN_LABELS: Record<string, string> = {
   NCAPS: "NCaps",
 };
 
-function methodLabel(ref: { patternId: string; slotValues?: Record<string, string> }): string {
+function methodLabel(
+  ref: { patternId: string; slotValues?: Record<string, string> },
+  t: (descriptor: { id: string; message: string }) => string,
+): string {
   const sv = ref.slotValues ?? {};
   switch (ref.patternId) {
-    case "deadkey_single_tap":
-      return `Deadkey: ${sv["triggerKey"] ?? "?"} + ${sv["baseLetters"] ?? "?"}`;
+    case "deadkey_single_tap": {
+      const label = t({ id: "editor.assignLoop.methodLabel.deadkey", message: "Deadkey" });
+      return `${label}: ${sv["triggerKey"] ?? "?"} + ${sv["baseLetters"] ?? "?"}`;
+    }
     case "simple_swap": {
       // kmnRules may be multiple lines (e.g. shift-layer CAPS/NCAPS pair) —
       // the badge only needs the bracketed vkey expression from the first line.
       const firstLine = (sv["kmnRules"] ?? "").split("\n")[0] ?? "";
-      return `Key: ${firstLine.replace(/^\+ \[/, "").replace(/\].*/, "")}`;
+      const label = t({ id: "editor.assignLoop.methodLabel.key", message: "Key" });
+      return `${label}: ${firstLine.replace(/^\+ \[/, "").replace(/\].*/, "")}`;
     }
     case "modifier_as_layer_switch": {
       // altgrKeyList is a bracket-notation combo spec — e.g. "[RALT K_E]" or
@@ -167,7 +179,10 @@ function methodLabel(ref: { patternId: string; slotValues?: Record<string, strin
       const altgrKeyList = sv["altgrKeyList"] ?? "";
       const parts = altgrKeyList.replace(/^\[/, "").replace(/\]$/, "").split(/\s+/).filter(Boolean);
       const key = parts.pop() ?? "?";
-      const prefix = parts.length > 0 ? parts.map((t) => MODIFIER_TOKEN_LABELS[t] ?? t).join("+") : "Layer";
+      const prefix =
+        parts.length > 0
+          ? parts.map((tok) => MODIFIER_TOKEN_LABELS[tok] ?? tok).join("+")
+          : t({ id: "editor.assignLoop.methodLabel.layer", message: "Layer" });
       return `${prefix}: ${key}`;
     }
     case "multi_char_sequence":
@@ -176,7 +191,7 @@ function methodLabel(ref: { patternId: string; slotValues?: Record<string, strin
       // since sequences are owned by the Sequence Gallery. This branch exists
       // so a raw patternId can never leak onto a badge if that exclusion is
       // ever bypassed.
-      return "Multi-key sequence";
+      return t({ id: "editor.assignLoop.methodLabel.multiKeySequence", message: "Multi-key sequence" });
     default:
       return ref.patternId;
   }
@@ -268,6 +283,7 @@ function GalleryPreviewWithPatterns({
   retry,
   onKeyTap,
 }: GalleryPreviewWithPatternsProps) {
+  const { t } = useLingui();
   return (
     <GalleryPreviewPane
       baseKeyboard={selectedBaseKeyboard}
@@ -275,8 +291,8 @@ function GalleryPreviewWithPatterns({
       retry={retry}
       {...(onKeyTap !== undefined ? { onKeyTap } : {})}
       defaultOskMode="desktop"
-      heading="Live preview"
-      warningLabel="Apply warnings:"
+      heading={t({ id: "editor.assignLoop.preview.heading", message: "Live preview" })}
+      warningLabel={t({ id: "editor.assignLoop.preview.applyWarnings", message: "Apply warnings:" })}
     />
   );
 }
@@ -494,6 +510,9 @@ function MethodChooser({
   modifierTokensInUse,
   shiftLayerDisabled,
 }: MethodChooserProps) {
+  const { t } = useLingui();
+  const deadkeyBaseLetterResolveOptions = buildDeadkeyBaseLetterResolveOptions(t);
+  const triggerKeyPlaceholder = t({ id: "editor.assignLoop.triggerKeyPlaceholder", message: "[trigger key]" });
 
   // Resolved display values for the deadkey preview line — resolve at this
   // read point (not just canApply/handleApply) so a custom trigger character
@@ -512,11 +531,11 @@ function MethodChooser({
     triggerResolution.kind === "customOk"
       ? triggerResolution.char
       : triggerKey === CUSTOM_KEY_OPTION_VALUE
-        ? "[trigger key]"
+        ? triggerKeyPlaceholder
         : triggerKey;
   const baseLetterResolution = resolveCharInput(
     deadkeyBaseLetter,
-    DEADKEY_BASE_LETTER_RESOLVE_OPTIONS,
+    deadkeyBaseLetterResolveOptions,
   );
   const deadkeyBaseLetterDisplay = baseLetterResolution.ok
     ? baseLetterResolution.value
@@ -531,7 +550,7 @@ function MethodChooser({
   // the reflection line and canApply's own validity check never disagree.
   const baseLetterReflection = reflectCharInput(
     deadkeyBaseLetter,
-    DEADKEY_BASE_LETTER_RESOLVE_OPTIONS,
+    deadkeyBaseLetterResolveOptions,
   );
 
   // Resolved vkey for the S-01/S-08 layer-preview lines below — a custom
@@ -557,10 +576,12 @@ function MethodChooser({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-        How to type it:
+        <Trans id="editor.assignLoop.howToTypeIt">How to type it:</Trans>
       </p>
       <p style={{ margin: 0, fontSize: 11, color: TEXT_DIM, fontFamily: FONT, opacity: 0.85 }}>
-        {CHAR_BOX_HELP_TEXT}
+        <Trans id="editor.assignLoop.charBoxHelp">
+          Type a character, or a Unicode value like U+00E9. Combine composed parts with spaces, e.g. U+006E U+0303.
+        </Trans>
       </p>
 
       {/* S-03 — always shown */}
@@ -572,24 +593,28 @@ function MethodChooser({
           style={headerBtnStyle}
         >
           <span style={{ fontWeight: 600, color: method === "sequence" ? ACCENT : TEXT_MAIN }}>
-            Type a sequence
+            <Trans id="editor.assignLoop.method.sequence.title">Type a sequence</Trans>
           </span>
           {method !== "sequence" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              Sequences are handled separately, in a dedicated step after this
-              gallery
+              <Trans id="editor.assignLoop.method.sequence.summary">
+                Sequences are handled separately, in a dedicated step after this
+                gallery
+              </Trans>
             </span>
           )}
         </button>
         {method === "sequence" && (
           <div style={configStyle}>
             <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-              Check this to mark{" "}
-              <span style={{ color: TEXT_MAIN, fontFamily: "monospace", fontSize: 16 }}>
-                {currentChar}
-              </span>{" "}
-              as a sequence. You&apos;ll define the actual key sequence later,
-              in the Sequence Gallery.
+              <Trans id="editor.assignLoop.method.sequence.checkHint">
+                Check this to mark{" "}
+                <span style={{ color: TEXT_MAIN, fontFamily: "monospace", fontSize: 16 }}>
+                  {currentChar}
+                </span>{" "}
+                as a sequence. You&apos;ll define the actual key sequence later,
+                in the Sequence Gallery.
+              </Trans>
             </p>
           </div>
         )}
@@ -604,13 +629,15 @@ function MethodChooser({
           style={headerBtnStyle}
         >
           <span style={{ fontWeight: 600, color: method === "deadkey" ? ACCENT : TEXT_MAIN }}>
-            Tap a trigger key, then a letter
+            <Trans id="editor.assignLoop.method.deadkey.title">Tap a trigger key, then a letter</Trans>
           </span>
           {method !== "deadkey" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              Trigger &rarr;{" "}
-              {deadkeyBaseLetterDisplay || "[base]"} &rarr;{" "}
-              {currentChar}
+              <Trans id="editor.assignLoop.method.deadkey.summary">
+                Trigger &rarr;{" "}
+                {deadkeyBaseLetterDisplay || t({ id: "editor.assignLoop.deadkeyBasePlaceholder", message: "[base]" })} &rarr;{" "}
+                {currentChar}
+              </Trans>
             </span>
           )}
         </button>
@@ -627,15 +654,15 @@ function MethodChooser({
                 flexWrap: "wrap",
               }}
             >
-              <span>Trigger key:</span>
+              <span><Trans id="editor.assignLoop.triggerKeyLabel">Trigger key:</Trans></span>
               <KeyPickerField
                 value={triggerKey}
                 onChange={onTriggerKeyChange}
                 customChar={triggerKeyCustomChar}
                 onCustomCharChange={onTriggerKeyCustomCharChange}
                 options={DEADKEY_OPTIONS}
-                selectAriaLabel="Trigger key for deadkey"
-                customInputAriaLabel="Custom trigger character for deadkey"
+                selectAriaLabel={t({ id: "editor.assignLoop.deadkey.triggerKeySelectAriaLabel", message: "Trigger key for deadkey" })}
+                customInputAriaLabel={t({ id: "editor.assignLoop.deadkey.triggerKeyCustomAriaLabel", message: "Custom trigger character for deadkey" })}
                 blockDelimiters
               />
             </div>
@@ -649,13 +676,13 @@ function MethodChooser({
                 fontFamily: FONT,
               }}
             >
-              <span style={{ alignSelf: "center" }}>Base letter:</span>
+              <span style={{ alignSelf: "center" }}><Trans id="editor.assignLoop.baseLetterLabel">Base letter:</Trans></span>
               <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <input
                   type="text"
                   value={deadkeyBaseLetter}
                   onChange={(e) => onDeadkeyBaseLetterChange(e.target.value)}
-                  aria-label="Base letter for deadkey"
+                  aria-label={t({ id: "editor.assignLoop.deadkey.baseLetterAriaLabel", message: "Base letter for deadkey" })}
                   maxLength={16}
                   style={inputStyle}
                 />
@@ -671,15 +698,19 @@ function MethodChooser({
                 )}
                 {deadkeyBaseLetterIsLoneCombiningMark && (
                   <span role="status" aria-live="polite" style={{ fontSize: 10, color: "#d29922", opacity: 0.9, fontFamily: FONT }}>
-                    That looks like a combining mark on its own — the base letter is usually a plain letter.
+                    <Trans id="editor.assignLoop.deadkey.loneCombiningMarkWarning">
+                      That looks like a combining mark on its own — the base letter is usually a plain letter.
+                    </Trans>
                   </span>
                 )}
               </span>
             </div>
             <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-              Press {triggerKeyDisplay}, then{" "}
-              {deadkeyBaseLetterDisplay || "[base letter]"} &rarr;{" "}
-              <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentChar}</span>
+              <Trans id="editor.assignLoop.method.deadkey.preview">
+                Press {triggerKeyDisplay}, then{" "}
+                {deadkeyBaseLetterDisplay || t({ id: "editor.assignLoop.deadkeyBaseLetterPlaceholder", message: "[base letter]" })} &rarr;{" "}
+                <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentChar}</span>
+              </Trans>
             </p>
           </div>
         )}
@@ -694,11 +725,13 @@ function MethodChooser({
           style={headerBtnStyle}
         >
           <span style={{ fontWeight: 600, color: method === "swap" ? ACCENT : TEXT_MAIN }}>
-            Assign to a key
+            <Trans id="editor.assignLoop.method.swap.title">Assign to a key</Trans>
           </span>
           {method !== "swap" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              Dedicate one physical key to produce {currentChar}
+              <Trans id="editor.assignLoop.method.swap.summary">
+                Dedicate one physical key to produce {currentChar}
+              </Trans>
             </span>
           )}
         </button>
@@ -715,20 +748,20 @@ function MethodChooser({
                 flexWrap: "wrap",
               }}
             >
-              <span>Key:</span>
+              <span><Trans id="editor.assignLoop.keyLabel">Key:</Trans></span>
               <KeyPickerField
                 value={selectedSwapKey}
                 onChange={onSwapKeyChange}
                 customChar={selectedSwapKeyCustomChar}
                 onCustomCharChange={onSwapKeyCustomCharChange}
                 options={KEY_OPTIONS}
-                selectAriaLabel="Physical key for simple swap"
-                customInputAriaLabel="Custom character for simple swap key"
+                selectAriaLabel={t({ id: "editor.assignLoop.swap.keySelectAriaLabel", message: "Physical key for simple swap" })}
+                customInputAriaLabel={t({ id: "editor.assignLoop.swap.keyCustomAriaLabel", message: "Custom character for simple swap key" })}
               />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span id="swap-layer-label" style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-                Layer:
+                <Trans id="editor.assignLoop.layerLabel">Layer:</Trans>
               </span>
               <RadioGroup
                 name="swap-layer"
@@ -736,13 +769,13 @@ function MethodChooser({
                 onChange={(v) => onSwapLayerChange(v as SwapLayer)}
                 ariaLabelledby="swap-layer-label"
                 options={[
-                  { value: "base", label: "Base" },
+                  { value: "base", label: t({ id: "editor.assignLoop.swap.layerBase", message: "Base" }) },
                   {
                     value: "shift",
-                    label: "Shift",
+                    label: t({ id: "editor.assignLoop.swap.layerShift", message: "Shift" }),
                     disabled: shiftLayerDisabled,
                     ...(shiftLayerDisabled
-                      ? { title: "Mnemonic keyboard: shift behaviour comes from the base layout" }
+                      ? { title: t({ id: "editor.assignLoop.swap.shiftDisabledReason", message: "Mnemonic keyboard: shift behaviour comes from the base layout" }) }
                       : {}),
                   },
                 ]}
@@ -750,8 +783,10 @@ function MethodChooser({
             </div>
             {swapLayer === "shift" && swapVkeyForDisplay !== null && (
               <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-                Shift + {swapVkeyForDisplay.replace(/^K_/, "")} &rarr;{" "}
-                <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentChar}</span>
+                <Trans id="editor.assignLoop.swap.shiftPreview">
+                  Shift + {swapVkeyForDisplay.replace(/^K_/, "")} &rarr;{" "}
+                  <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentChar}</span>
+                </Trans>
               </p>
             )}
           </div>
@@ -767,16 +802,18 @@ function MethodChooser({
           style={headerBtnStyle}
         >
           <span style={{ fontWeight: 600, color: method === "ralt" ? ACCENT : TEXT_MAIN }}>
-            Layer + key
+            <Trans id="editor.assignLoop.method.ralt.title">Layer + key</Trans>
           </span>
           {method !== "ralt" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              Hold a modifier layer and press a base key to get {currentChar}
+              <Trans id="editor.assignLoop.method.ralt.summary">
+                Hold a modifier layer and press a base key to get {currentChar}
+              </Trans>
             </span>
           )}
         </button>
         {method === "ralt" && (() => {
-          const filledRaltTokens = raltTokens.filter((t): t is ModifierToken => t !== "");
+          const filledRaltTokens = raltTokens.filter((tok): tok is ModifierToken => tok !== "");
           const raltAllFilled =
             raltTokens.length > 0 && filledRaltTokens.length === raltTokens.length;
           const raltHasRoomToAdd =
@@ -784,10 +821,10 @@ function MethodChooser({
             raltAllFilled &&
             (() => {
               const excluded = new Set<ModifierToken>();
-              for (const t of filledRaltTokens) {
-                for (const e of MODIFIER_EXCLUSIONS[t]) excluded.add(e);
+              for (const tok of filledRaltTokens) {
+                for (const e of MODIFIER_EXCLUSIONS[tok]) excluded.add(e);
               }
-              return modifierPool.some((t) => !excluded.has(t));
+              return modifierPool.some((tok) => !excluded.has(tok));
             })();
           const raltIsDesktopOnly =
             filledRaltTokens.includes("CAPS") || filledRaltTokens.includes("NCAPS");
@@ -832,20 +869,23 @@ function MethodChooser({
                   flexWrap: "wrap",
                 }}
               >
-                <span>Base key:</span>
+                <span><Trans id="editor.assignLoop.ralt.baseKeyLabel">Base key:</Trans></span>
                 <KeyPickerField
                   value={selectedRaltKey}
                   onChange={onRaltKeyChange}
                   customChar={selectedRaltKeyCustomChar}
                   onCustomCharChange={onRaltKeyCustomCharChange}
                   options={KEY_OPTIONS}
-                  selectAriaLabel="Base key for layer-switch combo"
-                  customInputAriaLabel="Custom character for layer-switch combo base key"
+                  selectAriaLabel={t({ id: "editor.assignLoop.ralt.baseKeySelectAriaLabel", message: "Base key for layer-switch combo" })}
+                  customInputAriaLabel={t({ id: "editor.assignLoop.ralt.baseKeyCustomAriaLabel", message: "Custom character for layer-switch combo base key" })}
                 />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <span style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-                  Layer{raltTokens.length > 1 ? "s" : ""}:
+                  {t({
+                    id: "editor.assignLoop.ralt.layersLabel",
+                    message: plural(raltTokens.length, { one: "Layer:", other: "Layers:" }),
+                  })}
                 </span>
                 {raltTokens.map((token, index) => {
                   const options = optionsForRaltSlot(modifierPool, raltTokens, index);
@@ -854,10 +894,15 @@ function MethodChooser({
                       <select
                         value={token}
                         onChange={(e) => onRaltTokenChange(index, e.target.value)}
-                        aria-label={`Layer ${index + 1} for layer-switch combo`}
+                        aria-label={t({
+                          id: "editor.assignLoop.ralt.layerSlotAriaLabel",
+                          message: `Layer ${index + 1} for layer-switch combo`,
+                        })}
                         style={selectStyle}
                       >
-                        <option value="">— Select —</option>
+                        <option value="">
+                          <Trans id="editor.assignLoop.ralt.selectPlaceholder">— Select —</Trans>
+                        </option>
                         {options.map((o) => (
                           <option
                             key={o}
@@ -865,14 +910,19 @@ function MethodChooser({
                             style={modifierTokensInUse.has(o) ? { fontWeight: 700 } : undefined}
                           >
                             {o}
-                            {modifierTokensInUse.has(o) ? " (in use)" : ""}
+                            {modifierTokensInUse.has(o)
+                              ? t({ id: "editor.assignLoop.ralt.inUseSuffix", message: " (in use)" })
+                              : ""}
                           </option>
                         ))}
                       </select>
                       {index > 0 && (
                         <button
                           type="button"
-                          aria-label={`Remove layer ${index + 1}`}
+                          aria-label={t({
+                            id: "editor.assignLoop.ralt.removeLayerAriaLabel",
+                            message: `Remove layer ${index + 1}`,
+                          })}
                           onClick={() => onRemoveRaltSlot(index)}
                           style={{
                             background: "transparent",
@@ -894,7 +944,7 @@ function MethodChooser({
                 {raltHasRoomToAdd && (
                   <button
                     type="button"
-                    aria-label="Add another layer"
+                    aria-label={t({ id: "editor.assignLoop.ralt.addLayerAriaLabel", message: "Add another layer" })}
                     onClick={onAddRaltSlot}
                     style={{
                       alignSelf: "flex-start",
@@ -908,7 +958,7 @@ function MethodChooser({
                       fontFamily: FONT,
                     }}
                   >
-                    + Add layer
+                    <Trans id="editor.assignLoop.ralt.addLayerButton">+ Add layer</Trans>
                   </button>
                 )}
               </div>
@@ -920,12 +970,16 @@ function MethodChooser({
               )}
               {raltIsDesktopOnly && (
                 <p style={{ margin: 0, fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}>
-                  Desktop only — this layer will not appear on the touch layout.
+                  <Trans id="editor.assignLoop.ralt.desktopOnlyNote">
+                    Desktop only — this layer will not appear on the touch layout.
+                  </Trans>
                 </p>
               )}
               {raltCanonicalTokens.includes("RALT") && (
                 <p style={{ margin: 0, fontSize: 11, color: "#d29922", fontFamily: FONT }}>
-                  Note: RAlt may conflict with system shortcuts on macOS.
+                  <Trans id="editor.assignLoop.ralt.macosConflictNote">
+                    Note: RAlt may conflict with system shortcuts on macOS.
+                  </Trans>
                 </p>
               )}
             </div>
@@ -959,6 +1013,11 @@ export function MechanismGallery({
   onBack,
   placementMap,
 }: MechanismGalleryProps) {
+  const { t } = useLingui();
+  const deadkeyBaseLetterResolveOptions = useMemo(
+    () => buildDeadkeyBaseLetterResolveOptions(t),
+    [t],
+  );
   const locked = useWorkingCopyStore((s) => s.desktopLocked);
   const unlockDesktop = useWorkingCopyStore((s) => s.unlockDesktop);
   const markStale = useWorkingCopyStore((s) => s.markStale);
@@ -1010,7 +1069,7 @@ export function MechanismGallery({
         mechanismAssignments
           .filter((a) => a.scope === "individual")
           .map((a) => a.target)
-          .filter((t) => lettersToAdd.includes(t)),
+          .filter((ch) => lettersToAdd.includes(ch)),
       ),
     [mechanismAssignments, lettersToAdd],
   );
@@ -1235,7 +1294,7 @@ export function MechanismGallery({
   // ALT until the keyboard already uses a chiral alt token, at which point
   // the pool leads with RALT (computeModifierPool's ["RALT","LALT"] order).
   const raltDefaultToken = useMemo<ModifierToken>(() => {
-    const altFamily = modifierPool.find((t) => t === "ALT" || t === "RALT" || t === "LALT");
+    const altFamily = modifierPool.find((tok) => tok === "ALT" || tok === "RALT" || tok === "LALT");
     return altFamily ?? "RALT";
   }, [modifierPool]);
 
@@ -1376,7 +1435,7 @@ export function MechanismGallery({
       // chosen — empty-combo Apply is disabled.
       return (
         resolvedVkeyOf(resolveKeyPickerSelection(selectedRaltKey, selectedRaltKeyCustomChar)) !== null &&
-        raltTokens.some((t) => t !== "")
+        raltTokens.some((tok) => tok !== "")
       );
     }
     // deadkey: trigger key must resolve to a physical key (real selection or
@@ -1385,7 +1444,7 @@ export function MechanismGallery({
     return (
       resolvedVkeyOf(
         resolveKeyPickerSelection(triggerKey, triggerKeyCustomChar, TRIGGER_KEY_RESOLVE_OPTIONS),
-      ) !== null && resolveCharInput(deadkeyBaseLetter, DEADKEY_BASE_LETTER_RESOLVE_OPTIONS).ok
+      ) !== null && resolveCharInput(deadkeyBaseLetter, deadkeyBaseLetterResolveOptions).ok
     );
   }, [
     currentChar,
@@ -1398,6 +1457,7 @@ export function MechanismGallery({
     selectedRaltKey,
     selectedRaltKeyCustomChar,
     raltTokens,
+    deadkeyBaseLetterResolveOptions,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -1448,7 +1508,7 @@ export function MechanismGallery({
     let assignment: MechanismAssignment;
 
     if (method === "deadkey") {
-      const base = resolveCharInput(deadkeyBaseLetter, DEADKEY_BASE_LETTER_RESOLVE_OPTIONS);
+      const base = resolveCharInput(deadkeyBaseLetter, deadkeyBaseLetterResolveOptions);
       const triggerResolution = resolveKeyPickerSelection(
         triggerKey,
         triggerKeyCustomChar,
@@ -1573,7 +1633,7 @@ export function MechanismGallery({
       // S-08: modifier_as_layer_switch — kmnFragment uses {{altgrKeyList}} and {{altgrOutputList}}.
       // Build a single-entry held-layer rule for this character, keyed on
       // whichever combo of ModifierTokens the author picked (generalized S-08).
-      const chosenTokens = raltTokens.filter((t): t is ModifierToken => t !== "");
+      const chosenTokens = raltTokens.filter((tok): tok is ModifierToken => tok !== "");
       let altgrKeyList: string;
       try {
         // Use the RESOLVED vkey (custom-char aware), never the raw
@@ -1627,6 +1687,7 @@ export function MechanismGallery({
     recordAssignments,
     sessionAssignments,
     resetMethodState,
+    deadkeyBaseLetterResolveOptions,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -1852,7 +1913,7 @@ export function MechanismGallery({
         <div style={{ maxWidth: 780, margin: "0 auto" }}>
           {onBack !== undefined && (
             <button type="button" onClick={onBack} style={ghostBtn}>
-              &larr; Back
+              <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
             </button>
           )}
           <div
@@ -1864,7 +1925,9 @@ export function MechanismGallery({
             }}
           >
             <p style={{ fontSize: 15 }}>
-              No base keyboard selected. Go back to choose a starting point.
+              <Trans id="editor.assignLoop.noBaseKeyboardSelected">
+                No base keyboard selected. Go back to choose a starting point.
+              </Trans>
             </p>
           </div>
         </div>
@@ -1882,7 +1945,7 @@ export function MechanismGallery({
         <div style={{ maxWidth: 780, margin: "0 auto" }}>
           {onBack !== undefined && (
             <button type="button" onClick={onBack} style={ghostBtn}>
-              &larr; Back
+              <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
             </button>
           )}
           <div
@@ -1894,8 +1957,10 @@ export function MechanismGallery({
             }}
           >
             <p style={{ fontSize: 15 }}>
-              No inventory confirmed yet. Complete the Survey (Phase B) to
-              confirm which characters your keyboard must produce.
+              <Trans id="editor.assignLoop.noInventoryConfirmed">
+                No inventory confirmed yet. Complete the Survey (Phase B) to
+                confirm which characters your keyboard must produce.
+              </Trans>
             </p>
           </div>
         </div>
@@ -1910,28 +1975,32 @@ export function MechanismGallery({
   if (showIntro) {
     return (
       <GalleryIntroSplash
-        eyebrow="Getting started · Desktop"
-        title="Welcome to the Mechanism Gallery"
+        eyebrow={t({ id: "editor.assignLoop.intro.eyebrow", message: "Getting started · Desktop" })}
+        title={t({ id: "editor.assignLoop.intro.title", message: "Welcome to the Mechanism Gallery" })}
         body={
-          <>
+          <Trans id="editor.assignLoop.intro.body">
             This is where you build your keyboard. For each character your
             language needs that the base layout doesn&rsquo;t already have,
             you&rsquo;ll choose how to type it on a physical (desktop) keyboard.
-          </>
+          </Trans>
         }
         bullets={[
-          <>You&rsquo;ll go character by character through the list from your survey.</>,
-          <>
+          <Trans id="editor.assignLoop.intro.bullet1" key="bullet1">
+            You&rsquo;ll go character by character through the list from your survey.
+          </Trans>,
+          <Trans id="editor.assignLoop.intro.bullet2" key="bullet2">
             Pick a method &mdash; use a dead key, swap a key, or use AltGr
             &mdash; or Skip characters you don&rsquo;t need.
-          </>,
-          <>
+          </Trans>,
+          <Trans id="editor.assignLoop.intro.bullet3" key="bullet3">
             Sequences get their own dedicated part of the flow, right after
             this gallery.
-          </>,
-          <>Phones and tablets come later, in the Touch gallery.</>,
+          </Trans>,
+          <Trans id="editor.assignLoop.intro.bullet4" key="bullet4">
+            Phones and tablets come later, in the Touch gallery.
+          </Trans>,
         ]}
-        startAriaLabel="Start the mechanism gallery"
+        startAriaLabel={t({ id: "editor.assignLoop.intro.startAriaLabel", message: "Start the mechanism gallery" })}
         onStart={() => {
           markGalleryIntroSeen("mechanism");
           setShowIntro(false);
@@ -1972,19 +2041,20 @@ export function MechanismGallery({
   // Invariant: callers always pass onComplete when locked can be true — so
   // the "no actionable control" state (locked with Apply/Skip/Next all
   // disabled and no completion button rendered) is unreachable.
+  const doneLabel = t({ id: "editor.assignLoop.doneButton", message: "Done" });
   const forwardButton: ForwardButtonSpec | null =
     locked && onComplete !== undefined
       ? {
-          label: "Continue →",
+          label: t({ id: "editor.assignLoop.continueButton", message: "Continue →" }),
           onClick: onComplete,
           testId: "mechanisms-continue",
-          ariaLabel: "Continue (desktop layout locked)",
+          ariaLabel: t({ id: "editor.assignLoop.continueAriaLabel", message: "Continue (desktop layout locked)" }),
           disabled: false,
           style: forwardBtnStyle,
         }
       : lettersToAdd.length === 0
         ? {
-            label: "Done",
+            label: doneLabel,
             onClick: onComplete,
             testId: "mechanisms-continue",
             disabled: false,
@@ -1992,9 +2062,13 @@ export function MechanismGallery({
           }
         : currentChar !== null
           ? {
-              label: hasAnotherCharAfterCurrent ? "Next character →" : "Done",
+              label: hasAnotherCharAfterCurrent
+                ? t({ id: "editor.assignLoop.nextCharacterButton", message: "Next character →" })
+                : doneLabel,
+              ariaLabel: hasAnotherCharAfterCurrent
+                ? t({ id: "editor.assignLoop.nextCharacterAriaLabel", message: "Next character" })
+                : doneLabel,
               onClick: handleNext,
-              ariaLabel: hasAnotherCharAfterCurrent ? "Next character" : "Done",
               disabled: !canGoNext || locked,
               style: {
                 padding: "9px 20px",
@@ -2060,11 +2134,11 @@ export function MechanismGallery({
               gap: 12,
             }}
           >
-            <span>Desktop layout locked — editing disabled</span>
+            <span><Trans id="editor.assignLoop.desktopLockedBanner">Desktop layout locked — editing disabled</Trans></span>
             <button
               type="button"
               onClick={handleUnlock}
-              aria-label="Unlock desktop layout to edit"
+              aria-label={t({ id: "editor.assignLoop.unlockAriaLabel", message: "Unlock desktop layout to edit" })}
               style={{
                 flexShrink: 0,
                 padding: "5px 12px",
@@ -2078,11 +2152,13 @@ export function MechanismGallery({
                 fontFamily: FONT,
               }}
             >
-              Unlock to edit
+              <Trans id="editor.assignLoop.unlockButton">Unlock to edit</Trans>
             </button>
           </div>
           <p style={{ margin: 0, fontSize: 11, fontFamily: FONT }}>
-            Editing the desktop layout may require re-reviewing your touch layout.
+            <Trans id="editor.assignLoop.unlockHint">
+              Editing the desktop layout may require re-reviewing your touch layout.
+            </Trans>
           </p>
         </div>
       )}
@@ -2092,7 +2168,10 @@ export function MechanismGallery({
             <p
               role="status"
               aria-live="polite"
-              aria-label={`${coveredCount} of ${lettersToAdd.length} added`}
+              aria-label={t({
+                id: "editor.assignLoop.coverageAriaLabel",
+                message: `${coveredCount} of ${lettersToAdd.length} added`,
+              })}
               style={{
                 margin: 0,
                 fontSize: 12,
@@ -2100,7 +2179,9 @@ export function MechanismGallery({
                 fontFamily: FONT,
               }}
             >
-              {coveredCount} of {lettersToAdd.length} added
+              <Trans id="editor.assignLoop.coverageLine">
+                {coveredCount} of {lettersToAdd.length} added
+              </Trans>
             </p>
           )}
 
@@ -2138,7 +2219,7 @@ export function MechanismGallery({
                   onClick={handleBack}
                   style={{ ...ghostBtn, fontSize: 13 }}
                 >
-                  &larr; Back
+                  <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
                 </button>
               )}
 
@@ -2165,7 +2246,7 @@ export function MechanismGallery({
                     data-testid="mechanisms-prev-char"
                     onClick={handlePreviousChar}
                     disabled={currentIdx <= 0}
-                    aria-label="Previous character"
+                    aria-label={t({ id: "editor.assignLoop.previousCharacterAriaLabel", message: "Previous character" })}
                     style={{
                       ...ghostBtn,
                       fontSize: 13,
@@ -2174,7 +2255,7 @@ export function MechanismGallery({
                         : {}),
                     }}
                   >
-                    &laquo; Previous character
+                    <Trans id="editor.assignLoop.previousCharacterButton">&laquo; Previous character</Trans>
                   </button>
                 )}
 
@@ -2219,7 +2300,7 @@ export function MechanismGallery({
               }}
             >
               <p style={{ margin: 0, fontSize: 14 }}>
-                No new characters to add.
+                <Trans id="editor.assignLoop.noNewCharacters">No new characters to add.</Trans>
               </p>
             </div>
           )}
@@ -2248,7 +2329,7 @@ export function MechanismGallery({
                     letterSpacing: "0.06em",
                   }}
                 >
-                  Add a key
+                  <Trans id="editor.assignLoop.addAKeyEyebrow">Add a key</Trans>
                 </p>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
                   <span
@@ -2271,7 +2352,7 @@ export function MechanismGallery({
               {suggestion !== null && !suggestionDismissed && (
                 <div
                   role="note"
-                  aria-label="Placement suggestion from kbgen seeder"
+                  aria-label={t({ id: "editor.assignLoop.suggestion.ariaLabel", message: "Placement suggestion from kbgen seeder" })}
                   style={{
                     background: "#0d2218",
                     border: "1px solid #238636",
@@ -2293,9 +2374,16 @@ export function MechanismGallery({
                   >
                     {(() => {
                       const keyName = suggestion.topCandidate.vkey.replace(/^K_/, "");
+                      const charOrEmpty = currentChar ?? "";
                       return suggestion.strategyId === "S-01"
-                        ? `Suggested: Replace ${keyName} with ${currentChar ?? ""}`
-                        : `Suggested: Right Alt + ${keyName} for ${currentChar ?? ""}`;
+                        ? t({
+                            id: "editor.assignLoop.suggestion.replaceText",
+                            message: `Suggested: Replace ${keyName} with ${charOrEmpty}`,
+                          })
+                        : t({
+                            id: "editor.assignLoop.suggestion.raltText",
+                            message: `Suggested: Right Alt + ${keyName} for ${charOrEmpty}`,
+                          });
                     })()}
                   </p>
                   <div style={{ display: "flex", gap: 8 }}>
@@ -2305,8 +2393,14 @@ export function MechanismGallery({
                       onClick={handleSuggestionAccept}
                       aria-label={
                         suggestion.strategyId === "S-01"
-                          ? `Accept suggestion: assign ${currentChar} to ${suggestion.topCandidate.vkey}`
-                          : `Accept suggestion: RAlt + ${suggestion.topCandidate.vkey} for ${currentChar}`
+                          ? t({
+                              id: "editor.assignLoop.suggestion.acceptSwapAriaLabel",
+                              message: `Accept suggestion: assign ${currentChar} to ${suggestion.topCandidate.vkey}`,
+                            })
+                          : t({
+                              id: "editor.assignLoop.suggestion.acceptRaltAriaLabel",
+                              message: `Accept suggestion: RAlt + ${suggestion.topCandidate.vkey} for ${currentChar}`,
+                            })
                       }
                       style={{
                         padding: "5px 14px",
@@ -2320,12 +2414,12 @@ export function MechanismGallery({
                         fontFamily: FONT,
                       }}
                     >
-                      Accept
+                      <Trans id="editor.assignLoop.suggestion.acceptButton">Accept</Trans>
                     </button>
                     <button
                       type="button"
                       onClick={handleSuggestionChange}
-                      aria-label="Deny suggestion and choose method manually"
+                      aria-label={t({ id: "editor.assignLoop.suggestion.denyAriaLabel", message: "Deny suggestion and choose method manually" })}
                       style={{
                         padding: "5px 14px",
                         background: "transparent",
@@ -2337,7 +2431,7 @@ export function MechanismGallery({
                         fontFamily: FONT,
                       }}
                     >
-                      Deny
+                      <Trans id="editor.assignLoop.suggestion.denyButton">Deny</Trans>
                     </button>
                   </div>
                 </div>
@@ -2380,7 +2474,7 @@ export function MechanismGallery({
               {pendingCompanion !== null && (
                 <div
                   role="note"
-                  aria-label="Case-pair companion proposal"
+                  aria-label={t({ id: "editor.assignLoop.companion.ariaLabel", message: "Case-pair companion proposal" })}
                   style={{
                     background: "#0d2218",
                     border: "1px solid #238636",
@@ -2392,15 +2486,20 @@ export function MechanismGallery({
                   }}
                 >
                   <p style={{ margin: 0, fontSize: 12, color: "#56d364", fontFamily: FONT }}>
-                    {pendingCompanion.originalChar} has an uppercase form,{" "}
-                    {pendingCompanion.counterpart}. Map {pendingCompanion.counterpart} to the
-                    shift layer of the same key as well?
+                    <Trans id="editor.assignLoop.companion.prompt">
+                      {pendingCompanion.originalChar} has an uppercase form,{" "}
+                      {pendingCompanion.counterpart}. Map {pendingCompanion.counterpart} to the
+                      shift layer of the same key as well?
+                    </Trans>
                   </p>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
                       type="button"
                       onClick={handleCompanionConfirm}
-                      aria-label={`Map ${pendingCompanion.counterpart} to the shift layer of ${pendingCompanion.vkey}`}
+                      aria-label={t({
+                        id: "editor.assignLoop.companion.confirmAriaLabel",
+                        message: `Map ${pendingCompanion.counterpart} to the shift layer of ${pendingCompanion.vkey}`,
+                      })}
                       style={{
                         padding: "5px 14px",
                         background: "#238636",
@@ -2413,12 +2512,15 @@ export function MechanismGallery({
                         fontFamily: FONT,
                       }}
                     >
-                      Map it
+                      <Trans id="editor.assignLoop.companion.confirmButton">Map it</Trans>
                     </button>
                     <button
                       type="button"
                       onClick={handleCompanionDecline}
-                      aria-label={`Do not map ${pendingCompanion.counterpart} to the shift layer`}
+                      aria-label={t({
+                        id: "editor.assignLoop.companion.declineAriaLabel",
+                        message: `Do not map ${pendingCompanion.counterpart} to the shift layer`,
+                      })}
                       style={{
                         padding: "5px 14px",
                         background: "transparent",
@@ -2430,7 +2532,7 @@ export function MechanismGallery({
                         fontFamily: FONT,
                       }}
                     >
-                      No thanks
+                      <Trans id="editor.assignLoop.companion.declineButton">No thanks</Trans>
                     </button>
                   </div>
                 </div>
@@ -2439,28 +2541,37 @@ export function MechanismGallery({
               {/* Apply + Next + Skip actions */}
               {appliedForCurrentChar > 0 && (
                 <p style={{ margin: 0, fontSize: 12, color: "#56d364", fontFamily: FONT }}>
-                  {appliedForCurrentChar} method{appliedForCurrentChar !== 1 ? "s" : ""} applied
+                  {t({
+                    id: "editor.assignLoop.appliedCount",
+                    message: plural(appliedForCurrentChar, {
+                      one: "# method applied",
+                      other: "# methods applied",
+                    }),
+                  })}
                 </p>
               )}
               {appliedForCurrentChar > 0 && (
                 <div
                   role="group"
-                  aria-label="Applied methods — click to remove"
+                  aria-label={t({ id: "editor.assignLoop.appliedMethodsAriaLabel", message: "Applied methods — click to remove" })}
                   style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2 }}
                 >
                   {mechanismAssignments
                     .filter((a) => a.scope === "individual" && a.target === currentChar)
                     .map((a, i) => {
                       const ref = a.mechanisms[0];
-                      const label = ref !== undefined ? methodLabel(ref) : a.mechanisms.map(methodLabel).join(", ");
+                      const label = ref !== undefined ? methodLabel(ref, t) : a.mechanisms.map((m) => methodLabel(m, t)).join(", ");
                       return (
                         <button
                           key={i}
                           type="button"
                           onClick={() => handleRemoveMechanism(a)}
                           disabled={locked}
-                          aria-label={`Remove method ${label} for ${currentChar}`}
-                          title="click to remove"
+                          aria-label={t({
+                            id: "editor.assignLoop.removeMethodAriaLabel",
+                            message: `Remove method ${label} for ${currentChar}`,
+                          })}
+                          title={t({ id: "editor.assignLoop.clickToRemove", message: "click to remove" })}
                           style={{
                             display: "inline-flex",
                             alignItems: "center",
@@ -2489,14 +2600,17 @@ export function MechanismGallery({
                   style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}
                 >
                   <span style={{ fontSize: 12, color: "#58a6ff", fontFamily: FONT }}>
-                    Flagged for sequence
+                    <Trans id="editor.assignLoop.flaggedForSequence">Flagged for sequence</Trans>
                   </span>
                   <button
                     type="button"
                     onClick={() => unflagCharForSequence(currentChar)}
                     disabled={locked}
-                    aria-label={`Remove sequence flag for ${toUPlusNotation(currentChar)} ${currentChar}`}
-                    title="click to remove"
+                    aria-label={t({
+                      id: "editor.assignLoop.removeSequenceFlagAriaLabel",
+                      message: `Remove sequence flag for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+                    })}
+                    title={t({ id: "editor.assignLoop.clickToRemove", message: "click to remove" })}
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
@@ -2511,7 +2625,7 @@ export function MechanismGallery({
                       cursor: locked ? "not-allowed" : "pointer",
                     }}
                   >
-                    remove
+                    <Trans id="editor.assignLoop.removeButton">remove</Trans>
                     <span aria-hidden="true" style={{ fontSize: 10, opacity: 0.7 }}>
                       {" ×"}
                     </span>
@@ -2527,7 +2641,10 @@ export function MechanismGallery({
                   type="button"
                   onClick={handleApply}
                   disabled={!canApply || locked}
-                  aria-label={`Apply method for ${currentChar}`}
+                  aria-label={t({
+                    id: "editor.assignLoop.applyMethodAriaLabel",
+                    message: `Apply method for ${currentChar}`,
+                  })}
                   style={{
                     padding: "9px 20px",
                     background: canApply ? BLUE_ACTION : "#21262d",
@@ -2540,13 +2657,16 @@ export function MechanismGallery({
                     fontFamily: FONT,
                   }}
                 >
-                  Apply method
+                  <Trans id="editor.assignLoop.applyMethodButton">Apply method</Trans>
                 </button>
                 <button
                   type="button"
                   onClick={handleNext}
                   disabled={locked}
-                  aria-label={`Skip this character (${toUPlusNotation(currentChar)} ${currentChar})`}
+                  aria-label={t({
+                    id: "editor.assignLoop.skipCharacterAriaLabel",
+                    message: `Skip this character (${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }})`,
+                  })}
                   style={{
                     background: "transparent",
                     border: "none",
@@ -2558,7 +2678,7 @@ export function MechanismGallery({
                     textDecoration: "underline",
                   }}
                 >
-                  Skip this character
+                  <Trans id="editor.assignLoop.skipCharacterButton">Skip this character</Trans>
                 </button>
               </div>
             </>
@@ -2576,11 +2696,11 @@ export function MechanismGallery({
                   letterSpacing: "0.05em",
                 }}
               >
-                Added
+                <Trans id="editor.assignLoop.addedHeading">Added</Trans>
               </p>
               <div
                 role="group"
-                aria-label="Added characters — click to remove"
+                aria-label={t({ id: "editor.assignLoop.addedGroupAriaLabel", message: "Added characters — click to remove" })}
                 style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
               >
                 {[...coveredChars].map((c) => (
@@ -2588,8 +2708,14 @@ export function MechanismGallery({
                     key={c}
                     type="button"
                     onClick={() => handleRemoveCovered(c)}
-                    aria-label={`Remove ${toUPlusNotation(c)} ${c}`}
-                    title={`${toUPlusNotation(c)} — click to remove`}
+                    aria-label={t({
+                      id: "editor.assignLoop.removeCharacterAriaLabel",
+                      message: `Remove ${{ notation: toUPlusNotation(c) }} ${{ char: c }}`,
+                    })}
+                    title={t({
+                      id: "editor.assignLoop.removeCharacterTitle",
+                      message: `${{ notation: toUPlusNotation(c) }} — click to remove`,
+                    })}
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
@@ -2630,11 +2756,11 @@ export function MechanismGallery({
                   letterSpacing: "0.05em",
                 }}
               >
-                Flagged for sequences
+                <Trans id="editor.assignLoop.flaggedForSequencesHeading">Flagged for sequences</Trans>
               </p>
               <div
                 role="group"
-                aria-label="Characters flagged for sequences — click to remove"
+                aria-label={t({ id: "editor.assignLoop.flaggedGroupAriaLabel", message: "Characters flagged for sequences — click to remove" })}
                 style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
               >
                 {sequenceFlaggedChars.map((c) => (
@@ -2642,8 +2768,14 @@ export function MechanismGallery({
                     key={c}
                     type="button"
                     onClick={() => unflagCharForSequence(c)}
-                    aria-label={`Remove sequence flag for ${toUPlusNotation(c)} ${c}`}
-                    title={`${toUPlusNotation(c)} — click to remove`}
+                    aria-label={t({
+                      id: "editor.assignLoop.removeSequenceFlagListAriaLabel",
+                      message: `Remove sequence flag for ${{ notation: toUPlusNotation(c) }} ${{ char: c }}`,
+                    })}
+                    title={t({
+                      id: "editor.assignLoop.removeSequenceFlagTitle",
+                      message: `${{ notation: toUPlusNotation(c) }} — click to remove`,
+                    })}
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
@@ -2688,7 +2820,9 @@ export function MechanismGallery({
             fontFamily: FONT,
           }}
         >
-          Pattern load error — preview transform may be incomplete.
+          <Trans id="editor.assignLoop.patternLoadError">
+            Pattern load error — preview transform may be incomplete.
+          </Trans>
           <br />
           <span style={{ fontSize: 11, color: TEXT_DIM }}>{loadError}</span>
         </div>
@@ -2702,8 +2836,8 @@ export function MechanismGallery({
 
   return (
     <AssignLoopShell
-      headingText="Mechanism Gallery"
-      modalityLabel="Desktop"
+      headingText={t({ id: "editor.assignLoop.mechanismGalleryHeading", message: "Mechanism Gallery" })}
+      modalityLabel={t({ id: "editor.assignLoop.modality.desktop", message: "Desktop" })}
       leftContent={leftContent}
       rightContent={
         !loading && loadError === null ? (
@@ -2715,7 +2849,7 @@ export function MechanismGallery({
           />
         ) : loading ? (
           <p style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
-            Loading patterns...
+            <Trans id="editor.assignLoop.loadingPatterns">Loading patterns...</Trans>
           </p>
         ) : null
       }

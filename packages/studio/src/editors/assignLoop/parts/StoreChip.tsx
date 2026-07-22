@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useLingui } from "@lingui/react/macro";
 import type { StoreCharChip } from '../../../lib/irToCarveNodes.ts';
 import { displayChar, invisibleCharLabel } from '../../../lib/irToCarveNodes.ts';
 import { KIND_COLOR } from './KindBadge.tsx';
@@ -19,6 +20,7 @@ interface StoreChipProps {
 // the character plus its codepoint (GlyphCell's enabled path additionally
 // shows key sequence/capability, which don't apply to a store slot).
 export const StoreChip = memo(function StoreChip({ chip, off, onToggle }: StoreChipProps) {
+  const { t } = useLingui();
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
   const label = invisibleCharLabel(chip.ch);
@@ -27,7 +29,7 @@ export const StoreChip = memo(function StoreChip({ chip, off, onToggle }: StoreC
 
   const showDisabledInfo = () => {
     if (chip.disabledReason === undefined) return;
-    setInfo({ kind: 'text', title: 'Not removable', body: chip.disabledReason });
+    setInfo({ kind: 'text', title: t({ id: "editor.assignLoop.storeChip.notRemovable", message: "Not removable" }), body: chip.disabledReason });
   };
 
   const showEnabledInfo = () => {

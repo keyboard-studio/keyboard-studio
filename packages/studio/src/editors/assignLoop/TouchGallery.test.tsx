@@ -10,7 +10,8 @@
 // Defect B regression is covered in StudioShell.test.tsx.
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
+import { screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
+import { render } from "../../test/renderWithI18n.tsx";
 import { TouchGallery, buildTouchMechanismRef } from "./TouchGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
