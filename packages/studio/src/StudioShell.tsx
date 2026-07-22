@@ -747,11 +747,23 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       {/* Left pane: survey questions (StepHost renders pane content) */}
       <section aria-label="Survey questions" style={questionsPaneStyle}>
         {globalWarnings.length > 0 && (
-          <div role="status" aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+          // Rendered flush on "var(--bg)" — the same token the container above
+          // paints and the one CharacterMapPane's own root implicitly sits on
+          // (it sets no background of its own, so it shows through to the
+          // container's var(--bg) too). Pinned explicitly here rather than left
+          // to accidental non-override, so a future change to questionsPaneStyle's
+          // background doesn't silently drag this along. No border/card fill/
+          // padding-as-box — this is text on the character-map surface, not a
+          // card.
+          <div
+            role="status"
+            aria-live="polite"
+            style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12, background: "var(--bg)" }}
+          >
             {globalWarnings.map((f, i) => (
               <div key={`${f.code}-${i}`} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: TEXT_MAIN }}>
-                  <span aria-hidden="true">⚠</span> Warning: {f.message}
+                  <span aria-hidden="true">⚠</span> {f.message}
                 </p>
                 {f.hint !== undefined && (
                   <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: TEXT_DIM }}>

@@ -45,6 +45,13 @@ describe("checkNormalizationUniformity (FR-022)", () => {
     expect(findings[0]?.severity).toBe("warning");
   });
 
+  it("names actual example characters in the message, keeping the two forms visually distinguishable", () => {
+    const { ir } = parseKmn(kmn(['+ "a" > "é"', `+ "b" > "e${ACUTE}"`]));
+    const findings = checkNormalizationUniformity(ir);
+    expect(findings[0]?.message).toContain("é");
+    expect(findings[0]?.message).toContain(`e◌${ACUTE}`);
+  });
+
   it("counts non-system store contents (stores feed outputs via index/outs)", () => {
     const { ir } = parseKmn(
       [
