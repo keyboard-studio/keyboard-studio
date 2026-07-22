@@ -45,6 +45,7 @@ import {
   chipIndicatorText,
   chipIndicatorColor,
   primaryButton,
+  secondaryButton,
   visuallyHidden,
 } from "./surveyStyles.ts";
 
@@ -82,6 +83,15 @@ type LoadState =
 // the key collides across scripts and React drops/merges same-key sections.
 function groupKey(group: CharacterMapGroup): string {
   return `${group.tier}-${group.script}-${group.block}`;
+}
+
+// DOM-id-safe derivation of groupKey() — used to pair the per-group Hide/Show
+// button's aria-controls with the cell-grid div's id. groupKey() can contain
+// spaces/punctuation (block names like "Combining Diacritical Marks"), which
+// are legal in an HTML id but awkward; collapse anything outside
+// [A-Za-z0-9_-] to a single hyphen so the id stays a plain token.
+function groupGridId(key: string): string {
+  return `char-map-group-grid-${key.replace(/[^A-Za-z0-9_-]+/g, "-")}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +169,13 @@ export function CharacterMapPane({
   const [announcement, setAnnouncement] = useState("");
   const [rawInput, setRawInput] = useState("");
   const [rawError, setRawError] = useState<string | null>(null);
+  // Per-group "Hide" toggle (deliberately distinct from `blocksOnly` above):
+  // this NEVER removes a group from `filteredGroups` — it only collapses that
+  // group's cell grid in place, so the section heading stays present and one
+  // click on "Show" restores it. Keyed by groupKey() (tier-script-block), the
+  // same stable identity the list key uses. Transient view state, like
+  // `blocksOnly` — reset on language change below, never persisted.
+  const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
   // Private-use pick awaiting its role answer (spec 046 FR-004): no linguistic
   // data exists for PUA characters, so the designer says letter-or-mark AT the
   // point of picking — the character is not added to any list until answered.
@@ -199,6 +216,7 @@ export function CharacterMapPane({
     setRawInput("");
     setRawError(null);
     setAnnouncement("");
+    setHiddenGroups(new Set());
     if (noBaseOrLanguage) {
       return;
     }
@@ -364,6 +382,31 @@ export function CharacterMapPane({
     );
   }
 
+  // Per-group Hide/Show toggle — collapses/restores ONE group's cell grid
+  // in place (never removes it from `filteredGroups`; see the hiddenGroups
+  // state comment above). Reuses the existing announcement live region,
+  // same as handleToggleBlocksOnly, rather than adding a second one.
+  function handleToggleGroupHidden(group: CharacterMapGroup, hidden: boolean): void {
+    const key = groupKey(group);
+    setHiddenGroups((prev) => {
+      const next = new Set(prev);
+      if (hidden) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+    setAnnouncement(
+      hidden
+        ? t({
+            id: "survey.characterMapPane.group.announceHidden",
+            message: `Hidden ${{ block: group.block }}`,
+          })
+        : t({
+            id: "survey.characterMapPane.group.announceShown",
+            message: `Showing ${{ block: group.block }}`,
+          }),
+    );
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%", minHeight: 0 }}>
       <h2 style={{ margin: 0, fontSize: "1.1rem", color: ACCENT }}>
@@ -517,63 +560,114 @@ export function CharacterMapPane({
                     message: `${{ block: group.block }} characters`,
                   });
             const key = groupKey(group);
+            const gridId = groupGridId(key);
+            // Search is ALWAYS whole-set (see the filteredGroups comment
+            // above): while a query is active, `group.cells` here is already
+            // the query-filtered survivors, so a hidden group must still
+            // render them rather than showing the "N hidden" collapse note —
+            // otherwise a match inside a hidden group would be invisible.
+            // hiddenGroups itself is left untouched, so clearing the query
+            // returns the group to its collapsed state.
+            const hasActiveQuery = query.trim() !== "";
+            const isHidden = !hasActiveQuery && hiddenGroups.has(key);
+            const hideShowAriaLabel = isHidden
+              ? t({
+                  id: "survey.characterMapPane.group.showAction",
+                  message: `Show ${{ block: group.block }}`,
+                })
+              : t({
+                  id: "survey.characterMapPane.group.hideAction",
+                  message: `Hide ${{ block: group.block }}`,
+                });
             return (
               <section
                 key={key}
                 aria-label={groupAriaLabel}
               >
-                <h3 style={sectionHeading}>
-                  {group.block}
-                  {label !== null && (
-                    <span style={{ fontWeight: 400, color: TEXT_DIM, fontSize: 11 }}>
-                      {" "}
-                      — {label}
-                    </span>
-                  )}
-                </h3>
-                <div
-                  role="group"
-                  aria-label={t({
-                    id: "survey.characterMapPane.group.clickToToggleAriaLabel",
-                    message: `${{ block: group.block }} characters — click to toggle`,
-                  })}
-                  style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
-                >
-                  {visibleCells.map((cell) => {
-                    const selected = chars.includes(cell.char.normalize("NFC"));
-                    const cp = toUPlusNotation(cell.char);
-                    const display = prefixCombiningMark(cell.char, cell.isCombiningMark);
-                    const actionLabel = selected
-                      ? t({ id: "survey.characterMapPane.cell.removeAction", message: "Remove" })
-                      : t({ id: "survey.characterMapPane.cell.addAction", message: "Add" });
-                    return (
-                      <button
-                        key={cell.char}
-                        type="button"
-                        onClick={() => handleToggle(cell)}
-                        aria-pressed={selected}
-                        aria-label={`${actionLabel} ${cell.char} (${cp})`}
-                        style={charChip(selected)}
-                      >
-                        <span style={chipGlyph(selected, glyphFontStack)}>{display}</span>
-                        <span style={chipCodepoint}>{cp}</span>
-                        {/* Non-color selected indicator (colorblind-safe) — shared
-                            helper with SuggestionChip's "[x]"/"+" pattern in
-                            PhaseB.tsx (surveyStyles.ts's chipIndicator*). */}
-                        <span style={chipIndicator(chipIndicatorColor(selected))}>
-                          {chipIndicatorText(selected)}
-                        </span>
-                      </button>
-                    );
-                  })}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <h3 style={sectionHeading}>
+                    {group.block}
+                    {label !== null && (
+                      <span style={{ fontWeight: 400, color: TEXT_DIM, fontSize: 11 }}>
+                        {" "}
+                        — {label}
+                      </span>
+                    )}
+                  </h3>
+                  {/* Per-group hide toggle — collapses ONLY this group's cell
+                      grid in place; the group stays in `filteredGroups` and this
+                      heading stays rendered either way (contrast with the
+                      "blocks my keyboard uses" checkbox above, which drops
+                      non-used groups from the data entirely). */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleGroupHidden(group, !isHidden)}
+                    aria-expanded={!isHidden}
+                    aria-controls={gridId}
+                    aria-label={hideShowAriaLabel}
+                    style={{ ...secondaryButton, padding: "2px 10px", fontSize: 11, flexShrink: 0 }}
+                  >
+                    {isHidden ? (
+                      <Trans id="survey.characterMapPane.group.showButton">Show</Trans>
+                    ) : (
+                      <Trans id="survey.characterMapPane.group.hideButton">Hide</Trans>
+                    )}
+                  </button>
                 </div>
-                {hiddenCount > 0 && (
+                {isHidden ? (
                   <div style={{ ...mutedNote, marginTop: 6 }}>
-                    <Trans id="survey.characterMapPane.group.hiddenCount">
-                      Showing {visibleCells.length} of {group.cells.length} characters — use search
-                      or "Add any character by code point" above to find a specific one.
+                    <Trans id="survey.characterMapPane.group.hiddenNote">
+                      {group.cells.length} characters hidden.
                     </Trans>
                   </div>
+                ) : (
+                  <>
+                    <div
+                      id={gridId}
+                      role="group"
+                      aria-label={t({
+                        id: "survey.characterMapPane.group.clickToToggleAriaLabel",
+                        message: `${{ block: group.block }} characters — click to toggle`,
+                      })}
+                      style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
+                    >
+                      {visibleCells.map((cell) => {
+                        const selected = chars.includes(cell.char.normalize("NFC"));
+                        const cp = toUPlusNotation(cell.char);
+                        const display = prefixCombiningMark(cell.char, cell.isCombiningMark);
+                        const actionLabel = selected
+                          ? t({ id: "survey.characterMapPane.cell.removeAction", message: "Remove" })
+                          : t({ id: "survey.characterMapPane.cell.addAction", message: "Add" });
+                        return (
+                          <button
+                            key={cell.char}
+                            type="button"
+                            onClick={() => handleToggle(cell)}
+                            aria-pressed={selected}
+                            aria-label={`${actionLabel} ${cell.char} (${cp})`}
+                            style={charChip(selected)}
+                          >
+                            <span style={chipGlyph(selected, glyphFontStack)}>{display}</span>
+                            <span style={chipCodepoint}>{cp}</span>
+                            {/* Non-color selected indicator (colorblind-safe) — shared
+                                helper with SuggestionChip's "[x]"/"+" pattern in
+                                PhaseB.tsx (surveyStyles.ts's chipIndicator*). */}
+                            <span style={chipIndicator(chipIndicatorColor(selected))}>
+                              {chipIndicatorText(selected)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {hiddenCount > 0 && (
+                      <div style={{ ...mutedNote, marginTop: 6 }}>
+                        <Trans id="survey.characterMapPane.group.hiddenCount">
+                          Showing {visibleCells.length} of {group.cells.length} characters — use search
+                          or "Add any character by code point" above to find a specific one.
+                        </Trans>
+                      </div>
+                    )}
+                  </>
                 )}
               </section>
             );
