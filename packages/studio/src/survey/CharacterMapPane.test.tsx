@@ -18,7 +18,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { screen, fireEvent, cleanup, waitFor, within, act } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
-import { CharacterMapPane, MAX_CELLS_PER_GROUP } from "./CharacterMapPane.tsx";
+import { CharacterMapPane, MAX_CELLS_PER_GROUP, MISSING_GLYPH_PLACEHOLDER } from "./CharacterMapPane.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
@@ -186,7 +186,7 @@ describe("CharacterMapPane — data path", () => {
     expect(markButton.textContent).toContain("◌");
   });
 
-  it("renders a deterministic box placeholder (not the glyph) when the selected font can't render a cell — codepoint label and click/aria behavior stay unchanged (Requirement 1)", async () => {
+  it("renders the U+A7F1 placeholder character (not the glyph) when the selected font can't render a cell — codepoint label and click/aria behavior stay unchanged (Requirement 1)", async () => {
     seedBaseAndLanguage();
     unsupportedDisplays.set(["b"]);
     render(<CharacterMapPane />);
@@ -197,11 +197,15 @@ describe("CharacterMapPane — data path", () => {
     const latinGroup = screen.getByLabelText("Latin characters (main)");
     const bButton = within(latinGroup).getByRole("button", { name: /Add b \(U\+0062\)/ });
 
-    // Box fallback: no visible "b" glyph text in the button, but the U+
-    // codepoint label and the aria-label both stay exactly as before.
+    // Placeholder fallback: no visible "b" glyph text in the button — the
+    // literal U+A7F1 character renders instead — but the U+ codepoint label
+    // and the aria-label both stay exactly as before.
     expect(bButton.textContent).not.toContain("b");
+    expect(bButton.textContent).toContain(MISSING_GLYPH_PLACEHOLDER);
     expect(bButton.textContent).toContain("U+0062");
-    expect(bButton.querySelector('[aria-hidden="true"]')).toBeTruthy();
+    const placeholderSpan = bButton.querySelector('[aria-hidden="true"]');
+    expect(placeholderSpan).toBeTruthy();
+    expect(placeholderSpan?.textContent).toBe(MISSING_GLYPH_PLACEHOLDER);
 
     // Still toggleable exactly like a normal (glyph-rendering) cell.
     fireEvent.click(bButton);
@@ -213,7 +217,7 @@ describe("CharacterMapPane — data path", () => {
     expect(aButton.textContent).toContain("a");
   });
 
-  it("never boxes a combining-mark cell even when the font-support checker reports it unsupported (regression)", async () => {
+  it("never renders the U+A7F1 placeholder for a combining-mark cell even when the font-support checker reports it unsupported (regression)", async () => {
     seedBaseAndLanguage();
     // The dotted-circle-prefixed display string for the fixture's combining
     // mark cell (◌ + U+0301) — report it as "unsupported" via the mocked
@@ -229,8 +233,9 @@ describe("CharacterMapPane — data path", () => {
     const markGroup = screen.getByLabelText("Combining Diacritical Marks characters (loanwords)");
     const markButton = within(markGroup).getByRole("button", { name: /Add.*\(U\+0301\)/ });
 
-    // Must still render the dotted-circle glyph, NEVER the box placeholder.
+    // Must still render the dotted-circle glyph, NEVER the U+A7F1 placeholder.
     expect(markButton.textContent).toContain("◌");
+    expect(markButton.textContent).not.toContain(MISSING_GLYPH_PLACEHOLDER);
     expect(markButton.querySelector('[aria-hidden="true"]')).toBeFalsy();
   });
 

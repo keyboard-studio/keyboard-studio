@@ -71,9 +71,19 @@ type LoadState =
 // Every listed character must render even when the selected Phase B font
 // can't draw its glyph — rather than trusting the OS's inconsistent tofu
 // (some systems draw a blank instead of a box), an unsupported glyph is
-// swapped for a deterministic bordered box (chipGlyphMissingBox,
-// surveyStyles.ts) via useFontSupportChecker (fontSupport.ts). The U+
-// codepoint label always stays, regardless of glyph-vs-box.
+// swapped for the literal U+A7F1 (MODIFIER LETTER CAPITAL S) character as a
+// deterministic placeholder glyph (MISSING_GLYPH_PLACEHOLDER below, styled
+// via chipGlyphMissingBox, surveyStyles.ts) via useFontSupportChecker
+// (fontSupport.ts). The U+ codepoint label always stays, regardless of
+// real-glyph-vs-placeholder.
+
+// Deterministic stand-in glyph rendered in place of a character the selected
+// Phase B font can't draw (see the note above and fontSupport.ts). U+A7F1 is
+// used verbatim rather than a hand-drawn CSS box — plain text, no extra
+// semantics beyond what the cell's aria-label (which names the real
+// character + its U+ codepoint) already conveys. Exported so tests assert
+// against the real placeholder character rather than a hardcoded literal.
+export const MISSING_GLYPH_PLACEHOLDER = String.fromCodePoint(0xa7f1);
 
 // tierLabel is defined INSIDE CharacterMapPane (below), closing over the
 // component's own `t` from useLingui() directly, rather than taking `t` as a
@@ -663,14 +673,15 @@ export function CharacterMapPane({
                         const selected = chars.includes(cell.char.normalize("NFC"));
                         const cp = toUPlusNotation(cell.char);
                         const display = prefixCombiningMark(cell.char, cell.isCombiningMark);
-                        // Font-support box fallback (Requirement 1): every listed
-                        // character must render, even ones the selected font
-                        // can't draw — a deterministic bordered box stands in
-                        // for the glyph rather than trusting the OS's own
-                        // (inconsistent) missing-glyph rendering. The U+
-                        // codepoint label below always renders regardless.
+                        // Font-support placeholder fallback (Requirement 1): every
+                        // listed character must render, even ones the selected
+                        // font can't draw — the literal U+A7F1 character
+                        // (MISSING_GLYPH_PLACEHOLDER above) stands in for the
+                        // glyph rather than trusting the OS's own (inconsistent)
+                        // missing-glyph rendering. The U+ codepoint label below
+                        // always renders regardless.
                         //
-                        // Combining marks are EXCLUDED from the box path
+                        // Combining marks are EXCLUDED from the placeholder path
                         // (cell.isCombiningMark gate below), never routed through
                         // isGlyphSupported at all. Root cause of the regression
                         // this guards against: a standalone combining mark has
@@ -683,7 +694,7 @@ export function CharacterMapPane({
                         // matches a generic-family baseline and misclassifies
                         // the cell as "unsupported" even when the font can draw
                         // the mark fine. A standalone mark must always show the
-                        // dotted circle, never a box.
+                        // dotted circle, never the U+A7F1 placeholder.
                         const glyphRenders = cell.isCombiningMark || isGlyphSupported(display);
                         const actionLabel = selected
                           ? t({ id: "survey.characterMapPane.cell.removeAction", message: "Remove" })
@@ -700,7 +711,9 @@ export function CharacterMapPane({
                             {glyphRenders ? (
                               <span style={chipGlyph(selected, glyphFontStack)}>{display}</span>
                             ) : (
-                              <span style={chipGlyphMissingBox(selected)} aria-hidden="true" />
+                              <span style={chipGlyphMissingBox(selected)} aria-hidden="true">
+                                {MISSING_GLYPH_PLACEHOLDER}
+                              </span>
                             )}
                             <span style={chipCodepoint}>{cp}</span>
                             {/* Non-color selected indicator (colorblind-safe) — shared

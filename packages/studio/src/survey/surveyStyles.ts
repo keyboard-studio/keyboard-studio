@@ -188,15 +188,14 @@ export function chipGlyph(checked: boolean, fontStack?: string): CSSProperties {
 }
 
 /**
- * Deterministic box placeholder shown in place of a glyph the selected
- * Phase B font can't render (see fontSupport.ts) — a fixed-size bordered box,
- * NOT reliance on the browser/OS's own missing-glyph ("tofu") rendering,
- * which is inconsistent across systems (some draw a visible box, some draw
- * blank). Shaped as a VERTICAL RECTANGLE (taller than wide), matching a
- * typical glyph slot/tofu box rather than a square swatch — 14px wide by
- * 24px tall, sized to sit comfortably against chipGlyph's 22px glyph
- * footprint so the chip layout doesn't jump excessively between glyph and
- * box cells. `checked` mirrors chipGlyph's accent-color selection.
+ * Deterministic placeholder glyph (the literal U+A7F1 character — see
+ * CharacterMapPane's MISSING_GLYPH_PLACEHOLDER) shown in place of a glyph the
+ * selected Phase B font can't render (see fontSupport.ts) — NOT reliance on
+ * the browser/OS's own missing-glyph ("tofu") rendering, which is
+ * inconsistent across systems (some draw a visible box, some draw blank).
+ * Sized/centered to match chipGlyph's 22px glyph footprint so the chip layout
+ * doesn't jump between a real glyph and this placeholder. `checked` mirrors
+ * chipGlyph's accent-color selection.
  *
  * NEVER applied to a combining mark cell — see the isCombiningMark gate at
  * CharacterMapPane's render site; a standalone mark always renders the
@@ -207,11 +206,10 @@ export function chipGlyph(checked: boolean, fontStack?: string): CSSProperties {
 export function chipGlyphMissingBox(checked: boolean): CSSProperties {
   return {
     display: "inline-block",
-    width: 14,
-    height: 24,
-    boxSizing: "border-box",
-    border: `1.5px solid ${checked ? CHIP_GLYPH_ACCENT : TEXT_DIM}`,
-    borderRadius: 2,
+    fontSize: 22,
+    lineHeight: 1,
+    textAlign: "center",
+    color: checked ? CHIP_GLYPH_ACCENT : TEXT_DIM,
   };
 }
 
