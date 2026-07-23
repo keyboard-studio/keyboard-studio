@@ -223,8 +223,10 @@ function isGuardrailExcluded(ch: string): boolean {
  * canonical combining class (ccc): several Mc marks (e.g. Devanagari vowel
  * signs) have ccc=0 and would be missed by a ccc-based test. Also
  * deliberately excludes \p{Sk} modifier symbols (U+00B4 ACUTE ACCENT,
- * U+02CA, U+02DC, etc.) — those are free-standing, not marks that attach to
- * a base.
+ * U+02DC SMALL TILDE, etc.) — those are free-standing, not marks that attach
+ * to a base. (U+02CA MODIFIER LETTER ACUTE ACCENT is General_Category Lm, not
+ * Sk, but is excluded from \p{M} for the same reason: it's a free-standing
+ * letter, not an attaching mark.)
  */
 export function isCombiningMarkChar(ch: string): boolean {
   return /^\p{M}$/u.test(ch);

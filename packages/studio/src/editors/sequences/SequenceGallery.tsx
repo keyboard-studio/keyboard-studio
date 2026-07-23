@@ -644,6 +644,14 @@ export function SequenceGallery({
     ? t({ id: "editor.assignLoop.nextCharacterAriaLabel", message: "Next character" })
     : t({ id: "editor.sequences.continueAriaLabel", message: "Continue (sequence gallery)" });
 
+  // Named local for the dotted-circle-wrapped current char, used inside the
+  // <Trans> macro below (editor.sequences.indicatorHint). A simple identifier
+  // extracts as a NAMED lingui placeholder; calling displayChar() inline in
+  // the macro collapses it to a POSITIONAL {0}, which is what broke the fr
+  // catalog for that id. Null only when currentChar is null, in which case
+  // the guarded block that reads it does not render.
+  const currentCharDisplay = currentChar !== null ? displayChar(currentChar) : null;
+
   // ---------------------------------------------------------------------------
   // Left pane
   // ---------------------------------------------------------------------------
@@ -842,7 +850,7 @@ export function SequenceGallery({
             <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
               <Trans id="editor.sequences.indicatorHint">
                 The single character that triggers the combination — typing it after the
-                content produces {displayChar(currentChar)}.
+                content produces {currentCharDisplay}.
               </Trans>
             </p>
             <input

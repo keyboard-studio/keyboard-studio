@@ -132,9 +132,11 @@ export function modifierLabel(rule: IRRule): string {
 // follow-up): many Mc marks (e.g. Devanagari vowel signs) have canonical
 // combining class (ccc) 0, so a ccc-based test under-detects — General_Category
 // is required, not ccc. Sk "modifier symbol" characters (U+00B4 ACUTE ACCENT,
-// U+02CA, U+02DC, etc.) are DELIBERATELY EXCLUDED: they are free-standing
+// U+02DC SMALL TILDE, etc.) are DELIBERATELY EXCLUDED: they are free-standing
 // spacing characters, not marks that attach to a base, and must never get a
-// dotted-circle prefix.
+// dotted-circle prefix. (U+02CA MODIFIER LETTER ACUTE ACCENT is General_Category
+// Lm, not Sk, but is excluded from \p{M} for the same reason: it's a
+// free-standing letter, not an attaching mark.)
 //
 // Thin alias over the engine's isCombiningMarkChar (characterMap.ts) — both
 // predicates test the same \p{M} class, so there is no reason to keep a

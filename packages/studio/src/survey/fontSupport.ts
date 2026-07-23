@@ -19,6 +19,25 @@
 // width. This is a heuristic, not an exact UCD glyph-coverage table — no such
 // table is available client-side.
 //
+// KNOWN LIMITATION (accepted for v1): this heuristic can produce FALSE
+// NEGATIVES — wrongly reporting a real, correctly-rendered glyph as
+// unsupported (so CharacterMapPane boxes a character the browser actually
+// draws fine) — for non-Latin BASE letters on platforms where the CSS
+// generic-family keywords (e.g. "monospace"/"serif" below, or "sans-serif"
+// generally) resolve to a broad multiscript fallback font. Several Linux
+// distros and ChromeOS ship Noto Sans (or a similar pan-Unicode font) as the
+// system-wide resolution target for those generic keywords. On such a
+// system, the author's chosen font stack and the generic baseline can both
+// end up resolving to that same substitution font for a given non-Latin
+// character, so the two measureText widths come out identical even though
+// the glyph renders correctly — the detector can't distinguish "my font drew
+// it" from "the OS quietly substituted the same broad fallback font for
+// both comparisons." Combining marks are already exempt from this whole
+// path (see CharacterMapPane's isCombiningMark gate — they never call
+// isGlyphSupported at all), so this limitation is scoped to non-mark base
+// characters only. No fix is planned for v1; flagged here as a documented,
+// accepted risk rather than a silent gap.
+//
 // Hard requirements (all satisfied below):
 //   - Degrades to "supported" (show the glyph) wherever real Canvas 2D text
 //     metrics are unavailable — jsdom under vitest, SSR, or any environment

@@ -255,6 +255,12 @@ function TouchMethodChooser({
 }: TouchMethodChooserProps) {
   const { t } = useLingui();
   const flickDirections = buildFlickDirections(t);
+  // Named local for the dotted-circle-wrapped char used in the <Trans> macros
+  // below — a simple identifier extracts as a NAMED lingui placeholder (e.g.
+  // {currentCharDisplay}), whereas calling displayChar() inline inside the
+  // macro collapses it to a POSITIONAL {0}/{1}, which is what broke the fr
+  // catalog (see the module-level fix note near MechanismGallery's twin).
+  const currentCharDisplay = displayChar(currentChar);
   const cardStyle = (active: boolean): CSSProperties => ({
     borderRadius: 8,
     border: `1px solid ${active ? ACCENT : BORDER}`,
@@ -283,7 +289,7 @@ function TouchMethodChooser({
           {method !== "longpress_alternates" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
               <Trans id="editor.assignLoop.touch.method.longpress.summary">
-                Hold a key to reveal {displayChar(currentChar)} as a long-press option.
+                Hold a key to reveal {currentCharDisplay} as a long-press option.
               </Trans>
             </span>
           )}
@@ -330,7 +336,7 @@ function TouchMethodChooser({
           {method !== "flick_gestures" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
               <Trans id="editor.assignLoop.touch.method.flick.summary">
-                Swipe a key in a direction to produce {displayChar(currentChar)}.
+                Swipe a key in a direction to produce {currentCharDisplay}.
               </Trans>
             </span>
           )}
@@ -399,7 +405,7 @@ function TouchMethodChooser({
           {method !== "multitap" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
               <Trans id="editor.assignLoop.touch.method.multitap.summary">
-                Tap a key rapidly more than once to reach {displayChar(currentChar)}.
+                Tap a key rapidly more than once to reach {currentCharDisplay}.
               </Trans>
             </span>
           )}
@@ -446,7 +452,7 @@ function TouchMethodChooser({
           {method !== "touch_key_replace" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
               <Trans id="editor.assignLoop.touch.method.replace.summary">
-                Make a key type {displayChar(currentChar)} directly on the touch keyboard.
+                Make a key type {currentCharDisplay} directly on the touch keyboard.
               </Trans>
             </span>
           )}
@@ -477,7 +483,7 @@ function TouchMethodChooser({
             </div>
             <p style={{ margin: 0, fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}>
               <Trans id="editor.assignLoop.touch.method.replace.summary">
-                Make a key type {displayChar(currentChar)} directly on the touch keyboard.
+                Make a key type {currentCharDisplay} directly on the touch keyboard.
               </Trans>
             </p>
           </div>
@@ -1316,6 +1322,14 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // Left pane content
   // ---------------------------------------------------------------------------
 
+  // Named local for the dotted-circle-wrapped current char, used inside the
+  // <Trans> suggestion-card macros below. A simple identifier extracts as a
+  // NAMED lingui placeholder; calling displayChar() inline in the macro
+  // collapses it to a POSITIONAL {0}/{1} (the cause of the fr catalog
+  // mismatch this fix addresses). Null only when currentChar is null, in
+  // which case none of the guarded blocks below render it.
+  const currentCharDisplay = currentChar !== null ? displayChar(currentChar) : null;
+
   const leftContent = (
     <div
       style={{
@@ -1514,7 +1528,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                       {suggestion.hostKey
                         ? hostKeyShortLabel(suggestion.hostKey)
                         : t({ id: "editor.assignLoop.touch.aKeyPlaceholder", message: "a key" })}{" "}
-                      to reach {displayChar(currentChar)}
+                      to reach {currentCharDisplay}
                     </Trans>
                   </p>
                   <div style={{ display: "flex", gap: 8 }}>
@@ -1575,7 +1589,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                       {suggestion.hostKey
                         ? hostKeyShortLabel(suggestion.hostKey)
                         : t({ id: "editor.assignLoop.touch.aKeyPlaceholder", message: "a key" })}{" "}
-                      with {displayChar(currentChar)}
+                      with {currentCharDisplay}
                     </Trans>
                   </p>
                   <div style={{ display: "flex", gap: 8 }}>
@@ -1632,7 +1646,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                     }}
                   >
                     <Trans id="editor.assignLoop.touch.suggestion.alreadyText">
-                      {displayChar(currentChar)} is already on the touch keyboard. Keep it as is?
+                      {currentCharDisplay} is already on the touch keyboard. Keep it as is?
                     </Trans>
                   </p>
                   <div style={{ display: "flex", gap: 8 }}>

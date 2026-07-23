@@ -566,6 +566,20 @@ function MethodChooser({
     resolveKeyPickerSelection(selectedRaltKey, selectedRaltKeyCustomChar),
   );
 
+  // Named locals for dotted-circle-wrapped interpolations used inside <Trans>/t()
+  // macros below. Computing these BEFORE the macro (rather than calling
+  // displayChar() inline inside the interpolation) keeps the identifier a
+  // simple reference, so lingui extracts a NAMED placeholder (e.g.
+  // {currentCharDisplay}) instead of collapsing it to a POSITIONAL {0}/{1} —
+  // named placeholders are required for the en/fr catalogs to stay aligned.
+  const currentCharDisplay = displayChar(currentChar);
+  const deadkeyBaseSummaryDisplay = deadkeyBaseLetterDisplay
+    ? displayChar(deadkeyBaseLetterDisplay)
+    : t({ id: "editor.assignLoop.deadkeyBasePlaceholder", message: "[base]" });
+  const deadkeyBasePreviewDisplay = deadkeyBaseLetterDisplay
+    ? displayChar(deadkeyBaseLetterDisplay)
+    : t({ id: "editor.assignLoop.deadkeyBaseLetterPlaceholder", message: "[base letter]" });
+
   // Each method is one card: transparent header button + inline config when selected.
   const cardStyle = (active: boolean): CSSProperties => ({
     borderRadius: 8,
@@ -612,7 +626,7 @@ function MethodChooser({
               <Trans id="editor.assignLoop.method.sequence.checkHint">
                 Check this to mark{" "}
                 <span style={{ color: TEXT_MAIN, fontFamily: "monospace", fontSize: 16 }}>
-                  {displayChar(currentChar)}
+                  {currentCharDisplay}
                 </span>{" "}
                 as a sequence. You&apos;ll define the actual key sequence later,
                 in the Sequence Gallery.
@@ -637,10 +651,8 @@ function MethodChooser({
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
               <Trans id="editor.assignLoop.method.deadkey.summary">
                 Trigger &rarr;{" "}
-                {deadkeyBaseLetterDisplay
-                  ? displayChar(deadkeyBaseLetterDisplay)
-                  : t({ id: "editor.assignLoop.deadkeyBasePlaceholder", message: "[base]" })} &rarr;{" "}
-                {displayChar(currentChar)}
+                {deadkeyBaseSummaryDisplay} &rarr;{" "}
+                {currentCharDisplay}
               </Trans>
             </span>
           )}
@@ -712,10 +724,8 @@ function MethodChooser({
             <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
               <Trans id="editor.assignLoop.method.deadkey.preview">
                 Press {triggerKeyDisplay}, then{" "}
-                {deadkeyBaseLetterDisplay
-                  ? displayChar(deadkeyBaseLetterDisplay)
-                  : t({ id: "editor.assignLoop.deadkeyBaseLetterPlaceholder", message: "[base letter]" })} &rarr;{" "}
-                <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{displayChar(currentChar)}</span>
+                {deadkeyBasePreviewDisplay} &rarr;{" "}
+                <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentCharDisplay}</span>
               </Trans>
             </p>
           </div>
@@ -736,7 +746,7 @@ function MethodChooser({
           {method !== "swap" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
               <Trans id="editor.assignLoop.method.swap.summary">
-                Dedicate one physical key to produce {displayChar(currentChar)}
+                Dedicate one physical key to produce {currentCharDisplay}
               </Trans>
             </span>
           )}
@@ -791,7 +801,7 @@ function MethodChooser({
               <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
                 <Trans id="editor.assignLoop.swap.shiftPreview">
                   Shift + {swapVkeyForDisplay.replace(/^K_/, "")} &rarr;{" "}
-                  <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{displayChar(currentChar)}</span>
+                  <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentCharDisplay}</span>
                 </Trans>
               </p>
             )}
@@ -813,7 +823,7 @@ function MethodChooser({
           {method !== "ralt" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
               <Trans id="editor.assignLoop.method.ralt.summary">
-                Hold a modifier layer and press a base key to get {displayChar(currentChar)}
+                Hold a modifier layer and press a base key to get {currentCharDisplay}
               </Trans>
             </span>
           )}
