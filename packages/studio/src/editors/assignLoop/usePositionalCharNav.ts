@@ -65,6 +65,17 @@ export interface UsePositionalCharNavResult {
    */
   handlePreviousChar: () => void;
   /**
+   * Jump directly to `char` — forward OR backward, to any position in
+   * `list` — ungated by covered/configured status on the character being
+   * left (same "no side effects of navigation itself" contract as
+   * handlePreviousChar/handleNext/handleBack). A no-op when `char` is not
+   * present in `list`. Backs the character-scroll-strip chip clicks (the
+   * horizontal character strip that replaced the old "Previous character"
+   * button — see CharScrollStrip.tsx): a click on ANY chip, not just the one
+   * immediately before the current position, must be able to navigate there.
+   */
+  handleSelectChar: (char: string) => void;
+  /**
    * Characters whose suggestion row/card has been explicitly accepted or
    * denied — a resolved suggestion never reappears, even on Back navigation
    * to that character. Skipping does not resolve a suggestion.
@@ -144,12 +155,27 @@ export function usePositionalCharNav({
     setCurrentChar(list[currentIdx - 1] ?? null);
   }, [currentChar, currentIdx, list, setCurrentChar]);
 
+  // Select-by-value — jumps to ANY position in `list`, forward or backward,
+  // ungated by covered/configured status. `list.includes` (not indexOf-then-
+  // compare) keeps the "not present -> no-op" check self-contained; the
+  // caller (CharScrollStrip) only ever offers chips drawn from this same
+  // `list`, so the not-found branch is defense-in-depth rather than a
+  // reachable UI path.
+  const handleSelectChar = useCallback(
+    (char: string) => {
+      if (!list.includes(char)) return;
+      setCurrentChar(char);
+    },
+    [list, setCurrentChar],
+  );
+
   return {
     currentIdx,
     hasAnotherCharAfterCurrent,
     handleNext,
     handleBack,
     handlePreviousChar,
+    handleSelectChar,
     suggestionResolved,
     markSuggestionResolved,
   };

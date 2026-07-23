@@ -10,7 +10,7 @@
 // Defect B regression is covered in StudioShell.test.tsx.
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
+import { screen, fireEvent, act, cleanup, waitFor, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { TouchGallery, buildTouchMechanismRef } from "./TouchGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -810,8 +810,30 @@ describe("TouchGallery — back navigation", () => {
   });
 });
 
-describe("TouchGallery — previous-character navigation", () => {
-  it("clicking '« Previous character' from an interior character moves to the immediately preceding character, ungated by intermediate configuration status", async () => {
+// The old "« Previous character" button (data-testid "touch-prev-char") only
+// ever stepped back exactly one position; it was replaced by CharScrollStrip
+// (data-testid "char-scroll-strip"), which offers ONE chip per inventory
+// character (data-testid "char-scroll-chip-<HEX>", every codepoint of the
+// grapheme, 4+-digit uppercase hex, hyphen-joined — see CharScrollStrip.tsx's
+// file header) and lets the author jump to ANY of them, forward or backward,
+// via handleSelectChar. These tests exercise that replacement contract
+// directly rather than deleting the navigation coverage. The phase-exit "←
+// Back" control (handleBack, tested elsewhere in this file) is retained and
+// is a separate control from the scroll strip.
+describe("TouchGallery — character-scroll-strip navigation", () => {
+  it("renders the char-scroll-strip with one chip per inventory character", async () => {
+    seedStore({ withInventory: ["中", "日", "月"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expect(screen.getByTestId("char-scroll-strip")).toBeTruthy();
+    expect(screen.getByTestId("char-scroll-chip-4E2D")).toBeTruthy();
+    expect(screen.getByTestId("char-scroll-chip-65E5")).toBeTruthy();
+    expect(screen.getByTestId("char-scroll-chip-6708")).toBeTruthy();
+  });
+
+  it("clicking an earlier character's chip moves back to it, ungated by intermediate configuration status", async () => {
     const onBack = vi.fn();
     seedStore({ withInventory: ["中", "日", "月"] });
     await act(async () => {
@@ -827,11 +849,9 @@ describe("TouchGallery — previous-character navigation", () => {
       expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
     });
 
-    const prevBtn = screen.getByTestId("touch-prev-char");
-    expect(prevBtn.getAttribute("aria-label")).toBe("Previous character");
-    expect((prevBtn as HTMLButtonElement).disabled).toBe(false);
-
-    fireEvent.click(prevBtn);
+    // Click the chip for "中" (the earlier, already-visited character) while
+    // sitting on "日" — must jump straight back to it.
+    fireEvent.click(screen.getByTestId("char-scroll-chip-4E2D"));
 
     // Landed back on "中" (idx 0) — the phase was NOT exited.
     await waitFor(() => {
@@ -840,44 +860,20 @@ describe("TouchGallery — previous-character navigation", () => {
     expect(onBack).not.toHaveBeenCalled();
   });
 
-  it("renders the previous-character button DISABLED on the first character", async () => {
+  it("clicking a later character's chip moves forward to it too — the old prev-only button could never do this", async () => {
     seedStore({ withInventory: ["中", "日", "月"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
-    // Starting on "中" (idx 0) — nowhere further back to step.
-    const prevBtn = screen.getByTestId("touch-prev-char");
-    expect(prevBtn).toBeTruthy();
-    expect((prevBtn as HTMLButtonElement).disabled).toBe(true);
 
-    // Clicking a disabled button is a no-op — still on "中".
-    fireEvent.click(prevBtn);
+    // Starting on "中" (idx 0) — jump straight to "月" (idx 2, the last
+    // character), skipping over "日" entirely without visiting it.
     expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
-  });
+    fireEvent.click(screen.getByTestId("char-scroll-chip-6708"));
 
-  it("the previous-character button is enabled on later (non-first) characters", async () => {
-    seedStore({ withInventory: ["中", "日", "月"] });
-    await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
-    });
-
-    // Advance to "日" (idx 1) via Skip (records nothing).
-    fireEvent.click(
-      screen.getByRole("button", { name: /Skip this character/i }),
-    );
-    await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
-    });
-    expect((screen.getByTestId("touch-prev-char") as HTMLButtonElement).disabled).toBe(false);
-
-    // Advance to "月" (idx 2, the last character) — still enabled there too.
-    fireEvent.click(
-      screen.getByRole("button", { name: /Skip this character/i }),
-    );
     await waitFor(() => {
       expect(screen.getByLabelText(/^U\+6708 月$/)).toBeTruthy();
     });
-    expect((screen.getByTestId("touch-prev-char") as HTMLButtonElement).disabled).toBe(false);
   });
 });
 
@@ -1055,10 +1051,16 @@ describe("TouchGallery — draft persistence across unmount/remount", () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    // The "Configured" chip row should show "ä" (it was persisted).
+    // The "Configured" chip row should show "ä" (it was persisted). Query
+    // scoped to the configured-group itself (via `within`) — a bare
+    // screen-level query for a button named "ä" now also matches the
+    // CharScrollStrip chip's "Go to U+00E4 ä" aria-label (the strip renders
+    // one chip per inventory character, unconditionally), which would make
+    // `queryByRole` throw on "found multiple elements" rather than asserting
+    // what this test actually cares about — the configured-chip row.
     const configuredGroup = screen.queryByRole("group", { name: /configured characters/i });
     expect(configuredGroup).not.toBeNull();
-    const chipButton = screen.queryByRole("button", { name: new RegExp("ä") });
+    const chipButton = within(configuredGroup!).queryByRole("button", { name: new RegExp("ä") });
     expect(chipButton).not.toBeNull();
   });
 });

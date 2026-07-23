@@ -89,6 +89,8 @@ import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
+import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
+import { getCharMechanisms } from "./parts/charMechanisms.ts";
 import { RadioGroup } from "../../ui/RadioGroup.tsx";
 import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
@@ -1367,7 +1369,7 @@ export function MechanismGallery({
     hasAnotherCharAfterCurrent,
     handleNext,
     handleBack,
-    handlePreviousChar,
+    handleSelectChar,
     suggestionResolved,
     markSuggestionResolved,
   } = usePositionalCharNav({
@@ -1815,6 +1817,19 @@ export function MechanismGallery({
   const handleCompanionDecline = useCallback(() => {
     setPendingCompanion(null);
   }, []);
+
+  // Part 3 (character-scroll-sequence-gallery) — every recorded sequence that
+  // USES currentChar in any slot (content/indicator/output), across the whole
+  // working copy, not just the ones whose OUTPUT is currentChar. Shares the
+  // getCharMechanisms selector with CharScrollStrip's badge (which counts
+  // PRODUCES only) and TouchGallery's own bottom list — see charMechanisms.ts.
+  const currentCharUsesSequences = useMemo(
+    () =>
+      currentChar !== null
+        ? getCharMechanisms(currentChar, sessionAssignments, "physical").usesSequences
+        : [],
+    [currentChar, sessionAssignments],
+  );
 
   // How many NON-sequence methods have already been applied to the current
   // character (mechanismAssignments already excludes the sequence-owned
@@ -2268,8 +2283,11 @@ export function MechanismGallery({
                 </button>
               )}
 
-              {/* Right-aligned forward cluster: optional jump-to-last +
-                  the primary forward action. */}
+              {/* Right-aligned forward cluster: the primary forward action.
+                  The old "Previous character" button that lived here has
+                  been replaced by the CharScrollStrip below (any character,
+                  not just the immediately-previous one, is now reachable by
+                  clicking its chip). */}
               <div
                 style={{
                   marginLeft: "auto",
@@ -2278,32 +2296,6 @@ export function MechanismGallery({
                   gap: 8,
                 }}
               >
-                {/* Previous character — rendered on every character
-                    (currentChar !== null, not locked), including the first
-                    one, where it is DISABLED (there is nowhere further back
-                    to step; the separate Back button below-left handles
-                    exiting the phase from the first character). Always
-                    steps back exactly one position, ungated by
-                    covered/applied status on the character being left. */}
-                {currentChar !== null && !locked && (
-                  <button
-                    type="button"
-                    data-testid="mechanisms-prev-char"
-                    onClick={handlePreviousChar}
-                    disabled={currentIdx <= 0}
-                    aria-label={t({ id: "editor.assignLoop.previousCharacterAriaLabel", message: "Previous character" })}
-                    style={{
-                      ...ghostBtn,
-                      fontSize: 13,
-                      ...(currentIdx <= 0
-                        ? { color: TEXT_DIM, opacity: 0.5, cursor: "not-allowed" }
-                        : {}),
-                    }}
-                  >
-                    <Trans id="editor.assignLoop.previousCharacterButton">&laquo; Previous character</Trans>
-                  </button>
-                )}
-
                 {/* Single button driven by the forwardButton spec computed
                     above — exactly one of the locked forward-escape, the
                     empty-diff Done completion, or the per-character
@@ -2326,6 +2318,22 @@ export function MechanismGallery({
                 )}
               </div>
             </div>
+          )}
+
+          {/* Character scroll strip — horizontal, all of lettersToAdd; click
+              any chip to jump straight to that character (replaces the old
+              "Previous character" button, which only ever stepped back one
+              position). Each chip's badge is the produces-count for that
+              character in THIS gallery's modality (physical) — see
+              charMechanisms.ts. */}
+          {lettersToAdd.length > 0 && (
+            <CharScrollStrip
+              chars={lettersToAdd}
+              currentChar={currentChar}
+              onSelectChar={handleSelectChar}
+              assignments={sessionAssignments}
+              modality="physical"
+            />
           )}
 
           {/* Empty-diff state — status text only; the forward/completion
@@ -2677,6 +2685,69 @@ export function MechanismGallery({
                   </button>
                 </div>
               )}
+
+              {/* Sequences using this character (Part 3) — every recorded
+                  multi_char_sequence where currentChar appears in ANY slot
+                  (content, indicator, or output), not just the ones whose
+                  output IS currentChar. Read-only here — mirrors
+                  SequenceGallery's own "Recorded sequences" card style
+                  (SequenceGallery.tsx) but editing a sequence stays owned by
+                  the Sequence Gallery, so no Remove control is offered. */}
+              {currentCharUsesSequences.length > 0 && (
+                <div
+                  style={{
+                    background: BG_CARD,
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: 10,
+                    padding: "10px 14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 12,
+                      color: TEXT_DIM,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    <Trans id="editor.assignLoop.usesSequences.heading">
+                      Sequences using this character
+                    </Trans>
+                  </p>
+                  {currentCharUsesSequences.map(({ target, ref }, idx) => {
+                    const seqContent = ref.slotValues?.["firstLetterOut"] ?? "";
+                    const seqIndicator = ref.slotValues?.["secondLetter"] ?? "";
+                    return (
+                      <div
+                        key={`${target}\0${seqContent}\0${seqIndicator}\0${idx}`}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          fontSize: 13,
+                          fontFamily: FONT,
+                        }}
+                      >
+                        <span style={{ color: TEXT_MAIN }}>
+                          {displayChar(seqContent)}
+                          {" + "}
+                          {displayChar(seqIndicator)}
+                          {" "}
+                          &rarr;{" "}
+                          <span style={{ fontFamily: "monospace", fontSize: 15 }}>
+                            {displayChar(target)}
+                          </span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Apply + Skip. Back and Next/Done live in the shared top
                   toolbar row above (see leftContent's top of pane) so the
                   forward-advance control is spatially separated from these

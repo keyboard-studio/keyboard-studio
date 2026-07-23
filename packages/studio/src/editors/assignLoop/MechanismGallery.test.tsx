@@ -1036,8 +1036,29 @@ describe("MechanismGallery — positional Back/Next navigation", () => {
   });
 });
 
-describe("MechanismGallery — previous-character navigation", () => {
-  it("clicking '« Previous character' from an interior character moves to the immediately preceding character, ungated by intermediate implementation status", async () => {
+// The old "« Previous character" button (data-testid "mechanisms-prev-char")
+// only ever stepped back exactly one position; it was replaced by
+// CharScrollStrip (data-testid "char-scroll-strip"), which offers ONE chip
+// per lettersToAdd character (data-testid "char-scroll-chip-<HEX>", where
+// <HEX> is every codepoint of the grapheme, 4+-digit uppercase hex,
+// hyphen-joined — see CharScrollStrip.tsx's file header) and lets the author
+// jump to ANY of them, forward or backward, via handleSelectChar. These
+// tests exercise that replacement contract directly rather than deleting the
+// navigation coverage.
+describe("MechanismGallery — character-scroll-strip navigation", () => {
+  it("renders the char-scroll-strip with one chip per lettersToAdd character", async () => {
+    seedInventory(["á", "é", "í"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    expect(screen.getByTestId("char-scroll-strip")).toBeTruthy();
+    expect(screen.getByTestId("char-scroll-chip-00E1")).toBeTruthy();
+    expect(screen.getByTestId("char-scroll-chip-00E9")).toBeTruthy();
+    expect(screen.getByTestId("char-scroll-chip-00ED")).toBeTruthy();
+  });
+
+  it("clicking an earlier character's chip moves back to it, ungated by intermediate implementation status", async () => {
     const onBack = vi.fn();
     seedInventory(["á", "é", "í"]);
     await act(async () => {
@@ -1058,11 +1079,9 @@ describe("MechanismGallery — previous-character navigation", () => {
       expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
     });
 
-    const prevBtn = screen.getByTestId("mechanisms-prev-char");
-    expect(prevBtn.getAttribute("aria-label")).toBe("Previous character");
-    expect((prevBtn as HTMLButtonElement).disabled).toBe(false);
-
-    fireEvent.click(prevBtn);
+    // Click the chip for "á" (the earlier, already-implemented character)
+    // while sitting on "é" — must jump straight back to it.
+    fireEvent.click(screen.getByTestId("char-scroll-chip-00E1"));
 
     // Landed back on "á" (idx 0) — the phase was NOT exited.
     await waitFor(() => {
@@ -1071,62 +1090,46 @@ describe("MechanismGallery — previous-character navigation", () => {
     expect(onBack).not.toHaveBeenCalled();
   });
 
-  it("renders the previous-character button DISABLED on the first character", async () => {
+  it("clicking a later character's chip moves forward to it too — the old prev-only button could never do this", async () => {
     seedInventory(["á", "é", "í"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    // Starting on "á" (idx 0) — nowhere further back to step.
-    const prevBtn = screen.getByTestId("mechanisms-prev-char");
-    expect(prevBtn).toBeTruthy();
-    expect((prevBtn as HTMLButtonElement).disabled).toBe(true);
 
-    // Clicking a disabled button is a no-op — still on "á", onBack untouched.
-    fireEvent.click(prevBtn);
+    // Starting on "á" (idx 0) — jump straight to "í" (idx 2, the last
+    // character), skipping over "é" entirely without visiting it.
     expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
-  });
+    fireEvent.click(screen.getByTestId("char-scroll-chip-00ED"));
 
-  it("the previous-character button is enabled on later (non-first) characters", async () => {
-    seedInventory(["á", "é", "í"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    });
-
-    // Advance to "é" (idx 1) via Skip (records nothing).
-    fireEvent.click(
-      screen.getByRole("button", { name: /Skip this character/i }),
-    );
-    await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
-    });
-    expect((screen.getByTestId("mechanisms-prev-char") as HTMLButtonElement).disabled).toBe(false);
-
-    // Advance to "í" (idx 2, the last character) — still enabled there too.
-    fireEvent.click(
-      screen.getByRole("button", { name: /Skip this character/i }),
-    );
     await waitFor(() => {
       expect(screen.getByLabelText(/^U\+00ED í$/)).toBeTruthy();
     });
-    expect((screen.getByTestId("mechanisms-prev-char") as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("does NOT render the previous-character button when the desktop layout is locked", async () => {
+  it("the char-scroll-strip stays rendered — and its chips stay clickable — when the desktop layout is locked", async () => {
     seedInventory(["á", "é", "í"]);
     await act(async () => {
       render(
         <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />,
       );
     });
-    expect(screen.getByTestId("mechanisms-prev-char")).toBeTruthy();
+    expect(screen.getByTestId("char-scroll-strip")).toBeTruthy();
 
     act(() => {
       useWorkingCopyStore.getState().lockDesktop();
     });
 
-    expect(screen.queryByTestId("mechanisms-prev-char")).toBeNull();
-    // The locked-forward-escape button takes over the primary slot instead.
+    // Unlike the removed prev-char button (which disappeared entirely once
+    // locked), the scroll strip is navigation, not editing — it must survive
+    // the lock, and the locked-forward-escape button takes over the primary
+    // forward slot alongside it (not in place of it).
+    expect(screen.getByTestId("char-scroll-strip")).toBeTruthy();
     expect(screen.getByTestId("mechanisms-continue")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("char-scroll-chip-00ED"));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+00ED í$/)).toBeTruthy();
+    });
   });
 });
 
