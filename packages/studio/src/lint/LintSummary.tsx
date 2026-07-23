@@ -5,6 +5,7 @@
 import type { LintFinding, LintSeverity } from "@keyboard-studio/contracts";
 import { LintChip } from "./LintChip";
 import { SEVERITY_COLORS, SEVERITY_ORDER } from "./colors";
+import { TEXT_MAIN } from "../ui/theme.ts";
 
 export interface LintSummaryProps {
   findings: LintFinding[];
@@ -102,7 +103,7 @@ export function LintSummary({ findings }: LintSummaryProps) {
                     // treatment — it renders in the panel's default
                     // foreground so the badge reads as a calm count, not
                     // an alarm. fatal/error/hint/info keep their colours.
-                    color: severity === "warning" ? "#e6edf3" : SEVERITY_COLORS[severity],
+                    color: severity === "warning" ? TEXT_MAIN : SEVERITY_COLORS[severity],
                   }}
                 >
                   {count} {labelFor(severity, count)}

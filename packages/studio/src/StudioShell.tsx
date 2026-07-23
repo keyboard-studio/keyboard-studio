@@ -44,6 +44,7 @@ import { PreviewScreen } from "./components/PreviewScreen.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
+import { Trans } from "@lingui/react/macro";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { LocaleSwitcher } from "./components/LocaleSwitcher.tsx";
@@ -763,7 +764,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
             {globalWarnings.map((f, i) => (
               <div key={`${f.code}-${i}`} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: TEXT_MAIN }}>
-                  <span aria-hidden="true">⚠</span> Warning: {f.message}
+                  <span aria-hidden="true">⚠</span>{" "}
+                  <Trans id="common.warningLabel">Warning:</Trans> {f.message}
                 </p>
                 {f.hint !== undefined && (
                   <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: TEXT_DIM }}>

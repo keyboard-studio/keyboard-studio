@@ -115,7 +115,7 @@ export function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnos
                     message: `Severity: ${d.severity}`,
                   })}
                 >
-                  <Trans id="diagnostics.item.warningLabel">Warning:</Trans> {location}
+                  <Trans id="common.warningLabel">Warning:</Trans> {location}
                   {d.message}
                 </span>
               </li>

@@ -52,6 +52,49 @@ describe("checkNormalizationUniformity (FR-022)", () => {
     expect(findings[0]?.message).toContain(`e◌${ACUTE}`);
   });
 
+  it("caps composed and decomposed examples at 3 each, dropping the 4th distinct instance", () => {
+    const { ir } = parseKmn(
+      kmn([
+        '+ "a" > "é"',
+        '+ "b" > "à"',
+        '+ "c" > "ü"',
+        '+ "d" > "ñ"',
+        `+ "e" > "e${ACUTE}"`,
+        `+ "f" > "a${ACUTE}"`,
+        `+ "g" > "o${ACUTE}"`,
+        `+ "h" > "u${ACUTE}"`,
+      ]),
+    );
+    const findings = checkNormalizationUniformity(ir);
+    expect(findings).toHaveLength(1);
+    const message = findings[0]?.message ?? "";
+    expect(message).toContain("é");
+    expect(message).toContain("à");
+    expect(message).toContain("ü");
+    expect(message).not.toContain("ñ");
+    expect(message).toContain(`e◌${ACUTE}`);
+    expect(message).toContain(`a◌${ACUTE}`);
+    expect(message).toContain(`o◌${ACUTE}`);
+    expect(message).not.toContain(`u◌${ACUTE}`);
+  });
+
+  it("dedupes a recurring decomposed base+mark pair to a single example", () => {
+    const { ir } = parseKmn(
+      kmn([
+        '+ "a" > "é"',
+        `+ "b" > "e${ACUTE}"`,
+        `+ "c" > "e${ACUTE}"`,
+        `+ "d" > "e${ACUTE}"`,
+      ]),
+    );
+    const findings = checkNormalizationUniformity(ir);
+    expect(findings).toHaveLength(1);
+    const message = findings[0]?.message ?? "";
+    const pair = `e◌${ACUTE}`;
+    const occurrences = message.split(pair).length - 1;
+    expect(occurrences).toBe(1);
+  });
+
   it("counts non-system store contents (stores feed outputs via index/outs)", () => {
     const { ir } = parseKmn(
       [

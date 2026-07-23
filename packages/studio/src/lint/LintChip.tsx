@@ -11,13 +11,11 @@
 // untouched.
 
 import { useState, useId } from "react";
+import { Trans } from "@lingui/react/macro";
 import type { LintFinding } from "@keyboard-studio/contracts";
 import { dispatchNavigateTo } from "./events";
 import { SEVERITY_COLORS } from "./colors";
-
-/** Neutral foreground used for warning-severity findings (matches the
- *  message text colour below — no separate "warning colour" exists). */
-const WARNING_NEUTRAL_COLOR = "#e6edf3";
+import { TEXT_MAIN } from "../ui/theme.ts";
 
 /** Warning glyph shown before "Warning: <message>" for warning findings. */
 const WARNING_GLYPH = "⚠";
@@ -37,7 +35,7 @@ export function LintChip({ finding }: LintChipProps) {
   const hintId = useId();
 
   const isWarning = finding.severity === "warning";
-  const severityColor = isWarning ? WARNING_NEUTRAL_COLOR : SEVERITY_COLORS[finding.severity];
+  const severityColor = isWarning ? TEXT_MAIN : SEVERITY_COLORS[finding.severity];
   const isUpstream = finding.origin === "upstream";
 
   function handleChipClick() {
@@ -121,7 +119,7 @@ export function LintChip({ finding }: LintChipProps) {
           style={{
             flexGrow: 1,
             fontSize: 12,
-            color: "#e6edf3",
+            color: TEXT_MAIN,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
@@ -131,7 +129,9 @@ export function LintChip({ finding }: LintChipProps) {
           {isWarning && (
             <>
               <span aria-hidden="true">{WARNING_GLYPH}</span>{" "}
-              <span>Warning:</span>{" "}
+              <span>
+                <Trans id="common.warningLabel">Warning:</Trans>
+              </span>{" "}
             </>
           )}
           <span>{truncate(finding.message, 60)}</span>
