@@ -626,9 +626,14 @@ describe("US1 — whole-text capture (spec 047)", () => {
       fireEvent.click(screen.getByRole("button", { name: /\+ Add/i }));
     });
     const { chars } = usePhaseBDraftStore.getState();
-    for (const ch of ["N", "a", "ï", "v", "e", "?", "Y", "s", "—", "3", "t", "i", "m", "."]) {
+    // Entered uppercase (N, Y) is folded to lowercase in the alphabet — we never
+    // store a capital without its lowercase (both cases reach the IR on Done).
+    for (const ch of ["n", "a", "ï", "v", "e", "?", "y", "s", "—", "3", "t", "i", "m", "."]) {
       expect(chars).toContain(ch);
     }
+    // The uppercase forms themselves are not stored (folded to lowercase).
+    expect(chars).not.toContain("N");
+    expect(chars).not.toContain("Y");
     // Ordinary space is never captured (SC-006).
     expect(chars).not.toContain(" ");
   });
@@ -854,6 +859,51 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
     expect(group.textContent).toContain("[+" + "́" + "]"); // [+ COMBINING ACUTE ]
     const chipBtn = group.querySelector("button[title='U+018F U+0301']");
     expect(chipBtn).not.toBeNull();
+  });
+
+  it("folds an entered uppercase to lowercase in the UI, recording both cases on Done (no capital without a lowercase)", async () => {
+    const onComplete = vi.fn<[SurveyPhaseResult], void>();
+    await renderBuildListView({ bcp47_tag: "en" }, onComplete);
+    const input = screen.getByRole("textbox", { name: /Character to add/i });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "Q" } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /\+ Add/i }));
+    });
+    // The UI shows the lowercase q, never a capital-without-lowercase.
+    const groupText = screen.getByRole("group", { name: /Accumulated characters/i }).textContent ?? "";
+    expect(groupText).toContain("U+0071"); // q
+    expect(groupText).not.toContain("U+0051"); // Q not shown
+    expect(usePhaseBDraftStore.getState().chars).toEqual(["q"]);
+    // Both cases still reach the recorded IR on Done.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Done/i }));
+    });
+    const inv = onComplete.mock.calls[0]![0].confirmedInventory ?? [];
+    expect(inv).toContain("q");
+    expect(inv).toContain("Q");
+  });
+
+  it("keeps a lowercase letter that has no uppercase counterpart, forcing no uppercase (IPA)", async () => {
+    // U+0138 LATIN SMALL LETTER KRA is \p{Ll} but has no uppercase mapping —
+    // exactly the "lowercase without a corresponding uppercase" IPA case.
+    const onComplete = vi.fn<[SurveyPhaseResult], void>();
+    await renderBuildListView({ bcp47_tag: "en" }, onComplete);
+    const input = screen.getByRole("textbox", { name: /Character to add/i });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "ĸ" } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /\+ Add/i }));
+    });
+    // Kept as entered (not folded away, no synthesized uppercase in the UI).
+    expect(usePhaseBDraftStore.getState().chars).toEqual(["ĸ"]);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Done/i }));
+    });
+    // No uppercase counterpart is forced into the recorded inventory.
+    expect(onComplete.mock.calls[0]![0].confirmedInventory).toEqual(["ĸ"]);
   });
 
   it("'Your alphabet' collapses letters to lowercase with the toggle off, reveals uppercases when on", async () => {
