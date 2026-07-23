@@ -373,6 +373,10 @@ export function CharacterMapPane({
       setRawError(null);
       return;
     }
+    // NOTE: the raw code-point field is a deliberate "add ANY exact character"
+    // power tool — it does NOT fold uppercase to lowercase (unlike the main
+    // "Type your alphabet" box), so an author can still reach a specific scalar
+    // value here when they mean it.
     addChar(char);
     const addedLabel = t({ id: "survey.characterMapPane.announce.added", message: "Added" });
     // Same bare-combining-mark concern as handleToggle's announcement — the

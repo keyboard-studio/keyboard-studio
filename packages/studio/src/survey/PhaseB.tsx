@@ -234,7 +234,16 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47 }: CharChipE
           unusual.map((u) => codepointLabel(u).title).join(", "),
       );
     }
-    onChange(nfcDedup(chars, harvested));
+    // We never store a capital without its lowercase: an entered uppercase cased
+    // letter is folded to its lowercase for the alphabet/UI (both cases still
+    // reach the recorded IR via the record-both-cases augmentation on Done).
+    // caseCounterpart(...).direction === "toLower" means the char is an
+    // uppercase letter with a lowercase counterpart.
+    const folded = harvested.map((c) => {
+      const cc = caseCounterpart(c, bcp47);
+      return cc?.direction === "toLower" ? cc.counterpart : c;
+    });
+    onChange(nfcDedup(chars, folded));
     setInputVal("");
     inputRef.current?.focus();
   }
