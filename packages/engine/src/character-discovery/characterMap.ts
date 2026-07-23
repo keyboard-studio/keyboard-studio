@@ -125,6 +125,18 @@ const COMMON_PUNCTUATION_RANGES: readonly BlockDef[] = [
 ];
 
 /**
+ * Spacing Modifier Letters (U+02B0..U+02FF): the Common-scoped block that
+ * COMMON_MODIFIER_LETTER_CHARS scans and CHARACTER_MAP_BLOCKS.Common labels.
+ * A single source of truth so the scanned range and the labelled range can
+ * never diverge (same rationale as COMMON_PUNCTUATION_RANGES above).
+ */
+const SPACING_MODIFIER_LETTERS_BLOCK: BlockDef = {
+  name: "Spacing Modifier Letters",
+  start: 0x02b0,
+  end: 0x02ff,
+};
+
+/**
  * SEPARATE from cldr.ts's SCRIPT_BLOCKS (which stays a single coarse range
  * per script, calibrated for pickerCandidates()). This table is a NAME
  * OVERLAY for the character-map "browse everything in the script" tiers: it
@@ -238,7 +250,7 @@ export const CHARACTER_MAP_BLOCKS: Record<string, BlockDef[]> = {
   // label time instead of falling through to the generic per-tier label.
   Common: [
     ...COMMON_PUNCTUATION_RANGES,
-    { name: "Spacing Modifier Letters", start: 0x02b0, end: 0x02ff },
+    SPACING_MODIFIER_LETTERS_BLOCK,
   ],
 };
 
@@ -652,7 +664,7 @@ const COMMON_PUNCTUATION_CHARS: readonly string[] = (() => {
  */
 const COMMON_MODIFIER_LETTER_CHARS: readonly string[] = (() => {
   const out: string[] = [];
-  for (let cp = 0x02b0; cp <= 0x02ff; cp++) {
+  for (let cp = SPACING_MODIFIER_LETTERS_BLOCK.start; cp <= SPACING_MODIFIER_LETTERS_BLOCK.end; cp++) {
     const ch = String.fromCodePoint(cp);
     if (isGuardrailExcluded(ch)) continue;
     if (!/\p{Script_Extensions=Common}/u.test(ch)) continue;
