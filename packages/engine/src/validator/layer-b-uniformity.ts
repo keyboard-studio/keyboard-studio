@@ -25,9 +25,18 @@ export const MARK_NORMALIZATION_UNIFORM_CODE = "KM_LINT_MARK_NORMALIZATION_UNIFO
 // only) — enclosing marks (Me) count as mark-bearing output here too.
 const COMBINING_MARK = /^\p{M}$/u;
 
+// Standard Unicode convention for showing a combining mark in isolation:
+// U+25CC DOTTED CIRCLE as the visible base. Used only in decomposed example
+// rendering so it stays visually distinct from a composed precomposed char
+// (without it, "e" + U+0301 and the precomposed "é" render identically).
+const DOTTED_CIRCLE = "◌";
+
 function isCombining(ch: string): boolean {
   return COMBINING_MARK.test(ch);
 }
+
+/** Cap on example characters collected per form (composed / decomposed). */
+const MAX_EXAMPLES_PER_FORM = 3;
 
 interface FormEvidence {
   /** Occurrences of a precomposed mark-bearing character (NFD splits it). */
@@ -38,6 +47,21 @@ interface FormEvidence {
   composedLine?: number;
   /** First source line carrying decomposed evidence, if known. */
   decomposedLine?: number;
+  /** First-seen, deduped precomposed characters, e.g. "é" — capped. */
+  composedExamples: string[];
+  /**
+   * First-seen, deduped base+mark examples, rendered as base + U+25CC
+   * (dotted circle) + the combining mark — e.g. "e" + U+0301 renders as
+   * "e◌́" — so it stays visually distinct from a composed "é". Capped.
+   */
+  decomposedExamples: string[];
+}
+
+/** Push `value` onto `examples` if not already present and under the cap. */
+function addExample(examples: string[], value: string): void {
+  if (examples.length >= MAX_EXAMPLES_PER_FORM) return;
+  if (examples.includes(value)) return;
+  examples.push(value);
 }
 
 /**
@@ -60,6 +84,7 @@ function classifyRun(run: string, evidence: FormEvidence, sourceLine?: number): 
         if (evidence.decomposedLine === undefined && sourceLine !== undefined) {
           evidence.decomposedLine = sourceLine;
         }
+        addExample(evidence.decomposedExamples, prev + DOTTED_CIRCLE + ch);
       }
       continue;
     }
@@ -68,6 +93,7 @@ function classifyRun(run: string, evidence: FormEvidence, sourceLine?: number): 
       if (evidence.composedLine === undefined && sourceLine !== undefined) {
         evidence.composedLine = sourceLine;
       }
+      addExample(evidence.composedExamples, ch);
     }
   }
 }
@@ -80,7 +106,12 @@ function classifyRun(run: string, evidence: FormEvidence, sourceLine?: number): 
  * mark-free keyboard yields no findings.
  */
 export function checkNormalizationUniformity(ir: KeyboardIR): LintFinding[] {
-  const evidence: FormEvidence = { composed: 0, decomposed: 0 };
+  const evidence: FormEvidence = {
+    composed: 0,
+    decomposed: 0,
+    composedExamples: [],
+    decomposedExamples: [],
+  };
 
   for (const group of ir.groups) {
     for (const rule of group.rules) {
@@ -114,20 +145,19 @@ export function checkNormalizationUniformity(ir: KeyboardIR): LintFinding[] {
   if (evidence.composed === 0 || evidence.decomposed === 0) return [];
 
   const line = evidence.decomposedLine ?? evidence.composedLine;
+  const examples = [...evidence.composedExamples, ...evidence.decomposedExamples];
   return [
     {
       code: MARK_NORMALIZATION_UNIFORM_CODE,
       severity: "warning",
       layer: "B",
       message:
-        `Mark-bearing output mixes forms: ${evidence.composed} ready-made ` +
-        `character${evidence.composed === 1 ? "" : "s"} and ${evidence.decomposed} ` +
-        `letter-plus-mark sequence${evidence.decomposed === 1 ? "" : "s"}. ` +
-        `A keyboard should produce all its accented letters one way or the other, ` +
-        `so search and backspace behave the same for every letter.`,
-      hint:
-        "Pick one output form for the whole keyboard (the marks step proposes one) " +
-        "and convert the outliers.",
+        "Some letters with accents, like é, can be typed two different ways on your " +
+        "keyboard. They look the same on screen, but the computer stores them differently " +
+        "underneath. That means searching for text might not find it, and pressing " +
+        "Backspace might delete more or less than you expect. Try to make your keyboard " +
+        "type each letter the same way every time. For example: " +
+        `${examples.join(", ")}.`,
       ...(line !== undefined
         ? { location: { file: "", line, column: 1 } }
         : {}),

@@ -7,6 +7,7 @@ import { plural } from "@lingui/core/macro";
 import type { LintFinding, LintSeverity } from "@keyboard-studio/contracts";
 import { LintChip } from "./LintChip";
 import { SEVERITY_COLORS, SEVERITY_ORDER } from "./colors";
+import { TEXT_MAIN } from "../ui/theme.ts";
 
 export interface LintSummaryProps {
   findings: LintFinding[];
@@ -132,7 +133,11 @@ export function LintSummary({ findings }: LintSummaryProps) {
                     gap: 4,
                     fontSize: 12,
                     fontWeight: 600,
-                    color: SEVERITY_COLORS[severity],
+                    // "warning" is deliberately excluded from the colour
+                    // treatment — it renders in the panel's default
+                    // foreground so the badge reads as a calm count, not
+                    // an alarm. fatal/error/hint/info keep their colours.
+                    color: severity === "warning" ? TEXT_MAIN : SEVERITY_COLORS[severity],
                   }}
                 >
                   {labelFor(severity, count)}
