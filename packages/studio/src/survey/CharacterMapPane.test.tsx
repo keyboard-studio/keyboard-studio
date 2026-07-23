@@ -549,7 +549,7 @@ describe("CharacterMapPane — digits & punctuation tiers", () => {
   });
 });
 
-// The three "Search in:" checkboxes live inside the "Search filters"
+// The three "Search by:" checkboxes live inside the "Search filters"
 // disclosure (closed by default) — open it before interacting with any of
 // them, mirroring how a real user would reach the panel.
 function openSearchFilters(): void {
@@ -867,7 +867,7 @@ describe("CharacterMapPane — search filter", () => {
 
   // -------------------------------------------------------------------------
   // "Search filters" disclosure (TASK 2) — dropdown trigger + popover replacing
-  // the always-visible "Search in:" row.
+  // the always-visible "Search by:" row.
   // -------------------------------------------------------------------------
 
   it("the filter checkboxes are not present until the 'Search filters' trigger is opened", async () => {
@@ -885,7 +885,7 @@ describe("CharacterMapPane — search filter", () => {
     fireEvent.click(trigger);
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByLabelText("Search by character")).toBeTruthy();
-    const panel = screen.getByRole("group", { name: "Search in:" });
+    const panel = screen.getByRole("group", { name: "Search by:" });
     expect(trigger.getAttribute("aria-controls")).toBe(panel.getAttribute("id"));
   });
 

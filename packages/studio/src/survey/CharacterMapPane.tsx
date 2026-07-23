@@ -205,7 +205,7 @@ export function CharacterMapPane({
 
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [query, setQuery] = useState("");
-  // "Search in:" field filters for the search box above — all-true by
+  // "Search by:" field filters for the search box above — all-true by
   // default (search every field). Deliberately independent of `blocksOnly`
   // below: these narrow WHICH FIELDS a query matches against, not which
   // groups are in scope. See characterSearch.ts's SearchFilters doc comment
@@ -493,7 +493,7 @@ export function CharacterMapPane({
     );
   }
 
-  // Toggles one of the "Search in:" field filters — reuses the existing
+  // Toggles one of the "Search by:" field filters — reuses the existing
   // announcement live region, same as handleToggleBlocksOnly, rather than
   // adding a second one.
   //
@@ -718,7 +718,7 @@ export function CharacterMapPane({
               role="group"
               aria-label={t({
                 id: "survey.characterMapPane.searchFilter.label",
-                message: "Search in:",
+                message: "Search by:",
               })}
               onKeyDown={handleFiltersKeyDown}
               style={{
@@ -741,7 +741,7 @@ export function CharacterMapPane({
               }}
             >
               <span style={{ fontWeight: 600 }}>
-                <Trans id="survey.characterMapPane.searchFilter.label">Search in:</Trans>
+                <Trans id="survey.characterMapPane.searchFilter.label">Search by:</Trans>
               </span>
               <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <Checkbox

@@ -1,7 +1,7 @@
 // Unit tests for characterSearch.ts's matchesQuery — the four search modes
 // (glyph / codepoint / name / base-letter) independent of CharacterMapPane's
 // rendering, plus the empty-query no-match contract, and the SearchFilters
-// gating (search box's "Search in:" checkboxes).
+// gating (search box's "Search by:" checkboxes).
 
 import { describe, it, expect } from "vitest";
 import { matchesQuery, type SearchFilters } from "./characterSearch.ts";

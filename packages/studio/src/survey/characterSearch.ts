@@ -38,7 +38,7 @@ import { toUPlusNotation } from "@keyboard-studio/contracts";
 
 /**
  * Which fields a search query is matched against. Maps 1:1 onto the pane's
- * three "Search in:" checkboxes. All-false is a valid (if useless) state —
+ * three "Search by:" checkboxes. All-false is a valid (if useless) state —
  * matchesQuery returns false for every cell rather than silently falling
  * back to "search everything".
  */
