@@ -487,16 +487,15 @@ describe("criteria.json schema conformance", () => {
     const section18 = records.filter((c) =>
       c.section.startsWith("18.")
     );
-    // 12 at Day-1 lock + the spec-046 mark-normalization uniformity row.
-    expect(section18.length).toBe(13);
+    // 12 at Day-1 lock.
+    expect(section18.length).toBe(12);
     section18.forEach((c) => {
       expect(validPrinciples, `${c.id}.principle`).toContain(c.principle);
     });
-    // The seven auto-checkable heuristics + the spec-046 uniformity row
-    // are layer-c-enforce.
+    // The seven auto-checkable heuristics are layer-c-enforce.
     expect(
       section18.filter((c) => c.band === "layer-c-enforce").length
-    ).toBe(8);
+    ).toBe(7);
   });
 
   it("every principle-tagged record uses a valid DiscusPrinciple value", () => {

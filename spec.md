@@ -659,7 +659,7 @@ The 133 criteria in `criteria.md` are classified into four enforcement bands per
 | yellow-survey | 32 | "BCP47 tag is correct for the language/script" — requires langtags.json lookup and linguistic judgment | Phase A survey asks for the tag; studio cross-checks against langtags.json and flags mismatches for user review. |
 | red-checklist | 10 | "If a third party submits a patch to an existing keyboard, original author was consulted" — requires direct author communication | Final checklist item in PR submission flow; PR body includes a reminder block. |
 
-**Total: 149 entries** (the 7.7a split adds 1 entry relative to the original 145-entry Day-1 catalog; the two section-19 import-output criteria add 2 more; the spec-046 mark-normalization uniformity row adds 1 more).
+**Total: 148 entries** (the 7.7a split adds 1 entry relative to the original 145-entry Day-1 catalog; the two section-19 import-output criteria add 2 more).
 
 Source-of-truth for the band assignments is `packages/contracts/data/criteria.json` (loadable via `import { ALL_CRITERIA } from "@keyboard-studio/contracts"` or the dedicated `/criteria` subpath). The Day-1 triage closed as issue #6.
 
