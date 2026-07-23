@@ -8,8 +8,12 @@
 // SPINE ORDER (FR-012, M2):
 //   Identity → choose base → Track → [project_name (spine:false)] →
 //   Characters (Phase A/B questions) → Marks → Carve → Mechanisms → [lock: "physical"] →
-//   Sequences → touch_seed_source (spine:false) → touch →
+//   touch_seed_source (spine:false) → touch →
 //   [lock: "touch"] → Help → Package (reserved)
+//
+// S-03 sequences build inline in MechanismGallery's method chooser (the
+// right-hand preview pane swaps for a one-character sequence builder while
+// that method is selected) — there is no separate "sequences" spine step.
 //
 // Side-trail steps (spine:false) in position order:
 //   project_name — copy-track only; joinTarget: "characters"
@@ -29,7 +33,6 @@ import {
   projectNameStep,
   carveStep,
   mechanismsStep,
-  sequencesStep,
   touchSeedSourceStep,
   touchStep,
   helpStep,
@@ -82,7 +85,7 @@ const charactersStep: Step = {
 //
 // Rules encoded here:
 //   M2 — spine order: Identity → choose_base → track → Characters → Marks →
-//         Carve → Mechanisms → (lock physical) → Sequences → touch →
+//         Carve → Mechanisms → (lock physical) → touch →
 //         (lock touch) → Help → Package
 //   M3 — exactly one lock:"physical" and one lock:"touch", in that order.
 //   M4 — touch_seed_source is spine:false with joinTarget resolving to "touch".
@@ -138,13 +141,6 @@ export const manifest: readonly Step[] = [
     lock: "physical",
   } satisfies Step,
 
-  // --- Sequences (Phase C follow-on: multi-key sequences, S-03) ---
-  // S-03 sequences move out of the Mechanism Gallery's method chooser into
-  // their own dedicated Sequence Gallery: it cycles the characters flagged
-  // for sequences and records a real multi_char_sequence MechanismAssignment
-  // per character on Apply. No lock (only "physical" and "touch" locks exist, M3).
-  sequencesStep,
-
   // --- Touch seed source (off-spine fork, FR-013, M4) ---
   // spine:false — side trail that lets the author choose the touch seed.
   // joinTarget: "touch" — rejoins the spine at the touch carve+add step.
@@ -183,7 +179,7 @@ export function validateManifestShape(): void {
   // M2 — spine order.
   const expectedSpine = [
     "identity", "choose_base", "track", "characters",
-    "marks", "carve", "mechanisms", "sequences", "touch", "help", "package",
+    "marks", "carve", "mechanisms", "touch", "help", "package",
   ];
   for (let i = 0; i < expectedSpine.length; i++) {
     const expected = expectedSpine[i];
@@ -227,15 +223,15 @@ export function validateManifestShape(): void {
 
   // Layout guard (spec 028 Stage 5, T016): layout:"full" is LOAD-BEARING —
   // StepHost reads step.layout to select full-screen vs two-pane chrome (R4).
-  // EXACTLY {carve, mechanisms, sequences, touch} must declare layout:"full";
-  // all others must be "pane" or omit layout. A mismatched layout would
-  // silently change the chrome.
-  const FULL_LAYOUT_IDS = new Set(["carve", "mechanisms", "sequences", "touch"]);
+  // EXACTLY {carve, mechanisms, touch} must declare layout:"full"; all others
+  // must be "pane" or omit layout. A mismatched layout would silently change
+  // the chrome.
+  const FULL_LAYOUT_IDS = new Set(["carve", "mechanisms", "touch"]);
   for (const step of manifest) {
     if (step.layout === "full") {
       if (!FULL_LAYOUT_IDS.has(step.id)) {
         throw new Error(
-          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/mechanisms/sequences/touch may be full-screen (spec 024 Stage 0)`,
+          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/mechanisms/touch may be full-screen (spec 024 Stage 0)`,
         );
       }
     }

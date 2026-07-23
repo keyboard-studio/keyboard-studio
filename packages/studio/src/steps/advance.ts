@@ -34,7 +34,6 @@ type ActiveStepId =
   | "carve"
   | "marks"
   | "mechanisms"
-  | "sequences"
   | "touch_seed_source"
   | "touch"
   | "help"
@@ -209,15 +208,15 @@ export function advance(
       return { next: nextSpineStepAfter("carve") }; // mechanisms
 
     case "mechanisms":
-      return { next: nextSpineStepAfter("mechanisms") }; // sequences
-
-    case "sequences":
       // Spec 035 R4/R12: route into the off-spine seed-source fork — but only
       // when no valid choice is recorded yet. A remembered choice goes
-      // straight to "touch" so back-and-forth over mechanisms/sequences
-      // doesn't re-ask. nextSpineStepAfter("sequences") would skip the
-      // off-spine touch_seed_source step entirely, so the fork check happens
-      // here explicitly rather than delegating to nextSpineStepAfter.
+      // straight to "touch" so back-and-forth over mechanisms doesn't re-ask.
+      // nextSpineStepAfter("mechanisms") would skip the off-spine
+      // touch_seed_source step entirely, so the fork check happens here
+      // explicitly rather than delegating to nextSpineStepAfter. (S-03
+      // sequences now build inline in the Mechanism Gallery's method
+      // chooser — there is no separate "sequences" step to route through
+      // first; this fork check used to live on that step's completion.)
       return ctx.touchSeedSource === null
         ? { next: "touch_seed_source" }
         : { next: "touch" };
