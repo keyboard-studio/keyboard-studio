@@ -182,8 +182,40 @@ describe("buildCharacterMap", () => {
     expect(punctChars).toContain(".");
   });
 
-  it("CHARACTER_MAP_BLOCKS is a separate table scoped to Latn/Cyrl/Arab/Deva", () => {
-    expect(Object.keys(CHARACTER_MAP_BLOCKS).sort()).toEqual(["Arab", "Cyrl", "Deva", "Latn"]);
+  it("CHARACTER_MAP_BLOCKS carries every CURATED_SCRIPTS member except Syrc, plus Common", () => {
+    // Was scoped to just Latn/Cyrl/Arab/Deva; now every CURATED_SCRIPTS
+    // script gets its primary block (Syrc excepted) plus a "Common" entry
+    // for the script-neutral folds (see blockNameFor/COMMON_PUNCTUATION_RANGES).
+    expect(Object.keys(CHARACTER_MAP_BLOCKS).sort()).toEqual([
+      "Adlm",
+      "Arab",
+      "Armn",
+      "Beng",
+      "Cher",
+      "Common",
+      "Cyrl",
+      "Deva",
+      "Ethi",
+      "Geor",
+      "Grek",
+      "Hebr",
+      "Hira",
+      "Kana",
+      "Khmr",
+      "Knda",
+      "Laoo",
+      "Latn",
+      "Mlym",
+      "Mymr",
+      "Nkoo",
+      "Sinh",
+      "Taml",
+      "Telu",
+      "Thaa",
+      "Thai",
+      "Tibt",
+      "Yiii",
+    ]);
   });
 
   it("Cyrl enumeration surfaces the combining acute in the block tier, tagged 'Cyrl' (the gathering script), not 'Inherited'", async () => {
@@ -222,15 +254,15 @@ describe("buildCharacterMap", () => {
     expect(chars).toContain("a");
   });
 
-  it("Ethiopic (Ethi) block tier yields letters even with no curated CHARACTER_MAP_BLOCKS entry", async () => {
-    // Ethi is absent from CHARACTER_MAP_BLOCKS entirely — full-script
-    // enumeration must still produce letters via Script_Extensions.
+  it("Ethiopic (Ethi) block tier yields letters under the curated 'Ethiopic' block name", async () => {
+    // Ethi now has a curated primary-block entry in CHARACTER_MAP_BLOCKS
+    // (U+1200-137F "Ethiopic") — updated from the pre-fix generic "Letters"
+    // fallback the script used to collapse to.
     const groups = await buildCharacterMap(makeIR(), "xx-Ethi", undefined, { loader: async () => null });
     const blockChars = groups.filter((g) => g.tier === "block").flatMap((g) => g.cells.map((c) => c.char));
     expect(blockChars).toContain("ሀ"); // U+1200 ETHIOPIC SYLLABLE HA
-    // No curated block name for Ethi, so it groups under the generic tier label.
     const blockNames = groups.filter((g) => g.tier === "block").map((g) => g.block);
-    expect(blockNames).toContain("Letters");
+    expect(blockNames).toContain("Ethiopic");
   });
 
   it("Ethiopic digits tier surfaces \\p{No} numerals (not \\p{Nd})", async () => {
@@ -604,5 +636,67 @@ describe("buildCharacterMap", () => {
     const { loadCharNames } = await import("./charNames.js");
     const names = await loadCharNames();
     expect(names.get(0x30000)).toBeUndefined();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Block/category labelling — locks the CLASS of fix (curated primary
+  // blocks for every uncurated CURATED_SCRIPTS member, plus the mark-aware
+  // "Combining marks" fallback), not just one instance.
+  // ---------------------------------------------------------------------------
+
+  describe.each([
+    ["Grek", "xx-Grek", "α", "Greek and Coptic"], // U+03B1 GREEK SMALL LETTER ALPHA
+    ["Armn", "xx-Armn", "ա", "Armenian"], // U+0561 ARMENIAN SMALL LETTER AYB
+    ["Geor", "xx-Geor", "ა", "Georgian"], // U+10D0 GEORGIAN LETTER AN
+    ["Hebr", "xx-Hebr", "א", "Hebrew"], // U+05D0 HEBREW LETTER ALEF
+    ["Thaa", "xx-Thaa", "ހ", "Thaana"], // U+0780 THAANA LETTER HAA
+    ["Nkoo", "xx-Nkoo", "ߊ", "NKo"], // U+07CA NKO LETTER A
+    ["Adlm", "xx-Adlm", "𞤀", "Adlam"], // U+1E900 ADLAM CAPITAL LETTER ALIF
+    ["Cher", "xx-Cher", "Ꭰ", "Cherokee"], // U+13A0 CHEROKEE LETTER A
+    ["Beng", "xx-Beng", "ক", "Bengali"], // U+0995 BENGALI LETTER KA
+    ["Taml", "xx-Taml", "க", "Tamil"], // U+0B95 TAMIL LETTER KA
+    ["Telu", "xx-Telu", "క", "Telugu"], // U+0C15 TELUGU LETTER KA
+    ["Knda", "xx-Knda", "ಕ", "Kannada"], // U+0C95 KANNADA LETTER KA
+    ["Mlym", "xx-Mlym", "ക", "Malayalam"], // U+0D15 MALAYALAM LETTER KA
+    ["Sinh", "xx-Sinh", "අ", "Sinhala"], // U+0D85 SINHALA LETTER AYANNA
+    ["Thai", "xx-Thai", "ก", "Thai"], // U+0E01 THAI CHARACTER KO KAI
+    ["Laoo", "xx-Laoo", "ກ", "Lao"], // U+0E81 LAO LETTER KO
+    ["Mymr", "xx-Mymr", "က", "Myanmar"], // U+1000 MYANMAR LETTER KA
+    ["Khmr", "xx-Khmr", "ក", "Khmer"], // U+1780 KHMER LETTER KA
+    ["Tibt", "xx-Tibt", "ཀ", "Tibetan"], // U+0F40 TIBETAN LETTER KA
+    ["Ethi", "xx-Ethi", "ሀ", "Ethiopic"], // U+1200 ETHIOPIC SYLLABLE HA
+    ["Hira", "xx-Hira", "あ", "Hiragana"], // U+3042 HIRAGANA LETTER A
+    ["Kana", "xx-Kana", "ア", "Katakana"], // U+30A2 KATAKANA LETTER A
+    ["Yiii", "xx-Yiii", "ꀀ", "Yi Syllables"], // U+A000 YI SYLLABLE IT
+  ])(
+    "previously-uncurated script %s",
+    (_script, bcp47, sampleChar, expectedBlockName) => {
+      it(`block tier groups ${sampleChar} under the curated '${expectedBlockName}' name, not a generic fallback`, async () => {
+        const groups = await buildCharacterMap(makeIR(), bcp47, undefined, { loader: async () => null });
+        const group = groups.find(
+          (g) => g.tier === "block" && g.cells.some((c) => c.char === sampleChar),
+        );
+        expect(group).toBeDefined();
+        expect(group?.block).toBe(expectedBlockName);
+      });
+    },
+  );
+
+  it("an uncurated script's combining mark (Syriac Pthaha, no CHARACTER_MAP_BLOCKS entry for Syrc) is labelled 'Combining marks', never 'Letters' or the unrelated 'Combining Diacritical Marks' block name", async () => {
+    // Syrc is a CURATED_SCRIPTS member with NO curated primary-block entry
+    // (deliberately left out — see the audit). U+0730 SYRIAC PTHAHA ABOVE is
+    // Mn and its Script_Extensions includes Syrc, so with "xx-Syrc" resolving
+    // the target script, Syrc's own categorizeScriptChars() call is the first
+    // to gather it and it falls through blockNameFor's curated-range loop.
+    const groups = await buildCharacterMap(makeIR(), "xx-Syrc", undefined, { loader: async () => null });
+    const mark = groups
+      .filter((g) => g.tier === "block")
+      .flatMap((g) => g.cells.map((c) => ({ char: c.char, block: g.block, isCombiningMark: c.isCombiningMark })))
+      .find((c) => c.char === "ܰ");
+    expect(mark).toBeDefined();
+    expect(mark?.isCombiningMark).toBe(true);
+    expect(mark?.block).toBe("Combining marks");
+    expect(mark?.block).not.toBe("Letters");
+    expect(mark?.block).not.toBe("Combining Diacritical Marks");
   });
 });

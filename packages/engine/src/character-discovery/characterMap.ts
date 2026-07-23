@@ -103,6 +103,28 @@ interface BlockDef {
 }
 
 /**
+ * Codepoint ranges reused by TWO consumers: the Common-scoped
+ * punctuation/symbol tier scan below (COMMON_PUNCTUATION_CHARS) and the
+ * "Common" entry in CHARACTER_MAP_BLOCKS just below — a single source of
+ * truth so the ranges a "Common"-tagged char is actually scanned against and
+ * the block name it is labelled with never diverge. Basic Latin,
+ * Latin-1 Supplement, General Punctuation, and Currency Symbols.
+ * Deliberately NOT the full Script=Common set (which also covers dingbats/emoji/
+ * technical symbols) — that long tail stays reachable only via the UI's U+XXXX
+ * escape hatch. These are the ranges where ordinary punctuation (`.` `,` `?`
+ * `!` `(` `)` `"` `'` `-` `:` `;` etc.) and currency signs (`€` `₦` `₵` `₹` — all
+ * `Script=Common`, so no script's Script_Extensions enumeration would surface
+ * them) actually live; currency signs are ordinary orthographic characters for
+ * many target languages, not exotic symbols.
+ */
+const COMMON_PUNCTUATION_RANGES: readonly BlockDef[] = [
+  { name: "Basic Latin", start: 0x0020, end: 0x007e },
+  { name: "Latin-1 Supplement", start: 0x00a0, end: 0x00ff },
+  { name: "General Punctuation", start: 0x2000, end: 0x206f },
+  { name: "Currency Symbols", start: 0x20a0, end: 0x20cf },
+];
+
+/**
  * SEPARATE from cldr.ts's SCRIPT_BLOCKS (which stays a single coarse range
  * per script, calibrated for pickerCandidates()). This table is a NAME
  * OVERLAY for the character-map "browse everything in the script" tiers: it
@@ -110,13 +132,28 @@ interface BlockDef {
  * enumerates the full script via Script_Extensions for that), it only
  * supplies real human-readable section headers for the codepoint ranges it
  * covers. Scripts/codepoints with no entry here still get full coverage —
- * they fall back to a generic per-tier label (see TIER_FALLBACK_LABEL).
+ * they fall back to a generic per-tier label (see TIER_FALLBACK_LABEL), and
+ * for the block tier a combining mark falls back further to "Combining
+ * marks" before "Letters" (see blockNameFor).
  *
  * Ranges + names pinned against the Unicode block chart
  * (https://www.unicode.org/charts/, cross-checked against
- * https://www.unicode.org/Public/16.0.0/ucd/Blocks.txt). Entries are listed
- * in ascending start-codepoint order per script so the resulting groups come
- * out in a stable, human-sensible order.
+ * https://www.unicode.org/Public/16.0.0/ucd/Blocks.txt, the pinned copy of
+ * which lives at lib/ucd/Blocks.txt). Entries are listed in ascending
+ * start-codepoint order per script so the resulting groups come out in a
+ * stable, human-sensible order.
+ *
+ * "Common" and the 23 single-block script entries below (Grek..Yiii) close
+ * the gap where an entire uncurated script collapsed to the generic
+ * per-tier label — each gets its ONE primary Unicode block (not every
+ * extension block a script may touch) so its browse groups get a real
+ * section header. "Common" reuses COMMON_PUNCTUATION_RANGES (rather than
+ * re-listing the same four ranges a second time) plus the Spacing Modifier
+ * Letters block that COMMON_MODIFIER_LETTER_CHARS scans — this is the
+ * "Common" sentinel script tag that blockNameFor("Common", cp, tier)
+ * actually receives (see blockTierCandidates/digitsTierCandidates/
+ * punctuationTierCandidates, which tag every Common-scoped fold with the
+ * literal string "Common").
  */
 export const CHARACTER_MAP_BLOCKS: Record<string, BlockDef[]> = {
   // Latin is named comprehensively across every Latin-associated Unicode
@@ -166,6 +203,40 @@ export const CHARACTER_MAP_BLOCKS: Record<string, BlockDef[]> = {
   Deva: [
     { name: "Devanagari", start: 0x0900, end: 0x097f },
     { name: "Devanagari Extended", start: 0xa8e0, end: 0xa8ff },
+  ],
+  // Single primary block per script — closes the "zero curated entries"
+  // gap for these CURATED_SCRIPTS members (order follows CURATED_SCRIPTS).
+  Grek: [{ name: "Greek and Coptic", start: 0x0370, end: 0x03ff }],
+  Armn: [{ name: "Armenian", start: 0x0530, end: 0x058f }],
+  Geor: [{ name: "Georgian", start: 0x10a0, end: 0x10ff }],
+  Hebr: [{ name: "Hebrew", start: 0x0590, end: 0x05ff }],
+  Thaa: [{ name: "Thaana", start: 0x0780, end: 0x07bf }],
+  Nkoo: [{ name: "NKo", start: 0x07c0, end: 0x07ff }],
+  Adlm: [{ name: "Adlam", start: 0x1e900, end: 0x1e95f }],
+  Cher: [{ name: "Cherokee", start: 0x13a0, end: 0x13ff }],
+  Beng: [{ name: "Bengali", start: 0x0980, end: 0x09ff }],
+  Taml: [{ name: "Tamil", start: 0x0b80, end: 0x0bff }],
+  Telu: [{ name: "Telugu", start: 0x0c00, end: 0x0c7f }],
+  Knda: [{ name: "Kannada", start: 0x0c80, end: 0x0cff }],
+  Mlym: [{ name: "Malayalam", start: 0x0d00, end: 0x0d7f }],
+  Sinh: [{ name: "Sinhala", start: 0x0d80, end: 0x0dff }],
+  Thai: [{ name: "Thai", start: 0x0e00, end: 0x0e7f }],
+  Laoo: [{ name: "Lao", start: 0x0e80, end: 0x0eff }],
+  Mymr: [{ name: "Myanmar", start: 0x1000, end: 0x109f }],
+  Khmr: [{ name: "Khmer", start: 0x1780, end: 0x17ff }],
+  Tibt: [{ name: "Tibetan", start: 0x0f00, end: 0x0fff }],
+  Ethi: [{ name: "Ethiopic", start: 0x1200, end: 0x137f }],
+  Hira: [{ name: "Hiragana", start: 0x3040, end: 0x309f }],
+  Kana: [{ name: "Katakana", start: 0x30a0, end: 0x30ff }],
+  Yiii: [{ name: "Yi Syllables", start: 0xa000, end: 0xa48f }],
+  // "Common" sentinel: reuses COMMON_PUNCTUATION_RANGES (single source of
+  // truth with the punctuation-tier scan below) plus the Spacing Modifier
+  // Letters block that COMMON_MODIFIER_LETTER_CHARS scans, so the
+  // already-correct names those folds carry are actually consulted at
+  // label time instead of falling through to the generic per-tier label.
+  Common: [
+    ...COMMON_PUNCTUATION_RANGES,
+    { name: "Spacing Modifier Letters", start: 0x02b0, end: 0x02ff },
   ],
 };
 
@@ -324,6 +395,10 @@ function dedupeScripts(scripts: readonly string[]): string[] {
  * "main"/"auxiliary" keep the pre-existing "Other" fallback; the three
  * full-script tiers fall back to their own tier name so an uncurated script
  * still gets a sensible section header instead of a meaningless "Other".
+ * "Letters" is reserved for genuine leftover \p{L} in the block tier — an
+ * uncurated combining mark there gets the more specific "Combining marks"
+ * label instead (see blockNameFor), so it never sits under a "Letters"
+ * header.
  */
 const TIER_FALLBACK_LABEL: Record<CharacterMapTier, string> = {
   main: "Other",
@@ -336,13 +411,20 @@ const TIER_FALLBACK_LABEL: Record<CharacterMapTier, string> = {
 /**
  * Human-readable block name for a codepoint, given the char's attributed
  * script bucket (an ISO 15924 code, or the "Common" sentinel) and the tier it
- * was found in. Prefers a curated CHARACTER_MAP_BLOCKS section name; falls
- * back to TIER_FALLBACK_LABEL otherwise. CHARACTER_MAP_BLOCKS has no "Common"
- * entries, so the universal script-neutral folds always fall through to the
- * generic label. Combining marks now bucket to whichever script's
- * Script_Extensions enumeration gathered them (e.g. Latn, Cyrl), so they DO
- * pick up the curated "Combining Diacritical Marks" section name where that
- * script's table carries one.
+ * was found in. Prefers a curated CHARACTER_MAP_BLOCKS section name (now
+ * including a "Common" entry and a primary block for every CURATED_SCRIPTS
+ * member except Syrc, so most scripts no longer fall through at all); falls
+ * back to TIER_FALLBACK_LABEL otherwise. For the block tier specifically, an
+ * UNCURATED combining mark (script/codepoint absent from
+ * CHARACTER_MAP_BLOCKS) gets the generic "Combining marks" label rather than
+ * "Letters" — deliberately NOT "Combining Diacritical Marks", which names one
+ * real Unicode block (U+0300-036F); reusing it for a mark from a different
+ * block (e.g. Tibetan U+0F71) would misname it. A curated range that already
+ * names a real combining-marks block for a script (e.g. Cyrl's "Combining
+ * Diacritical Marks" entry) still wins, since the range loop above runs
+ * first. Combining marks bucket to whichever script's Script_Extensions
+ * enumeration gathered them (e.g. Latn, Cyrl), so they DO pick up a curated
+ * section name where that script's table carries one.
  */
 function blockNameFor(script: string, cp: number, tier: CharacterMapTier): string {
   const defs = CHARACTER_MAP_BLOCKS[script];
@@ -351,6 +433,7 @@ function blockNameFor(script: string, cp: number, tier: CharacterMapTier): strin
       if (cp >= def.start && cp <= def.end) return def.name;
     }
   }
+  if (tier === "block" && isCombiningMarkChar(String.fromCodePoint(cp))) return "Combining marks";
   return TIER_FALLBACK_LABEL[tier];
 }
 
@@ -481,24 +564,6 @@ function categorizeScriptChars(script: string): ScriptCategorizedChars {
 const COMMON_DIGIT_CHARS: readonly string[] = Array.from({ length: 10 }, (_, i) =>
   String.fromCodePoint(0x30 + i),
 );
-
-/**
- * Codepoint ranges scanned for the Common-scoped punctuation/symbol tier:
- * Basic Latin, Latin-1 Supplement, General Punctuation, and Currency Symbols.
- * Deliberately NOT the full Script=Common set (which also covers dingbats/emoji/
- * technical symbols) — that long tail stays reachable only via the UI's U+XXXX
- * escape hatch. These are the ranges where ordinary punctuation (`.` `,` `?`
- * `!` `(` `)` `"` `'` `-` `:` `;` etc.) and currency signs (`€` `₦` `₵` `₹` — all
- * `Script=Common`, so no script's Script_Extensions enumeration would surface
- * them) actually live; currency signs are ordinary orthographic characters for
- * many target languages, not exotic symbols.
- */
-const COMMON_PUNCTUATION_RANGES: readonly BlockDef[] = [
-  { name: "Basic Latin", start: 0x0020, end: 0x007e },
-  { name: "Latin-1 Supplement", start: 0x00a0, end: 0x00ff },
-  { name: "General Punctuation", start: 0x2000, end: 0x206f },
-  { name: "Currency Symbols", start: 0x20a0, end: 0x20cf },
-];
 
 /**
  * Computed once at module load (a ~350-codepoint scan, not per-call): every
