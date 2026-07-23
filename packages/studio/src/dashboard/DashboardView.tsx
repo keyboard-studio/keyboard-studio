@@ -30,7 +30,7 @@ import {
   buildManifestProjection,
   attachDrillDowns,
 } from "./manifestProjection.ts";
-import { buildFlowSources, buildLibrarySection } from "./renderedNodeSet.ts";
+import { buildFlowSources, buildLibrarySection, buildLeftoverSection } from "./renderedNodeSet.ts";
 import { FlowGraphView } from "./FlowGraphView.tsx";
 import { StrategyTreeView } from "./StrategyTreeView.tsx";
 import { ScriptRoutingView } from "./ScriptRoutingView.tsx";
@@ -413,6 +413,9 @@ export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
   // reserve + "also live" dual-references. Derived from flowSources status:"proposed"
   // entries; excluded from the live rendered<->runtime bijection.
   const library = useMemo(() => buildLibrarySection(), []);
+  // Leftover — registered questions used by NO live flow: kept for reference /
+  // future reuse, shown in their own section so they never clog a live drill-down.
+  const leftover = useMemo(() => buildLeftoverSection(), []);
 
   // Spec 015 (DEC-001 = Variant A): project the manifest spine onto a FlowGraph
   // via the StepGraph → FlowGraph/GraphNode adapter, reusing FlowGraphView /
@@ -637,6 +640,51 @@ export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
                 </ul>
               )}
             </div>
+          </section>
+
+          {/* Leftover questions — registered but used by NO live flow. Kept for
+              reference / future reuse (spec-022 no-delete); never run by the live
+              survey and never rendered as reserve clog inside a live drill-down. */}
+          <section style={{ marginTop: 36, borderTop: "1px solid #21262d", paddingTop: 24 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4, flexWrap: "wrap" }}>
+              <h2 style={{ margin: 0, fontSize: 15, color: "#6e40c9" }}>
+                <Trans id="dashboard.leftover.heading">Leftover questions</Trans>
+              </h2>
+              <span style={{ fontSize: 11.5, color: "#6e7681", fontFamily: MONO }}>
+                {t({
+                  id: "dashboard.leftover.count",
+                  message: plural(leftover.length, {
+                    one: "# registered · used by no live flow",
+                    other: "# registered · used by no live flow",
+                  }),
+                })}
+              </span>
+            </div>
+            <p style={{ margin: "0 0 16px", fontSize: 12, color: "#6e7681", maxWidth: 920 }}>
+              <Trans id="dashboard.leftover.description">
+                Registered questions that no live flow currently uses — kept for reference and
+                possible reuse, never run by the live survey. Re-add an id to a live flow YAML to
+                bring it back (see{" "}
+                <code style={{ fontFamily: MONO }}>content/flows/README.md</code>).
+              </Trans>
+            </p>
+            {leftover.length === 0 ? (
+              <span style={{ color: "#3fb950", fontFamily: MONO, fontSize: 12 }}>
+                {"[OK] "}
+                <Trans id="dashboard.leftover.empty">
+                  Every registered question is used by a live flow.
+                </Trans>
+              </span>
+            ) : (
+              <ul style={{ margin: 0, padding: "0 0 0 16px", color: "#8b949e", fontFamily: MONO, fontSize: 12 }}>
+                {leftover.map((n) => (
+                  <li key={n.id}>
+                    {n.id}
+                    {n.label !== n.id && <span style={{ color: "#6e7681" }}> — {n.label}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
         </>
       )}

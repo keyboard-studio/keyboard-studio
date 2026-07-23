@@ -18,7 +18,6 @@ import pbPickerConfirmMod from "./b/pb_picker_confirm.ts";
 import pbRoutingBranchMod from "./b/pb_routing_branch.ts";
 import pbStandardLettersMod from "./b/pb_standard_letters.ts";
 import pbTypingApproachMod from "./b/pb_typing_approach.ts";
-import pbMarkInputOrderMod from "./b/pb_mark_input_order.ts";
 import pbSpecialLettersMod from "./b/pb_special_letters.ts";
 import pbSpecialLettersListMod from "./b/pb_special_letters_list.ts";
 import pbSpecialLettersNotesMod from "./b/pb_special_letters_notes.ts";
@@ -74,7 +73,6 @@ export const phaseBRegistry: Readonly<Record<string, QuestionModule>> = {
   pb_routing_branch: pbRoutingBranchMod,
   pb_standard_letters: pbStandardLettersMod,
   pb_typing_approach: pbTypingApproachMod,
-  pb_mark_input_order: pbMarkInputOrderMod,
   pb_special_letters: pbSpecialLettersMod,
   pb_special_letters_list: pbSpecialLettersListMod,
   pb_special_letters_notes: pbSpecialLettersNotesMod,

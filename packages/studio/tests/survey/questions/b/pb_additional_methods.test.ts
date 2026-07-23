@@ -13,14 +13,8 @@ describe("pb_additional_methods — definition", () => {
   });
 });
 
-describe("pb_additional_methods — fixtures (no validate)", () => {
+describe("pb_additional_methods — fixtures", () => {
   it("has no invalid fixtures", () => {
     expect(fixtures.invalid).toHaveLength(0);
   });
-  for (const { value, note } of fixtures.valid) {
-    it(`valid fixture: ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      // No validate() — optional question; confirm fixture data is present.
-      expect(true).toBe(true);
-    });
-  }
 });

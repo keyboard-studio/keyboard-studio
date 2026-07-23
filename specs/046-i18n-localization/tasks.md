@@ -41,7 +41,7 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 - [x] T007 `I18nProvider` ownership in [StudioShell.tsx](../../packages/studio/src/StudioShell.tsx) (covers app + direct-render tests)
 - [x] T008 Drift gate [utilities/i18n-catalog-lint/index.js](../../utilities/i18n-catalog-lint/index.js) + wired into `pnpm lint`
 - [x] T009 Establish the `area.component.thing` id-namespace convention ([contracts/catalog-format.md](contracts/catalog-format.md))
-- [ ] T010 Provision the Crowdin project; set `CROWDIN_PROJECT_ID` / `CROWDIN_PERSONAL_TOKEN` as CI secrets; verify `crowdin upload sources --dry-run -b main` (ops; blocks the live round-trip, not the code work) (#1253)
+- [x] T010 Provision the Crowdin project; set `CROWDIN_PROJECT_ID` / `CROWDIN_PERSONAL_TOKEN` as CI secrets; verify `crowdin upload sources --dryrun -b main` (ops; blocks the live round-trip, not the code work) (#1253)
 
 **Checkpoint**: Foundation ready — user-story chrome work can proceed.
 
@@ -56,7 +56,7 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 ### Tests for User Story 1
 
 - [x] T011 [P] [US1] LocaleSwitcher tests (render / persist / activate / `resolveInitialLocale`) — [LocaleSwitcher.test.tsx](../../packages/studio/src/components/LocaleSwitcher.test.tsx)
-- [ ] T012 [P] [US1] Acceptance check: a fully-translated area renders zero English chrome under `fr` (extend a converted-area test) (#1254)
+- [x] T012 [P] [US1] Acceptance check: a fully-translated area renders zero English chrome under `fr` (extend a converted-area test) (#1254)
 
 ### Implementation for User Story 1
 
@@ -68,9 +68,9 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 - [x] T018 [P] [US1] Convert dashboard chrome (`dashboard.*`) — `packages/studio/src/dashboard/*.tsx` (#1257)
 - [x] T019 [P] [US1] Localize `ui/` primitive user-facing strings + aria (`ui.*`) — `packages/studio/src/ui/*.tsx` (#1258)
 - [x] T020 [P] [US1] Convert remaining `components/` chrome (`preview.*`/`profile.*`/`account.*`) — PreviewScreen, ProfileScreen, AccountControl, OAuthCallbackScreen, etc. (#1259)
-- [ ] T021 [US1] Convert [lib/publishManagedPRErrorMessage.ts](../../packages/studio/src/lib/publishManagedPRErrorMessage.ts) error-copy (global `t` macro pattern) + fix its unit test (deferred from the Output area) (#1260)
-- [ ] T022 [US1] After each area: re-extract catalogs, keep the drift gate green, add illustrative `fr` for the demo — `pnpm --filter @keyboard-studio/studio messages:extract` (#1261)
-- [ ] T023 [US1] Crowdin Tier A first live `upload sources` (after T010) (#1262)
+- [x] T021 [US1] Convert [lib/publishManagedPRErrorMessage.ts](../../packages/studio/src/lib/publishManagedPRErrorMessage.ts) error-copy (global `t` macro pattern) + fix its unit test (deferred from the Output area) (#1260)
+- [x] T022 [US1] After each area: re-extract catalogs, keep the drift gate green, add illustrative `fr` for the demo — `pnpm --filter @keyboard-studio/studio messages:extract` (#1261)
+- [x] T023 [US1] Crowdin Tier A first live `upload sources` (after T010) (#1262)
 
 **Checkpoint**: Studio UI fully localizable; MVP demonstrable in `fr`.
 
@@ -108,17 +108,17 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 
 ### Tests for User Story 3
 
-- [ ] T032 [P] [US3] Region-resolution test (`pt-BR` → `pt` → `en`) for `lib/i18n.ts` (#1271)
-- [ ] T033 [P] [US3] Playwright E2E locale-switch walk in `packages/studio/e2e` (#1272)
+- [x] T032 [P] [US3] Region-resolution test (`pt-BR` → `pt` → `en`) for `lib/i18n.ts` (#1271)
+- [x] T033 [P] [US3] Playwright E2E locale-switch walk in `packages/studio/e2e` (#1272)
 
 ### Implementation for User Story 3
 
-- [ ] T034 [P] [US3] Region-specific locale resolution (`pt-BR` → `pt` → `en`) in [lib/i18n.ts](../../packages/studio/src/lib/i18n.ts) + switch to `%locale%` token in [crowdin.yml](../../crowdin.yml) (#1273)
-- [ ] T035 [P] [US3] ICU plural audit; convert count-dependent strings to the `plural` macro (#1274)
-- [ ] T036 [P] [US3] Add translator context (message comments / screenshots) for ambiguous ids (#1275)
-- [ ] T037 [US3] CI: `upload sources` on merge to `main` (`.github/workflows`) (#1276)
-- [ ] T038 [US3] CI: scheduled/webhook `download` → open a translations PR through the km-triage gate (#1277)
-- [ ] T039 [P] [US3] Remove the first-paint English flash: pre-resolve persisted/detected locale before initial render (#1278)
+- [x] T034 [P] [US3] Region-specific locale resolution (`pt-BR` → `pt` → `en`) in [lib/i18n.ts](../../packages/studio/src/lib/i18n.ts) + switch to `%locale%` token in [crowdin.yml](../../crowdin.yml) (#1273)
+- [x] T035 [P] [US3] ICU plural audit; convert count-dependent strings to the `plural` macro (#1274)
+- [x] T036 [P] [US3] Add translator context (message comments / screenshots) for ambiguous ids (#1275)
+- [x] T037 [US3] CI: `upload sources` on merge to `main` (`.github/workflows`) (#1276)
+- [x] T038 [US3] CI: scheduled/webhook `download` → open a translations PR through the km-triage gate (#1277)
+- [x] T039 [P] [US3] Remove the first-paint English flash: pre-resolve persisted/detected locale before initial render (#1278)
 
 **Checkpoint**: All stories independently functional; translation stays current with low toil.
 
@@ -126,9 +126,9 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T040 [P] Docs: keep [docs/i18n-spike.md](../../docs/i18n-spike.md) + this spec in sync; add the id-namespace convention to [CLAUDE.md](../../CLAUDE.md) Conventions (#1279)
-- [ ] T041 Run [quickstart.md](quickstart.md) validation end-to-end (#1280)
-- [ ] T042 [P] Completeness check (SC-004): adding a fully-translated locale requires zero code change (#1281)
+- [x] T040 [P] Docs: keep [docs/i18n-spike.md](../../docs/i18n-spike.md) + this spec in sync; add the id-namespace convention to [CLAUDE.md](../../CLAUDE.md) Conventions (#1279)
+- [x] T041 Run [quickstart.md](quickstart.md) validation end-to-end (#1280)
+- [x] T042 [P] Completeness check (SC-004): adding a fully-translated locale requires zero code change (#1281)
 
 ---
 

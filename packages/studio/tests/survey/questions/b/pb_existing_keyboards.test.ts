@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/b/pb_existing_keyboards.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/b/pb_existing_keyboards.ts";
 
 describe("pb_existing_keyboards — definition", () => {
   it("has correct id", () => {
@@ -16,13 +19,8 @@ describe("pb_existing_keyboards — definition", () => {
   });
 });
 
-describe("pb_existing_keyboards — fixtures (no validate)", () => {
+describe("pb_existing_keyboards — fixtures", () => {
   it("has no invalid fixtures", () => {
     expect(fixtures.invalid).toHaveLength(0);
   });
-  for (const { value, note } of fixtures.valid) {
-    it(`valid fixture: ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      expect(true).toBe(true);
-    });
-  }
 });
