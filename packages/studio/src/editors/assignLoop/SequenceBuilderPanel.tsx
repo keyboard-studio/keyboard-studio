@@ -223,6 +223,16 @@ export function SequenceBuilderPanel({
     if (!contentValue.ok || !indicatorValue.ok) return;
     if (charToVkey(indicatorValue.value) === null) return;
 
+    // `char` (== MechanismGallery's currentChar) is used directly as the
+    // sequence's collapsedChar/target with no per-method NFC guard here — it
+    // does not need one. mergePhaseResults (packages/contracts/src/surveySession.ts)
+    // NFC-normalizes every confirmedInventory entry before it ever reaches
+    // session state, so lettersToAdd (useInventoryDiff) and therefore
+    // currentChar are already NFC at the source. Every other method
+    // (swap/deadkey/ralt — MechanismGallery.tsx) also uses currentChar
+    // directly as `target` with no local normalize() call; this panel matches
+    // that pattern rather than re-adding a sequence-only guard the retired
+    // SequenceGallery.handleApply used to carry.
     const { mechs: existingMechs, rest } = partitionSequenceAssignment(sessionAssignments, char);
 
     // Dedup by (firstLetterOut, secondLetter) — an identical sequence is a
