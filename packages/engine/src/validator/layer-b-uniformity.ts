@@ -17,24 +17,15 @@
 // lintRuleId "KM_LINT_MARK_NORMALIZATION_UNIFORM" (contracts criteria.json).
 
 import type { KeyboardIR, LintFinding } from "@keyboard-studio/contracts";
+import { isCombiningMarkChar } from "../character-discovery/characterMap.js";
 
 export const MARK_NORMALIZATION_UNIFORM_CODE = "KM_LINT_MARK_NORMALIZATION_UNIFORM" as const;
-
-// Deliberately the WIDE Unicode mark class (\p{M} = Mn+Mc+Me, matching
-// codec/nfd-to-nfc.ts and characterMap's isCombiningMarkChar, which was
-// widened to the same \p{M} test) — enclosing marks (Me) count as
-// mark-bearing output here too.
-const COMBINING_MARK = /^\p{M}$/u;
 
 // Standard Unicode convention for showing a combining mark in isolation:
 // U+25CC DOTTED CIRCLE as the visible base. Used only in decomposed example
 // rendering so it stays visually distinct from a composed precomposed char
 // (without it, "e" + U+0301 and the precomposed "é" render identically).
 const DOTTED_CIRCLE = "◌";
-
-function isCombining(ch: string): boolean {
-  return COMBINING_MARK.test(ch);
-}
 
 /** Cap on example characters collected per form (composed / decomposed). */
 const MAX_EXAMPLES_PER_FORM = 3;
@@ -77,10 +68,10 @@ function classifyRun(run: string, evidence: FormEvidence, sourceLine?: number): 
   for (let i = 0; i < units.length; i++) {
     const ch = units[i];
     if (ch === undefined) continue;
-    if (isCombining(ch)) {
+    if (isCombiningMarkChar(ch)) {
       // A combining mark following a non-mark starter = a decomposed sequence.
       const prev = units[i - 1];
-      if (prev !== undefined && !isCombining(prev)) {
+      if (prev !== undefined && !isCombiningMarkChar(prev)) {
         evidence.decomposed++;
         if (evidence.decomposedLine === undefined && sourceLine !== undefined) {
           evidence.decomposedLine = sourceLine;
