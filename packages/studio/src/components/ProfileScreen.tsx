@@ -20,6 +20,7 @@ import {
 } from "../lib/galleryTheme.ts";
 import { ERROR_TEXT } from "../ui/theme.ts";
 import { GitHubMark, GoogleMark } from "./ProviderMarks.tsx";
+import { MyKeyboardsList } from "./MyKeyboardsList.tsx";
 
 // ---------------------------------------------------------------------------
 // Shared style helpers
@@ -126,20 +127,6 @@ const providerLabelStyle: React.CSSProperties = {
 const providerValueStyle: React.CSSProperties = {
   color: TEXT_MAIN,
   fontWeight: 700,
-};
-
-// "My keyboards" — a disabled, non-functional entry with a coming-soon caption.
-const myKeyboardsStyle: React.CSSProperties = {
-  ...columnButtonStyle,
-  opacity: 0.6,
-};
-
-const comingSoonStyle: React.CSSProperties = {
-  margin: "6px 0 0",
-  fontSize: 12,
-  color: TEXT_DIM,
-  fontFamily: FONT,
-  fontStyle: "italic",
 };
 
 const errorStyle: React.CSSProperties = {
@@ -309,21 +296,8 @@ export function ProfileScreen() {
           )}
         </div>
 
-        {/* My keyboards — non-functional placeholder */}
-        <div>
-          <button
-            type="button"
-            style={myKeyboardsStyle}
-            disabled
-          >
-            <span><Trans id="profile.myKeyboards.label">My keyboards</Trans></span>
-          </button>
-          <p style={comingSoonStyle}>
-            <Trans id="profile.myKeyboards.comingSoon">
-              Coming soon. It&rsquo;s non-functional.
-            </Trans>
-          </p>
-        </div>
+        {/* My keyboards — the multi-project draft list (US3a / FR-014). */}
+        <MyKeyboardsList />
       </div>
 
       {/* Bottom — back link, then the single global Sign out button */}
