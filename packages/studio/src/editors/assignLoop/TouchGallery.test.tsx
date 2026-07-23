@@ -880,6 +880,61 @@ describe("TouchGallery — character-scroll-strip navigation", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Producer-count badge (CharScrollStrip Part 2) — integration coverage.
+//
+// CharScrollStrip.test.tsx already unit-tests the badge in isolation. This
+// closes the gap that isolation leaves for the TOUCH modality specifically:
+// it proves the badge TouchGallery renders is wired to THIS gallery's real
+// `charTouchAssignments` (built from the author's own charTouch edits) and
+// the "touch" modality — not a constant, and not the desktop/physical count
+// leaking across. A swapped `assignments` array or wrong `modality` at the
+// TouchGallery -> CharScrollStrip call site would slip past
+// CharScrollStrip.test.tsx alone but must fail here.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — character-scroll-strip producer badge (integration)", () => {
+  it("the current char's badge starts RED at 0, then GREEN at 1 after a real touch Apply records the mechanism", async () => {
+    // "中" has no Phase C assignment and is not in the default touch layout —
+    // suggestion kind = "none" (see the "multiple methods per character" describe
+    // block), so the chooser shows directly with nothing to Accept/Deny first.
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const stripBefore = screen.getByTestId("char-scroll-strip");
+    const badgeBefore = within(stripBefore).getByTestId("char-scroll-badge-4E2D");
+    expect(badgeBefore.textContent).toBe("0");
+    expect(badgeBefore.style.color).toBe("rgb(248, 81, 73)"); // #f85149 — badge-bad color
+
+    // Drive the real touch Apply flow (long-press K_A, the chooser's default
+    // active method) — the same interaction the "multiple methods per
+    // character" describe block below uses to record into charTouch, so this
+    // test exercises the actual store write, not a hand-built assignment.
+    const hostKeySelect = screen.queryByRole("combobox", { name: /host key/i });
+    expect(hostKeySelect).not.toBeNull();
+    await act(async () => {
+      fireEvent.change(hostKeySelect!, { target: { value: "K_A" } });
+    });
+    const applyBtn = screen.queryAllByRole("button").find(
+      (b) => b.textContent?.trim() === "Apply method",
+    ) ?? null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    await waitFor(() => {
+      const badgeAfter = within(screen.getByTestId("char-scroll-strip")).getByTestId(
+        "char-scroll-badge-4E2D",
+      );
+      expect(badgeAfter.textContent).toBe("1");
+      expect(badgeAfter.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Skip — pure forward navigation; records nothing.
 // ---------------------------------------------------------------------------
 

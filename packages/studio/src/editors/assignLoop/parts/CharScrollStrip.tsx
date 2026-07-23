@@ -42,7 +42,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { MechanismAssignment, Modality } from "@keyboard-studio/contracts";
-import { toUPlusNotation } from "@keyboard-studio/contracts";
+import { toUPlusNotation, toHex4 } from "@keyboard-studio/contracts";
 import { displayChar } from "../../../lib/irToCarveNodes.ts";
 import { getCharMechanisms } from "./charMechanisms.ts";
 import {
@@ -66,15 +66,11 @@ export interface CharScrollStripProps {
   modality: Modality;
 }
 
-/** Hyphen-joined 4+-digit uppercase hex of EVERY codepoint in `char` — the chip/badge testid key (see file header). */
+/** Hyphen-joined 4+-digit uppercase hex of EVERY codepoint in `char` — the chip/badge testid key (see file header).
+ *  Shares the per-codepoint `toHex4` primitive with `toUPlusNotation`. */
 function charHex(char: string): string {
   return Array.from(char)
-    .map((codePoint) =>
-      (codePoint.codePointAt(0) ?? 0)
-        .toString(16)
-        .toUpperCase()
-        .padStart(4, "0"),
-    )
+    .map((codePoint) => toHex4(codePoint.codePointAt(0) ?? 0))
     .join("-");
 }
 

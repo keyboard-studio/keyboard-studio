@@ -22,9 +22,10 @@
 //   - Guards: null base → no-base prompt; empty inventory → survey prompt.
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { screen, fireEvent, act, cleanup, waitFor, within } from "@testing-library/react";
+import { screen, fireEvent, act, cleanup, waitFor, within, renderHook } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { MechanismGallery, PATTERN_SEQUENCE, PATTERN_DEADKEY } from "./MechanismGallery.tsx";
+import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { useWorkingCopyStore, bindManifest } from "../../stores/workingCopyStore.ts";
 import {
   MECHANISMS_STEP_ID,
@@ -1130,6 +1131,96 @@ describe("MechanismGallery — character-scroll-strip navigation", () => {
     fireEvent.click(screen.getByTestId("char-scroll-chip-00ED"));
     await waitFor(() => {
       expectCurrentChar("í");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// usePositionalCharNav.handleSelectChar — not-found no-op (the branch the
+// UI-level chip-click tests above can never reach, since CharScrollStrip
+// only ever offers chips drawn from the SAME `list` handleSelectChar checks
+// against). Exercised directly against the hook rather than through
+// MechanismGallery/TouchGallery — there is no dedicated
+// usePositionalCharNav.test.ts(x) file, so this lands beside the gallery
+// suite that most directly depends on handleSelectChar's contract (the
+// character-scroll-strip navigation tests immediately above).
+// ---------------------------------------------------------------------------
+
+describe("usePositionalCharNav — handleSelectChar not-found no-op", () => {
+  it("leaves currentChar/currentIdx genuinely unchanged when called with a character not in `list`", () => {
+    const list = ["á", "é", "í"] as const;
+    let currentChar: string | null = "é";
+    const setCurrentChar = vi.fn((c: string | null) => {
+      currentChar = c;
+    });
+
+    const { result } = renderHook(() =>
+      usePositionalCharNav({
+        list,
+        currentChar,
+        setCurrentChar,
+      }),
+    );
+
+    // Sitting on "é" (idx 1) before the no-op call.
+    expect(result.current.currentIdx).toBe(1);
+
+    act(() => {
+      result.current.handleSelectChar("z"); // not present in `list`
+    });
+
+    // The guard (`if (!list.includes(char)) return;`) must fire BEFORE
+    // setCurrentChar is invoked — asserting the setter was never called
+    // (rather than merely re-checking currentIdx, which could stay 1 by
+    // coincidence if setCurrentChar were called with the same value) is what
+    // makes this fail if the not-found guard is ever removed or the
+    // `!list.includes` check is inverted.
+    expect(setCurrentChar).not.toHaveBeenCalled();
+    // The external state this test's setter closure would have mutated is
+    // still exactly what it started as — the selection genuinely did not move.
+    expect(currentChar).toBe("é");
+    expect(result.current.currentIdx).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Producer-count badge (CharScrollStrip Part 2) — integration coverage.
+//
+// CharScrollStrip.test.tsx already unit-tests the badge in isolation (a
+// hand-built `assignments` prop). This closes the gap that isolation leaves:
+// it proves the badge MechanismGallery actually renders is wired to THIS
+// gallery's real store-backed `session.assignments` (via the same
+// `sessionAssignments` prop the "apply (deadkey)" describe block above
+// asserts against) and the "physical" modality — not a stray/constant array.
+// A swapped `assignments` array or wrong `modality` at the
+// MechanismGallery -> CharScrollStrip call site would slip past
+// CharScrollStrip.test.tsx alone but must fail here.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — character-scroll-strip producer badge (integration)", () => {
+  it("the current char's badge starts RED at 0, then GREEN at 1 after a real Apply records the assignment", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    const badgeBefore = within(strip).getByTestId("char-scroll-badge-00E1");
+    expect(badgeBefore.textContent).toBe("0");
+    expect(badgeBefore.style.color).toBe("rgb(248, 81, 73)"); // #f85149 — badge-bad color
+
+    // "á" defaults to the pre-enabled deadkey method (§3c) — apply directly,
+    // the same real Apply flow the "apply (deadkey)" describe block above
+    // drives, so this test exercises the actual store write
+    // (session.assignments), not a hand-built MechanismAssignment.
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+
+    await waitFor(() => {
+      const badgeAfter = within(screen.getByTestId("char-scroll-strip")).getByTestId(
+        "char-scroll-badge-00E1",
+      );
+      expect(badgeAfter.textContent).toBe("1");
+      expect(badgeAfter.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
     });
   });
 });

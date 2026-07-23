@@ -7,7 +7,24 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { isNoncharacterCodePoint, parseUPlusNotation } from "./charUtils.js";
+import { isNoncharacterCodePoint, parseUPlusNotation, toHex4, toUPlusNotation } from "./charUtils.js";
+
+describe("toHex4", () => {
+  it("pads a BMP codepoint to 4 uppercase hex digits", () => {
+    expect(toHex4(0x0041)).toBe("0041");
+    expect(toHex4(0x61)).toBe("0061"); // single hex digit still pads to 4
+  });
+
+  it("passes an astral codepoint through unpadded at 5-6 digits (the pad is a floor, not a fixed width)", () => {
+    expect(toHex4(0x1f600)).toBe("1F600"); // 5 digits
+    expect(toHex4(0x10ffff)).toBe("10FFFF"); // 6 digits, the Unicode maximum
+  });
+
+  it("backs toUPlusNotation's per-codepoint formatting — the two must agree, or CharScrollStrip's chip/badge testids and its visible U+ notation would drift apart", () => {
+    expect(toUPlusNotation("A")).toBe(`U+${toHex4(0x0041)}`);
+    expect(toUPlusNotation("\u{1F600}")).toBe(`U+${toHex4(0x1f600)}`);
+  });
+});
 
 describe("isNoncharacterCodePoint", () => {
   it.each([0xfffe, 0xffff, 0x1fffe, 0xfdd0, 0xfdef])(

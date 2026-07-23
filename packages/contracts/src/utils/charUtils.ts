@@ -18,11 +18,17 @@ export function stripUndefined<T extends object>(obj: T): T {
   ) as T;
 }
 
+/** Shared "4+-digit uppercase hex of a single codepoint" primitive — the pad
+ *  is a minimum, so 5-6 digit astral codepoints pass through unpadded. */
+export function toHex4(codePoint: number): string {
+  return codePoint.toString(16).toUpperCase().padStart(4, "0");
+}
+
 /** Converts the first code point of `char` to a `U+XXXX` string.
  *  Precondition: `char` is a non-empty string; only the first code point is used. */
 export function toUPlusNotation(char: string): string {
   const cp = char.codePointAt(0)!;
-  return "U+" + cp.toString(16).toUpperCase().padStart(4, "0");
+  return "U+" + toHex4(cp);
 }
 
 /** Returns true when `char` is an accented letter decomposable to base + combining mark
