@@ -856,6 +856,31 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
     expect(chipBtn).not.toBeNull();
   });
 
+  it("'Your alphabet' collapses letters to lowercase with the toggle off, reveals uppercases when on", async () => {
+    await renderBuildListView({});
+    act(() => {
+      usePhaseBDraftStore.getState().setAll(["a", "b", "c"]);
+    });
+    const groupText = () =>
+      screen.getByRole("group", { name: /Accumulated characters/i }).textContent ?? "";
+    expect(groupText()).toContain("U+0061"); // a shown
+    expect(groupText()).not.toContain("U+0041"); // A hidden by default
+    const toggle = screen.getByTestId("your-alphabet-uppercase-toggle");
+    await act(async () => {
+      fireEvent.click(toggle);
+    });
+    expect(groupText()).toContain("U+0041"); // A revealed (display-only)
+    expect(groupText()).toContain("U+0042"); // B
+  });
+
+  it("'Your alphabet' count is the collapsed lowercase-unit count (both cases present not double-counted)", async () => {
+    await renderBuildListView({});
+    act(() => {
+      usePhaseBDraftStore.getState().setAll(["a", "A", "b", "B"]);
+    });
+    expect(screen.getByText(/Your alphabet \(2\)/i)).toBeTruthy();
+  });
+
   it("FR-012 — a single-code-point grapheme still renders a plain U+XXXX label with no badge", async () => {
     await renderBuildListView({});
     act(() => {

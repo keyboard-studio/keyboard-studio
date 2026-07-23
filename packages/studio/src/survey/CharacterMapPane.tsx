@@ -27,7 +27,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
-import { isPrivateUseCodePoint } from "@keyboard-studio/engine";
+import { isPrivateUseCodePoint, caseCounterpart } from "@keyboard-studio/engine";
 import { isCombining, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { ALL_FILTERS, matchesQuery, type SearchFilters } from "./characterSearch.ts";
 import { TextField, Checkbox } from "../ui/index.ts";
@@ -351,6 +351,7 @@ export function CharacterMapPane({
     [loadState],
   );
 
+
   // Client-side filter — plain array filter, no timer of any kind. Search is
   // ALWAYS whole-set: when a query is present it searches every loaded group
   // regardless of the "blocks my keyboard uses" checkbox, so a query can
@@ -364,19 +365,31 @@ export function CharacterMapPane({
   // the checkbox stays checked.
   const filteredGroups = useMemo(() => {
     if (loadState.status !== "done") return [];
+    // Cased-script fold: drop uppercase letters that have a lowercase
+    // counterpart, so the map offers only the lowercase of each pair (spec 047
+    // refinement). The uppercase is still recorded on Done. usedByBase is
+    // preserved; a group whose cells were all uppercase drops out.
+    const cased = loadState.groups
+      .map((g) => ({
+        ...g,
+        cells: g.cells.filter(
+          (c) => caseCounterpart(c.char.normalize("NFC"), bcp47)?.direction !== "toLower",
+        ),
+      }))
+      .filter((g) => g.cells.length > 0);
     const q = query.trim();
     if (q !== "") {
-      return loadState.groups
+      return cased
         .map((g) => ({ ...g, cells: g.cells.filter((c) => matchesQuery(c, q, searchFilters)) }))
         .filter((g) => g.cells.length > 0);
     }
     if (blocksOnly && hasKnownBlocks) {
-      return loadState.groups.filter(
+      return cased.filter(
         (g) => g.usedByBase || g.cells.some((c) => chars.includes(c.char.normalize("NFC"))),
       );
     }
-    return loadState.groups;
-  }, [loadState, query, searchFilters, blocksOnly, hasKnownBlocks, chars]);
+    return cased;
+  }, [loadState, query, searchFilters, blocksOnly, hasKnownBlocks, chars, bcp47]);
 
   // Defined here (not at module scope) so its `t()` calls close over this
   // component's own `t` binding directly — see the note above CodepointParseResult.

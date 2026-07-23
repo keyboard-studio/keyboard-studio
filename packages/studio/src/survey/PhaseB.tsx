@@ -204,12 +204,15 @@ interface CharChipEditorProps {
   onChange: (next: string[]) => void;
   /** When true, auto-focus the input on mount. */
   autoFocus?: boolean;
+  /** BCP47 tag for locale-correct case-collapse of the letter chips (FR-008). */
+  bcp47?: string | undefined;
 }
 
-function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorProps) {
+function CharChipEditor({ chars, onChange, autoFocus = false, bcp47 }: CharChipEditorProps) {
   const { t } = useLingui();
   const glyphFontStack = useGlyphFontStack();
   const [inputVal, setInputVal] = useState("");
+  const [showUppercase, setShowUppercase] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -243,10 +246,24 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
   // sections); bare combining marks by raw Unicode code-point order (a diacritic
   // has no meaningful dictionary position), listed after the letters.
   const linguisticChars = chars.filter(isLinguisticChar);
-  const displayChars = [
-    ...collate(linguisticChars.filter((c) => !isCombiningMarkChar(c))),
-    ...linguisticChars.filter((c) => isCombiningMarkChar(c)).sort(codePointCompare),
-  ];
+  const bareMarks = linguisticChars.filter(isCombiningMarkChar).sort(codePointCompare);
+  const letters = linguisticChars.filter((c) => !isCombiningMarkChar(c));
+  // Case-collapse the letters to their lowercase/caseless unit (FR-008/FR-010):
+  // hide an uppercase only when its lowercase is actually present; a lowercase or
+  // caseless (or uppercase-only) letter is shown as entered.
+  const upperOf = (b: string): string | null => {
+    const cc = caseCounterpart(b, bcp47);
+    return cc?.direction === "toUpper" ? cc.counterpart : null;
+  };
+  const hiddenUppers = new Set<string>();
+  for (const b of letters) {
+    const u = upperOf(b);
+    if (u !== null) hiddenUppers.add(u);
+  }
+  const displayLetters = collate(letters.filter((b) => !hiddenUppers.has(b)));
+  // Count reflects the collapsed lowercase/caseless units + bare marks.
+  const unitCount = displayLetters.length + bareMarks.length;
+  const hasCasedLetter = letters.some((b) => upperOf(b) !== null);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -300,9 +317,22 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
             color: TEXT_MAIN,
           }}
         >
-          <Trans id="survey.phaseB.charChipEditor.count">Your alphabet ({displayChars.length})</Trans>
+          <Trans id="survey.phaseB.charChipEditor.count">Your alphabet ({displayLetters.length + bareMarks.length})</Trans>
         </p>
-        {displayChars.length === 0 ? (
+        {hasCasedLetter && (
+          <label
+            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: TEXT_DIM, cursor: "pointer", margin: "0 0 8px 0" }}
+          >
+            <input
+              type="checkbox"
+              data-testid="your-alphabet-uppercase-toggle"
+              checked={showUppercase}
+              onChange={(e) => setShowUppercase(e.target.checked)}
+            />
+            <Trans id="survey.phaseB.breakdown.showUppercase">Show uppercase letters</Trans>
+          </label>
+        )}
+        {unitCount === 0 ? (
           <p style={mutedParaFlush}>
             <Trans id="survey.phaseB.charChipEditor.empty">
               No characters yet — type your whole alphabet above, with a space
@@ -318,11 +348,49 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
             })}
             style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}
           >
-            {displayChars.map((c) => {
-              // This delete chip is always in one visual state, not a toggle.
-              // The charChip/chipGlyph booleans below are FIXED literals chosen
-              // to reproduce the original inline hex (unchecked shell + accent
+            {displayLetters.flatMap((c) => {
+              // Removable chip for the lowercase/caseless (or uppercase-only)
+              // letter. The charChip/chipGlyph booleans are FIXED literals
+              // reproducing the original inline hex (unchecked shell + accent
               // glyph), not real checked state — do not wire them to a value.
+              const { title } = codepointLabel(c);
+              const cells = [
+                <button
+                  key={c}
+                  type="button"
+                  title={title}
+                  onClick={() => onChange(chars.filter((x) => x !== c))}
+                  aria-label={t({
+                    id: "survey.phaseB.charChipEditor.removeAriaLabel",
+                    message: `Remove ${{ char: c }} (${{ cp: title }})`,
+                  })}
+                  style={charChip(false)}
+                >
+                  <span style={chipGlyph(true, glyphFontStack)}>{displayChar(c)}</span>
+                  <CpLabel grapheme={c} />
+                  <span style={chipIndicator(ERROR_RED)}>x</span>
+                </button>,
+              ];
+              // Derived uppercase (display-only) when the toggle is on — mirrors
+              // the breakdown Letters section; not a removable pick.
+              const upper = showUppercase ? upperOf(c) : null;
+              if (upper !== null) {
+                const upperTitle = codepointLabel(upper).title;
+                cells.push(
+                  <span
+                    key={upper}
+                    title={upperTitle}
+                    aria-label={`${displayChar(upper)} (${upperTitle})`}
+                    style={{ ...charChip(false), cursor: "default" }}
+                  >
+                    <span style={chipGlyph(true, glyphFontStack)}>{displayChar(upper)}</span>
+                    <CpLabel grapheme={upper} />
+                  </span>,
+                );
+              }
+              return cells;
+            })}
+            {bareMarks.map((c) => {
               const { title } = codepointLabel(c);
               return (
                 <button
@@ -336,9 +404,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
                   })}
                   style={charChip(false)}
                 >
-                  <span style={chipGlyph(true, glyphFontStack)}>
-                    {displayChar(c)}
-                  </span>
+                  <span style={chipGlyph(true, glyphFontStack)}>{displayChar(c)}</span>
                   <CpLabel grapheme={c} />
                   <span style={chipIndicator(ERROR_RED)}>x</span>
                 </button>
@@ -884,7 +950,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
             character (for example: a b c ŋ ɛ), then press Enter or + Add.
           </Trans>
         </p>
-        <CharChipEditor chars={chars} onChange={setAll} autoFocus={false} />
+        <CharChipEditor chars={chars} onChange={setAll} autoFocus={false} bcp47={context.bcp47_tag} />
       </section>
 
       {/* Section 3: visible three-store decomposition (spec 046 US5) + the
