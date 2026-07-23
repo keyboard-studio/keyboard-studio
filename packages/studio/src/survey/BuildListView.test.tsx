@@ -597,6 +597,18 @@ describe("AlphabetBreakdown — visible decomposition (spec 046)", () => {
     const marks = screen.getByTestId("alphabet-marks");
     expect(marks.textContent).toContain("◌");
   });
+
+  it("orders the Marks section by raw code point, not ICU (spec 047 refinement)", async () => {
+    await renderBuildListView();
+    const BREVE = "̆"; // U+0306
+    const CIRCUMFLEX = "̂"; // U+0302
+    // Entered breve-first; code-point order must still list U+0302 before U+0306.
+    act(() => {
+      usePhaseBDraftStore.getState().setAll([BREVE, CIRCUMFLEX]);
+    });
+    const marks = screen.getByTestId("alphabet-marks").textContent ?? "";
+    expect(marks.indexOf("U+0302")).toBeLessThan(marks.indexOf("U+0306"));
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -802,6 +814,24 @@ describe("US4 — focused Your-alphabet list (spec 047)", () => {
     // 5 and ? still appear in their breakdown sections.
     expect(screen.getByTestId("alphabet-numbers").textContent).toContain("U+0035");
     expect(screen.getByTestId("alphabet-punctuation").textContent).toContain("U+003F");
+  });
+
+  it("orders letters/combos by ICU and bare diacritics by code-point, marks last", async () => {
+    await renderBuildListView({});
+    const GRAVE = "̀"; // U+0300
+    const ACUTE = "́"; // U+0301
+    // Entered out of order: ɛ (U+025B), a, é (U+00E9 combo), acute, grave.
+    act(() => {
+      usePhaseBDraftStore.getState().setAll(["ɛ", "a", "é", ACUTE, GRAVE]);
+    });
+    const group = screen.getByRole("group", { name: /Accumulated characters/i }).textContent ?? "";
+    const at = (u: string) => group.indexOf(u);
+    // Letters/combos in ICU order: a < é < ɛ.
+    expect(at("U+0061")).toBeLessThan(at("U+00E9"));
+    expect(at("U+00E9")).toBeLessThan(at("U+025B"));
+    // Bare marks in code-point order (U+0300 before U+0301), after all letters.
+    expect(at("U+025B")).toBeLessThan(at("U+0300"));
+    expect(at("U+0300")).toBeLessThan(at("U+0301"));
   });
 });
 
