@@ -21,6 +21,7 @@ import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 import { expectCurrentChar } from "../../test/currentCharChip.ts";
+import { PATTERN_SEQUENCE } from "./patternIds.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() — refs shared across mock closures and test bodies.
@@ -931,6 +932,73 @@ describe("TouchGallery — character-scroll-strip producer badge (integration)",
       expect(badgeAfter.textContent).toBe("1");
       expect(badgeAfter.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// UsesSequencesCard (Part 3) — integration coverage.
+//
+// UsesSequencesCard.tsx (packages/studio/src/editors/assignLoop/parts/) has
+// its own render-level unit test exercising pure props in isolation. This
+// closes the gap that leaves for TouchGallery specifically: it proves the
+// card TouchGallery renders is wired to THIS gallery's real
+// `desktopAssignments` (Phase C store state, via seedWithDesktopAssignment —
+// the same store-seed helper the R11 emission suite above uses to drive a
+// real Phase C assignment) — not a hand-built prop or a constant. A
+// swapped/empty assignments source at the TouchGallery -> UsesSequencesCard
+// call site would slip past a UsesSequencesCard-only unit test but must fail
+// here.
+//
+// PRODUCES vs USES: the seeded sequence's own `target` ("ŋ", what the
+// sequence PRODUCES) is deliberately a DIFFERENT character from currentChar
+// ("n", the char under test) — "n" only appears as the sequence's
+// `firstLetterOut` (an INPUT slot), never as the char it produces. This is
+// exactly the produces-vs-uses distinction the card exists to surface, and
+// sequences are always recorded with modality "physical" even though this is
+// the Touch gallery (see charMechanisms.ts's file-header comment) — this
+// test is what proves that cross-modality read actually happens for real
+// desktopAssignments, not just in the unit-level charMechanisms.test.ts.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — UsesSequencesCard (integration)", () => {
+  it("renders the card with a row for a real recorded Phase C sequence that USES the current character as an input slot (not its produced char)", async () => {
+    const sequenceAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "ŋ",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: PATTERN_SEQUENCE,
+          strategyId: "S-03",
+          slotValues: { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
+        },
+      ],
+      source: "user",
+    };
+    seedWithDesktopAssignment("n", sequenceAssignment);
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expectCurrentChar("n");
+    const card = await screen.findByTestId("uses-sequences-card");
+    const row = within(card).getByTestId("uses-sequences-row-0");
+    // The row names the sequence's own input pair and its produced char —
+    // proving this is the REAL recorded sequence surfaced from real store
+    // state, not a placeholder or a hardcoded row.
+    expect(row.textContent).toContain("n");
+    expect(row.textContent).toContain("g");
+    expect(row.textContent).toContain("ŋ");
+  });
+
+  it("control: renders no uses-sequences-card for a character with no recorded using-sequence anywhere in Phase C", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    expectCurrentChar("中");
+    expect(screen.queryByTestId("uses-sequences-card")).toBeNull();
   });
 });
 

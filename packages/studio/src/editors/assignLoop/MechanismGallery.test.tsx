@@ -1226,6 +1226,70 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
 });
 
 // ---------------------------------------------------------------------------
+// UsesSequencesCard (Part 3) — integration coverage.
+//
+// UsesSequencesCard.tsx (packages/studio/src/editors/assignLoop/parts/) has
+// its own render-level unit test exercising pure props in isolation. This
+// closes the gap that leaves: it proves the card MechanismGallery actually
+// renders is wired to THIS gallery's real store-backed `sessionAssignments`
+// (recorded via the same `recordAssignments` store call the P1 coexistence
+// suite above uses to simulate a Sequence-Gallery-recorded assignment) — not
+// a hand-built prop or a constant. A swapped/empty assignments source at the
+// MechanismGallery -> UsesSequencesCard call site would slip past a
+// UsesSequencesCard-only unit test but must fail here.
+//
+// PRODUCES vs USES: the seeded assignment's own `target` ("ŋ", what the
+// sequence PRODUCES) is deliberately a DIFFERENT character from currentChar
+// ("n", the char under test) — "n" only appears as the sequence's
+// `firstLetterOut` (an INPUT slot), never as the char it produces. This is
+// exactly the produces-vs-uses distinction the card exists to surface.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — UsesSequencesCard (integration)", () => {
+  it("renders the card with a row for a real recorded sequence that USES the current character as an input slot (not its produced char)", async () => {
+    seedInventory(["n"]);
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_SEQUENCE,
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    expectCurrentChar("n");
+    const card = await screen.findByTestId("uses-sequences-card");
+    const row = within(card).getByTestId("uses-sequences-row-0");
+    // The row names the sequence's own input pair and its produced char —
+    // proving this is the REAL recorded sequence surfaced from real store
+    // state, not a placeholder or a hardcoded row.
+    expect(row.textContent).toContain("n");
+    expect(row.textContent).toContain("g");
+    expect(row.textContent).toContain("ŋ");
+  });
+
+  it("control: renders no uses-sequences-card for a character with no recorded using-sequence anywhere in the assignments", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expectCurrentChar("x");
+    expect(screen.queryByTestId("uses-sequences-card")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Edit after Done — "Unlock to edit" affordance in the locked banner.
 //
 // Fixture manifest mirrors the shape of the production manifest for this

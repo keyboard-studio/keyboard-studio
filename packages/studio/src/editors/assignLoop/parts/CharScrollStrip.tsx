@@ -52,6 +52,7 @@ import {
   TEXT_DIM,
   FONT,
 } from "../../../lib/galleryTheme.ts";
+import { ERROR_RED } from "../../../ui/theme.ts";
 
 export interface CharScrollStripProps {
   /** All characters in this gallery's own walk order (lettersToAdd for MechanismGallery, inventory for TouchGallery). */
@@ -265,8 +266,8 @@ export function CharScrollStrip({
                   fontWeight: 600,
                   lineHeight: "16px",
                   background: badgeGood ? "#0d2218" : "#2a0a0a",
-                  border: `1px solid ${badgeGood ? "#238636" : "#f85149"}`,
-                  color: badgeGood ? "#56d364" : "#f85149",
+                  border: `1px solid ${badgeGood ? "#238636" : ERROR_RED}`,
+                  color: badgeGood ? "#56d364" : ERROR_RED,
                 }}
               >
                 {count}

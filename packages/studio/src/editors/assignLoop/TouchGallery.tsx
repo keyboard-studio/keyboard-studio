@@ -81,11 +81,11 @@ import { GalleryIntroSplash } from "./IntroSplash.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
-import { getCharMechanisms } from "./parts/charMechanisms.ts";
+import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { KEY_OPTIONS, VALID_HOST_KEYS } from "../../lib/keyOptions.ts";
 import { resolveKeyPickerSelection, resolvedVkeyOf } from "../../lib/charInput.ts";
 import {
-  BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
+  BG_PAGE, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
   galleryPageStyle as pageStyle,
   galleryGhostBtn as ghostBtn,
   gallerySelectStyle as selectStyle,
@@ -871,22 +871,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // above, before this memo) — same precedent as touchKey/modsDepsKey.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detectionSeedLayout, inventoryKey]);
-
-  // Part 3 (character-scroll-sequence-gallery) — every recorded sequence that
-  // USES currentChar in any slot (content/indicator/output), across the whole
-  // working copy. Sequences are always recorded with modality "physical"
-  // (SequenceGallery never writes touch assignments), so this is sourced from
-  // desktopAssignments (Phase C, physical) rather than the local charTouch
-  // map — the `modality` argument only gates PRODUCES, which this section
-  // does not use. Shares the getCharMechanisms selector with CharScrollStrip's
-  // badge and MechanismGallery's own bottom list — see charMechanisms.ts.
-  const currentCharUsesSequences = useMemo(
-    () =>
-      currentChar !== null
-        ? getCharMechanisms(currentChar, desktopAssignments, "touch").usesSequences
-        : [],
-    [currentChar, desktopAssignments],
-  );
 
   // ---------------------------------------------------------------------------
   // Per-character suggestion computation
@@ -1718,61 +1702,13 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               sequence's content/indicator/output on the desktop layout.
               Read-only — mirrors SequenceGallery's own "Recorded sequences"
               card style; editing a sequence stays owned by the Sequence
-              Gallery. */}
-          {currentCharUsesSequences.length > 0 && (
-            <div
-              style={{
-                background: BG_CARD,
-                border: `1px solid ${BORDER}`,
-                borderRadius: 10,
-                padding: "10px 14px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-              }}
-            >
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 12,
-                  color: TEXT_DIM,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                <Trans id="editor.assignLoop.usesSequences.heading">
-                  Sequences using this character
-                </Trans>
-              </p>
-              {currentCharUsesSequences.map(({ target, ref }, idx) => {
-                const seqContent = ref.slotValues?.["firstLetterOut"] ?? "";
-                const seqIndicator = ref.slotValues?.["secondLetter"] ?? "";
-                return (
-                  <div
-                    key={`${target}\0${seqContent}\0${seqIndicator}\0${idx}`}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      fontSize: 13,
-                      fontFamily: FONT,
-                    }}
-                  >
-                    <span style={{ color: TEXT_MAIN }}>
-                      {displayChar(seqContent)}
-                      {" + "}
-                      {displayChar(seqIndicator)}
-                      {" "}
-                      &rarr;{" "}
-                      <span style={{ fontFamily: "monospace", fontSize: 15 }}>
-                        {displayChar(target)}
-                      </span>
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+              Gallery. Shared with MechanismGallery's own bottom list — see
+              UsesSequencesCard.tsx. */}
+          <UsesSequencesCard
+            currentChar={currentChar}
+            assignments={desktopAssignments}
+            modality="touch"
+          />
 
           {/* Apply + Skip. Back and Next/Done live in the shared top toolbar
               row above so the forward-advance control is spatially

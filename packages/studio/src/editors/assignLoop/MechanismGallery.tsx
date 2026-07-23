@@ -90,10 +90,10 @@ import { GalleryIntroSplash } from "./IntroSplash.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
-import { getCharMechanisms } from "./parts/charMechanisms.ts";
+import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { RadioGroup } from "../../ui/RadioGroup.tsx";
 import {
-  BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
+  BG_PAGE, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
   galleryPageStyle as pageStyle,
   galleryGhostBtn as ghostBtn,
   galleryInputStyle as inputStyle,
@@ -1818,19 +1818,6 @@ export function MechanismGallery({
     setPendingCompanion(null);
   }, []);
 
-  // Part 3 (character-scroll-sequence-gallery) — every recorded sequence that
-  // USES currentChar in any slot (content/indicator/output), across the whole
-  // working copy, not just the ones whose OUTPUT is currentChar. Shares the
-  // getCharMechanisms selector with CharScrollStrip's badge (which counts
-  // PRODUCES only) and TouchGallery's own bottom list — see charMechanisms.ts.
-  const currentCharUsesSequences = useMemo(
-    () =>
-      currentChar !== null
-        ? getCharMechanisms(currentChar, sessionAssignments, "physical").usesSequences
-        : [],
-    [currentChar, sessionAssignments],
-  );
-
   // How many NON-sequence methods have already been applied to the current
   // character (mechanismAssignments already excludes the sequence-owned
   // dimension — see excludeSequenceMechanisms above).
@@ -2674,61 +2661,14 @@ export function MechanismGallery({
                   output IS currentChar. Read-only here — mirrors
                   SequenceGallery's own "Recorded sequences" card style
                   (SequenceGallery.tsx) but editing a sequence stays owned by
-                  the Sequence Gallery, so no Remove control is offered. */}
-              {currentCharUsesSequences.length > 0 && (
-                <div
-                  style={{
-                    background: BG_CARD,
-                    border: `1px solid ${BORDER}`,
-                    borderRadius: 10,
-                    padding: "10px 14px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 6,
-                  }}
-                >
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 12,
-                      color: TEXT_DIM,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                    }}
-                  >
-                    <Trans id="editor.assignLoop.usesSequences.heading">
-                      Sequences using this character
-                    </Trans>
-                  </p>
-                  {currentCharUsesSequences.map(({ target, ref }, idx) => {
-                    const seqContent = ref.slotValues?.["firstLetterOut"] ?? "";
-                    const seqIndicator = ref.slotValues?.["secondLetter"] ?? "";
-                    return (
-                      <div
-                        key={`${target}\0${seqContent}\0${seqIndicator}\0${idx}`}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          fontSize: 13,
-                          fontFamily: FONT,
-                        }}
-                      >
-                        <span style={{ color: TEXT_MAIN }}>
-                          {displayChar(seqContent)}
-                          {" + "}
-                          {displayChar(seqIndicator)}
-                          {" "}
-                          &rarr;{" "}
-                          <span style={{ fontFamily: "monospace", fontSize: 15 }}>
-                            {displayChar(target)}
-                          </span>
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                  the Sequence Gallery, so no Remove control is offered.
+                  Shared with TouchGallery's own bottom list — see
+                  UsesSequencesCard.tsx. */}
+              <UsesSequencesCard
+                currentChar={currentChar}
+                assignments={sessionAssignments}
+                modality="physical"
+              />
 
               {/* Apply + Skip. Back and Next/Done live in the shared top
                   toolbar row above (see leftContent's top of pane) so the
