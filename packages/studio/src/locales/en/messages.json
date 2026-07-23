@@ -3,6 +3,7 @@
   "editor.touchSeed.reseedDiscardsPlatforms": " Choosing this discards the base's shipped tablet/desktop touch platforms — only a phone layout is produced.",
   "survey.marks.attachment.confirmedOnPrefix": "— confirmed on",
   "editor.assignLoop.ralt.selectPlaceholder": "— Select —",
+  "survey.selectField.placeholder": "— Select one —",
   "editor.sequences.indicatorUnresolvableWarning": "'{0}' isn't a key on this layout — pick a character that maps to a physical key.",
   "editor.carve.cascade.cannotFullyRemoveTitle": "\"{char}\" can't be fully removed",
   "editor.assignLoop.previousCharacterButton": "« Previous character",

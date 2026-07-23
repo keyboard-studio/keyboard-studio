@@ -28,6 +28,18 @@ export interface SelectMenuProps {
    * RadioGroup/MultiSelect — pass the id of a sibling label element.
    */
   ariaLabelledby?: string;
+  /** Same idiom as `RadioGroup`'s `required` prop (RadioGroup.tsx) — sets
+   * `aria-required` on the trigger button. */
+  required?: boolean;
+  /**
+   * Style override merged onto the trigger button, on top of the default
+   * `TRIGGER_STYLE` — same "callers may override, merged not replaced" idiom
+   * as `ui/Dropdown.tsx`, and applied to the same element Dropdown applies
+   * its override to (the visible control), not the outer wrapper. Lets a
+   * caller size the control (e.g. a fixed width) the way a native `<select>`
+   * would otherwise auto-size to its content.
+   */
+  style?: React.CSSProperties;
   /**
    * Optional per-option render hook for the label span (e.g. render each
    * font name in its own font). Defaults to plain `opt.label` text. Used
@@ -140,6 +152,8 @@ export function SelectMenu({
   onChange,
   id,
   ariaLabelledby,
+  required,
+  style,
   renderOptionLabel = defaultRenderLabel,
 }: SelectMenuProps): React.ReactElement {
   const [open, setOpen] = useState(false);
@@ -265,8 +279,9 @@ export function SelectMenu({
         aria-expanded={open}
         aria-controls={listId}
         aria-labelledby={ariaLabelledby}
+        aria-required={required}
         className={mergeClassNames("ks-control ks-focus-ring ks-hit-target")}
-        style={TRIGGER_STYLE}
+        style={{ ...TRIGGER_STYLE, ...style }}
         onClick={() => setOpen((prev) => !prev)}
         onKeyDown={handleTriggerKeyDown}
       >

@@ -31,17 +31,17 @@ describe("LocaleSwitcher", () => {
 
   it("shows the active locale and lists every supported locale", () => {
     renderSwitcher();
-    const select = screen.getByRole("combobox") as HTMLSelectElement;
-    expect(select.value).toBe("en");
+    const trigger = screen.getByRole("button");
+    expect(trigger.textContent).toContain("English");
+    fireEvent.click(trigger);
     expect(screen.getByRole("option", { name: "English" })).toBeTruthy();
     expect(screen.getByRole("option", { name: "Français" })).toBeTruthy();
   });
 
   it("persists the choice and activates the locale on selection", async () => {
     renderSwitcher();
-    const select = screen.getByRole("combobox") as HTMLSelectElement;
-
-    fireEvent.change(select, { target: { value: "fr" } });
+    fireEvent.click(screen.getByRole("button"));
+    fireEvent.click(screen.getByRole("option", { name: "Français" }));
 
     // Persisted synchronously…
     expect(loadSavedLocale()).toBe("fr");
@@ -51,7 +51,8 @@ describe("LocaleSwitcher", () => {
 
   it("renders the field label translated once French is active", async () => {
     renderSwitcher();
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "fr" } });
+    fireEvent.click(screen.getByRole("button"));
+    fireEvent.click(screen.getByRole("option", { name: "Français" }));
     await waitFor(() => expect(i18n.locale).toBe("fr"));
     // "Language" -> "Langue" from the fr catalog.
     expect(screen.getByText("Langue")).toBeTruthy();
