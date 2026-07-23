@@ -1,0 +1,11 @@
+{
+  "content.adaptationQuestion.q_ip1_keep_strategies.provenanceLabel": "the base keyboard's recognized input-strategy fingerprint",
+  "content.adaptationQuestion.q_ip2_keep_device_targets.provenanceLabel": "the base keyboard's device targets vs the ones you declared",
+  "content.adaptationQuestion.q_ip3_keep_script_conventions.provenanceLabel": "the base keyboard's neutral-residue script conventions",
+  "content.adaptationQuestion.q_sa1_target_script_spread.provenanceLabel": "scripts used by existing keyboards for related languages",
+  "content.adaptationQuestion.q_sa2_base_script_mismatch.provenanceLabel": "the base keyboard's own script vs the script you chose",
+  "content.adaptationQuestion.q_sa3_latin_flavor.provenanceLabel": "the base keyboard's Latin sub-profile",
+  "content.adaptationQuestion.q_tp1_confidence_threshold.provenanceLabel": "the single-script confidence threshold (default 80%)",
+  "content.adaptationQuestion.q_tp2_fallback_tier_prefill.provenanceLabel": "whether fallback-tier bases may prefill (default: allowed, always marked)",
+  "content.adaptationQuestion.q_tp3_orthography_join.provenanceLabel": "alternate-script keyboards for related languages in a known family"
+}

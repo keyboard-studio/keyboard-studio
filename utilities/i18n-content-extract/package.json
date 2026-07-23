@@ -1,0 +1,15 @@
+{
+  "name": "@keyboard-studio/i18n-content-extract",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tier B content-i18n sidecar extractor (spec 046 T027). Walks a fixed, render-verified allowlist of prose fields out of content/patterns/**/*.yaml, content/adaptation-questions/*.yaml, and packages/contracts/data/criteria.json, and flattens them into content/i18n/en/*.json for Crowdin. Never touches the content records themselves. No build step; run via tsx.",
+  "scripts": {
+    "extract": "tsx cli.ts",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "vitest": "^4.1.6"
+  }
+}
