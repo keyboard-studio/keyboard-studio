@@ -26,7 +26,7 @@
 // the same pinned version already vetted for @keyboard-studio/engine's own
 // zip writer, not a new library introduction).
 
-import { test, expect, type Page } from "playwright/test";
+import { test, expect } from "playwright/test";
 import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
@@ -75,23 +75,16 @@ declare global {
 //
 // The shared survey prelude (identity-lite, base picker, track choice,
 // prefill, character list, mechanism/touch galleries, help phase) now lives
-// in ./helpers/surveyFlow and is imported above. Only the Sequence Gallery
-// driver is carve-local: it is the interim empty-state driver for the S-03
-// sequences step (inserted between mechanisms and the touch fork), which the
-// shared prelude does not yet cover.
-
-/**
- * sequences step — the interim Sequence Gallery, inserted between mechanisms
- * and the touch fork (S-03 sequences have their own dedicated part of the
- * flow, authored separately, after the mechanism gallery). This fixture's
- * empty-diff path (confirmMechanismsEmpty) never flags a character for
- * sequences, so the gallery's empty state always shows here — a single
- * "Continue (sequence gallery)" forward control that records/emits nothing.
- */
-async function driveSequenceGallery(page: Page): Promise<void> {
-  await expect(page.getByText("Sequence Gallery")).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("button", { name: "Continue (sequence gallery)" }).click();
-}
+// in ./helpers/surveyFlow and is imported above. There is no carve-local
+// driver left: the standalone Sequence Gallery step (formerly inserted
+// between mechanisms and the touch fork) has been retired — S-03 sequences
+// now build inline inside the Mechanism Gallery's method chooser (selecting
+// the "sequence" method swaps the right/preview pane for SequenceBuilderPanel;
+// see MechanismGallery.tsx). This fixture's mechanism step never flags a
+// character for anything (confirmMechanismsEmpty's "No new characters to
+// add." empty-diff path), so there is no per-character loop here to drive the
+// sequence builder through — nothing to replace the old pass-through driver
+// with for THIS walk.
 
 // ---------------------------------------------------------------------------
 // Spec
@@ -116,8 +109,10 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     await buildOneCharacterList(page, "᙮");
 
     // Manifest spine order (StudioShell.tsx) is characters -> marks -> carve ->
-    // mechanisms -> sequences -> touch -> help; the marks-free alphabet ("᙮")
-    // auto-skips the marks step, so carve renders right after Phase B.
+    // mechanisms -> touch -> help (no separate sequences step — S-03 builds
+    // inline in the Mechanism Gallery, see the note above); the marks-free
+    // alphabet ("᙮") auto-skips the marks step, so carve renders right after
+    // Phase B.
 
     // ---------------------------------------------------------------------
     // Carve gallery
@@ -154,10 +149,10 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     await page.getByTestId("carve-continue").click();
 
     // ---------------------------------------------------------------------
-    // Remaining spine steps: mechanisms, sequences, touch, help.
+    // Remaining spine steps: mechanisms, touch, help. (No separate sequences
+    // step — see the note above the describe block.)
     // ---------------------------------------------------------------------
     await confirmMechanismsEmpty(page);
-    await driveSequenceGallery(page);
     await driveTouchGallery(page);
     await driveHelpPhase(page);
 
@@ -227,7 +222,6 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     await page.getByTestId("carve-continue").click();
 
     await confirmMechanismsEmpty(page);
-    await driveSequenceGallery(page);
     await driveTouchGallery(page);
     await driveHelpPhase(page);
 

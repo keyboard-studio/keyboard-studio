@@ -21,7 +21,7 @@ import { manifest, validateManifestShape } from "./manifest.ts";
 
 type WalkStep =
   | "identity" | "choose_base" | "track" | "project_name" | "characters"
-  | "carve" | "marks" | "mechanisms" | "sequences" | "touch_seed_source" | "touch" | "help" | "done" | "unsupported";
+  | "carve" | "marks" | "mechanisms" | "touch_seed_source" | "touch" | "help" | "done" | "unsupported";
 
 function walkSpine(
   ctx: { selectedTrack: "copy" | "adapt" | null; identitySupported: boolean },
@@ -95,13 +95,9 @@ describe("nextSpineStepAfter", () => {
     expect(nextSpineStepAfter("carve")).toBe("mechanisms");
   });
 
-  it("mechanisms → sequences", () => {
-    expect(nextSpineStepAfter("mechanisms")).toBe("sequences");
-  });
-
-  it("sequences → touch (skips touch_seed_source which is spine:false)", () => {
-    // touch_seed_source is spine:false so nextSpineStepAfter("sequences") skips it.
-    expect(nextSpineStepAfter("sequences")).toBe("touch");
+  it("mechanisms → touch (skips touch_seed_source which is spine:false)", () => {
+    // touch_seed_source is spine:false so nextSpineStepAfter("mechanisms") skips it.
+    expect(nextSpineStepAfter("mechanisms")).toBe("touch");
   });
 
   it("touch → help", () => {
@@ -122,13 +118,13 @@ describe("nextSpineStepAfter", () => {
 // ---------------------------------------------------------------------------
 
 describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
-  it("SR-1/SR-2 copy track: identity -> choose_base -> track -> project_name -> characters -> marks -> carve -> mechanisms -> sequences -> touch_seed_source -> touch -> help -> done", () => {
+  it("SR-1/SR-2 copy track: identity -> choose_base -> track -> project_name -> characters -> marks -> carve -> mechanisms -> touch_seed_source -> touch -> help -> done", () => {
     const { sequence, navigateAtEnd } = walkSpine(copyCtx);
     // Spec 035 R4/R12: with no recorded fork choice (copyCtx.touchSeedSource === null),
-    // sequences routes through the off-spine touch_seed_source fork before touch.
+    // mechanisms routes through the off-spine touch_seed_source fork before touch.
     expect(sequence).toEqual([
       "identity", "choose_base", "track", "project_name", "characters",
-      "marks", "carve", "mechanisms", "sequences", "touch_seed_source", "touch", "help", "done",
+      "marks", "carve", "mechanisms", "touch_seed_source", "touch", "help", "done",
     ]);
     // "... -> done -> output": help -> done carries navigate:"output".
     expect(navigateAtEnd).toBe("output");
@@ -138,7 +134,7 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
     const { sequence, navigateAtEnd } = walkSpine(adaptCtx);
     expect(sequence).toEqual([
       "identity", "choose_base", "track", "characters",
-      "marks", "carve", "mechanisms", "sequences", "touch_seed_source", "touch", "help", "done",
+      "marks", "carve", "mechanisms", "touch_seed_source", "touch", "help", "done",
     ]);
     expect(sequence).not.toContain("project_name");
     expect(navigateAtEnd).toBe("output");
@@ -162,17 +158,15 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
 
 describe("spec 034 SR-3 — mechanisms advances to touch, never past it", () => {
   // lockDesktop() firing at mechanisms completion is covered by reducer.test.ts
-  // R1; here we pin the advance half: mechanisms enters sequences, which then
-  // enters the touch_seed_source fork (spec 035 R4/R12) which joins straight
-  // to touch — touch is a genuinely-visited step (never skipped past to
-  // help/done) that then reaches help.
-  it("advance(mechanisms) enters sequences, then the touch_seed_source fork, never skipping touch to help/done", () => {
+  // R1; here we pin the advance half: mechanisms enters the touch_seed_source
+  // fork (spec 035 R4/R12) which joins straight to touch — touch is a
+  // genuinely-visited step (never skipped past to help/done) that then
+  // reaches help.
+  it("advance(mechanisms) enters the touch_seed_source fork, never skipping touch to help/done", () => {
     const outcome = advance("mechanisms", undefined, copyCtx);
-    expect(outcome.next).toBe("sequences");
+    expect(outcome.next).toBe("touch_seed_source");
     expect(outcome.next).not.toBe("help");
     expect(outcome.next).not.toBe("done");
-    const seqOutcome = advance("sequences", undefined, copyCtx);
-    expect(seqOutcome.next).toBe("touch_seed_source");
     // The off-spine fork joins straight to touch — touch is still reached.
     expect(advance("touch_seed_source", undefined, copyCtx).next).toBe("touch");
   });
@@ -198,7 +192,7 @@ describe("spec 034 SR-5 — validateManifestShape structural guard", () => {
     const spineIds = manifest.filter((s) => s.spine !== false).map((s) => s.id);
     expect(spineIds).toEqual([
       "identity", "choose_base", "track", "characters",
-      "marks", "carve", "mechanisms", "sequences", "touch", "help", "package",
+      "marks", "carve", "mechanisms", "touch", "help", "package",
     ]);
   });
 });
@@ -302,22 +296,18 @@ describe("advance: spine hops", () => {
     expect(advance("carve", undefined, copyCtx).next).toBe("mechanisms");
   });
 
-  it("mechanisms → sequences", () => {
-    expect(advance("mechanisms", undefined, copyCtx).next).toBe("sequences");
+  it("mechanisms → touch_seed_source when no fork choice is recorded (spec 035 R4/R12)", () => {
+    expect(advance("mechanisms", undefined, copyCtx).next).toBe("touch_seed_source");
   });
 
-  it("sequences → touch_seed_source when no fork choice is recorded (spec 035 R4/R12)", () => {
-    expect(advance("sequences", undefined, copyCtx).next).toBe("touch_seed_source");
-  });
-
-  it("sequences → touch directly when a fork choice IS recorded (spec 035 R12 fork memory)", () => {
+  it("mechanisms → touch directly when a fork choice IS recorded (spec 035 R12 fork memory)", () => {
     const withChoice = { ...copyCtx, touchSeedSource: "import-adapt" as const };
-    expect(advance("sequences", undefined, withChoice).next).toBe("touch");
+    expect(advance("mechanisms", undefined, withChoice).next).toBe("touch");
   });
 
-  it("sequences → touch directly for the other recorded choice too", () => {
+  it("mechanisms → touch directly for the other recorded choice too", () => {
     const withChoice = { ...copyCtx, touchSeedSource: "reseed-from-desktop" as const };
-    expect(advance("sequences", undefined, withChoice).next).toBe("touch");
+    expect(advance("mechanisms", undefined, withChoice).next).toBe("touch");
   });
 
   it("touch_seed_source → touch (joinTarget hop, spec 035 R4)", () => {

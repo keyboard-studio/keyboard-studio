@@ -22,8 +22,15 @@
 //     unimplemented and is never counted toward coverage.
 //   - Forward from the LAST character is the phase completion ("Done" calls
 //     onComplete) rather than landing on a null currentChar.
+//   - Selecting the S-03 sequence method swaps the RIGHT pane's live preview
+//     for SequenceBuilderPanel — a one-character sequence builder that
+//     records a real multi_char_sequence MechanismAssignment on its own
+//     Apply. There is no separate Sequence Gallery step; Apply/Cancel both
+//     return the method to "swap", which swaps the right pane back to the
+//     preview (see rightContent below).
 //
-// RIGHT pane: GalleryPreviewWithPatterns — live OSK preview, unchanged.
+// RIGHT pane: GalleryPreviewWithPatterns (live OSK preview), or
+// SequenceBuilderPanel while method === "sequence" (see above).
 //
 // Contract shapes: see packages/contracts/src/assignmentMap.ts
 // Pattern IDs/strategyIds: multi_char_sequence (S-03),
@@ -93,6 +100,7 @@ import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
+import { SequenceBuilderPanel, hasSequenceForChar } from "./SequenceBuilderPanel.tsx";
 import { RadioGroup } from "../../ui/RadioGroup.tsx";
 import {
   BG_PAGE, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
@@ -102,7 +110,10 @@ import {
   galleryForwardBtnStyle as forwardBtnStyle,
   gallerySelectStyle as selectStyle,
 } from "../../lib/galleryTheme.ts";
-import { PATTERN_SEQUENCE, PATTERN_DEADKEY, PATTERN_SWAP, PATTERN_RALT } from "./patternIds.ts";
+import {
+  PATTERN_SEQUENCE, PATTERN_DEADKEY, PATTERN_SWAP, PATTERN_RALT,
+  isSequenceAssignmentForChar,
+} from "./patternIds.ts";
 
 // Re-exported for existing importers that reach the pattern id constants via
 // this module; the canonical declarations now live in ./patternIds.ts.
@@ -201,9 +212,10 @@ function methodLabel(
     case "multi_char_sequence":
       // Defensive fallback only — excludeSequenceMechanisms (below) keeps
       // PATTERN_SEQUENCE mechanisms out of every badge list this label feeds,
-      // since sequences are owned by the Sequence Gallery. This branch exists
-      // so a raw patternId can never leak onto a badge if that exclusion is
-      // ever bypassed.
+      // since sequences are tracked as a separate dimension (see the
+      // "Sequences" chip row below) rather than the "Added"/"Applied methods"
+      // rows. This branch exists so a raw patternId can never leak onto a
+      // badge if that exclusion is ever bypassed.
       return resolveMessage(i18n, msg({ id: "editor.assignLoop.methodLabel.multiKeySequence", message: "Multi-key sequence" }));
     default:
       return ref.patternId;
@@ -211,14 +223,15 @@ function methodLabel(
 }
 
 // ---------------------------------------------------------------------------
-// excludeSequenceMechanisms — the Sequence Gallery owns multi_char_sequence
-// (PATTERN_SEQUENCE / S-03) mechanisms, even though they are recorded into
-// the SAME Phase C assignments array (scope: "individual") this gallery reads
-// via sessionAssignments. Without this filter, a char whose ONLY recorded
-// mechanism is a sequence (defined in the Sequence Gallery, then revisited
-// here via Back-nav) would show as "Added" in coveredChars/appliedForCurrentChar/
-// the "Applied methods" badge row, and its covered-char chip's Remove control
-// would silently delete the sequence work (the P1 this function fixes).
+// excludeSequenceMechanisms — multi_char_sequence (PATTERN_SEQUENCE / S-03)
+// mechanisms are tracked as a separate dimension (see the "Sequences" chip
+// row and SequenceBuilderPanel below), even though they are recorded into the
+// SAME Phase C assignments array (scope: "individual") this gallery reads via
+// sessionAssignments. Without this filter, a char whose ONLY recorded
+// mechanism is a sequence would show as "Added" in
+// coveredChars/appliedForCurrentChar/the "Applied methods" badge row, and its
+// covered-char chip's Remove control would silently delete the sequence work
+// (the P1 this function fixes).
 //
 // An assignment made up ENTIRELY of PATTERN_SEQUENCE mechanisms is dropped
 // outright — it never surfaces in this gallery's covered/applied view. An
@@ -226,8 +239,8 @@ function methodLabel(
 // mechanism(s) on the same target (permitted by the MechanismAssignment
 // contract, though no current write path actually produces one — this
 // gallery always appends a NEW assignment object per apply, and
-// SequenceGallery's own partitionSequenceAssignment only ever touches the
-// sequence-only assignment for a char) keeps just its non-sequence
+// SequenceBuilderPanel's own partitionSequenceAssignment only ever touches
+// the sequence-only assignment for a char) keeps just its non-sequence
 // mechanisms, so a genuinely mechanism-covered char is never hidden merely
 // because it also carries a sequence.
 function excludeSequenceMechanisms(
@@ -492,7 +505,7 @@ const configStyle: CSSProperties = {
 };
 
 // pageStyle, ghostBtn, and inputStyle are imported (aliased) from
-// ../../lib/galleryTheme.ts — shared byte-for-byte with SequenceGallery.tsx
+// ../../lib/galleryTheme.ts — shared byte-for-byte with SequenceBuilderPanel.tsx
 // (and, for pageStyle/ghostBtn, TouchGallery.tsx) rather than redefined here.
 
 function MethodChooser({
@@ -625,8 +638,7 @@ function MethodChooser({
           {method !== "sequence" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
               <Trans id="editor.assignLoop.method.sequence.summary">
-                Sequences are handled separately, in a dedicated step after this
-                gallery
+                Type two or more keystrokes in a row to produce {currentCharDisplay}
               </Trans>
             </span>
           )}
@@ -635,12 +647,12 @@ function MethodChooser({
           <div style={configStyle}>
             <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
               <Trans id="editor.assignLoop.method.sequence.checkHint">
-                Check this to mark{" "}
+                The sequence builder is open on the right, in place of the
+                live preview — define the key sequence for{" "}
                 <span style={{ color: TEXT_MAIN, fontFamily: "monospace", fontSize: 16 }}>
                   {currentCharDisplay}
                 </span>{" "}
-                as a sequence. You&apos;ll define the actual key sequence later,
-                in the Sequence Gallery.
+                there.
               </Trans>
             </p>
           </div>
@@ -1061,8 +1073,13 @@ export function MechanismGallery({
   const markStale = useWorkingCopyStore((s) => s.markStale);
   const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
   const recordAssignments = useWorkingCopyStore((s) => s.recordAssignments);
-  const sequenceFlaggedChars = useWorkingCopyStore((s) => s.sequenceFlaggedChars);
-  const flagCharForSequence = useWorkingCopyStore((s) => s.flagCharForSequence);
+  // unflagCharForSequence is reused here purely for its assignment-stripping
+  // side effect (it removes a char's whole recorded multi_char_sequence
+  // assignment regardless of sequenceFlaggedChars membership — see the store
+  // action's own doc comment) — the flagging half of its contract is no
+  // longer driven from this gallery now that sequences build inline via
+  // SequenceBuilderPanel (see hasSequenceForChar for the coverage check that
+  // replaces sequenceFlaggedChars membership).
   const unflagCharForSequence = useWorkingCopyStore((s) => s.unflagCharForSequence);
   const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
@@ -1128,6 +1145,15 @@ export function MechanismGallery({
           .filter((ch) => lettersToAdd.includes(ch)),
       ),
     [mechanismAssignments, lettersToAdd],
+  );
+
+  // Chars in lettersToAdd that already have a recorded PATTERN_SEQUENCE
+  // assignment — the "Sequences" chip row below. Tracked separately from
+  // coveredChars/mechanismAssignments (see excludeSequenceMechanisms) since a
+  // sequence is a distinct dimension from a non-sequence mechanism.
+  const sequenceRecordedChars = useMemo(
+    () => lettersToAdd.filter((c) => hasSequenceForChar(sessionAssignments, c)),
+    [lettersToAdd, sessionAssignments],
   );
 
   // One-time intro splash — shown on first entry to the desktop gallery so the
@@ -1234,6 +1260,10 @@ export function MechanismGallery({
         ids.add(PATTERN_DEADKEY);
         ids.add(PATTERN_SWAP);
         ids.add(PATTERN_RALT);
+        // PATTERN_SEQUENCE — the sequence builder now records real
+        // multi_char_sequence assignments directly (see SequenceBuilderPanel),
+        // so the live preview must be able to resolve this pattern too.
+        ids.add(PATTERN_SEQUENCE);
         return Promise.all([...ids].map((id) => svc.getById(id)));
       })
       .then((patterns) => {
@@ -1287,7 +1317,7 @@ export function MechanismGallery({
   // Per-char method state — reset when currentChar changes
   // ---------------------------------------------------------------------------
 
-  const [method, setMethod] = useState<Method>("sequence");
+  const [method, setMethod] = useState<Method>("swap");
   const [triggerKey, setTriggerKey] = useState("K_COLON");
   const [triggerKeyCustomChar, setTriggerKeyCustomChar] = useState("");
   const [deadkeyBaseLetter, setDeadkeyBaseLetter] = useState("");
@@ -1403,7 +1433,7 @@ export function MechanismGallery({
   // ---------------------------------------------------------------------------
 
   const resetMethodState = useCallback(() => {
-    setMethod("sequence");
+    setMethod("swap");
     setTriggerKey("K_COLON");
     setTriggerKeyCustomChar("");
     setDeadkeyBaseLetter("");
@@ -1422,7 +1452,7 @@ export function MechanismGallery({
     resetMethodState();
     if (currentChar !== null && isDecomposableAccented(currentChar)) {
       // §3c defaults-first: for a decomposable accented letter the natural method
-      // is deadkey (S-02) — propose-then-confirm. resetMethodState sets "sequence"
+      // is deadkey (S-02) — propose-then-confirm. resetMethodState sets "swap"
       // unconditionally, so override here after the reset.
       setDeadkeyBaseLetter([...currentChar.normalize("NFD")][0] ?? "");
       setMethod("deadkey");
@@ -1479,8 +1509,11 @@ export function MechanismGallery({
   const canApply = useMemo(() => {
     if (currentChar === null) return false;
     if (method === "sequence") {
-      // Flagging always has a valid target — no config to fill in.
-      return true;
+      // No-op here — the sequence builder (rendered in the right pane, see
+      // rightContent below) owns its own Apply button and commit logic; the
+      // generic "Apply method" button is hidden for this method (see the
+      // render below), so this branch only guards against a stray call.
+      return false;
     }
     if (method === "swap") {
       return resolvedVkeyOf(resolveKeyPickerSelection(selectedSwapKey, selectedSwapKeyCustomChar)) !== null;
@@ -1551,15 +1584,9 @@ export function MechanismGallery({
 
   const handleApply = useCallback(() => {
     if (currentChar === null || !canApply) return;
-
-    if (method === "sequence") {
-      // No MechanismAssignment recorded — flag only. The Sequence Gallery
-      // resolves the actual key sequence later; recording an assignment here
-      // with no slot values would emit broken .kmn.
-      flagCharForSequence(currentChar);
-      resetMethodState();
-      return;
-    }
+    // method === "sequence" is unreachable here: canApply returns false for
+    // it (the sequence builder in the right pane owns its own Apply — see
+    // SequenceBuilderPanel), so the guard above already returned.
 
     let assignment: MechanismAssignment;
 
@@ -1727,7 +1754,6 @@ export function MechanismGallery({
     currentChar,
     canApply,
     method,
-    flagCharForSequence,
     triggerKey,
     triggerKeyCustomChar,
     deadkeyBaseLetter,
@@ -1847,7 +1873,7 @@ export function MechanismGallery({
     currentChar !== null &&
     (appliedForCurrentChar > 0 ||
       coveredChars.has(currentChar) ||
-      sequenceFlaggedChars.includes(currentChar));
+      hasSequenceForChar(sessionAssignments, currentChar));
 
   // Skip is pure forward navigation — it records nothing, so it is identical
   // to handleNext (advance one position, or complete from the last
@@ -1859,15 +1885,20 @@ export function MechanismGallery({
     (char: string) => {
       // Own only the non-sequence mechanisms for `char` — a recorded
       // multi_char_sequence assignment (or the sequence-mechanism dimension
-      // of a mixed assignment) belongs to the Sequence Gallery and must
-      // survive this "Added" chip's removal untouched (see
+      // of a mixed assignment) is tracked as a separate dimension (see the
+      // "Sequences" chip row) and must survive this "Added" chip's removal
+      // untouched (see
       // excludeSequenceMechanisms above). An assignment left with zero
       // mechanisms after this strip is dropped entirely; one that still
-      // holds sequence mechanisms is kept, narrowed to just those.
+      // holds sequence mechanisms is kept, narrowed to just those. The
+      // "does `a` carry a sequence mechanism for `char`" half of this split
+      // is the same predicate hoisted to isSequenceAssignmentForChar in
+      // ./patternIds.ts — reused here instead of reimplemented.
       const next = sessionAssignments.flatMap((a) => {
         if (!(a.scope === "individual" && a.target === char)) return [a];
+        if (!isSequenceAssignmentForChar(a, char)) return [];
         const sequenceOnly = a.mechanisms.filter((m) => m.patternId === PATTERN_SEQUENCE);
-        return sequenceOnly.length > 0 ? [{ ...a, mechanisms: sequenceOnly }] : [];
+        return [{ ...a, mechanisms: sequenceOnly }];
       });
       recordAssignments(next);
       // Finding 2 (P2): a pending case-pair companion refers to a specific
@@ -1891,8 +1922,8 @@ export function MechanismGallery({
       // it must be a rebuilt exclusion-view of an underlying assignment that
       // ALSO carries PATTERN_SEQUENCE mechanisms (see excludeSequenceMechanisms
       // above); in that case drop only the mechanisms visible here, leaving
-      // the sequence mechanisms on the original — still owned by the
-      // Sequence Gallery — untouched.
+      // the sequence mechanisms on the original (still tracked as a separate
+      // dimension — see the "Sequences" chip row) untouched.
       let next: MechanismAssignment[];
       if (sessionAssignments.includes(assignment)) {
         next = sessionAssignments.filter((a) => a !== assignment);
@@ -2049,8 +2080,9 @@ export function MechanismGallery({
             &mdash; or Skip characters you don&rsquo;t need.
           </Trans>,
           <Trans id="editor.assignLoop.intro.bullet3" key="bullet3">
-            Sequences get their own dedicated part of the flow, right after
-            this gallery.
+            Need several keystrokes for one character? Pick &ldquo;Type a
+            sequence&rdquo; and a small builder opens right here, in place
+            of the preview.
           </Trans>,
           <Trans id="editor.assignLoop.intro.bullet4" key="bullet4">
             Phones and tablets come later, in the Touch gallery.
@@ -2082,8 +2114,7 @@ export function MechanismGallery({
   // ---------------------------------------------------------------------------
 
   // The always-enabled forward-button style is the shared `forwardBtnStyle`
-  // import (aliased from galleryTheme.ts's galleryForwardBtnStyle) — same
-  // object SequenceGallery uses for its own Next/Done button base.
+  // import (aliased from galleryTheme.ts's galleryForwardBtnStyle).
 
   interface ForwardButtonSpec {
     label: string;
@@ -2626,20 +2657,20 @@ export function MechanismGallery({
                     })}
                 </div>
               )}
-              {currentChar !== null && sequenceFlaggedChars.includes(currentChar) && (
+              {currentChar !== null && hasSequenceForChar(sessionAssignments, currentChar) && (
                 <div
                   style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}
                 >
                   <span style={{ fontSize: 12, color: "#58a6ff", fontFamily: FONT }}>
-                    <Trans id="editor.assignLoop.flaggedForSequence">Flagged for sequence</Trans>
+                    <Trans id="editor.assignLoop.sequenceRecordedBadge">Sequence recorded</Trans>
                   </span>
                   <button
                     type="button"
                     onClick={() => unflagCharForSequence(currentChar)}
                     disabled={locked}
                     aria-label={t({
-                      id: "editor.assignLoop.removeSequenceFlagAriaLabel",
-                      message: `Remove sequence flag for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+                      id: "editor.assignLoop.removeSequenceAssignmentAriaLabel",
+                      message: `Remove recorded sequence for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
                     })}
                     title={t({ id: "editor.assignLoop.clickToRemove", message: "click to remove" })}
                     style={{
@@ -2682,30 +2713,34 @@ export function MechanismGallery({
               {/* Apply + Skip. Back and Next/Done live in the shared top
                   toolbar row above (see leftContent's top of pane) so the
                   forward-advance control is spatially separated from these
-                  editing actions. */}
+                  editing actions. The generic "Apply method" button is
+                  hidden for method === "sequence" — the sequence builder
+                  (right pane, see rightContent below) owns its own Apply. */}
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                <button
-                  type="button"
-                  onClick={handleApply}
-                  disabled={!canApply || locked}
-                  aria-label={t({
-                    id: "editor.assignLoop.applyMethodAriaLabel",
-                    message: `Apply method for ${currentChar}`,
-                  })}
-                  style={{
-                    padding: "9px 20px",
-                    background: canApply ? BLUE_ACTION : "#21262d",
-                    border: "none",
-                    borderRadius: 6,
-                    color: canApply ? "#e6edf3" : TEXT_DIM,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: canApply ? "pointer" : "not-allowed",
-                    fontFamily: FONT,
-                  }}
-                >
-                  <Trans id="editor.assignLoop.applyMethodButton">Apply method</Trans>
-                </button>
+                {method !== "sequence" && (
+                  <button
+                    type="button"
+                    onClick={handleApply}
+                    disabled={!canApply || locked}
+                    aria-label={t({
+                      id: "editor.assignLoop.applyMethodAriaLabel",
+                      message: `Apply method for ${currentChar}`,
+                    })}
+                    style={{
+                      padding: "9px 20px",
+                      background: canApply ? BLUE_ACTION : "#21262d",
+                      border: "none",
+                      borderRadius: 6,
+                      color: canApply ? "#e6edf3" : TEXT_DIM,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: canApply ? "pointer" : "not-allowed",
+                      fontFamily: FONT,
+                    }}
+                  >
+                    <Trans id="editor.assignLoop.applyMethodButton">Apply method</Trans>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleNext}
@@ -2791,8 +2826,10 @@ export function MechanismGallery({
             </div>
           )}
 
-          {/* Flagged-for-sequences chip row — deferred, not counted as added */}
-          {sequenceFlaggedChars.length > 0 && (
+          {/* Sequences chip row — chars with a recorded multi_char_sequence
+              assignment, tracked separately from "Added" (see
+              excludeSequenceMechanisms). */}
+          {sequenceRecordedChars.length > 0 && (
             <div>
               <p
                 style={{
@@ -2803,24 +2840,24 @@ export function MechanismGallery({
                   letterSpacing: "0.05em",
                 }}
               >
-                <Trans id="editor.assignLoop.flaggedForSequencesHeading">Flagged for sequences</Trans>
+                <Trans id="editor.assignLoop.sequencesHeading">Sequences</Trans>
               </p>
               <div
                 role="group"
-                aria-label={t({ id: "editor.assignLoop.flaggedGroupAriaLabel", message: "Characters flagged for sequences — click to remove" })}
+                aria-label={t({ id: "editor.assignLoop.sequencesGroupAriaLabel", message: "Characters with a recorded sequence — click to remove" })}
                 style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
               >
-                {sequenceFlaggedChars.map((c) => (
+                {sequenceRecordedChars.map((c) => (
                   <button
                     key={c}
                     type="button"
                     onClick={() => unflagCharForSequence(c)}
                     aria-label={t({
-                      id: "editor.assignLoop.removeSequenceFlagListAriaLabel",
-                      message: `Remove sequence flag for ${{ notation: toUPlusNotation(c) }} ${{ char: c }}`,
+                      id: "editor.assignLoop.removeSequenceAssignmentListAriaLabel",
+                      message: `Remove recorded sequence for ${{ notation: toUPlusNotation(c) }} ${{ char: c }}`,
                     })}
                     title={t({
-                      id: "editor.assignLoop.removeSequenceFlagTitle",
+                      id: "editor.assignLoop.removeSequenceAssignmentTitle",
                       message: `${{ notation: toUPlusNotation(c) }} — click to remove`,
                     })}
                     style={{
@@ -2887,7 +2924,21 @@ export function MechanismGallery({
       modalityLabel={t({ id: "editor.assignLoop.modality.desktop", message: "Desktop" })}
       leftContent={leftContent}
       rightContent={
-        !loading && loadError === null ? (
+        // Selecting the S-03 sequence method swaps the live preview for the
+        // sequence builder — the trigger is the method-card click itself
+        // (MethodChooser's onMethodChange), not a later Apply. Apply and
+        // Cancel both hand control back via resetMethodState (method ->
+        // "swap"), which reverts this branch to the preview below, exactly
+        // like every other method's Apply already resets method state.
+        method === "sequence" && currentChar !== null ? (
+          <SequenceBuilderPanel
+            char={currentChar}
+            sessionAssignments={sessionAssignments}
+            recordAssignments={recordAssignments}
+            onApplied={resetMethodState}
+            onCancel={resetMethodState}
+          />
+        ) : !loading && loadError === null ? (
           <GalleryPreviewWithPatterns
             selectedBaseKeyboard={selectedBaseKeyboard}
             stage={artifactStage}

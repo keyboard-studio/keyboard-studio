@@ -50,7 +50,6 @@ const ACTIVE_STEP_IDS = new Set([
   "characters",
   "carve",
   "mechanisms",
-  "sequences",
   "touch",
   "help",
 ]);

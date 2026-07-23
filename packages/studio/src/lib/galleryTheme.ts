@@ -17,11 +17,12 @@ export {
 // These are composed CSSProperties objects, NOT primitive tokens (the "do not
 // add token values" note above is about the hex/font values re-exported from
 // ui/theme.ts). They were byte-identical consts hand-copied across
-// MechanismGallery.tsx, SequenceGallery.tsx, and TouchGallery.tsx; consolidated
-// here so the galleries can no longer drift apart. A gallery whose page needs
-// its own variant (e.g. SequenceGallery's flex-column page layout) spreads one
-// of these as a base and layers its own overrides locally rather than
-// redefining the whole object.
+// MechanismGallery.tsx and TouchGallery.tsx (and formerly the retired
+// SequenceGallery.tsx — its sequence-builder UI now lives inline in
+// MechanismGallery.tsx's SequenceBuilderPanel.tsx); consolidated here so the
+// galleries can no longer drift apart. A gallery whose page needs its own
+// variant spreads one of these as a base and layers its own overrides
+// locally rather than redefining the whole object.
 // ---------------------------------------------------------------------------
 
 import type { CSSProperties } from "react";
@@ -81,7 +82,7 @@ export const gallerySelectStyle: CSSProperties = {
 
 /**
  * Monospace character-entry box shared by MechanismGallery's deadkey
- * trigger/base-letter boxes and SequenceGallery's Content/Indicator boxes.
+ * trigger/base-letter boxes and SequenceBuilderPanel's Content/Indicator boxes.
  */
 export const galleryInputStyle: CSSProperties = {
   width: 52,

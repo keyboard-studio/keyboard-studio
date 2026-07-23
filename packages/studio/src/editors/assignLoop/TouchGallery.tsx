@@ -170,8 +170,7 @@ const configStyle: CSSProperties = {
 };
 
 // pageStyle and ghostBtn are imported (aliased) from ../../lib/galleryTheme.ts
-// — shared byte-for-byte with MechanismGallery.tsx/SequenceGallery.tsx rather
-// than redefined here.
+// — shared byte-for-byte with MechanismGallery.tsx rather than redefined here.
 
 // ---------------------------------------------------------------------------
 // Touch method type
