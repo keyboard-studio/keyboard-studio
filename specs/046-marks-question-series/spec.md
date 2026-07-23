@@ -446,12 +446,21 @@ combination.
   against a given base at the attachment station MUST correspond to no
   reachable path from that base plus that mark's key(s) to a composed
   result on the produced keyboard.
-- **FR-022**: The system MUST enforce the uniformity invariant on every
-  keyboard this feature governs: the produced keyboard's mark-bearing
-  output is either uniformly in the ready-made-character form or uniformly
-  in the base-plus-mark form, and this property MUST be checkable
-  mechanically against the finished keyboard's design, not merely asserted
-  by the survey answer that produced it.
+- **FR-022**: **[RETIRED 2026-07-23]** This requirement previously read:
+  "The system MUST enforce the uniformity invariant on every keyboard this
+  feature governs: the produced keyboard's mark-bearing output is either
+  uniformly in the ready-made-character form or uniformly in the
+  base-plus-mark form, and this property MUST be checkable mechanically
+  against the finished keyboard's design, not merely asserted by the survey
+  answer that produced it." Retired by explicit maintainer decision: the
+  concern that an accented/diacritic character can be typed more than one
+  way is no longer enforced via a validator warning. The implementing
+  check (`checkNormalizationUniformity`, the `layer-c-enforce` criteria row
+  carrying `KM_LINT_MARK_NORMALIZATION_UNIFORM`, and its wiring into the
+  validator oracle/index) has been removed from the engine. No replacement
+  mechanism is specified at this time; any future handling of this concern
+  will be defined in a separate amendment. The FR-022 id is retained
+  as a placeholder (not reassigned) so later FR references stay stable.
 - **FR-023**: If editing the confirmed alphabet after the marks series has
   been completed changes the evidence a prior mental-model or output-form
   decision was based on (e.g. adding a base to a mark whose class was
