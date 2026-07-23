@@ -26,6 +26,7 @@
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { screen, fireEvent, act, cleanup, waitFor, within, renderHook } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { render } from "../../test/renderWithI18n.tsx";
 import { MechanismGallery, PATTERN_SEQUENCE, PATTERN_DEADKEY } from "./MechanismGallery.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
@@ -336,19 +337,40 @@ describe("MechanismGallery — sequence method chooser", () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
     // "á" decomposes to a + U+0301, so the §3c default method is deadkey and
-    // the live preview (OSKFrame mock) is showing.
+    // the live preview (OSKFrame mock) is showing (visible, not hidden).
     expect(screen.getByTestId("osk-frame")).toBeTruthy();
+    expect(screen.getByTestId("mechanism-preview-wrapper").style.display).not.toBe("none");
 
     // Selecting the sequence method is itself the trigger — no separate
     // Apply needed to open the builder.
     fireEvent.click(screen.getByText(/Type a sequence/i));
 
-    expect(screen.queryByTestId("osk-frame")).toBeNull();
+    // The preview stays MOUNTED (never destroyed/recreated — see the
+    // rightContent doc comment: OSKFrame's iframe must never unmount, since
+    // KMW reinit is expensive/unsafe) — only its wrapper is hidden via CSS.
+    expect(screen.getByTestId("osk-frame")).toBeTruthy();
+    expect(screen.getByTestId("mechanism-preview-wrapper").style.display).toBe("none");
     expect(screen.getByTestId("sequences-content")).toBeTruthy();
     expect(screen.getByTestId("sequences-indicator")).toBeTruthy();
     // The generic "Apply method" button is hidden for this method — the
     // builder owns its own Apply (sequences-apply).
     expect(screen.queryByRole("button", { name: /Apply method for á/i })).toBeNull();
+  });
+
+  it("does NOT unmount/recreate the OSKFrame when toggling the sequence method (KMW reinit is expensive/unsafe — see OSKFrame.tsx's own doc comment)", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    const oskFrameBefore = screen.getByTestId("osk-frame");
+
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.click(screen.getByTestId("sequence-builder-cancel"));
+
+    // Same DOM node — proves OSKFrame was never unmounted+remounted across
+    // the round trip (a fresh mount would be a DIFFERENT node reference).
+    expect(screen.getByTestId("osk-frame")).toBe(oskFrameBefore);
+    expect(screen.getByTestId("mechanism-preview-wrapper").style.display).not.toBe("none");
   });
 
   it("the builder's own Apply is disabled until Content and Indicator both resolve", async () => {
@@ -3759,5 +3781,45 @@ describe("MechanismGallery — no in-box placeholders (Fix 1)", () => {
     expect(
       screen.getAllByText("Type a character directly, or a Unicode value like U+00E9."),
     ).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Real-interaction regression (bug report: "I can't click my cursor into any
+// of the fields and type") — uses @testing-library/user-event, which
+// simulates a genuine click-to-focus + per-character keydown/input/keyup
+// sequence (unlike fireEvent.change, which sets a value directly and would
+// pass even if the input never accepted real focus/keystrokes). Proves the
+// Content/Indicator boxes actually accept focus and typed input end to end,
+// through the full gallery (method-card click -> builder mount -> type).
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — sequence builder accepts real click+type (user-event)", () => {
+  it("clicking into Content and Indicator and typing updates their values and the combine-preview", async () => {
+    seedInventory(["á"]);
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+
+    const contentInput = screen.getByTestId("sequences-content") as HTMLInputElement;
+    const indicatorInput = screen.getByTestId("sequences-indicator") as HTMLInputElement;
+
+    await user.click(contentInput);
+    await user.type(contentInput, "a");
+    expect(contentInput.value).toBe("a");
+    expect(document.activeElement).toBe(contentInput);
+
+    await user.click(indicatorInput);
+    await user.type(indicatorInput, "s");
+    expect(indicatorInput.value).toBe("s");
+    expect(document.activeElement).toBe(indicatorInput);
+
+    // Combine-preview reflects both typed values.
+    expect(screen.getByText(/a \+ s/)).toBeTruthy();
+
+    const applyBtn = screen.getByTestId("sequences-apply") as HTMLButtonElement;
+    expect(applyBtn.disabled).toBe(false);
   });
 });

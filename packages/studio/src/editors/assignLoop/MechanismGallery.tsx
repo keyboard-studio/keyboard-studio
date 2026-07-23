@@ -624,6 +624,85 @@ function MethodChooser({
         </Trans>
       </p>
 
+      {/* S-01 — always shown. Rendered FIRST: "Assign to a key" is the
+          per-character default method (see MechanismGallery's
+          useState<Method>("swap")), so its card leads the list. */}
+      <div style={cardStyle(method === "swap")}>
+        <button
+          type="button"
+          aria-pressed={method === "swap"}
+          onClick={() => onMethodChange("swap")}
+          style={headerBtnStyle}
+        >
+          <span style={{ fontWeight: 600, color: method === "swap" ? ACCENT : TEXT_MAIN }}>
+            <Trans id="editor.assignLoop.method.swap.title">Assign to a key</Trans>
+          </span>
+          {method !== "swap" && (
+            <span style={{ fontSize: 11, color: TEXT_DIM }}>
+              <Trans id="editor.assignLoop.method.swap.summary">
+                Dedicate one physical key to produce {currentCharDisplay}
+              </Trans>
+            </span>
+          )}
+        </button>
+        {method === "swap" && (
+          <div style={configStyle}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 12,
+                color: TEXT_DIM,
+                fontFamily: FONT,
+                flexWrap: "wrap",
+              }}
+            >
+              <span><Trans id="editor.assignLoop.keyLabel">Key:</Trans></span>
+              <KeyPickerField
+                value={selectedSwapKey}
+                onChange={onSwapKeyChange}
+                customChar={selectedSwapKeyCustomChar}
+                onCustomCharChange={onSwapKeyCustomCharChange}
+                options={KEY_OPTIONS}
+                selectAriaLabel={t({ id: "editor.assignLoop.swap.keySelectAriaLabel", message: "Physical key for simple swap" })}
+                customInputAriaLabel={t({ id: "editor.assignLoop.swap.keyCustomAriaLabel", message: "Custom character for simple swap key" })}
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span id="swap-layer-label" style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+                <Trans id="editor.assignLoop.layerLabel">Layer:</Trans>
+              </span>
+              <RadioGroup
+                name="swap-layer"
+                value={swapLayer}
+                onChange={(v) => onSwapLayerChange(v as SwapLayer)}
+                ariaLabelledby="swap-layer-label"
+                options={[
+                  { value: "base", label: t({ id: "editor.assignLoop.swap.layerBase", message: "Base" }) },
+                  {
+                    value: "shift",
+                    label: t({ id: "editor.assignLoop.swap.layerShift", message: "Shift" }),
+                    disabled: shiftLayerDisabled,
+                    ...(shiftLayerDisabled
+                      ? { title: t({ id: "editor.assignLoop.swap.shiftDisabledReason", message: "Mnemonic keyboard: shift behaviour comes from the base layout" }) }
+                      : {}),
+                  },
+                ]}
+              />
+            </div>
+            {swapLayer === "shift" && swapVkeyForDisplay !== null && (
+              <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+                <Trans id="editor.assignLoop.swap.shiftPreview">
+                  Shift + {swapVkeyForDisplay.replace(/^K_/, "")} &rarr;{" "}
+                  <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentCharDisplay}</span>
+                </Trans>
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* S-03 — always shown */}
       <div style={cardStyle(method === "sequence")}>
         <button
@@ -751,83 +830,6 @@ function MethodChooser({
                 <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentCharDisplay}</span>
               </Trans>
             </p>
-          </div>
-        )}
-      </div>
-
-      {/* S-01 — always shown */}
-      <div style={cardStyle(method === "swap")}>
-        <button
-          type="button"
-          aria-pressed={method === "swap"}
-          onClick={() => onMethodChange("swap")}
-          style={headerBtnStyle}
-        >
-          <span style={{ fontWeight: 600, color: method === "swap" ? ACCENT : TEXT_MAIN }}>
-            <Trans id="editor.assignLoop.method.swap.title">Assign to a key</Trans>
-          </span>
-          {method !== "swap" && (
-            <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              <Trans id="editor.assignLoop.method.swap.summary">
-                Dedicate one physical key to produce {currentCharDisplay}
-              </Trans>
-            </span>
-          )}
-        </button>
-        {method === "swap" && (
-          <div style={configStyle}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 12,
-                color: TEXT_DIM,
-                fontFamily: FONT,
-                flexWrap: "wrap",
-              }}
-            >
-              <span><Trans id="editor.assignLoop.keyLabel">Key:</Trans></span>
-              <KeyPickerField
-                value={selectedSwapKey}
-                onChange={onSwapKeyChange}
-                customChar={selectedSwapKeyCustomChar}
-                onCustomCharChange={onSwapKeyCustomCharChange}
-                options={KEY_OPTIONS}
-                selectAriaLabel={t({ id: "editor.assignLoop.swap.keySelectAriaLabel", message: "Physical key for simple swap" })}
-                customInputAriaLabel={t({ id: "editor.assignLoop.swap.keyCustomAriaLabel", message: "Custom character for simple swap key" })}
-              />
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span id="swap-layer-label" style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-                <Trans id="editor.assignLoop.layerLabel">Layer:</Trans>
-              </span>
-              <RadioGroup
-                name="swap-layer"
-                value={swapLayer}
-                onChange={(v) => onSwapLayerChange(v as SwapLayer)}
-                ariaLabelledby="swap-layer-label"
-                options={[
-                  { value: "base", label: t({ id: "editor.assignLoop.swap.layerBase", message: "Base" }) },
-                  {
-                    value: "shift",
-                    label: t({ id: "editor.assignLoop.swap.layerShift", message: "Shift" }),
-                    disabled: shiftLayerDisabled,
-                    ...(shiftLayerDisabled
-                      ? { title: t({ id: "editor.assignLoop.swap.shiftDisabledReason", message: "Mnemonic keyboard: shift behaviour comes from the base layout" }) }
-                      : {}),
-                  },
-                ]}
-              />
-            </div>
-            {swapLayer === "shift" && swapVkeyForDisplay !== null && (
-              <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-                <Trans id="editor.assignLoop.swap.shiftPreview">
-                  Shift + {swapVkeyForDisplay.replace(/^K_/, "")} &rarr;{" "}
-                  <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentCharDisplay}</span>
-                </Trans>
-              </p>
-            )}
           </div>
         )}
       </div>
@@ -2924,32 +2926,53 @@ export function MechanismGallery({
       modalityLabel={t({ id: "editor.assignLoop.modality.desktop", message: "Desktop" })}
       leftContent={leftContent}
       rightContent={
-        // Selecting the S-03 sequence method swaps the live preview for the
-        // sequence builder — the trigger is the method-card click itself
+        // Selecting the S-03 sequence method swaps the visible right pane for
+        // the sequence builder — the trigger is the method-card click itself
         // (MethodChooser's onMethodChange), not a later Apply. Apply and
         // Cancel both hand control back via resetMethodState (method ->
-        // "swap"), which reverts this branch to the preview below, exactly
-        // like every other method's Apply already resets method state.
-        method === "sequence" && currentChar !== null ? (
-          <SequenceBuilderPanel
-            char={currentChar}
-            sessionAssignments={sessionAssignments}
-            recordAssignments={recordAssignments}
-            onApplied={resetMethodState}
-            onCancel={resetMethodState}
-          />
-        ) : !loading && loadError === null ? (
-          <GalleryPreviewWithPatterns
-            selectedBaseKeyboard={selectedBaseKeyboard}
-            stage={artifactStage}
-            retry={artifactRetry}
-            onKeyTap={handleKeyTap}
-          />
-        ) : loading ? (
-          <p style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
-            <Trans id="editor.assignLoop.loadingPatterns">Loading patterns...</Trans>
-          </p>
-        ) : null
+        // "swap"), which reverts the visible pane back to the preview below,
+        // exactly like every other method's Apply already resets method
+        // state.
+        //
+        // IMPORTANT: the preview branch is toggled via CSS (display:none),
+        // NOT by conditionally unmounting it. GalleryPreviewWithPatterns owns
+        // OSKFrame's <iframe>, whose own header comment states the iframe
+        // "is mounted unconditionally ... so KMW's init() runs once and
+        // stays warm — hiding & re-creating the iframe would reset KMW
+        // context on every selection". An earlier version of this file
+        // violated that invariant by unmounting GalleryPreviewWithPatterns
+        // whenever method === "sequence", destroying and later recreating
+        // the WASM/KMW-backed iframe on every method toggle — exactly the
+        // "expensive"/unsafe reinit its own doc comment warns against. Always
+        // render it; only the wrapping div's `display` changes.
+        <>
+          <div
+            data-testid="mechanism-preview-wrapper"
+            style={{ display: method === "sequence" && currentChar !== null ? "none" : "contents" }}
+          >
+            {!loading && loadError === null ? (
+              <GalleryPreviewWithPatterns
+                selectedBaseKeyboard={selectedBaseKeyboard}
+                stage={artifactStage}
+                retry={artifactRetry}
+                onKeyTap={handleKeyTap}
+              />
+            ) : loading ? (
+              <p style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
+                <Trans id="editor.assignLoop.loadingPatterns">Loading patterns...</Trans>
+              </p>
+            ) : null}
+          </div>
+          {method === "sequence" && currentChar !== null && (
+            <SequenceBuilderPanel
+              char={currentChar}
+              sessionAssignments={sessionAssignments}
+              recordAssignments={recordAssignments}
+              onApplied={resetMethodState}
+              onCancel={resetMethodState}
+            />
+          )}
+        </>
       }
     />
   );
