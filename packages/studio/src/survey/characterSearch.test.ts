@@ -1,9 +1,10 @@
 // Unit tests for characterSearch.ts's matchesQuery — the four search modes
 // (glyph / codepoint / name / base-letter) independent of CharacterMapPane's
-// rendering, plus the empty-query no-match contract.
+// rendering, plus the empty-query no-match contract, and the SearchFilters
+// gating (search box's "Search in:" checkboxes).
 
 import { describe, it, expect } from "vitest";
-import { matchesQuery } from "./characterSearch.ts";
+import { matchesQuery, type SearchFilters } from "./characterSearch.ts";
 
 const COMBINING_ACUTE = "́";
 
@@ -96,5 +97,55 @@ describe("matchesQuery", () => {
     expect(matchesQuery({ char: "\u{1E900}", name: "ADLAM CAPITAL LETTER ALIF" }, "adlam")).toBe(
       true,
     );
+  });
+
+  describe("SearchFilters gating", () => {
+    const ALL: SearchFilters = { codepoint: true, name: true, character: true };
+    const NONE: SearchFilters = { codepoint: false, name: false, character: false };
+
+    it("omitting filters defaults to all-true (backward-compatible: matches every mode)", () => {
+      expect(matchesQuery({ char: "a" }, "a")).toBe(true);
+      expect(matchesQuery({ char: "A" }, "0041")).toBe(true);
+      expect(matchesQuery({ char: "a", name: "LATIN SMALL LETTER A" }, "latin")).toBe(true);
+    });
+
+    it("all-false never matches, regardless of mode", () => {
+      expect(matchesQuery({ char: "a" }, "a", NONE)).toBe(false);
+      expect(matchesQuery({ char: "A" }, "0041", NONE)).toBe(false);
+      expect(matchesQuery({ char: "a", name: "LATIN SMALL LETTER A" }, "latin", NONE)).toBe(false);
+      expect(matchesQuery({ char: "o" }, "o", NONE)).toBe(false);
+    });
+
+    it("filters.codepoint alone gates mode (b) CODEPOINT only", () => {
+      const only: SearchFilters = { ...NONE, codepoint: true };
+      expect(matchesQuery({ char: "A" }, "0041", only)).toBe(true); // codepoint match
+      expect(matchesQuery({ char: "A" }, "A", only)).toBe(false); // glyph match suppressed
+      expect(matchesQuery({ char: "A", name: "LATIN CAPITAL LETTER A" }, "latin", only)).toBe(
+        false,
+      ); // name match suppressed
+    });
+
+    it("filters.name alone gates mode (c) NAME only", () => {
+      const only: SearchFilters = { ...NONE, name: true };
+      expect(
+        matchesQuery({ char: COMBINING_ACUTE, name: "COMBINING ACUTE ACCENT" }, "acute", only),
+      ).toBe(true);
+      expect(matchesQuery({ char: "a" }, "a", only)).toBe(false); // glyph match suppressed
+      expect(matchesQuery({ char: "A" }, "0041", only)).toBe(false); // codepoint match suppressed
+    });
+
+    it("filters.character alone gates modes (a) GLYPH and (d) BASE LETTER only", () => {
+      const only: SearchFilters = { ...NONE, character: true };
+      expect(matchesQuery({ char: "a" }, "a", only)).toBe(true); // glyph
+      expect(matchesQuery({ char: "ø" }, "o", only)).toBe(true); // base-letter fold
+      expect(matchesQuery({ char: "A" }, "0041", only)).toBe(false); // codepoint suppressed
+      expect(matchesQuery({ char: "a", name: "LATIN SMALL LETTER A" }, "latin", only)).toBe(
+        false,
+      ); // name suppressed
+    });
+
+    it("explicit all-true filters behave identically to the default", () => {
+      expect(matchesQuery({ char: "a" }, "a", ALL)).toBe(true);
+    });
   });
 });

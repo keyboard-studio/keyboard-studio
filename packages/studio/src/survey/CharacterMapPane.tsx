@@ -29,7 +29,7 @@ import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
 import { isPrivateUseCodePoint } from "@keyboard-studio/engine";
 import { isCombining, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
-import { matchesQuery } from "./characterSearch.ts";
+import { ALL_FILTERS, matchesQuery, type SearchFilters } from "./characterSearch.ts";
 import { TextField, Checkbox } from "../ui/index.ts";
 import { useGlyphFontStack } from "./useGlyphFontStack.ts";
 import { useFontSupportChecker } from "./useFontSupportChecker.ts";
@@ -203,6 +203,12 @@ export function CharacterMapPane({
 
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [query, setQuery] = useState("");
+  // "Search in:" field filters for the search box above — all-true by
+  // default (search every field). Deliberately independent of `blocksOnly`
+  // below: these narrow WHICH FIELDS a query matches against, not which
+  // groups are in scope. See characterSearch.ts's SearchFilters doc comment
+  // for the mode mapping.
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>(ALL_FILTERS);
   const [blocksOnly, setBlocksOnly] = useState(true);
   const [announcement, setAnnouncement] = useState("");
   const [rawInput, setRawInput] = useState("");
@@ -265,6 +271,7 @@ export function CharacterMapPane({
     // persist across a language/base change — reset the transient UI state
     // before the new fetch starts.
     setQuery("");
+    setSearchFilters(ALL_FILTERS);
     setRawInput("");
     setRawError(null);
     setAnnouncement("");
@@ -312,7 +319,7 @@ export function CharacterMapPane({
     const q = query.trim();
     if (q !== "") {
       return loadState.groups
-        .map((g) => ({ ...g, cells: g.cells.filter((c) => matchesQuery(c, q)) }))
+        .map((g) => ({ ...g, cells: g.cells.filter((c) => matchesQuery(c, q, searchFilters)) }))
         .filter((g) => g.cells.length > 0);
     }
     if (blocksOnly && hasKnownBlocks) {
@@ -321,7 +328,7 @@ export function CharacterMapPane({
       );
     }
     return loadState.groups;
-  }, [loadState, query, blocksOnly, hasKnownBlocks, chars]);
+  }, [loadState, query, searchFilters, blocksOnly, hasKnownBlocks, chars]);
 
   // Defined here (not at module scope) so its `t()` calls close over this
   // component's own `t` binding directly — see the note above CodepointParseResult.
@@ -438,6 +445,30 @@ export function CharacterMapPane({
         : t({
             id: "survey.characterMapPane.blocksOnly.announceOff",
             message: "Showing all blocks",
+          }),
+    );
+  }
+
+  // Toggles one of the "Search in:" field filters — reuses the existing
+  // announcement live region, same as handleToggleBlocksOnly, rather than
+  // adding a second one.
+  function handleToggleSearchFilter(field: keyof SearchFilters, next: boolean): void {
+    setSearchFilters((prev) => ({ ...prev, [field]: next }));
+    const fieldLabel =
+      field === "character"
+        ? t({ id: "survey.characterMapPane.searchFilter.character", message: "Character" })
+        : field === "name"
+          ? t({ id: "survey.characterMapPane.searchFilter.name", message: "Name" })
+          : t({ id: "survey.characterMapPane.searchFilter.unicode", message: "Unicode value" });
+    setAnnouncement(
+      next
+        ? t({
+            id: "survey.characterMapPane.searchFilter.announceOn",
+            message: `Now searching by ${{ field: fieldLabel }}`,
+          })
+        : t({
+            id: "survey.characterMapPane.searchFilter.announceOff",
+            message: `No longer searching by ${{ field: fieldLabel }}`,
           }),
     );
   }
@@ -584,6 +615,53 @@ export function CharacterMapPane({
         placeholder={t({ id: "survey.characterMapPane.search.placeholder", message: "Search characters" })}
         aria-label={t({ id: "survey.characterMapPane.search.ariaLabel", message: "Search the character map" })}
       />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 10,
+          fontSize: 12,
+          color: TEXT_DIM,
+        }}
+      >
+        <span>
+          <Trans id="survey.characterMapPane.searchFilter.label">Search in:</Trans>
+        </span>
+        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <Checkbox
+            checked={searchFilters.character}
+            onChange={(e) => handleToggleSearchFilter("character", e.target.checked)}
+            aria-label={t({
+              id: "survey.characterMapPane.searchFilter.character.ariaLabel",
+              message: "Search by character",
+            })}
+          />
+          <Trans id="survey.characterMapPane.searchFilter.character">Character</Trans>
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <Checkbox
+            checked={searchFilters.name}
+            onChange={(e) => handleToggleSearchFilter("name", e.target.checked)}
+            aria-label={t({
+              id: "survey.characterMapPane.searchFilter.name.ariaLabel",
+              message: "Search by name",
+            })}
+          />
+          <Trans id="survey.characterMapPane.searchFilter.name">Name</Trans>
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <Checkbox
+            checked={searchFilters.codepoint}
+            onChange={(e) => handleToggleSearchFilter("codepoint", e.target.checked)}
+            aria-label={t({
+              id: "survey.characterMapPane.searchFilter.unicode.ariaLabel",
+              message: "Search by Unicode value",
+            })}
+          />
+          <Trans id="survey.characterMapPane.searchFilter.unicode">Unicode value</Trans>
+        </label>
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         {!noBaseOrLanguage && hasKnownBlocks && (
           <label

@@ -648,6 +648,123 @@ describe("CharacterMapPane — search filter", () => {
     expect(within(group).queryByRole("button", { name: /A \(U\+0041\)/ })).toBeNull();
   });
 
+  it("unchecking the Unicode value filter stops codepoint matches", async () => {
+    seedBaseAndLanguage();
+    getGroupsResult.set([
+      {
+        block: "Basic Latin",
+        tier: "main",
+        script: "Latn",
+        usedByBase: false,
+        cells: [{ char: "A", isCombiningMark: false }], // U+0041
+      },
+    ]);
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Basic Latin characters (main)")).toBeTruthy();
+    });
+    const searchInput = screen.getByLabelText("Search the character map");
+    fireEvent.change(searchInput, { target: { value: "0041" } });
+    expect(screen.getByLabelText("Basic Latin characters (main)")).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Search by Unicode value"));
+    expect(
+      screen.queryByText('No characters match "0041".'),
+    ).toBeTruthy();
+  });
+
+  it("unchecking the Character filter stops glyph matches while a Name match still surfaces the same cell", async () => {
+    seedBaseAndLanguage();
+    getGroupsResult.set([
+      {
+        block: "Latin",
+        tier: "main",
+        script: "Latn",
+        usedByBase: false,
+        cells: [{ char: "ø", isCombiningMark: false, name: "LATIN SMALL LETTER O WITH STROKE" }],
+      },
+    ]);
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const searchInput = screen.getByLabelText("Search the character map");
+
+    // Before unchecking: a raw-glyph query matches via the Character filter's
+    // GLYPH mode (the cell's name is plain ASCII, so this isn't a Name-mode
+    // coincidence).
+    fireEvent.change(searchInput, { target: { value: "ø" } });
+    expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Search by character"));
+    expect(screen.queryByText('No characters match "ø".')).toBeTruthy();
+
+    // The Name filter is untouched — a name-substring query for the very
+    // same cell still matches, proving "Character" gates glyph/base-letter
+    // matching specifically, not search as a whole.
+    fireEvent.change(searchInput, { target: { value: "stroke" } });
+    expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+  });
+
+  it("unchecking the Name filter stops name-substring matches while a Character (glyph) match still surfaces the same cell", async () => {
+    seedBaseAndLanguage();
+    getGroupsResult.set([
+      {
+        block: "Latin",
+        tier: "main",
+        script: "Latn",
+        usedByBase: false,
+        cells: [{ char: "ø", isCombiningMark: false, name: "LATIN SMALL LETTER O WITH STROKE" }],
+      },
+    ]);
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const searchInput = screen.getByLabelText("Search the character map");
+
+    fireEvent.change(searchInput, { target: { value: "stroke" } });
+    expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Search by name"));
+    expect(screen.queryByText('No characters match "stroke".')).toBeTruthy();
+
+    // The Character filter is untouched — a raw-glyph query for the very
+    // same cell still matches.
+    fireEvent.change(searchInput, { target: { value: "ø" } });
+    expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+  });
+
+  it("a language/base change resets the search filter checkboxes back to all-checked", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const characterCheckbox = screen.getByLabelText("Search by character") as HTMLInputElement;
+    const nameCheckbox = screen.getByLabelText("Search by name") as HTMLInputElement;
+    const unicodeCheckbox = screen.getByLabelText("Search by Unicode value") as HTMLInputElement;
+
+    fireEvent.click(characterCheckbox);
+    fireEvent.click(nameCheckbox);
+    expect(characterCheckbox.checked).toBe(false);
+    expect(nameCheckbox.checked).toBe(false);
+
+    // Drive a language change the same way the hiddenGroups-reset test does
+    // (act + setSurveyContext) — this re-triggers the fetch effect, which
+    // resets searchFilters to ALL_FILTERS.
+    act(() => {
+      useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "fr", language_name: "French" });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Search by character")).toHaveProperty("checked", true);
+    });
+    expect(screen.getByLabelText("Search by name")).toHaveProperty("checked", true);
+    expect(screen.getByLabelText("Search by Unicode value")).toHaveProperty("checked", true);
+  });
+
   it("matches by base letter — 'o' finds o, an accented o, and a non-decomposing o-variant", async () => {
     seedBaseAndLanguage();
     getGroupsResult.set([
