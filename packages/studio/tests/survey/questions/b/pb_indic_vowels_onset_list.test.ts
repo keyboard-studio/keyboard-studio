@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/b/pb_indic_vowels_onset_list.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/b/pb_indic_vowels_onset_list.ts";
 
 describe("pb_indic_vowels_onset_list — definition", () => {
   it("has correct id", () => {

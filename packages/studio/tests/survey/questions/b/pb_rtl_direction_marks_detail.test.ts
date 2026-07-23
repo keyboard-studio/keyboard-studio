@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/b/pb_rtl_direction_marks_detail.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/b/pb_rtl_direction_marks_detail.ts";
 
 describe("pb_rtl_direction_marks_detail — definition", () => {
   it("has correct id", () => {
@@ -18,8 +21,10 @@ describe("pb_rtl_direction_marks_detail — definition", () => {
     expect(definition.next).toBe("pb_rtl_special_letters");
   });
   it("offers RLM and LRM codepoints as options", () => {
-    const opts = (definition as Record<string, unknown>)["options"] as Array<{ value: string }>;
-    const values = opts.map(o => o.value);
+    const opts = (definition as Record<string, unknown>)["options"] as Array<{
+      value: string;
+    }>;
+    const values = opts.map((o) => o.value);
     expect(values).toContain("U+200F");
     expect(values).toContain("U+200E");
   });

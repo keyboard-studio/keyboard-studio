@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/b/pb_azerty_qz_swap.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/b/pb_azerty_qz_swap.ts";
 
 describe("pb_azerty_qz_swap — definition", () => {
   it("has correct id", () => {

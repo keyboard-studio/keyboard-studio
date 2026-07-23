@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/f/pf_credits.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/f/pf_credits.ts";
 
 describe("pf_credits — definition", () => {
   it("has correct id", () => {

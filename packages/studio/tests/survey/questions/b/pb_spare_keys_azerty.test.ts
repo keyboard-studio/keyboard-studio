@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/b/pb_spare_keys_azerty.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/b/pb_spare_keys_azerty.ts";
 
 describe("pb_spare_keys_azerty — definition", () => {
   it("has correct id", () => {

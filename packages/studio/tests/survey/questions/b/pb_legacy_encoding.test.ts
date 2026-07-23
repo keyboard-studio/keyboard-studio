@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/b/pb_legacy_encoding.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/b/pb_legacy_encoding.ts";
 
 describe("pb_legacy_encoding — definition", () => {
   it("has correct id", () => {

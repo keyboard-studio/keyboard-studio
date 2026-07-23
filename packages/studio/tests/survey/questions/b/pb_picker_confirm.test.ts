@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/b/pb_picker_confirm.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/b/pb_picker_confirm.ts";
 
 describe("pb_picker_confirm — definition", () => {
   it("has correct id", () => {
@@ -12,7 +15,9 @@ describe("pb_picker_confirm — definition", () => {
     expect(definition.type).toBe("multi_select");
   });
   it("uses seeded picker candidates options source", () => {
-    expect((definition as Record<string, unknown>)["options_source"]).toBe("@picker_candidates_seeded");
+    expect((definition as Record<string, unknown>)["options_source"]).toBe(
+      "@picker_candidates_seeded",
+    );
   });
   it("routes to pb_routing_branch", () => {
     expect(definition.next).toBe("pb_routing_branch");

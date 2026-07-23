@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/b/pb_contact_language.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/b/pb_contact_language.ts";
 
 describe("pb_contact_language — definition", () => {
   it("has correct id", () => {

@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/b/pb_rtl_special_letters.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/b/pb_rtl_special_letters.ts";
 
 describe("pb_rtl_special_letters — definition", () => {
   it("has correct id", () => {

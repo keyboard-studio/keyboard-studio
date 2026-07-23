@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/b/pb_indic_virama.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/b/pb_indic_virama.ts";
 
 describe("pb_indic_virama — definition", () => {
   it("has correct id", () => {

@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/b/pb_co_installed_keyboards.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/b/pb_co_installed_keyboards.ts";
 
 describe("pb_co_installed_keyboards — definition", () => {
   it("has correct id", () => {

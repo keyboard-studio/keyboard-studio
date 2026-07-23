@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/b/pb_latin_qwerty_branch.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/b/pb_latin_qwerty_branch.ts";
 
 describe("pb_latin_qwerty_branch — definition", () => {
   it("has correct id", () => {
