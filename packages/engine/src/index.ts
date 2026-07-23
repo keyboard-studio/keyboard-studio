@@ -224,3 +224,7 @@ export type {
 // Inventory diff (spec §8): static extraction of a keyboard's produced glyph set.
 export { producedGlyphs, collectFromOutput } from "./inventory/producedGlyphs.js";
 export type { ProducedGlyphsOptions } from "./inventory/producedGlyphs.js";
+
+// Inventory diff (spec §8): needed-vs-produced coverage delta (standalone; not wired into any caller).
+export { computeInventoryDelta } from "./inventory/computeInventoryDelta.js";
+export type { InventoryDelta } from "./inventory/computeInventoryDelta.js";
