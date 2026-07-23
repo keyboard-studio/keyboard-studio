@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022",
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@keyboard-studio/contracts": ["../../packages/contracts/src/index.ts"]
+    }
+  }
+}

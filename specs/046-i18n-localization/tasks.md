@@ -84,13 +84,13 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 
 ### Tests for User Story 2
 
-- [ ] T024 [P] [US2] Extractor test: control fields excluded, prose extracted, from a sample pattern + adaptation-question YAML (#1263)
+- [x] T024 [P] [US2] Extractor test: control fields excluded, prose extracted, from a sample pattern + adaptation-question YAML (#1263)
 - [ ] T025 [P] [US2] `criteria.<lang>.json` satisfies `CriterionSchema`; the 148-row count test still reads only the canonical English `criteria.json` (#1264)
 
 ### Implementation for User Story 2
 
-- [ ] T026 [US2] **Joint engine+content session** (Article VI seam): agree per-string id derivation from a record, extractor location, and loader fallback semantics; record the decision in [research.md](research.md) (#1265)
-- [ ] T027 [US2] Build extraction utility `utilities/i18n-content-extract` → flat `content/i18n/en/*.json` from content records (#1266)
+- [x] T026 [US2] **Joint engine+content session** (Article VI seam): agree per-string id derivation from a record, extractor location, and loader fallback semantics; record the decision in [research.md](research.md) (#1265)
+- [x] T027 [US2] Build extraction utility `utilities/i18n-content-extract` → flat `content/i18n/en/*.json` from content records (#1266)
 - [ ] T028 [US2] Content i18n loader with English fallback (studio/engine resolves localized prose by active locale) (#1267)
 - [ ] T029 [US2] Localize criteria descriptions → `packages/contracts/data/criteria.<lang>.json`; loader + schema conformance (respects T025) (#1268)
 - [ ] T030 [US2] Activate the Tier B mapping in [crowdin.yml](../../crowdin.yml) (`content/i18n/**`) (#1269)
