@@ -1,0 +1,743 @@
+{
+  "workflow": "speckit",
+  "specName": "Richer character-inventory breakdown on \"Add your whole alphabet\"",
+  "branch": "047-alphabet-inventory-categories",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-23T18:03:11.090Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-23T18:11:28.029Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-23T18:11:28.032Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T21:26:34.451Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T21:26:55.046Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T21:27:35.219Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-23T21:28:55.148Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T21:33:38.574Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-23T21:53:59.331Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-23T21:53:59.333Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:03.128Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:03.373Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:03.612Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:03.856Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:04.093Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:04.324Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:04.555Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:04.786Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:32.818Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:33.053Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:33.283Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:33.517Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:33.744Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:33.976Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:34.197Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:34.422Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016a",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:34.642Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:34.868Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:35.122Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:35.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:35.594Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:35.826Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:36.052Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:36.278Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:36.506Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:36.730Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:36.959Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:37.190Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:37.426Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:27:37.649Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-23T22:28:55.450Z"
+    }
+  ],
+  "telemetryInstanceId": "f122ed49-164f-4612-9e56-794b71dcbeaa",
+  "approach": "Capture every grapheme in the Type-your-alphabet box (dropping only CR/LF/CRLF/Tab/space, logging unusual chars), then split the inventory in phaseBDraftStore.deriveStores() into Letters/Marks/Accented plus new derived Numbers/Punctuation/Symbols/Separators/Control arrays classified by Unicode General Category. Order each section with a default Intl.Collator, collapse Letters to lowercase with a Show-uppercase toggle (reusing engine caseCounterpart), and keep chars/confirmedInventory complete so the contract stays additive.",
+  "decisions": [
+    {
+      "decision": "Derive the six category arrays once in phaseBDraftStore.deriveStores() as additive studio-store state",
+      "why": "Single derivation makes the sections mutually exclusive by construction (FR-005) and directly unit-testable; keeping chars/confirmedInventory complete honors the no-contract-change assumption (FR-013)",
+      "rejected": "View-only classification in AlphabetBreakdown, or adding category fields to the ConfirmedAlphabet contract"
+    },
+    {
+      "decision": "{\"decision\": \"Add a pure glyphCategory() primitive to engine character-discovery using native \\p{L|N|P|S|Z|C} escapes\", \"why\": \"The engine already classifies characters exclusively via native Unicode property escapes (isCombiningMarkChar); keeps all GC logic in one package with no UCD table\", \"rejected\": \"A studio-local classifier, or using the generated charnames JSON\"}"
+    },
+    {
+      "decision": "Reuse engine caseCounterpart for the case toggle and record-both-cases; order sections with default Intl.Collator; add a studio-local codepointLabel helper for the U+XXXX+ multi-code-point label",
+      "why": "caseCounterpart already encodes the single-code-point/locale/null guards the spec asks for; Intl.Collator is the platform ICU binding (root collation) with no dependency; a local label helper avoids editing the locked toUPlusNotation util (FR-012/FR-014)",
+      "rejected": "Raw toUpperCase/code-point sort, or extending toUPlusNotation itself"
+    },
+    {
+      "decision": "T016 gate outcome (a): restrict store bases to letters; route non-letters to derived category arrays",
+      "why": "the only ConfirmedAlphabet.bases consumers (marks worklist/attachment-proposals) want letters as attachment bases; complete inventory preserved in flat chars/confirmedInventory (FR-013)",
+      "rejected": "view-only p{L} filter (T016a) — unnecessary once no consumer depends on non-letter bases"
+    },
+    {
+      "decision": "relax AlphabetBreakdown render guard to show once any bases exist",
+      "why": "US3 requires the Letters section + uppercase toggle to appear for a letters-only alphabet (a b c); existing spec-046 test only asserts marks/accented testids absent, still passes",
+      "rejected": "keeping the marks/stack-only guard — would hide Letters for plain alphabets, failing US3"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Studio-only feature (plus one pure engine glyphCategory primitive); no contract/schema edits, all Constitution articles PASS",
+      "key_finding": "Every Unicode primitive needed already exists in the engine (caseCounterpart, decomposeGrapheme, isCombiningMarkChar, isPrivateUseCodePoint); the only new engine code is a GC classifier, and phaseBDraftStore.deriveStores() is the single place category routing lands"
+    },
+    "tasks": {
+      "summary": "29 tasks across 7 phases, organized by the four user stories, test-first; MVP = US1 (whole-text capture) + US2 (category breakdown)",
+      "key_finding": "US1-US4 implementation tasks all edit packages/studio/src/survey/PhaseB.tsx so they are not parallelizable on that file; Phase 2 primitives (engine glyphCategory, studio codepointLabel + collation) block every story"
+    },
+    "implement": {
+      "summary": "Whole-text grapheme capture + six-way Unicode-GC inventory breakdown (Numbers/Punctuation/Symbols/Separators/Control), ICU-ordered, with Letters case-collapse+uppercase toggle, record-both-cases on Done, letters-only Your-alphabet list, and compact multi-code-point chip labels — studio SPA + one pure engine glyphCategory primitive, no contract change"
+    }
+  },
+  "coverage": {
+    "FR-009": {
+      "tasks": [
+        "T022",
+        "T024"
+      ],
+      "tests": [
+        "BuildListView.test.tsx::records both cases",
+        "Turkish dotted-i on Done"
+      ]
+    },
+    "FR-008": {
+      "tasks": [
+        "T021",
+        "T023"
+      ],
+      "tests": [
+        "BuildListView.test.tsx::toggling on reveals derived uppercases"
+      ]
+    },
+    "FR-007": {
+      "tasks": [
+        "T008",
+        "T015",
+        "T019"
+      ],
+      "tests": [
+        "BuildListView.test.tsx::Letters default-ICU ordered"
+      ]
+    },
+    "FR-006": {
+      "tasks": [
+        "T015",
+        "T018"
+      ],
+      "tests": [
+        "BuildListView.test.tsx::empty sections hidden"
+      ]
+    },
+    "FR-005": {
+      "tasks": [
+        "T003",
+        "T004",
+        "T014",
+        "T017"
+      ],
+      "tests": [
+        "phaseBDraftStore.test.ts::no character double-counted",
+        "BuildListView.test.tsx::routes a/1/./€"
+      ]
+    },
+    "FR-004": {
+      "tasks": [
+        "T003",
+        "T004",
+        "T017",
+        "T018"
+      ],
+      "tests": [
+        "BuildListView.test.tsx::new sections render beneath Accented"
+      ]
+    },
+    "FR-003": {
+      "tasks": [
+        "T009",
+        "T011",
+        "T012"
+      ],
+      "tests": [
+        "charNormUtils.test.ts::reports retained separators in unusual"
+      ]
+    },
+    "FR-002": {
+      "tasks": [
+        "T009",
+        "T011"
+      ],
+      "tests": [
+        "charNormUtils.test.ts::drops ONLY CR/LF/CRLF/Tab/space"
+      ]
+    },
+    "FR-001": {
+      "tasks": [
+        "T009",
+        "T011",
+        "T012"
+      ],
+      "tests": [
+        "charNormUtils.test.ts::harvestChars",
+        "BuildListView.test.tsx::US1 whole-text capture"
+      ]
+    },
+    "FR-014": {
+      "tasks": [
+        "T006",
+        "T007",
+        "T013",
+        "T020"
+      ],
+      "tests": [
+        "codepointLabel.test.ts::multi-cp",
+        "BuildListView.test.tsx::U+018F+ with full stack on hover"
+      ]
+    },
+    "FR-010": {
+      "tasks": [
+        "T021",
+        "T022",
+        "T024"
+      ],
+      "tests": [
+        "BuildListView.test.tsx::caseless letter shown as entered",
+        "uppercase-only not synthesized"
+      ]
+    },
+    "FR-011": {
+      "tasks": [
+        "T025",
+        "T026"
+      ],
+      "tests": [
+        "BuildListView.test.tsx::US4 focused Your-alphabet list"
+      ]
+    },
+    "FR-012": {
+      "tasks": [
+        "T007",
+        "T027"
+      ]
+    },
+    "FR-013": {
+      "tasks": [
+        "T014",
+        "T016",
+        "T017"
+      ],
+      "tests": [
+        "phaseBDraftStore.test.ts::chars stays COMPLETE (T016 regression guard)"
+      ]
+    }
+  },
+  "currentTask": "T029",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "engine glyphCategory module (final impl subsumes stub)",
+      "files": [
+        "packages/engine/src/character-discovery/glyphCategory.ts"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "studio helper modules (final impl subsumes stubs)",
+      "files": [
+        "packages/studio/src/survey/codepointLabel.ts",
+        "collation.ts",
+        "charNormUtils.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "GC classification vectors incl mutual-exclusion + bare-mark fallback",
+      "files": [
+        "packages/engine/src/character-discovery/glyphCategory.test.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "pure glyphCategory() via native p{L|N|P|S|Z} + control fallback",
+      "files": [
+        "packages/engine/src/character-discovery/glyphCategory.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "export glyphCategory + GlyphCategory from engine index",
+      "files": [
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "codepoint-label vectors (single + multi-cp)",
+      "files": [
+        "packages/studio/src/survey/codepointLabel.test.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "codepointLabel() compact U+first+ label + full-stack title",
+      "files": [
+        "packages/studio/src/survey/codepointLabel.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "shared default-ICU Intl.Collator comparator",
+      "files": [
+        "packages/studio/src/survey/collation.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "harvestChars unit tests (capture/skip-set/unusual/dedup)",
+      "files": [
+        "packages/studio/src/survey/charNormUtils.test.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "US1 DOM capture cases (sentence/no-spaces/whitespace-only)",
+      "files": [
+        "packages/studio/src/survey/BuildListView.test.tsx"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "harvestChars() whole-string grapheme harvest + unusual list",
+      "files": [
+        "packages/studio/src/survey/charNormUtils.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "rewire CharChipEditor.add() to harvestChars + log unusual",
+      "files": [
+        "packages/studio/src/survey/PhaseB.tsx"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "codepointLabel in Your-alphabet chips (label+title+aria)",
+      "files": [
+        "packages/studio/src/survey/PhaseB.tsx"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "store category-routing + no-double-count + FR-013/T016 guard tests",
+      "files": [
+        "packages/studio/src/stores/phaseBDraftStore.test.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "breakdown-section render/order/ICU tests",
+      "files": [
+        "packages/studio/src/survey/BuildListView.test.tsx"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "gate resolved outcome (a): no consumer needs non-letter bases; restrict bases to letters",
+      "files": [
+        "packages/studio/src/stores/phaseBDraftStore.ts",
+        "packages/studio/src/stores/phaseBDraftStore.test.ts"
+      ]
+    },
+    "T016a": {
+      "status": "DONE",
+      "did": "N/A — T016 outcome (a); view-only filter not needed"
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "deriveStores routes non-letters to numbers/punct/symbols/separators/controls; bases=letters; chars complete",
+      "files": [
+        "packages/studio/src/stores/phaseBDraftStore.ts"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "render 5 new sections beneath accented, non-empty only, (n) counts",
+      "files": [
+        "packages/studio/src/survey/PhaseB.tsx"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "ICU-order every breakdown section via collate()",
+      "files": [
+        "packages/studio/src/survey/PhaseB.tsx"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "codepointLabel in AlphabetBreakdown chips",
+      "files": [
+        "packages/studio/src/survey/PhaseB.tsx"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "US3 case-collapse/toggle/caseless/uppercase-only tests",
+      "files": [
+        "packages/studio/src/survey/BuildListView.test.tsx"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "record-both-cases test incl Turkish dotted-i",
+      "files": [
+        "packages/studio/src/survey/BuildListView.test.tsx"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Letters case-collapse via caseCounterpart + showUppercase toggle",
+      "files": [
+        "packages/studio/src/survey/PhaseB.tsx"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Done path augments recorded alphabet with derived uppercases",
+      "files": [
+        "packages/studio/src/survey/PhaseB.tsx"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "US4 Your-alphabet filter test (letters/marks/combos only)",
+      "files": [
+        "packages/studio/src/survey/BuildListView.test.tsx"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "filter Your-alphabet chip list to linguistic content; filtered count",
+      "files": [
+        "packages/studio/src/survey/PhaseB.tsx"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "FR-012 single-cp label unchanged confirmation test",
+      "files": [
+        "packages/studio/src/survey/BuildListView.test.tsx"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "full gate: engine+studio tests, typecheck, lint (i18n-lint env-blocked)"
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "N/A — feature adds no keyboard/fixture"
+    }
+  },
+  "verified": [
+    {
+      "what": "engine unit tests",
+      "command": "pnpm --filter @keyboard-studio/engine test",
+      "result": "1923 passed, 2 skipped (glyphCategory 4/4)"
+    },
+    {
+      "what": "studio unit+component tests",
+      "command": "pnpm --filter @keyboard-studio/studio test",
+      "result": "4024 passed (BuildListView 43, phaseBDraftStore 40, charNormUtils/codepointLabel 12)",
+      "warnings": [
+        "jsdom canvas getContext not-implemented noise from unrelated useFontSupportChecker test — benign"
+      ]
+    },
+    {
+      "what": "repo typecheck",
+      "command": "pnpm typecheck",
+      "result": "all 7 projects clean"
+    },
+    {
+      "what": "lint gate",
+      "command": "pnpm lint",
+      "result": "eslint/depcruise/crew/facet/facet-index/adaptation/test-antipattern all GREEN; i18n-catalog-lint FAILS (orphan-locale) because lingui extract is non-functional in this sandbox — pre-existing env issue, not a rename; catalogs manually kept in sync (822/822 keys, sets equal)",
+      "warnings": [
+        "eslint no-console warning on FR-003 log — intentional, matches existing [bracket]-prefixed console convention; lint has no --max-warnings 0"
+      ]
+    }
+  ],
+  "last_action": "all 29 tasks done (T016a N/A); engine 1923 + studio 4024 tests pass, typecheck clean, lint green except env-blocked i18n-catalog-lint"
+}

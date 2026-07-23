@@ -809,6 +809,7 @@
   "editor.assignLoop.intro.bullet1": "Vous allez parcourir caractère par caractère la liste de votre enquête.",
   "editor.assignLoop.touch.intro.bullet1": "Vous allez parcourir caractère par caractère, tout comme la galerie de bureau.",
   "survey.phaseB.charChipEditor.count": "Votre alphabet ({0})",
+  "survey.phaseB.breakdown.showUppercase": "Afficher les lettres majuscules",
   "survey.marks.stacking.intro": "Votre alphabet montre des lettres pouvant porter plus d'un signe. Confirmez si le clavier doit l'autoriser, et exactement quelles combinaisons.",
   "survey.phaseB.suggestionPanel.baseAlreadyCovers": "Votre clavier de base couvre déjà l’alphabet de cette langue.",
   "survey.prefill.row.startingKeyboard.note": "votre base choisie",

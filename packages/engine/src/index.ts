@@ -145,6 +145,9 @@ export type { CharacterMapTier, CharacterMapCell, CharacterMapGroup } from "./ch
 // one base + ordered combining marks; null for PUA / plain letters / digraphs.
 export { decomposeGrapheme } from "./character-discovery/decompose.js";
 export type { GraphemeDecomposition } from "./character-discovery/decompose.js";
+// spec 047 — pure Unicode General-Category classifier for the inventory breakdown.
+export { glyphCategory } from "./character-discovery/glyphCategory.js";
+export type { GlyphCategory } from "./character-discovery/glyphCategory.js";
 
 // Marks question series (spec 046): pure engine functions behind the S0-S5
 // stations — the shared posture table is the single source the facet, the S4
