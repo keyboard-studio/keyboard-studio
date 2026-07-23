@@ -392,7 +392,11 @@ export async function driveTouchGallery(page: Page): Promise<void> {
   }
 
   const continueButton = page.getByTestId("touch-continue");
-  const hostKeySelect = page.getByRole("combobox", { name: "Host key for long-press" });
+  // #1307: native <select> popups don't open in the VS Code webview, so the
+  // host key picker is now a ui/SelectMenu (button + DOM-rendered listbox),
+  // not a native <select> — open it, then click the option by its
+  // data-value (the underlying vkey), not Playwright's selectOption().
+  const hostKeySelect = page.getByRole("button", { name: "Host key for long-press" });
   const applyButton = page.getByRole("button", { name: /^Apply touch method for/ });
 
   for (let guard = 0; guard < 200; guard++) {
@@ -404,7 +408,8 @@ export async function driveTouchGallery(page: Page): Promise<void> {
     // reset on every currentChar change), so a disabled continueButton means
     // this character still needs the default long-press method + Apply.
     if (await continueButton.isDisabled()) {
-      await hostKeySelect.selectOption({ label: "K_A (A)" });
+      await hostKeySelect.click();
+      await hostKeySelect.locator('xpath=..').locator('li[data-value="K_A"]').click();
       await applyButton.click();
     }
     await continueButton.click();

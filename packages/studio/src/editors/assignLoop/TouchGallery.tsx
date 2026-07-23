@@ -85,14 +85,20 @@ import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
+import { SelectMenu } from "../../ui/SelectMenu.tsx";
 import { KEY_OPTIONS, VALID_HOST_KEYS } from "../../lib/keyOptions.ts";
 import { resolveKeyPickerSelection, resolvedVkeyOf } from "../../lib/charInput.ts";
 import {
   BG_PAGE, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
   galleryPageStyle as pageStyle,
   galleryGhostBtn as ghostBtn,
-  gallerySelectStyle as selectStyle,
 } from "../../lib/galleryTheme.ts";
+
+// SelectMenu's trigger already carries the same colors gallerySelectStyle
+// used to set explicitly (BG_PAGE/BORDER/TEXT_MAIN, byte-identical values —
+// see ui/theme.ts); only a width override is still needed since a native
+// <select> auto-sizes to content but SelectMenu's trigger is width: 100%.
+const selectStyle: CSSProperties = { width: 160, fontSize: 12 };
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -382,16 +388,13 @@ function TouchMethodChooser({
               }}
             >
               <Trans id="editor.assignLoop.touch.directionLabel">Direction:</Trans>
-              <select
+              <SelectMenu
                 value={flickDirection}
-                onChange={(e) => onFlickDirectionChange(e.target.value)}
-                aria-label={t({ id: "editor.assignLoop.touch.flickDirectionAriaLabel", message: "Flick direction" })}
+                onChange={onFlickDirectionChange}
+                ariaLabel={t({ id: "editor.assignLoop.touch.flickDirectionAriaLabel", message: "Flick direction" })}
+                options={flickDirections}
                 style={selectStyle}
-              >
-                {flickDirections.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+              />
             </label>
           </div>
         )}
