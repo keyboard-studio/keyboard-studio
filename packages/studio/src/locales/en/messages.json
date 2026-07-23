@@ -714,6 +714,7 @@
   "editor.assignLoop.infoView.capabilityHint.notRemovableOpaque": "Uses advanced syntax the editor can't rewrite, so removing it here won't take effect.",
   "preview.overlay.error.vfs.title": "VFS load failed",
   "output.submit.success.linkAriaLabel": "View your keyboard submission",
+  "diagnostics.item.warningLabel": "Warning:",
   "editor.assignLoop.preview.defaultWarningsLabel": "Warnings:",
   "oauth.callback.error.detail": "We couldn’t complete the sign-in. This is usually temporary — please return to the studio and try connecting again.",
   "welcome.title": "Welcome to Keyboard Studio",
