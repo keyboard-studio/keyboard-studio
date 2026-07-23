@@ -63,10 +63,13 @@ const TAUTOLOGY_RE =
   /expect\(\s*(true|false|\d+|(['"]).*?\2)\s*\)\.toBe\(\s*\1\s*\)/g;
 
 // SURVEY ORDER-SNAPSHOT: .map(...)).toEqual([ followed by string literals.
-// Matches .map(q => q.id)).toEqual([ or .map(x => x.id)).toEqual([ or similar,
-// typically wrapped in expect: expect(...map(q => q.id)).toEqual([...])
+// Matches .map(q => q.id)).toEqual([ or .map((q) => q.id)).toEqual([ or similar,
+// typically wrapped in expect: expect(...map((q) => q.id)).toEqual([...])
 // The key signal is the question-ID extraction arrow + literal array literal start.
-const SURVEY_SNAPSHOT_RE = /\.map\s*\(\s*\w+\s*=>\s*\w+\.id\s*\)\)\s*\.toEqual\(\s*\[\s*(['"])/g;
+// The arrow parameter may be parenthesized or bare — the repo uses `(q) =>`, so
+// the parens are required-optional here (a bare-only pattern silently never fires).
+const SURVEY_SNAPSHOT_RE =
+  /\.map\s*\(\s*\(?\s*\w+\s*\)?\s*=>\s*\w+\.id\s*\)\)\s*\.toEqual\(\s*\[\s*(['"])/g;
 
 // ---------------------------------------------------------------------------
 // Main lint

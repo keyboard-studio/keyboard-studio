@@ -134,22 +134,22 @@ describe("tokenize", () => {
 
   it("recognizes begin directive", () => {
     const tokens = tokenize("begin Unicode > use(main)\n");
-    expect(tokens.find(t => t.kind === "begin")?.kind).toBe("begin");
+    expect(tokens.filter(t => t.kind === "begin")).toHaveLength(1);
   });
 
   it("recognizes group directive", () => {
     const tokens = tokenize("group(main) using keys\n");
-    expect(tokens.find(t => t.kind === "group")?.kind).toBe("group");
+    expect(tokens.filter(t => t.kind === "group")).toHaveLength(1);
   });
 
   it("recognizes match directive", () => {
     const tokens = tokenize("match > use(deadkeys)\n");
-    expect(tokens.find(t => t.kind === "match")?.kind).toBe("match");
+    expect(tokens.filter(t => t.kind === "match")).toHaveLength(1);
   });
 
   it("recognizes nomatch directive", () => {
     const tokens = tokenize("nomatch > use(fallback)\n");
-    expect(tokens.find(t => t.kind === "nomatch")?.kind).toBe("nomatch");
+    expect(tokens.filter(t => t.kind === "nomatch")).toHaveLength(1);
   });
 
   it("strips BOM from input", () => {
