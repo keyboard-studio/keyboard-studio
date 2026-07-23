@@ -20,3 +20,13 @@ export function collateCompare(a: string, b: string): number {
 export function collate(chars: readonly string[]): string[] {
   return [...chars].sort(collateCompare);
 }
+
+/**
+ * Raw Unicode code-point comparator. Used for BARE combining marks (spec 047):
+ * a lone diacritic has no meaningful dictionary position, so it is shown in
+ * code-point order rather than ICU collation order. Compares by the first code
+ * point (combining marks are single code points).
+ */
+export function codePointCompare(a: string, b: string): number {
+  return (a.codePointAt(0) ?? 0) - (b.codePointAt(0) ?? 0);
+}

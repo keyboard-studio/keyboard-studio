@@ -28,7 +28,7 @@ import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { useGlyphFontStack } from "./useGlyphFontStack.ts";
 import { nfcDedup, harvestChars } from "./charNormUtils.ts";
 import { codepointLabel } from "./codepointLabel.ts";
-import { collate } from "./collation.ts";
+import { collate, codePointCompare } from "./collation.ts";
 import { glyphCategory, isCombiningMarkChar, caseCounterpart } from "@keyboard-studio/engine";
 import { displayChar, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { suggestMissingChars } from "../lib/services.ts";
@@ -215,8 +215,15 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
 
   const addDisabled = inputVal.trim() === "";
   // "Your alphabet" shows only linguistic content (FR-011); non-letters remain
-  // visible in their breakdown sections below.
-  const displayChars = chars.filter(isLinguisticChar);
+  // visible in their breakdown sections below. Ordering: letters and
+  // letter+mark combos by default ICU collation (matching the breakdown
+  // sections); bare combining marks by raw Unicode code-point order (a diacritic
+  // has no meaningful dictionary position), listed after the letters.
+  const linguisticChars = chars.filter(isLinguisticChar);
+  const displayChars = [
+    ...collate(linguisticChars.filter((c) => !isCombiningMarkChar(c))),
+    ...linguisticChars.filter((c) => isCombiningMarkChar(c)).sort(codePointCompare),
+  ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -675,7 +682,8 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
           "alphabet-marks",
           `Marks (${marks.length})`,
           "Accents and other marks that attach to a letter.",
-          collate(marks).map((m) => chip(m, prefixCombiningMark(m, true), justAddedMarks.has(m))),
+          // Bare diacritics: raw code-point order, not ICU (spec 047 refinement).
+          [...marks].sort(codePointCompare).map((m) => chip(m, prefixCombiningMark(m, true), justAddedMarks.has(m))),
         )}
       {attestedStacks.length > 0 &&
         section(
