@@ -9,6 +9,8 @@
     { "source": "/oauth/health", "destination": "/api/oauth/health" },
     { "source": "/submit/managed-pr/selftest", "destination": "/api/submit/managed-pr-selftest" },
     { "source": "/submit/managed-pr", "destination": "/api/submit/managed-pr" },
+    { "source": "/drafts/content", "destination": "/api/drafts/content" },
+    { "source": "/drafts", "destination": "/api/drafts" },
     {
       "source": "/kbd-proxy/:path*",
       "destination": "https://raw.githubusercontent.com/keyboard-studio/keyboards/master/:path*"
