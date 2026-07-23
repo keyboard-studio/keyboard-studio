@@ -1016,4 +1016,30 @@ describe("CharacterMapPane — per-group Hide/Show", () => {
     const grid = within(latinGroup).getByRole("group", { name: /click to toggle/i });
     expect(grid.getAttribute("id")).toBe(controlsId);
   });
+
+  it("keeps aria-controls pointing at an element that exists while the group is collapsed (no dangling idref)", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+    const hideButton = within(latinGroup).getByRole("button", { name: "Hide Latin" });
+    const controlsId = hideButton.getAttribute("aria-controls");
+    expect(controlsId).toBeTruthy();
+
+    fireEvent.click(hideButton);
+
+    // Same aria-controls value persists across the collapse (the button
+    // itself is unchanged, just relabelled to "Show").
+    const showButton = within(latinGroup).getByRole("button", { name: "Show Latin" });
+    expect(showButton.getAttribute("aria-controls")).toBe(controlsId);
+
+    // The idref must resolve to a real element — the collapsed-state note,
+    // not the (now unrendered) cell grid.
+    const controlledElement = document.getElementById(controlsId as string);
+    expect(controlledElement).not.toBeNull();
+    expect(controlledElement?.textContent).toMatch(/characters hidden/i);
+  });
 });

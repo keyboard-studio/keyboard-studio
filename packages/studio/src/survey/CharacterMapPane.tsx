@@ -625,7 +625,7 @@ export function CharacterMapPane({
                   </button>
                 </div>
                 {isHidden ? (
-                  <div style={{ ...mutedNote, marginTop: 6 }}>
+                  <div id={gridId} style={{ ...mutedNote, marginTop: 6 }}>
                     <Trans id="survey.characterMapPane.group.hiddenNote">
                       {group.cells.length} characters hidden.
                     </Trans>
