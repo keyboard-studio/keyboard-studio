@@ -549,6 +549,13 @@ describe("CharacterMapPane — digits & punctuation tiers", () => {
   });
 });
 
+// The three "Search in:" checkboxes live inside the "Search filters"
+// disclosure (closed by default) — open it before interacting with any of
+// them, mirroring how a real user would reach the panel.
+function openSearchFilters(): void {
+  fireEvent.click(screen.getByRole("button", { name: "Search filters" }));
+}
+
 describe("CharacterMapPane — search filter", () => {
   it("filters cells by substring match, dropping groups with zero surviving cells", async () => {
     seedBaseAndLanguage();
@@ -667,6 +674,7 @@ describe("CharacterMapPane — search filter", () => {
     fireEvent.change(searchInput, { target: { value: "0041" } });
     expect(screen.getByLabelText("Basic Latin characters (main)")).toBeTruthy();
 
+    openSearchFilters();
     fireEvent.click(screen.getByLabelText("Search by Unicode value"));
     expect(
       screen.queryByText('No characters match "0041".'),
@@ -696,6 +704,7 @@ describe("CharacterMapPane — search filter", () => {
     fireEvent.change(searchInput, { target: { value: "ø" } });
     expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
 
+    openSearchFilters();
     fireEvent.click(screen.getByLabelText("Search by character"));
     expect(screen.queryByText('No characters match "ø".')).toBeTruthy();
 
@@ -726,6 +735,7 @@ describe("CharacterMapPane — search filter", () => {
     fireEvent.change(searchInput, { target: { value: "stroke" } });
     expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
 
+    openSearchFilters();
     fireEvent.click(screen.getByLabelText("Search by name"));
     expect(screen.queryByText('No characters match "stroke".')).toBeTruthy();
 
@@ -742,9 +752,9 @@ describe("CharacterMapPane — search filter", () => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
     });
 
+    openSearchFilters();
     const characterCheckbox = screen.getByLabelText("Search by character") as HTMLInputElement;
     const nameCheckbox = screen.getByLabelText("Search by name") as HTMLInputElement;
-    const unicodeCheckbox = screen.getByLabelText("Search by Unicode value") as HTMLInputElement;
 
     fireEvent.click(characterCheckbox);
     fireEvent.click(nameCheckbox);
@@ -753,14 +763,16 @@ describe("CharacterMapPane — search filter", () => {
 
     // Drive a language change the same way the hiddenGroups-reset test does
     // (act + setSurveyContext) — this re-triggers the fetch effect, which
-    // resets searchFilters to ALL_FILTERS.
+    // resets searchFilters to ALL_FILTERS (and closes the filters panel).
     act(() => {
       useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "fr", language_name: "French" });
     });
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Search by character")).toHaveProperty("checked", true);
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
     });
+    openSearchFilters();
+    expect(screen.getByLabelText("Search by character")).toHaveProperty("checked", true);
     expect(screen.getByLabelText("Search by name")).toHaveProperty("checked", true);
     expect(screen.getByLabelText("Search by Unicode value")).toHaveProperty("checked", true);
   });
@@ -792,6 +804,134 @@ describe("CharacterMapPane — search filter", () => {
     expect(within(group).queryByRole("button", { name: /ó \(U\+00F3\)/ })).toBeTruthy();
     expect(within(group).queryByRole("button", { name: /ø \(U\+00F8\)/ })).toBeTruthy();
     expect(within(group).queryByRole("button", { name: /Add b \(U\+0062\)/ })).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // P0 regression — "the search bar does nothing". Reproduction: click into
+  // the search box the way a real user would (focus, then type), and
+  // separately, drive the search filters into an all-unchecked state and
+  // confirm the pane refuses to reach it (see CharacterMapPane.tsx's
+  // handleToggleSearchFilter doc comment for the root-cause writeup).
+  // -------------------------------------------------------------------------
+
+  it("a real user click-then-type into the search box narrows the grid (regression coverage for the reported 'search bar does nothing' bug)", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const searchInput = screen.getByLabelText("Search the character map");
+    fireEvent.click(searchInput);
+    fireEvent.focus(searchInput);
+    // Real typing is a sequence of incremental value changes, not one bulk
+    // paste-like fireEvent.change — append one character at a time.
+    let typed = "";
+    for (const ch of "a") {
+      typed += ch;
+      fireEvent.input(searchInput, { target: { value: typed } });
+    }
+
+    expect((searchInput as HTMLInputElement).value).toBe("a");
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+    expect(within(latinGroup).queryByRole("button", { name: /a \(U\+0061\)/ })).toBeTruthy();
+    expect(within(latinGroup).queryByRole("button", { name: /b \(U\+0062\)/ })).toBeNull();
+  });
+
+  it("refuses to uncheck the last remaining search filter — at least one field stays selected, so a query never silently matches nothing", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    openSearchFilters();
+    const characterCheckbox = screen.getByLabelText("Search by character") as HTMLInputElement;
+    const nameCheckbox = screen.getByLabelText("Search by name") as HTMLInputElement;
+    const unicodeCheckbox = screen.getByLabelText("Search by Unicode value") as HTMLInputElement;
+
+    fireEvent.click(characterCheckbox);
+    fireEvent.click(nameCheckbox);
+    // Two down, one (codepoint) left checked — this attempt to uncheck the
+    // last one must be refused.
+    fireEvent.click(unicodeCheckbox);
+
+    expect(unicodeCheckbox.checked).toBe(true);
+    expect(screen.getByText("At least one search field must stay selected.")).toBeTruthy();
+
+    // A query that only the (still-active) codepoint mode can match still
+    // works — proving search wasn't silently disabled.
+    fireEvent.change(screen.getByLabelText("Search the character map"), { target: { value: "0061" } });
+    expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+  });
+
+  // -------------------------------------------------------------------------
+  // "Search filters" disclosure (TASK 2) — dropdown trigger + popover replacing
+  // the always-visible "Search in:" row.
+  // -------------------------------------------------------------------------
+
+  it("the filter checkboxes are not present until the 'Search filters' trigger is opened", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    expect(screen.queryByLabelText("Search by character")).toBeNull();
+    const trigger = screen.getByRole("button", { name: "Search filters" });
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(trigger.getAttribute("aria-haspopup")).toBe("true");
+
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByLabelText("Search by character")).toBeTruthy();
+    const panel = screen.getByRole("group", { name: "Search in:" });
+    expect(trigger.getAttribute("aria-controls")).toBe(panel.getAttribute("id"));
+  });
+
+  it("Escape closes the filters panel and returns focus to the trigger", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const trigger = screen.getByRole("button", { name: "Search filters" });
+    fireEvent.click(trigger);
+    const characterCheckbox = screen.getByLabelText("Search by character");
+
+    fireEvent.keyDown(characterCheckbox, { key: "Escape" });
+
+    expect(screen.queryByLabelText("Search by character")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("a pointerdown outside the trigger and panel closes the filters popover", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Search filters" }));
+    expect(screen.getByLabelText("Search by character")).toBeTruthy();
+
+    fireEvent.pointerDown(document.body);
+
+    expect(screen.queryByLabelText("Search by character")).toBeNull();
+  });
+
+  it("toggling a checkbox inside the open panel keeps it open", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    openSearchFilters();
+    fireEvent.click(screen.getByLabelText("Search by name"));
+    expect(screen.getByLabelText("Search by character")).toBeTruthy();
+    expect((screen.getByLabelText("Search by name") as HTMLInputElement).checked).toBe(false);
   });
 });
 

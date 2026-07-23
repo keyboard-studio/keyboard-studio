@@ -20,7 +20,7 @@
 // (D3 scope guard: the studio's one 300ms cycle belongs to the validator/WASM
 // oracle; this is a synchronous UI filter over already-loaded data).
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { parseUPlusNotation, scriptSubtagOf, toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -35,6 +35,8 @@ import { useGlyphFontStack } from "./useGlyphFontStack.ts";
 import { useFontSupportChecker } from "./useFontSupportChecker.ts";
 import {
   ACCENT,
+  BG_PAGE,
+  BORDER,
   ERROR_RED,
   TEXT_DIM,
   mutedNote,
@@ -209,6 +211,13 @@ export function CharacterMapPane({
   // groups are in scope. See characterSearch.ts's SearchFilters doc comment
   // for the mode mapping.
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(ALL_FILTERS);
+  // "Search filters" disclosure — the three checkboxes above live inside a
+  // popover anchored to a trigger button right of the search box, closed by
+  // default. Local open/closed state only; no timer of any kind (D3 scope
+  // guard — same as the search filter itself).
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersContainerRef = useRef<HTMLDivElement>(null);
+  const filtersTriggerRef = useRef<HTMLButtonElement>(null);
   const [blocksOnly, setBlocksOnly] = useState(true);
   const [announcement, setAnnouncement] = useState("");
   const [rawInput, setRawInput] = useState("");
@@ -238,6 +247,40 @@ export function CharacterMapPane({
   // edge (see the handleZoom comment below).
   const zoomOutButtonRef = useRef<HTMLButtonElement>(null);
   const zoomInButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Close the "Search filters" popover on outside-click (pointerdown outside
+  // both the trigger and the panel — both live inside filtersContainerRef).
+  // Only attached while open, same idiom as ui/SelectMenu.tsx's own
+  // click-outside effect. Escape-close is handled inline (handleFiltersKeyDown
+  // below) since it also needs to refocus the trigger, which a document
+  // listener can't do symmetrically with the outside-click case.
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const handlePointerDown = (e: PointerEvent): void => {
+      if (!filtersContainerRef.current?.contains(e.target as Node)) {
+        setFiltersOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [filtersOpen]);
+
+  function closeFiltersAndRefocusTrigger(): void {
+    setFiltersOpen(false);
+    filtersTriggerRef.current?.focus();
+  }
+
+  function handleFiltersKeyDown(e: KeyboardEvent): void {
+    // Only handle Escape while the panel is open — otherwise a stray Escape on
+    // the focused trigger would swallow its default action (e.g. dismissing a
+    // parent overlay) for no visible effect.
+    if (e.key === "Escape" && filtersOpen) {
+      e.preventDefault();
+      closeFiltersAndRefocusTrigger();
+    }
+  }
 
   // No base IR / no BCP47 yet — short-circuit BEFORE the fetch, mirroring
   // SuggestionPanel's own `!bcp47 || baseIr === null` guard (PhaseB.tsx). Without
@@ -272,6 +315,7 @@ export function CharacterMapPane({
     // before the new fetch starts.
     setQuery("");
     setSearchFilters(ALL_FILTERS);
+    setFiltersOpen(false);
     setRawInput("");
     setRawError(null);
     setAnnouncement("");
@@ -452,7 +496,35 @@ export function CharacterMapPane({
   // Toggles one of the "Search in:" field filters — reuses the existing
   // announcement live region, same as handleToggleBlocksOnly, rather than
   // adding a second one.
+  //
+  // P0 FIX (reported regression: "the search bar does nothing"): matchesQuery
+  // treats an all-false SearchFilters as a valid, deliberate "match nothing"
+  // state (characterSearch.ts's documented WYSIWYG contract, unit-tested in
+  // characterSearch.test.ts) — but reaching that state via these three
+  // checkboxes gave NO indication that search was now fully disabled, so a
+  // user unchecking all three (there is nothing that visually distinguishes
+  // "0 fields selected" from any other combination) would see every
+  // subsequent query return zero results, indistinguishable from the search
+  // box being broken. Refuse the toggle when it would leave every field
+  // unchecked, rather than silently landing in that state — the pure
+  // predicate's own all-false contract is untouched (still reachable/tested
+  // at the matchesQuery level), only the UI's affordance for reaching it is
+  // removed.
   function handleToggleSearchFilter(field: keyof SearchFilters, next: boolean): void {
+    if (!next) {
+      const anyOtherFieldStillChecked = (Object.keys(searchFilters) as (keyof SearchFilters)[]).some(
+        (key) => key !== field && searchFilters[key],
+      );
+      if (!anyOtherFieldStillChecked) {
+        setAnnouncement(
+          t({
+            id: "survey.characterMapPane.searchFilter.announceAtLeastOne",
+            message: "At least one search field must stay selected.",
+          }),
+        );
+        return;
+      }
+    }
     setSearchFilters((prev) => ({ ...prev, [field]: next }));
     const fieldLabel =
       field === "character"
@@ -609,58 +681,104 @@ export function CharacterMapPane({
           </div>
         </div>
       )}
-      <TextField
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder={t({ id: "survey.characterMapPane.search.placeholder", message: "Search characters" })}
-        aria-label={t({ id: "survey.characterMapPane.search.ariaLabel", message: "Search the character map" })}
-      />
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 10,
-          fontSize: 12,
-          color: TEXT_DIM,
-        }}
-      >
-        <span>
-          <Trans id="survey.characterMapPane.searchFilter.label">Search in:</Trans>
-        </span>
-        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <Checkbox
-            checked={searchFilters.character}
-            onChange={(e) => handleToggleSearchFilter("character", e.target.checked)}
+      {/* Search row: the query TextField grows to fill the row; the "Search
+          filters" disclosure trigger sits to its right, collapsed by
+          default. Reusing the style idiom of the raw-codepoint <form> row
+          above (flex row, gap 8, aligned controls) rather than inventing a
+          new one. */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <TextField
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t({ id: "survey.characterMapPane.search.placeholder", message: "Search characters" })}
+          aria-label={t({ id: "survey.characterMapPane.search.ariaLabel", message: "Search the character map" })}
+          style={{ flex: 1 }}
+        />
+        <div ref={filtersContainerRef} style={{ position: "relative", flexShrink: 0 }}>
+          <button
+            type="button"
+            ref={filtersTriggerRef}
+            onClick={() => setFiltersOpen((prev) => !prev)}
+            onKeyDown={handleFiltersKeyDown}
+            aria-haspopup="true"
+            aria-expanded={filtersOpen}
+            aria-controls="char-map-search-filters-panel"
             aria-label={t({
-              id: "survey.characterMapPane.searchFilter.character.ariaLabel",
-              message: "Search by character",
+              id: "survey.characterMapPane.searchFilter.trigger.ariaLabel",
+              message: "Search filters",
             })}
-          />
-          <Trans id="survey.characterMapPane.searchFilter.character">Character</Trans>
-        </label>
-        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <Checkbox
-            checked={searchFilters.name}
-            onChange={(e) => handleToggleSearchFilter("name", e.target.checked)}
-            aria-label={t({
-              id: "survey.characterMapPane.searchFilter.name.ariaLabel",
-              message: "Search by name",
-            })}
-          />
-          <Trans id="survey.characterMapPane.searchFilter.name">Name</Trans>
-        </label>
-        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <Checkbox
-            checked={searchFilters.codepoint}
-            onChange={(e) => handleToggleSearchFilter("codepoint", e.target.checked)}
-            aria-label={t({
-              id: "survey.characterMapPane.searchFilter.unicode.ariaLabel",
-              message: "Search by Unicode value",
-            })}
-          />
-          <Trans id="survey.characterMapPane.searchFilter.unicode">Unicode value</Trans>
-        </label>
+            style={{ ...secondaryButton, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}
+          >
+            <Trans id="survey.characterMapPane.searchFilter.trigger">Search filters</Trans>
+            <span aria-hidden="true">▾</span>
+          </button>
+          {filtersOpen && (
+            <div
+              id="char-map-search-filters-panel"
+              role="group"
+              aria-label={t({
+                id: "survey.characterMapPane.searchFilter.label",
+                message: "Search in:",
+              })}
+              onKeyDown={handleFiltersKeyDown}
+              style={{
+                position: "absolute",
+                top: "100%",
+                right: 0,
+                zIndex: 20,
+                marginTop: 4,
+                padding: 10,
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                whiteSpace: "nowrap",
+                background: BG_PAGE,
+                border: `1px solid ${BORDER}`,
+                borderRadius: 6,
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
+                fontSize: 12,
+                color: TEXT_DIM,
+              }}
+            >
+              <span style={{ fontWeight: 600 }}>
+                <Trans id="survey.characterMapPane.searchFilter.label">Search in:</Trans>
+              </span>
+              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <Checkbox
+                  checked={searchFilters.character}
+                  onChange={(e) => handleToggleSearchFilter("character", e.target.checked)}
+                  aria-label={t({
+                    id: "survey.characterMapPane.searchFilter.character.ariaLabel",
+                    message: "Search by character",
+                  })}
+                />
+                <Trans id="survey.characterMapPane.searchFilter.character">Character</Trans>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <Checkbox
+                  checked={searchFilters.name}
+                  onChange={(e) => handleToggleSearchFilter("name", e.target.checked)}
+                  aria-label={t({
+                    id: "survey.characterMapPane.searchFilter.name.ariaLabel",
+                    message: "Search by name",
+                  })}
+                />
+                <Trans id="survey.characterMapPane.searchFilter.name">Name</Trans>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <Checkbox
+                  checked={searchFilters.codepoint}
+                  onChange={(e) => handleToggleSearchFilter("codepoint", e.target.checked)}
+                  aria-label={t({
+                    id: "survey.characterMapPane.searchFilter.unicode.ariaLabel",
+                    message: "Search by Unicode value",
+                  })}
+                />
+                <Trans id="survey.characterMapPane.searchFilter.unicode">Unicode value</Trans>
+              </label>
+            </div>
+          )}
+        </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         {!noBaseOrLanguage && hasKnownBlocks && (
