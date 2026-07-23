@@ -1,5 +1,8 @@
+import type { I18n } from '@lingui/core';
+import { msg } from '@lingui/core/macro';
 import { useLingui } from "@lingui/react/macro";
 import type { CardKind } from '../../../lib/irToCarveNodes.ts';
+import { resolveMessage } from './carveShared.tsx';
 export type { CardKind } from '../../../lib/irToCarveNodes.ts';
 
 export const KIND_COLOR: Record<CardKind, string> = {
@@ -9,17 +12,18 @@ export const KIND_COLOR: Record<CardKind, string> = {
   raw:     '#b90529',
 };
 
-// Chrome (human-readable category labels) — built per-render from t() since
-// this needs an active useLingui() context; see buildKindLabel below.
-function buildKindLabel(
-  kind: CardKind,
-  t: (descriptor: { id: string; message: string }) => string,
-): string {
+// Chrome (human-readable category labels) — built per-render via the
+// optional-i18n + msg()/resolveMessage() pattern (see Inspector.tsx's
+// storeBlurb/ruleDetailLabel) rather than taking `t` as a bare function
+// parameter — Lingui's macro tracks the specific binding introduced by
+// useLingui(), so a re-bound `t` parameter is a distinct binding the
+// extractor does not follow and its ids never make it into the catalog.
+function buildKindLabel(kind: CardKind, i18n?: I18n): string {
   switch (kind) {
-    case 'pattern': return t({ id: "editor.assignLoop.kindBadge.pattern", message: "Pattern" });
-    case 'group': return t({ id: "editor.assignLoop.kindBadge.group", message: "Group" });
-    case 'store': return t({ id: "editor.assignLoop.kindBadge.store", message: "Store" });
-    case 'raw': return t({ id: "editor.assignLoop.kindBadge.raw", message: "Advanced" });
+    case 'pattern': return resolveMessage(i18n, msg({ id: "editor.assignLoop.kindBadge.pattern", message: "Pattern" }));
+    case 'group': return resolveMessage(i18n, msg({ id: "editor.assignLoop.kindBadge.group", message: "Group" }));
+    case 'store': return resolveMessage(i18n, msg({ id: "editor.assignLoop.kindBadge.store", message: "Store" }));
+    case 'raw': return resolveMessage(i18n, msg({ id: "editor.assignLoop.kindBadge.raw", message: "Advanced" }));
     default: return kind;
   }
 }
@@ -27,9 +31,9 @@ function buildKindLabel(
 interface KindBadgeProps { kind: CardKind }
 
 export function KindBadge({ kind }: KindBadgeProps) {
-  const { t } = useLingui();
+  const { i18n } = useLingui();
   const color = KIND_COLOR[kind];
-  const label = buildKindLabel(kind, t);
+  const label = buildKindLabel(kind, i18n);
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',

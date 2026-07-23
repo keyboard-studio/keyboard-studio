@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Trans, useLingui } from "@lingui/react/macro";
-import { plural } from "@lingui/core/macro";
+import { msg, plural } from "@lingui/core/macro";
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
 import { toRailNodes, nodeState, buildCharWeb, annotateRemovalRecommendations, recommendedRemovalChars, coordinatedCollateralForSlots, displayChar } from '../../lib/irToCarveNodes.ts';
 import type { CarveNode, CharLocation, RecommendedRemovalChar, CoordinatedCollateralChar } from '../../lib/irToCarveNodes.ts';
@@ -13,7 +13,7 @@ import { RemovalBanner } from '../assignLoop/parts/RemovalBanner.tsx';
 import { Rail } from '../assignLoop/parts/Rail.tsx';
 import { Inspector } from '../assignLoop/parts/Inspector.tsx';
 import { InfoView, capabilityHint } from '../assignLoop/parts/InfoView.tsx';
-import { InfoIcon } from '../assignLoop/parts/carveShared.tsx';
+import { InfoIcon, resolveMessage } from '../assignLoop/parts/carveShared.tsx';
 import { ConfirmDialog } from '../assignLoop/parts/ConfirmDialog.tsx';
 import { useHoverInfoStore } from '../../stores/hoverInfoStore.ts';
 import { collectCharContributors, analyzeStores } from '@keyboard-studio/engine';
@@ -86,8 +86,11 @@ interface BuildPendingCascadeArgs {
    * using it in that case).
    */
   analysis: StoreAnalysis | undefined;
-  /** From the caller's useLingui() — passed through to capabilityHint() and the "an advanced rule" fallback label below. */
-  t: (descriptor: { id: string; message: string }) => string;
+  /** From the caller's useLingui() — passed through to capabilityHint() and
+   * resolveMessage() (the "an advanced rule" fallback label below). Not a bare
+   * `t` parameter: Lingui's macro tracks the specific binding useLingui()
+   * introduces, so a re-bound `t` here would be a distinct binding the
+   * extractor doesn't follow (see Inspector.tsx's storeBlurb for the same fix). */
   i18n: import('@lingui/core').I18n;
 }
 
@@ -108,7 +111,7 @@ interface BuildPendingCascadeArgs {
  * prevention: the user can still confirm and remove.
  */
 function buildPendingCascade({
-  ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes, needed, bcp47, analysis, t, i18n,
+  ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes, needed, bcp47, analysis, i18n,
 }: BuildPendingCascadeArgs): PendingCascade | null {
   // No IR to analyse → plain single-chip toggle.
   if (ir == null) return null;
@@ -134,7 +137,7 @@ function buildPendingCascade({
   const blockedRuleIds = found.ruleNodeIds.filter(isNotRemovable);
   const ruleLabel = (id: string): string => {
     for (const node of nodes) if (node.glyphs?.some((g) => g.gid === id)) return node.name;
-    return t({ id: 'editor.carve.advancedRuleFallbackLabel', message: 'an advanced rule' });
+    return resolveMessage(i18n, msg({ id: 'editor.carve.advancedRuleFallbackLabel', message: 'an advanced rule' }));
   };
   const blocked = [
     ...found.blocked,
@@ -464,7 +467,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
     const pending = buildPendingCascade({
       ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes,
-      needed: neededSet, bcp47: identityBcp47, analysis: storeAnalysis, t, i18n,
+      needed: neededSet, bcp47: identityBcp47, analysis: storeAnalysis, i18n,
     });
     if (pending === null) { handleToggleGlyph(gid); return; }
     setPendingCascade(pending);
@@ -483,7 +486,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       ir, gid: chipId, targetChar: ch,
       clickedLabel: t({ id: 'editor.carve.thisCharacterFallbackLabel', message: 'this character' }),
       isItemDeleted, removalCapabilities, nodes,
-      needed: neededSet, bcp47: identityBcp47, analysis: storeAnalysis, t, i18n,
+      needed: neededSet, bcp47: identityBcp47, analysis: storeAnalysis, i18n,
     });
     if (pending === null) { handleToggleGlyph(chipId); return; }
     setPendingCascade(pending);
