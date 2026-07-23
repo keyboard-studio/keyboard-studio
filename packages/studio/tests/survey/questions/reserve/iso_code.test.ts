@@ -66,14 +66,8 @@ describe("iso_code — mutate() writes header.bcp47 only", () => {
   });
 });
 
-describe("iso_code — fixtures (no validate)", () => {
+describe("iso_code — fixtures", () => {
   it("has no invalid fixtures", () => {
     expect(fixtures.invalid).toHaveLength(0);
   });
-  for (const { value, note } of fixtures.valid) {
-    it(`valid fixture: ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      // No validate() — just confirm fixture data is present.
-      expect(true).toBe(true);
-    });
-  }
 });

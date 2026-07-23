@@ -12,14 +12,8 @@ describe("desktop_first_notice — definition", () => {
   });
 });
 
-describe("desktop_first_notice — fixtures (no validate)", () => {
+describe("desktop_first_notice — fixtures", () => {
   it("has no invalid fixtures", () => {
     expect(fixtures.invalid).toHaveLength(0);
   });
-  for (const { value, note } of fixtures.valid) {
-    it(`valid fixture: ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      // No validate() on notice questions — just assert fixture is present.
-      expect(true).toBe(true);
-    });
-  }
 });

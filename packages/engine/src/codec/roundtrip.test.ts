@@ -122,9 +122,10 @@ describe("round-trip: basic_kbdfr", () => {
     expect(ir.raw.length).toBe(0);
   });
 
-  it("is a no-op when keyboard checkout is absent", () => {
-    // This test body always passes; the skip guard above handles the real work.
-    expect(true).toBe(true);
+  it.skipIf(available)("skips codec testing when keyboard checkout is absent", () => {
+    // When fixtures are unavailable, the skip-guarded tests above are skipped.
+    // This assertion documents that expected behavior.
+    expect(available).toBe(false);
   });
 });
 
@@ -150,8 +151,10 @@ describe("round-trip: ahom_star", () => {
     expect(normaliseForComparison(ir2)).toEqual(normaliseForComparison(ir1));
   });
 
-  it("is a no-op when keyboard checkout is absent", () => {
-    expect(true).toBe(true);
+  it.skipIf(ahomAvailable)("skips codec testing when keyboard checkout is absent", () => {
+    // When fixtures are unavailable, the skip-guarded tests above are skipped.
+    // This assertion documents that expected behavior.
+    expect(ahomAvailable).toBe(false);
   });
 });
 

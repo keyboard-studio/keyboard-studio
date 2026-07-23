@@ -16,7 +16,6 @@ import {
   toPattern,
 } from "./schemas";
 import { samplePatterns } from "./fixtures/patterns";
-import { ALL_CRITERIA } from "./criteriaData";
 import criteriaJsonRaw from "../data/criteria.json" with { type: "json" };
 
 // -----------------------------------------------------------------------------
@@ -213,17 +212,15 @@ describe("toPattern (RawPattern -> Pattern normalisation)", () => {
 
 describe("CriterionSchema (spec §11)", () => {
   it("validates the entire shipped criteria.json catalog", () => {
+    // The point of this test is that EVERY row parses against CriterionSchema.
+    // It deliberately does NOT assert the catalog's cardinality: the catalog
+    // grows over time, so a hardcoded count (148, 149, ...) would go red on a
+    // legitimate addition — noise, not a real regression signal. git diff
+    // already shows cardinality changes.
     const result = CriterionSchema.array().safeParse(criteriaJsonRaw);
     expect(result.success, result.success ? "" : JSON.stringify(result.error?.issues?.slice(0, 5))).toBe(true);
-    if (result.success) {
-      expect(result.data.length).toBe(149);
-    }
-  });
-
-  it("is the same catalog ALL_CRITERIA exposes (parsed at module load)", () => {
-    // ALL_CRITERIA is produced by CriterionSchema.array().parse at import time;
-    // if criteria.json had drifted, importing this module would already throw.
-    expect(ALL_CRITERIA.length).toBe(149);
+    // Guard only against a vacuous pass on an empty/degenerate file.
+    expect((result.success ? result.data : []).length).toBeGreaterThan(0);
   });
 
   it("accepts each band variant with its own hook", () => {

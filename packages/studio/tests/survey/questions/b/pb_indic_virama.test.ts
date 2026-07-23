@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/b/pb_indic_virama.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/b/pb_indic_virama.ts";
 
 describe("pb_indic_virama — definition", () => {
   it("has correct id", () => {
@@ -16,13 +19,8 @@ describe("pb_indic_virama — definition", () => {
   });
 });
 
-describe("pb_indic_virama — fixtures (no validate)", () => {
+describe("pb_indic_virama — fixtures", () => {
   it("has no invalid fixtures", () => {
     expect(fixtures.invalid).toHaveLength(0);
   });
-  for (const { value, note } of fixtures.valid) {
-    it(`valid fixture: ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      expect(true).toBe(true);
-    });
-  }
 });

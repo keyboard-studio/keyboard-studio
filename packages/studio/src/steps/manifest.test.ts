@@ -194,7 +194,7 @@ describe("M3 — exactly one lock:physical then one lock:touch", () => {
 describe("M4 — touch_seed_source fork", () => {
   it("a step with id 'touch_seed_source' exists in the manifest", () => {
     const found = manifest.find((s) => s.id === "touch_seed_source");
-    expect(found).toBeDefined();
+    expect(found?.id).toBe("touch_seed_source");
   });
 
   it("touch_seed_source has spine:false", () => {

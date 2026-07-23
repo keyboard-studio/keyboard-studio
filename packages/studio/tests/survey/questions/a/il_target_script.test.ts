@@ -48,7 +48,7 @@ describe("il_target_script — definition", () => {
     const conditional = rules.find(
       (r) => r.condition !== undefined && r.goto === "il_script_not_supported",
     );
-    expect(conditional).toBeDefined();
+    expect(conditional?.goto).toBe("il_script_not_supported");
   });
 
   it("conditional branch covers Ethi, Hani, and Hang", () => {
@@ -68,7 +68,7 @@ describe("il_target_script — definition", () => {
       default?: unknown;
     }>;
     const fallthrough = rules.find((r) => "default" in r);
-    expect(fallthrough).toBeDefined();
+    expect(fallthrough?.condition).toBeUndefined();
   });
 
   it("default branch goto is null (terminal)", () => {
