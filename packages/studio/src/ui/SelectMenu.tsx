@@ -280,6 +280,10 @@ export function SelectMenu({
         aria-controls={listId}
         aria-labelledby={ariaLabelledby}
         aria-required={required}
+        // Not read by the component itself — a stable, value-based test hook
+        // mirroring a native <select>'s own `.value`, since callers can no
+        // longer read that off this button directly.
+        data-value={value}
         className={mergeClassNames("ks-control ks-focus-ring ks-hit-target")}
         style={{ ...TRIGGER_STYLE, ...style }}
         onClick={() => setOpen((prev) => !prev)}
@@ -307,6 +311,11 @@ export function SelectMenu({
                 role="option"
                 id={optionId}
                 aria-selected={isSelected}
+                // Not read by the component itself — a stable, value-based
+                // test hook so specs can select an option without depending
+                // on exact label text/formatting (mirrors how tests used to
+                // query a native <option value="...">).
+                data-value={opt.value}
                 className={OPTION_ROW_CLASSNAME}
                 onClick={() => selectOption(opt)}
                 style={{

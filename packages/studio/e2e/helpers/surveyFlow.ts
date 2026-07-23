@@ -159,9 +159,14 @@ export async function driveIdentityLite(
   await page.waitForSelector("#il_language_code", { timeout: 15_000 });
   await surveyAdvance(page).click();
 
-  // Q5: Target script (select) — required
+  // Q5: Target script (select) — required. #1307: native <select> popups
+  // don't open in the VS Code webview, so this is now a ui/SelectMenu
+  // (button + DOM-rendered listbox) — open it, then click the option by
+  // its data-value, not Playwright's native-<select> selectOption().
   await page.waitForSelector("#il_target_script", { timeout: 10_000 });
-  await page.selectOption("#il_target_script", script);
+  const targetScriptSelect = page.locator("#il_target_script");
+  await targetScriptSelect.click();
+  await targetScriptSelect.locator("xpath=..").locator(`li[data-value="${script}"]`).click();
   await surveyAdvance(page).click();
 
   // Robustness check for the phase boundary: identity-lite hands off
