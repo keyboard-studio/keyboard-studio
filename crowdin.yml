@@ -26,15 +26,31 @@
 files:
   # ── Tier A — Studio UI chrome (engine team; spec §12) ──────────────────────
   - source: "/packages/studio/src/locales/en/messages.json"
-    translation: "/packages/studio/src/locales/%two_letters_code%/messages.json"
+    translation: "/packages/studio/src/locales/%locale%/messages.json"
     # Keep untranslated keys in downloaded files (empty string values). Every
     # key must exist in every locale file so the loader is stable; the runtime
     # falls back to the English source via the explicit id, so an empty target
     # value is harmless, not a gap to prune.
     skip_untranslated_strings: false
-    # %two_letters_code% (ISO 639-1) suffices while targets are language-only
-    # (fr, es, …). Switch to %locale% / %locale_with_underscore% when a
-    # region-specific target (pt-BR, zh-CN) is added.
+    # %locale% (not %two_letters_code%) so a region-specific target (pt-BR,
+    # zh-CN) gets its own directory instead of colliding with its base
+    # language — adding ONE OF THOSE is then a SUPPORTED_LOCALES entry +
+    # catalog files, no crowdin.yml change (SC-004), because %locale% already
+    # produces the right region-qualified directory by default.
+    #
+    # Crowdin's default %locale% carries a region for every language, though —
+    # including ones we treat as language-only today (en -> en-US, fr -> fr-FR
+    # per Crowdin's own language list). The languages_mapping below pins THOSE
+    # two to the short directory names the app already reads
+    # (packages/studio/src/lib/i18n.ts SUPPORTED_LOCALES). So: adding a new
+    # LANGUAGE-ONLY locale (e.g. plain `de`) needs its own languages_mapping
+    # entry here, same as en/fr — skipping it would reproduce this exact
+    # fr -> fr-FR directory mismatch. Adding a locale that's genuinely
+    # region-qualified from the start (pt-BR) needs no mapping entry at all.
+    languages_mapping:
+      locale:
+        en: "en"
+        fr: "fr"
 
   # ── Tier B — Content-owned strings (content team; spec §12) ────────────────
   # DEFERRED to the i18n feature spec — DO NOT uncomment as-is.

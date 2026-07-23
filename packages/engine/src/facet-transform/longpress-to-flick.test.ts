@@ -48,7 +48,12 @@ describe("US2 longpress → flick — exception preservation (T020 / SC-004)", (
     const p = proposal as TransformProposal;
     expect(p.previewKind).toBe("ux-description");
     expect(p.namedLosses.join(" ")).toMatch(/discoverab/i);
-    expect(p.derivedParameterReview, "flick-direction review table").toBeDefined();
+    // Only the dominant key (k_dom, 2 sub-keys) converts in the default preview;
+    // its directions derive in position order (e, w). Exceptions/over-budget keys
+    // produce no review rows.
+    expect(p.derivedParameterReview?.kind).toBe("flick-direction");
+    expect(p.derivedParameterReview?.rows.map((r) => r.derivedValue)).toEqual(["e", "w"]);
+    expect(p.derivedParameterReview?.note).toMatch(/not authoritative/i);
 
     // Principled-split preserved by default; gap offered as a fix (SC-004).
     const split = p.affectedSites.find((s) => s.siteId === touchKeyNodeId(ir, "k_split"))!;
@@ -62,15 +67,23 @@ describe("US2 longpress → flick — exception preservation (T020 / SC-004)", (
     if (result.status !== "committed") return;
 
     const next = result.nextIr;
-    // Dominant key converted to flick.
-    expect(findKey(next, "k_dom").flick).toBeDefined();
+    // Dominant key converted to flick: 2 sub-keys → directions e, w, each carrying
+    // the original sub-key content plus physical-suggested provenance.
+    const domFlick = findKey(next, "k_dom").flick!;
+    expect(Object.keys(domFlick).sort()).toEqual(["e", "w"]);
+    expect(domFlick.e).toMatchObject({ id: "sub_0", text: "a", provenance: "physical-suggested" });
+    expect(domFlick.w).toMatchObject({ id: "sub_1", text: "b", provenance: "physical-suggested" });
     expect(findKey(next, "k_dom").sk).toBeUndefined();
     expect(findKey(next, "k_dom").provenance).toBe("physical-suggested");
-    // Principled-split preserved (still a longpress).
-    expect(findKey(next, "k_split").sk).toBeDefined();
+    // Principled-split preserved (still a longpress): both sub-keys intact and NOT
+    // re-stamped physical-suggested — their original hand-set provenance survives.
+    expect(findKey(next, "k_split").sk).toMatchObject([
+      { id: "sub_0", text: "a", provenance: "hand-set" },
+      { id: "sub_1", text: "b", provenance: "hand-set" },
+    ]);
     expect(findKey(next, "k_split").flick).toBeUndefined();
-    // Over-budget key refused per-site with a reason (never truncated).
-    expect(findKey(next, "k_over").sk).toBeDefined();
+    // Over-budget key refused per-site with a reason (never truncated): all 9 sub-keys intact.
+    expect(findKey(next, "k_over").sk).toHaveLength(9);
     const refused = result.ledger.find((l) => l.outcome === "refused");
     expect(refused?.reason).toMatch(/budget/i);
     // Output unchanged (only input UX changed).

@@ -47,8 +47,11 @@ export type NodeKind = "live" | "library-not-in-flow" | "stub" | "proposed";
  *   "not-yet-ordered"  — stage whose spine position is not yet derivable
  *   "library"          — proposed-flow nodes (spec 025): a distinct Library section,
  *                        separate from the live spine and from flat reserve.
+ *   "leftover"         — registered questions used by NO live flow: a distinct
+ *                        Leftover section — kept for reference / future reuse,
+ *                        never run by the live survey and never clogging a live flow.
  */
-export type NodeRegion = "flow" | "not-yet-ordered" | "library";
+export type NodeRegion = "flow" | "not-yet-ordered" | "library" | "leftover";
 
 /** A single question, flattened for rendering. */
 export interface GraphNode {

@@ -1,8 +1,10 @@
 // i18n bootstrap (Lingui spike).
 //
-// English is bundled synchronously (static import) so first paint never blocks
-// on a fetch and there is always a fallback; the persisted/detected locale is
-// then applied (async for non-source locales). The `?lingui` suffix makes
+// English is bundled synchronously (static import) so it is always available
+// as a fallback; a non-English persisted/detected locale is then fetched
+// async and awaited by main.tsx before first paint (T039), so the fallback
+// that matters isn't "renders before the fetch" but "renders English if the
+// fetch never resolves" — see localeReady below. The `?lingui` suffix makes
 // @lingui/vite-plugin compile the JSON catalog to a runtime Messages object at
 // import time. Message ids are explicit and stable — see WelcomeScreen.tsx.
 import { i18n } from "@lingui/core";
@@ -41,15 +43,25 @@ export function saveLocale(locale: Locale): void {
   }
 }
 
+/**
+ * Resolve a BCP47 tag against SUPPORTED_LOCALES: the exact tag first (so a
+ * future region entry like `pt-BR` matches directly), then its base-language
+ * subtag (`pt-BR` -> `pt`), else null. Adding a region locale is then just a
+ * SUPPORTED_LOCALES entry + catalog files — no resolver change (SC-004).
+ */
+function resolveSupportedTag(tag: string): Locale | null {
+  const lower = tag.toLowerCase();
+  if (isSupported(lower)) return lower;
+  const primary = lower.split("-")[0];
+  return primary !== undefined && isSupported(primary) ? primary : null;
+}
+
 /** Best-effort match of the browser's preferred language to a supported locale. */
 function detectBrowserLocale(): Locale {
   try {
     const lang =
       typeof navigator !== "undefined" ? (navigator.language ?? "") : "";
-    const primary = lang.toLowerCase().split("-")[0];
-    return primary !== undefined && isSupported(primary)
-      ? primary
-      : DEFAULT_LOCALE;
+    return resolveSupportedTag(lang) ?? DEFAULT_LOCALE;
   } catch {
     return DEFAULT_LOCALE;
   }
@@ -71,14 +83,23 @@ export async function activateLocale(locale: Locale): Promise<void> {
   i18n.activate(locale);
 }
 
-// Bootstrap: load + activate English synchronously (always-available fallback),
-// then apply the persisted/detected locale. For a non-English returning visitor
-// the target catalog loads async, so first paint may briefly show English before
-// switching — acceptable at this stage.
+// Bootstrap: load + activate English synchronously (always-available
+// fallback) so `i18n` is usable the instant this module evaluates, then apply
+// the persisted/detected locale. `localeReady` resolves once that locale (if
+// non-English) has finished loading, so callers that await it before their
+// first render never show an English flash (T039) — main.tsx does this.
+// A failed catalog fetch (chunk 404 after a deploy, transient network error,
+// …) must NOT block that first render: English is already active, so
+// localeReady always resolves — it swallows the rejection and stays on the
+// English fallback rather than propagating a boot-blocking rejection.
 i18n.load(DEFAULT_LOCALE, enMessages);
 i18n.activate(DEFAULT_LOCALE);
 
 const initialLocale = resolveInitialLocale();
-if (initialLocale !== DEFAULT_LOCALE) {
-  void activateLocale(initialLocale);
-}
+export const localeReady: Promise<void> =
+  initialLocale !== DEFAULT_LOCALE
+    ? activateLocale(initialLocale).catch(() => {
+        // English stays active (already loaded above) — a harmless fallback,
+        // same as this used to fail silently before T039 awaited it.
+      })
+    : Promise.resolve();

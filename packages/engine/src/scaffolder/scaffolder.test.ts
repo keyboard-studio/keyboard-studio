@@ -200,8 +200,8 @@ describe("createScaffolderService", () => {
 
       const { vfs } = await service.scaffold(baseKeyboard, "new_keyboard", "New Keyboard");
 
-      expect(vfs.get("source/new_keyboard.kmn")).toBeDefined();
-      expect(vfs.get("LICENSE.md")).toBeDefined();
+      expect(vfs.get("source/new_keyboard.kmn")?.content).toContain("begin Unicode > use(main)");
+      expect(vfs.get("LICENSE.md")?.content).toContain("MIT License");
     });
 
     it("surfaces a warning when base source is unreachable", async () => {
@@ -212,7 +212,7 @@ describe("createScaffolderService", () => {
 
       expect(warnings).toHaveLength(1);
       expect(warnings[0]).toMatch(/base keyboard source unavailable/);
-      expect(vfs.get("source/new_keyboard.kmn")).toBeDefined();
+      expect(vfs.get("source/new_keyboard.kmn")?.content).toContain("begin Unicode > use(main)");
     });
 
     it("returns no scaffolder-level warnings on successful .kmn fetch (loader optional-file warnings are forwarded)", async () => {

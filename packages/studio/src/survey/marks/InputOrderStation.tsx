@@ -1,14 +1,15 @@
 // InputOrderStation — S3 of the marks series (spec 046, FR-012/FR-025).
 //
 // The content and prefill behavior of the retired standalone question
-// `pb_mark_input_order` (survey/questions/b/pb_mark_input_order.ts at
-// retirement), relocated VERBATIM into the series: prompt, help text, and the
+// `pb_mark_input_order` (survey/questions/reserve/pb_mark_input_order.ts,
+// physically relocated there), relocated VERBATIM into the series: prompt, help text, and the
 // two options are unchanged; the prefill comes from the base keyboard's own
 // behavior (`detectMarkInputOrderFromImport` → session axes markInputOrder)
 // when available. Rendered only when at least one mark-class was confirmed as
 // letter-plus-mark — attach order is meaningless without a productive mark key.
 
-import { definition as markInputOrderDefinition } from "../questions/b/pb_mark_input_order.ts";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { definition as markInputOrderDefinition } from "../questions/reserve/pb_mark_input_order.ts";
 import { BORDER, TEXT_MAIN, mutedParaFlush, sectionHeading } from "../surveyStyles.ts";
 
 export type MarkInputOrder = "prefix" | "postfix";
@@ -30,11 +31,16 @@ const OPTIONS: { value: MarkInputOrder; label: string }[] = (
 ).map((o) => ({ value: o.value as MarkInputOrder, label: o.label }));
 
 export function InputOrderStation({ value, onChange, prefilledFromImport }: InputOrderStationProps) {
+  const { t } = useLingui();
+  const sectionAriaLabel = t({
+    id: "survey.marks.inputOrder.sectionAriaLabel",
+    message: "Mark input order",
+  });
   return (
-    <section data-testid="marks-input-order" aria-label="Mark input order">
+    <section data-testid="marks-input-order" aria-label={sectionAriaLabel}>
       <h3 style={sectionHeading}>{PROMPT}</h3>
       <p style={mutedParaFlush}>{HELP_TEXT}</p>
-      <div role="radiogroup" aria-label="Mark input order" style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+      <div role="radiogroup" aria-label={sectionAriaLabel} style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
         {OPTIONS.map((option) => (
           <label
             key={option.value}
@@ -62,7 +68,9 @@ export function InputOrderStation({ value, onChange, prefilledFromImport }: Inpu
       </div>
       {prefilledFromImport && (
         <p style={{ ...mutedParaFlush, marginTop: 8, fontSize: 12 }}>
-          Pre-filled from how the keyboard you started from already behaves.
+          <Trans id="survey.marks.inputOrder.prefilledFromImportNote">
+            Pre-filled from how the keyboard you started from already behaves.
+          </Trans>
         </p>
       )}
     </section>
