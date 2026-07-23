@@ -787,7 +787,7 @@
   "editor.assignLoop.infoView.capabilityHint.notRemovableOpaque": "Utilise une syntaxe avancée que l'éditeur ne peut pas réécrire, donc le supprimer ici n'aura aucun effet.",
   "preview.overlay.error.vfs.title": "Échec du chargement du VFS",
   "output.submit.success.linkAriaLabel": "Voir votre soumission de clavier",
-  "common.warningLabel": "",
+  "common.warningLabel": "Avertissement :",
   "editor.assignLoop.preview.defaultWarningsLabel": "Avertissements :",
   "oauth.callback.error.detail": "Nous n’avons pas pu terminer la connexion. C’est généralement temporaire — veuillez retourner au studio et réessayer de vous connecter.",
   "welcome.title": "Bienvenue dans Keyboard Studio",
