@@ -743,7 +743,7 @@ export function CharacterMapPane({
               <span style={{ fontWeight: 600 }}>
                 <Trans id="survey.characterMapPane.searchFilter.label">Search by:</Trans>
               </span>
-              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <label className="ks-hit-target" style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <Checkbox
                   checked={searchFilters.character}
                   onChange={(e) => handleToggleSearchFilter("character", e.target.checked)}
@@ -754,7 +754,7 @@ export function CharacterMapPane({
                 />
                 <Trans id="survey.characterMapPane.searchFilter.character">Character</Trans>
               </label>
-              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <label className="ks-hit-target" style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <Checkbox
                   checked={searchFilters.name}
                   onChange={(e) => handleToggleSearchFilter("name", e.target.checked)}
@@ -765,7 +765,7 @@ export function CharacterMapPane({
                 />
                 <Trans id="survey.characterMapPane.searchFilter.name">Name</Trans>
               </label>
-              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <label className="ks-hit-target" style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <Checkbox
                   checked={searchFilters.codepoint}
                   onChange={(e) => handleToggleSearchFilter("codepoint", e.target.checked)}
@@ -783,6 +783,7 @@ export function CharacterMapPane({
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         {!noBaseOrLanguage && hasKnownBlocks && (
           <label
+            className="ks-hit-target"
             style={{
               display: "flex",
               alignItems: "center",
