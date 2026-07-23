@@ -584,76 +584,81 @@ export function CharacterMapPane({
         placeholder={t({ id: "survey.characterMapPane.search.placeholder", message: "Search characters" })}
         aria-label={t({ id: "survey.characterMapPane.search.ariaLabel", message: "Search the character map" })}
       />
-      {!noBaseOrLanguage && hasKnownBlocks && (
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 12,
-            color: TEXT_DIM,
-            alignSelf: "flex-start",
-          }}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {!noBaseOrLanguage && hasKnownBlocks && (
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              color: TEXT_DIM,
+            }}
+          >
+            <Checkbox
+              checked={blocksOnly}
+              onChange={(e) => handleToggleBlocksOnly(e.target.checked)}
+              aria-label={t({
+                id: "survey.characterMapPane.blocksOnly.ariaLabel",
+                message: "Show only blocks my keyboard uses",
+              })}
+            />
+            <Trans id="survey.characterMapPane.blocksOnly.label">
+              Show only blocks my keyboard uses
+            </Trans>
+          </label>
+        )}
+        {/* Zoom control — a fixed toolbar in the header area (stays put while
+            the grid below scrolls). Scales the chip glyphs/cells via the
+            `scale` param on charChip/chipGlyph/chipGlyphMissingBox/chipCodepoint
+            (surveyStyles.ts) rather than a CSS transform on the scroll
+            container, so the flex-wrap grid keeps reflowing correctly.
+            `marginLeft: "auto"` pushes it to the right corner whether or not
+            the checkbox above is rendered — do not rely on the row's
+            `justify-content` for this, it would mis-center when the
+            checkbox is absent. */}
+        <div
+          role="group"
+          aria-label={t({ id: "survey.characterMapPane.zoom.groupAriaLabel", message: "Zoom the character map" })}
+          style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}
         >
-          <Checkbox
-            checked={blocksOnly}
-            onChange={(e) => handleToggleBlocksOnly(e.target.checked)}
-            aria-label={t({
-              id: "survey.characterMapPane.blocksOnly.ariaLabel",
-              message: "Show only blocks my keyboard uses",
-            })}
-          />
-          <Trans id="survey.characterMapPane.blocksOnly.label">
-            Show only blocks my keyboard uses
-          </Trans>
-        </label>
-      )}
-      {/* Zoom control — a fixed toolbar in the header area (stays put while
-          the grid below scrolls). Scales the chip glyphs/cells via the
-          `scale` param on charChip/chipGlyph/chipGlyphMissingBox/chipCodepoint
-          (surveyStyles.ts) rather than a CSS transform on the scroll
-          container, so the flex-wrap grid keeps reflowing correctly. */}
-      <div
-        role="group"
-        aria-label={t({ id: "survey.characterMapPane.zoom.groupAriaLabel", message: "Zoom the character map" })}
-        style={{ display: "flex", alignItems: "center", gap: 8, alignSelf: "flex-start" }}
-      >
-        <button
-          ref={zoomOutButtonRef}
-          type="button"
-          onClick={() => handleZoom(-1)}
-          disabled={zoom <= ZOOM_MIN}
-          aria-label={t({ id: "survey.characterMapPane.zoom.zoomOut", message: "Zoom out" })}
-          style={{
-            ...secondaryButton,
-            padding: "2px 10px",
-            fontSize: 13,
-            ...(zoom <= ZOOM_MIN ? { opacity: 0.4, cursor: "not-allowed" } : {}),
-          }}
-        >
-          −
-        </button>
-        <span
-          data-testid="char-map-zoom-level"
-          style={{ fontSize: 12, color: TEXT_DIM, minWidth: 40, textAlign: "center" }}
-        >
-          <Trans id="survey.characterMapPane.zoom.level">{zoomPercent(zoom)}%</Trans>
-        </span>
-        <button
-          ref={zoomInButtonRef}
-          type="button"
-          onClick={() => handleZoom(1)}
-          disabled={zoom >= ZOOM_MAX}
-          aria-label={t({ id: "survey.characterMapPane.zoom.zoomIn", message: "Zoom in" })}
-          style={{
-            ...secondaryButton,
-            padding: "2px 10px",
-            fontSize: 13,
-            ...(zoom >= ZOOM_MAX ? { opacity: 0.4, cursor: "not-allowed" } : {}),
-          }}
-        >
-          +
-        </button>
+          <button
+            ref={zoomOutButtonRef}
+            type="button"
+            onClick={() => handleZoom(-1)}
+            disabled={zoom <= ZOOM_MIN}
+            aria-label={t({ id: "survey.characterMapPane.zoom.zoomOut", message: "Zoom out" })}
+            style={{
+              ...secondaryButton,
+              padding: "2px 10px",
+              fontSize: 13,
+              ...(zoom <= ZOOM_MIN ? { opacity: 0.4, cursor: "not-allowed" } : {}),
+            }}
+          >
+            −
+          </button>
+          <span
+            data-testid="char-map-zoom-level"
+            style={{ fontSize: 12, color: TEXT_DIM, minWidth: 40, textAlign: "center" }}
+          >
+            <Trans id="survey.characterMapPane.zoom.level">{zoomPercent(zoom)}%</Trans>
+          </span>
+          <button
+            ref={zoomInButtonRef}
+            type="button"
+            onClick={() => handleZoom(1)}
+            disabled={zoom >= ZOOM_MAX}
+            aria-label={t({ id: "survey.characterMapPane.zoom.zoomIn", message: "Zoom in" })}
+            style={{
+              ...secondaryButton,
+              padding: "2px 10px",
+              fontSize: 13,
+              ...(zoom >= ZOOM_MAX ? { opacity: 0.4, cursor: "not-allowed" } : {}),
+            }}
+          >
+            +
+          </button>
+        </div>
       </div>
       {/* Screen-reader announcer for toggle actions — visually hidden. */}
       <div aria-live="polite" style={visuallyHidden}>
