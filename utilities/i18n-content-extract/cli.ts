@@ -14,10 +14,11 @@
  * Default (no flags): full build, written to content/i18n/en/*.json.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { extractContentCatalogs, type ContentCatalog, type ContentRoots } from "./extract.js";
+import { stableStringify, writeTextIfChanged } from "../facet-index/writeStable.js";
 
 const REPO_ROOT = join(import.meta.dirname, "..", "..");
 
@@ -30,14 +31,6 @@ export interface RunResult {
   changed: string[];
   total: number;
   fileCount: number;
-}
-
-// Stable key order so re-running with no content changes produces a
-// byte-identical file — required for --check to be a meaningful diff.
-function stableStringify(catalog: ContentCatalog): string {
-  const sorted: ContentCatalog = {};
-  for (const key of Object.keys(catalog).sort()) sorted[key] = catalog[key];
-  return JSON.stringify(sorted, null, 2) + "\n";
 }
 
 /**
@@ -59,13 +52,15 @@ export function run(options: RunOptions): RunResult {
   const changed: string[] = [];
   for (const [name, catalog] of files) {
     const outPath = join(options.outDir, name);
+    // Flat { id: prose } catalogs — sortDeep's recursive sort reduces to a
+    // plain top-level sort for this shape, matching the byte output the
+    // committed catalogs were generated with.
     const after = stableStringify(catalog);
-    const before = existsSync(outPath) ? readFileSync(outPath, "utf8") : null;
-    if (before === after) continue;
-    changed.push(name);
-    if (!options.check) {
-      mkdirSync(dirname(outPath), { recursive: true });
-      writeFileSync(outPath, after);
+    if (options.check) {
+      const before = existsSync(outPath) ? readFileSync(outPath, "utf8") : null;
+      if (before !== after) changed.push(name);
+    } else if (writeTextIfChanged(outPath, after)) {
+      changed.push(name);
     }
   }
 
