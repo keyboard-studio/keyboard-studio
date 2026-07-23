@@ -47,15 +47,9 @@ describe("il_script_not_supported — inputs / writes (IRPath)", () => {
   });
 });
 
-describe("il_script_not_supported — fixtures (no validate)", () => {
+describe("il_script_not_supported — fixtures", () => {
   it("has no invalid fixtures (terminal notice, no user input)", () => {
     expect(fixtures.invalid).toHaveLength(0);
   });
 
-  for (const { value, note } of fixtures.valid) {
-    it(`valid fixture: ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      // No validate() on notice questions — just confirm fixture is present.
-      expect(true).toBe(true);
-    });
-  }
 });

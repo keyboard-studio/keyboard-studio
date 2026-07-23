@@ -41,7 +41,7 @@ describe("charToVkey", () => {
 
   it("CHAR_TO_VKEY has no entry derived from the empty '-- choose a key --' option", () => {
     const emptyOption = KEY_OPTIONS.find((o) => o.value === "");
-    expect(emptyOption).toBeDefined();
+    expect(emptyOption?.value).toBe("");
     // The empty option's value is excluded by construction; its label
     // ("-- choose a key --") has no trailing "(X)" to match anyway.
     for (const [, vkey] of CHAR_TO_VKEY) {

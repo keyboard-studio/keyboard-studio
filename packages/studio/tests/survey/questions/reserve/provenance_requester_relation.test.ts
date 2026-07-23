@@ -12,13 +12,8 @@ describe("provenance_requester_relation — definition", () => {
   });
 });
 
-describe("provenance_requester_relation — fixtures (no validate)", () => {
+describe("provenance_requester_relation — fixtures", () => {
   it("has no invalid fixtures", () => {
     expect(fixtures.invalid).toHaveLength(0);
   });
-  for (const { value, note } of fixtures.valid) {
-    it(`valid fixture: ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      expect(true).toBe(true);
-    });
-  }
 });

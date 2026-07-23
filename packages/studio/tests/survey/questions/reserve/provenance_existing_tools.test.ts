@@ -12,13 +12,8 @@ describe("provenance_existing_tools — definition", () => {
   });
 });
 
-describe("provenance_existing_tools — fixtures (no validate)", () => {
+describe("provenance_existing_tools — fixtures", () => {
   it("has no invalid fixtures", () => {
     expect(fixtures.invalid).toHaveLength(0);
   });
-  for (const { value, note } of fixtures.valid) {
-    it(`valid fixture: ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      expect(true).toBe(true);
-    });
-  }
 });

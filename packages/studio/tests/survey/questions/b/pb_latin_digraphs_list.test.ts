@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/b/pb_latin_digraphs_list.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/b/pb_latin_digraphs_list.ts";
 
 describe("pb_latin_digraphs_list — definition", () => {
   it("has correct id", () => {
@@ -16,13 +19,8 @@ describe("pb_latin_digraphs_list — definition", () => {
   });
 });
 
-describe("pb_latin_digraphs_list — fixtures (no validate)", () => {
+describe("pb_latin_digraphs_list — fixtures", () => {
   it("has no invalid fixtures", () => {
     expect(fixtures.invalid).toHaveLength(0);
   });
-  for (const { value, note } of fixtures.valid) {
-    it(`valid fixture: ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      expect(true).toBe(true);
-    });
-  }
 });
