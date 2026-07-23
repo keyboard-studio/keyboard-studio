@@ -12,6 +12,16 @@
 //     that character in the caller's modality (see charMechanisms.ts's
 //     getCharMechanisms — PRODUCES, not USES). Green when >=1, red when 0.
 //
+// The CURRENTLY SELECTED chip additionally grows (a larger glyph) and shows
+// its `U+XXXX` notation between the glyph and the badge — this strip is now
+// the single place the "which character, what codepoint, how many
+// mechanisms" trio is surfaced, replacing the separate character-heading
+// card each gallery used to render below it (see MechanismGallery.tsx and
+// TouchGallery.tsx history). The visible U+ text on the selected chip is
+// `aria-hidden` because the button's own `aria-label` already states the
+// notation — without that, some screen readers would announce the
+// character/codepoint twice when browsing the chip's content.
+//
 // Test-id scheme (documented — Part 1 asked for a stable, picked scheme):
 // both the chip and its badge key off the FULL sequence of the character's
 // Unicode codepoints, each in 4+-digit uppercase hex (the same per-codepoint
@@ -35,7 +45,7 @@ import type { MechanismAssignment, Modality } from "@keyboard-studio/contracts";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { displayChar } from "../../../lib/irToCarveNodes.ts";
 import { getCharMechanisms } from "./charMechanisms.ts";
-import { BG_CARD, BORDER, ACCENT, FONT } from "../../../lib/galleryTheme.ts";
+import { BG_CARD, BORDER, ACCENT, TEXT_DIM, FONT } from "../../../lib/galleryTheme.ts";
 
 export interface CharScrollStripProps {
   /** All characters in this gallery's own walk order (lettersToAdd for MechanismGallery, inventory for TouchGallery). */
@@ -121,15 +131,20 @@ export function CharScrollStrip({
         // additionally opts this item out of the shrink algorithm entirely,
         // as a second, independent guard.
         //
-        // 96px clears one row of chips: glyph (fontSize 20/lineHeight 1)
-        // + 4px column gap + badge (16px line-height + 1px top/bottom
-        // border = 18px) = 42px of button content, +16px button vertical
-        // padding +2px button border = 60px per chip, +6px wrapper
-        // paddingBottom = 66px, plus ~30px headroom for a classic
-        // (non-overlay) horizontal scrollbar track on Windows/Linux/Chrome
-        // (scrollbarWidth:"thin" below only affects Firefox) and for
-        // cross-browser font-metrics rounding.
-        minHeight: 96,
+        // 128px clears one row of chips including the grown SELECTED one,
+        // which is the tallest: glyph (fontSize 32/lineHeight 1) + 4px
+        // column gap + U+ notation line (fontSize 11/lineHeight 1) + 4px
+        // column gap + badge (16px line-height + 1px top/bottom border =
+        // 18px) = 32+4+11+4+18 = 69px of button content, +20px button
+        // vertical padding (10px top/bottom on the grown chip) +2px button
+        // border = 91px per chip, +6px wrapper paddingBottom = 97px, plus
+        // ~30px headroom for a classic (non-overlay) horizontal scrollbar
+        // track on Windows/Linux/Chrome (scrollbarWidth:"thin" below only
+        // affects Firefox) and for cross-browser font-metrics rounding —
+        // rounded up to 128 for margin. Non-selected chips are shorter
+        // (glyph 20px + badge only, ~66px as before) so they never drive
+        // this floor.
+        minHeight: 128,
         paddingBottom: 6,
         scrollSnapType: "x proximity",
         scrollbarWidth: "thin",
@@ -162,7 +177,7 @@ export function CharScrollStrip({
               flexDirection: "column",
               alignItems: "center",
               gap: 4,
-              padding: "8px 10px",
+              padding: isSelected ? "10px 12px" : "8px 10px",
               background: isSelected ? "#0d2840" : BG_CARD,
               border: `1px solid ${isSelected ? ACCENT : BORDER}`,
               borderRadius: 8,
@@ -172,7 +187,7 @@ export function CharScrollStrip({
           >
             <span
               style={{
-                fontSize: 20,
+                fontSize: isSelected ? 32 : 20,
                 lineHeight: 1,
                 fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
                 color: "#ffffff",
@@ -180,6 +195,25 @@ export function CharScrollStrip({
             >
               {displayChar(c)}
             </span>
+            {isSelected && (
+              // Visible U+ notation on the grown/selected chip only — the
+              // per-char "character heading" card each gallery used to
+              // render below the strip is gone; this is its replacement.
+              // aria-hidden: the button's own aria-label above already
+              // states the notation, so this stays a sighted-only cue and
+              // is never announced a second time.
+              <span
+                aria-hidden="true"
+                style={{
+                  fontSize: 11,
+                  lineHeight: 1,
+                  fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+                  color: TEXT_DIM,
+                }}
+              >
+                {toUPlusNotation(c)}
+              </span>
+            )}
             <span
               data-testid={`char-scroll-badge-${hex}`}
               aria-label={t({

@@ -1387,41 +1387,23 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       {/* Per-char UI */}
       {currentChar !== null && (
         <>
-          {/* Character heading card (identical to MechanismGallery's) */}
-          <div
+          {/* "Touch mapping" section header — the character-heading card that
+              used to live here (glyph + U+ notation) is gone; the
+              CharScrollStrip below now shows both on the selected chip
+              directly (see CharScrollStrip.tsx). This label is kept so the
+              "you're now configuring this character's touch access" cue
+              doesn't disappear along with the card. */}
+          <p
             style={{
-              background: BG_CARD,
-              border: `1px solid ${BORDER}`,
-              borderRadius: 10,
-              padding: "16px 18px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 6,
+              margin: 0,
+              fontSize: 12,
+              color: TEXT_DIM,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
             }}
           >
-            <p
-              style={{
-                margin: 0,
-                fontSize: 12,
-                color: TEXT_DIM,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-              }}
-            >
-              <Trans id="editor.assignLoop.touch.mappingEyebrow">Touch mapping</Trans>
-            </p>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-              <span
-                style={{ fontSize: 36, fontFamily: "monospace", lineHeight: 1 }}
-                aria-label={`${toUPlusNotation(currentChar)} ${currentChar}`}
-              >
-                {displayChar(currentChar)}
-              </span>
-              <span style={{ fontSize: 13, color: TEXT_DIM }}>
-                {toUPlusNotation(currentChar)}
-              </span>
-            </div>
-          </div>
+            <Trans id="editor.assignLoop.touch.mappingEyebrow">Touch mapping</Trans>
+          </p>
 
           {/* Top toolbar row — Back (left) + the primary forward action
               (right), on the same horizontal level; it carries marginLeft:

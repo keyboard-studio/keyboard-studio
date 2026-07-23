@@ -2361,41 +2361,23 @@ export function MechanismGallery({
           {/* Per-char UI */}
           {currentChar !== null && (
             <>
-              {/* Character heading */}
-              <div
+              {/* "Add a key" section header — the character-heading card that
+                  used to live here (glyph + U+ notation) is gone; the
+                  CharScrollStrip above now shows both on the selected chip
+                  directly (see CharScrollStrip.tsx). This label is kept so
+                  the "you're now choosing how to add this key" cue doesn't
+                  disappear along with the card. */}
+              <p
                 style={{
-                  background: BG_CARD,
-                  border: `1px solid ${BORDER}`,
-                  borderRadius: 10,
-                  padding: "16px 18px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 6,
+                  margin: 0,
+                  fontSize: 12,
+                  color: TEXT_DIM,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
                 }}
               >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 12,
-                    color: TEXT_DIM,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                  }}
-                >
-                  <Trans id="editor.assignLoop.addAKeyEyebrow">Add a key</Trans>
-                </p>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                  <span
-                    style={{ fontSize: 36, fontFamily: "monospace", lineHeight: 1 }}
-                    aria-label={`${toUPlusNotation(currentChar)} ${currentChar}`}
-                  >
-                    {displayChar(currentChar)}
-                  </span>
-                  <span style={{ fontSize: 13, color: TEXT_DIM }}>
-                    {toUPlusNotation(currentChar)}
-                  </span>
-                </div>
-              </div>
+                <Trans id="editor.assignLoop.addAKeyEyebrow">Add a key</Trans>
+              </p>
 
               {/* kbgen suggestion row — shown above method chooser when a
                   qualifying placement candidate exists and hasn't been dismissed.

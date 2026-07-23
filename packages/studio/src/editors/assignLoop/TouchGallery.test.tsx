@@ -20,6 +20,7 @@ import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
+import { expectCurrentChar } from "../../test/currentCharChip.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() — refs shared across mock closures and test bodies.
@@ -534,7 +535,7 @@ describe("TouchGallery — seed-source-aware detection reads the shipped layout 
     // (records nothing) and works regardless of that suggestion's state.
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+20AC €$/)).toBeTruthy();
+      expectCurrentChar("€");
     });
 
     // The seed-source-aware detection (T015) must surface the "already"
@@ -599,7 +600,7 @@ describe("TouchGallery — detectionSeedLayout/layoutForLintAndGate fallback on 
 
     // Fallback path taken: the gallery still renders the character card for
     // "a" instead of crashing.
-    expect(screen.getByLabelText(/^U\+0061 a$/)).toBeTruthy();
+    expectCurrentChar("a");
     expect(errorSpy).toHaveBeenCalled();
 
     errorSpy.mockRestore();
@@ -680,10 +681,11 @@ describe("TouchGallery — back navigation", () => {
     // within Phase E (idx 1 -> idx 0), purely positionally.
     expect(onBack).not.toHaveBeenCalled();
 
-    // The "ä" character heading should now be visible (we returned to char 1).
-    // Use the per-char "Touch mapping" label which is unique to the per-char UI.
+    // We returned to char 1 ("ä") — the per-char assignment UI (the "Touch
+    // mapping" section) is showing again.
     const headings = screen.queryAllByText(/Touch mapping/i);
     expect(headings.length).toBeGreaterThan(0);
+    expectCurrentChar("ä");
   });
 
   it("Back from empty-inventory guard calls onBack", async () => {
@@ -718,7 +720,7 @@ describe("TouchGallery — back navigation", () => {
     });
 
     // --- Configure "中" (idx 0): pick a host key, Apply, then Next → "日" (idx 1). ---
-    expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+    expectCurrentChar("中");
     fireEvent.change(screen.getByLabelText(/Host key for long-press/i), {
       target: { value: "K_A" },
     });
@@ -729,7 +731,7 @@ describe("TouchGallery — back navigation", () => {
       fireEvent.click(nextBtn);
     });
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+      expectCurrentChar("日");
     });
 
     // --- Configure "日" (idx 1), then Next → "月" (idx 2, the LAST character). ---
@@ -743,7 +745,7 @@ describe("TouchGallery — back navigation", () => {
       fireEvent.click(nextBtn);
     });
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+6708 月$/)).toBeTruthy();
+      expectCurrentChar("月");
     });
 
     // The last character's forward button already reads "Done" (not yet
@@ -754,7 +756,7 @@ describe("TouchGallery — back navigation", () => {
     // --- Back from "月" (idx 2) lands on "日" (idx 1) — configured, not skipped. ---
     fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+      expectCurrentChar("日");
     });
     expect(onBack).not.toHaveBeenCalled();
 
@@ -767,17 +769,17 @@ describe("TouchGallery — back navigation", () => {
     expect((nextFrom日 as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(nextFrom日);
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+6708 月$/)).toBeTruthy();
+      expectCurrentChar("月");
     });
 
     // --- Back twice more: "月" → "日" → "中" (idx 0), both configured, neither skipped. ---
     fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+      expectCurrentChar("日");
     });
     fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+      expectCurrentChar("中");
     });
     expect(onBack).not.toHaveBeenCalled();
 
@@ -791,11 +793,11 @@ describe("TouchGallery — back navigation", () => {
     // instance forward to exercise Done.)
     fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+      expectCurrentChar("日");
     });
     fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+6708 月$/)).toBeTruthy();
+      expectCurrentChar("月");
     });
     fireEvent.change(screen.getByLabelText(/Host key for long-press/i), {
       target: { value: "K_C" },
@@ -841,12 +843,12 @@ describe("TouchGallery — character-scroll-strip navigation", () => {
     });
 
     // Advance to "日" (idx 1) via Skip — "月" stays untouched.
-    expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+    expectCurrentChar("中");
     fireEvent.click(
       screen.getByRole("button", { name: /Skip this character/i }),
     );
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+      expectCurrentChar("日");
     });
 
     // Click the chip for "中" (the earlier, already-visited character) while
@@ -855,7 +857,7 @@ describe("TouchGallery — character-scroll-strip navigation", () => {
 
     // Landed back on "中" (idx 0) — the phase was NOT exited.
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+      expectCurrentChar("中");
     });
     expect(onBack).not.toHaveBeenCalled();
   });
@@ -868,11 +870,11 @@ describe("TouchGallery — character-scroll-strip navigation", () => {
 
     // Starting on "中" (idx 0) — jump straight to "月" (idx 2, the last
     // character), skipping over "日" entirely without visiting it.
-    expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+    expectCurrentChar("中");
     fireEvent.click(screen.getByTestId("char-scroll-chip-6708"));
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+6708 月$/)).toBeTruthy();
+      expectCurrentChar("月");
     });
   });
 });
@@ -894,7 +896,7 @@ describe("TouchGallery — skip character", () => {
     expect(useWorkingCopyStore.getState().touchDraft?.charTouchEntries ?? []).toHaveLength(0);
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+      expectCurrentChar("日");
     });
   });
 
@@ -910,7 +912,7 @@ describe("TouchGallery — skip character", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+      expectCurrentChar("日");
     });
 
     // Skipping recorded nothing, so coverage is unchanged.
@@ -922,7 +924,7 @@ describe("TouchGallery — skip character", () => {
     // configured — Next stays disabled until it is actually applied.
     fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+      expectCurrentChar("中");
     });
     const nextBtn = screen.getByRole("button", { name: /Next character/i });
     expect((nextBtn as HTMLButtonElement).disabled).toBe(true);
@@ -1443,13 +1445,13 @@ describe("TouchGallery — suggestion card variants", () => {
     // Skip it — no accept/deny, no assignment recorded.
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+0078 x$/)).toBeTruthy();
+      expectCurrentChar("x");
     });
 
     // Navigate back to "á" without ever resolving its suggestion.
     fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+      expectCurrentChar("á");
     });
 
     // Unlike the accept/deny case above, the suggestion card for "á" MUST

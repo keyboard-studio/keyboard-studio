@@ -11,6 +11,7 @@ import { render } from "../../../test/renderWithI18n.tsx";
 import { CharScrollStrip } from "./CharScrollStrip.tsx";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import { PATTERN_DEADKEY } from "../patternIds.ts";
+import { expectCurrentChar, getCurrentCharChip } from "../../../test/currentCharChip.ts";
 
 afterEach(() => {
   cleanup();
@@ -111,6 +112,47 @@ describe("CharScrollStrip — producer-count badge", () => {
     );
 
     expect(screen.getByTestId("char-scroll-badge-0061").textContent).toBe("0");
+  });
+});
+
+describe("CharScrollStrip — current-chip selection (aria-pressed + accessible name)", () => {
+  // This strip is the sole replacement for the removed per-gallery character-
+  // heading card (see the file-header comment above); MechanismGallery.test.tsx
+  // and TouchGallery.test.tsx locate "the current character" via the shared
+  // getCurrentCharChip()/expectCurrentChar() helpers
+  // (../../../test/currentCharChip.ts). These tests exercise those helpers
+  // directly against the component they key off, so a change to the chip's
+  // aria-pressed/aria-label contract fails here first, not only in the two
+  // much larger gallery suites.
+  it("marks only the currentChar chip aria-pressed, with the 'Go to U+XXXX <char>' accessible name", () => {
+    render(
+      <CharScrollStrip
+        chars={["a", "b", "c"]}
+        currentChar="b"
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+
+    expectCurrentChar("b");
+    expect(getCurrentCharChip()).toBe(screen.getByTestId("char-scroll-chip-0062"));
+    expect(screen.getByTestId("char-scroll-chip-0061").getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByTestId("char-scroll-chip-0063").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("throws (via getCurrentCharChip) when currentChar is null — no chip is pressed", () => {
+    render(
+      <CharScrollStrip
+        chars={["a", "b"]}
+        currentChar={null}
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+
+    expect(() => getCurrentCharChip()).toThrow();
   });
 });
 

@@ -43,6 +43,7 @@ import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import type { MechanismAssignment, IRGroup, IRRule, IRStore } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
+import { expectCurrentChar } from "../../test/currentCharChip.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() — variables referenced inside vi.mock() factory closures.
@@ -293,10 +294,10 @@ describe("MechanismGallery — current character display", () => {
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    // The character heading renders "Add a key" label above the char glyph.
+    // The "Add a key" eyebrow still renders above the CharScrollStrip.
     expect(screen.getByText("Add a key")).toBeTruthy();
-    // The char glyph has aria-label "U+00E1 á".
-    expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+    // The CharScrollStrip's selected chip is "á" (aria-pressed + "Go to U+00E1 á").
+    expectCurrentChar("á");
   });
 
   it("renders the coverage status line with initial 0-of-N count", async () => {
@@ -538,7 +539,7 @@ describe("MechanismGallery — apply (sequence flag)", () => {
     // indicator) are in play for the assertions below.
     fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
 
     // Distinct aria-labels — each resolves to exactly one, correctly-scoped
@@ -709,7 +710,7 @@ describe("MechanismGallery — advance after apply", () => {
 
     // Now the current char should be "é".
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
   });
 
@@ -749,7 +750,7 @@ describe("MechanismGallery — skip character", () => {
 
     // Current char is now é.
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
   });
 
@@ -767,7 +768,7 @@ describe("MechanismGallery — skip character", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
 
     // Skipping recorded nothing, so coverage is unchanged.
@@ -779,7 +780,7 @@ describe("MechanismGallery — skip character", () => {
     // Next stays disabled until it is actually applied.
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+      expectCurrentChar("á");
     });
     const nextBtn = screen.getByRole("button", { name: /Next character/i });
     expect((nextBtn as HTMLButtonElement).disabled).toBe(true);
@@ -973,7 +974,7 @@ describe("MechanismGallery — positional Back/Next navigation", () => {
     });
 
     // --- Implement "á" (idx 0), then Next → "é" (idx 1). ---
-    expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+    expectCurrentChar("á");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
     await waitFor(() => {
       const nextBtn = screen.getByRole("button", { name: /Next character/i });
@@ -981,7 +982,7 @@ describe("MechanismGallery — positional Back/Next navigation", () => {
       fireEvent.click(nextBtn);
     });
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
 
     // --- Implement "é" (idx 1), then Next → "í" (idx 2, the LAST character). ---
@@ -992,7 +993,7 @@ describe("MechanismGallery — positional Back/Next navigation", () => {
       fireEvent.click(nextBtn);
     });
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00ED í$/)).toBeTruthy();
+      expectCurrentChar("í");
     });
 
     // The last character's forward button already reads "Done" (not yet
@@ -1003,7 +1004,7 @@ describe("MechanismGallery — positional Back/Next navigation", () => {
     // --- Back from "í" (idx 2) lands on "é" (idx 1) — covered, not skipped. ---
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
     expect(onBack).not.toHaveBeenCalled();
 
@@ -1016,17 +1017,17 @@ describe("MechanismGallery — positional Back/Next navigation", () => {
     expect((nextFromE as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(nextFromE);
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00ED í$/)).toBeTruthy();
+      expectCurrentChar("í");
     });
 
     // --- Back twice more: "í" → "é" → "á" (idx 0), both covered, neither skipped. ---
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+      expectCurrentChar("á");
     });
     expect(onBack).not.toHaveBeenCalled();
 
@@ -1068,7 +1069,7 @@ describe("MechanismGallery — character-scroll-strip navigation", () => {
     });
 
     // Advance to "é" (idx 1) via Apply + Next — "í" stays untouched.
-    expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+    expectCurrentChar("á");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
     await waitFor(() => {
       const nextBtn = screen.getByRole("button", { name: /Next character/i });
@@ -1076,7 +1077,7 @@ describe("MechanismGallery — character-scroll-strip navigation", () => {
       fireEvent.click(nextBtn);
     });
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
 
     // Click the chip for "á" (the earlier, already-implemented character)
@@ -1085,7 +1086,7 @@ describe("MechanismGallery — character-scroll-strip navigation", () => {
 
     // Landed back on "á" (idx 0) — the phase was NOT exited.
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+      expectCurrentChar("á");
     });
     expect(onBack).not.toHaveBeenCalled();
   });
@@ -1098,11 +1099,11 @@ describe("MechanismGallery — character-scroll-strip navigation", () => {
 
     // Starting on "á" (idx 0) — jump straight to "í" (idx 2, the last
     // character), skipping over "é" entirely without visiting it.
-    expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+    expectCurrentChar("á");
     fireEvent.click(screen.getByTestId("char-scroll-chip-00ED"));
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00ED í$/)).toBeTruthy();
+      expectCurrentChar("í");
     });
   });
 
@@ -1128,7 +1129,7 @@ describe("MechanismGallery — character-scroll-strip navigation", () => {
 
     fireEvent.click(screen.getByTestId("char-scroll-chip-00ED"));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00ED í$/)).toBeTruthy();
+      expectCurrentChar("í");
     });
   });
 });
@@ -1276,9 +1277,9 @@ describe("MechanismGallery — Back after skipping the only character", () => {
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     expect(onComplete).toHaveBeenCalledOnce();
 
-    // The heading for "á" is still present — positional nav never nulled
+    // "á" is still the selected chip — positional nav never nulled
     // currentChar out from under the completed character.
-    expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+    expectCurrentChar("á");
 
     // Back is still positional: idx 0 has no prior position, so it calls
     // onBack — not gated by the character having just been skipped.
@@ -1331,14 +1332,15 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
       expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
     });
 
-    // Navigate back to "é" without resolving à's suggestion. Anchored regex:
-    // "é" is covered (accepted above), so an "Added" chip ("Remove U+00E9 é")
-    // also carries "U+00E9" in its aria-label — match only the
-    // character-heading span's exact label.
+    // Navigate back to "é" without resolving à's suggestion. Scoped via
+    // expectCurrentChar to the CharScrollStrip's selected chip: "é" is
+    // covered (accepted above), so an "Added" chip ("Remove U+00E9 é") also
+    // carries "U+00E9" in its own aria-label — an unscoped query would be
+    // ambiguous.
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     expect(onBack).not.toHaveBeenCalled();
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
 
     // The already-accepted suggestion for "é" must NOT re-render its card.
@@ -1366,13 +1368,13 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // Skip it — no accept/deny, no assignment recorded.
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E0 à$/)).toBeTruthy();
+      expectCurrentChar("à");
     });
 
     // Navigate back to "é" without ever resolving its suggestion.
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
 
     // Unlike the accept/deny case above, the suggestion row for "é" MUST
