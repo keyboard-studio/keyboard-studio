@@ -113,9 +113,10 @@ Per-field render-site verification (not just schema presence):
 **Decision**: T027's initial extraction allowlist covers only the
 confirmed-rendering rows (`title`, `questions[].prompt`/`.options[].label`,
 `provenanceLabel`) plus the two "not yet wired but spec-intended" fields
-(`description`, `preSubmitChecklistText`) — **excluding** `elicits` and all
-nine extended-metadata fields. Re-add any of these the moment a real render
-site lands. `Criterion.section` is deferred pending a render-site check.
+(`Pattern.description`, `Criterion.preSubmitChecklistText`) — **excluding**
+`elicits` and all nine extended-metadata fields. Re-add any of these the
+moment a real render site lands. `Criterion.section` is deferred pending a
+render-site check.
 
 ### Frozen literals inside otherwise-translatable prose
 
@@ -142,7 +143,9 @@ Reuse the Tier A `area.component.thing` dot convention, rooted under
 `content.pattern.<patternId>.question.<questionId>.prompt`,
 `content.pattern.<patternId>.question.<questionId>.option.<value>.label`,
 `content.adaptationQuestion.<id>.provenanceLabel`,
-`content.criteria.<criterionId>.description` / `.checklistText`.
+`content.criteria.<criterionId>.description` / `.checklistText` (the key
+intentionally shortens `Criterion.preSubmitChecklistText` — the `preSubmit`
+prefix is redundant once the segment already reads `content.criteria.<id>`).
 
 Criterion ids already embed literal dots (`4.3-copyright-holder-is-authorized`),
 ambiguous against the project's `area ("." segment)+` id grammar if a key is
@@ -150,7 +153,11 @@ ever parsed by splitting on `.`. **Decision**: when a record id contains
 literal dots, replace them with `_` when forming the catalog-key segment only
 (`content.criteria.4_3-copyright-holder-is-authorized.description`) — the
 original `id` field is unaffected; the catalog key stays a flat, opaque,
-never-decomposed string. This composite-key convention is distinct from
+never-decomposed string. The same rule applies to the `<value>` segment in
+`...option.<value>.label` above — option values aren't schema-guaranteed to be
+dot-free, so they're slugified identically (both are implemented via one
+shared `slugifyIdSegment` helper in the T027 extractor, not two copies of the
+rule). This composite-key convention is distinct from
 `adaptation-catalog-lint`'s existing colon-separated `namespace:slug`
 convention for `consumers` entries (`utilities/adaptation-catalog-lint/index.js:249`)
 — don't conflate the two.
@@ -173,8 +180,8 @@ New tool at `utilities/i18n-content-extract/`, following the `facet-index`
 convention (own `package.json`, `"type":"module"`, `tsx`-run) rather than the
 plain-node convention (`i18n-catalog-lint`/`adaptation-catalog-lint`), since it
 needs `PatternSchema`/`CriterionSchema` from `@keyboard-studio/contracts`
-(exported at `packages/contracts/src/index.ts:12,35`) so the prose/control
-split is defined once and can't drift from the runtime type.
+(both defined in `schemas.ts` and re-exported at `packages/contracts/src/index.ts:35`)
+so the prose/control split is defined once and can't drift from the runtime type.
 
 `utilities/*` is excluded from the pnpm workspace (`pnpm-workspace.yaml`,
 except `oauth-backend`), so `facet-index` reaches `@keyboard-studio/contracts`
