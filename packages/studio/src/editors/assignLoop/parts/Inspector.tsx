@@ -97,44 +97,47 @@ function LoadBearing() {
   );
 }
 
-// storeBlurb is a plain (non-component) helper, but its only call site is
-// inside StoreDetail (a component with a live `t`) — no direct unit test
-// calls it, so a required `t` param (rather than the optional-i18n +
-// msg()/resolveMessage() pattern above) is enough here.
-function storeBlurb(node: CarveNode, t: (descriptor: { id: string; message: string }) => string): string {
-  const intro = t({
+// storeBlurb is a plain (non-component) helper called from StoreDetail. It
+// used to take the live `t` as a bare function parameter, but the Lingui
+// macro tracks the specific variable BINDING introduced by useLingui() (see
+// survey/CharacterMapPane.tsx's tierLabel comment) — a `t` re-bound as a
+// plain parameter is a distinct binding the extractor does not follow, so
+// none of these ids ever made it into locales/en/messages.json. Use the same
+// optional-i18n + msg()/resolveMessage() pattern as storePairDescription above.
+function storeBlurb(node: CarveNode, i18n?: I18n): string {
+  const intro = resolveMessage(i18n, msg({
     id: 'editor.assignLoop.inspector.storeIntro',
     message: 'Stores are named character lists that rules in patterns and groups reference, not the rules themselves.',
-  });
+  }));
   if (node.referencedByNodeId !== undefined) {
-    return `${intro} ${t({
+    return `${intro} ${resolveMessage(i18n, msg({
       id: 'editor.assignLoop.inspector.storeBlurb.patternOwned',
       message: 'This store belongs to the pattern above; its removal is managed through that pattern.',
-    })}`;
+    }))}`;
   }
   const u = node.storeUsage;
   if (!u) {
-    return `${intro} ${t({
+    return `${intro} ${resolveMessage(i18n, msg({
       id: 'editor.assignLoop.inspector.storeBlurb.unreferenced',
       message: "This one isn't referenced by any active rules, so it's likely safe to remove on its own.",
-    })}`;
+    }))}`;
   }
   if (u.asSource && u.asOutput) {
-    return `${intro} ${t({
+    return `${intro} ${resolveMessage(i18n, msg({
       id: 'editor.assignLoop.inspector.storeBlurb.both',
       message: 'This one is used on both sides: rules scan your input against it AND pick their output from it.',
-    })}`;
+    }))}`;
   }
   if (u.asSource) {
-    return `${intro} ${t({
+    return `${intro} ${resolveMessage(i18n, msg({
       id: 'editor.assignLoop.inspector.storeBlurb.input',
       message: 'Rules scan your input against this list; when a character matches, the rule fires.',
-    })}`;
+    }))}`;
   }
-  return `${intro} ${t({
+  return `${intro} ${resolveMessage(i18n, msg({
     id: 'editor.assignLoop.inspector.storeBlurb.output',
     message: 'Rules pick their output character from this list based on which key was pressed.',
-  })}`;
+  }))}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -263,22 +266,23 @@ function storeRoleChip(node: CarveNode): React.ReactNode {
 }
 
 
-// ruleDetailLabel is a plain (non-component) helper, but its only call sites
-// are inside StoreDetail (a component with a live `t`) — no direct unit test
-// calls it, so a required `t` param is enough here (see storeBlurb above).
+// ruleDetailLabel is a plain (non-component) helper called from StoreDetail.
+// It used to take the live `t` as a bare function parameter — the same
+// extraction-breaking shape as storeBlurb above (see that comment). Use the
+// optional-i18n + msg()/resolveMessage() pattern instead.
 function ruleDetailLabel(
   r: { isKeystroke: boolean; isContextSensitive: boolean; precedingLabel: string; producesOutput: boolean },
-  t: (descriptor: { id: string; message: string; values?: Record<string, unknown> }) => string,
+  i18n?: I18n,
 ): string {
   const base = r.isKeystroke
-    ? t({ id: 'editor.assignLoop.inspector.ruleDetail.keystroke', message: 'type a character from this list, then the keyboard replaces it with its matching output' })
+    ? resolveMessage(i18n, msg({ id: 'editor.assignLoop.inspector.ruleDetail.keystroke', message: 'type a character from this list, then the keyboard replaces it with its matching output' }))
     : r.producesOutput
-      ? t({ id: 'editor.assignLoop.inspector.ruleDetail.contextOutput', message: 'when this character is already in the buffer, then the keyboard replaces it with its matching output' })
-      : t({ id: 'editor.assignLoop.inspector.ruleDetail.contextOnly', message: 'when this character is already in the buffer, used as context to trigger the rule' });
+      ? resolveMessage(i18n, msg({ id: 'editor.assignLoop.inspector.ruleDetail.contextOutput', message: 'when this character is already in the buffer, then the keyboard replaces it with its matching output' }))
+      : resolveMessage(i18n, msg({ id: 'editor.assignLoop.inspector.ruleDetail.contextOnly', message: 'when this character is already in the buffer, used as context to trigger the rule' }));
   if (!r.isContextSensitive) return base.charAt(0).toUpperCase() + base.slice(1);
   const after = r.precedingLabel
-    ? t({ id: 'editor.assignLoop.inspector.ruleDetail.afterPreceding', message: `After ${{ precedingLabel: r.precedingLabel }}: ` })
-    : t({ id: 'editor.assignLoop.inspector.ruleDetail.afterSpecificInput', message: 'After specific input: ' });
+    ? resolveMessage(i18n, msg({ id: 'editor.assignLoop.inspector.ruleDetail.afterPreceding', message: `After ${{ precedingLabel: r.precedingLabel }}: ` }))
+    : resolveMessage(i18n, msg({ id: 'editor.assignLoop.inspector.ruleDetail.afterSpecificInput', message: 'After specific input: ' }));
   return after + base;
 }
 
@@ -393,7 +397,7 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
             {node.loadBearing === true && <LoadBearing />}
           </div>
           <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--app-text-subtle)', lineHeight: 1.55 }}>
-            {storeBlurb(node, t)}
+            {storeBlurb(node, i18n)}
           </p>
         </div>
       </div>
@@ -598,7 +602,7 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
                         <RuleTypeBadge conditional={g.isContextSensitive} />
                         {g.platformGuard && <PlatformBadge platform={g.platformGuard} />}
                         <span style={{ flex: 1, fontSize: 11, color: c.dead ? 'var(--app-text-subtle)' : 'var(--app-text-muted)', lineHeight: 1.45, textDecoration: c.dead ? 'line-through' : 'none' }}>
-                          {ruleDetailLabel(g, t)}
+                          {ruleDetailLabel(g, i18n)}
                         </span>
                         <span style={{ fontSize: 10, color: 'var(--app-text-subtle)', whiteSpace: 'nowrap' }}>×{g.rules.length} {expanded ? '▼' : '▶'}</span>
                       </button>
@@ -616,7 +620,7 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
                     <RuleTypeBadge conditional={r.isContextSensitive} />
                     {r.platformGuard && <PlatformBadge platform={r.platformGuard} />}
                     <span style={{ fontSize: 11, color: c.dead ? 'var(--app-text-subtle)' : 'var(--app-text-muted)', lineHeight: 1.45, textDecoration: c.dead ? 'line-through' : 'none' }}>
-                      {ruleDetailLabel(r, t)}
+                      {ruleDetailLabel(r, i18n)}
                     </span>
                   </div>
                 ))
