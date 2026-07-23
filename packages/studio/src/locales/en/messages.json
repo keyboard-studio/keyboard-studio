@@ -874,6 +874,7 @@
   "editor.assignLoop.intro.bullet1": "You’ll go character by character through the list from your survey.",
   "editor.assignLoop.touch.intro.bullet1": "You’ll go character by character, just like the desktop gallery.",
   "survey.phaseB.charChipEditor.count": "Your alphabet ({0})",
+  "survey.phaseB.breakdown.showUppercase": "Show uppercase letters",
   "survey.marks.stacking.intro": "Your alphabet shows letters that may carry more than one mark. Confirm whether the keyboard should allow that, and exactly which combinations.",
   "survey.phaseB.suggestionPanel.baseAlreadyCovers": "Your base keyboard already covers this language's alphabet.",
   "survey.prefill.row.startingKeyboard.note": "your chosen base",

@@ -45,7 +45,7 @@
 import { create } from "zustand";
 import type { AttestedStack, ConfirmedAlphabet, DeclaredRole } from "@keyboard-studio/contracts";
 import { makeConfirmedAlphabet } from "@keyboard-studio/contracts";
-import { decomposeGrapheme, isCombiningMarkChar, isPrivateUseCodePoint } from "@keyboard-studio/engine";
+import { decomposeGrapheme, isCombiningMarkChar, isPrivateUseCodePoint, glyphCategory } from "@keyboard-studio/engine";
 import { nfcDedup } from "../survey/charNormUtils.ts";
 import { DEFAULT_PHASE_B_FONT, type PhaseBFontValue } from "../survey/surveyStyles.ts";
 
@@ -71,6 +71,17 @@ export interface PhaseBDraftState {
   marks: string[];
   attestedStacks: AttestedStack[];
   declaredRoles: Record<string, DeclaredRole>;
+  /**
+   * Derived category arrays for the alphabet breakdown (spec 047, FR-004/005).
+   * Every captured non-letter, non-mark, non-PUA pick is routed to exactly one
+   * of these by Unicode General Category; `bases` holds true letters only. The
+   * flat `chars` list below remains the COMPLETE inventory (FR-013).
+   */
+  numbers: string[];
+  punctuation: string[];
+  symbols: string[];
+  separators: string[];
+  controls: string[];
   /** The most recent add()'s contribution, for the visible-decomposition highlight. */
   lastPick: LastPickContribution | null;
 
@@ -115,6 +126,11 @@ interface DerivedStores {
   marks: string[];
   attestedStacks: AttestedStack[];
   declaredRoles: Record<string, DeclaredRole>;
+  numbers: string[];
+  punctuation: string[];
+  symbols: string[];
+  separators: string[];
+  controls: string[];
 }
 
 function isPrivateUseGrapheme(g: string): boolean {
@@ -131,10 +147,27 @@ function deriveStores(picks: DraftPick[]): DerivedStores {
   const marks: string[] = [];
   const attestedStacks: AttestedStack[] = [];
   const declaredRoles: Record<string, DeclaredRole> = {};
+  const numbers: string[] = [];
+  const punctuation: string[] = [];
+  const symbols: string[] = [];
+  const separators: string[] = [];
+  const controls: string[] = [];
   const charSeen = new Set<string>();
   const baseSeen = new Set<string>();
   const markSeen = new Set<string>();
   const stackSeen = new Set<string>();
+  // One deduping pusher per derived category array (first-appearance order).
+  const pushInto = (arr: string[], seen: Set<string>) => (v: string): void => {
+    if (!seen.has(v)) {
+      seen.add(v);
+      arr.push(v);
+    }
+  };
+  const pushNumber = pushInto(numbers, new Set<string>());
+  const pushPunctuation = pushInto(punctuation, new Set<string>());
+  const pushSymbol = pushInto(symbols, new Set<string>());
+  const pushSeparator = pushInto(separators, new Set<string>());
+  const pushControl = pushInto(controls, new Set<string>());
 
   const pushChar = (g: string): void => {
     if (!charSeen.has(g)) {
@@ -186,12 +219,46 @@ function deriveStores(picks: DraftPick[]): DerivedStores {
       pushStack({ base: decomposition.base, marks: decomposition.marks });
       continue;
     }
-    // Plain letter, digit, punctuation, or a multi-base sequence (digraph):
-    // a whole unit of the Letters list.
-    pushBase(nfc);
+    // Non-mark, non-PUA, non-decomposable: route by Unicode General Category
+    // (spec 047, FR-004/FR-005) so only true letters — and multi-letter
+    // digraphs, which classify as `letter` — land in the Letters `bases`.
+    // Digits/punctuation/symbols/separators/controls get their own derived
+    // section arrays; the flat `chars` above still holds the COMPLETE
+    // inventory the recorded confirmedInventory is taken from (FR-013).
+    switch (glyphCategory(nfc)) {
+      case "letter":
+        pushBase(nfc);
+        break;
+      case "number":
+        pushNumber(nfc);
+        break;
+      case "punctuation":
+        pushPunctuation(nfc);
+        break;
+      case "symbol":
+        pushSymbol(nfc);
+        break;
+      case "separator":
+        pushSeparator(nfc);
+        break;
+      case "control":
+        pushControl(nfc);
+        break;
+    }
   }
 
-  return { chars, bases, marks, attestedStacks, declaredRoles };
+  return {
+    chars,
+    bases,
+    marks,
+    attestedStacks,
+    declaredRoles,
+    numbers,
+    punctuation,
+    symbols,
+    separators,
+    controls,
+  };
 }
 
 /** Contribution diff for the just-added grapheme (visible decomposition, US5). */
@@ -223,6 +290,11 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
   marks: [],
   attestedStacks: [],
   declaredRoles: {},
+  numbers: [],
+  punctuation: [],
+  symbols: [],
+  separators: [],
+  controls: [],
   lastPick: null,
   selectedFont: DEFAULT_PHASE_B_FONT,
 
@@ -283,6 +355,11 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
       marks: [],
       attestedStacks: [],
       declaredRoles: {},
+      numbers: [],
+      punctuation: [],
+      symbols: [],
+      separators: [],
+      controls: [],
       lastPick: null,
     });
   },

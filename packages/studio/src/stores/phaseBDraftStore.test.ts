@@ -322,3 +322,90 @@ describe("phaseBDraftStore — three-store split (spec 046)", () => {
     expect(s.declaredRoles[pua]).toBe("mark");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Category split (spec 047): deriveStores routes non-letters to derived
+// numbers/punctuation/symbols/separators/controls arrays; letters stay in
+// `bases`; `chars`/confirmed inventory stays COMPLETE (FR-004/005/013).
+// ---------------------------------------------------------------------------
+
+describe("phaseBDraftStore — category split (spec 047)", () => {
+  const NBSP = " ";
+  const ZWSP = "​";
+
+  beforeEach(() => {
+    usePhaseBDraftStore.getState().reset();
+  });
+
+  it("routes a letter, digit, punctuation, symbol, NBSP, and a surviving control each to exactly one array (FR-005/SC-002)", () => {
+    usePhaseBDraftStore.getState().setAll(["a", "1", ".", "€", NBSP, ZWSP]);
+    const s = usePhaseBDraftStore.getState();
+    expect(s.bases).toEqual(["a"]);
+    expect(s.numbers).toEqual(["1"]);
+    expect(s.punctuation).toEqual(["."]);
+    expect(s.symbols).toEqual(["€"]);
+    expect(s.separators).toEqual([NBSP]);
+    expect(s.controls).toEqual([ZWSP]); // ZWSP is \p{Cf} — control/other
+  });
+
+  it("no character is double-counted across the category arrays", () => {
+    usePhaseBDraftStore.getState().setAll(["a", "1", ".", "€", NBSP, ZWSP]);
+    const s = usePhaseBDraftStore.getState();
+    const all = [
+      ...s.bases,
+      ...s.numbers,
+      ...s.punctuation,
+      ...s.symbols,
+      ...s.separators,
+      ...s.controls,
+    ];
+    expect(new Set(all).size).toBe(all.length);
+  });
+
+  it("marks and PUA-declared-letter keep their existing paths (edge cases)", () => {
+    const ACUTE = "́";
+    const pua = String.fromCodePoint(0xe000);
+    usePhaseBDraftStore.getState().add(ACUTE); // lone mark
+    usePhaseBDraftStore.getState().add(pua); // unclassified PUA → letter
+    const s = usePhaseBDraftStore.getState();
+    expect(s.marks).toEqual([ACUTE]);
+    expect(s.bases).toEqual([pua]);
+    // A mark or PUA never leaks into a GC category array.
+    expect(s.numbers).toEqual([]);
+    expect(s.controls).toEqual([]);
+    expect(s.punctuation).toEqual([]);
+  });
+
+  it("chars/confirmedInventory stays COMPLETE across all categories (FR-013 / T016 regression guard)", () => {
+    // The complete inventory lives in `chars`, NOT in `bases` — a downstream
+    // consumer of the recorded alphabet must still see the non-letters even
+    // though `bases` is now restricted to letters.
+    usePhaseBDraftStore.getState().setAll(["a", "1", "."]);
+    const s = usePhaseBDraftStore.getState();
+    expect(s.chars).toEqual(["a", "1", "."]); // complete, verbatim
+    expect(s.bases).toEqual(["a"]); // letters only — no digit/punctuation
+    expect(s.bases).not.toContain("1");
+    expect(s.bases).not.toContain(".");
+  });
+
+  it("removing a pick recomputes every derived array with no orphans", () => {
+    usePhaseBDraftStore.getState().setAll(["a", "1", ".", "€"]);
+    usePhaseBDraftStore.getState().remove("1");
+    const s = usePhaseBDraftStore.getState();
+    expect(s.chars).toEqual(["a", ".", "€"]);
+    expect(s.numbers).toEqual([]); // the only number was removed
+    expect(s.punctuation).toEqual(["."]);
+    expect(s.symbols).toEqual(["€"]);
+  });
+
+  it("reset clears the derived category arrays", () => {
+    usePhaseBDraftStore.getState().setAll(["1", ".", "€"]);
+    usePhaseBDraftStore.getState().reset();
+    const s = usePhaseBDraftStore.getState();
+    expect(s.numbers).toEqual([]);
+    expect(s.punctuation).toEqual([]);
+    expect(s.symbols).toEqual([]);
+    expect(s.separators).toEqual([]);
+    expect(s.controls).toEqual([]);
+  });
+});
