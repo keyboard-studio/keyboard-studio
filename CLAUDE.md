@@ -189,6 +189,7 @@ Review cycles on spec or code changes; coordinated multi-specialist refactors; a
 - Windows environment: no emoji in console output (global CLAUDE.md rule). Use `[OK]`, `[ERROR]`, `[WARN]` etc.
 - File references in user-facing text use markdown links (`[spec.md](spec.md)`), not backticks, per the VSCode-extension guidance in the system prompt.
 - Don't cite specific GitHub issue numbers inside shipped code or comments — cross-link via commit messages and PR bodies (spec Sec 18).
+- **i18n message ids** (spec 046): `area ( "." segment )+`, lowercase, dot-separated — e.g. `welcome.title`, `output.submit.button.submit`. An id is a permanent handle; renaming one orphans its translations, so only do it when the string's *meaning* changed, not its wording. Full authoring rules (JSX `<Trans>` vs. the `t` macro, variable interpolation, ICU plurals, what not to wrap) live in [specs/046-i18n-localization/contracts/catalog-format.md](specs/046-i18n-localization/contracts/catalog-format.md); rationale in [docs/i18n-spike.md](docs/i18n-spike.md).
 
 ## Commit and issue title style
 

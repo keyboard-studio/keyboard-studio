@@ -126,9 +126,9 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T040 [P] Docs: keep [docs/i18n-spike.md](../../docs/i18n-spike.md) + this spec in sync; add the id-namespace convention to [CLAUDE.md](../../CLAUDE.md) Conventions (#1279)
-- [ ] T041 Run [quickstart.md](quickstart.md) validation end-to-end (#1280)
-- [ ] T042 [P] Completeness check (SC-004): adding a fully-translated locale requires zero code change (#1281)
+- [x] T040 [P] Docs: keep [docs/i18n-spike.md](../../docs/i18n-spike.md) + this spec in sync; add the id-namespace convention to [CLAUDE.md](../../CLAUDE.md) Conventions (#1279)
+- [x] T041 Run [quickstart.md](quickstart.md) validation end-to-end (#1280)
+- [x] T042 [P] Completeness check (SC-004): adding a fully-translated locale requires zero code change (#1281)
 
 ---
 

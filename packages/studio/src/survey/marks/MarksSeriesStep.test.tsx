@@ -6,7 +6,8 @@
 // the series shell.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, act, fireEvent } from "@testing-library/react";
+import { screen, cleanup, act, fireEvent } from "@testing-library/react";
+import { render } from "../../test/renderWithI18n.tsx";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { MarksSeriesStep, computeMarksGate } from "./MarksSeriesStep.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";

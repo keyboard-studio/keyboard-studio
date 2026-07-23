@@ -8,6 +8,8 @@
 // an already-confirmed summary the designer can open and edit (FR-008).
 // Case pairs are derived from the alphabet's case data, never asked (FR-009).
 
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import type { AttachmentProposal } from "@keyboard-studio/engine";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { prefixCombiningMark } from "../../lib/irToCarveNodes.ts";
@@ -46,14 +48,24 @@ function AttachmentRow({
   checked: Record<string, boolean>;
   onToggle: (base: string, next: boolean) => void;
 }) {
+  const { t } = useLingui();
   const checkedBases = bases.filter((b) => checked[b] === true);
   const body = (
     <>
       <p style={{ ...mutedParaFlush, margin: "6px 0" }}>
-        Tick every letter this mark can sit on. Letters left unticked will not
-        take this mark on your finished keyboard.
+        <Trans id="survey.marks.attachment.rowHelpText">
+          Tick every letter this mark can sit on. Letters left unticked will not
+          take this mark on your finished keyboard.
+        </Trans>
       </p>
-      <div role="group" aria-label={`Letters that can carry ${markLabel(proposal.mark)}`} style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+      <div
+        role="group"
+        aria-label={t({
+          id: "survey.marks.attachment.rowGroupAriaLabel",
+          message: `Letters that can carry ${{ mark: markLabel(proposal.mark) }}`,
+        })}
+        style={{ display: "flex", flexWrap: "wrap", gap: 10 }}
+      >
         {bases.map((base) => {
           const state = proposal.states[base] ?? "blocked";
           const isChecked = checked[base] === true;
@@ -77,11 +89,16 @@ function AttachmentRow({
                 type="checkbox"
                 checked={isChecked}
                 onChange={(e) => onToggle(base, e.target.checked)}
-                aria-label={`${base} can carry ${markLabel(proposal.mark)}`}
+                aria-label={t({
+                  id: "survey.marks.attachment.checkboxAriaLabel",
+                  message: `${{ base }} can carry ${{ mark: markLabel(proposal.mark) }}`,
+                })}
               />
               <span>{(base + proposal.mark).normalize("NFC")}</span>
               {state === "plausible" && !isChecked && (
-                <span style={{ fontSize: 10, color: ACCENT }}>suggested</span>
+                <span style={{ fontSize: 10, color: ACCENT }}>
+                  <Trans id="survey.marks.attachment.suggestedTag">suggested</Trans>
+                </span>
               )}
             </label>
           );
@@ -95,9 +112,12 @@ function AttachmentRow({
     return (
       <details data-testid={`attachment-row-${toUPlusNotation(proposal.mark)}`}>
         <summary style={{ fontSize: 14, color: TEXT_MAIN, cursor: "pointer" }}>
-          {markLabel(proposal.mark)} — confirmed on{" "}
+          {markLabel(proposal.mark)}{" "}
+          <Trans id="survey.marks.attachment.confirmedOnPrefix">— confirmed on</Trans>{" "}
           <strong>{checkedBases.map((b) => (b + proposal.mark).normalize("NFC")).join(", ")}</strong>{" "}
-          <span style={{ color: TEXT_DIM, fontSize: 12 }}>(open to edit)</span>
+          <span style={{ color: TEXT_DIM, fontSize: 12 }}>
+            <Trans id="survey.marks.attachment.openToEdit">(open to edit)</Trans>
+          </span>
         </summary>
         {body}
       </details>
@@ -121,9 +141,18 @@ export function AttachmentStation({
   onToggle,
   casePairCount,
 }: AttachmentStationProps) {
+  const { t } = useLingui();
   return (
-    <section data-testid="marks-attachment" aria-label="Which letters carry each mark">
-      <h3 style={sectionHeading}>Which letters take each mark?</h3>
+    <section
+      data-testid="marks-attachment"
+      aria-label={t({
+        id: "survey.marks.attachment.sectionAriaLabel",
+        message: "Which letters carry each mark",
+      })}
+    >
+      <h3 style={sectionHeading}>
+        <Trans id="survey.marks.attachment.heading">Which letters take each mark?</Trans>
+      </h3>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         {proposals.map((proposal) => (
           <AttachmentRow
@@ -137,8 +166,13 @@ export function AttachmentStation({
       </div>
       {casePairCount > 0 && (
         <p style={{ ...mutedParaFlush, marginTop: 12, fontSize: 12 }}>
-          Capital letters follow automatically — {casePairCount} capital/lowercase
-          pair{casePairCount === 1 ? "" : "s"} in your alphabet carry the same marks.
+          {t({
+            id: "survey.marks.attachment.casePairsNote",
+            message: plural(casePairCount, {
+              one: "Capital letters follow automatically — # capital/lowercase pair in your alphabet carry the same marks.",
+              other: "Capital letters follow automatically — # capital/lowercase pairs in your alphabet carry the same marks.",
+            }),
+          })}
         </p>
       )}
     </section>
