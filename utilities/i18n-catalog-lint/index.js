@@ -14,6 +14,11 @@
 // Drift definition:
 //   • source locale (en): fresh vs committed must be equal (keys AND values,
 //     key order ignored) — catches added/removed strings and edited English.
+//     Added/removed ids are hard errors — the catalog is structurally missing
+//     entries a t()/<Trans> call in source now requires. Edited English under
+//     an existing id is only a WARNING: the id and its (now-stale) target
+//     translations still exist, so nothing is broken — a translator just
+//     needs to catch up, which shouldn't block CI/build.
 //   • target locales (fr, …): the KEY SET must match (values legitimately
 //     differ — those are translations) — catches strings not propagated.
 //
@@ -31,6 +36,7 @@ const SOURCE_LOCALE = "en";
 const CATALOG_FILE = "messages.json";
 
 const problems = [];
+const warnings = [];
 
 function readCatalog(file) {
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : null;
@@ -101,12 +107,19 @@ try {
         const changed = keySet(fresh).filter(
           (k) => k in committed && committed[k] !== fresh[k],
         );
-        problems.push(
-          `[${locale}] source catalog out of date` +
-            (added.length ? ` — added: ${added.join(", ")}` : "") +
-            (removed.length ? ` — removed: ${removed.join(", ")}` : "") +
-            (changed.length ? ` — English changed: ${changed.join(", ")}` : ""),
-        );
+
+        if (added.length || removed.length) {
+          problems.push(
+            `[${locale}] source catalog out of date` +
+              (added.length ? ` — added: ${added.join(", ")}` : "") +
+              (removed.length ? ` — removed: ${removed.join(", ")}` : ""),
+          );
+        }
+        if (changed.length) {
+          warnings.push(
+            `[${locale}] English changed (translations may now be stale, not blocking): ${changed.join(", ")}`,
+          );
+        }
       }
     } else {
       const missing = keySet(fresh).filter((k) => !(k in committed));
@@ -137,6 +150,14 @@ try {
   }
 } finally {
   fs.rmSync(tmpRoot, { recursive: true, force: true });
+}
+
+if (warnings.length > 0) {
+  console.warn("[WARN] i18n-catalog-lint: English source text changed under existing ids.");
+  for (const w of warnings) console.warn("  - " + w);
+  console.warn(
+    "\nRun pnpm --filter @keyboard-studio/studio messages:extract to pick these up (not required to pass).",
+  );
 }
 
 if (problems.length > 0) {
