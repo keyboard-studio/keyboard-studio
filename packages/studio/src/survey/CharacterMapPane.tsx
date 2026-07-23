@@ -81,9 +81,11 @@ type LoadState =
 // (see @lingui/babel-plugin-lingui-macro's getBinding().referencePaths), so a
 // `t` re-bound as a plain function parameter in a module-level helper is a
 // distinct binding the extractor does not follow (confirmed empirically:
-// editors/assignLoop/parts/Inspector.tsx's ruleDetailLabel(r, t) helper takes
-// this shape and its ids do NOT appear in locales/en/messages.json even after
-// extraction — do not copy that shape here).
+// editors/assignLoop/parts/Inspector.tsx's ruleDetailLabel/storeBlurb helpers
+// used to take this shape and their ids did NOT appear in
+// locales/en/messages.json even after extraction, until fixed to take an
+// optional `i18n` and resolve via msg()/resolveMessage() instead — do not
+// copy the broken bare-`t`-parameter shape here).
 
 // Stable identity for a group — used as the React list key. Includes `script`
 // because the multi-script grid can carry several groups that share a generic

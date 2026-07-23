@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
+import type { I18n } from '@lingui/core';
+import { msg } from '@lingui/core/macro';
 import { useLingui } from "@lingui/react/macro";
 import type { CarveNode } from '../../../lib/irToCarveNodes.ts';
 import { nodeState, MOD_GROUP_DEFS } from '../../../lib/irToCarveNodes.ts';
 import { KIND_COLOR } from './KindBadge.tsx';
 import { ToggleBox } from './ToggleBox.tsx';
-import { WarnIcon } from './carveShared.tsx';
+import { WarnIcon, resolveMessage } from './carveShared.tsx';
 import type { MouseEvent } from 'react';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 
@@ -13,14 +15,17 @@ interface RailSection {
   kind: CarveNode['kind'];
 }
 
-// Chrome (section headings); built per-render from t() below since this
-// needs an active useLingui() context — see buildSections.
-function buildSections(t: (descriptor: { id: string; message: string }) => string): RailSection[] {
+// Chrome (section headings); built per-render via the optional-i18n +
+// msg()/resolveMessage() pattern (see Inspector.tsx's storeBlurb) rather than
+// taking `t` as a bare function parameter — Lingui's macro tracks the
+// specific binding introduced by useLingui(), so a re-bound `t` parameter is
+// a distinct binding the extractor does not follow.
+function buildSections(i18n?: I18n): RailSection[] {
   return [
-    { label: t({ id: "editor.assignLoop.rail.section.patterns", message: "Patterns" }), kind: 'pattern' },
-    { label: t({ id: "editor.assignLoop.rail.section.groups", message: "Groups" }), kind: 'group' },
-    { label: t({ id: "editor.assignLoop.rail.section.stores", message: "Stores" }), kind: 'store' },
-    { label: t({ id: "editor.assignLoop.rail.section.advanced", message: "Advanced" }), kind: 'raw' },
+    { label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.section.patterns", message: "Patterns" })), kind: 'pattern' },
+    { label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.section.groups", message: "Groups" })), kind: 'group' },
+    { label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.section.stores", message: "Stores" })), kind: 'store' },
+    { label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.section.advanced", message: "Advanced" })), kind: 'raw' },
   ];
 }
 
@@ -36,18 +41,18 @@ function storeSubGroup(node: CarveNode): StoreSubGroup {
   return 'unused';
 }
 
-// Chrome (sub-section headings + chip abbreviations); built per-render from
-// t() below since this needs an active useLingui() context — see
-// buildStoreSubs.
+// Chrome (sub-section headings + chip abbreviations); built per-render via
+// the same optional-i18n + msg()/resolveMessage() pattern as buildSections
+// above (see its comment for why a bare `t` parameter is unsafe here).
 function buildStoreSubs(
-  t: (descriptor: { id: string; message: string }) => string,
+  i18n?: I18n,
 ): { key: StoreSubGroup; label: string; chip: string; color: string }[] {
   return [
-    { key: 'input', label: t({ id: "editor.assignLoop.rail.storeSub.input", message: "Input" }), chip: t({ id: "editor.assignLoop.rail.storeSub.inputChip", message: "in" }), color: 'var(--app-accent-text)' },
-    { key: 'output', label: t({ id: "editor.assignLoop.rail.storeSub.output", message: "Output" }), chip: t({ id: "editor.assignLoop.rail.storeSub.outputChip", message: "out" }), color: '#7dbf8e' },
-    { key: 'both', label: t({ id: "editor.assignLoop.rail.storeSub.both", message: "Input + Output" }), chip: t({ id: "editor.assignLoop.rail.storeSub.bothChip", message: "in+out" }), color: '#c8b0e8' },
-    { key: 'pattern', label: t({ id: "editor.assignLoop.rail.storeSub.pattern", message: "Pattern" }), chip: '', color: KIND_COLOR.pattern },
-    { key: 'unused', label: t({ id: "editor.assignLoop.rail.storeSub.unused", message: "Unused" }), chip: '', color: 'var(--app-text-subtle)' },
+    { key: 'input', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.input", message: "Input" })), chip: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.inputChip", message: "in" })), color: 'var(--app-accent-text)' },
+    { key: 'output', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.output", message: "Output" })), chip: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.outputChip", message: "out" })), color: '#7dbf8e' },
+    { key: 'both', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.both", message: "Input + Output" })), chip: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.bothChip", message: "in+out" })), color: '#c8b0e8' },
+    { key: 'pattern', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.pattern", message: "Pattern" })), chip: '', color: KIND_COLOR.pattern },
+    { key: 'unused', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.unused", message: "Unused" })), chip: '', color: 'var(--app-text-subtle)' },
   ];
 }
 
@@ -71,9 +76,9 @@ function SectionHeader({ tone, label, count }: { tone: string; label: string; co
 }
 
 export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, onSetManyGlyphs, onToggleNode }: RailProps) {
-  const { t } = useLingui();
-  const SECTIONS = buildSections(t);
-  const STORE_SUBS = buildStoreSubs(t);
+  const { t, i18n } = useLingui();
+  const SECTIONS = buildSections(i18n);
+  const STORE_SUBS = buildStoreSubs(i18n);
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
 

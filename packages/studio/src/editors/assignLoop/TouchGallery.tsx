@@ -55,7 +55,10 @@
 // Single 300 ms debounce contract upheld — no second timer introduced.
 
 import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
+import type { I18n } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { resolveMessage } from "../../lib/i18nResolve.ts";
 import type { TouchAssignment, MechanismRef, TouchLayoutIR } from "@keyboard-studio/contracts";
 import { createVirtualFS, toUPlusNotation, isDecomposableAccented, formatUncoveredTouchMessage } from "@keyboard-studio/contracts";
 import type { DesktopModifications } from "@keyboard-studio/engine";
@@ -110,30 +113,30 @@ function dirArrow(dir: string): string {
   return dir;
 }
 
-/** Produce a human-readable label for a single configured mechanism chip. */
-function touchMechanismLabel(
-  target: string,
-  m: MechanismRef,
-  t: (descriptor: { id: string; message: string }) => string,
-): string {
+/** Produce a human-readable label for a single configured mechanism chip.
+ * Takes an optional i18n + resolves via msg()/resolveMessage() rather than a
+ * bare `t` parameter — Lingui's macro tracks the specific binding introduced
+ * by useLingui(), so a re-bound `t` parameter is a distinct binding the
+ * extractor does not follow (see Inspector.tsx's storeBlurb for the same fix). */
+function touchMechanismLabel(target: string, m: MechanismRef, i18n?: I18n): string {
   const patternId = m.patternId;
   const sv = m.slotValues ?? {};
   const hkShort = sv["hostKey"] ? hostKeyShortLabel(sv["hostKey"]) : "";
   if (patternId === "touch_inherited") {
-    return `${target} · ${t({ id: "editor.assignLoop.touch.mechanismLabel.inherited", message: "inherited" })}`;
+    return `${target} · ${resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.mechanismLabel.inherited", message: "inherited" }))}`;
   }
   if (patternId === "longpress_alternates") {
-    return `${target} · ${t({ id: "editor.assignLoop.touch.mechanismLabel.longpress", message: "long-press" })} ${hkShort}`;
+    return `${target} · ${resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.mechanismLabel.longpress", message: "long-press" }))} ${hkShort}`;
   }
   if (patternId === "flick_gestures") {
     const dir = sv["direction"] ?? "";
-    return `${target} · ${t({ id: "editor.assignLoop.touch.mechanismLabel.flick", message: "flick" })} ${hkShort} ${dirArrow(dir)}`.trimEnd();
+    return `${target} · ${resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.mechanismLabel.flick", message: "flick" }))} ${hkShort} ${dirArrow(dir)}`.trimEnd();
   }
   if (patternId === "multitap") {
-    return `${target} · ${t({ id: "editor.assignLoop.touch.mechanismLabel.multitap", message: "multitap" })} ${hkShort}`;
+    return `${target} · ${resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.mechanismLabel.multitap", message: "multitap" }))} ${hkShort}`;
   }
   if (patternId === "touch_key_replace") {
-    return `${target} · ${t({ id: "editor.assignLoop.touch.mechanismLabel.replace", message: "replace" })} ${hkShort}`;
+    return `${target} · ${resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.mechanismLabel.replace", message: "replace" }))} ${hkShort}`;
   }
   return target;
 }
@@ -228,17 +231,18 @@ interface TouchMethodChooserProps {
   onFlickDirectionChange: (v: string) => void;
 }
 
-// Chrome (option labels); built per-render from t() below since this needs an
-// active useLingui() context — see buildFlickDirections.
-function buildFlickDirections(
-  t: (descriptor: { id: string; message: string }) => string,
-): ReadonlyArray<{ value: string; label: string }> {
+// Chrome (option labels); built per-render via the optional-i18n +
+// msg()/resolveMessage() pattern (see Inspector.tsx's storeBlurb) rather than
+// a bare `t` parameter — Lingui's macro tracks the specific binding
+// introduced by useLingui(), so a re-bound `t` parameter is a distinct
+// binding the extractor does not follow.
+function buildFlickDirections(i18n?: I18n): ReadonlyArray<{ value: string; label: string }> {
   return [
-    { value: "", label: t({ id: "editor.assignLoop.touch.flickChoosePlaceholder", message: "-- choose direction --" }) },
-    { value: "n", label: t({ id: "editor.assignLoop.touch.flickUp", message: "Up (north)" }) },
-    { value: "s", label: t({ id: "editor.assignLoop.touch.flickDown", message: "Down (south)" }) },
-    { value: "e", label: t({ id: "editor.assignLoop.touch.flickRight", message: "Right (east)" }) },
-    { value: "w", label: t({ id: "editor.assignLoop.touch.flickLeft", message: "Left (west)" }) },
+    { value: "", label: resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.flickChoosePlaceholder", message: "-- choose direction --" })) },
+    { value: "n", label: resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.flickUp", message: "Up (north)" })) },
+    { value: "s", label: resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.flickDown", message: "Down (south)" })) },
+    { value: "e", label: resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.flickRight", message: "Right (east)" })) },
+    { value: "w", label: resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.flickLeft", message: "Left (west)" })) },
   ];
 }
 
@@ -253,8 +257,8 @@ function TouchMethodChooser({
   flickDirection,
   onFlickDirectionChange,
 }: TouchMethodChooserProps) {
-  const { t } = useLingui();
-  const flickDirections = buildFlickDirections(t);
+  const { t, i18n } = useLingui();
+  const flickDirections = buildFlickDirections(i18n);
   // Named local for the dotted-circle-wrapped char used in the <Trans> macros
   // below — a simple identifier extracts as a NAMED lingui placeholder (e.g.
   // {currentCharDisplay}), whereas calling displayChar() inline inside the
@@ -514,7 +518,7 @@ export interface TouchGalleryProps {
 }
 
 export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const identity = useWorkingCopyStore((s) => s.identity);
@@ -1789,7 +1793,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                   onClick={() => handleRemoveMechanism(c, i)}
                   aria-label={t({
                     id: "editor.assignLoop.touch.removeMechanismAriaLabel",
-                    message: `Remove ${{ notation: toUPlusNotation(c) }} ${{ label: touchMechanismLabel(c, m, t) }}`,
+                    message: `Remove ${{ notation: toUPlusNotation(c) }} ${{ label: touchMechanismLabel(c, m, i18n) }}`,
                   })}
                   title={t({
                     id: "editor.assignLoop.removeCharacterTitle",
@@ -1815,7 +1819,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                       displayChar() so a standalone combining mark shows the
                       dotted circle; the aria-label above keeps the raw
                       target (via touchMechanismLabel(c, ...)) untouched. */}
-                  {touchMechanismLabel(displayChar(c), m, t)}
+                  {touchMechanismLabel(displayChar(c), m, i18n)}
                   <span
                     aria-hidden="true"
                     style={{ fontSize: 11, color: "#56d364", opacity: 0.7 }}

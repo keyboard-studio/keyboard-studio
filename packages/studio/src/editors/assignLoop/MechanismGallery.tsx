@@ -39,8 +39,10 @@ import {
   useMemo,
   type CSSProperties,
 } from "react";
+import type { I18n } from "@lingui/core";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { plural } from "@lingui/core/macro";
+import { msg, plural } from "@lingui/core/macro";
+import { resolveMessage } from "../../lib/i18nResolve.ts";
 import { useShallow } from "zustand/react/shallow";
 import type {
   BaseKeyboard,
@@ -119,20 +121,23 @@ export { PATTERN_SEQUENCE, PATTERN_DEADKEY, PATTERN_SWAP, PATTERN_RALT };
 //
 // singleGraphemeReason is user-facing chrome (an error string), but this
 // object is constructed at module scope where no useLingui() is available —
-// buildDeadkeyBaseLetterResolveOptions(t) below builds the localized version
-// per-render; each component that needs it calls that with its own t().
-function buildDeadkeyBaseLetterResolveOptions(
-  t: (descriptor: { id: string; message: string }) => string,
-): ResolveCharInputOptions {
+// buildDeadkeyBaseLetterResolveOptions(i18n) below builds the localized
+// version per-render; each component that needs it calls that with its own
+// i18n instance. Takes an optional i18n + resolves via
+// msg()/resolveMessage() rather than a bare `t` parameter — Lingui's macro
+// tracks the specific binding introduced by useLingui(), so a re-bound `t`
+// parameter is a distinct binding the extractor does not follow (see
+// Inspector.tsx's storeBlurb for the same fix).
+function buildDeadkeyBaseLetterResolveOptions(i18n?: I18n): ResolveCharInputOptions {
   return {
     multiToken: true,
     singleGrapheme: true,
     blockDelimiters: true,
-    singleGraphemeReason: t({
+    singleGraphemeReason: resolveMessage(i18n, msg({
       id: "editor.assignLoop.deadkeySingleGraphemeReason",
       message:
         "Enter one base character. (Covering several base letters with one dead key is coming later.)",
-    }),
+    })),
   };
 }
 
@@ -157,21 +162,25 @@ const MODIFIER_TOKEN_LABELS: Record<string, string> = {
   NCAPS: "NCaps",
 };
 
+// Takes an optional i18n + resolves via msg()/resolveMessage() rather than a
+// bare `t` parameter — Lingui's macro tracks the specific binding introduced
+// by useLingui(), so a re-bound `t` parameter is a distinct binding the
+// extractor does not follow (see Inspector.tsx's storeBlurb for the same fix).
 function methodLabel(
   ref: { patternId: string; slotValues?: Record<string, string> },
-  t: (descriptor: { id: string; message: string }) => string,
+  i18n?: I18n,
 ): string {
   const sv = ref.slotValues ?? {};
   switch (ref.patternId) {
     case "deadkey_single_tap": {
-      const label = t({ id: "editor.assignLoop.methodLabel.deadkey", message: "Deadkey" });
+      const label = resolveMessage(i18n, msg({ id: "editor.assignLoop.methodLabel.deadkey", message: "Deadkey" }));
       return `${label}: ${sv["triggerKey"] ?? "?"} + ${sv["baseLetters"] ?? "?"}`;
     }
     case "simple_swap": {
       // kmnRules may be multiple lines (e.g. shift-layer CAPS/NCAPS pair) —
       // the badge only needs the bracketed vkey expression from the first line.
       const firstLine = (sv["kmnRules"] ?? "").split("\n")[0] ?? "";
-      const label = t({ id: "editor.assignLoop.methodLabel.key", message: "Key" });
+      const label = resolveMessage(i18n, msg({ id: "editor.assignLoop.methodLabel.key", message: "Key" }));
       return `${label}: ${firstLine.replace(/^\+ \[/, "").replace(/\].*/, "")}`;
     }
     case "modifier_as_layer_switch": {
@@ -184,7 +193,7 @@ function methodLabel(
       const prefix =
         parts.length > 0
           ? parts.map((tok) => MODIFIER_TOKEN_LABELS[tok] ?? tok).join("+")
-          : t({ id: "editor.assignLoop.methodLabel.layer", message: "Layer" });
+          : resolveMessage(i18n, msg({ id: "editor.assignLoop.methodLabel.layer", message: "Layer" }));
       return `${prefix}: ${key}`;
     }
     case "multi_char_sequence":
@@ -193,7 +202,7 @@ function methodLabel(
       // since sequences are owned by the Sequence Gallery. This branch exists
       // so a raw patternId can never leak onto a badge if that exclusion is
       // ever bypassed.
-      return t({ id: "editor.assignLoop.methodLabel.multiKeySequence", message: "Multi-key sequence" });
+      return resolveMessage(i18n, msg({ id: "editor.assignLoop.methodLabel.multiKeySequence", message: "Multi-key sequence" }));
     default:
       return ref.patternId;
   }
@@ -512,8 +521,8 @@ function MethodChooser({
   modifierTokensInUse,
   shiftLayerDisabled,
 }: MethodChooserProps) {
-  const { t } = useLingui();
-  const deadkeyBaseLetterResolveOptions = buildDeadkeyBaseLetterResolveOptions(t);
+  const { t, i18n } = useLingui();
+  const deadkeyBaseLetterResolveOptions = buildDeadkeyBaseLetterResolveOptions(i18n);
   const triggerKeyPlaceholder = t({ id: "editor.assignLoop.triggerKeyPlaceholder", message: "[trigger key]" });
 
   // Resolved display values for the deadkey preview line — resolve at this
@@ -1040,10 +1049,10 @@ export function MechanismGallery({
   placementMap,
   worklist,
 }: MechanismGalleryProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const deadkeyBaseLetterResolveOptions = useMemo(
-    () => buildDeadkeyBaseLetterResolveOptions(t),
-    [t],
+    () => buildDeadkeyBaseLetterResolveOptions(i18n),
+    [i18n],
   );
   const locked = useWorkingCopyStore((s) => s.desktopLocked);
   const unlockDesktop = useWorkingCopyStore((s) => s.unlockDesktop);
@@ -2605,7 +2614,7 @@ export function MechanismGallery({
                     .filter((a) => a.scope === "individual" && a.target === currentChar)
                     .map((a, i) => {
                       const ref = a.mechanisms[0];
-                      const label = ref !== undefined ? methodLabel(ref, t) : a.mechanisms.map((m) => methodLabel(m, t)).join(", ");
+                      const label = ref !== undefined ? methodLabel(ref, i18n) : a.mechanisms.map((m) => methodLabel(m, i18n)).join(", ");
                       return (
                         <button
                           key={i}

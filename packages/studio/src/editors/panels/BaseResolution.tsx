@@ -6,8 +6,11 @@
 // The chosen base then back-fills the prefill confirmations. refs #369.
 
 import { useEffect, useMemo, useState } from "react";
+import type { I18n } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import { resolveMessage } from "../../lib/i18nResolve.ts";
 import { getBaseBrowserService } from "../../lib/services.ts";
 import { suggestBases, type SuggestTarget } from "../../lib/suggestBase.ts";
 import {
@@ -21,25 +24,25 @@ import { BaseKeyboardPicker } from "../../components/BaseKeyboardPicker.tsx";
 import { Badge, Button } from "../../ui/index.ts";
 import type { BadgeTone } from "../../ui/Badge.tsx";
 
-// Chrome (badge labels); built per-render from t() below since this needs an
-// active useLingui() context — see buildReasonLabel.
-function buildReasonLabel(
-  reason: ResolvedReason,
-  t: (descriptor: { id: string; message: string }) => string,
-): string {
+// Chrome (badge labels); built per-render via the optional-i18n +
+// msg()/resolveMessage() pattern (see Inspector.tsx's storeBlurb) rather than
+// taking `t` as a bare function parameter — Lingui's macro tracks the
+// specific binding introduced by useLingui(), so a re-bound `t` parameter is
+// a distinct binding the extractor does not follow.
+function buildReasonLabel(reason: ResolvedReason, i18n?: I18n): string {
   switch (reason) {
     case "language-match-monolingual":
-      return t({ id: "editor.baseResolution.reason.monolingual", message: "Dedicated to your language" });
+      return resolveMessage(i18n, msg({ id: "editor.baseResolution.reason.monolingual", message: "Dedicated to your language" }));
     case "language-match-multilingual":
-      return t({ id: "editor.baseResolution.reason.multilingual", message: "Already supports your language" });
+      return resolveMessage(i18n, msg({ id: "editor.baseResolution.reason.multilingual", message: "Already supports your language" }));
     case "genealogical":
-      return t({ id: "editor.baseResolution.reason.genealogical", message: "Related language, same script" });
+      return resolveMessage(i18n, msg({ id: "editor.baseResolution.reason.genealogical", message: "Related language, same script" }));
     case "script-match":
-      return t({ id: "editor.baseResolution.reason.scriptMatch", message: "Matches your script" });
+      return resolveMessage(i18n, msg({ id: "editor.baseResolution.reason.scriptMatch", message: "Matches your script" }));
     case "language-cross-script":
-      return t({ id: "editor.baseResolution.reason.crossScript", message: "Supports your language, different script" });
+      return resolveMessage(i18n, msg({ id: "editor.baseResolution.reason.crossScript", message: "Supports your language, different script" }));
     case "us-qwerty-fallback":
-      return t({ id: "editor.baseResolution.reason.usQwertyFallback", message: "Start blank (US QWERTY)" });
+      return resolveMessage(i18n, msg({ id: "editor.baseResolution.reason.usQwertyFallback", message: "Start blank (US QWERTY)" }));
   }
 }
 
@@ -89,7 +92,7 @@ export function BaseResolution({
   previewStatus,
   onBack,
 }: BaseResolutionProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const [bases, setBases] = useState<BaseKeyboard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -348,7 +351,7 @@ export function BaseResolution({
                   <Trans id="editor.baseResolution.relatedBadge">Related: {relative.name}, same script</Trans>
                 </Badge>
               ) : (
-                <Badge tone={REASON_TONE[reason]}>{buildReasonLabel(reason, t)}</Badge>
+                <Badge tone={REASON_TONE[reason]}>{buildReasonLabel(reason, i18n)}</Badge>
               )}
             </Button>
             );
