@@ -132,9 +132,11 @@ const COMMON_PUNCTUATION_RANGES: readonly BlockDef[] = [
  * enumerates the full script via Script_Extensions for that), it only
  * supplies real human-readable section headers for the codepoint ranges it
  * covers. Scripts/codepoints with no entry here still get full coverage —
- * they fall back to a generic per-tier label (see TIER_FALLBACK_LABEL), and
- * for the block tier a combining mark falls back further to "Combining
- * marks" before "Letters" (see blockNameFor).
+ * they fall back to a generic per-tier label (see TIER_FALLBACK_LABEL) for
+ * the digits/punctuation/main/auxiliary tiers; the block tier instead falls
+ * back to "Combining marks" for a combining mark, or a script-qualified
+ * "<Script> letters" ("Other letters" if unmapped) for anything else — never
+ * the bare word "Letters" (see blockNameFor).
  *
  * Ranges + names pinned against the Unicode block chart
  * (https://www.unicode.org/charts/, cross-checked against
@@ -392,20 +394,61 @@ function dedupeScripts(scripts: readonly string[]): string[] {
 /**
  * Generic label used when a codepoint falls outside every CHARACTER_MAP_BLOCKS
  * range for its script (including scripts absent from the table entirely).
- * "main"/"auxiliary" keep the pre-existing "Other" fallback; the three
- * full-script tiers fall back to their own tier name so an uncurated script
- * still gets a sensible section header instead of a meaningless "Other".
- * "Letters" is reserved for genuine leftover \p{L} in the block tier — an
- * uncurated combining mark there gets the more specific "Combining marks"
- * label instead (see blockNameFor), so it never sits under a "Letters"
- * header.
+ * "main"/"auxiliary" keep the pre-existing "Other" fallback; "digits"/
+ * "punctuation" fall back to their own tier name so an uncurated script still
+ * gets a sensible section header instead of a meaningless "Other". The
+ * "block" tier is NOT in this table — its fallback is never a bare tier name
+ * (a bare "Letters" heading is too vague to locate a section by); it is
+ * computed explicitly in blockNameFor as a script-qualified "<Script>
+ * letters" (or "Other letters" when the script code is unmapped/"Common"),
+ * see SCRIPT_DISPLAY_NAME below.
  */
-const TIER_FALLBACK_LABEL: Record<CharacterMapTier, string> = {
+const TIER_FALLBACK_LABEL: Record<Exclude<CharacterMapTier, "block">, string> = {
   main: "Other",
   auxiliary: "Other",
-  block: "Letters",
   digits: "Digits",
   punctuation: "Punctuation",
+};
+
+/**
+ * Plain-English display name for every ISO 15924 script code that can reach
+ * blockNameFor's block-tier fallback — every CHARACTER_MAP_BLOCKS key plus
+ * the alias source codes in SCRIPT_ALIAS_MAP (Syrc/Hani/Hang) that don't have
+ * their own curated entry. Used ONLY to qualify the block-tier fallback
+ * heading ("<Script> letters"); the "Common" sentinel and any code absent
+ * from this map fall back to "Other letters".
+ */
+const SCRIPT_DISPLAY_NAME: Record<string, string> = {
+  Latn: "Latin",
+  Cyrl: "Cyrillic",
+  Arab: "Arabic",
+  Deva: "Devanagari",
+  Grek: "Greek",
+  Armn: "Armenian",
+  Geor: "Georgian",
+  Hebr: "Hebrew",
+  Thaa: "Thaana",
+  Nkoo: "NKo",
+  Adlm: "Adlam",
+  Cher: "Cherokee",
+  Beng: "Bengali",
+  Taml: "Tamil",
+  Telu: "Telugu",
+  Knda: "Kannada",
+  Mlym: "Malayalam",
+  Sinh: "Sinhala",
+  Thai: "Thai",
+  Laoo: "Lao",
+  Mymr: "Myanmar",
+  Khmr: "Khmer",
+  Tibt: "Tibetan",
+  Ethi: "Ethiopic",
+  Hira: "Hiragana",
+  Kana: "Katakana",
+  Yiii: "Yi",
+  Syrc: "Syriac",
+  Hani: "Han",
+  Hang: "Hangul",
 };
 
 /**
@@ -414,17 +457,22 @@ const TIER_FALLBACK_LABEL: Record<CharacterMapTier, string> = {
  * was found in. Prefers a curated CHARACTER_MAP_BLOCKS section name (now
  * including a "Common" entry and a primary block for every CURATED_SCRIPTS
  * member except Syrc, so most scripts no longer fall through at all); falls
- * back to TIER_FALLBACK_LABEL otherwise. For the block tier specifically, an
- * UNCURATED combining mark (script/codepoint absent from
- * CHARACTER_MAP_BLOCKS) gets the generic "Combining marks" label rather than
- * "Letters" — deliberately NOT "Combining Diacritical Marks", which names one
- * real Unicode block (U+0300-036F); reusing it for a mark from a different
- * block (e.g. Tibetan U+0F71) would misname it. A curated range that already
- * names a real combining-marks block for a script (e.g. Cyrl's "Combining
- * Diacritical Marks" entry) still wins, since the range loop above runs
- * first. Combining marks bucket to whichever script's Script_Extensions
- * enumeration gathered them (e.g. Latn, Cyrl), so they DO pick up a curated
- * section name where that script's table carries one.
+ * back to TIER_FALLBACK_LABEL for the digits/punctuation/main/auxiliary
+ * tiers. For the block tier specifically, an UNCURATED combining mark
+ * (script/codepoint absent from CHARACTER_MAP_BLOCKS) gets the generic
+ * "Combining marks" label — deliberately NOT "Combining Diacritical Marks",
+ * which names one real Unicode block (U+0300-036F); reusing it for a mark
+ * from a different block (e.g. Tibetan U+0F71) would misname it. A curated
+ * range that already names a real combining-marks block for a script (e.g.
+ * Cyrl's "Combining Diacritical Marks" entry) still wins, since the range
+ * loop above runs first. Combining marks bucket to whichever script's
+ * Script_Extensions enumeration gathered them (e.g. Latn, Cyrl), so they DO
+ * pick up a curated section name where that script's table carries one.
+ * Any other uncurated block-tier leftover (a genuine \p{L} letter with no
+ * curated range) is NEVER labelled with the bare word "Letters" — it is
+ * qualified with the gathering script's display name via
+ * SCRIPT_DISPLAY_NAME, e.g. "Latin letters", or "Other letters" for the
+ * "Common" sentinel or any script code absent from that map.
  */
 function blockNameFor(script: string, cp: number, tier: CharacterMapTier): string {
   const defs = CHARACTER_MAP_BLOCKS[script];
@@ -433,7 +481,10 @@ function blockNameFor(script: string, cp: number, tier: CharacterMapTier): strin
       if (cp >= def.start && cp <= def.end) return def.name;
     }
   }
-  if (tier === "block" && isCombiningMarkChar(String.fromCodePoint(cp))) return "Combining marks";
+  if (tier === "block") {
+    if (isCombiningMarkChar(String.fromCodePoint(cp))) return "Combining marks";
+    return `${SCRIPT_DISPLAY_NAME[script] ?? "Other"} letters`;
+  }
   return TIER_FALLBACK_LABEL[tier];
 }
 

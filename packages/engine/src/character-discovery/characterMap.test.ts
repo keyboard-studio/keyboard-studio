@@ -682,6 +682,37 @@ describe("buildCharacterMap", () => {
     },
   );
 
+  it("an uncurated script letter (Cherokee Supplement U+AB70, outside CHARACTER_MAP_BLOCKS.Cher's curated 0x13A0-0x13FF range) falls back to the script-qualified 'Cherokee letters', never the bare 'Letters'", async () => {
+    // U+AB70 CHEROKEE SMALL LETTER A: Script_Extensions includes Cher (so
+    // Cher's categorizeScriptChars() gathers it), but it sits in the
+    // "Cherokee Supplement" Unicode block, which CHARACTER_MAP_BLOCKS.Cher
+    // does not curate (only the primary "Cherokee" block, 0x13A0-0x13FF, is
+    // listed) — so it falls all the way through blockNameFor's curated-range
+    // loop to the block-tier fallback. Before this fix that fallback was the
+    // bare TIER_FALLBACK_LABEL.block ("Letters"); now it is qualified with
+    // the gathering script's display name.
+    const cherokeeSupplementLowerA = String.fromCodePoint(0xab70);
+    const groups = await buildCharacterMap(makeIR(), "xx-Cher", undefined, { loader: async () => null });
+    const group = groups.find(
+      (g) => g.tier === "block" && g.cells.some((c) => c.char === cherokeeSupplementLowerA),
+    );
+    expect(group).toBeDefined();
+    expect(group?.block).toBe("Cherokee letters");
+    expect(group?.block).not.toBe("Letters");
+  });
+
+  it("no block-tier group is ever labelled the bare 'Letters', across the full CURATED_SCRIPTS enumeration", async () => {
+    // Enumerates every CURATED_SCRIPTS member (no target/base script narrows
+    // it) so any script/codepoint combination that falls through every
+    // curated range in CHARACTER_MAP_BLOCKS is exercised. Locks the general
+    // invariant (not just the Cherokee-Supplement instance above): the
+    // vaguest possible section heading must never reach the UI unqualified.
+    const groups = await buildCharacterMap(null, undefined, undefined, { loader: async () => null });
+    const blockGroups = groups.filter((g) => g.tier === "block");
+    expect(blockGroups.length).toBeGreaterThan(0);
+    expect(blockGroups.some((g) => g.block === "Letters")).toBe(false);
+  });
+
   it("an uncurated script's combining mark (Syriac Pthaha, no CHARACTER_MAP_BLOCKS entry for Syrc) is labelled 'Combining marks', never 'Letters' or the unrelated 'Combining Diacritical Marks' block name", async () => {
     // Syrc is a CURATED_SCRIPTS member with NO curated primary-block entry
     // (deliberately left out — see the audit). U+0730 SYRIAC PTHAHA ABOVE is
