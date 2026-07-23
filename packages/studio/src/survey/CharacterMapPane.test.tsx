@@ -18,7 +18,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { screen, fireEvent, cleanup, waitFor, within, act } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
-import { CharacterMapPane, MAX_CELLS_PER_GROUP } from "./CharacterMapPane.tsx";
+import {
+  CharacterMapPane,
+  MAX_CELLS_PER_GROUP,
+  ZOOM_MIN,
+  ZOOM_MAX,
+  ZOOM_STEP,
+  zoomPercent,
+} from "./CharacterMapPane.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
@@ -1103,5 +1110,175 @@ describe("CharacterMapPane — per-group Hide/Show", () => {
     const controlledElement = document.getElementById(controlsId as string);
     expect(controlledElement).not.toBeNull();
     expect(controlledElement?.textContent).toMatch(/characters hidden/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Zoom control — scales the rendered chip glyphs (and the chip cells around
+// them) via the +/- toolbar. Threaded through surveyStyles.ts's `scale`
+// params (charChip/chipGlyph/chipGlyphMissingBox/chipCodepoint) so the
+// flex-wrap grid reflows naturally, rather than a CSS transform on the
+// scrollable container.
+// ---------------------------------------------------------------------------
+
+describe("CharacterMapPane — zoom control", () => {
+  it("defaults to 100% and renders the glyph at fontSize 22 (unchanged from pre-zoom)", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    expect(screen.getByTestId("char-map-zoom-level").textContent).toBe("100%");
+
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+    const aButton = within(latinGroup).getByRole("button", { name: /Add a \(U\+0061\)/ });
+    const glyphSpan = aButton.querySelector("span") as HTMLElement;
+    expect(glyphSpan.style.fontSize).toBe("22px");
+  });
+
+  it("clicking + increases the rendered glyph font-size and updates the zoom indicator", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+
+    expect(screen.getByTestId("char-map-zoom-level").textContent).toBe("125%");
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+    const aButton = within(latinGroup).getByRole("button", { name: /Add a \(U\+0061\)/ });
+    const glyphSpan = aButton.querySelector("span") as HTMLElement;
+    expect(glyphSpan.style.fontSize).toBe("27.5px");
+  });
+
+  it("clicking − decreases the rendered glyph font-size and updates the zoom indicator", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
+
+    // One ZOOM_STEP down from the 100% default happens to land exactly on
+    // ZOOM_MIN (1 - ZOOM_STEP === ZOOM_MIN at the current constants).
+    expect(screen.getByTestId("char-map-zoom-level").textContent).toBe(`${zoomPercent(ZOOM_MIN)}%`);
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+    const aButton = within(latinGroup).getByRole("button", { name: /Add a \(U\+0061\)/ });
+    const glyphSpan = aButton.querySelector("span") as HTMLElement;
+    expect(glyphSpan.style.fontSize).toBe("16.5px");
+  });
+
+  it("disables − at the minimum zoom and re-enables it after zooming back in", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const minPercent = `${zoomPercent(ZOOM_MIN)}%`;
+    const zoomOut = screen.getByRole("button", { name: "Zoom out" }) as HTMLButtonElement;
+    expect(zoomOut.disabled).toBe(false);
+
+    fireEvent.click(zoomOut); // 100% -> ZOOM_MIN
+    expect(screen.getByTestId("char-map-zoom-level").textContent).toBe(minPercent);
+    expect(zoomOut.disabled).toBe(true);
+
+    // A further click while disabled must not move past the clamp.
+    fireEvent.click(zoomOut);
+    expect(screen.getByTestId("char-map-zoom-level").textContent).toBe(minPercent);
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(zoomOut.disabled).toBe(false);
+  });
+
+  it("disables + at the maximum zoom", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const maxPercent = `${zoomPercent(ZOOM_MAX)}%`;
+    // Number of ZOOM_STEP clicks needed to walk from the 100% default up to
+    // ZOOM_MAX, derived from the exported constants rather than hardcoded.
+    const stepsToMax = Math.ceil((ZOOM_MAX - 1) / ZOOM_STEP);
+    const zoomIn = screen.getByRole("button", { name: "Zoom in" }) as HTMLButtonElement;
+    for (let i = 0; i < stepsToMax; i++) {
+      fireEvent.click(zoomIn);
+    }
+    expect(screen.getByTestId("char-map-zoom-level").textContent).toBe(maxPercent);
+    expect(zoomIn.disabled).toBe(true);
+
+    // A further click while disabled must not move past the clamp.
+    fireEvent.click(zoomIn);
+    expect(screen.getByTestId("char-map-zoom-level").textContent).toBe(maxPercent);
+  });
+
+  it("moves focus to the zoom-in button when zoom-out hits ZOOM_MIN, and vice versa (clamp-boundary focus management)", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const zoomOut = screen.getByRole("button", { name: "Zoom out" }) as HTMLButtonElement;
+    const zoomIn = screen.getByRole("button", { name: "Zoom in" }) as HTMLButtonElement;
+
+    zoomOut.focus();
+    expect(document.activeElement).toBe(zoomOut);
+    fireEvent.click(zoomOut); // 100% -> ZOOM_MIN; zoomOut is about to disable
+    expect(zoomOut.disabled).toBe(true);
+    expect(document.activeElement).toBe(zoomIn);
+
+    // Walk back up to ZOOM_MAX — the last click disables zoomIn, so focus
+    // must land back on zoomOut.
+    const stepsToMax = Math.ceil((ZOOM_MAX - ZOOM_MIN) / ZOOM_STEP);
+    for (let i = 0; i < stepsToMax; i++) {
+      fireEvent.click(zoomIn);
+    }
+    expect(zoomIn.disabled).toBe(true);
+    expect(document.activeElement).toBe(zoomOut);
+  });
+
+  it("announces the new zoom level via the shared aria-live region", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(screen.getByText("Zoom 125%")).toBeTruthy();
+  });
+
+  it("scales the codepoint label and the missing-glyph box fallback alongside the glyph", async () => {
+    seedBaseAndLanguage();
+    unsupportedDisplays.set(["b"]);
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" })); // 125%
+
+    const aButton = within(latinGroup).getByRole("button", { name: /Add a \(U\+0061\)/ });
+    const codepointSpan = aButton.querySelectorAll("span")[1] as HTMLElement;
+    expect(codepointSpan.style.fontSize).toBe("11.25px"); // 9 * 1.25
+
+    const bButton = within(latinGroup).getByRole("button", { name: /Add b \(U\+0062\)/ });
+    const boxSpan = bButton.querySelector('[aria-hidden="true"]') as HTMLElement;
+    expect(boxSpan.style.width).toBe("17.5px"); // 14 * 1.25
+    expect(boxSpan.style.height).toBe("30px"); // 24 * 1.25
   });
 });

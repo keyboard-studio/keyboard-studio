@@ -20,7 +20,7 @@
 // (D3 scope guard: the studio's one 300ms cycle belongs to the validator/WASM
 // oracle; this is a synchronous UI filter over already-loaded data).
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { parseUPlusNotation, scriptSubtagOf, toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -149,6 +149,34 @@ function parseCodepointInput(raw: string): CodepointParseResult {
 // supported" stub well before reaching this pane, so they never hit this cap.
 export const MAX_CELLS_PER_GROUP = 3000;
 
+// ---------------------------------------------------------------------------
+// Zoom — scales the rendered chip glyphs (and the chip cells around them) so
+// characters are easier to distinguish/read. Threaded into charChip/chipGlyph/
+// chipGlyphMissingBox/chipCodepoint via their `scale` parameter (surveyStyles.ts)
+// rather than a CSS `transform: scale()` on the grid container, which would
+// break the flex-wrap grid's reflow/overflow/scroll behavior. Synchronous UI
+// state — no debounce timer (D3 scope guard: the studio's one 300ms cycle
+// belongs to the validator/WASM oracle, not a viewing preference like this).
+// ---------------------------------------------------------------------------
+
+export const ZOOM_MIN = 0.75;
+export const ZOOM_MAX = 2.5;
+// Exported (alongside ZOOM_MIN/ZOOM_MAX/zoomPercent below) so tests derive
+// expected boundary percentages/iteration counts from these constants rather
+// than hardcoding them — see CharacterMapPane.test.tsx's zoom-control block.
+export const ZOOM_STEP = 0.25;
+const ZOOM_DEFAULT = 1;
+
+/** Clamp a zoom factor into [ZOOM_MIN, ZOOM_MAX] — guards both +/- steps. */
+function clampZoom(value: number): number {
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
+}
+
+/** Round-trip-safe percent label for a zoom factor (1 -> 100, 1.25 -> 125). */
+export function zoomPercent(zoom: number): number {
+  return Math.round(zoom * 100);
+}
+
 interface CharacterMapPaneProps {
   // Per-group render cap. Defaults to MAX_CELLS_PER_GROUP; overridable only so
   // tests can exercise the exact slice/"Showing N of M" logic with a small cap
@@ -190,6 +218,20 @@ export function CharacterMapPane({
   // data exists for PUA characters, so the designer says letter-or-mark AT the
   // point of picking — the character is not added to any list until answered.
   const [pendingPuaChar, setPendingPuaChar] = useState<string | null>(null);
+  // Zoom factor for the chip grid (glyph size, box fallback, and codepoint
+  // label all scale proportionally — see the surveyStyles.ts `scale` params
+  // above). Deliberately LEFT UNRESET across language/base changes (unlike
+  // `query`/`hiddenGroups` below) — it's a viewing preference, not
+  // language-specific data, so switching languages shouldn't discard it.
+  const [zoom, setZoom] = useState(ZOOM_DEFAULT);
+  // Refs to the zoom −/+ buttons themselves — used ONLY so handleZoom can
+  // shift focus to the OTHER (still-enabled) button when a click lands
+  // exactly on a clamp bound and disables the button that was just clicked.
+  // Without this, a disabled button drops focus to <body> in most browsers,
+  // which is bad for keyboard/screen-reader users repeatedly zooming to an
+  // edge (see the handleZoom comment below).
+  const zoomOutButtonRef = useRef<HTMLButtonElement>(null);
+  const zoomInButtonRef = useRef<HTMLButtonElement>(null);
 
   // No base IR / no BCP47 yet — short-circuit BEFORE the fetch, mirroring
   // SuggestionPanel's own `!bcp47 || baseIr === null` guard (PhaseB.tsx). Without
@@ -425,6 +467,39 @@ export function CharacterMapPane({
     );
   }
 
+  // Zoom the chip grid in/out one step, clamped to [ZOOM_MIN, ZOOM_MAX], and
+  // announce the new level via the shared aria-live region (same pattern as
+  // handleToggleBlocksOnly/handleToggleGroupHidden — never a second live
+  // region). Computed directly from the current `zoom` (rather than the
+  // `setZoom(prev => ...)` updater form) so the just-clicked-a-bound check
+  // below can run synchronously in the same handler, right after `setZoom` —
+  // the button that was clicked is disabled at the clamp (see the render
+  // below), so this handler only ever fires here from an enabled button, and
+  // React doesn't batch multiple clicks into one handler call.
+  //
+  // Clamp-boundary focus fix: when `next` lands exactly on ZOOM_MIN or
+  // ZOOM_MAX, the button just clicked is about to become `disabled` on the
+  // next render. A focused button that becomes disabled drops focus to
+  // <body> in most browsers — bad for keyboard/screen-reader users who keep
+  // pressing toward an edge. Shift focus to the OTHER zoom button (the one
+  // that stays enabled) right here, before that re-render lands.
+  function handleZoom(direction: 1 | -1): void {
+    const next = clampZoom(zoom + direction * ZOOM_STEP);
+    if (next === zoom) return;
+    setZoom(next);
+    setAnnouncement(
+      t({
+        id: "survey.characterMapPane.zoom.announceZoom",
+        message: `Zoom ${{ percent: zoomPercent(next) }}%`,
+      }),
+    );
+    if (next === ZOOM_MIN) {
+      zoomInButtonRef.current?.focus();
+    } else if (next === ZOOM_MAX) {
+      zoomOutButtonRef.current?.focus();
+    }
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%", minHeight: 0 }}>
       <h2 style={{ margin: 0, fontSize: "1.1rem", color: ACCENT }}>
@@ -509,30 +584,82 @@ export function CharacterMapPane({
         placeholder={t({ id: "survey.characterMapPane.search.placeholder", message: "Search characters" })}
         aria-label={t({ id: "survey.characterMapPane.search.ariaLabel", message: "Search the character map" })}
       />
-      {!noBaseOrLanguage && hasKnownBlocks && (
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 12,
-            color: TEXT_DIM,
-            alignSelf: "flex-start",
-          }}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {!noBaseOrLanguage && hasKnownBlocks && (
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              color: TEXT_DIM,
+            }}
+          >
+            <Checkbox
+              checked={blocksOnly}
+              onChange={(e) => handleToggleBlocksOnly(e.target.checked)}
+              aria-label={t({
+                id: "survey.characterMapPane.blocksOnly.ariaLabel",
+                message: "Show only blocks my keyboard uses",
+              })}
+            />
+            <Trans id="survey.characterMapPane.blocksOnly.label">
+              Show only blocks my keyboard uses
+            </Trans>
+          </label>
+        )}
+        {/* Zoom control — a fixed toolbar in the header area (stays put while
+            the grid below scrolls). Scales the chip glyphs/cells via the
+            `scale` param on charChip/chipGlyph/chipGlyphMissingBox/chipCodepoint
+            (surveyStyles.ts) rather than a CSS transform on the scroll
+            container, so the flex-wrap grid keeps reflowing correctly.
+            `marginLeft: "auto"` pushes it to the right corner whether or not
+            the checkbox above is rendered — do not rely on the row's
+            `justify-content` for this, it would mis-center when the
+            checkbox is absent. */}
+        <div
+          role="group"
+          aria-label={t({ id: "survey.characterMapPane.zoom.groupAriaLabel", message: "Zoom the character map" })}
+          style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}
         >
-          <Checkbox
-            checked={blocksOnly}
-            onChange={(e) => handleToggleBlocksOnly(e.target.checked)}
-            aria-label={t({
-              id: "survey.characterMapPane.blocksOnly.ariaLabel",
-              message: "Show only blocks my keyboard uses",
-            })}
-          />
-          <Trans id="survey.characterMapPane.blocksOnly.label">
-            Show only blocks my keyboard uses
-          </Trans>
-        </label>
-      )}
+          <button
+            ref={zoomOutButtonRef}
+            type="button"
+            onClick={() => handleZoom(-1)}
+            disabled={zoom <= ZOOM_MIN}
+            aria-label={t({ id: "survey.characterMapPane.zoom.zoomOut", message: "Zoom out" })}
+            style={{
+              ...secondaryButton,
+              padding: "2px 10px",
+              fontSize: 13,
+              ...(zoom <= ZOOM_MIN ? { opacity: 0.4, cursor: "not-allowed" } : {}),
+            }}
+          >
+            −
+          </button>
+          <span
+            data-testid="char-map-zoom-level"
+            style={{ fontSize: 12, color: TEXT_DIM, minWidth: 40, textAlign: "center" }}
+          >
+            <Trans id="survey.characterMapPane.zoom.level">{zoomPercent(zoom)}%</Trans>
+          </span>
+          <button
+            ref={zoomInButtonRef}
+            type="button"
+            onClick={() => handleZoom(1)}
+            disabled={zoom >= ZOOM_MAX}
+            aria-label={t({ id: "survey.characterMapPane.zoom.zoomIn", message: "Zoom in" })}
+            style={{
+              ...secondaryButton,
+              padding: "2px 10px",
+              fontSize: 13,
+              ...(zoom >= ZOOM_MAX ? { opacity: 0.4, cursor: "not-allowed" } : {}),
+            }}
+          >
+            +
+          </button>
+        </div>
+      </div>
       {/* Screen-reader announcer for toggle actions — visually hidden. */}
       <div aria-live="polite" style={visuallyHidden}>
         {announcement}
@@ -695,18 +822,18 @@ export function CharacterMapPane({
                             onClick={() => handleToggle(cell)}
                             aria-pressed={selected}
                             aria-label={`${actionLabel} ${cell.char} (${cp})`}
-                            style={charChip(selected)}
+                            style={charChip(selected, zoom)}
                           >
                             {glyphRenders ? (
-                              <span style={chipGlyph(selected, glyphFontStack)}>{display}</span>
+                              <span style={chipGlyph(selected, glyphFontStack, zoom)}>{display}</span>
                             ) : (
-                              <span style={chipGlyphMissingBox(selected)} aria-hidden="true" />
+                              <span style={chipGlyphMissingBox(selected, zoom)} aria-hidden="true" />
                             )}
-                            <span style={chipCodepoint}>{cp}</span>
+                            <span style={chipCodepoint(zoom)}>{cp}</span>
                             {/* Non-color selected indicator (colorblind-safe) — shared
                                 helper with SuggestionChip's "[x]"/"+" pattern in
                                 PhaseB.tsx (surveyStyles.ts's chipIndicator*). */}
-                            <span style={chipIndicator(chipIndicatorColor(selected))}>
+                            <span style={chipIndicator(chipIndicatorColor(selected), zoom)}>
                               {chipIndicatorText(selected)}
                             </span>
                           </button>
