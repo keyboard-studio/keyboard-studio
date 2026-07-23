@@ -288,7 +288,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
                 <span style={chipGlyph(true, glyphFontStack)}>
                   {displayChar(c)}
                 </span>
-                <span style={chipCodepoint}>
+                <span style={chipCodepoint()}>
                   {toUPlusNotation(c)}
                 </span>
                 <span style={chipIndicator(ERROR_RED)}>x</span>
@@ -329,7 +329,7 @@ function SuggestionChip({ char, checked, onToggle }: SuggestionChipProps) {
       <span style={chipGlyph(checked, glyphFontStack)}>
         {displayChar(char)}
       </span>
-      <span style={chipCodepoint}>{cp}</span>
+      <span style={chipCodepoint()}>{cp}</span>
       <span style={chipIndicator(chipIndicatorColor(checked))}>
         {chipIndicatorText(checked)}
       </span>
@@ -558,7 +558,7 @@ function AlphabetBreakdown() {
       style={charChip(false)}
     >
       <span style={chipGlyph(true)}>{display}</span>
-      <span style={chipCodepoint}>{toUPlusNotation(glyph)}</span>
+      <span style={chipCodepoint()}>{toUPlusNotation(glyph)}</span>
       {justAdded && <span style={chipIndicator(ACCENT)}>new</span>}
     </span>
   );

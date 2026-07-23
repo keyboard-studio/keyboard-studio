@@ -45,6 +45,7 @@
   "editor.sequences.coverageLine": "{0} of {1}",
   "editor.assignLoop.touch.coverageLine": "{0} of {totalChars} configured",
   "editor.assignLoop.statusBar.removedReversibleLine": "{0} removed · reversible until you continue",
+  "survey.characterMapPane.zoom.level": "{0}%",
   "editor.assignLoop.appliedCount": "{appliedForCurrentChar, plural, one {# method applied} other {# methods applied}}",
   "survey.marks.attachment.checkboxAriaLabel": "{base} can carry {mark}",
   "survey.characterMapPane.group.ariaLabel": "{block} characters",
@@ -819,5 +820,9 @@
   "output.submit.name.label": "Your name (for attribution)",
   "editor.carve.rulesLookGood": "Your rules look good",
   "output.submit.success.heading": "Your submission is being reviewed.",
-  "editor.carve.yourTargetLanguageFallback": "your target language"
+  "editor.carve.yourTargetLanguageFallback": "your target language",
+  "survey.characterMapPane.zoom.announceZoom": "Zoom {percent}%",
+  "survey.characterMapPane.zoom.zoomIn": "Zoom in",
+  "survey.characterMapPane.zoom.zoomOut": "Zoom out",
+  "survey.characterMapPane.zoom.groupAriaLabel": "Zoom the character map"
 }

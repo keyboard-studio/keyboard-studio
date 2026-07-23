@@ -153,19 +153,26 @@ export function primaryButton(disabled: boolean): CSSProperties {
 // Character chips (CharChipEditor / SuggestionChip)
 // ---------------------------------------------------------------------------
 
-/** The chip button shell — `checked` selects the accent border/background. */
-export function charChip(checked: boolean): CSSProperties {
+/**
+ * The chip button shell — `checked` selects the accent border/background.
+ * `scale` (default 1, byte-identical to the pre-zoom shape) proportionally
+ * scales padding/gap/minWidth — CharacterMapPane's zoom control threads its
+ * `zoom` state factor through here so the flex-wrap grid reflows naturally
+ * around larger/smaller chips, rather than a CSS `transform: scale()` on the
+ * container (which would break wrapping/overflow/scroll).
+ */
+export function charChip(checked: boolean, scale = 1): CSSProperties {
   return {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    padding: "6px 10px",
+    padding: `${6 * scale}px ${10 * scale}px`,
     border: `1px solid ${checked ? BLUE_ACTION : BORDER}`,
     borderRadius: 8,
     background: checked ? CHECKED_CHIP_BG : BG_CARD,
     cursor: "pointer",
-    gap: 2,
-    minWidth: 44,
+    gap: 2 * scale,
+    minWidth: 44 * scale,
   };
 }
 
@@ -176,11 +183,13 @@ const DEFAULT_CHIP_GLYPH_FONT_STACK = "system-ui, sans-serif";
  * The chip's large glyph span — `checked` (or "confirmed") selects accent
  * color. `fontStack` overrides the rendering font (Phase B font-selection
  * dropdown, see FONT_OPTIONS below); omitted, it falls back to the original
- * system-ui stack so existing callers are unaffected.
+ * system-ui stack so existing callers are unaffected. `scale` (default 1,
+ * byte-identical to the pre-zoom shape) proportionally scales the rendered
+ * glyph's font size — CharacterMapPane's zoom control.
  */
-export function chipGlyph(checked: boolean, fontStack?: string): CSSProperties {
+export function chipGlyph(checked: boolean, fontStack?: string, scale = 1): CSSProperties {
   return {
-    fontSize: 22,
+    fontSize: 22 * scale,
     fontFamily: fontStack ?? DEFAULT_CHIP_GLYPH_FONT_STACK,
     lineHeight: 1,
     color: checked ? CHIP_GLYPH_ACCENT : TEXT_DIM,
@@ -208,12 +217,16 @@ export function chipGlyph(checked: boolean, fontStack?: string): CSSProperties {
  * dotted-circle glyph instead, regardless of what the font-support heuristic
  * reports (that heuristic misfires on zero-advance-width marks — see
  * fontSupport.ts's isGlyphSupported doc comment).
+ *
+ * `scale` (default 1, byte-identical to the pre-zoom shape) proportionally
+ * scales the box footprint — CharacterMapPane's zoom control, so the box
+ * fallback stays sized against chipGlyph's glyph footprint at any zoom level.
  */
-export function chipGlyphMissingBox(checked: boolean): CSSProperties {
+export function chipGlyphMissingBox(checked: boolean, scale = 1): CSSProperties {
   return {
     display: "inline-block",
-    width: 14,
-    height: 24,
+    width: 14 * scale,
+    height: 24 * scale,
     boxSizing: "border-box",
     border: `1.5px solid ${checked ? CHIP_GLYPH_ACCENT : TEXT_DIM}`,
     borderRadius: 2,
@@ -261,12 +274,20 @@ export function isPhaseBFontValue(value: unknown): value is PhaseBFontValue {
   return typeof value === "string" && FONT_OPTIONS.some((o) => o.value === value);
 }
 
-/** The chip's small U+XXXX codepoint label — identical in both chip variants. */
-export const chipCodepoint: CSSProperties = {
-  fontSize: 9,
-  color: TEXT_DIM,
-  fontFamily: "monospace",
-};
+/**
+ * The chip's small U+XXXX codepoint label — identical in both chip variants.
+ * `scale` (default 1, byte-identical to the pre-zoom shape) proportionally
+ * scales the label's font size — CharacterMapPane's zoom control. A function
+ * (not a plain const) so every call site — including the two chip variants in
+ * PhaseB.tsx that never zoom — passes through unaffected at the default.
+ */
+export function chipCodepoint(scale = 1): CSSProperties {
+  return {
+    fontSize: 9 * scale,
+    color: TEXT_DIM,
+    fontFamily: "monospace",
+  };
+}
 
 /**
  * The chip's non-color selected-indicator span shell — `fontSize: 10` plus a
@@ -279,10 +300,16 @@ export const chipCodepoint: CSSProperties = {
  * CharChipEditor's ERROR_RED "x" — a fixed, non-toggle visual state, per its
  * own inline comment — round-trips through this helper unchanged, alongside
  * the two real toggles' CHIP_GLYPH_ACCENT/TEXT_DIM "[x]"/"+" pair.
+ *
+ * `scale` (default 1, byte-identical to the pre-zoom shape) proportionally
+ * scales the indicator's font size — CharacterMapPane's zoom control, the
+ * same parameter shape as its charChip/chipGlyph/chipGlyphMissingBox/
+ * chipCodepoint siblings above, so the marker doesn't stay undersized while
+ * the glyph around it grows.
  */
-export function chipIndicator(color: string): CSSProperties {
+export function chipIndicator(color: string, scale = 1): CSSProperties {
   return {
-    fontSize: 10,
+    fontSize: 10 * scale,
     color,
   };
 }
