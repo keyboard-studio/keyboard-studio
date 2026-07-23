@@ -840,28 +840,30 @@ describe("US4 — focused Your-alphabet list (spec 047)", () => {
 // ---------------------------------------------------------------------------
 
 describe("FR-014 — code-point chip label (spec 047)", () => {
-  it("a multi-code-point grapheme shows U+<first>+ with the full stack on hover (SC-007)", async () => {
+  it("a multi-code-point grapheme shows the base + a bracketed [+<mark>] badge with the full stack on hover (SC-007)", async () => {
     await renderBuildListView({});
     // Ə + combining acute (U+018F U+0301): no single composed form.
     const graph = "Ə́";
     act(() => {
       usePhaseBDraftStore.getState().setAll([graph]);
     });
-    // The "Your alphabet" chip carries the compact label + full-stack title.
+    // The "Your alphabet" chip shows the base code point, then the extra mark in
+    // a bracketed "[+́]" badge; the full stack is on the chip's hover title.
     const group = screen.getByRole("group", { name: /Accumulated characters/i });
-    expect(group.textContent).toContain("U+018F+");
+    expect(group.textContent).toContain("U+018F");
+    expect(group.textContent).toContain("[+" + "́" + "]"); // [+ COMBINING ACUTE ]
     const chipBtn = group.querySelector("button[title='U+018F U+0301']");
     expect(chipBtn).not.toBeNull();
   });
 
-  it("FR-012 — a single-code-point grapheme still renders a plain U+XXXX label with no '+' affordance", async () => {
+  it("FR-012 — a single-code-point grapheme still renders a plain U+XXXX label with no badge", async () => {
     await renderBuildListView({});
     act(() => {
       usePhaseBDraftStore.getState().setAll(["a"]);
     });
     const group = screen.getByRole("group", { name: /Accumulated characters/i });
     expect(group.textContent).toContain("U+0061");
-    // No compact multi-code-point affordance on a single code point.
-    expect(group.textContent).not.toContain("U+0061+");
+    // No multi-code-point badge on a single code point.
+    expect(group.textContent).not.toContain("[+");
   });
 });
