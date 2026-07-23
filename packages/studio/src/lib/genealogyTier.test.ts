@@ -71,7 +71,7 @@ describe("applyGenealogicalTier — integration over real relatedness", () => {
     // (German, deu) and carries the numeric path-length distance for the UI.
     const german = resolved[0]!;
     expect(german.relative?.iso639p3).toBe("deu");
-    expect(typeof german.relative?.name).toBe("string");
+    expect(german.relative?.name).toBeTruthy();
     expect(german.relative?.distance).toBeGreaterThan(0);
     // Pure script-matches carry no relative.
     expect(resolved[1]!.relative).toBeUndefined();

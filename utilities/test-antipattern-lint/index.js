@@ -106,11 +106,14 @@ function main() {
 
     // ---- Check 2: SURVEY ORDER-SNAPSHOT ----
     // Only flag in survey-scoped test files. Normalize path separators for cross-platform matching.
+    // One regex suffices: `.*/survey/` already covers both src/survey and tests/survey
+    // (the `.*` matches the `tests` segment) — a separate tests/survey branch was redundant.
+    // Caveat: SURVEY_SNAPSHOT_RE only catches the single-expression chained form
+    // (`.map(...)).toEqual([`). Splitting into two statements
+    // (`const ids = xs.map(...); expect(ids).toEqual([...])`) bypasses it — accepted
+    // limitation; the inline form is the one that actually shows up in snapshots.
     const normalizedPath = frel.replace(/\\/g, "/");
-    if (
-      /packages\/studio\/.*\/survey\/.*\.test\.ts$/.test(normalizedPath) ||
-      /packages\/studio\/tests\/survey\/.*\.test\.ts$/.test(normalizedPath)
-    ) {
+    if (/packages\/studio\/.*\/survey\/.*\.test\.ts$/.test(normalizedPath)) {
       for (const match of content.matchAll(SURVEY_SNAPSHOT_RE)) {
         const lineNum = content.substring(0, match.index).split("\n").length;
         fail(

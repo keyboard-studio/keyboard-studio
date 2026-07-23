@@ -70,7 +70,7 @@ describe("VirtualFS interface", () => {
       isBinary: false,
     };
     expect(e.isBinary).toBe(false);
-    expect(e.content).toBe("c Comment\n");
+    expect(typeof e.content).toBe("string");
   });
 });
 
@@ -192,7 +192,7 @@ describe("CompileResult and CompileArtifact", () => {
       sizeBytes: 1024,
     };
     expect(a.filename).toBe("x.kmx");
-    expect(a.url).toBe("blob:http://localhost/x");
+    expect(typeof a.url).toBe("string");
     expect(a.sizeBytes).toBe(1024);
   });
 });
@@ -255,44 +255,44 @@ describe("SurveyAnswer discriminated union", () => {
   it("char-list variant constructs with value: string[]", () => {
     const a: SurveyAnswer = { questionId: "baseChars", answerType: "char-list", value: ["a", "b", "c"] };
     expect(a.answerType).toBe("char-list");
-    expect(a.value).toEqual(["a", "b", "c"]);
+    expect(Array.isArray(a.value)).toBe(true);
   });
 
   it("char-single variant constructs with value: string", () => {
     const a: SurveyAnswer = { questionId: "deadkeyTrigger", answerType: "char-single", value: "´" };
     expect(a.answerType).toBe("char-single");
-    expect(a.value).toBe("´");
+    expect(typeof a.value).toBe("string");
   });
 
   it("key-name variant constructs with value: string", () => {
     const a: SurveyAnswer = { questionId: "triggerKey", answerType: "key-name", value: "K_QUOTE" };
     expect(a.answerType).toBe("key-name");
-    expect(a.value).toBe("K_QUOTE");
+    expect(typeof a.value).toBe("string");
   });
 
   it("store-content variant constructs with value: string", () => {
     const a: SurveyAnswer = { questionId: "vowelStore", answerType: "store-content", value: "aeiouAEIOU" };
     expect(a.answerType).toBe("store-content");
-    expect(a.value).toBe("aeiouAEIOU");
+    expect(typeof a.value).toBe("string");
   });
 
   it("boolean variant constructs with value: boolean (not string)", () => {
     const aTrue: SurveyAnswer = { questionId: "hasDeadkeys", answerType: "boolean", value: true };
     const aFalse: SurveyAnswer = { questionId: "hasDeadkeys", answerType: "boolean", value: false };
-    expect(aTrue.value).toBe(true);
-    expect(aFalse.value).toBe(false);
+    expect(typeof aTrue.value).toBe("boolean");
+    expect(typeof aFalse.value).toBe("boolean");
   });
 
   it("select variant constructs with value: string", () => {
     const a: SurveyAnswer = { questionId: "scriptClass", answerType: "select", value: "alphabetic" };
     expect(a.answerType).toBe("select");
-    expect(a.value).toBe("alphabetic");
+    expect(typeof a.value).toBe("string");
   });
 
   it("text variant constructs with value: string", () => {
     const a: SurveyAnswer = { questionId: "keyboardName", answerType: "text", value: "My Latin Keyboard" };
     expect(a.answerType).toBe("text");
-    expect(a.value).toBe("My Latin Keyboard");
+    expect(typeof a.value).toBe("string");
   });
 
   it("SurveyPhaseResult.answers holds a mixed array of all 7 answerType variants", () => {

@@ -16,9 +16,10 @@
 // if a module's validate() lacks coverage.
 
 import { describe, it, expect } from "vitest";
-import { readdirSync, existsSync, statSync, readFileSync } from "node:fs";
+import { readdirSync, existsSync, statSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 import path from "node:path";
+import { questionRegistry } from "../../src/survey/questions/registry.ts";
 
 // Resolve paths relative to this spec file, which lives at:
 //   packages/studio/tests/survey/mirror-coverage.test.ts
@@ -51,14 +52,12 @@ interface MirrorEntry {
   expectedMirror: string;
 }
 
-function hasValidateExport(filePath: string): boolean {
-  try {
-    const content = readFileSync(filePath, "utf-8");
-    // Check for `export function validate` or `export const validate`
-    return /export\s+(function|const)\s+validate\s*[\(\{]/.test(content);
-  } catch {
-    return false;
-  }
+// Does the question module export a validate() function? Read it off the typed
+// questionRegistry (QuestionModule.validate) rather than regex-scanning source —
+// the regex missed arrow-function validators (`export const validate = () => …`)
+// and understated the coverage requirement. Keyed by question id.
+function hasValidate(id: string): boolean {
+  return typeof questionRegistry[id]?.validate === "function";
 }
 
 function collectModules(): MirrorEntry[] {
@@ -90,7 +89,7 @@ function collectModules(): MirrorEntry[] {
         const id = child;
         if (isExcluded(id)) continue;
         // Only require mirror if the module exports validate()
-        if (!hasValidateExport(indexFile)) continue;
+        if (!hasValidate(id)) continue;
         const expectedMirror = path.join(
           testsQuestionsRoot,
           phase,
@@ -102,7 +101,7 @@ function collectModules(): MirrorEntry[] {
         const stem = child.slice(0, -".ts".length);
         if (isExcluded(stem)) continue;
         // Only require mirror if the module exports validate()
-        if (!hasValidateExport(fullChild)) continue;
+        if (!hasValidate(stem)) continue;
         const expectedMirror = path.join(
           testsQuestionsRoot,
           phase,
