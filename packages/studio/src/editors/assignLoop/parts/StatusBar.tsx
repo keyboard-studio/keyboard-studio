@@ -6,7 +6,7 @@ import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 import type { CardKind } from './KindBadge.tsx';
 import { KeySeq } from './KeySeq.tsx';
 import { ChevronIcon, UndoIcon, CheckIcon } from './carveShared.tsx';
-import { isCombining } from '../../../lib/irToCarveNodes.ts';
+import { displayChar } from '../../../lib/irToCarveNodes.ts';
 
 export type RemovedItem =
   | { type: 'node'; id: string; kind: CardKind; label: string; count: number; glyphIds?: string[] | undefined }
@@ -67,7 +67,7 @@ function RemovedMenu({ list, onRestore, onRestoreAll, onClose }: RemovedMenuProp
                 <>
                   <span style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 34, height: 34, padding: '0 7px', background: 'var(--app-surface-2)', border: '1px solid var(--app-border)', borderRadius: 7 }}>
                     <span style={{ font: "400 18px/1 'Lora', serif", color: 'var(--app-text)' }}>
-                      {isCombining(it.ch) ? '◌' + it.ch : it.ch}
+                      {displayChar(it.ch)}
                     </span>
                   </span>
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>

@@ -73,6 +73,7 @@ import type { BaseKeyboard, MechanismAssignment, MechanismRef, Pattern } from "@
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { getPatternLibraryService } from "../../lib/services.ts";
+import { displayChar } from "../../lib/irToCarveNodes.ts";
 import { useKeyboardArtifact, type ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
 import { GalleryPreviewPane } from "../assignLoop/PreviewPane.tsx";
@@ -643,6 +644,14 @@ export function SequenceGallery({
     ? t({ id: "editor.assignLoop.nextCharacterAriaLabel", message: "Next character" })
     : t({ id: "editor.sequences.continueAriaLabel", message: "Continue (sequence gallery)" });
 
+  // Named local for the dotted-circle-wrapped current char, used inside the
+  // <Trans> macro below (editor.sequences.indicatorHint). A simple identifier
+  // extracts as a NAMED lingui placeholder; calling displayChar() inline in
+  // the macro collapses it to a POSITIONAL {0}, which is what broke the fr
+  // catalog for that id. Null only when currentChar is null, in which case
+  // the guarded block that reads it does not render.
+  const currentCharDisplay = currentChar !== null ? displayChar(currentChar) : null;
+
   // ---------------------------------------------------------------------------
   // Left pane
   // ---------------------------------------------------------------------------
@@ -766,7 +775,7 @@ export function SequenceGallery({
                 style={{ fontSize: 36, fontFamily: "monospace", lineHeight: 1 }}
                 aria-label={`${toUPlusNotation(currentChar)} ${currentChar}`}
               >
-                {currentChar}
+                {displayChar(currentChar)}
               </span>
               <span style={{ fontSize: 13, color: TEXT_DIM }}>
                 {toUPlusNotation(currentChar)}
@@ -841,7 +850,7 @@ export function SequenceGallery({
             <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
               <Trans id="editor.sequences.indicatorHint">
                 The single character that triggers the combination — typing it after the
-                content produces {currentChar}.
+                content produces {currentCharDisplay}.
               </Trans>
             </p>
             <input
@@ -878,13 +887,13 @@ export function SequenceGallery({
 
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <span style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
-              {content !== "" ? content : t({ id: "editor.sequences.contentPlaceholder", message: "[content]" })}
+              {content !== "" ? displayChar(content) : t({ id: "editor.sequences.contentPlaceholder", message: "[content]" })}
               {" + "}
-              {indicator !== "" ? indicator : t({ id: "editor.sequences.indicatorPlaceholder", message: "[indicator]" })}
+              {indicator !== "" ? displayChar(indicator) : t({ id: "editor.sequences.indicatorPlaceholder", message: "[indicator]" })}
               {" "}
               &rarr;{" "}
               <span style={{ color: TEXT_MAIN, fontFamily: "monospace", fontSize: 16 }}>
-                {currentChar}
+                {displayChar(currentChar)}
               </span>
             </span>
           </div>
@@ -995,13 +1004,13 @@ export function SequenceGallery({
                     }}
                   >
                     <span style={{ color: TEXT_MAIN }}>
-                      {seqContent}
+                      {displayChar(seqContent)}
                       {" + "}
-                      {seqIndicator}
+                      {displayChar(seqIndicator)}
                       {" "}
                       &rarr;{" "}
                       <span style={{ fontFamily: "monospace", fontSize: 15 }}>
-                        {currentChar}
+                        {displayChar(currentChar)}
                       </span>
                     </span>
                     <button

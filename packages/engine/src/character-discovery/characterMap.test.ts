@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { IRGroup, KeyboardIR } from "@keyboard-studio/contracts";
 import type { CldrFullLoader } from "./cldr.js";
-import { buildCharacterMap, CHARACTER_MAP_BLOCKS } from "./characterMap.js";
+import { buildCharacterMap, CHARACTER_MAP_BLOCKS, isCombiningMarkChar } from "./characterMap.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -96,6 +96,14 @@ describe("buildCharacterMap", () => {
     expect(plainA?.isCombiningMark).toBe(false);
   });
 
+  it("isCombiningMarkChar: General_Category M (Mn/Mc/Me), widened from the old Mn/Mc-only test — Me marks now flag true, Sk modifier symbols stay false", () => {
+    expect(isCombiningMarkChar("̀")).toBe(true); // U+0300 COMBINING GRAVE ACCENT (Mn)
+    expect(isCombiningMarkChar("ा")).toBe(true); // U+093E DEVANAGARI VOWEL SIGN AA (Mc, ccc=0)
+    expect(isCombiningMarkChar("⃝")).toBe(true); // U+20DD COMBINING ENCLOSING CIRCLE (Me)
+    expect(isCombiningMarkChar("´")).toBe(false); // U+00B4 ACUTE ACCENT (Sk) — free-standing, not a mark
+    expect(isCombiningMarkChar("a")).toBe(false);
+  });
+
   it("excludes control chars and PUA from every tier", async () => {
     // A hostile loader surfacing a control char (U+0001) and a PUA char
     // (U+E000) alongside real exemplars, proving the guardrail strips them
@@ -110,6 +118,23 @@ describe("buildCharacterMap", () => {
     expect(chars).not.toContain("\ue000");
     expect(chars).toContain("a");
     expect(chars).toContain("\u025b");
+  });
+
+  it("lists a character regardless of whether any installed font can render it — the ONLY filter is the guardrail (control/PUA/noncharacter/unassigned/format), never font glyph coverage", async () => {
+    // Adlam is a Unicode Supplementary Multilingual Plane script (U+1E900+)
+    // that most systems' default font stacks do NOT have installed glyphs
+    // for — exactly the case Requirement 1 (studio-side box fallback) exists
+    // to handle. buildCharacterMap has no font awareness anywhere (grep the
+    // module: no `font`, `canvas`, or `document` reference at all) — its
+    // only exclusion is isGuardrailExcluded (control/PUA/noncharacter/
+    // unassigned/format). This locks in that font support is never a
+    // filtering criterion at the engine layer; the studio is solely
+    // responsible for choosing glyph-vs-box display for what this function
+    // returns.
+    const groups = await buildCharacterMap(makeIR(), "xx-Adlm", undefined, async () => null);
+    const blockChars = groups.filter((g) => g.tier === "block").flatMap((g) => g.cells.map((c) => c.char));
+    // U+1E900 ADLAM CAPITAL LETTER ALIF
+    expect(blockChars).toContain("𞤀");
   });
 
   it("dedupes globally — no char appears in two cells", async () => {

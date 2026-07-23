@@ -187,6 +187,39 @@ export function chipGlyph(checked: boolean, fontStack?: string): CSSProperties {
   };
 }
 
+/**
+ * Deterministic box placeholder shown in place of a glyph the selected
+ * Phase B font can't render (see fontSupport.ts) — a fixed-size bordered box,
+ * NOT reliance on the browser/OS's own missing-glyph ("tofu") rendering,
+ * which is inconsistent across systems (some draw a visible box, some draw
+ * blank). Shaped as a VERTICAL RECTANGLE (taller than wide), matching a
+ * typical glyph slot/tofu box rather than a square swatch — 14px wide by
+ * 24px tall, sized to sit comfortably against chipGlyph's 22px glyph
+ * footprint so the chip layout doesn't jump excessively between glyph and
+ * box cells. `checked` mirrors chipGlyph's accent-color selection.
+ *
+ * This is deliberately CSS-drawn (a bordered box, no text glyph inside) —
+ * font-independent, so it can never itself render as tofu the way a stand-in
+ * character (e.g. U+A7F1) could if that character happened to be missing
+ * from the active font too.
+ *
+ * NEVER applied to a combining mark cell — see the isCombiningMark gate at
+ * CharacterMapPane's render site; a standalone mark always renders the
+ * dotted-circle glyph instead, regardless of what the font-support heuristic
+ * reports (that heuristic misfires on zero-advance-width marks — see
+ * fontSupport.ts's isGlyphSupported doc comment).
+ */
+export function chipGlyphMissingBox(checked: boolean): CSSProperties {
+  return {
+    display: "inline-block",
+    width: 14,
+    height: 24,
+    boxSizing: "border-box",
+    border: `1.5px solid ${checked ? CHIP_GLYPH_ACCENT : TEXT_DIM}`,
+    borderRadius: 2,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Phase B character font selection — the dropdown at the top of the
 // build-list step applies one font to every glyph rendered while adding

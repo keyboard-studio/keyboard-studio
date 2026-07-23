@@ -52,4 +52,26 @@ describe("decomposeGrapheme", () => {
     // U+0915 U+093C (ka + nukta) composes from U+0958; NFD splits it back.
     expect(decomposeGrapheme("क़")).toEqual({ base: "क", marks: ["़"] });
   });
+
+  it("decomposes a base letter plus a General_Category Me (enclosing) mark - real orthography", () => {
+    // U+0430 CYRILLIC SMALL LETTER A + U+0489 COMBINING CYRILLIC MILLIONS
+    // SIGN (Me). isCombiningMarkChar/isCombining were widened from Mn+Mc to
+    // the full \p{M} (Mn/Mc/Me) class; this locks in that decomposeGrapheme
+    // routes the Me mark into `marks`, not treating the sequence as a
+    // multi-base digraph.
+    const MILLIONS_SIGN = "҉";
+    expect(decomposeGrapheme("а" + MILLIONS_SIGN)).toEqual({
+      base: "а",
+      marks: [MILLIONS_SIGN],
+    });
+  });
+
+  it("decomposes a base letter plus a General_Category Me (enclosing) mark - symbolic case", () => {
+    // U+0061 LATIN SMALL LETTER A + U+20DD COMBINING ENCLOSING CIRCLE (Me).
+    const ENCLOSING_CIRCLE = "⃝";
+    expect(decomposeGrapheme("a" + ENCLOSING_CIRCLE)).toEqual({
+      base: "a",
+      marks: [ENCLOSING_CIRCLE],
+    });
+  });
 });

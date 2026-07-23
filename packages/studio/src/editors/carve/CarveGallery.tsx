@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
-import { toRailNodes, nodeState, buildCharWeb, annotateRemovalRecommendations, recommendedRemovalChars, coordinatedCollateralForSlots } from '../../lib/irToCarveNodes.ts';
+import { toRailNodes, nodeState, buildCharWeb, annotateRemovalRecommendations, recommendedRemovalChars, coordinatedCollateralForSlots, displayChar } from '../../lib/irToCarveNodes.ts';
 import type { CarveNode, CharLocation, RecommendedRemovalChar, CoordinatedCollateralChar } from '../../lib/irToCarveNodes.ts';
 import { KIND_COLOR } from '../assignLoop/parts/KindBadge.tsx';
 import { StatusBar } from '../assignLoop/parts/StatusBar.tsx';
@@ -204,7 +204,7 @@ function CollateralWarning({ collateral, isBulk }: { collateral: CoordinatedColl
       </b>{' '}
       {collateral.map((c, i) => (
         <span key={i}>
-          &quot;{c.ch}&quot; from {c.storeName}
+          &quot;{displayChar(c.ch)}&quot; from {c.storeName}
           {c.isNeeded ? <b> — needed for your language</b> : null}
           {i < collateral.length - 1 ? ', ' : ''}
         </span>

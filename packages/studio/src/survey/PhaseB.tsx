@@ -27,7 +27,7 @@ import { useSurveySessionStore, type DiscoveryMethod } from "../stores/surveySes
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { useGlyphFontStack } from "./useGlyphFontStack.ts";
 import { nfcDedup } from "./charNormUtils.ts";
-import { prefixCombiningMark } from "../lib/irToCarveNodes.ts";
+import { displayChar, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { suggestMissingChars } from "../lib/services.ts";
 import type { MissingCharSuggestions } from "../lib/services.ts";
 import { RadioGroup, SelectMenu } from "../ui/index.ts";
@@ -286,7 +286,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
                 style={charChip(false)}
               >
                 <span style={chipGlyph(true, glyphFontStack)}>
-                  {c}
+                  {displayChar(c)}
                 </span>
                 <span style={chipCodepoint}>
                   {toUPlusNotation(c)}
@@ -327,7 +327,7 @@ function SuggestionChip({ char, checked, onToggle }: SuggestionChipProps) {
       style={charChip(checked)}
     >
       <span style={chipGlyph(checked, glyphFontStack)}>
-        {char}
+        {displayChar(char)}
       </span>
       <span style={chipCodepoint}>{cp}</span>
       <span style={chipIndicator(chipIndicatorColor(checked))}>

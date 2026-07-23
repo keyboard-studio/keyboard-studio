@@ -53,6 +53,7 @@ import { toUPlusNotation, isDecomposableAccented } from "@keyboard-studio/contra
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
 import { getPatternLibraryService } from "../../lib/services.ts";
+import { displayChar } from "../../lib/irToCarveNodes.ts";
 import type { AxisFill, DiscoveryAxisVector } from "@keyboard-studio/contracts";
 import {
   defaultFillAxes,
@@ -565,6 +566,20 @@ function MethodChooser({
     resolveKeyPickerSelection(selectedRaltKey, selectedRaltKeyCustomChar),
   );
 
+  // Named locals for dotted-circle-wrapped interpolations used inside <Trans>/t()
+  // macros below. Computing these BEFORE the macro (rather than calling
+  // displayChar() inline inside the interpolation) keeps the identifier a
+  // simple reference, so lingui extracts a NAMED placeholder (e.g.
+  // {currentCharDisplay}) instead of collapsing it to a POSITIONAL {0}/{1} —
+  // named placeholders are required for the en/fr catalogs to stay aligned.
+  const currentCharDisplay = displayChar(currentChar);
+  const deadkeyBaseSummaryDisplay = deadkeyBaseLetterDisplay
+    ? displayChar(deadkeyBaseLetterDisplay)
+    : t({ id: "editor.assignLoop.deadkeyBasePlaceholder", message: "[base]" });
+  const deadkeyBasePreviewDisplay = deadkeyBaseLetterDisplay
+    ? displayChar(deadkeyBaseLetterDisplay)
+    : t({ id: "editor.assignLoop.deadkeyBaseLetterPlaceholder", message: "[base letter]" });
+
   // Each method is one card: transparent header button + inline config when selected.
   const cardStyle = (active: boolean): CSSProperties => ({
     borderRadius: 8,
@@ -611,7 +626,7 @@ function MethodChooser({
               <Trans id="editor.assignLoop.method.sequence.checkHint">
                 Check this to mark{" "}
                 <span style={{ color: TEXT_MAIN, fontFamily: "monospace", fontSize: 16 }}>
-                  {currentChar}
+                  {currentCharDisplay}
                 </span>{" "}
                 as a sequence. You&apos;ll define the actual key sequence later,
                 in the Sequence Gallery.
@@ -636,8 +651,8 @@ function MethodChooser({
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
               <Trans id="editor.assignLoop.method.deadkey.summary">
                 Trigger &rarr;{" "}
-                {deadkeyBaseLetterDisplay || t({ id: "editor.assignLoop.deadkeyBasePlaceholder", message: "[base]" })} &rarr;{" "}
-                {currentChar}
+                {deadkeyBaseSummaryDisplay} &rarr;{" "}
+                {currentCharDisplay}
               </Trans>
             </span>
           )}
@@ -709,8 +724,8 @@ function MethodChooser({
             <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
               <Trans id="editor.assignLoop.method.deadkey.preview">
                 Press {triggerKeyDisplay}, then{" "}
-                {deadkeyBaseLetterDisplay || t({ id: "editor.assignLoop.deadkeyBaseLetterPlaceholder", message: "[base letter]" })} &rarr;{" "}
-                <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentChar}</span>
+                {deadkeyBasePreviewDisplay} &rarr;{" "}
+                <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentCharDisplay}</span>
               </Trans>
             </p>
           </div>
@@ -731,7 +746,7 @@ function MethodChooser({
           {method !== "swap" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
               <Trans id="editor.assignLoop.method.swap.summary">
-                Dedicate one physical key to produce {currentChar}
+                Dedicate one physical key to produce {currentCharDisplay}
               </Trans>
             </span>
           )}
@@ -786,7 +801,7 @@ function MethodChooser({
               <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
                 <Trans id="editor.assignLoop.swap.shiftPreview">
                   Shift + {swapVkeyForDisplay.replace(/^K_/, "")} &rarr;{" "}
-                  <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentChar}</span>
+                  <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentCharDisplay}</span>
                 </Trans>
               </p>
             )}
@@ -808,7 +823,7 @@ function MethodChooser({
           {method !== "ralt" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
               <Trans id="editor.assignLoop.method.ralt.summary">
-                Hold a modifier layer and press a base key to get {currentChar}
+                Hold a modifier layer and press a base key to get {currentCharDisplay}
               </Trans>
             </span>
           )}
@@ -966,7 +981,7 @@ function MethodChooser({
               {raltPreviewSpec !== null && (
                 <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
                   {raltPreviewSpec} &rarr;{" "}
-                  <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentChar}</span>
+                  <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{displayChar(currentChar)}</span>
                 </p>
               )}
               {raltIsDesktopOnly && (
@@ -2366,7 +2381,7 @@ export function MechanismGallery({
                     style={{ fontSize: 36, fontFamily: "monospace", lineHeight: 1 }}
                     aria-label={`${toUPlusNotation(currentChar)} ${currentChar}`}
                   >
-                    {currentChar}
+                    {displayChar(currentChar)}
                   </span>
                   <span style={{ fontSize: 13, color: TEXT_DIM }}>
                     {toUPlusNotation(currentChar)}
@@ -2404,7 +2419,7 @@ export function MechanismGallery({
                   >
                     {(() => {
                       const keyName = suggestion.topCandidate.vkey.replace(/^K_/, "");
-                      const charOrEmpty = currentChar ?? "";
+                      const charOrEmpty = currentChar !== null ? displayChar(currentChar) : "";
                       return suggestion.strategyId === "S-01"
                         ? t({
                             id: "editor.assignLoop.suggestion.replaceText",
@@ -2761,7 +2776,7 @@ export function MechanismGallery({
                       lineHeight: 1.3,
                     }}
                   >
-                    {c}
+                    {displayChar(c)}
                     <span
                       aria-hidden="true"
                       style={{ fontSize: 11, color: "#56d364", opacity: 0.7 }}
@@ -2821,7 +2836,7 @@ export function MechanismGallery({
                       lineHeight: 1.3,
                     }}
                   >
-                    {c}
+                    {displayChar(c)}
                     <span
                       aria-hidden="true"
                       style={{ fontSize: 11, color: "#58a6ff", opacity: 0.7 }}
