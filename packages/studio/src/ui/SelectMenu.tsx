@@ -29,6 +29,21 @@ export interface SelectMenuProps {
    */
   ariaLabelledby?: string;
   /**
+   * Value for `aria-label` on the trigger button — for call sites with no
+   * sibling label element to reference (mirrors how a native `<select>`
+   * often carries a bare `aria-label` string instead of `aria-labelledby`).
+   * Ignored if `ariaLabelledby` is also set.
+   */
+  ariaLabel?: string;
+  /**
+   * Style override for the outer (relatively-positioned) container, merged
+   * over the default `{ position: "relative" }` — same "callers may
+   * override, merged not replaced" idiom as `ui/Dropdown.tsx`. Lets a caller
+   * size the control (e.g. a fixed width) the way a native `<select>` would
+   * otherwise auto-size to its content.
+   */
+  style?: React.CSSProperties;
+  /**
    * Optional per-option render hook for the label span (e.g. render each
    * font name in its own font). Defaults to plain `opt.label` text. Used
    * both for each row in the open list and for the trigger's current-value
@@ -140,6 +155,8 @@ export function SelectMenu({
   onChange,
   id,
   ariaLabelledby,
+  ariaLabel,
+  style,
   renderOptionLabel = defaultRenderLabel,
 }: SelectMenuProps): React.ReactElement {
   const [open, setOpen] = useState(false);
@@ -256,7 +273,7 @@ export function SelectMenu({
   };
 
   return (
-    <div ref={containerRef} style={{ position: "relative" }} onBlur={handleContainerBlur}>
+    <div ref={containerRef} style={{ position: "relative", ...style }} onBlur={handleContainerBlur}>
       <button
         type="button"
         id={id}
@@ -265,6 +282,7 @@ export function SelectMenu({
         aria-expanded={open}
         aria-controls={listId}
         aria-labelledby={ariaLabelledby}
+        aria-label={ariaLabelledby === undefined ? ariaLabel : undefined}
         className={mergeClassNames("ks-control ks-focus-ring ks-hit-target")}
         style={TRIGGER_STYLE}
         onClick={() => setOpen((prev) => !prev)}

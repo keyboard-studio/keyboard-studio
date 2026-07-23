@@ -7,6 +7,7 @@
 // name. The visible field label IS localized (<Trans>).
 import { Trans } from "@lingui/react/macro";
 import { useLingui } from "@lingui/react";
+import { SelectMenu } from "../ui/SelectMenu.tsx";
 import {
   SUPPORTED_LOCALES,
   activateLocale,
@@ -14,17 +15,18 @@ import {
   type Locale,
 } from "../lib/i18n.ts";
 
+const LABEL_ID = "nav-language-label";
+
 export function LocaleSwitcher() {
   const { i18n } = useLingui();
 
-  function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const next = e.target.value as Locale;
-    saveLocale(next);
-    void activateLocale(next);
+  function handleChange(next: string) {
+    saveLocale(next as Locale);
+    void activateLocale(next as Locale);
   }
 
   return (
-    <label
+    <span
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -35,25 +37,20 @@ export function LocaleSwitcher() {
           "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
       }}
     >
-      <Trans id="nav.language">Language</Trans>
-      <select
+      <span id={LABEL_ID}>
+        <Trans id="nav.language">Language</Trans>
+      </span>
+      <SelectMenu
+        id="nav-language-select"
+        ariaLabelledby={LABEL_ID}
         value={i18n.locale}
         onChange={handleChange}
-        style={{
-          background: "#0d1117",
-          color: "#e6edf3",
-          border: "1px solid #283040",
-          borderRadius: 4,
-          padding: "2px 6px",
-          fontSize: 13,
-        }}
-      >
-        {Object.entries(SUPPORTED_LOCALES).map(([code, name]) => (
-          <option key={code} value={code}>
-            {name}
-          </option>
-        ))}
-      </select>
-    </label>
+        options={Object.entries(SUPPORTED_LOCALES).map(([code, name]) => ({
+          value: code,
+          label: name,
+        }))}
+        style={{ width: 130 }}
+      />
+    </span>
   );
 }

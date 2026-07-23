@@ -11,13 +11,13 @@ import { loadLangtags } from "../lib/langtagsDefaults.ts";
 import {
   TextField,
   Textarea,
-  Dropdown,
+  SelectMenu,
   RadioGroup,
   Notice,
   Label,
   MultiSelect,
 } from "../ui/index.ts";
-import type { DropdownOption } from "../ui/Dropdown.tsx";
+import type { SelectMenuOption } from "../ui/SelectMenu.tsx";
 import type { RadioOption } from "../ui/RadioGroup.tsx";
 import type { MultiSelectOption } from "../ui/MultiSelect.tsx";
 import { helpText, TEXT_DIM } from "./surveyStyles.ts";
@@ -620,20 +620,26 @@ function StyledCombobox({
 }
 
 // ---------------------------------------------------------------------------
-// Select (native <select>)  →  ui Dropdown
+// Select (native <select> does not open in the VS Code webview — #1307)
+// →  ui SelectMenu
 // ---------------------------------------------------------------------------
 
 function SelectField({ question, value, onChange }: FieldProps) {
+  const { t } = useLingui();
   const strVal = stringValue(value);
-  const dropdownOptions: DropdownOption[] = (question.options ?? []).map(
-    (opt) => ({ value: opt.value, label: opt.label }),
-  );
+  // Leading placeholder option — matches ui/Dropdown's own hardcoded "— Select
+  // one —" entry (always first, selectable to reset to unanswered), now
+  // actually localized (Dropdown's was a plain string, never wrapped in t()).
+  const selectOptions: SelectMenuOption[] = [
+    { value: "", label: t({ id: "survey.selectField.placeholder", message: "— Select one —" }) },
+    ...(question.options ?? []).map((opt) => ({ value: opt.value, label: opt.label })),
+  ];
   return (
-    <Dropdown
+    <SelectMenu
       id={question.id}
-      aria-required={question.required === true}
+      ariaLabelledby={`label-${question.id}`}
       value={strVal}
-      options={dropdownOptions}
+      options={selectOptions}
       onChange={(v) => onChange(v)}
     />
   );

@@ -3,6 +3,7 @@
   "editor.touchSeed.reseedDiscardsPlatforms": " Choisir cette option supprime les plateformes tactiles tablette/bureau fournies par la base — seule une disposition téléphone est produite.",
   "survey.marks.attachment.confirmedOnPrefix": "— confirmé sur",
   "editor.assignLoop.ralt.selectPlaceholder": "— Sélectionner —",
+  "survey.selectField.placeholder": "— Choisir —",
   "editor.sequences.indicatorUnresolvableWarning": "« {0} » n'est pas une touche de cette disposition — choisissez un caractère qui correspond à une touche physique.",
   "editor.carve.cascade.cannotFullyRemoveTitle": "« {char} » ne peut pas être entièrement supprimé",
   "editor.assignLoop.previousCharacterButton": "« Caractère précédent",
