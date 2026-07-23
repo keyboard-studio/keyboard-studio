@@ -760,13 +760,38 @@ export function CharacterMapPane({
                     aria-expanded={!isHidden}
                     aria-controls={gridId}
                     aria-label={hideShowAriaLabel}
-                    style={{ ...secondaryButton, padding: "2px 10px", fontSize: 11, flexShrink: 0 }}
+                    style={{
+                      ...secondaryButton,
+                      padding: "2px 8px",
+                      fontSize: 11,
+                      lineHeight: 1,
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
                   >
-                    {isHidden ? (
-                      <Trans id="survey.characterMapPane.group.showButton">Show</Trans>
-                    ) : (
-                      <Trans id="survey.characterMapPane.group.hideButton">Hide</Trans>
-                    )}
+                    {/* Disclosure triangle — visual only. An intentional
+                        single-glyph triangle (not the SVG ChevronIcon in
+                        editors/assignLoop/parts/carveShared.tsx — that is a
+                        chevron, not a triangle); only the rotate-on-toggle
+                        technique is shared. The glyph rotates rather than
+                        swapping character so the button's accessible name stays
+                        entirely on aria-label above; the glyph itself is
+                        aria-hidden decoration. Pointing right (▶, unrotated)
+                        = collapsed/hidden; rotated 90deg to point down (▼)
+                        = open/visible. */}
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        display: "inline-block",
+                        transform: isHidden ? "none" : "rotate(90deg)",
+                        transition: "transform .15s",
+                        fontSize: 9,
+                      }}
+                    >
+                      {"▶"}
+                    </span>
                   </button>
                 </div>
                 {isHidden ? (
