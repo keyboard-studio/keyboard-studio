@@ -101,9 +101,35 @@ export function CharScrollStrip({
       style={{
         display: "flex",
         flexDirection: "row",
+        flexShrink: 0,
         gap: 8,
         overflowX: "auto",
         overflowY: "hidden",
+        // Explicit floor, not just flexShrink:0: this div is a direct flex
+        // item of each caller's flex-column pane (MechanismGallery's and
+        // TouchGallery's `leftContent`). Because its OWN overflow is
+        // non-visible (overflowX:auto / overflowY:hidden), the CSS flexbox
+        // automatic-minimum-size rule resets its content-based floor to 0
+        // (https://www.w3.org/TR/css-flexbox-1/#min-size-auto) — so once the
+        // pane's stacked content exceeds the pane's height and the column
+        // has to shrink something, THIS item (having no other floor) is what
+        // collapses, not its overflow:visible siblings (e.g. the method
+        // chooser box below, which keeps its min-content height). That's the
+        // "only a couple pixels showing" bug. minHeight is a real,
+        // non-"auto" value, so it becomes the shrink floor directly and the
+        // automatic-min-size-to-0 rule no longer applies; flexShrink:0
+        // additionally opts this item out of the shrink algorithm entirely,
+        // as a second, independent guard.
+        //
+        // 96px clears one row of chips: glyph (fontSize 20/lineHeight 1)
+        // + 4px column gap + badge (16px line-height + 1px top/bottom
+        // border = 18px) = 42px of button content, +16px button vertical
+        // padding +2px button border = 60px per chip, +6px wrapper
+        // paddingBottom = 66px, plus ~30px headroom for a classic
+        // (non-overlay) horizontal scrollbar track on Windows/Linux/Chrome
+        // (scrollbarWidth:"thin" below only affects Firefox) and for
+        // cross-browser font-metrics rounding.
+        minHeight: 96,
         paddingBottom: 6,
         scrollSnapType: "x proximity",
         scrollbarWidth: "thin",
