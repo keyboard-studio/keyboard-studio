@@ -20,6 +20,30 @@ export function ChevronIcon({ open, size = 14 }: { open: boolean; size?: number 
   );
 }
 
+// A filled disclosure triangle — deliberately NOT built on the shared `Icon`
+// wrapper above: `Icon` is hardwired to `fill="none" stroke="currentColor"`,
+// which renders a hollow outline rather than a solid glyph. Rather than add
+// a fill/stroke override prop to `Icon` (which every other consumer would
+// need to keep ignoring), this renders its own small `<svg>` following the
+// same viewBox/size/style conventions as `Icon` — same size handling, same
+// rotate-on-toggle idiom as ChevronIcon (which rotates 180deg between two
+// chevron orientations; this rotates 90deg between "pointing right" and
+// "pointing down", matching a disclosure triangle rather than a chevron).
+export function TriangleIcon({ open, size = 14 }: { open: boolean; size?: number | undefined }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      stroke="none"
+      style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}
+    >
+      <path d="M8 5l11 7-11 7z" />
+    </svg>
+  );
+}
+
 export function WarnIcon({ size = 13 }: IconProps) {
   return (
     <Icon size={size}>

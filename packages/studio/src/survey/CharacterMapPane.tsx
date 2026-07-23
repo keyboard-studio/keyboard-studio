@@ -31,6 +31,7 @@ import { isPrivateUseCodePoint } from "@keyboard-studio/engine";
 import { isCombining, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { matchesQuery } from "./characterSearch.ts";
 import { TextField, Checkbox } from "../ui/index.ts";
+import { TriangleIcon } from "../editors/assignLoop/parts/carveShared.tsx";
 import { useGlyphFontStack } from "./useGlyphFontStack.ts";
 import { useFontSupportChecker } from "./useFontSupportChecker.ts";
 import {
@@ -87,9 +88,10 @@ type LoadState =
 
 // Stable identity for a group — used as the React list key. Includes `script`
 // because the multi-script grid can carry several groups that share a generic
-// fallback block name (e.g. uncurated scripts all label their letter block
-// "Letters", digits "Digits", punctuation "Punctuation"); without the script
-// the key collides across scripts and React drops/merges same-key sections.
+// fallback block name (e.g. several scripts share the "Digits", "Punctuation",
+// or "Combining marks" fallback labels; the letter fallback is script-qualified
+// like "Latin letters"); without the script the key collides across scripts and
+// React drops/merges same-key sections.
 function groupKey(group: CharacterMapGroup): string {
   return `${group.tier}-${group.script}-${group.block}`;
 }
@@ -771,27 +773,15 @@ export function CharacterMapPane({
                       justifyContent: "center",
                     }}
                   >
-                    {/* Disclosure triangle — visual only. An intentional
-                        single-glyph triangle (not the SVG ChevronIcon in
-                        editors/assignLoop/parts/carveShared.tsx — that is a
-                        chevron, not a triangle); only the rotate-on-toggle
-                        technique is shared. The glyph rotates rather than
-                        swapping character so the button's accessible name stays
-                        entirely on aria-label above; the glyph itself is
-                        aria-hidden decoration. Pointing right (▶, unrotated)
-                        = collapsed/hidden; rotated 90deg to point down (▼)
-                        = open/visible. */}
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        display: "inline-block",
-                        transform: isHidden ? "none" : "rotate(90deg)",
-                        transition: "transform .15s",
-                        fontSize: 9,
-                      }}
-                    >
-                      {"▶"}
-                    </span>
+                    {/* Disclosure triangle — visual only, via the shared
+                        TriangleIcon (editors/assignLoop/parts/carveShared.tsx),
+                        the same module ChevronIcon lives in, following the
+                        same rotate-on-toggle idiom. A plain SVG <path> with no
+                        <title> adds no accessible text of its own, so the
+                        button's accessible name stays entirely on aria-label
+                        above. Pointing right (unrotated) = collapsed/hidden;
+                        rotated 90deg to point down = open/visible. */}
+                    <TriangleIcon open={!isHidden} size={11} />
                   </button>
                 </div>
                 {isHidden ? (
