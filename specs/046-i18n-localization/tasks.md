@@ -89,7 +89,7 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 
 ### Implementation for User Story 2
 
-- [ ] T026 [US2] **Joint engine+content session** (Article VI seam): agree per-string id derivation from a record, extractor location, and loader fallback semantics; record the decision in [research.md](research.md) (#1265)
+- [x] T026 [US2] **Joint engine+content session** (Article VI seam): agree per-string id derivation from a record, extractor location, and loader fallback semantics; record the decision in [research.md](research.md) (#1265)
 - [ ] T027 [US2] Build extraction utility `utilities/i18n-content-extract` → flat `content/i18n/en/*.json` from content records (#1266)
 - [ ] T028 [US2] Content i18n loader with English fallback (studio/engine resolves localized prose by active locale) (#1267)
 - [ ] T029 [US2] Localize criteria descriptions → `packages/contracts/data/criteria.<lang>.json`; loader + schema conformance (respects T025) (#1268)
