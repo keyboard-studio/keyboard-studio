@@ -45,7 +45,13 @@ import type { MechanismAssignment, Modality } from "@keyboard-studio/contracts";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { displayChar } from "../../../lib/irToCarveNodes.ts";
 import { getCharMechanisms } from "./charMechanisms.ts";
-import { BG_CARD, BORDER, ACCENT, TEXT_DIM, FONT } from "../../../lib/galleryTheme.ts";
+import {
+  BG_CARD,
+  BORDER,
+  ACCENT,
+  TEXT_DIM,
+  FONT,
+} from "../../../lib/galleryTheme.ts";
 
 export interface CharScrollStripProps {
   /** All characters in this gallery's own walk order (lettersToAdd for MechanismGallery, inventory for TouchGallery). */
@@ -63,7 +69,12 @@ export interface CharScrollStripProps {
 /** Hyphen-joined 4+-digit uppercase hex of EVERY codepoint in `char` — the chip/badge testid key (see file header). */
 function charHex(char: string): string {
   return Array.from(char)
-    .map((codePoint) => (codePoint.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0"))
+    .map((codePoint) =>
+      (codePoint.codePointAt(0) ?? 0)
+        .toString(16)
+        .toUpperCase()
+        .padStart(4, "0"),
+    )
     .join("-");
 }
 
@@ -87,7 +98,11 @@ export function CharScrollStrip({
     // feature-detect rather than assuming its presence, so component tests
     // that mount this strip don't need to polyfill a browser-only API.
     if (typeof el?.scrollIntoView === "function") {
-      el.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+      el.scrollIntoView({
+        behavior: "smooth",
+        inline: "nearest",
+        block: "nearest",
+      });
     }
   }, [currentChar]);
 
@@ -105,144 +120,165 @@ export function CharScrollStrip({
   if (chars.length === 0) return null;
 
   return (
-    <div
-      data-testid="char-scroll-strip"
-      aria-label={t({ id: "editor.assignLoop.charScroll.stripAriaLabel", message: "Characters" })}
-      style={{
-        display: "flex",
-        flexDirection: "row",
-        flexShrink: 0,
-        gap: 8,
-        overflowX: "auto",
-        overflowY: "hidden",
-        // Explicit floor, not just flexShrink:0: this div is a direct flex
-        // item of each caller's flex-column pane (MechanismGallery's and
-        // TouchGallery's `leftContent`). Because its OWN overflow is
-        // non-visible (overflowX:auto / overflowY:hidden), the CSS flexbox
-        // automatic-minimum-size rule resets its content-based floor to 0
-        // (https://www.w3.org/TR/css-flexbox-1/#min-size-auto) — so once the
-        // pane's stacked content exceeds the pane's height and the column
-        // has to shrink something, THIS item (having no other floor) is what
-        // collapses, not its overflow:visible siblings (e.g. the method
-        // chooser box below, which keeps its min-content height). That's the
-        // "only a couple pixels showing" bug. minHeight is a real,
-        // non-"auto" value, so it becomes the shrink floor directly and the
-        // automatic-min-size-to-0 rule no longer applies; flexShrink:0
-        // additionally opts this item out of the shrink algorithm entirely,
-        // as a second, independent guard.
-        //
-        // 128px clears one row of chips including the grown SELECTED one,
-        // which is the tallest: glyph (fontSize 32/lineHeight 1) + 4px
-        // column gap + U+ notation line (fontSize 11/lineHeight 1) + 4px
-        // column gap + badge (16px line-height + 1px top/bottom border =
-        // 18px) = 32+4+11+4+18 = 69px of button content, +20px button
-        // vertical padding (10px top/bottom on the grown chip) +2px button
-        // border = 91px per chip, +6px wrapper paddingBottom = 97px, plus
-        // ~30px headroom for a classic (non-overlay) horizontal scrollbar
-        // track on Windows/Linux/Chrome (scrollbarWidth:"thin" below only
-        // affects Firefox) and for cross-browser font-metrics rounding —
-        // rounded up to 128 for margin. Non-selected chips are shorter
-        // (glyph 20px + badge only, ~66px as before) so they never drive
-        // this floor.
-        minHeight: 128,
-        paddingBottom: 6,
-        scrollSnapType: "x proximity",
-        scrollbarWidth: "thin",
-      }}
-    >
-      {chars.map((c) => {
-        const hex = charHex(c);
-        const isSelected = c === currentChar;
-        const count = producesCountByChar.get(c) ?? 0;
-        const badgeGood = count >= 1;
-        return (
-          <button
-            key={c}
-            type="button"
-            ref={(el) => {
-              if (el) chipRefs.current.set(c, el);
-              else chipRefs.current.delete(c);
-            }}
-            data-testid={`char-scroll-chip-${hex}`}
-            aria-pressed={isSelected}
-            aria-label={t({
-              id: "editor.assignLoop.charScroll.chipAriaLabel",
-              message: `Go to ${{ notation: toUPlusNotation(c) }} ${{ char: c }}`,
-            })}
-            onClick={() => onSelectChar(c)}
-            style={{
-              flexShrink: 0,
-              scrollSnapAlign: "start",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 4,
-              padding: isSelected ? "10px 12px" : "8px 10px",
-              background: isSelected ? "#0d2840" : BG_CARD,
-              border: `1px solid ${isSelected ? ACCENT : BORDER}`,
-              borderRadius: 8,
-              cursor: "pointer",
-              fontFamily: FONT,
-            }}
-          >
-            <span
+    <>
+      {/* Thicker horizontal scrollbar than the browser default. Firefox is
+          handled by scrollbarWidth:"auto" on the element below; WebKit/Blink
+          (Chrome/Edge/Safari) needs ::-webkit-scrollbar, which cannot be set
+          via an inline style, so it rides this scoped rule keyed off the
+          strip's stable class. */}
+      <style>{`
+        .ks-char-scroll-strip::-webkit-scrollbar { height: 12px; }
+        .ks-char-scroll-strip::-webkit-scrollbar-track { background: transparent; }
+        .ks-char-scroll-strip::-webkit-scrollbar-thumb {
+          background: ${BORDER};
+          border-radius: 6px;
+        }
+        .ks-char-scroll-strip:hover::-webkit-scrollbar-thumb { background: ${ACCENT}; }
+      `}</style>
+      <div
+        className="ks-char-scroll-strip"
+        data-testid="char-scroll-strip"
+        aria-label={t({
+          id: "editor.assignLoop.charScroll.stripAriaLabel",
+          message: "Characters",
+        })}
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          // Chips size to their own content and sit centred in the band.
+          // Without this the row's default align-items:stretch stretched
+          // every chip to the full strip height, leaving the lower half of
+          // each chip empty below its top-anchored glyph/badge.
+          alignItems: "center",
+          flexShrink: 0,
+          gap: 8,
+          overflowX: "auto",
+          overflowY: "hidden",
+          // Explicit floor, not just flexShrink:0: this div is a direct flex
+          // item of each caller's flex-column pane (MechanismGallery's and
+          // TouchGallery's `leftContent`). Because its OWN overflow is
+          // non-visible (overflowX:auto / overflowY:hidden), the CSS flexbox
+          // automatic-minimum-size rule resets its content-based floor to 0
+          // (https://www.w3.org/TR/css-flexbox-1/#min-size-auto) — so once the
+          // pane's stacked content exceeds the pane's height and the column
+          // has to shrink something, THIS item (having no other floor) is what
+          // collapses, not its overflow:visible siblings (e.g. the method
+          // chooser box below, which keeps its min-content height). That's the
+          // "only a couple pixels showing" bug. minHeight is a real,
+          // non-"auto" value, so it becomes the shrink floor directly and the
+          // automatic-min-size-to-0 rule no longer applies; flexShrink:0
+          // additionally opts this item out of the shrink algorithm entirely,
+          // as a second, independent guard.
+          //
+          // The floor only needs to clear the tallest chip (the grown
+          // SELECTED one) plus the thicker scrollbar below it, not leave a
+          // half-empty band: grown chip ~89px (glyph 32 + 4 gap + U+ line 11
+          // + 4 gap + badge 18 = 69 content, +18px padding +2px border) +6px
+          // wrapper paddingBottom +12px scrollbar track ≈ 107px. 108 keeps a
+          // stable floor with negligible dead space; taller natural content
+          // (never the case today) would win over it anyway.
+          minHeight: 108,
+          paddingBottom: 6,
+          scrollSnapType: "x proximity",
+          scrollbarWidth: "auto",
+        }}
+      >
+        {chars.map((c) => {
+          const hex = charHex(c);
+          const isSelected = c === currentChar;
+          const count = producesCountByChar.get(c) ?? 0;
+          const badgeGood = count >= 1;
+          return (
+            <button
+              key={c}
+              type="button"
+              ref={(el) => {
+                if (el) chipRefs.current.set(c, el);
+                else chipRefs.current.delete(c);
+              }}
+              data-testid={`char-scroll-chip-${hex}`}
+              aria-pressed={isSelected}
+              aria-label={t({
+                id: "editor.assignLoop.charScroll.chipAriaLabel",
+                message: `Go to ${{ notation: toUPlusNotation(c) }} ${{ char: c }}`,
+              })}
+              onClick={() => onSelectChar(c)}
               style={{
-                fontSize: isSelected ? 32 : 20,
-                lineHeight: 1,
-                fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
-                color: "#ffffff",
+                flexShrink: 0,
+                scrollSnapAlign: "start",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 4,
+                padding: isSelected ? "10px 12px" : "8px 10px",
+                background: isSelected ? "#0d2840" : BG_CARD,
+                border: `1px solid ${isSelected ? ACCENT : BORDER}`,
+                borderRadius: 8,
+                cursor: "pointer",
+                fontFamily: FONT,
               }}
             >
-              {displayChar(c)}
-            </span>
-            {isSelected && (
-              // Visible U+ notation on the grown/selected chip only — the
-              // per-char "character heading" card each gallery used to
-              // render below the strip is gone; this is its replacement.
-              // aria-hidden: the button's own aria-label above already
-              // states the notation, so this stays a sighted-only cue and
-              // is never announced a second time.
               <span
-                aria-hidden="true"
                 style={{
-                  fontSize: 11,
+                  fontSize: isSelected ? 32 : 20,
                   lineHeight: 1,
-                  fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
-                  color: TEXT_DIM,
+                  fontFamily:
+                    "ui-monospace, 'Cascadia Code', Consolas, monospace",
+                  color: "#ffffff",
                 }}
               >
-                {toUPlusNotation(c)}
+                {displayChar(c)}
               </span>
-            )}
-            <span
-              data-testid={`char-scroll-badge-${hex}`}
-              aria-label={t({
-                id: "editor.assignLoop.charScroll.badgeAriaLabel",
-                message: plural(count, {
-                  one: "# way produces this character",
-                  other: "# ways produce this character",
-                }),
-              })}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                minWidth: 16,
-                padding: "0 5px",
-                borderRadius: 8,
-                fontSize: 10,
-                fontWeight: 600,
-                lineHeight: "16px",
-                background: badgeGood ? "#0d2218" : "#2a0a0a",
-                border: `1px solid ${badgeGood ? "#238636" : "#f85149"}`,
-                color: badgeGood ? "#56d364" : "#f85149",
-              }}
-            >
-              {count}
-            </span>
-          </button>
-        );
-      })}
-    </div>
+              {isSelected && (
+                // Visible U+ notation on the grown/selected chip only — the
+                // per-char "character heading" card each gallery used to
+                // render below the strip is gone; this is its replacement.
+                // aria-hidden: the button's own aria-label above already
+                // states the notation, so this stays a sighted-only cue and
+                // is never announced a second time.
+                <span
+                  aria-hidden="true"
+                  style={{
+                    fontSize: 11,
+                    lineHeight: 1,
+                    fontFamily:
+                      "ui-monospace, 'Cascadia Code', Consolas, monospace",
+                    color: TEXT_DIM,
+                  }}
+                >
+                  {toUPlusNotation(c)}
+                </span>
+              )}
+              <span
+                data-testid={`char-scroll-badge-${hex}`}
+                aria-label={t({
+                  id: "editor.assignLoop.charScroll.badgeAriaLabel",
+                  message: plural(count, {
+                    one: "# way produces this character",
+                    other: "# ways produce this character",
+                  }),
+                })}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minWidth: 16,
+                  padding: "0 5px",
+                  borderRadius: 8,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  lineHeight: "16px",
+                  background: badgeGood ? "#0d2218" : "#2a0a0a",
+                  border: `1px solid ${badgeGood ? "#238636" : "#f85149"}`,
+                  color: badgeGood ? "#56d364" : "#f85149",
+                }}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </>
   );
 }
