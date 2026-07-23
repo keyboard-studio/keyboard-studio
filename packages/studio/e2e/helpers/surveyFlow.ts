@@ -159,9 +159,16 @@ export async function driveIdentityLite(
   await page.waitForSelector("#il_language_code", { timeout: 15_000 });
   await surveyAdvance(page).click();
 
-  // Q5: Target script (select) — required
-  await page.waitForSelector("#il_target_script", { timeout: 10_000 });
-  await page.selectOption("#il_target_script", script);
+  // Q5: Target script (select) — required.
+  // #1307: native <select> popups don't open in the VS Code webview, so this
+  // field is now a ui/SelectMenu (button + DOM-rendered listbox), not a
+  // native <select> — open it, then click the option by its data-value (the
+  // underlying script value), not Playwright's selectOption(). Same pattern
+  // as driveTouchGallery's host-key picker below.
+  const targetScriptSelect = page.locator("#il_target_script");
+  await targetScriptSelect.waitFor({ timeout: 10_000 });
+  await targetScriptSelect.click();
+  await targetScriptSelect.locator('xpath=..').locator(`li[data-value="${script}"]`).click();
   await surveyAdvance(page).click();
 
   // Robustness check for the phase boundary: identity-lite hands off
