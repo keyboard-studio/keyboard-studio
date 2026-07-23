@@ -85,6 +85,21 @@ describe("SelectMenu", () => {
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
   });
 
+  it("merges a caller-supplied style override onto the trigger without losing the base styles", () => {
+    render(
+      <SelectMenu options={OPTIONS} value="a" onChange={() => undefined} style={{ width: 130 }} />,
+    );
+    const trigger = screen.getByRole("button");
+    expect(trigger.style.width).toBe("130px");
+    // Base TRIGGER_STYLE properties survive the merge.
+    expect(trigger.style.cursor).toBe("pointer");
+  });
+
+  it("aria-required reflects the required prop on the trigger", () => {
+    render(<SelectMenu options={OPTIONS} value="a" onChange={() => undefined} required />);
+    expect(screen.getByRole("button").getAttribute("aria-required")).toBe("true");
+  });
+
   it("mousedown outside the component closes an open list", () => {
     render(<SelectMenu options={OPTIONS} value="a" onChange={() => undefined} />);
     fireEvent.click(screen.getByRole("button"));

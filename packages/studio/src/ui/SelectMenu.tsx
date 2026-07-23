@@ -28,19 +28,16 @@ export interface SelectMenuProps {
    * RadioGroup/MultiSelect — pass the id of a sibling label element.
    */
   ariaLabelledby?: string;
+  /** Same idiom as `RadioGroup`'s `required` prop (RadioGroup.tsx) — sets
+   * `aria-required` on the trigger button. */
+  required?: boolean;
   /**
-   * Value for `aria-label` on the trigger button — for call sites with no
-   * sibling label element to reference (mirrors how a native `<select>`
-   * often carries a bare `aria-label` string instead of `aria-labelledby`).
-   * Ignored if `ariaLabelledby` is also set.
-   */
-  ariaLabel?: string;
-  /**
-   * Style override for the outer (relatively-positioned) container, merged
-   * over the default `{ position: "relative" }` — same "callers may
-   * override, merged not replaced" idiom as `ui/Dropdown.tsx`. Lets a caller
-   * size the control (e.g. a fixed width) the way a native `<select>` would
-   * otherwise auto-size to its content.
+   * Style override merged onto the trigger button, on top of the default
+   * `TRIGGER_STYLE` — same "callers may override, merged not replaced" idiom
+   * as `ui/Dropdown.tsx`, and applied to the same element Dropdown applies
+   * its override to (the visible control), not the outer wrapper. Lets a
+   * caller size the control (e.g. a fixed width) the way a native `<select>`
+   * would otherwise auto-size to its content.
    */
   style?: React.CSSProperties;
   /**
@@ -155,7 +152,7 @@ export function SelectMenu({
   onChange,
   id,
   ariaLabelledby,
-  ariaLabel,
+  required,
   style,
   renderOptionLabel = defaultRenderLabel,
 }: SelectMenuProps): React.ReactElement {
@@ -273,7 +270,7 @@ export function SelectMenu({
   };
 
   return (
-    <div ref={containerRef} style={{ position: "relative", ...style }} onBlur={handleContainerBlur}>
+    <div ref={containerRef} style={{ position: "relative" }} onBlur={handleContainerBlur}>
       <button
         type="button"
         id={id}
@@ -282,9 +279,9 @@ export function SelectMenu({
         aria-expanded={open}
         aria-controls={listId}
         aria-labelledby={ariaLabelledby}
-        aria-label={ariaLabelledby === undefined ? ariaLabel : undefined}
+        aria-required={required}
         className={mergeClassNames("ks-control ks-focus-ring ks-hit-target")}
-        style={TRIGGER_STYLE}
+        style={{ ...TRIGGER_STYLE, ...style }}
         onClick={() => setOpen((prev) => !prev)}
         onKeyDown={handleTriggerKeyDown}
       >

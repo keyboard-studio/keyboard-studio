@@ -638,6 +638,7 @@ function SelectField({ question, value, onChange }: FieldProps) {
     <SelectMenu
       id={question.id}
       ariaLabelledby={`label-${question.id}`}
+      required={question.required === true}
       value={strVal}
       options={selectOptions}
       onChange={(v) => onChange(v)}
