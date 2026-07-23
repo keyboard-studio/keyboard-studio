@@ -135,7 +135,7 @@ The contract types, the decomposition helper, the shared posture table, and the 
 - [x] **T020** [P] [US3] `OutputFormStation.tsx` (S4): notice presentation for the unambiguous branches, mandatory step-by-step backspace preview for the selected form (FR-017), station not rendered when zero decidable pairs exist (edge case); mechanical SC-005 test asserting no "Unicode"/"normalization" in any designer-facing string; container testid `marks-output-form` · `packages/studio/src/survey/marks/OutputFormStation.tsx`
 - [~] **T021** [P] [US3] New `layer-c-enforce` criteria row carrying `lintRuleId: "KM_LINT_MARK_NORMALIZATION_UNIFORM"`; enforced counts bump 148 → 149 and band 66 → 67 in the count tests and the summary recompute · `packages/contracts/data/criteria.json`, `packages/contracts/src/types.test.ts`, `packages/contracts/src/schemas.test.ts`, `criteria-summary.md` — RETIRED (FR-022 withdrawn 2026-07-23; criteria row and code removed, catalog reverted to 148 rows)
 
-**Checkpoint**: US3 is independently testable — the never-composing alphabet gets the decomposed proposal as a notice, and mixing forms is a mechanically detected defect.
+**Checkpoint**: US3 is independently testable — the never-composing alphabet gets the decomposed proposal as a notice, and mixing forms is flagged by the output-form station's design-time notice (mechanical detection retired — see FR-022).
 
 ---
 
