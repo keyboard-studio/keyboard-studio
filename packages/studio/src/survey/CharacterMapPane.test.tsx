@@ -643,7 +643,10 @@ describe("CharacterMapPane — per-group render cap", () => {
       expect(screen.getByLabelText("Synthetic characters (main)")).toBeTruthy();
     });
     const group = screen.getByLabelText("Synthetic characters (main)");
-    expect(within(group).getAllByRole("button")).toHaveLength(TEST_CAP);
+    // Scope to the cell grid (the inner role="group" div) so the section's
+    // own Hide/Show toggle button isn't counted alongside the cell buttons.
+    const cellGrid = within(group).getByRole("group", { name: /click to toggle/i });
+    expect(within(cellGrid).getAllByRole("button")).toHaveLength(TEST_CAP);
     expect(screen.queryByText(/Showing \d+ of \d+ characters/i)).toBeNull();
   });
 
@@ -659,7 +662,8 @@ describe("CharacterMapPane — per-group render cap", () => {
       expect(screen.getByLabelText("Synthetic characters (main)")).toBeTruthy();
     });
     const group = screen.getByLabelText("Synthetic characters (main)");
-    expect(within(group).getAllByRole("button")).toHaveLength(TEST_CAP);
+    const cellGrid = within(group).getByRole("group", { name: /click to toggle/i });
+    expect(within(cellGrid).getAllByRole("button")).toHaveLength(TEST_CAP);
     expect(
       screen.getByText(new RegExp(`Showing ${TEST_CAP} of ${over} characters`, "i")),
     ).toBeTruthy();
@@ -840,5 +844,202 @@ describe("CharacterMapPane — blocks-my-keyboard-uses filter", () => {
     });
     // Both cells render — neither same-key section was dropped/merged.
     expect(screen.getByRole("button", { name: /Add Ꭰ \(U\+13A0\)/ })).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-group "Hide" button — deliberately different from the "blocks my
+// keyboard uses" checkbox above: collapses ONE group's cell grid in place
+// without dropping the group from the data. The heading stays queryable, and
+// a single click on "Show" restores the cells.
+// ---------------------------------------------------------------------------
+
+describe("CharacterMapPane — per-group Hide/Show", () => {
+  it("clicking Hide collapses a group's cells but keeps its heading present", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+    const aButtonBefore = within(latinGroup).queryByRole("button", { name: /Add a \(U\+0061\)/ });
+    expect(aButtonBefore).toBeTruthy();
+
+    fireEvent.click(within(latinGroup).getByRole("button", { name: "Hide Latin" }));
+
+    // Heading still present.
+    expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    // Cells gone.
+    expect(within(latinGroup).queryByRole("button", { name: /Add a \(U\+0061\)/ })).toBeNull();
+    expect(within(latinGroup).queryByRole("button", { name: /Add b \(U\+0062\)/ })).toBeNull();
+    // The toggle is now a "Show" control.
+    const showButton = within(latinGroup).getByRole("button", { name: "Show Latin" });
+    expect(showButton.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("clicking Show restores the cells", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+    fireEvent.click(within(latinGroup).getByRole("button", { name: "Hide Latin" }));
+    expect(within(latinGroup).queryByRole("button", { name: /Add a \(U\+0061\)/ })).toBeNull();
+
+    fireEvent.click(within(latinGroup).getByRole("button", { name: "Show Latin" }));
+
+    expect(within(latinGroup).getByRole("button", { name: /Add a \(U\+0061\)/ })).toBeTruthy();
+    expect(within(latinGroup).getByRole("button", { name: /Add b \(U\+0062\)/ })).toBeTruthy();
+    const hideButton = within(latinGroup).getByRole("button", { name: "Hide Latin" });
+    expect(hideButton.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("hiding one group leaves other groups' cells visible (per-group, not all-or-nothing)", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+    fireEvent.click(within(latinGroup).getByRole("button", { name: "Hide Latin" }));
+
+    // Latin cells collapsed...
+    expect(within(latinGroup).queryByRole("button", { name: /Add a \(U\+0061\)/ })).toBeNull();
+    // ...but the other group's cells are untouched.
+    const markGroup = screen.getByLabelText("Combining Diacritical Marks characters (loanwords)");
+    expect(within(markGroup).getByRole("button", { name: /Add.*\(U\+0301\)/ })).toBeTruthy();
+  });
+
+  it("hidden state does not remove the group from the data — heading still queryable and re-fetch is not triggered", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const before = callCount.get();
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+    fireEvent.click(within(latinGroup).getByRole("button", { name: "Hide Latin" }));
+
+    // The section (and its aria-label) is still present — the group was never
+    // filtered out of the underlying data, only its cell grid collapsed.
+    expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    // No re-fetch occurred — this was a pure client-side view toggle.
+    expect(callCount.get()).toBe(before);
+  });
+
+  it("announces the hide/show action via the shared aria-live region", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+
+    fireEvent.click(within(latinGroup).getByRole("button", { name: "Hide Latin" }));
+    expect(screen.getByText("Hidden Latin")).toBeTruthy();
+
+    fireEvent.click(within(latinGroup).getByRole("button", { name: "Show Latin" }));
+    expect(screen.getByText("Showing Latin")).toBeTruthy();
+  });
+
+  it("a language/base change resets hiddenGroups — a previously-hidden group renders expanded again", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+    fireEvent.click(within(latinGroup).getByRole("button", { name: "Hide Latin" }));
+    expect(within(latinGroup).queryByRole("button", { name: /Add a \(U\+0061\)/ })).toBeNull();
+
+    // Drive a language change the same way the existing search test does
+    // (act + setSurveyContext) — this re-triggers the fetch effect, which
+    // resets hiddenGroups at ~line 210.
+    act(() => {
+      useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "fr", language_name: "French" });
+    });
+
+    await waitFor(() => {
+      const refreshedGroup = screen.getByLabelText("Latin characters (main)");
+      expect(within(refreshedGroup).queryByRole("button", { name: /Add a \(U\+0061\)/ })).toBeTruthy();
+    });
+  });
+
+  it("search bypasses a per-group Hide: a matching cell in a hidden group still renders while the query is active, and the group re-collapses once the query is cleared", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+    fireEvent.click(within(latinGroup).getByRole("button", { name: "Hide Latin" }));
+    expect(within(latinGroup).queryByRole("button", { name: /Add a \(U\+0061\)/ })).toBeNull();
+
+    // Search for a cell that lives inside the hidden group.
+    fireEvent.change(screen.getByLabelText("Search the character map"), { target: { value: "a" } });
+
+    const latinGroupWhileSearching = screen.getByLabelText("Latin characters (main)");
+    expect(
+      within(latinGroupWhileSearching).getByRole("button", { name: /Add a \(U\+0061\)/ }),
+    ).toBeTruthy();
+
+    // Clear the query — the group returns to collapsed (hiddenGroups was
+    // never cleared, only bypassed for the duration of the active query).
+    fireEvent.change(screen.getByLabelText("Search the character map"), { target: { value: "" } });
+
+    const latinGroupAfterClear = screen.getByLabelText("Latin characters (main)");
+    expect(
+      within(latinGroupAfterClear).queryByRole("button", { name: /Add a \(U\+0061\)/ }),
+    ).toBeNull();
+    expect(within(latinGroupAfterClear).getByRole("button", { name: "Show Latin" })).toBeTruthy();
+  });
+
+  it("pairs the Hide/Show button's aria-controls with the cell grid's id", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+    const hideButton = within(latinGroup).getByRole("button", { name: "Hide Latin" });
+    const controlsId = hideButton.getAttribute("aria-controls");
+    expect(controlsId).toBeTruthy();
+    const grid = within(latinGroup).getByRole("group", { name: /click to toggle/i });
+    expect(grid.getAttribute("id")).toBe(controlsId);
+  });
+
+  it("keeps aria-controls pointing at an element that exists while the group is collapsed (no dangling idref)", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+    const hideButton = within(latinGroup).getByRole("button", { name: "Hide Latin" });
+    const controlsId = hideButton.getAttribute("aria-controls");
+    expect(controlsId).toBeTruthy();
+
+    fireEvent.click(hideButton);
+
+    // Same aria-controls value persists across the collapse (the button
+    // itself is unchanged, just relabelled to "Show").
+    const showButton = within(latinGroup).getByRole("button", { name: "Show Latin" });
+    expect(showButton.getAttribute("aria-controls")).toBe(controlsId);
+
+    // The idref must resolve to a real element — the collapsed-state note,
+    // not the (now unrendered) cell grid.
+    const controlledElement = document.getElementById(controlsId as string);
+    expect(controlledElement).not.toBeNull();
+    expect(controlledElement?.textContent).toMatch(/characters hidden/i);
   });
 });
