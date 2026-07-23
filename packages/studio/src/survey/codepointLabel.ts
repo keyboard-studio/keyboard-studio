@@ -6,8 +6,14 @@
 // site (FR-012).
 
 export interface CodepointLabel {
-  /** What the chip shows: "U+0061" for one code point, "U+018F+" for many. */
-  label: string;
+  /** The base (first) code point in U+XXXX notation, e.g. "U+018F". */
+  base: string;
+  /**
+   * The extra code points beyond the first, as their literal characters (the
+   * combining marks themselves), e.g. "́" for U+0301. Empty for a single-code-
+   * point grapheme. The chip renders these as a bracketed "[+…]" affordance.
+   */
+  extras: string;
   /** Hover / accessible name: every code point, space-separated. */
   title: string;
 }
@@ -19,18 +25,23 @@ function toU(ch: string): string {
 }
 
 /**
- * Build the code-point label for a grapheme.
+ * Break a grapheme's code-point label into its display parts (spec 047 FR-014).
  *
- * - Single code point  -> `{ label: "U+0061", title: "U+0061" }`.
- * - Multi code point    -> `{ label: "U+<first>+", title: "U+.. U+.. …" }`,
- *   e.g. `Ə́` (U+018F U+0301) -> `{ label: "U+018F+", title: "U+018F U+0301" }`.
+ * - Single code point -> `{ base: "U+0061", extras: "", title: "U+0061" }`.
+ * - Multi code point   -> `{ base: "U+<first>", extras: "<remaining chars>",
+ *   title: "U+.. U+.. …" }`, e.g. `Ə́` (U+018F U+0301) ->
+ *   `{ base: "U+018F", extras: "́", title: "U+018F U+0301" }`.
+ *
+ * The chip shows `base` followed, when `extras` is non-empty, by a bracketed
+ * `[+<extras>]` badge in a contrasting color; the full stack is on hover
+ * (`title`).
  */
 export function codepointLabel(grapheme: string): CodepointLabel {
   const codePoints = [...grapheme];
   const all = codePoints.map(toU);
-  const title = all.join(" ");
-  if (codePoints.length <= 1) {
-    return { label: title, title };
-  }
-  return { label: `${all[0]}+`, title };
+  return {
+    base: all[0] ?? "",
+    extras: codePoints.slice(1).join(""),
+    title: all.join(" "),
+  };
 }

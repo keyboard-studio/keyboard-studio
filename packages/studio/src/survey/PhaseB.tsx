@@ -167,6 +167,29 @@ function isLinguisticChar(c: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// CpLabel — chip code-point label with the FR-014 multi-code-point affordance
+// ---------------------------------------------------------------------------
+
+/**
+ * Renders a chip's code-point label (spec 047 FR-014): the base code point in
+ * U+XXXX notation, followed — for a multi-code-point grapheme — by a bracketed
+ * "[+<extra marks>]" badge in a contrasting (accent) color that shows the extra
+ * combining mark(s) themselves. The full space-separated stack is exposed on
+ * the chip's hover title/accessible name by the caller.
+ */
+function CpLabel({ grapheme }: { grapheme: string }) {
+  const { base, extras } = codepointLabel(grapheme);
+  return (
+    <span style={chipCodepoint()}>
+      {base}
+      {extras !== "" && (
+        <span style={{ color: ACCENT, fontWeight: 700 }}>{`[+${extras}]`}</span>
+      )}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // CharChipEditor — reusable type-in input + chip list (no state of its own)
 // ---------------------------------------------------------------------------
 
@@ -300,7 +323,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
               // The charChip/chipGlyph booleans below are FIXED literals chosen
               // to reproduce the original inline hex (unchecked shell + accent
               // glyph), not real checked state — do not wire them to a value.
-              const { label, title } = codepointLabel(c);
+              const { title } = codepointLabel(c);
               return (
                 <button
                   key={c}
@@ -316,7 +339,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
                   <span style={chipGlyph(true, glyphFontStack)}>
                     {displayChar(c)}
                   </span>
-                  <span style={chipCodepoint()}>{label}</span>
+                  <CpLabel grapheme={c} />
                   <span style={chipIndicator(ERROR_RED)}>x</span>
                 </button>
               );
@@ -605,16 +628,18 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
     lastPick?.addedStack != null ? composedStack(lastPick.addedStack) : null;
 
   const chip = (glyph: string, display: string, justAdded: boolean) => {
-    const { label, title } = codepointLabel(glyph);
+    const { title } = codepointLabel(glyph);
     return (
       <span
         key={glyph}
         title={title}
         aria-label={`${display} (${title})${justAdded ? " — just added" : ""}`}
-        style={charChip(false)}
+        // Breakdown chips are a read-only VIEW (not remove buttons), so no
+        // pointer cursor — removal stays on the CharChipEditor pick chips above.
+        style={{ ...charChip(false), cursor: "default" }}
       >
         <span style={chipGlyph(true)}>{display}</span>
-        <span style={chipCodepoint()}>{label}</span>
+        <CpLabel grapheme={glyph} />
         {justAdded && <span style={chipIndicator(ACCENT)}>new</span>}
       </span>
     );
