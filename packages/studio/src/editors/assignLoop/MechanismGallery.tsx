@@ -91,9 +91,11 @@ import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
+import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
+import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { RadioGroup } from "../../ui/RadioGroup.tsx";
 import {
-  BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
+  BG_PAGE, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
   galleryPageStyle as pageStyle,
   galleryGhostBtn as ghostBtn,
   galleryInputStyle as inputStyle,
@@ -1376,7 +1378,7 @@ export function MechanismGallery({
     hasAnotherCharAfterCurrent,
     handleNext,
     handleBack,
-    handlePreviousChar,
+    handleSelectChar,
     suggestionResolved,
     markSuggestionResolved,
   } = usePositionalCharNav({
@@ -2277,8 +2279,11 @@ export function MechanismGallery({
                 </button>
               )}
 
-              {/* Right-aligned forward cluster: optional jump-to-last +
-                  the primary forward action. */}
+              {/* Right-aligned forward cluster: the primary forward action.
+                  The old "Previous character" button that lived here has
+                  been replaced by the CharScrollStrip below (any character,
+                  not just the immediately-previous one, is now reachable by
+                  clicking its chip). */}
               <div
                 style={{
                   marginLeft: "auto",
@@ -2287,32 +2292,6 @@ export function MechanismGallery({
                   gap: 8,
                 }}
               >
-                {/* Previous character — rendered on every character
-                    (currentChar !== null, not locked), including the first
-                    one, where it is DISABLED (there is nowhere further back
-                    to step; the separate Back button below-left handles
-                    exiting the phase from the first character). Always
-                    steps back exactly one position, ungated by
-                    covered/applied status on the character being left. */}
-                {currentChar !== null && !locked && (
-                  <button
-                    type="button"
-                    data-testid="mechanisms-prev-char"
-                    onClick={handlePreviousChar}
-                    disabled={currentIdx <= 0}
-                    aria-label={t({ id: "editor.assignLoop.previousCharacterAriaLabel", message: "Previous character" })}
-                    style={{
-                      ...ghostBtn,
-                      fontSize: 13,
-                      ...(currentIdx <= 0
-                        ? { color: TEXT_DIM, opacity: 0.5, cursor: "not-allowed" }
-                        : {}),
-                    }}
-                  >
-                    <Trans id="editor.assignLoop.previousCharacterButton">&laquo; Previous character</Trans>
-                  </button>
-                )}
-
                 {/* Single button driven by the forwardButton spec computed
                     above — exactly one of the locked forward-escape, the
                     empty-diff Done completion, or the per-character
@@ -2335,6 +2314,22 @@ export function MechanismGallery({
                 )}
               </div>
             </div>
+          )}
+
+          {/* Character scroll strip — horizontal, all of lettersToAdd; click
+              any chip to jump straight to that character (replaces the old
+              "Previous character" button, which only ever stepped back one
+              position). Each chip's badge is the produces-count for that
+              character in THIS gallery's modality (physical) — see
+              charMechanisms.ts. */}
+          {lettersToAdd.length > 0 && (
+            <CharScrollStrip
+              chars={lettersToAdd}
+              currentChar={currentChar}
+              onSelectChar={handleSelectChar}
+              assignments={sessionAssignments}
+              modality="physical"
+            />
           )}
 
           {/* Empty-diff state — status text only; the forward/completion
@@ -2362,41 +2357,23 @@ export function MechanismGallery({
           {/* Per-char UI */}
           {currentChar !== null && (
             <>
-              {/* Character heading */}
-              <div
+              {/* "Add a key" section header — the character-heading card that
+                  used to live here (glyph + U+ notation) is gone; the
+                  CharScrollStrip above now shows both on the selected chip
+                  directly (see CharScrollStrip.tsx). This label is kept so
+                  the "you're now choosing how to add this key" cue doesn't
+                  disappear along with the card. */}
+              <p
                 style={{
-                  background: BG_CARD,
-                  border: `1px solid ${BORDER}`,
-                  borderRadius: 10,
-                  padding: "16px 18px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 6,
+                  margin: 0,
+                  fontSize: 12,
+                  color: TEXT_DIM,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
                 }}
               >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 12,
-                    color: TEXT_DIM,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                  }}
-                >
-                  <Trans id="editor.assignLoop.addAKeyEyebrow">Add a key</Trans>
-                </p>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                  <span
-                    style={{ fontSize: 36, fontFamily: "monospace", lineHeight: 1 }}
-                    aria-label={`${toUPlusNotation(currentChar)} ${currentChar}`}
-                  >
-                    {displayChar(currentChar)}
-                  </span>
-                  <span style={{ fontSize: 13, color: TEXT_DIM }}>
-                    {toUPlusNotation(currentChar)}
-                  </span>
-                </div>
-              </div>
+                <Trans id="editor.assignLoop.addAKeyEyebrow">Add a key</Trans>
+              </p>
 
               {/* kbgen suggestion row — shown above method chooser when a
                   qualifying placement candidate exists and hasn't been dismissed.
@@ -2686,6 +2663,22 @@ export function MechanismGallery({
                   </button>
                 </div>
               )}
+
+              {/* Sequences using this character (Part 3) — every recorded
+                  multi_char_sequence where currentChar appears in ANY slot
+                  (content, indicator, or output), not just the ones whose
+                  output IS currentChar. Read-only here — mirrors
+                  SequenceGallery's own "Recorded sequences" card style
+                  (SequenceGallery.tsx) but editing a sequence stays owned by
+                  the Sequence Gallery, so no Remove control is offered.
+                  Shared with TouchGallery's own bottom list — see
+                  UsesSequencesCard.tsx. */}
+              <UsesSequencesCard
+                currentChar={currentChar}
+                assignments={sessionAssignments}
+                modality="physical"
+              />
+
               {/* Apply + Skip. Back and Next/Done live in the shared top
                   toolbar row above (see leftContent's top of pane) so the
                   forward-advance control is spatially separated from these

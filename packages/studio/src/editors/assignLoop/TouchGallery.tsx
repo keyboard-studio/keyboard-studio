@@ -83,10 +83,12 @@ import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
+import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
+import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { KEY_OPTIONS, VALID_HOST_KEYS } from "../../lib/keyOptions.ts";
 import { resolveKeyPickerSelection, resolvedVkeyOf } from "../../lib/charInput.ts";
 import {
-  BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
+  BG_PAGE, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
   galleryPageStyle as pageStyle,
   galleryGhostBtn as ghostBtn,
   gallerySelectStyle as selectStyle,
@@ -588,6 +590,15 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     [charTouch],
   );
 
+  // Stable array of charTouch's values, memoized on the Map reference itself
+  // (charTouch is only ever replaced immutably on a real edit — see
+  // setCharTouch call sites — so this recomputes exactly when touchKey would,
+  // not on every unrelated render). Fed to CharScrollStrip's `assignments`
+  // prop: passing `[...charTouch.values()]` inline there would build a new
+  // array identity every render and thrash that component's own
+  // useMemo([chars, assignments, modality]).
+  const charTouchAssignments = useMemo(() => [...charTouch.values()], [charTouch]);
+
   // Stable primitive key so the mods memo only recomputes when the carve
   // overlay or Phase C assignments actually change (the Set/array identities
   // are replaced immutably on every mutation, so a size/length-based key is a
@@ -793,7 +804,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     hasAnotherCharAfterCurrent,
     handleNext,
     handleBack,
-    handlePreviousChar,
+    handleSelectChar,
     suggestionResolved,
     markSuggestionResolved,
   } = usePositionalCharNav({
@@ -1364,48 +1375,30 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       {/* Per-char UI */}
       {currentChar !== null && (
         <>
-          {/* Character heading card (identical to MechanismGallery's) */}
-          <div
+          {/* "Touch mapping" section header — the character-heading card that
+              used to live here (glyph + U+ notation) is gone; the
+              CharScrollStrip below now shows both on the selected chip
+              directly (see CharScrollStrip.tsx). This label is kept so the
+              "you're now configuring this character's touch access" cue
+              doesn't disappear along with the card. */}
+          <p
             style={{
-              background: BG_CARD,
-              border: `1px solid ${BORDER}`,
-              borderRadius: 10,
-              padding: "16px 18px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 6,
+              margin: 0,
+              fontSize: 12,
+              color: TEXT_DIM,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
             }}
           >
-            <p
-              style={{
-                margin: 0,
-                fontSize: 12,
-                color: TEXT_DIM,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-              }}
-            >
-              <Trans id="editor.assignLoop.touch.mappingEyebrow">Touch mapping</Trans>
-            </p>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-              <span
-                style={{ fontSize: 36, fontFamily: "monospace", lineHeight: 1 }}
-                aria-label={`${toUPlusNotation(currentChar)} ${currentChar}`}
-              >
-                {displayChar(currentChar)}
-              </span>
-              <span style={{ fontSize: 13, color: TEXT_DIM }}>
-                {toUPlusNotation(currentChar)}
-              </span>
-            </div>
-          </div>
+            <Trans id="editor.assignLoop.touch.mappingEyebrow">Touch mapping</Trans>
+          </p>
 
-          {/* Top toolbar row — Back (left) + a right-aligned forward cluster
-              (right), on the same horizontal level. The cluster holds the
-              previous-character button (rendered on every character,
-              disabled on the first) immediately to the left of the primary
-              forward action (Next character/Done); it carries marginLeft:
-              "auto" (rather than each button) so it holds position. */}
+          {/* Top toolbar row — Back (left) + the primary forward action
+              (right), on the same horizontal level; it carries marginLeft:
+              "auto" so it holds position. The old "Previous character"
+              button that used to sit in this cluster has been replaced by
+              the CharScrollStrip below (any character, not just the
+              immediately-previous one, is reachable via its chips). */}
           <div
             style={{
               display: "flex",
@@ -1434,30 +1427,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 gap: 8,
               }}
             >
-              {/* Previous character — rendered on every character, including
-                  the first one, where it is DISABLED (there is nowhere
-                  further back to step; the separate Back button handles
-                  exiting the phase from the first character). Always steps
-                  back exactly one position, ungated by configured status on
-                  the character being left. This block is only reached when
-                  currentChar !== null (per-char UI), so no separate null
-                  check is needed here. */}
-              <button
-                type="button"
-                data-testid="touch-prev-char"
-                onClick={handlePreviousChar}
-                disabled={currentIdx <= 0}
-                aria-label={t({ id: "editor.assignLoop.previousCharacterAriaLabel", message: "Previous character" })}
-                style={{
-                  ...ghostBtn,
-                  fontSize: 13,
-                  ...(currentIdx <= 0
-                    ? { color: TEXT_DIM, opacity: 0.5, cursor: "not-allowed" }
-                    : {}),
-                }}
-              >
-                <Trans id="editor.assignLoop.previousCharacterButton">&laquo; Previous character</Trans>
-              </button>
               <button
                 type="button"
                 data-testid="touch-continue"
@@ -1486,6 +1455,20 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               </button>
             </div>
           </div>
+
+          {/* Character scroll strip — horizontal, all of inventory; click
+              any chip to jump straight to that character (replaces the old
+              "Previous character" button, which only ever stepped back one
+              position). Each chip's badge is the produces-count for that
+              character in THIS gallery's modality (touch) — see
+              charMechanisms.ts. */}
+          <CharScrollStrip
+            chars={inventory}
+            currentChar={currentChar}
+            onSelectChar={handleSelectChar}
+            assignments={charTouchAssignments}
+            modality="touch"
+          />
 
           {/* FR-008 completion gate message — set by handleContinue when
               touchCoverage finds an inventory char with no reachable touch
@@ -1713,6 +1696,23 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               onFlickDirectionChange={setFlickDirection}
             />
           )}
+
+          {/* Sequences using this character (Part 3) — every recorded
+              multi_char_sequence where currentChar appears in ANY slot
+              (content, indicator, or output). Sequences are a desktop-only
+              (physical) concept — sourced from desktopAssignments — but
+              still worth surfacing here: an author configuring touch access
+              may need to know this character is already "in play" as a
+              sequence's content/indicator/output on the desktop layout.
+              Read-only — mirrors SequenceGallery's own "Recorded sequences"
+              card style; editing a sequence stays owned by the Sequence
+              Gallery. Shared with MechanismGallery's own bottom list — see
+              UsesSequencesCard.tsx. */}
+          <UsesSequencesCard
+            currentChar={currentChar}
+            assignments={desktopAssignments}
+            modality="touch"
+          />
 
           {/* Apply + Skip. Back and Next/Done live in the shared top toolbar
               row above so the forward-advance control is spatially

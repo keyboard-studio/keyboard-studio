@@ -10,7 +10,7 @@
 // Defect B regression is covered in StudioShell.test.tsx.
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
+import { screen, fireEvent, act, cleanup, waitFor, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { TouchGallery, buildTouchMechanismRef } from "./TouchGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -20,6 +20,8 @@ import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
+import { expectCurrentChar } from "../../test/currentCharChip.ts";
+import { PATTERN_SEQUENCE } from "./patternIds.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() — refs shared across mock closures and test bodies.
@@ -534,7 +536,7 @@ describe("TouchGallery — seed-source-aware detection reads the shipped layout 
     // (records nothing) and works regardless of that suggestion's state.
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+20AC €$/)).toBeTruthy();
+      expectCurrentChar("€");
     });
 
     // The seed-source-aware detection (T015) must surface the "already"
@@ -599,7 +601,7 @@ describe("TouchGallery — detectionSeedLayout/layoutForLintAndGate fallback on 
 
     // Fallback path taken: the gallery still renders the character card for
     // "a" instead of crashing.
-    expect(screen.getByLabelText(/^U\+0061 a$/)).toBeTruthy();
+    expectCurrentChar("a");
     expect(errorSpy).toHaveBeenCalled();
 
     errorSpy.mockRestore();
@@ -680,10 +682,11 @@ describe("TouchGallery — back navigation", () => {
     // within Phase E (idx 1 -> idx 0), purely positionally.
     expect(onBack).not.toHaveBeenCalled();
 
-    // The "ä" character heading should now be visible (we returned to char 1).
-    // Use the per-char "Touch mapping" label which is unique to the per-char UI.
+    // We returned to char 1 ("ä") — the per-char assignment UI (the "Touch
+    // mapping" section) is showing again.
     const headings = screen.queryAllByText(/Touch mapping/i);
     expect(headings.length).toBeGreaterThan(0);
+    expectCurrentChar("ä");
   });
 
   it("Back from empty-inventory guard calls onBack", async () => {
@@ -718,7 +721,7 @@ describe("TouchGallery — back navigation", () => {
     });
 
     // --- Configure "中" (idx 0): pick a host key, Apply, then Next → "日" (idx 1). ---
-    expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+    expectCurrentChar("中");
     fireEvent.change(screen.getByLabelText(/Host key for long-press/i), {
       target: { value: "K_A" },
     });
@@ -729,7 +732,7 @@ describe("TouchGallery — back navigation", () => {
       fireEvent.click(nextBtn);
     });
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+      expectCurrentChar("日");
     });
 
     // --- Configure "日" (idx 1), then Next → "月" (idx 2, the LAST character). ---
@@ -743,7 +746,7 @@ describe("TouchGallery — back navigation", () => {
       fireEvent.click(nextBtn);
     });
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+6708 月$/)).toBeTruthy();
+      expectCurrentChar("月");
     });
 
     // The last character's forward button already reads "Done" (not yet
@@ -754,7 +757,7 @@ describe("TouchGallery — back navigation", () => {
     // --- Back from "月" (idx 2) lands on "日" (idx 1) — configured, not skipped. ---
     fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+      expectCurrentChar("日");
     });
     expect(onBack).not.toHaveBeenCalled();
 
@@ -767,17 +770,17 @@ describe("TouchGallery — back navigation", () => {
     expect((nextFrom日 as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(nextFrom日);
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+6708 月$/)).toBeTruthy();
+      expectCurrentChar("月");
     });
 
     // --- Back twice more: "月" → "日" → "中" (idx 0), both configured, neither skipped. ---
     fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+      expectCurrentChar("日");
     });
     fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+      expectCurrentChar("中");
     });
     expect(onBack).not.toHaveBeenCalled();
 
@@ -791,11 +794,11 @@ describe("TouchGallery — back navigation", () => {
     // instance forward to exercise Done.)
     fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+      expectCurrentChar("日");
     });
     fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+6708 月$/)).toBeTruthy();
+      expectCurrentChar("月");
     });
     fireEvent.change(screen.getByLabelText(/Host key for long-press/i), {
       target: { value: "K_C" },
@@ -810,8 +813,30 @@ describe("TouchGallery — back navigation", () => {
   });
 });
 
-describe("TouchGallery — previous-character navigation", () => {
-  it("clicking '« Previous character' from an interior character moves to the immediately preceding character, ungated by intermediate configuration status", async () => {
+// The old "« Previous character" button (data-testid "touch-prev-char") only
+// ever stepped back exactly one position; it was replaced by CharScrollStrip
+// (data-testid "char-scroll-strip"), which offers ONE chip per inventory
+// character (data-testid "char-scroll-chip-<HEX>", every codepoint of the
+// grapheme, 4+-digit uppercase hex, hyphen-joined — see CharScrollStrip.tsx's
+// file header) and lets the author jump to ANY of them, forward or backward,
+// via handleSelectChar. These tests exercise that replacement contract
+// directly rather than deleting the navigation coverage. The phase-exit "←
+// Back" control (handleBack, tested elsewhere in this file) is retained and
+// is a separate control from the scroll strip.
+describe("TouchGallery — character-scroll-strip navigation", () => {
+  it("renders the char-scroll-strip with one chip per inventory character", async () => {
+    seedStore({ withInventory: ["中", "日", "月"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expect(screen.getByTestId("char-scroll-strip")).toBeTruthy();
+    expect(screen.getByTestId("char-scroll-chip-4E2D")).toBeTruthy();
+    expect(screen.getByTestId("char-scroll-chip-65E5")).toBeTruthy();
+    expect(screen.getByTestId("char-scroll-chip-6708")).toBeTruthy();
+  });
+
+  it("clicking an earlier character's chip moves back to it, ungated by intermediate configuration status", async () => {
     const onBack = vi.fn();
     seedStore({ withInventory: ["中", "日", "月"] });
     await act(async () => {
@@ -819,65 +844,161 @@ describe("TouchGallery — previous-character navigation", () => {
     });
 
     // Advance to "日" (idx 1) via Skip — "月" stays untouched.
-    expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+    expectCurrentChar("中");
     fireEvent.click(
       screen.getByRole("button", { name: /Skip this character/i }),
     );
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+      expectCurrentChar("日");
     });
 
-    const prevBtn = screen.getByTestId("touch-prev-char");
-    expect(prevBtn.getAttribute("aria-label")).toBe("Previous character");
-    expect((prevBtn as HTMLButtonElement).disabled).toBe(false);
-
-    fireEvent.click(prevBtn);
+    // Click the chip for "中" (the earlier, already-visited character) while
+    // sitting on "日" — must jump straight back to it.
+    fireEvent.click(screen.getByTestId("char-scroll-chip-4E2D"));
 
     // Landed back on "中" (idx 0) — the phase was NOT exited.
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+      expectCurrentChar("中");
     });
     expect(onBack).not.toHaveBeenCalled();
   });
 
-  it("renders the previous-character button DISABLED on the first character", async () => {
+  it("clicking a later character's chip moves forward to it too — the old prev-only button could never do this", async () => {
     seedStore({ withInventory: ["中", "日", "月"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
-    // Starting on "中" (idx 0) — nowhere further back to step.
-    const prevBtn = screen.getByTestId("touch-prev-char");
-    expect(prevBtn).toBeTruthy();
-    expect((prevBtn as HTMLButtonElement).disabled).toBe(true);
 
-    // Clicking a disabled button is a no-op — still on "中".
-    fireEvent.click(prevBtn);
-    expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+    // Starting on "中" (idx 0) — jump straight to "月" (idx 2, the last
+    // character), skipping over "日" entirely without visiting it.
+    expectCurrentChar("中");
+    fireEvent.click(screen.getByTestId("char-scroll-chip-6708"));
+
+    await waitFor(() => {
+      expectCurrentChar("月");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Producer-count badge (CharScrollStrip Part 2) — integration coverage.
+//
+// CharScrollStrip.test.tsx already unit-tests the badge in isolation. This
+// closes the gap that isolation leaves for the TOUCH modality specifically:
+// it proves the badge TouchGallery renders is wired to THIS gallery's real
+// `charTouchAssignments` (built from the author's own charTouch edits) and
+// the "touch" modality — not a constant, and not the desktop/physical count
+// leaking across. A swapped `assignments` array or wrong `modality` at the
+// TouchGallery -> CharScrollStrip call site would slip past
+// CharScrollStrip.test.tsx alone but must fail here.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — character-scroll-strip producer badge (integration)", () => {
+  it("the current char's badge starts RED at 0, then GREEN at 1 after a real touch Apply records the mechanism", async () => {
+    // "中" has no Phase C assignment and is not in the default touch layout —
+    // suggestion kind = "none" (see the "multiple methods per character" describe
+    // block), so the chooser shows directly with nothing to Accept/Deny first.
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const stripBefore = screen.getByTestId("char-scroll-strip");
+    const badgeBefore = within(stripBefore).getByTestId("char-scroll-badge-4E2D");
+    expect(badgeBefore.textContent).toBe("0");
+    expect(badgeBefore.style.color).toBe("rgb(248, 81, 73)"); // #f85149 — badge-bad color
+
+    // Drive the real touch Apply flow (long-press K_A, the chooser's default
+    // active method) — the same interaction the "multiple methods per
+    // character" describe block below uses to record into charTouch, so this
+    // test exercises the actual store write, not a hand-built assignment.
+    const hostKeySelect = screen.queryByRole("combobox", { name: /host key/i });
+    expect(hostKeySelect).not.toBeNull();
+    await act(async () => {
+      fireEvent.change(hostKeySelect!, { target: { value: "K_A" } });
+    });
+    const applyBtn = screen.queryAllByRole("button").find(
+      (b) => b.textContent?.trim() === "Apply method",
+    ) ?? null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    await waitFor(() => {
+      const badgeAfter = within(screen.getByTestId("char-scroll-strip")).getByTestId(
+        "char-scroll-badge-4E2D",
+      );
+      expect(badgeAfter.textContent).toBe("1");
+      expect(badgeAfter.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// UsesSequencesCard (Part 3) — integration coverage.
+//
+// UsesSequencesCard.tsx (packages/studio/src/editors/assignLoop/parts/) has
+// its own render-level unit test exercising pure props in isolation. This
+// closes the gap that leaves for TouchGallery specifically: it proves the
+// card TouchGallery renders is wired to THIS gallery's real
+// `desktopAssignments` (Phase C store state, via seedWithDesktopAssignment —
+// the same store-seed helper the R11 emission suite above uses to drive a
+// real Phase C assignment) — not a hand-built prop or a constant. A
+// swapped/empty assignments source at the TouchGallery -> UsesSequencesCard
+// call site would slip past a UsesSequencesCard-only unit test but must fail
+// here.
+//
+// PRODUCES vs USES: the seeded sequence's own `target` ("ŋ", what the
+// sequence PRODUCES) is deliberately a DIFFERENT character from currentChar
+// ("n", the char under test) — "n" only appears as the sequence's
+// `firstLetterOut` (an INPUT slot), never as the char it produces. This is
+// exactly the produces-vs-uses distinction the card exists to surface, and
+// sequences are always recorded with modality "physical" even though this is
+// the Touch gallery (see charMechanisms.ts's file-header comment) — this
+// test is what proves that cross-modality read actually happens for real
+// desktopAssignments, not just in the unit-level charMechanisms.test.ts.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — UsesSequencesCard (integration)", () => {
+  it("renders the card with a row for a real recorded Phase C sequence that USES the current character as an input slot (not its produced char)", async () => {
+    const sequenceAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "ŋ",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: PATTERN_SEQUENCE,
+          strategyId: "S-03",
+          slotValues: { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
+        },
+      ],
+      source: "user",
+    };
+    seedWithDesktopAssignment("n", sequenceAssignment);
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expectCurrentChar("n");
+    const card = await screen.findByTestId("uses-sequences-card");
+    const row = within(card).getByTestId("uses-sequences-row-0");
+    // The row names the sequence's own input pair and its produced char —
+    // proving this is the REAL recorded sequence surfaced from real store
+    // state, not a placeholder or a hardcoded row.
+    expect(row.textContent).toContain("n");
+    expect(row.textContent).toContain("g");
+    expect(row.textContent).toContain("ŋ");
   });
 
-  it("the previous-character button is enabled on later (non-first) characters", async () => {
-    seedStore({ withInventory: ["中", "日", "月"] });
+  it("control: renders no uses-sequences-card for a character with no recorded using-sequence anywhere in Phase C", async () => {
+    seedStore({ withInventory: ["中"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
-
-    // Advance to "日" (idx 1) via Skip (records nothing).
-    fireEvent.click(
-      screen.getByRole("button", { name: /Skip this character/i }),
-    );
-    await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
-    });
-    expect((screen.getByTestId("touch-prev-char") as HTMLButtonElement).disabled).toBe(false);
-
-    // Advance to "月" (idx 2, the last character) — still enabled there too.
-    fireEvent.click(
-      screen.getByRole("button", { name: /Skip this character/i }),
-    );
-    await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+6708 月$/)).toBeTruthy();
-    });
-    expect((screen.getByTestId("touch-prev-char") as HTMLButtonElement).disabled).toBe(false);
+    expectCurrentChar("中");
+    expect(screen.queryByTestId("uses-sequences-card")).toBeNull();
   });
 });
 
@@ -898,7 +1019,7 @@ describe("TouchGallery — skip character", () => {
     expect(useWorkingCopyStore.getState().touchDraft?.charTouchEntries ?? []).toHaveLength(0);
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+      expectCurrentChar("日");
     });
   });
 
@@ -914,7 +1035,7 @@ describe("TouchGallery — skip character", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+      expectCurrentChar("日");
     });
 
     // Skipping recorded nothing, so coverage is unchanged.
@@ -926,7 +1047,7 @@ describe("TouchGallery — skip character", () => {
     // configured — Next stays disabled until it is actually applied.
     fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+      expectCurrentChar("中");
     });
     const nextBtn = screen.getByRole("button", { name: /Next character/i });
     expect((nextBtn as HTMLButtonElement).disabled).toBe(true);
@@ -1055,10 +1176,16 @@ describe("TouchGallery — draft persistence across unmount/remount", () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    // The "Configured" chip row should show "ä" (it was persisted).
+    // The "Configured" chip row should show "ä" (it was persisted). Query
+    // scoped to the configured-group itself (via `within`) — a bare
+    // screen-level query for a button named "ä" now also matches the
+    // CharScrollStrip chip's "Go to U+00E4 ä" aria-label (the strip renders
+    // one chip per inventory character, unconditionally), which would make
+    // `queryByRole` throw on "found multiple elements" rather than asserting
+    // what this test actually cares about — the configured-chip row.
     const configuredGroup = screen.queryByRole("group", { name: /configured characters/i });
     expect(configuredGroup).not.toBeNull();
-    const chipButton = screen.queryByRole("button", { name: new RegExp("ä") });
+    const chipButton = within(configuredGroup!).queryByRole("button", { name: new RegExp("ä") });
     expect(chipButton).not.toBeNull();
   });
 });
@@ -1441,13 +1568,13 @@ describe("TouchGallery — suggestion card variants", () => {
     // Skip it — no accept/deny, no assignment recorded.
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+0078 x$/)).toBeTruthy();
+      expectCurrentChar("x");
     });
 
     // Navigate back to "á" without ever resolving its suggestion.
     fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+      expectCurrentChar("á");
     });
 
     // Unlike the accept/deny case above, the suggestion card for "á" MUST
