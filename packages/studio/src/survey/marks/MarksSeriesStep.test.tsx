@@ -164,6 +164,121 @@ describe("MarksSeriesStep — S1 attachment station", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Lowercase-only diacritic base choices (spec 049, US1 + US2)
+// ---------------------------------------------------------------------------
+
+describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
+  function seedCasedAlphabet(): void {
+    // A cased Latin base: lowercase e/a with their uppercase counterparts, one
+    // caseless-context-free mark. Acute attested on e and a.
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "B",
+      answers: [],
+      alphabet: {
+        bases: ["e", "E", "a", "A"],
+        marks: [ACUTE],
+        attestedStacks: [
+          { base: "e", marks: [ACUTE] },
+          { base: "a", marks: [ACUTE] },
+        ],
+        declaredRoles: {},
+      },
+    });
+  }
+
+  it("US1/SC-001: the attachment row offers no uppercase duplicate of a present lowercase", () => {
+    seedCasedAlphabet();
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    // The row exposes one checkbox per offered base via its aria-label
+    // "<base> can carry ...". Uppercase E / A must not appear as choices.
+    expect(screen.queryByLabelText(/^E can carry/)).toBeNull();
+    expect(screen.queryByLabelText(/^A can carry/)).toBeNull();
+    // Lowercase counterparts remain offered.
+    expect(screen.getByLabelText(/^e can carry/)).toBeTruthy();
+    expect(screen.getByLabelText(/^a can carry/)).toBeTruthy();
+  });
+
+  it("US1/SC-003: a caseless base's choice set is identical to the unfolded bases", () => {
+    const KA = "क";
+    const NUKTA = "़";
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "B",
+      answers: [],
+      alphabet: {
+        bases: [KA],
+        marks: [NUKTA],
+        attestedStacks: [{ base: KA, marks: [NUKTA] }],
+        declaredRoles: {},
+      },
+    });
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    expect(screen.getByLabelText(new RegExp(`^${KA} can carry`))).toBeTruthy();
+  });
+
+  it("US1/SC-004: the case-pair note reflects the lowercase-fold count", () => {
+    seedCasedAlphabet();
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    // e and a each have a present uppercase counterpart → 2 pairs.
+    expect(screen.getByTestId("marks-attachment").textContent).toContain(
+      "2 capital/lowercase pairs",
+    );
+  });
+
+  it("a mark attested ONLY on the uppercase base still names that base in the confirmed summary", () => {
+    // Regression: the auto-confirmed summary derives its confirmed-base list
+    // from the checked map's own keys, not the folded (lowercase-only) display
+    // list. With acute attested only on "E" (never on "e"), "E" is folded out
+    // of the offered choices but must still appear as the confirmed base — a
+    // blank "confirmed on" summary would misrepresent what is attached.
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "B",
+      answers: [],
+      alphabet: {
+        bases: ["e", "E"],
+        marks: [ACUTE],
+        attestedStacks: [{ base: "E", marks: [ACUTE] }],
+        declaredRoles: {},
+      },
+    });
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    const row = screen.getByTestId("attachment-row-U+0301");
+    expect(row.tagName.toLowerCase()).toBe("details"); // auto-confirmed
+    expect(row.textContent).toContain("confirmed on");
+    // The confirmed grapheme is the accented capital, not a blank.
+    expect(row.querySelector("strong")?.textContent).toBe(("E" + ACUTE).normalize("NFC"));
+  });
+
+  it("US2/SC-002: attaching a mark to lowercase bases still produces the uppercase counterparts in the worklist", () => {
+    seedCasedAlphabet();
+    const onComplete = vi.fn();
+    act(() => {
+      render(<MarksSeriesStep onComplete={onComplete} />);
+    });
+    // Walk to completion (attested e/a acute stay checked).
+    for (let i = 0; i < 6 && onComplete.mock.calls.length === 0; i++) {
+      fireEvent.click(screen.getByTestId("marks-continue"));
+    }
+    const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
+    const units = result.marksWorklist?.ownLetterUnits ?? [];
+    // Accented capitals are produced without a second question.
+    expect(units).toContain(("E" + ACUTE).normalize("NFC"));
+    expect(units).toContain(("A" + ACUTE).normalize("NFC"));
+    // The uppercase base×mark pairs are NOT blocked.
+    const blocked = result.marksWorklist?.blockedCombinations ?? [];
+    expect(blocked).not.toContainEqual({ base: "E", mark: ACUTE });
+    expect(blocked).not.toContainEqual({ base: "A", mark: ACUTE });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // S4 output-form station (US3, FR-013..FR-017; SC-005)
 // ---------------------------------------------------------------------------
 

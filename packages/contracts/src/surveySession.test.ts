@@ -305,10 +305,11 @@ describe("mergePhaseResults() — alphabet + marksWorklist (spec 046)", () => {
   const ACUTE = "́";
   const GRAVE = "̀";
 
-  it("omits alphabet and marksWorklist when no phase carries them (pre-046 shape)", () => {
+  it("omits alphabet, marksWorklist, and marksOutputForm when no phase carries them (pre-046 shape)", () => {
     const session = mergePhaseResults({}, [{ phase: "B", answers: [] }]);
     expect("alphabet" in session).toBe(false);
     expect("marksWorklist" in session).toBe(false);
+    expect("marksOutputForm" in session).toBe(false);
   });
 
   it("merges alphabets store-wise across phases, deduped, first-appearance order", () => {
@@ -427,5 +428,14 @@ describe("mergePhaseResults() — alphabet + marksWorklist (spec 046)", () => {
       markUnits: [],
       blockedCombinations: [],
     });
+  });
+
+  it("marksOutputForm is last-wins across phases", () => {
+    const phases: SurveyPhaseResult[] = [
+      { phase: "B", answers: [], marksOutputForm: "ready-made" },
+      { phase: "C", answers: [], marksOutputForm: "base-plus-mark" },
+    ];
+    const session = mergePhaseResults({}, phases);
+    expect(session.marksOutputForm).toBe("base-plus-mark");
   });
 });

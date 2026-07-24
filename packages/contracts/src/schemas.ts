@@ -30,6 +30,7 @@ import type {
   ConfirmedAlphabet,
   DeclaredRole,
   MarkUnit,
+  OutputForm,
   PlacementWorklist,
 } from "./confirmedAlphabet";
 import type { Scale, ScriptClass } from "./axes";
@@ -525,6 +526,10 @@ export const PlacementWorklistSchema = z.object({
   blockedCombinations: z.array(BlockedCombinationSchema),
 });
 
+// The S4 whole-keyboard output-form decision (spec 046). Carried on
+// SurveyPhaseResult/SurveySession as `marksOutputForm`.
+export const OutputFormSchema = z.enum(["ready-made", "base-plus-mark"]);
+
 // ---------------------------------------------------------------------------
 // Compile-time drift guards.
 //
@@ -602,6 +607,7 @@ type _BlockedCombinationGuard = Expect<
 type _PlacementWorklistGuard = Expect<
   AssignableTo<z.infer<typeof PlacementWorklistSchema>, PlacementWorklist>
 >;
+type _OutputFormGuard = Expect<AssignableTo<z.infer<typeof OutputFormSchema>, OutputForm>>;
 type _TouchKeyIRGuard = Expect<AssignableTo<z.infer<typeof TouchKeyIRSchema>, TouchKeyIR>>;
 // TouchLayoutIR is guarded on its `platforms` slice (the touch-key + provenance
 // payload — the spec-014 durability target). `nodeIds` is intentionally not run

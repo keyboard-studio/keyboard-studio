@@ -10,8 +10,27 @@
 // words "Unicode" or "normalization" — asserted mechanically in tests.
 
 import type { PosturePair } from "./nfc-posture-of-inventory.js";
+import type { OutputForm } from "@keyboard-studio/contracts";
+import type { CharNormalizationForm } from "../character-discovery/suggestMissing.js";
 
-export type OutputForm = "ready-made" | "base-plus-mark";
+// Canonical declaration lives in contracts (confirmedAlphabet.ts) — engine
+// re-exports rather than declaring a divergent copy (contracts is the
+// dependency root and cannot import engine's type back).
+export type { OutputForm };
+
+/**
+ * Maps the chosen whole-keyboard output form to the Unicode normalization
+ * form the carve gallery's produced-vs-needed comparison normalizes BOTH
+ * sides to (see `isCharCoveredForLocale`'s `form` parameter and its callers
+ * in `packages/studio/src/lib/irToCarveNodes.ts`) — "ready-made" produces
+ * single precomposed characters (NFC), "base-plus-mark" produces decomposed
+ * base+combining-mark sequences (NFD). `undefined` (no output-form decision
+ * made yet — e.g. the marks series was skipped) degrades to "NFC", matching
+ * pre-046 behavior exactly.
+ */
+export function normalizationFormForOutputForm(outputForm: OutputForm | undefined): CharNormalizationForm {
+  return outputForm === "base-plus-mark" ? "NFD" : "NFC";
+}
 
 export interface OutputFormProposal {
   form: OutputForm;

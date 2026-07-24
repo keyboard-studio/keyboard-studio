@@ -38,12 +38,12 @@ import {
 import {
   groupMarkClasses,
   proposeAttachments,
-  deriveCaseCounterparts,
   nfcPostureOfInventory,
   resolveOutputFormProposal,
   hasDecidablePairs,
   computeMentalModelPrefills,
   buildPlacementWorklist,
+  expandCaseCounterpartAttachments,
   type AttachmentProposal,
   type MarkClass,
   type MentalModelAnswer,
@@ -52,6 +52,7 @@ import {
 import type { EditorStepProps } from "../../steps/types.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { lowercaseBaseView, casedBaseCount } from "../charNormUtils.ts";
 import { AttachmentStation } from "./AttachmentStation.tsx";
 import { MentalModelStation } from "./MentalModelStation.tsx";
 import { InputOrderStation, type MarkInputOrder } from "./InputOrderStation.tsx";
@@ -136,9 +137,10 @@ export function classNeedsMentalModelScreen(
 
 /**
  * The series' phase result: reported on completion (or on the S0 skip). The
- * chosen output form rides along as a studio-local payload extension (see
- * steps/reducer.ts MarksCompleteResult) — the reducer needs it to decide
- * whether to generate stepwise backspace-unwrap stores.
+ * chosen output form is now a real contract field (SurveyPhaseResult.marksOutputForm,
+ * spec 046) — the reducer (steps/reducer.ts MarksCompleteResult) still reads
+ * it off this result to decide whether to generate stepwise backspace-unwrap
+ * stores; carve's needed-set derivation reads it off the merged session.
  */
 function seriesResult(
   worklist = makeEmptyPlacementWorklist(),
@@ -149,7 +151,7 @@ function seriesResult(
     answers: [],
     marksWorklist: worklist,
     ...(outputForm !== undefined ? { marksOutputForm: outputForm } : {}),
-  } as SurveyPhaseResult;
+  };
 }
 
 const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
@@ -171,9 +173,18 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     () => proposeAttachments(gate.alphabet, classes),
     [gate.alphabet, classes],
   );
-  const casePairs = useMemo(
-    () => deriveCaseCounterparts(gate.alphabet, surveyContext.bcp47_tag),
-    [gate.alphabet, surveyContext.bcp47_tag],
+  const bcp47 = surveyContext.bcp47_tag;
+  // Marks questions offer only lowercase/caseless bases (spec 049, US1); the
+  // uppercase counterpart's attachment is derived, not asked. The affordance
+  // count is pinned to the folded lowercase view (SC-004), and the shared fold
+  // is the same one the character step uses (FR-006).
+  const attachmentBases = useMemo(
+    () => lowercaseBaseView(gate.alphabet.bases, bcp47),
+    [gate.alphabet, bcp47],
+  );
+  const casePairCount = useMemo(
+    () => casedBaseCount(gate.alphabet.bases, bcp47),
+    [gate.alphabet, bcp47],
   );
   const posture = useMemo(() => nfcPostureOfInventory(gate.alphabet), [gate.alphabet]);
   const mentalModelPrefills = useMemo(
@@ -290,10 +301,18 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     // Assemble the FR-020 handoff. The stacking answer constrains the stack
     // list downstream; the worklist's three groups cover every base and mark
     // (SC-007, verified in engine tests).
+    // US1 asked only about lowercase bases; expand each checked cased base to
+    // its uppercase counterpart so the worklist still covers accented capitals
+    // (spec 049, US2 / FR-002). Additive — never clears an existing check.
+    const expandedAttachments = expandCaseCounterpartAttachments(
+      gate.alphabet,
+      attachmentChecked,
+      bcp47,
+    );
     const worklist = buildPlacementWorklist({
       alphabet: gate.alphabet,
       classes,
-      attachments: attachmentChecked,
+      attachments: expandedAttachments,
       mentalModel,
       inputOrder,
     });
@@ -340,7 +359,7 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
       {currentStation === "marks_attachment" && (
         <AttachmentStation
           proposals={proposals}
-          bases={gate.alphabet.bases}
+          bases={attachmentBases}
           checked={attachmentChecked}
           onToggle={(mark, base, next) =>
             setAttachmentChecked((prev) => ({
@@ -348,7 +367,7 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
               [mark]: { ...prev[mark], [base]: next },
             }))
           }
-          casePairCount={casePairs.size}
+          casePairCount={casePairCount}
         />
       )}
 
