@@ -234,11 +234,13 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47 }: CharChipE
           unusual.map((u) => codepointLabel(u).title).join(", "),
       );
     }
-    // We never store a capital without its lowercase: an entered uppercase cased
-    // letter is folded to its lowercase for the alphabet/UI (both cases still
-    // reach the recorded IR via the record-both-cases augmentation on Done).
-    // caseCounterpart(...).direction === "toLower" means the char is an
-    // uppercase letter with a lowercase counterpart.
+    // When BOTH cases of a letter exist, show the lowercase: an entered
+    // uppercase that has a single-character lowercase counterpart is folded to
+    // that lowercase for the alphabet/UI (both cases still reach the recorded IR
+    // via the record-both-cases augmentation on Done). An uppercase with NO
+    // lowercase counterpart — and a lowercase with no uppercase (IPA) — is left
+    // exactly as chosen (caseCounterpart returns null, so no fold). Only the
+    // uppercase→lowercase direction ever folds; lowercase is never touched.
     const folded = harvested.map((c) => {
       const cc = caseCounterpart(c, bcp47);
       return cc?.direction === "toLower" ? cc.counterpart : c;
