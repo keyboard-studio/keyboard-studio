@@ -120,6 +120,7 @@
   "editor.trackStep.adaptTitle": "Adapter",
   "survey.characterMapPane.rawInput.addButton": "Ajouter",
   "survey.characterMapPane.cell.addAction": "Ajouter",
+  "survey.characterMapPane.cell.fromBase": " — depuis votre clavier de base",
   "survey.phaseB.suggestionChip.addAction": "Ajouter",
   "survey.phaseB.buildList.instructions": "Ajoutez <0>tout votre alphabet</0> sur cette page — chaque caractère utilisé par votre langue, pas seulement les caractères spéciaux. Cochez les caractères suggérés ci-dessous, puis saisissez ceux qui manquent <1>en séparant chaque caractère par un espace</1>, comme ceci :",
   "survey.characterMapPane.rawInput.ariaLabel": "Ajouter un caractère par point de code Unicode",
