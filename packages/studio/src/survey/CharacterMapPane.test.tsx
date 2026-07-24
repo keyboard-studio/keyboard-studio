@@ -288,6 +288,35 @@ describe("CharacterMapPane — data path", () => {
     expect(within(group).queryByRole("button", { name: /B \(U\+0042\)/ })).toBeNull();
   });
 
+  it("clicking a cased letter adds BOTH cases to the alphabet; clicking again removes both (spec 047)", async () => {
+    seedBaseAndLanguage();
+    getGroupsResult.set([
+      {
+        block: "Latin",
+        tier: "main",
+        script: "Latn",
+        usedByBase: false,
+        cells: [
+          { char: "a", isCombiningMark: false },
+          { char: "b", isCombiningMark: false },
+        ],
+      },
+    ]);
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const group = screen.getByLabelText("Latin characters (main)");
+    fireEvent.click(within(group).getByRole("button", { name: /Add a \(U\+0061\)/ }));
+    // The lowercase and its (hidden) uppercase both join the alphabet.
+    expect(usePhaseBDraftStore.getState().chars).toContain("a");
+    expect(usePhaseBDraftStore.getState().chars).toContain("A");
+    // Clicking the now-selected cell removes both.
+    fireEvent.click(within(group).getByRole("button", { name: /Remove a \(U\+0061\)/ }));
+    expect(usePhaseBDraftStore.getState().chars).not.toContain("a");
+    expect(usePhaseBDraftStore.getState().chars).not.toContain("A");
+  });
+
   it("a cell already present in phaseBDraftStore.chars renders aria-pressed=true on mount", async () => {
     seedBaseAndLanguage();
     usePhaseBDraftStore.getState().setAll(["b"]);

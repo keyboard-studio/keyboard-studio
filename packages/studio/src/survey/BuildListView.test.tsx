@@ -885,6 +885,21 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
     expect(inv).toContain("Q");
   });
 
+  it("removing a letter from 'Your alphabet' removes both cases in one click (spec 047)", async () => {
+    await renderBuildListView({ bcp47_tag: "en" });
+    // Both cases present (e.g. added via the character map); only the lowercase
+    // chip is shown (toggle off).
+    act(() => {
+      usePhaseBDraftStore.getState().setAll(["q", "Q"]);
+    });
+    const removeBtn = screen.getByRole("button", { name: /Remove q \(U\+0071\)/ });
+    await act(async () => {
+      fireEvent.click(removeBtn);
+    });
+    // One click clears the pair — the uppercase does not linger as an orphan.
+    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+  });
+
   it("keeps an entered uppercase that has no single-character lowercase, as chosen", async () => {
     // U+0130 İ (LATIN CAPITAL LETTER I WITH DOT ABOVE): in 'en' its lowercase is
     // two code points (i + combining dot), so there is no single-char lowercase
