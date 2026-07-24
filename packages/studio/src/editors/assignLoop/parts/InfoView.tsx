@@ -4,7 +4,7 @@ import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import type { RemovalCapability } from '@keyboard-studio/contracts';
 import type { CarveNode } from '../../../lib/irToCarveNodes.ts';
-import { displayChar, resolveNodeName } from '../../../lib/irToCarveNodes.ts';
+import { displayChar, resolveNodeName, resolveReferencedByLabel } from '../../../lib/irToCarveNodes.ts';
 import { InfoIcon, resolveMessage } from './carveShared.tsx';
 import { resolveContentString } from '../../../lib/contentI18n.ts';
 import { KeySeq } from './KeySeq.tsx';
@@ -230,10 +230,7 @@ function infoForNode(node: CarveNode, i18n?: I18n): InfoContent {
       };
     }
     if (u === undefined && node.referencedByLabel !== undefined) {
-      const patternLabel =
-        node.referencedByNodeId !== undefined
-          ? resolveContentString('patterns', node.referencedByNodeId, 'title', node.referencedByLabel, i18n)
-          : node.referencedByLabel;
+      const patternLabel = resolveReferencedByLabel(node, i18n);
       return {
         title: resolveMessage(
           i18n,

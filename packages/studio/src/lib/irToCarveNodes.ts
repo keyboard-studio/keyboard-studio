@@ -997,6 +997,22 @@ export function resolveLocationLabel(
   return resolveContentString('patterns', loc.nodeId, 'title', loc.label, i18n);
 }
 
+/**
+ * `CarveNode.referencedByLabel` mirrors the owning pattern's title verbatim
+ * for a store node (spec 046 T028) — same Tier B content string as
+ * resolveNodeName/resolveLocationLabel above, just carried under a different
+ * field name. Resolves it once rather than duplicating the
+ * `referencedByNodeId !== undefined ? resolveContentString(...) : referencedByLabel`
+ * ternary at each of its two call sites (InfoView.tsx, Inspector.tsx).
+ * Returns undefined when the node has no referencing pattern at all.
+ */
+export function resolveReferencedByLabel(node: CarveNode, i18n?: I18n): string | undefined {
+  if (node.referencedByLabel === undefined) return undefined;
+  return node.referencedByNodeId !== undefined
+    ? resolveContentString('patterns', node.referencedByNodeId, 'title', node.referencedByLabel, i18n)
+    : node.referencedByLabel;
+}
+
 // ---------------------------------------------------------------------------
 // idsTriState — tri-state derived purely from a flat array of item ids.
 // Single source shared by glyphsTriState (CarveGlyph.gid) and nodeState's
