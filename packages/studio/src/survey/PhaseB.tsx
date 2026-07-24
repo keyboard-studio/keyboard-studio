@@ -26,7 +26,10 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore, type DiscoveryMethod } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { useGlyphFontStack } from "./useGlyphFontStack.ts";
-import { nfcDedup } from "./charNormUtils.ts";
+import { nfcDedup, harvestChars, casePairOf } from "./charNormUtils.ts";
+import { codepointLabel } from "./codepointLabel.ts";
+import { collate, codePointCompare } from "./collation.ts";
+import { glyphCategory, isCombiningMarkChar, caseCounterpart } from "@keyboard-studio/engine";
 import { displayChar, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { suggestMissingChars } from "../lib/services.ts";
 import type { MissingCharSuggestions } from "../lib/services.ts";
@@ -148,17 +151,42 @@ function makeManualOnlyFlow(flow: FlowDef): FlowDef {
 }
 
 // ---------------------------------------------------------------------------
-// getFirstGrapheme — module-level helper, not exported
+// isLinguisticChar — the "Your alphabet" chip-list filter (spec 047, FR-011)
 // ---------------------------------------------------------------------------
 
-function getFirstGrapheme(s: string): string {
-  if (!s) return "";
-  if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
-    const seg = new Intl.Segmenter();
-    const [first] = seg.segment(s);
-    return first?.segment ?? "";
-  }
-  return [...s][0] ?? "";
+/**
+ * True when a captured grapheme is linguistic content — a letter, a combining
+ * mark (diacritic), or a letter+mark combination — and therefore belongs in the
+ * "Your alphabet" running list. Numbers, punctuation, symbols, separators, and
+ * control characters are excluded here (they remain visible in their own
+ * breakdown sections). A letter+mark combo classifies as `letter` because it
+ * contains a letter code point; a lone mark is caught by isCombiningMarkChar.
+ */
+function isLinguisticChar(c: string): boolean {
+  return isCombiningMarkChar(c) || glyphCategory(c) === "letter";
+}
+
+// ---------------------------------------------------------------------------
+// CpLabel — chip code-point label with the FR-014 multi-code-point affordance
+// ---------------------------------------------------------------------------
+
+/**
+ * Renders a chip's code-point label (spec 047 FR-014): the base code point in
+ * U+XXXX notation, followed — for a multi-code-point grapheme — by a bracketed
+ * "[+<extra marks>]" badge in a contrasting (accent) color that shows the extra
+ * combining mark(s) themselves. The full space-separated stack is exposed on
+ * the chip's hover title/accessible name by the caller.
+ */
+function CpLabel({ grapheme }: { grapheme: string }) {
+  const { base, extras } = codepointLabel(grapheme);
+  return (
+    <span style={chipCodepoint()}>
+      {base}
+      {extras !== "" && (
+        <span style={{ color: ACCENT, fontWeight: 700 }}>{`[+${extras}]`}</span>
+      )}
+    </span>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -166,21 +194,25 @@ function getFirstGrapheme(s: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Presentational component: a text input that adds characters (first grapheme
- * per space-separated token) and a chip grid that shows accumulated chars with
- * remove buttons. State is owned by the parent.
+ * Presentational component: a text input that captures every distinct grapheme
+ * typed or pasted (spec 047 FR-001, via harvestChars) and a chip grid that
+ * shows the accumulated LINGUISTIC characters (letters/marks/combos, FR-011)
+ * with remove buttons. State is owned by the parent.
  */
 interface CharChipEditorProps {
   chars: string[];
   onChange: (next: string[]) => void;
   /** When true, auto-focus the input on mount. */
   autoFocus?: boolean;
+  /** BCP47 tag for locale-correct case-collapse of the letter chips (FR-008). */
+  bcp47?: string | undefined;
 }
 
-function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorProps) {
+function CharChipEditor({ chars, onChange, autoFocus = false, bcp47 }: CharChipEditorProps) {
   const { t } = useLingui();
   const glyphFontStack = useGlyphFontStack();
   const [inputVal, setInputVal] = useState("");
+  const [showUppercase, setShowUppercase] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -188,17 +220,61 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
   }, [autoFocus]);
 
   function add(): void {
-    const trimmed = inputVal.trim().normalize("NFC");
-    if (!trimmed) return;
-    const tokens = trimmed.split(/\s+/).filter(Boolean);
-    const newChars = tokens.map(getFirstGrapheme).filter(Boolean);
-    if (newChars.length === 0) return;
-    onChange(nfcDedup(chars, newChars));
+    // Capture EVERY distinct character in the whole input, not just the first
+    // grapheme of each space-separated token (spec 047 FR-001). harvestChars
+    // drops only CR/LF/CRLF/Tab/space (FR-002) and reports retained unusual
+    // invisibles so we can log them for discoverability (FR-003).
+    const { chars: harvested, unusual } = harvestChars(inputVal);
+    if (harvested.length === 0) return;
+    if (unusual.length > 0) {
+      // FR-003: no in-UI alert is required — a console log makes the unusual
+      // separator/format/control characters discoverable to the developer.
+      console.info(
+        "[phase-b] kept unusual invisible character(s): " +
+          unusual.map((u) => codepointLabel(u).title).join(", "),
+      );
+    }
+    // When BOTH cases of a letter exist, show the lowercase: an entered
+    // uppercase that has a single-character lowercase counterpart is folded to
+    // that lowercase for the alphabet/UI (both cases still reach the recorded IR
+    // via the record-both-cases augmentation on Done). An uppercase with NO
+    // lowercase counterpart — and a lowercase with no uppercase (IPA) — is left
+    // exactly as chosen (caseCounterpart returns null, so no fold). Only the
+    // uppercase→lowercase direction ever folds; lowercase is never touched.
+    const folded = harvested.map((c) => {
+      const cc = caseCounterpart(c, bcp47);
+      return cc?.direction === "toLower" ? cc.counterpart : c;
+    });
+    onChange(nfcDedup(chars, folded));
     setInputVal("");
     inputRef.current?.focus();
   }
 
   const addDisabled = inputVal.trim() === "";
+  // "Your alphabet" shows only linguistic content (FR-011); non-letters remain
+  // visible in their breakdown sections below. Ordering: letters and
+  // letter+mark combos by default ICU collation (matching the breakdown
+  // sections); bare combining marks by raw Unicode code-point order (a diacritic
+  // has no meaningful dictionary position), listed after the letters.
+  const linguisticChars = chars.filter(isLinguisticChar);
+  const bareMarks = linguisticChars.filter(isCombiningMarkChar).sort(codePointCompare);
+  const letters = linguisticChars.filter((c) => !isCombiningMarkChar(c));
+  // Case-collapse the letters to their lowercase/caseless unit (FR-008/FR-010):
+  // hide an uppercase only when its lowercase is actually present; a lowercase or
+  // caseless (or uppercase-only) letter is shown as entered.
+  const upperOf = (b: string): string | null => {
+    const cc = caseCounterpart(b, bcp47);
+    return cc?.direction === "toUpper" ? cc.counterpart : null;
+  };
+  const hiddenUppers = new Set<string>();
+  for (const b of letters) {
+    const u = upperOf(b);
+    if (u !== null) hiddenUppers.add(u);
+  }
+  const displayLetters = collate(letters.filter((b) => !hiddenUppers.has(b)));
+  // Count reflects the collapsed lowercase/caseless units + bare marks.
+  const unitCount = displayLetters.length + bareMarks.length;
+  const hasCasedLetter = letters.some((b) => upperOf(b) !== null);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -252,9 +328,22 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
             color: TEXT_MAIN,
           }}
         >
-          <Trans id="survey.phaseB.charChipEditor.count">Your alphabet ({chars.length})</Trans>
+          <Trans id="survey.phaseB.charChipEditor.count">Your alphabet ({displayLetters.length + bareMarks.length})</Trans>
         </p>
-        {chars.length === 0 ? (
+        {hasCasedLetter && (
+          <label
+            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: TEXT_DIM, cursor: "pointer", margin: "0 0 8px 0" }}
+          >
+            <input
+              type="checkbox"
+              data-testid="your-alphabet-uppercase-toggle"
+              checked={showUppercase}
+              onChange={(e) => setShowUppercase(e.target.checked)}
+            />
+            <Trans id="survey.phaseB.breakdown.showUppercase">Show uppercase letters</Trans>
+          </label>
+        )}
+        {unitCount === 0 ? (
           <p style={mutedParaFlush}>
             <Trans id="survey.phaseB.charChipEditor.empty">
               No characters yet — type your whole alphabet above, with a space
@@ -270,30 +359,74 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
             })}
             style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}
           >
-            {chars.map((c) => (
-              // This delete chip is always in one visual state, not a toggle.
-              // The charChip/chipGlyph booleans below are FIXED literals chosen
-              // to reproduce the original inline hex (unchecked shell + accent
+            {displayLetters.flatMap((c) => {
+              // Removable chip for the lowercase/caseless (or uppercase-only)
+              // letter. The charChip/chipGlyph booleans are FIXED literals
+              // reproducing the original inline hex (unchecked shell + accent
               // glyph), not real checked state — do not wire them to a value.
-              <button
-                key={c}
-                type="button"
-                onClick={() => onChange(chars.filter((x) => x !== c))}
-                aria-label={t({
-                  id: "survey.phaseB.charChipEditor.removeAriaLabel",
-                  message: `Remove ${{ char: c }} (${{ cp: toUPlusNotation(c) }})`,
-                })}
-                style={charChip(false)}
-              >
-                <span style={chipGlyph(true, glyphFontStack)}>
-                  {displayChar(c)}
-                </span>
-                <span style={chipCodepoint()}>
-                  {toUPlusNotation(c)}
-                </span>
-                <span style={chipIndicator(ERROR_RED)}>x</span>
-              </button>
-            ))}
+              const { title } = codepointLabel(c);
+              const cells = [
+                <button
+                  key={c}
+                  type="button"
+                  title={title}
+                  onClick={() => {
+                    // Removing a letter removes BOTH cases (the inverse of the
+                    // map, which adds both) — even the uppercase hidden by the
+                    // case-collapse, so it never re-appears as an orphan chip.
+                    const pair = new Set(casePairOf(c, bcp47));
+                    onChange(chars.filter((x) => !pair.has(x)));
+                  }}
+                  aria-label={t({
+                    id: "survey.phaseB.charChipEditor.removeAriaLabel",
+                    message: `Remove ${{ char: c }} (${{ cp: title }})`,
+                  })}
+                  style={charChip(false)}
+                >
+                  <span style={chipGlyph(true, glyphFontStack)}>{displayChar(c)}</span>
+                  <CpLabel grapheme={c} />
+                  <span style={chipIndicator(ERROR_RED)}>x</span>
+                </button>,
+              ];
+              // Derived uppercase (display-only) when the toggle is on — mirrors
+              // the breakdown Letters section; not a removable pick.
+              const upper = showUppercase ? upperOf(c) : null;
+              if (upper !== null) {
+                const upperTitle = codepointLabel(upper).title;
+                cells.push(
+                  <span
+                    key={upper}
+                    title={upperTitle}
+                    aria-label={`${displayChar(upper)} (${upperTitle})`}
+                    style={{ ...charChip(false), cursor: "default" }}
+                  >
+                    <span style={chipGlyph(true, glyphFontStack)}>{displayChar(upper)}</span>
+                    <CpLabel grapheme={upper} />
+                  </span>,
+                );
+              }
+              return cells;
+            })}
+            {bareMarks.map((c) => {
+              const { title } = codepointLabel(c);
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  title={title}
+                  onClick={() => onChange(chars.filter((x) => x !== c))}
+                  aria-label={t({
+                    id: "survey.phaseB.charChipEditor.removeAriaLabel",
+                    message: `Remove ${{ char: c }} (${{ cp: title }})`,
+                  })}
+                  style={charChip(false)}
+                >
+                  <span style={chipGlyph(true, glyphFontStack)}>{displayChar(c)}</span>
+                  <CpLabel grapheme={c} />
+                  <span style={chipIndicator(ERROR_RED)}>x</span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -536,13 +669,39 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
 // pick chips above (removing a pick automatically retracts what it implied).
 // ---------------------------------------------------------------------------
 
-function AlphabetBreakdown() {
+interface AlphabetBreakdownProps {
+  /** BCP47 tag for locale-correct case derivation in the Letters section (FR-008). */
+  bcp47?: string | undefined;
+}
+
+function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
   const bases = usePhaseBDraftStore((s) => s.bases);
   const marks = usePhaseBDraftStore((s) => s.marks);
   const attestedStacks = usePhaseBDraftStore((s) => s.attestedStacks);
+  const numbers = usePhaseBDraftStore((s) => s.numbers);
+  const punctuation = usePhaseBDraftStore((s) => s.punctuation);
+  const symbols = usePhaseBDraftStore((s) => s.symbols);
+  const separators = usePhaseBDraftStore((s) => s.separators);
+  const controls = usePhaseBDraftStore((s) => s.controls);
   const lastPick = usePhaseBDraftStore((s) => s.lastPick);
+  const [showUppercase, setShowUppercase] = useState(false);
 
-  if (marks.length === 0 && attestedStacks.length === 0) return null;
+  // Render once the alphabet has any content to break down. Spec 047 US3 shows
+  // the Letters section (with its lowercase/uppercase toggle) even for a
+  // letters-only alphabet, so bases alone are enough to reveal the panel — the
+  // per-section guards below still hide every empty section (FR-006).
+  if (
+    bases.length === 0 &&
+    marks.length === 0 &&
+    attestedStacks.length === 0 &&
+    numbers.length === 0 &&
+    punctuation.length === 0 &&
+    symbols.length === 0 &&
+    separators.length === 0 &&
+    controls.length === 0
+  ) {
+    return null;
+  }
 
   const composedStack = (stack: { base: string; marks: string[] }): string =>
     (stack.base + stack.marks.join("")).normalize("NFC");
@@ -551,57 +710,132 @@ function AlphabetBreakdown() {
   const justAddedStack =
     lastPick?.addedStack != null ? composedStack(lastPick.addedStack) : null;
 
-  const chip = (glyph: string, display: string, justAdded: boolean) => (
-    <span
-      key={glyph}
-      aria-label={`${display} (${toUPlusNotation(glyph)})${justAdded ? " — just added" : ""}`}
-      style={charChip(false)}
-    >
-      <span style={chipGlyph(true)}>{display}</span>
-      <span style={chipCodepoint()}>{toUPlusNotation(glyph)}</span>
-      {justAdded && <span style={chipIndicator(ACCENT)}>new</span>}
-    </span>
-  );
+  const chip = (glyph: string, display: string, justAdded: boolean) => {
+    const { title } = codepointLabel(glyph);
+    return (
+      <span
+        key={glyph}
+        title={title}
+        aria-label={`${display} (${title})${justAdded ? " — just added" : ""}`}
+        // Breakdown chips are a read-only VIEW (not remove buttons), so no
+        // pointer cursor — removal stays on the CharChipEditor pick chips above.
+        style={{ ...charChip(false), cursor: "default" }}
+      >
+        <span style={chipGlyph(true)}>{display}</span>
+        <CpLabel grapheme={glyph} />
+        {justAdded && <span style={chipIndicator(ACCENT)}>new</span>}
+      </span>
+    );
+  };
 
   const section = (
     testid: string,
     title: string,
     note: string,
     children: ReactNode,
+    extraHeader?: ReactNode,
   ) => (
     <div data-testid={testid} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>{title}</p>
       <p style={{ ...mutedParaFlush, margin: 0, fontSize: 12 }}>{note}</p>
+      {extraHeader}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{children}</div>
     </div>
+  );
+
+  // Letters case-collapse (FR-008/FR-010): show one chip per lowercase/caseless
+  // letter; a present uppercase is hidden behind its lowercase (never the
+  // reverse) and revealed only under the toggle.
+  const upperOf = (b: string): string | null => {
+    const cc = caseCounterpart(b, bcp47);
+    return cc?.direction === "toUpper" ? cc.counterpart : null;
+  };
+  const hiddenUppers = new Set<string>();
+  for (const b of bases) {
+    const u = upperOf(b);
+    if (u !== null) hiddenUppers.add(u);
+  }
+  const displayBases = collate(bases.filter((b) => !hiddenUppers.has(b)));
+
+  const uppercaseToggle = (
+    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: TEXT_DIM, cursor: "pointer" }}>
+      <input
+        type="checkbox"
+        data-testid="letters-uppercase-toggle"
+        checked={showUppercase}
+        onChange={(e) => setShowUppercase(e.target.checked)}
+      />
+      <Trans id="survey.phaseB.breakdown.showUppercase">Show uppercase letters</Trans>
+    </label>
   );
 
   return (
     <section aria-label="How your alphabet breaks down" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <h3 style={sectionHeading}>How your alphabet breaks down</h3>
-      {bases.length > 0 &&
+      {displayBases.length > 0 &&
         section(
           "alphabet-letters",
-          `Letters (${bases.length})`,
+          `Letters (${displayBases.length})`,
           "Letters that stand on their own.",
-          bases.map((b) => chip(b, b, justAddedBases.has(b))),
+          displayBases.flatMap((b) => {
+            const u = showUppercase ? upperOf(b) : null;
+            const cells = [chip(b, b, justAddedBases.has(b))];
+            if (u !== null) cells.push(chip(u, u, false));
+            return cells;
+          }),
+          uppercaseToggle,
         )}
       {marks.length > 0 &&
         section(
           "alphabet-marks",
           `Marks (${marks.length})`,
           "Accents and other marks that attach to a letter.",
-          marks.map((m) => chip(m, prefixCombiningMark(m, true), justAddedMarks.has(m))),
+          // Bare diacritics: raw code-point order, not ICU (spec 047 refinement).
+          [...marks].sort(codePointCompare).map((m) => chip(m, prefixCombiningMark(m, true), justAddedMarks.has(m))),
         )}
       {attestedStacks.length > 0 &&
         section(
           "alphabet-accented",
           `Accented letters (${attestedStacks.length})`,
           "Letter-plus-mark combinations your language uses.",
-          attestedStacks.map((s) => {
-            const composed = composedStack(s);
-            return chip(composed, composed, justAddedStack === composed);
-          }),
+          collate(attestedStacks.map(composedStack)).map((composed) =>
+            chip(composed, composed, justAddedStack === composed),
+          ),
+        )}
+      {numbers.length > 0 &&
+        section(
+          "alphabet-numbers",
+          `Numbers (${numbers.length})`,
+          "Digits and other numeric characters.",
+          collate(numbers).map((c) => chip(c, c, false)),
+        )}
+      {punctuation.length > 0 &&
+        section(
+          "alphabet-punctuation",
+          `Punctuation (${punctuation.length})`,
+          "Punctuation marks.",
+          collate(punctuation).map((c) => chip(c, c, false)),
+        )}
+      {symbols.length > 0 &&
+        section(
+          "alphabet-symbols",
+          `Symbols (${symbols.length})`,
+          "Currency, math, and other symbols.",
+          collate(symbols).map((c) => chip(c, c, false)),
+        )}
+      {separators.length > 0 &&
+        section(
+          "alphabet-separators",
+          `Separators (${separators.length})`,
+          "Spaces and other separator characters (kept, not the ordinary space).",
+          collate(separators).map((c) => chip(c, displayChar(c), false)),
+        )}
+      {controls.length > 0 &&
+        section(
+          "alphabet-controls",
+          `Control/other (${controls.length})`,
+          "Invisible control or format characters that were kept.",
+          collate(controls).map((c) => chip(c, displayChar(c), false)),
         )}
     </section>
   );
@@ -733,12 +967,13 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
             character (for example: a b c ŋ ɛ), then press Enter or + Add.
           </Trans>
         </p>
-        <CharChipEditor chars={chars} onChange={setAll} autoFocus={false} />
+        <CharChipEditor chars={chars} onChange={setAll} autoFocus={false} bcp47={context.bcp47_tag} />
       </section>
 
-      {/* Section 3: visible three-store decomposition (spec 046 US5) —
-          renders only when the alphabet implies marks or accented letters. */}
-      <AlphabetBreakdown />
+      {/* Section 3: visible three-store decomposition (spec 046 US5) + the
+          spec-047 category sections — renders once the alphabet implies marks,
+          accented letters, or any non-letter category. */}
+      <AlphabetBreakdown bcp47={context.bcp47_tag} />
 
       {/* The character grid has moved to the right pane —
           see CharacterMapPane.tsx, rendered by StudioShell's SurveyView. */}
@@ -750,10 +985,18 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
           data-testid="phase-b-done"
           disabled={doneDisabled}
           onClick={() => {
+            // Record both cases (spec 047 FR-009): augment the captured
+            // inventory with each cased letter's locale-correct counterpart via
+            // the engine's caseCounterpart, deduped. A null counterpart
+            // (caseless script, or a multi-character expansion like ß→SS)
+            // contributes nothing (FR-010).
+            const derivedUppercases = chars
+              .map((c) => caseCounterpart(c, context.bcp47_tag)?.counterpart)
+              .filter((u): u is string => u != null);
             onComplete({
               phase: "B",
               answers: [],
-              confirmedInventory: chars,
+              confirmedInventory: nfcDedup(chars, derivedUppercases),
             });
           }}
           className="ks-focus-ring ks-hit-target"

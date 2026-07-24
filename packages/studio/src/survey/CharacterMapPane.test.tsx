@@ -30,6 +30,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import type { IRGroup } from "@keyboard-studio/contracts";
 import type { CharacterMapGroup } from "../lib/services.ts";
 
 // ---------------------------------------------------------------------------
@@ -126,6 +127,21 @@ function seedBaseAndLanguage(bcp47 = "yo", languageName = "Yoruba"): void {
   useWorkingCopyStore.getState().instantiateFromBase(TEST_BASE, {
     vfs: { files: new Map() },
     ir: makeTestIR([]),
+  });
+  useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: bcp47, language_name: languageName });
+}
+
+/** Seed a base whose IR PRODUCES the given glyphs (one rule per char). */
+function seedBaseProducing(produced: string[], bcp47 = "yo", languageName = "Yoruba"): void {
+  const rules = produced.map((c, i) => ({
+    nodeId: `rule#${i}`,
+    context: [{ kind: "vkey" as const, name: "K_A", modifiers: [] }],
+    output: [{ kind: "char" as const, value: c.normalize("NFC") }],
+  }));
+  const group: IRGroup = { nodeId: "group#main", name: "main", usingKeys: true, readonly: false, rules };
+  useWorkingCopyStore.getState().instantiateFromBase(TEST_BASE, {
+    vfs: { files: new Map() },
+    ir: makeTestIR([group]),
   });
   useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: bcp47, language_name: languageName });
 }
@@ -264,6 +280,152 @@ describe("CharacterMapPane — data path", () => {
     expect(usePhaseBDraftStore.getState().chars).not.toContain("a");
     const aButtonFinal = within(latinGroup).getByRole("button", { name: /Add a \(U\+0061\)/ });
     expect(aButtonFinal.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("hides uppercase letters of a cased script, showing only the lowercase (spec 047)", async () => {
+    seedBaseAndLanguage();
+    getGroupsResult.set([
+      {
+        block: "Latin",
+        tier: "main",
+        script: "Latn",
+        usedByBase: false,
+        cells: [
+          { char: "a", isCombiningMark: false },
+          { char: "A", isCombiningMark: false },
+          { char: "b", isCombiningMark: false },
+          { char: "B", isCombiningMark: false },
+        ],
+      },
+    ]);
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const group = screen.getByLabelText("Latin characters (main)");
+    // Lowercase shown…
+    expect(within(group).queryByRole("button", { name: /Add a \(U\+0061\)/ })).toBeTruthy();
+    expect(within(group).queryByRole("button", { name: /Add b \(U\+0062\)/ })).toBeTruthy();
+    // …uppercase counterparts hidden (recorded on Done instead).
+    expect(within(group).queryByRole("button", { name: /A \(U\+0041\)/ })).toBeNull();
+    expect(within(group).queryByRole("button", { name: /B \(U\+0042\)/ })).toBeNull();
+  });
+
+  it("clicking a cased letter adds BOTH cases to the alphabet; clicking again removes both (spec 047)", async () => {
+    seedBaseAndLanguage();
+    getGroupsResult.set([
+      {
+        block: "Latin",
+        tier: "main",
+        script: "Latn",
+        usedByBase: false,
+        cells: [
+          { char: "a", isCombiningMark: false },
+          { char: "b", isCombiningMark: false },
+        ],
+      },
+    ]);
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const group = screen.getByLabelText("Latin characters (main)");
+    fireEvent.click(within(group).getByRole("button", { name: /Add a \(U\+0061\)/ }));
+    // The lowercase and its (hidden) uppercase both join the alphabet.
+    expect(usePhaseBDraftStore.getState().chars).toContain("a");
+    expect(usePhaseBDraftStore.getState().chars).toContain("A");
+    // Clicking the now-selected cell removes both.
+    fireEvent.click(within(group).getByRole("button", { name: /Remove a \(U\+0061\)/ }));
+    expect(usePhaseBDraftStore.getState().chars).not.toContain("a");
+    expect(usePhaseBDraftStore.getState().chars).not.toContain("A");
+  });
+
+  it("tints base-keyboard output glyphs (with an accessible hint) until the author selects them", async () => {
+    // Base produces "a" but not "b".
+    seedBaseProducing(["a"]);
+    getGroupsResult.set([
+      {
+        block: "Latin",
+        tier: "main",
+        script: "Latn",
+        usedByBase: false,
+        cells: [
+          { char: "a", isCombiningMark: false },
+          { char: "b", isCombiningMark: false },
+        ],
+      },
+    ]);
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    // "a" is a base-output glyph → accessible name carries the base hint.
+    expect(
+      screen.getByRole("button", { name: /Add a \(U\+0061\) — from your base keyboard/ }),
+    ).toBeTruthy();
+    // "b" is not produced by the base → no hint.
+    expect(
+      screen.queryByRole("button", { name: /Add b \(U\+0062\) — from your base keyboard/ }),
+    ).toBeNull();
+    // Selecting "a" clears the base tint/hint (it is now a chosen alphabet char).
+    fireEvent.click(screen.getByRole("button", { name: /Add a \(U\+0061\) — from your base keyboard/ }));
+    expect(screen.queryByRole("button", { name: /from your base keyboard/ })).toBeNull();
+  });
+
+  it("shows only letters, numerals, and marks; excludes symbols and separators (spec 047)", async () => {
+    seedBaseAndLanguage();
+    getGroupsResult.set([
+      {
+        block: "Mixed",
+        tier: "main",
+        script: "Latn",
+        usedByBase: false,
+        cells: [
+          { char: "a", isCombiningMark: false }, // letter — kept
+          { char: "5", isCombiningMark: false }, // numeral — kept (word-forming)
+          { char: "́", isCombiningMark: true }, // combining mark — kept
+          { char: "€", isCombiningMark: false }, // symbol — excluded
+          { char: " ", isCombiningMark: false }, // NBSP separator — excluded
+        ],
+      },
+    ]);
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Mixed characters (main)")).toBeTruthy();
+    });
+    const group = screen.getByLabelText("Mixed characters (main)");
+    expect(within(group).queryByRole("button", { name: /Add a \(U\+0061\)/ })).toBeTruthy();
+    expect(within(group).queryByRole("button", { name: /Add 5 \(U\+0035\)/ })).toBeTruthy();
+    expect(within(group).queryByRole("button", { name: /\(U\+0301\)/ })).toBeTruthy(); // mark
+    expect(within(group).queryByRole("button", { name: /\(U\+20AC\)/ })).toBeNull(); // € symbol
+    expect(within(group).queryByRole("button", { name: /\(U\+00A0\)/ })).toBeNull(); // NBSP separator
+  });
+
+  it("shows the yellow base-output legend note when the base produces glyphs", async () => {
+    seedBaseProducing(["a"]);
+    getGroupsResult.set([
+      { block: "Latin", tier: "main", script: "Latn", usedByBase: false, cells: [{ char: "a", isCombiningMark: false }] },
+    ]);
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Characters outlined in yellow are available in your chosen base keyboard/i),
+      ).toBeTruthy();
+    });
+  });
+
+  it("omits the base-output legend note when the base produces nothing", async () => {
+    seedBaseAndLanguage(); // makeTestIR([]) — empty produced set
+    getGroupsResult.set([
+      { block: "Latin", tier: "main", script: "Latn", usedByBase: false, cells: [{ char: "a", isCombiningMark: false }] },
+    ]);
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    expect(
+      screen.queryByText(/Characters outlined in yellow are available in your chosen base keyboard/i),
+    ).toBeNull();
   });
 
   it("a cell already present in phaseBDraftStore.chars renders aria-pressed=true on mount", async () => {
@@ -522,7 +684,7 @@ describe("CharacterMapPane — raw code point entry", () => {
 // ---------------------------------------------------------------------------
 
 describe("CharacterMapPane — digits & punctuation tiers", () => {
-  it("renders the digits and punctuation tier labels", async () => {
+  it("renders the digits tier; punctuation/symbols are not shown on this page (spec 047)", async () => {
     seedBaseAndLanguage();
     getGroupsResult.set([
       {
@@ -545,7 +707,13 @@ describe("CharacterMapPane — digits & punctuation tiers", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("Digits characters (Digits & numerals)")).toBeTruthy();
     });
-    expect(screen.getByLabelText("Punctuation characters (Punctuation & symbols)")).toBeTruthy();
+    // Numerals are kept (some languages use digits word-formingly)…
+    expect(screen.getByRole("button", { name: /Add 0 \(U\+0030\)/ })).toBeTruthy();
+    // …but punctuation/symbols move to a later dedicated page — their group is
+    // filtered out here (every cell dropped → group not rendered).
+    expect(
+      screen.queryByLabelText("Punctuation characters (Punctuation & symbols)"),
+    ).toBeNull();
   });
 });
 
@@ -620,7 +788,11 @@ describe("CharacterMapPane — search filter", () => {
     ).toBeTruthy();
   });
 
-  it("matches by codepoint — 'U+0041', '0041', and the partial prefix '003'", async () => {
+  it("matches by codepoint — 'U+0061', '0061', and the partial prefix '003'", async () => {
+    // NOTE: uses lowercase 'a' (U+0061), not uppercase 'A': the map hides
+    // uppercase letters of cased scripts (spec 047 refinement), so an uppercase
+    // fixture would be filtered out of the grid entirely. This test exercises
+    // the code-point search mechanism, independent of casing.
     seedBaseAndLanguage();
     getGroupsResult.set([
       {
@@ -629,7 +801,7 @@ describe("CharacterMapPane — search filter", () => {
         script: "Latn",
         usedByBase: false,
         cells: [
-          { char: "A", isCombiningMark: false }, // U+0041
+          { char: "a", isCombiningMark: false }, // U+0061
           { char: "0", isCombiningMark: false }, // U+0030
           { char: "9", isCombiningMark: false }, // U+0039
         ],
@@ -642,17 +814,17 @@ describe("CharacterMapPane — search filter", () => {
     const group = screen.getByLabelText("Basic Latin characters (main)");
     const searchInput = screen.getByLabelText("Search the character map");
 
-    fireEvent.change(searchInput, { target: { value: "U+0041" } });
-    expect(within(group).queryByRole("button", { name: /A \(U\+0041\)/ })).toBeTruthy();
+    fireEvent.change(searchInput, { target: { value: "U+0061" } });
+    expect(within(group).queryByRole("button", { name: /a \(U\+0061\)/ })).toBeTruthy();
     expect(within(group).queryByRole("button", { name: /0 \(U\+0030\)/ })).toBeNull();
 
-    fireEvent.change(searchInput, { target: { value: "0041" } });
-    expect(within(group).queryByRole("button", { name: /A \(U\+0041\)/ })).toBeTruthy();
+    fireEvent.change(searchInput, { target: { value: "0061" } });
+    expect(within(group).queryByRole("button", { name: /a \(U\+0061\)/ })).toBeTruthy();
 
     fireEvent.change(searchInput, { target: { value: "003" } });
     expect(within(group).queryByRole("button", { name: /0 \(U\+0030\)/ })).toBeTruthy();
     expect(within(group).queryByRole("button", { name: /9 \(U\+0039\)/ })).toBeTruthy();
-    expect(within(group).queryByRole("button", { name: /A \(U\+0041\)/ })).toBeNull();
+    expect(within(group).queryByRole("button", { name: /a \(U\+0061\)/ })).toBeNull();
   });
 
   it("unchecking the Unicode value filter stops codepoint matches", async () => {
@@ -663,7 +835,7 @@ describe("CharacterMapPane — search filter", () => {
         tier: "main",
         script: "Latn",
         usedByBase: false,
-        cells: [{ char: "A", isCombiningMark: false }], // U+0041
+        cells: [{ char: "a", isCombiningMark: false }], // U+0061
       },
     ]);
     render(<CharacterMapPane />);
@@ -671,13 +843,13 @@ describe("CharacterMapPane — search filter", () => {
       expect(screen.getByLabelText("Basic Latin characters (main)")).toBeTruthy();
     });
     const searchInput = screen.getByLabelText("Search the character map");
-    fireEvent.change(searchInput, { target: { value: "0041" } });
+    fireEvent.change(searchInput, { target: { value: "0061" } });
     expect(screen.getByLabelText("Basic Latin characters (main)")).toBeTruthy();
 
     openSearchFilters();
     fireEvent.click(screen.getByLabelText("Search by Unicode value"));
     expect(
-      screen.queryByText('No characters match "0041".'),
+      screen.queryByText('No characters match "0061".'),
     ).toBeTruthy();
   });
 
@@ -940,12 +1112,13 @@ describe("CharacterMapPane — search filter", () => {
 // script like Yi (~1,165 letters) renders in full; still caps anything larger.
 // ---------------------------------------------------------------------------
 
-// Synthetic cells built from a run of PUA code points — unique `char` values
-// (required, since `cell.char` is the React key) without depending on any
-// real script having exactly N assigned letters.
+// Synthetic cells built from a run of CJK ideograph code points (U+4E00+) —
+// unique `char` values (required, since `cell.char` is the React key) that are
+// all \p{Lo} LETTERS, so they survive this page's letters/numerals/marks cell
+// filter (PUA would be dropped as non-letter "control").
 function syntheticCells(count: number): CharacterMapGroup["cells"] {
   return Array.from({ length: count }, (_, i) => ({
-    char: String.fromCodePoint(0xe000 + i),
+    char: String.fromCodePoint(0x4e00 + i),
     isCombiningMark: false,
   }));
 }
@@ -1160,8 +1333,10 @@ describe("CharacterMapPane — blocks-my-keyboard-uses filter", () => {
     // both render without needing to be toggled.
     seedBaseAndLanguage();
     getGroupsResult.set([
+      // Two caseless-script letters (Greek α is lowercase; Devanagari क is
+      // caseless) so neither is removed by the uppercase fold (spec 047).
       { block: "Letters", tier: "block", script: "Grek", usedByBase: false, cells: [{ char: "α", isCombiningMark: false }] },
-      { block: "Letters", tier: "block", script: "Cher", usedByBase: false, cells: [{ char: "Ꭰ", isCombiningMark: false }] },
+      { block: "Letters", tier: "block", script: "Deva", usedByBase: false, cells: [{ char: "क", isCombiningMark: false }] },
     ]);
     render(<CharacterMapPane />);
 
@@ -1169,7 +1344,7 @@ describe("CharacterMapPane — blocks-my-keyboard-uses filter", () => {
       expect(screen.getByRole("button", { name: /Add α \(U\+03B1\)/ })).toBeTruthy();
     });
     // Both cells render — neither same-key section was dropped/merged.
-    expect(screen.getByRole("button", { name: /Add Ꭰ \(U\+13A0\)/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Add क \(U\+0915\)/ })).toBeTruthy();
   });
 });
 

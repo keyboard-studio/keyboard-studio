@@ -22,12 +22,13 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { parseUPlusNotation, scriptSubtagOf, toUPlusNotation } from "@keyboard-studio/contracts";
+import { buildProducedSet, parseUPlusNotation, scriptSubtagOf, toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
-import { isPrivateUseCodePoint } from "@keyboard-studio/engine";
+import { casePairOf } from "./charNormUtils.ts";
+import { isPrivateUseCodePoint, caseCounterpart, glyphCategory } from "@keyboard-studio/engine";
 import { isCombining, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { ALL_FILTERS, matchesQuery, type SearchFilters } from "./characterSearch.ts";
 import { TextField, Checkbox } from "../ui/index.ts";
@@ -183,6 +184,12 @@ export function zoomPercent(zoom: number): number {
   return Math.round(zoom * 100);
 }
 
+// "Produced by the base keyboard, not yet in your alphabet" chip tint — a warm
+// amber BORDER only (the filled background read as too distracting); paired with
+// an accessible-name hint (never colour alone) so the signal is not
+// colour-dependent.
+const BASE_OUTPUT_BORDER = "#c9a227";
+
 interface CharacterMapPaneProps {
   // Per-group render cap. Defaults to MAX_CELLS_PER_GROUP; overridable only so
   // tests can exercise the exact slice/"Showing N of M" logic with a small cap
@@ -202,8 +209,8 @@ export function CharacterMapPane({
   const languageName = surveyContext.language_name;
 
   const chars = usePhaseBDraftStore((s) => s.chars);
-  const toggle = usePhaseBDraftStore((s) => s.toggle);
   const addChar = usePhaseBDraftStore((s) => s.add);
+  const removeChar = usePhaseBDraftStore((s) => s.remove);
   const glyphFontStack = useGlyphFontStack();
   const isGlyphSupported = useFontSupportChecker(glyphFontStack);
 
@@ -351,6 +358,16 @@ export function CharacterMapPane({
     [loadState],
   );
 
+  // Every glyph the base keyboard already produces (NFC). Cells for these are
+  // tinted yellow in the grid UNTIL the author selects them into the alphabet —
+  // a "your base already types this" affordance. Browser-safe, memoized on the
+  // base IR (no I/O). Empty set when there is no base IR.
+  const baseProduced = useMemo<Set<string>>(
+    () => (baseIr !== null ? buildProducedSet(baseIr) : new Set<string>()),
+    [baseIr],
+  );
+
+
   // Client-side filter — plain array filter, no timer of any kind. Search is
   // ALWAYS whole-set: when a query is present it searches every loaded group
   // regardless of the "blocks my keyboard uses" checkbox, so a query can
@@ -364,19 +381,39 @@ export function CharacterMapPane({
   // the checkbox stays checked.
   const filteredGroups = useMemo(() => {
     if (loadState.status !== "done") return [];
+    // Two cell folds applied before search/blocks filtering (spec 047):
+    //   1. Cased-script fold — drop the uppercase of a case pair so the map
+    //      offers only the lowercase (its uppercase joins the alphabet on
+    //      select and is recorded on Done).
+    //   2. This page shows only LETTERS, NUMERALS, and MARKS. Numerals are kept
+    //      because some languages use digits word-formingly. Punctuation,
+    //      symbols, separators, and control/format characters move to a later
+    //      dedicated page.
+    const cased = loadState.groups
+      .map((g) => ({
+        ...g,
+        cells: g.cells.filter((c) => {
+          const nfc = c.char.normalize("NFC");
+          if (caseCounterpart(nfc, bcp47)?.direction === "toLower") return false;
+          if (c.isCombiningMark) return true; // marks (\p{M}) — glyphCategory folds these to "control"
+          const cat = glyphCategory(nfc);
+          return cat === "letter" || cat === "number";
+        }),
+      }))
+      .filter((g) => g.cells.length > 0);
     const q = query.trim();
     if (q !== "") {
-      return loadState.groups
+      return cased
         .map((g) => ({ ...g, cells: g.cells.filter((c) => matchesQuery(c, q, searchFilters)) }))
         .filter((g) => g.cells.length > 0);
     }
     if (blocksOnly && hasKnownBlocks) {
-      return loadState.groups.filter(
+      return cased.filter(
         (g) => g.usedByBase || g.cells.some((c) => chars.includes(c.char.normalize("NFC"))),
       );
     }
-    return loadState.groups;
-  }, [loadState, query, searchFilters, blocksOnly, hasKnownBlocks, chars]);
+    return cased;
+  }, [loadState, query, searchFilters, blocksOnly, hasKnownBlocks, chars, bcp47]);
 
   // Defined here (not at module scope) so its `t()` calls close over this
   // component's own `t` binding directly — see the note above CodepointParseResult.
@@ -413,7 +450,18 @@ export function CharacterMapPane({
   function handleToggle(cell: CharacterMapCell): void {
     const nfc = cell.char.normalize("NFC");
     const wasSelected = chars.includes(nfc);
-    toggle(cell.char);
+    // Selecting a cased letter adds BOTH cases (its uppercase is hidden in the
+    // map but joins the alphabet); deselecting removes both. "Your alphabet"
+    // mirrors this — removing a letter there removes both cases too.
+    const pair = casePairOf(nfc, bcp47);
+    if (wasSelected) {
+      for (const p of pair) if (chars.includes(p)) removeChar(p);
+    } else {
+      // Add the counterpart(s) first, then the clicked char, so lastPick (used
+      // by the visible-decomposition announcement) reflects the clicked char.
+      for (const p of pair.slice(1)) addChar(p);
+      addChar(cell.char);
+    }
     const actionWord = wasSelected
       ? t({ id: "survey.characterMapPane.announce.removed", message: "Removed" })
       : t({ id: "survey.characterMapPane.announce.added", message: "Added" });
@@ -457,6 +505,10 @@ export function CharacterMapPane({
       setRawError(null);
       return;
     }
+    // NOTE: the raw code-point field is a deliberate "add ANY exact character"
+    // power tool — it does NOT fold uppercase to lowercase (unlike the main
+    // "Type your alphabet" box), so an author can still reach a specific scalar
+    // value here when they mean it.
     addChar(char);
     const addedLabel = t({ id: "survey.characterMapPane.announce.added", message: "Added" });
     // Same bare-combining-mark concern as handleToggle's announcement — the
@@ -618,6 +670,13 @@ export function CharacterMapPane({
           list you're building on the left.
         </Trans>
       </p>
+      {baseProduced.size > 0 && (
+        <p style={{ margin: 0, fontSize: 12, color: BASE_OUTPUT_BORDER, lineHeight: 1.5 }}>
+          <Trans id="survey.characterMapPane.baseOutputNote">
+            Note: Characters outlined in yellow are available in your chosen base keyboard.
+          </Trans>
+        </p>
+      )}
       <form
         onSubmit={handleRawSubmit}
         style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}
@@ -1026,17 +1085,32 @@ export function CharacterMapPane({
                         // the mark fine. A standalone mark must always show the
                         // dotted circle, never a box.
                         const glyphRenders = cell.isCombiningMark || isGlyphSupported(display);
+                        // Yellow "your base keyboard already types this" affordance,
+                        // shown until the author selects the glyph into the alphabet.
+                        const isBaseOutput = !selected && baseProduced.has(cell.char.normalize("NFC"));
                         const actionLabel = selected
                           ? t({ id: "survey.characterMapPane.cell.removeAction", message: "Remove" })
                           : t({ id: "survey.characterMapPane.cell.addAction", message: "Add" });
+                        // Accessible name carries the base-output fact (never colour
+                        // alone) so screen-reader users get the same signal.
+                        const baseOutputHint = isBaseOutput
+                          ? t({
+                              id: "survey.characterMapPane.cell.fromBase",
+                              message: " — from your base keyboard",
+                            })
+                          : "";
                         return (
                           <button
                             key={cell.char}
                             type="button"
                             onClick={() => handleToggle(cell)}
                             aria-pressed={selected}
-                            aria-label={`${actionLabel} ${cell.char} (${cp})`}
-                            style={charChip(selected, zoom)}
+                            aria-label={`${actionLabel} ${cell.char} (${cp})${baseOutputHint}`}
+                            style={
+                              isBaseOutput
+                                ? { ...charChip(false, zoom), border: `1px solid ${BASE_OUTPUT_BORDER}` }
+                                : charChip(selected, zoom)
+                            }
                           >
                             {glyphRenders ? (
                               <span style={chipGlyph(selected, glyphFontStack, zoom)}>{display}</span>
