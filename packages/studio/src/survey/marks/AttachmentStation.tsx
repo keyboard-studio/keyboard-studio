@@ -49,7 +49,12 @@ function AttachmentRow({
   onToggle: (base: string, next: boolean) => void;
 }) {
   const { t } = useLingui();
-  const checkedBases = bases.filter((b) => checked[b] === true);
+  // Derive from the checked map's own keys, not the (folded) display `bases`
+  // list: a mark attested only on an uppercase base is still confirmed on that
+  // base even though the base is folded out of the displayed lowercase choices
+  // (spec 049). Filtering the display list would render a blank "confirmed on"
+  // summary for such a mark. The worklist is unaffected either way.
+  const checkedBases = Object.keys(checked).filter((b) => checked[b] === true);
   const body = (
     <>
       <p style={{ ...mutedParaFlush, margin: "6px 0" }}>

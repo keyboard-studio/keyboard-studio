@@ -230,6 +230,32 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
     );
   });
 
+  it("a mark attested ONLY on the uppercase base still names that base in the confirmed summary", () => {
+    // Regression: the auto-confirmed summary derives its confirmed-base list
+    // from the checked map's own keys, not the folded (lowercase-only) display
+    // list. With acute attested only on "E" (never on "e"), "E" is folded out
+    // of the offered choices but must still appear as the confirmed base — a
+    // blank "confirmed on" summary would misrepresent what is attached.
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "B",
+      answers: [],
+      alphabet: {
+        bases: ["e", "E"],
+        marks: [ACUTE],
+        attestedStacks: [{ base: "E", marks: [ACUTE] }],
+        declaredRoles: {},
+      },
+    });
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    const row = screen.getByTestId("attachment-row-U+0301");
+    expect(row.tagName.toLowerCase()).toBe("details"); // auto-confirmed
+    expect(row.textContent).toContain("confirmed on");
+    // The confirmed grapheme is the accented capital, not a blank.
+    expect(row.querySelector("strong")?.textContent).toBe(("E" + ACUTE).normalize("NFC"));
+  });
+
   it("US2/SC-002: attaching a mark to lowercase bases still produces the uppercase counterparts in the worklist", () => {
     seedCasedAlphabet();
     const onComplete = vi.fn();

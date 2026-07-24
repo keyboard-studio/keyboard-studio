@@ -1654,6 +1654,36 @@ describe('annotateRemovalRecommendations', () => {
     expect(group?.recommendation).toBe('none');
   });
 
+  it("does NOT recommend removing a cross-combining-class grapheme when its attested stack is typed in non-canonical order (Vietnamese ậ, base-plus-mark/NFD seam)", () => {
+    // Regression (km-domain, PR #1358): an AttestedStack preserves the author's
+    // TYPED mark order (deriveCarveNeededSet emits it verbatim under
+    // base-plus-mark). For Vietnamese ậ the typed order is circumflex (ccc 230)
+    // then dot-below (ccc 220) — the REVERSE of Unicode's canonical
+    // (ascending-ccc) order. The keyboard produces the grapheme in canonical
+    // NFD order. If only the produced side were normalized, the needed literal
+    // and produced literal would not string-match and carve would falsely flag
+    // a still-needed grapheme as surplus. annotateRemovalRecommendations
+    // normalizes BOTH sides to `form`, so under NFD the two collapse to the
+    // same string and the node is correctly kept.
+    const CIRCUMFLEX = '̂'; // ccc 230
+    const DOT_BELOW = '̣'; // ccc 220
+    const canonicalOrder = 'a' + DOT_BELOW + CIRCUMFLEX; // what the keyboard produces (NFD)
+    const typedOrder = 'a' + CIRCUMFLEX + DOT_BELOW; // the attested/needed literal
+    expect(typedOrder).not.toBe(canonicalOrder); // orders genuinely differ
+
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule-1', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: canonicalOrder }] }],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set([typedOrder]), undefined, undefined, 'NFD');
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
   it("returns 'none' for every node when the confirmed inventory is empty (Phase B not completed)", () => {
     const ir = makeIR({
       groups: [makeGroup([makeCharOnlyRule()])],

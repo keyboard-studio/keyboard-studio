@@ -10,7 +10,8 @@ import { deriveCarveNeededSet } from "./carve-needed-set.js";
 
 const ACUTE = "́";
 const CEDILLA = "̧";
-const CIRCUMFLEX = "̂";
+const CIRCUMFLEX = "̂"; // U+0302, combining class 230
+const DOT_BELOW = "̣"; // U+0323, combining class 220
 
 describe("deriveCarveNeededSet", () => {
   it("fallback: absent worklist degrades to the whole confirmedInventory projection (pre-046 behavior)", () => {
@@ -194,6 +195,47 @@ describe("deriveCarveNeededSet", () => {
 
     expect(result.requiredPrimary.has("é")).toBe(true);
     expect(result.blockCandidates).toEqual([{ base: "e", mark: ACUTE }]);
+  });
+
+  it("cross-combining-class stack (Vietnamese ậ): typed order preserved verbatim under base-plus-mark, and collapses to the produced grapheme once the comparison seam normalizes", () => {
+    // circumflex (ccc 230) is typed/attested BEFORE dot-below (ccc 220), so the
+    // author's stacking order is the REVERSE of Unicode's canonical
+    // (ascending-ccc) order. composeCombo must never re-derive canonical order
+    // (that would erase the order-distinct-stack contract), so under
+    // base-plus-mark the needed literal is preserved verbatim.
+    const alphabet = makeConfirmedAlphabet({
+      bases: ["a"],
+      marks: [CIRCUMFLEX, DOT_BELOW],
+      attestedStacks: [{ base: "a", marks: [CIRCUMFLEX, DOT_BELOW] }],
+    });
+    const worklist: PlacementWorklist = {
+      ownLetterUnits: ["a"],
+      markUnits: [
+        { mark: CIRCUMFLEX, inputOrder: "postfix" },
+        { mark: DOT_BELOW, inputOrder: "postfix" },
+      ],
+      blockedCombinations: [],
+    };
+    const readyMade = deriveCarveNeededSet({ alphabet, worklist, outputForm: "ready-made" });
+    const basePlusMark = deriveCarveNeededSet({ alphabet, worklist, outputForm: "base-plus-mark" });
+
+    // ready-made NFC-composes to the precomposed grapheme U+1EAD (ậ).
+    expect(readyMade.requiredPrimary.has("ậ")).toBe(true);
+
+    // base-plus-mark preserves the author's typed order verbatim — NOT the
+    // canonical NFD order (which puts dot-below before circumflex).
+    const verbatim = "a" + CIRCUMFLEX + DOT_BELOW;
+    const canonical = "a" + DOT_BELOW + CIRCUMFLEX;
+    expect(basePlusMark.requiredPrimary.has(verbatim)).toBe(true);
+    expect(verbatim.normalize("NFD")).toBe(canonical); // typed order != canonical
+
+    // The carve comparison seam (annotateRemovalRecommendations / CarveGallery's
+    // neededSet) normalizes BOTH the needed literal and the produced literal to
+    // the output form's normalization form (base-plus-mark => NFD) before
+    // matching. So a produced "ậ" (in either typed or canonical order) collapses
+    // to the SAME string as this needed literal — no false "surplus" removal.
+    expect(verbatim.normalize("NFD")).toBe("ậ".normalize("NFD"));
+    expect(verbatim.normalize("NFD")).toBe(canonical.normalize("NFD"));
   });
 
   it("outputForm 'base-plus-mark' leaves the combo literal (no NFC compose attempt)", () => {
