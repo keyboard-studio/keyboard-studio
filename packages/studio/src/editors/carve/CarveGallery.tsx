@@ -357,9 +357,21 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   // is the SAME neededChars ∪ tieredNeededSet union annotateRemovalRecommendations
   // computes internally, pre-unioned here so recommendedRemovalChars (a pure
   // character-granularity pass) doesn't need to know about the two-signal shape.
+  // Members are normalized to carveNormalizationForm at construction: this set
+  // is the `coveringSet`/`needed` argument to recommendedRemovalChars,
+  // coordinatedCollateralForSlots, and buildPendingCascade — all passed
+  // `form: carveNormalizationForm` — and isCharCoveredForLocale's contract
+  // requires the covering set to already be normalized to that form. Skipping
+  // this silently mismatches the collateral-safety check under NFD
+  // (base-plus-mark output), which can miss warning about deleting a
+  // still-needed decomposed character. Mirrors the renormalize helper in
+  // annotateRemovalRecommendations.
   const neededSet = useMemo(
-    () => (neededChars ? new Set([...neededChars, ...tieredNeededSet]) : tieredNeededSet),
-    [neededChars, tieredNeededSet],
+    () => new Set(
+      [...(neededChars ? [...neededChars, ...tieredNeededSet] : tieredNeededSet)]
+        .map((ch) => ch.normalize(carveNormalizationForm)),
+    ),
+    [neededChars, tieredNeededSet, carveNormalizationForm],
   );
   const recommendedChars = useMemo(
     () => (instantiationMode !== null && (tieredNeededSet.size > 0 || neededChars !== null) && ir
