@@ -116,6 +116,7 @@
   "survey.phaseB.charChipEditor.groupAriaLabel": "Caractères accumulés — cliquer pour supprimer",
   "editor.trackStep.adaptTitle": "Adapter",
   "survey.characterMapPane.rawInput.addButton": "Ajouter",
+  "survey.characterMapPane.baseOutputNote": "Remarque : les caractères entourés en jaune sont disponibles dans le clavier de base que vous avez choisi.",
   "survey.characterMapPane.cell.addAction": "Ajouter",
   "survey.characterMapPane.cell.fromBase": " — depuis votre clavier de base",
   "survey.phaseB.suggestionChip.addAction": "Ajouter",
