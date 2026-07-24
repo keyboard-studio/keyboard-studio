@@ -17,7 +17,7 @@ export interface SelectMenuOption {
 }
 
 export interface SelectMenuProps {
-  options: SelectMenuOption[];
+  options: readonly SelectMenuOption[];
   /** Currently selected value. */
   value: string;
   onChange: (value: string) => void;
@@ -31,6 +31,13 @@ export interface SelectMenuProps {
   /** Same idiom as `RadioGroup`'s `required` prop (RadioGroup.tsx) — sets
    * `aria-required` on the trigger button. */
   required?: boolean;
+  /**
+   * Value for `aria-label` on the trigger button — for call sites with no
+   * sibling label element to reference (mirrors how a native `<select>`
+   * often carries a bare `aria-label` string instead of `aria-labelledby`).
+   * Ignored if `ariaLabelledby` is also set.
+   */
+  ariaLabel?: string;
   /**
    * Style override merged onto the trigger button, on top of the default
    * `TRIGGER_STYLE` — same "callers may override, merged not replaced" idiom
@@ -153,6 +160,7 @@ export function SelectMenu({
   id,
   ariaLabelledby,
   required,
+  ariaLabel,
   style,
   renderOptionLabel = defaultRenderLabel,
 }: SelectMenuProps): React.ReactElement {
@@ -280,6 +288,11 @@ export function SelectMenu({
         aria-controls={listId}
         aria-labelledby={ariaLabelledby}
         aria-required={required}
+        aria-label={ariaLabelledby === undefined ? ariaLabel : undefined}
+        // Not read by the component itself — a stable, value-based test hook
+        // mirroring a native <select>'s own `.value`, since callers can no
+        // longer read that off this button directly.
+        data-value={value}
         className={mergeClassNames("ks-control ks-focus-ring ks-hit-target")}
         style={{ ...TRIGGER_STYLE, ...style }}
         onClick={() => setOpen((prev) => !prev)}
@@ -307,6 +320,11 @@ export function SelectMenu({
                 role="option"
                 id={optionId}
                 aria-selected={isSelected}
+                // Not read by the component itself — a stable, value-based
+                // test hook so specs can select an option without depending
+                // on exact label text/formatting (mirrors how tests used to
+                // query a native <option value="...">).
+                data-value={opt.value}
                 className={OPTION_ROW_CLASSNAME}
                 onClick={() => selectOption(opt)}
                 style={{

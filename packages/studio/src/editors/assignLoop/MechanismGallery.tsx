@@ -94,19 +94,22 @@ import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { RadioGroup } from "../../ui/RadioGroup.tsx";
+import { SelectMenu, type SelectMenuOption } from "../../ui/SelectMenu.tsx";
 import {
   BG_PAGE, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
   galleryPageStyle as pageStyle,
   galleryGhostBtn as ghostBtn,
   galleryInputStyle as inputStyle,
   galleryForwardBtnStyle as forwardBtnStyle,
-  gallerySelectStyle as selectStyle,
+  gallerySelectMenuStyle,
 } from "../../lib/galleryTheme.ts";
 import { PATTERN_SEQUENCE, PATTERN_DEADKEY, PATTERN_SWAP, PATTERN_RALT } from "./patternIds.ts";
 
 // Re-exported for existing importers that reach the pattern id constants via
 // this module; the canonical declarations now live in ./patternIds.ts.
 export { PATTERN_SEQUENCE, PATTERN_DEADKEY, PATTERN_SWAP, PATTERN_RALT };
+
+const selectStyle: CSSProperties = gallerySelectMenuStyle(140);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -463,9 +466,8 @@ const VALID_DEADKEY_TRIGGER_KEYS: ReadonlySet<string> = new Set(
 );
 
 // selectStyle — used by the S-08 layer-combo dropdowns (the modifier-token
-// <select>s); the base-key picker itself uses KeyPickerField, which carries its
-// own internal style. Imported (aliased) from ../../lib/galleryTheme.ts so it
-// stays byte-identical with TouchGallery's key/mechanism <select>s.
+// SelectMenus); the base-key picker itself uses KeyPickerField, which carries
+// its own internal style.
 
 // Static styles shared across MethodChooser renders — none depend on props or
 // state, so they are hoisted to module scope rather than recreated per render.
@@ -916,33 +918,32 @@ function MethodChooser({
                 </span>
                 {raltTokens.map((token, index) => {
                   const options = optionsForRaltSlot(modifierPool, raltTokens, index);
+                  const raltSlotOptions: SelectMenuOption[] = [
+                    { value: "", label: t({ id: "editor.assignLoop.ralt.selectPlaceholder", message: "— Select —" }) },
+                    ...options.map((o) => ({
+                      value: o,
+                      label: modifierTokensInUse.has(o)
+                        ? `${o}${t({ id: "editor.assignLoop.ralt.inUseSuffix", message: " (in use)" })}`
+                        : o,
+                    })),
+                  ];
                   return (
                     <div key={index} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <select
+                      <SelectMenu
                         value={token}
-                        onChange={(e) => onRaltTokenChange(index, e.target.value)}
-                        aria-label={t({
+                        onChange={(v) => onRaltTokenChange(index, v)}
+                        ariaLabel={t({
                           id: "editor.assignLoop.ralt.layerSlotAriaLabel",
                           message: `Layer ${index + 1} for layer-switch combo`,
                         })}
+                        options={raltSlotOptions}
+                        renderOptionLabel={(opt) =>
+                          modifierTokensInUse.has(opt.value as ModifierToken)
+                            ? <span style={{ fontWeight: 700 }}>{opt.label}</span>
+                            : opt.label
+                        }
                         style={selectStyle}
-                      >
-                        <option value="">
-                          <Trans id="editor.assignLoop.ralt.selectPlaceholder">— Select —</Trans>
-                        </option>
-                        {options.map((o) => (
-                          <option
-                            key={o}
-                            value={o}
-                            style={modifierTokensInUse.has(o) ? { fontWeight: 700 } : undefined}
-                          >
-                            {o}
-                            {modifierTokensInUse.has(o)
-                              ? t({ id: "editor.assignLoop.ralt.inUseSuffix", message: " (in use)" })
-                              : ""}
-                          </option>
-                        ))}
-                      </select>
+                      />
                       {index > 0 && (
                         <button
                           type="button"

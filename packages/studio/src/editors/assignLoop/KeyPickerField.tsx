@@ -1,7 +1,8 @@
-// KeyPickerField — a key-picker <select> plus an optional "Enter my own
-// character..." custom-character text input, shared by every key-picker
-// dropdown in MechanismGallery (deadkey trigger, S-01 swap, S-08 ralt) and
-// TouchGallery (long-press / flick / multitap / replace host key).
+// KeyPickerField — a key-picker ui/SelectMenu (native <select> popups don't
+// open in the VS Code webview) plus an optional "Enter my own character..."
+// custom-character text input, shared by every key-picker dropdown in
+// MechanismGallery (deadkey trigger, S-01 swap, S-08 ralt) and TouchGallery
+// (long-press / flick / multitap / replace host key).
 //
 // Resolution (which physical key the current selection/typed text maps to)
 // is computed by the pure resolveKeyPickerSelection() helper in
@@ -17,23 +18,16 @@
 
 import type { CSSProperties } from "react";
 import { Trans } from "@lingui/react/macro";
+import { SelectMenu, type SelectMenuOption } from "../../ui/SelectMenu.tsx";
 import { CUSTOM_KEY_OPTION, CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 import {
   resolveKeyPickerSelection,
   reflectCharInput,
   type KeyPickerResolveOptions,
 } from "../../lib/charInput.ts";
-import { BG_PAGE, BORDER, TEXT_MAIN, TEXT_DIM, FONT } from "../../lib/galleryTheme.ts";
+import { BG_PAGE, BORDER, TEXT_MAIN, TEXT_DIM, FONT, gallerySelectMenuStyle } from "../../lib/galleryTheme.ts";
 
-const selectStyle: CSSProperties = {
-  background: BG_PAGE,
-  border: `1px solid ${BORDER}`,
-  borderRadius: 4,
-  color: TEXT_MAIN,
-  fontSize: 12,
-  padding: "4px 8px",
-  fontFamily: FONT,
-};
+const selectStyle: CSSProperties = gallerySelectMenuStyle(170);
 
 const customInputStyle: CSSProperties = {
   width: 90,
@@ -87,22 +81,20 @@ export function KeyPickerField({
   // success line still reads e.g. "; → U+003B → K_SEMI" or
   // "U+0041 → A → K_A".
   const reflection = reflectCharInput(customChar, resolveOptions);
+  const selectMenuOptions: SelectMenuOption[] = [
+    ...options,
+    { value: CUSTOM_KEY_OPTION_VALUE, label: CUSTOM_KEY_OPTION.label },
+  ];
 
   return (
     <span style={{ display: "inline-flex", flexDirection: "column", gap: 4 }}>
-      <select
+      <SelectMenu
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label={selectAriaLabel}
+        onChange={onChange}
+        ariaLabel={selectAriaLabel}
+        options={selectMenuOptions}
         style={selectStyle}
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-        <option value={CUSTOM_KEY_OPTION_VALUE}>{CUSTOM_KEY_OPTION.label}</option>
-      </select>
+      />
       {isCustom && (
         <span style={{ display: "inline-flex", flexDirection: "column", gap: 2 }}>
           <span style={{ fontSize: 10, color: TEXT_DIM, fontFamily: FONT }}>
