@@ -85,7 +85,7 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 ### Tests for User Story 2
 
 - [x] T024 [P] [US2] Extractor test: control fields excluded, prose extracted, from a sample pattern + adaptation-question YAML (#1263)
-- [ ] T025 [P] [US2] `criteria.<lang>.json` satisfies `CriterionSchema`; the 148-row count test still reads only the canonical English `criteria.json` (#1264)
+- [x] T025 [P] [US2] `criteria.<lang>.json` satisfies `CriterionSchema`; the 148-row count test still reads only the canonical English `criteria.json` (#1264)
 
 ### Implementation for User Story 2
 

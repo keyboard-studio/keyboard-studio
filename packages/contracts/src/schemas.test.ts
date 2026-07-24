@@ -16,6 +16,7 @@ import {
   toPattern,
 } from "./schemas";
 import { samplePatterns } from "./fixtures/patterns";
+import { ALL_CRITERIA } from "./criteriaData";
 import criteriaJsonRaw from "../data/criteria.json" with { type: "json" };
 
 // -----------------------------------------------------------------------------
@@ -256,6 +257,56 @@ describe("CriterionSchema (spec §11)", () => {
       id: "1.5-x", section: "1. Test", band: "purple-haze", description: "x",
     });
     expect(result.success).toBe(false);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Localized criteria.<lang>.json contract (spec 046 D7 / T025)
+//
+// packages/contracts/data/criteria.<lang>.json does not exist yet (ships with
+// T029); this fixture stands in for one so the contract is pinned ahead of
+// that work, per the tasks-before-implementation ordering for User Story 2.
+// A localized file is the canonical criteria.json with `description` (and
+// `preSubmitChecklistText` on red-checklist rows) translated — every other
+// field, including the four band-hook fields, is byte-identical.
+// -----------------------------------------------------------------------------
+
+describe("localized criteria.<lang>.json contract (spec 046 D7)", () => {
+  const localizedFixture = (criteriaJsonRaw as Array<Record<string, unknown>>).map(
+    (c) => ({
+      ...c,
+      description: `[fr] ${c.description as string}`,
+      ...("preSubmitChecklistText" in c
+        ? { preSubmitChecklistText: `[fr] ${c.preSubmitChecklistText as string}` }
+        : {}),
+    })
+  );
+
+  it("a localized catalog (translated prose only) satisfies CriterionSchema", () => {
+    const result = CriterionSchema.array().safeParse(localizedFixture);
+    expect(result.success, result.success ? "" : JSON.stringify(result.error?.issues?.slice(0, 5))).toBe(true);
+  });
+
+  it("a localized catalog keeps the same ids, bands, and hooks as the canonical file", () => {
+    const english = CriterionSchema.array().parse(criteriaJsonRaw);
+    const localized = CriterionSchema.array().parse(localizedFixture);
+    expect(localized.map((c) => c.id)).toEqual(english.map((c) => c.id));
+    expect(localized.map((c) => c.band)).toEqual(english.map((c) => c.band));
+  });
+
+  it("rejects a localized catalog that drops or reorders a row relative to the canonical file", () => {
+    const truncated = localizedFixture.slice(1);
+    const english = CriterionSchema.array().parse(criteriaJsonRaw);
+    const localized = CriterionSchema.array().parse(truncated);
+    expect(localized.length).not.toBe(english.length);
+  });
+
+  it("the canonical row count (ALL_CRITERIA) is derived only from criteria.json, never a sibling locale file", () => {
+    // criteriaData.ts's ALL_CRITERIA statically imports only ../data/criteria.json.
+    // This pins that invariant: its length always equals the canonical file's
+    // row count, so a criteria.<lang>.json sitting alongside it in data/ can
+    // never inflate the count the partition tests (types.test.ts) read from.
+    expect(ALL_CRITERIA.length).toBe(criteriaJsonRaw.length);
   });
 });
 
