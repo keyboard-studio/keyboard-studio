@@ -26,7 +26,12 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore, type DiscoveryMethod } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { useGlyphFontStack } from "./useGlyphFontStack.ts";
-import { nfcDedup, harvestChars, casePairOf } from "./charNormUtils.ts";
+import {
+  nfcDedup,
+  harvestChars,
+  casePairOf,
+  lowercaseBaseView,
+} from "./charNormUtils.ts";
 import { codepointLabel } from "./codepointLabel.ts";
 import { collate, codePointCompare } from "./collation.ts";
 import { glyphCategory, isCombiningMarkChar, caseCounterpart } from "@keyboard-studio/engine";
@@ -266,12 +271,8 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47 }: CharChipE
     const cc = caseCounterpart(b, bcp47);
     return cc?.direction === "toUpper" ? cc.counterpart : null;
   };
-  const hiddenUppers = new Set<string>();
-  for (const b of letters) {
-    const u = upperOf(b);
-    if (u !== null) hiddenUppers.add(u);
-  }
-  const displayLetters = collate(letters.filter((b) => !hiddenUppers.has(b)));
+  // Single source of truth with the marks step (spec 049, FR-006).
+  const displayLetters = collate(lowercaseBaseView(letters, bcp47));
   // Count reflects the collapsed lowercase/caseless units + bare marks.
   const unitCount = displayLetters.length + bareMarks.length;
   const hasCasedLetter = letters.some((b) => upperOf(b) !== null);
@@ -750,12 +751,8 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
     const cc = caseCounterpart(b, bcp47);
     return cc?.direction === "toUpper" ? cc.counterpart : null;
   };
-  const hiddenUppers = new Set<string>();
-  for (const b of bases) {
-    const u = upperOf(b);
-    if (u !== null) hiddenUppers.add(u);
-  }
-  const displayBases = collate(bases.filter((b) => !hiddenUppers.has(b)));
+  // Single source of truth with the marks step (spec 049, FR-006).
+  const displayBases = collate(lowercaseBaseView(bases, bcp47));
 
   const uppercaseToggle = (
     <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: TEXT_DIM, cursor: "pointer" }}>

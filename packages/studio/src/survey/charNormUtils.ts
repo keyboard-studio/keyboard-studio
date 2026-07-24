@@ -70,6 +70,58 @@ export function casePairOf(c: string, bcp47?: string): string[] {
   return cc !== null ? [c, cc.counterpart] : [c];
 }
 
+// ---------------------------------------------------------------------------
+// Casing fold — shared source of truth for the character step (PhaseB) and the
+// marks step (spec 049, FR-006). Fold an uppercase base behind its lowercase
+// counterpart only when that counterpart is actually present; caseless /
+// uppercase-only-without-lowercase input is left untouched.
+// ---------------------------------------------------------------------------
+
+/** The uppercase counterpart of `b` when `b` is a cased lowercase letter, else null. */
+function upperCounterpartOf(b: string, bcp47?: string): string | null {
+  const cc = caseCounterpart(b, bcp47);
+  return cc?.direction === "toUpper" ? cc.counterpart : null;
+}
+
+/**
+ * The set of uppercase bases hidden behind a present lowercase counterpart:
+ * for each base whose lowercase counterpart maps up, that uppercase is hidden
+ * (FR-001). Caseless / uppercase-only-without-lowercase input yields an empty
+ * set (FR-004).
+ */
+export function hiddenUppercaseBases(bases: string[], bcp47?: string): Set<string> {
+  const hidden = new Set<string>();
+  for (const b of bases) {
+    const u = upperCounterpartOf(b, bcp47);
+    if (u !== null) hidden.add(u);
+  }
+  return hidden;
+}
+
+/**
+ * `bases` with the hidden uppercases removed, order preserved — the displayed
+ * choice list (FR-001). Caseless input returns `bases` unchanged (FR-004).
+ */
+export function lowercaseBaseView(bases: string[], bcp47?: string): string[] {
+  const hidden = hiddenUppercaseBases(bases, bcp47);
+  return bases.filter((b) => !hidden.has(b));
+}
+
+/**
+ * Count of shown lowercase bases whose uppercase counterpart is also present in
+ * `bases` — the "capitals follow automatically" affordance count (FR-005). Zero
+ * for caseless input (FR-004).
+ */
+export function casedBaseCount(bases: string[], bcp47?: string): number {
+  const present = new Set(bases);
+  let count = 0;
+  for (const b of bases) {
+    const u = upperCounterpartOf(b, bcp47);
+    if (u !== null && present.has(u)) count++;
+  }
+  return count;
+}
+
 export function harvestChars(raw: string): { chars: string[]; unusual: string[] } {
   const kept: string[] = [];
   const unusualRaw: string[] = [];
