@@ -365,6 +365,35 @@ describe("CharacterMapPane — data path", () => {
     expect(screen.queryByRole("button", { name: /from your base keyboard/ })).toBeNull();
   });
 
+  it("shows only letters, numerals, and marks; excludes symbols and separators (spec 047)", async () => {
+    seedBaseAndLanguage();
+    getGroupsResult.set([
+      {
+        block: "Mixed",
+        tier: "main",
+        script: "Latn",
+        usedByBase: false,
+        cells: [
+          { char: "a", isCombiningMark: false }, // letter — kept
+          { char: "5", isCombiningMark: false }, // numeral — kept (word-forming)
+          { char: "́", isCombiningMark: true }, // combining mark — kept
+          { char: "€", isCombiningMark: false }, // symbol — excluded
+          { char: " ", isCombiningMark: false }, // NBSP separator — excluded
+        ],
+      },
+    ]);
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Mixed characters (main)")).toBeTruthy();
+    });
+    const group = screen.getByLabelText("Mixed characters (main)");
+    expect(within(group).queryByRole("button", { name: /Add a \(U\+0061\)/ })).toBeTruthy();
+    expect(within(group).queryByRole("button", { name: /Add 5 \(U\+0035\)/ })).toBeTruthy();
+    expect(within(group).queryByRole("button", { name: /\(U\+0301\)/ })).toBeTruthy(); // mark
+    expect(within(group).queryByRole("button", { name: /\(U\+20AC\)/ })).toBeNull(); // € symbol
+    expect(within(group).queryByRole("button", { name: /\(U\+00A0\)/ })).toBeNull(); // NBSP separator
+  });
+
   it("a cell already present in phaseBDraftStore.chars renders aria-pressed=true on mount", async () => {
     seedBaseAndLanguage();
     usePhaseBDraftStore.getState().setAll(["b"]);
@@ -621,7 +650,7 @@ describe("CharacterMapPane — raw code point entry", () => {
 // ---------------------------------------------------------------------------
 
 describe("CharacterMapPane — digits & punctuation tiers", () => {
-  it("renders the digits and punctuation tier labels", async () => {
+  it("renders the digits tier; punctuation/symbols are not shown on this page (spec 047)", async () => {
     seedBaseAndLanguage();
     getGroupsResult.set([
       {
@@ -644,7 +673,13 @@ describe("CharacterMapPane — digits & punctuation tiers", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("Digits characters (Digits & numerals)")).toBeTruthy();
     });
-    expect(screen.getByLabelText("Punctuation characters (Punctuation & symbols)")).toBeTruthy();
+    // Numerals are kept (some languages use digits word-formingly)…
+    expect(screen.getByRole("button", { name: /Add 0 \(U\+0030\)/ })).toBeTruthy();
+    // …but punctuation/symbols move to a later dedicated page — their group is
+    // filtered out here (every cell dropped → group not rendered).
+    expect(
+      screen.queryByLabelText("Punctuation characters (Punctuation & symbols)"),
+    ).toBeNull();
   });
 });
 
@@ -786,12 +821,13 @@ describe("CharacterMapPane — search filter", () => {
 // script like Yi (~1,165 letters) renders in full; still caps anything larger.
 // ---------------------------------------------------------------------------
 
-// Synthetic cells built from a run of PUA code points — unique `char` values
-// (required, since `cell.char` is the React key) without depending on any
-// real script having exactly N assigned letters.
+// Synthetic cells built from a run of CJK ideograph code points (U+4E00+) —
+// unique `char` values (required, since `cell.char` is the React key) that are
+// all \p{Lo} LETTERS, so they survive this page's letters/numerals/marks cell
+// filter (PUA would be dropped as non-letter "control").
 function syntheticCells(count: number): CharacterMapGroup["cells"] {
   return Array.from({ length: count }, (_, i) => ({
-    char: String.fromCodePoint(0xe000 + i),
+    char: String.fromCodePoint(0x4e00 + i),
     isCombiningMark: false,
   }));
 }

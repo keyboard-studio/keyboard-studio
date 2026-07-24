@@ -28,7 +28,7 @@ import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
 import { casePairOf } from "./charNormUtils.ts";
-import { isPrivateUseCodePoint, caseCounterpart } from "@keyboard-studio/engine";
+import { isPrivateUseCodePoint, caseCounterpart, glyphCategory } from "@keyboard-studio/engine";
 import { isCombining, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { matchesQuery } from "./characterSearch.ts";
 import { TextField, Checkbox } from "../ui/index.ts";
@@ -150,11 +150,11 @@ function parseCodepointInput(raw: string): CodepointParseResult {
 // supported" stub well before reaching this pane, so they never hit this cap.
 export const MAX_CELLS_PER_GROUP = 3000;
 
-// "Produced by the base keyboard, not yet in your alphabet" chip tint. A warm
-// amber that reads on the dark survey surface; paired with an accessible-name
-// hint (never colour alone) so the signal is not colour-dependent.
+// "Produced by the base keyboard, not yet in your alphabet" chip tint — a warm
+// amber BORDER only (the filled background read as too distracting); paired with
+// an accessible-name hint (never colour alone) so the signal is not
+// colour-dependent.
 const BASE_OUTPUT_BORDER = "#c9a227";
-const BASE_OUTPUT_BG = "rgba(201, 162, 39, 0.16)";
 
 interface CharacterMapPaneProps {
   // Per-group render cap. Defaults to MAX_CELLS_PER_GROUP; overridable only so
@@ -284,16 +284,24 @@ export function CharacterMapPane({
   // the checkbox stays checked.
   const filteredGroups = useMemo(() => {
     if (loadState.status !== "done") return [];
-    // Cased-script fold: drop uppercase letters that have a lowercase
-    // counterpart, so the map offers only the lowercase of each pair (spec 047
-    // refinement). The uppercase is still recorded on Done. usedByBase is
-    // preserved; a group whose cells were all uppercase drops out.
+    // Two cell folds applied before search/blocks filtering (spec 047):
+    //   1. Cased-script fold — drop the uppercase of a case pair so the map
+    //      offers only the lowercase (its uppercase joins the alphabet on
+    //      select and is recorded on Done).
+    //   2. This page shows only LETTERS, NUMERALS, and MARKS. Numerals are kept
+    //      because some languages use digits word-formingly. Punctuation,
+    //      symbols, separators, and control/format characters move to a later
+    //      dedicated page.
     const cased = loadState.groups
       .map((g) => ({
         ...g,
-        cells: g.cells.filter(
-          (c) => caseCounterpart(c.char.normalize("NFC"), bcp47)?.direction !== "toLower",
-        ),
+        cells: g.cells.filter((c) => {
+          const nfc = c.char.normalize("NFC");
+          if (caseCounterpart(nfc, bcp47)?.direction === "toLower") return false;
+          if (c.isCombiningMark) return true; // marks (\p{M}) — glyphCategory folds these to "control"
+          const cat = glyphCategory(nfc);
+          return cat === "letter" || cat === "number";
+        }),
       }))
       .filter((g) => g.cells.length > 0);
     const q = query.trim();
@@ -752,7 +760,7 @@ export function CharacterMapPane({
                             aria-label={`${actionLabel} ${cell.char} (${cp})${baseOutputHint}`}
                             style={
                               isBaseOutput
-                                ? { ...charChip(false), border: `1px solid ${BASE_OUTPUT_BORDER}`, background: BASE_OUTPUT_BG }
+                                ? { ...charChip(false), border: `1px solid ${BASE_OUTPUT_BORDER}` }
                                 : charChip(selected)
                             }
                           >
