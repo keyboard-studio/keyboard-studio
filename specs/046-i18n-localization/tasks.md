@@ -91,10 +91,10 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 
 - [x] T026 [US2] **Joint engine+content session** (Article VI seam): agree per-string id derivation from a record, extractor location, and loader fallback semantics; record the decision in [research.md](research.md) (#1265)
 - [x] T027 [US2] Build extraction utility `utilities/i18n-content-extract` → flat `content/i18n/en/*.json` from content records (#1266)
-- [ ] T028 [US2] Content i18n loader with English fallback (studio/engine resolves localized prose by active locale) (#1267)
-- [ ] T029 [US2] Localize criteria descriptions — translate `content/i18n/{locale}/criteria.json` (superseded path; was `packages/contracts/data/criteria.<lang>.json`, see research.md D7's supersession note) and wire `resolveContentString("criteria", ...)` into `Criterion.description`/`preSubmitChecklistText` render sites (respects T025) (#1268)
-- [ ] T030 [US2] Activate the Tier B mapping in [crowdin.yml](../../crowdin.yml) (`content/i18n/**`) (#1269)
-- [ ] T031 [US2] Extend the drift gate (or add a content-catalog checker) to cover Tier B extraction freshness; wire into `pnpm lint` (#1270)
+- [ ] T028 [US2] Content i18n loader with English fallback (studio/engine resolves localized prose by active locale) (#1267) — in review on `km/1267-content-i18n-loader` (PR #1349), not yet merged to `main`; not part of this branch.
+- [ ] T029 [US2] Localize criteria descriptions — translate `content/i18n/{locale}/criteria.json` (superseded path; was `packages/contracts/data/criteria.<lang>.json`, see research.md D7's supersession note) and wire `resolveContentString("criteria", ...)` into `Criterion.description`/`preSubmitChecklistText` render sites (respects T025) (#1268) — **partially done 2026-07-24, see research.md D9**: `content/i18n/fr/criteria.json` authored (158/158 keys, parity-checked). The render-site wiring half is **not done** — a repo-wide search found no code anywhere reads either field for end-user display, so there is nothing to wire `resolveContentString` into yet. Leave unchecked until a criteria-review/checklist UI exists.
+- [x] T030 [US2] Activate the Tier B mapping in [crowdin.yml](../../crowdin.yml) (`content/i18n/**`) (#1269) — done 2026-07-24, see research.md D10.
+- [x] T031 [US2] Extend the drift gate (or add a content-catalog checker) to cover Tier B extraction freshness; wire into `pnpm lint` (#1270) — done 2026-07-24 as `utilities/content-i18n-lint`, see research.md D10. Caught and fixed one real pre-existing drift (a stale criterion key extracted before the criterion was removed from canonical data).
 
 **Checkpoint**: Author sees survey + guidance text translated, not just chrome.
 

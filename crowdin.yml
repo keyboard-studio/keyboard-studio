@@ -5,12 +5,19 @@
 #     Lingui spike already produces. This is Crowdin's ideal case: the id is the
 #     string key, the English is the fingerprinted value (English drift resets
 #     approvals). See docs/i18n-spike.md.
-#   • Tier B (content-owned strings) — DEFERRED, scaffolding only (commented
-#     below). Pointing Crowdin at the raw content records is WRONG: its generic
-#     JSON/YAML parser translates every string value, so control fields
-#     (id, category, answerType, default, firingCondition, lintRuleId, BCP47
-#     tags, …) would be sent to translators. Tier B needs an extraction step —
-#     tracked in the i18n feature spec, not this config.
+#   • Tier B (content-owned strings) — ACTIVE (spec 046 T030). Pointing Crowdin
+#     at the raw content records would be WRONG: its generic JSON/YAML parser
+#     translates every string value, so control fields (id, category,
+#     answerType, default, firingCondition, lintRuleId, BCP47 tags, …) would be
+#     sent to translators. The extraction step this needed is
+#     utilities/i18n-content-extract (spec 046 T027) — it flattens the
+#     render-verified prose allowlist (research.md D8) into
+#     content/i18n/en/{patterns,adaptationQuestions,criteria}.json, the SAME
+#     flat { id: text } shape as Tier A, so Crowdin can be pointed at those
+#     sidecars directly below. Freshness (sidecars in sync with the content
+#     records they were extracted from) is enforced by
+#     utilities/content-i18n-lint, wired into `pnpm lint` (spec 046 T031) —
+#     not by this file.
 #
 # Credentials come from the environment (never commit a token). The CLI reads
 # these named env vars; set them in CI secrets / a local shell:
@@ -53,19 +60,21 @@ files:
         fr: "fr"
 
   # ── Tier B — Content-owned strings (content team; spec §12) ────────────────
-  # DEFERRED to the i18n feature spec — DO NOT uncomment as-is.
-  #
-  # The translatable prose in these records (title / description / prompt /
-  # elicits / provenanceLabel, and criteria.json `description`) is interleaved
-  # with non-translatable control fields at several nesting levels. Crowdin's
-  # generic parser cannot cleanly whitelist those keys from the CLI config, so
-  # the intended design is a build step that extracts the translatable fields
-  # into flat { id: text } sidecar catalogs (identical shape to Tier A) and
-  # points Crowdin at those instead. criteria.json is additionally gated by its
-  # zod schema (CriterionSchema) and the 148-row count test — a localized copy
-  # must satisfy both, and the count test must keep reading the canonical
-  # English file. Both are feature-spec decisions.
-  #
-  # - source: "/content/i18n/en/*.json"
-  #   translation: "/content/i18n/%two_letters_code%/%original_file_name%"
-  #   skip_untranslated_strings: false
+  # Points at the extracted sidecar catalogs (utilities/i18n-content-extract,
+  # spec 046 T027), not the raw content records — those still interleave
+  # translatable prose with control fields (id, category, answerType, default,
+  # firingCondition, lintRuleId, BCP47 tags, …) that must never reach a
+  # translator. The sidecars are already a flat { id: text } shape, so this
+  # mirrors the Tier A block above: %locale% (not %two_letters_code%) plus the
+  # same en/fr languages_mapping, for the same reason (a region-qualified
+  # target locale needs its own mapping entry; see the Tier A comment above).
+  - source: "/content/i18n/en/*.json"
+    translation: "/content/i18n/%locale%/%original_file_name%"
+    # Same rationale as Tier A: every key must exist in every locale file for
+    # a stable resolveContentString lookup; an empty target value falls back
+    # to the English value already in hand (contentI18n.ts), not a gap.
+    skip_untranslated_strings: false
+    languages_mapping:
+      locale:
+        en: "en"
+        fr: "fr"

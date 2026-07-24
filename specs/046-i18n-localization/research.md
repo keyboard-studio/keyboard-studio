@@ -236,3 +236,90 @@ site of an in-scope field (e.g. `irToCarveNodes.ts:625`, `Prefill.tsx:55`) —
 same as `t()`/`<Trans>` replacing raw English at Tier A chrome sites, just
 sourcing from the sidecar instead of a Lingui macro. Target-locale sidecar
 files load the same lazy/code-split way as Tier A per-locale catalogs (D6).
+
+## D9 — T029 render-site gap for `Criterion.description` / `.checklistText`
+
+**Resolved 2026-07-24.** T029 asks to (a) translate
+`content/i18n/{locale}/criteria.json` and (b) wire `resolveContentString`
+into `Criterion.description`/`preSubmitChecklistText` render sites. A
+repo-wide search (studio, engine, `@keymanapp/keyboard-lint`, all of
+`utilities/*`, `docs/`) confirms D8's "Not yet" call for both fields still
+holds: no code path anywhere reads either field for end-user display. The
+`resolveContentString("criteria", ...)` plumbing in `contentI18n.ts` (T028)
+has zero production callers — it's scaffolding built ahead of a
+criteria-review/checklist UI that does not exist yet in the Studio. Band 3
+(`yellow-survey`) and band 4 (`red-checklist`) criteria are documented as
+*intended* to surface eventually (`docs/discus-principles-integration.md`),
+but that surfacing is a separate, unbuilt feature — out of scope for an i18n
+task to invent.
+
+**Decision**: T029 ships the translation half only —
+`content/i18n/fr/criteria.json` authored with real French text (158/158 keys,
+parity-checked against `content/i18n/en/criteria.json`), same direct-authoring
+approach used for the Tier A `fr` catalogs ahead of the live Crowdin
+round-trip (T010/T030 note). The "wire into render sites" half is **not
+done** — there is nothing to wire into. `pnpm crew-lint`/`i18n-catalog-lint`
+don't cover Tier B `fr` parity yet (that's T031, since landed — see D10), so
+this file was unenforced by CI at the time T029 shipped. Re-open the wiring
+half the moment a criteria-review/checklist UI lands (file it as its own
+feature, not a silent addition to this i18n task) — at that point
+`resolveContentString` already has the sidecar data ready to consume.
+
+## D10 — T030/T031: Crowdin activation + Tier B drift gate
+
+**Resolved 2026-07-24.**
+
+**T030** — activated the Tier B block in `crowdin.yml`: `source:
+/content/i18n/en/*.json` → `translation:
+/content/i18n/%locale%/%original_file_name%`, with the same `en`/`fr`
+`languages_mapping` as the Tier A block (region-qualified Crowdin defaults —
+`fr` → `fr-FR` — pinned back to the short directory names the app reads).
+Nothing content-shaped changed here versus D8's plan; this just flips the
+already-designed mapping from commented-out to active now that T027/T028 give
+it something real to point at.
+
+**T031** — added `utilities/content-i18n-lint` (wired into `pnpm lint` right
+after `i18n-catalog-lint`), Tier B's counterpart to that Tier A drift gate.
+Two checks: (1) the committed `content/i18n/en/*.json` sidecars must match a
+fresh extraction from the content records (added/removed keys are hard
+errors; changed English values are warnings, same asymmetry as Tier A's
+gate) — this is the "extraction freshness" T031 asked for; (2) every
+non-English locale directory's *existing* catalog files must have the same
+key set as their English counterpart (a locale that hasn't started
+translating a given file yet is not a gap — only a file that exists with a
+mismatched key set is).
+
+D8's "Extractor location & shape" section anticipated this gate would simply
+shell out to `i18n-content-extract --check` (the way T028 already documented
+that flag existing for T031). That turned out not to work: `content-i18n-lint`
+must run under plain `node` with only root devDependencies (same constraint
+`utilities/facet-index-lint/index.js` already documents) because CI's
+`pnpm install --frozen-lockfile` never installs the standalone `utilities/*`
+tools' own dependencies (`i18n-content-extract` needs `tsx` + the `@keyboard-
+studio/contracts` TS source, neither available at that point). Importing
+`@keyboard-studio/contracts`'s *built* `dist/` instead (guaranteed present —
+CI runs `pnpm -r build` before `pnpm lint`) also failed: that output targets
+`moduleResolution: "Bundler"` consumers (Vite/Vitest) and its relative
+imports between dist files omit the `.js` extension, which plain Node's
+strict ESM resolver rejects (`ERR_MODULE_NOT_FOUND`) — confirmed empirically,
+not a hypothetical. **Decision**: `content-i18n-lint` is a hand-kept plain-JS
+mirror of `extract.ts`'s field-walk (same trade-off `facet-index-lint`
+already accepts for the identical reason), reading
+`packages/contracts/data/criteria.json` directly (plain JSON, no schema layer
+needed for the two fields this cares about) and using the `yaml` root
+devDependency for the pattern/adaptation-question YAML walk. Keep the two in
+sync by hand if either changes.
+
+Running this gate for the first time caught a real, pre-existing drift: the
+committed `content/i18n/en/criteria.json` (from T027) still carried
+`content.criteria.18_13-mark-normalization-uniform.description`, a criterion
+that no longer exists in `packages/contracts/data/criteria.json` (148 rows,
+none matching `18.13-*`) — removed from the canonical data sometime after
+T027 extracted it, with the sidecar never regenerated. Fixed by re-running
+the real extractor (`npx tsx utilities/i18n-content-extract/cli.ts`, from
+inside that directory so its local `tsconfig.json` path-alias resolves) and
+dropping the matching stale key from the `fr` translation — this is exactly
+the drift class T031 exists to catch, and validates the plain-JS
+reimplementation is faithful to the real extractor's output (a from-scratch
+extractor run reproduced the identical single-key diff this checker
+reported).
