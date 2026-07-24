@@ -26,7 +26,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore, type DiscoveryMethod } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { useGlyphFontStack } from "./useGlyphFontStack.ts";
-import { nfcDedup, harvestChars } from "./charNormUtils.ts";
+import { nfcDedup, harvestChars, casePairOf } from "./charNormUtils.ts";
 import { codepointLabel } from "./codepointLabel.ts";
 import { collate, codePointCompare } from "./collation.ts";
 import { glyphCategory, isCombiningMarkChar, caseCounterpart } from "@keyboard-studio/engine";
@@ -370,7 +370,13 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47 }: CharChipE
                   key={c}
                   type="button"
                   title={title}
-                  onClick={() => onChange(chars.filter((x) => x !== c))}
+                  onClick={() => {
+                    // Removing a letter removes BOTH cases (the inverse of the
+                    // map, which adds both) — even the uppercase hidden by the
+                    // case-collapse, so it never re-appears as an orphan chip.
+                    const pair = new Set(casePairOf(c, bcp47));
+                    onChange(chars.filter((x) => !pair.has(x)));
+                  }}
                   aria-label={t({
                     id: "survey.phaseB.charChipEditor.removeAriaLabel",
                     message: `Remove ${{ char: c }} (${{ cp: title }})`,

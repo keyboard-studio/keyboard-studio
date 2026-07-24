@@ -3,7 +3,7 @@
  * Pure functions — no React dependencies, no side effects.
  */
 
-import { glyphCategory } from "@keyboard-studio/engine";
+import { glyphCategory, caseCounterpart } from "@keyboard-studio/engine";
 
 /**
  * NFC-normalize each element of `incoming`, append to `base` skipping
@@ -58,6 +58,18 @@ export function segmentGraphemes(s: string): string[] {
  * can log them for discoverability (FR-003). `unusual` is a subset of `chars`
  * (both NFC-normalized and deduped).
  */
+/**
+ * The full case pair for a character: `[c]` when it is caseless or has no
+ * single-character counterpart, or `[c, counterpart]` when both cases exist
+ * (spec 047). Used so selecting/removing a cased letter acts on both cases at
+ * once — the map adds both, "Your alphabet" removes both — even when one case is
+ * hidden in the UI. Order is `[c, counterpart]` (the passed char first).
+ */
+export function casePairOf(c: string, bcp47?: string): string[] {
+  const cc = caseCounterpart(c, bcp47);
+  return cc !== null ? [c, cc.counterpart] : [c];
+}
+
 export function harvestChars(raw: string): { chars: string[]; unusual: string[] } {
   const kept: string[] = [];
   const unusualRaw: string[] = [];

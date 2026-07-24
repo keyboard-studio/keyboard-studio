@@ -27,6 +27,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
+import { casePairOf } from "./charNormUtils.ts";
 import { isPrivateUseCodePoint, caseCounterpart } from "@keyboard-studio/engine";
 import { isCombining, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { ALL_FILTERS, matchesQuery, type SearchFilters } from "./characterSearch.ts";
@@ -202,8 +203,8 @@ export function CharacterMapPane({
   const languageName = surveyContext.language_name;
 
   const chars = usePhaseBDraftStore((s) => s.chars);
-  const toggle = usePhaseBDraftStore((s) => s.toggle);
   const addChar = usePhaseBDraftStore((s) => s.add);
+  const removeChar = usePhaseBDraftStore((s) => s.remove);
   const glyphFontStack = useGlyphFontStack();
   const isGlyphSupported = useFontSupportChecker(glyphFontStack);
 
@@ -426,7 +427,18 @@ export function CharacterMapPane({
   function handleToggle(cell: CharacterMapCell): void {
     const nfc = cell.char.normalize("NFC");
     const wasSelected = chars.includes(nfc);
-    toggle(cell.char);
+    // Selecting a cased letter adds BOTH cases (its uppercase is hidden in the
+    // map but joins the alphabet); deselecting removes both. "Your alphabet"
+    // mirrors this — removing a letter there removes both cases too.
+    const pair = casePairOf(nfc, bcp47);
+    if (wasSelected) {
+      for (const p of pair) if (chars.includes(p)) removeChar(p);
+    } else {
+      // Add the counterpart(s) first, then the clicked char, so lastPick (used
+      // by the visible-decomposition announcement) reflects the clicked char.
+      for (const p of pair.slice(1)) addChar(p);
+      addChar(cell.char);
+    }
     const actionWord = wasSelected
       ? t({ id: "survey.characterMapPane.announce.removed", message: "Removed" })
       : t({ id: "survey.characterMapPane.announce.added", message: "Added" });
