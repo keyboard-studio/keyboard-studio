@@ -335,11 +335,11 @@ function loadReferencePins(): ReferencePin[] {
   return pins;
 }
 
-function emptyTierCounts(): FacetTierCounts {
+export function emptyTierCounts(): FacetTierCounts {
   return { content: 0, declared: 0, fallback: 0, undetermined: 0 };
 }
 
-function bumpTierCounts(counts: FacetTierCounts, categorization: Categorization): void {
+export function bumpTierCounts(counts: FacetTierCounts, categorization: Categorization): void {
   if (categorization.value === UNDETERMINED) {
     counts.undetermined += 1;
   } else if (categorization.provenanceTier === "content-derived") {
