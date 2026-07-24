@@ -885,6 +885,21 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
     expect(inv).toContain("Q");
   });
 
+  it("keeps an entered uppercase that has no single-character lowercase, as chosen", async () => {
+    // U+0130 İ (LATIN CAPITAL LETTER I WITH DOT ABOVE): in 'en' its lowercase is
+    // two code points (i + combining dot), so there is no single-char lowercase
+    // to fold to — the entered uppercase is kept exactly as chosen.
+    await renderBuildListView({ bcp47_tag: "en" });
+    const input = screen.getByRole("textbox", { name: /Character to add/i });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "İ" } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /\+ Add/i }));
+    });
+    expect(usePhaseBDraftStore.getState().chars).toEqual(["İ"]);
+  });
+
   it("keeps a lowercase letter that has no uppercase counterpart, forcing no uppercase (IPA)", async () => {
     // U+0138 LATIN SMALL LETTER KRA is \p{Ll} but has no uppercase mapping —
     // exactly the "lowercase without a corresponding uppercase" IPA case.
