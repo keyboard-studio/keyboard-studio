@@ -14,6 +14,8 @@ import type {
 import { buildProducedSet } from '@keyboard-studio/contracts';
 import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, isCharCoveredForLocale, collectCharContributors, isPlusSeparator, parseSlotId, isCombiningMarkChar } from '@keyboard-studio/engine';
 import type { StoreSlotBlockReason, StoreSlotEditMode, StoreAnalysis, CharContributors, CharNormalizationForm } from '@keyboard-studio/engine';
+import type { I18n } from '@lingui/core';
+import { resolveContentString } from './contentI18n.ts';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 
 // ---------------------------------------------------------------------------
@@ -964,6 +966,35 @@ export interface CarveNode {
    * Undefined on nodes produced directly by toRailNodes() before annotation runs.
    */
   recommendation?: 'high' | 'medium' | 'none' | undefined;
+}
+
+/**
+ * `CarveNode.name` is `pattern.title` verbatim for `kind: 'pattern'` nodes
+ * (see toRailNodes below) — a Tier B content string (spec 046 T028). Render
+ * sites across the Carve editor (Rail, Inspector header, InfoView hover
+ * panel, DepBanner, CarveGallery cascade dialogs) all print `node.name`, so
+ * resolve it here once rather than duplicating the
+ * `node.kind === 'pattern' ? resolveContentString(...) : node.name` branch at
+ * every call site. Group/store/raw names are IR-authoring names, not Pattern
+ * content, and pass through unresolved.
+ */
+export function resolveNodeName(node: CarveNode, i18n?: I18n): string {
+  if (node.kind !== 'pattern') return node.name;
+  return resolveContentString('patterns', node.nodeId, 'title', node.name, i18n);
+}
+
+/**
+ * Same resolution as resolveNodeName, for the `{kind, nodeId, label}` shape
+ * shared by CharLocation (buildCharWeb's cross-reference web popup, below)
+ * and the engine's CharContributors.locations (collectCharContributors) —
+ * both carry pattern.title verbatim in `label` for `kind: 'pattern'` entries.
+ */
+export function resolveLocationLabel(
+  loc: { kind: 'group' | 'pattern' | 'store' | 'raw'; nodeId: string; label: string },
+  i18n?: I18n,
+): string {
+  if (loc.kind !== 'pattern') return loc.label;
+  return resolveContentString('patterns', loc.nodeId, 'title', loc.label, i18n);
 }
 
 // ---------------------------------------------------------------------------

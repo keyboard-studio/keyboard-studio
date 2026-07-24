@@ -4,7 +4,8 @@ import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { plural } from '@lingui/core/macro';
 import type { CarveNode, CarveGlyph, StoreRuleDetail, CharLocation } from '../../../lib/irToCarveNodes.ts';
-import { nodeState, MOD_GROUP_DEFS, glyphsTriState, idsTriState } from '../../../lib/irToCarveNodes.ts';
+import { nodeState, MOD_GROUP_DEFS, glyphsTriState, idsTriState, resolveNodeName } from '../../../lib/irToCarveNodes.ts';
+import { resolveContentString } from '../../../lib/contentI18n.ts';
 import { ToggleBox } from './ToggleBox.tsx';
 import { GlyphCell } from './GlyphCell.tsx';
 import { StoreChip } from './StoreChip.tsx';
@@ -372,7 +373,7 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
   const consumers = [
     ...(node.storeUsage?.patternRefs ?? []).map((r) => ({
       id: r.patternId,
-      label: r.patternTitle,
+      label: resolveContentString('patterns', r.patternId, 'title', r.patternTitle, i18n),
       ruleCount: r.ruleCount,
       rules: r.rules,
       dead: isDeleted(r.patternId),
@@ -643,7 +644,12 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
           </p>
         </div>
       )}
-      {node.referencedByLabel !== undefined && (
+      {node.referencedByLabel !== undefined && (() => {
+        const referencedByLabel =
+          node.referencedByNodeId !== undefined
+            ? resolveContentString('patterns', node.referencedByNodeId, 'title', node.referencedByLabel, i18n)
+            : node.referencedByLabel;
+        return (
         <div style={{
           marginTop: 18, display: 'flex', gap: 11, padding: '12px 15px', borderRadius: 10,
           background: refAlive ? 'var(--app-surface)' : 'color-mix(in srgb, var(--sil-orange) 9%, var(--app-surface))',
@@ -656,17 +662,18 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
             {refAlive
               ? (
                 <Trans id="editor.assignLoop.inspector.referencedBy">
-                  Referenced by <b>{node.referencedByLabel}</b>. Keep this unless you remove that pattern too.
+                  Referenced by <b>{referencedByLabel}</b>. Keep this unless you remove that pattern too.
                 </Trans>
               )
               : (
                 <Trans id="editor.assignLoop.inspector.noLongerReferenced">
-                  <b>No longer referenced.</b> {node.referencedByLabel} was removed, so this store is now unused and safe to drop.
+                  <b>No longer referenced.</b> {referencedByLabel} was removed, so this store is now unused and safe to drop.
                 </Trans>
               )}
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -703,7 +710,7 @@ interface InspectorProps {
 }
 
 export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode, onSelectNode, onCascadeDelete, onStoreCascade, charWeb, onWebTag }: InspectorProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const [q, setQ] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   useEffect(() => { setQ(''); setCollapsed(new Set()); }, [node?.nodeId]);
@@ -754,7 +761,7 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
         <ToggleBox glyph={node.trigger} state={st} size={40} onClick={() => onSetManyGlyphs(glyphs.map((x) => x.gid), st !== 'off')} />
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
-            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--app-text)', lineHeight: 1 }}>{node.name}</h2>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--app-text)', lineHeight: 1 }}>{resolveNodeName(node, i18n)}</h2>
             <KindBadge kind={node.kind} />
             {node.strategy !== undefined && <StrategyChip id={node.strategy} />}
           </div>
