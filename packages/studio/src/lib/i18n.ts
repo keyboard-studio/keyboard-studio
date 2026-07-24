@@ -10,6 +10,7 @@
 import { i18n } from "@lingui/core";
 import { messages as enMessages } from "../locales/en/messages.json?lingui";
 import { storageAvailable } from "./storageGuard.ts";
+import { activateContentLocale } from "./contentI18n.ts";
 
 export const SUPPORTED_LOCALES = { en: "English", fr: "Français" } as const;
 export type Locale = keyof typeof SUPPORTED_LOCALES;
@@ -72,12 +73,19 @@ export function resolveInitialLocale(): Locale {
   return loadSavedLocale() ?? detectBrowserLocale();
 }
 
-/** Switch the active UI locale, lazily loading its catalog on first use. */
+/**
+ * Switch the active UI locale, lazily loading its catalog on first use.
+ * Loads the Tier B content-i18n sidecar catalogs (spec 046 T028) in parallel
+ * with the Tier A chrome catalog — same lazy/code-split treatment (D6),
+ * same never-block-on-failure contract (activateContentLocale swallows a
+ * missing/404'd catalog per type rather than rejecting).
+ */
 export async function activateLocale(locale: Locale): Promise<void> {
   if (locale !== DEFAULT_LOCALE) {
-    const { messages } = await import(
-      `../locales/${locale}/messages.json?lingui`
-    );
+    const [{ messages }] = await Promise.all([
+      import(`../locales/${locale}/messages.json?lingui`),
+      activateContentLocale(locale),
+    ]);
     i18n.load(locale, messages);
   }
   i18n.activate(locale);

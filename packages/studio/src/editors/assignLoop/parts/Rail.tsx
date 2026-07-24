@@ -3,7 +3,7 @@ import type { I18n } from '@lingui/core';
 import { msg } from '@lingui/core/macro';
 import { useLingui } from "@lingui/react/macro";
 import type { CarveNode } from '../../../lib/irToCarveNodes.ts';
-import { nodeState, MOD_GROUP_DEFS } from '../../../lib/irToCarveNodes.ts';
+import { nodeState, MOD_GROUP_DEFS, resolveNodeName } from '../../../lib/irToCarveNodes.ts';
 import { KIND_COLOR } from './KindBadge.tsx';
 import { ToggleBox } from './ToggleBox.tsx';
 import { WarnIcon, resolveMessage } from './carveShared.tsx';
@@ -162,7 +162,7 @@ export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, on
                   color: st === 'off' ? 'var(--app-text-subtle)' : 'var(--app-text)',
                   textDecoration: st === 'off' ? 'line-through' : 'none',
                 }}>
-                  {node.name}
+                  {resolveNodeName(node, i18n)}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 2 }}>
                   {total !== null && !showBreakdown && (

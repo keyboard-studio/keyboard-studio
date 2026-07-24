@@ -404,9 +404,10 @@ describe('capabilityHint distinctness', () => {
 import React from 'react';
 import { afterEach, beforeEach } from 'vitest';
 import { screen, cleanup } from '@testing-library/react';
-import { render } from '../../../test/renderWithI18n.tsx';
+import { render, i18n } from '../../../test/renderWithI18n.tsx';
 import { InfoView } from './InfoView.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
+import { _setContentCatalogForTesting, _resetContentI18nForTesting } from '../../../lib/contentI18n.ts';
 
 // Reset the store and unmount any rendered components before/after each render
 // test so DOM and Zustand state never leak between cases.
@@ -563,6 +564,59 @@ describe('<InfoView> kind:"key" — #917 "Managed by" pattern-owner line', () =>
     render(<InfoView />);
 
     expect(document.body.textContent).not.toContain('Managed by');
+  });
+});
+
+// spec 046 T028 — the "Managed by" pattern-owner label is a Tier B content
+// string (the pattern's own title), resolved via resolveContentString against
+// content/i18n/{locale}/patterns.json (with English fallback), not a Lingui
+// Tier A chrome string.
+describe('<InfoView> kind:"key" — Tier B content-i18n (spec 046 T028)', () => {
+  afterEach(() => {
+    i18n.activate('en');
+    _resetContentI18nForTesting();
+  });
+
+  it('shows the fr-translated pattern title under an active fr locale', () => {
+    _setContentCatalogForTesting('fr', {
+      patterns: { 'content.pattern.p1.title': 'Diacritiques' },
+    });
+    i18n.load('fr', {});
+    i18n.activate('fr');
+
+    useHoverInfoStore.setState({
+      info: {
+        kind: 'key',
+        keys: ['K_A'],
+        ch: 'a',
+        off: false,
+        capability: 'not-removable:context-sensitive',
+        owners: [{ kind: 'pattern', nodeId: 'p1', label: 'Diacritics' }],
+      },
+    });
+    render(<InfoView />);
+
+    expect(document.body.textContent).toContain('Managed by the Diacritiques pattern.');
+    expect(document.body.textContent).not.toContain('Diacritics');
+  });
+
+  it('falls back to the English label under fr when no translation is seeded for this pattern', () => {
+    i18n.load('fr', {});
+    i18n.activate('fr');
+
+    useHoverInfoStore.setState({
+      info: {
+        kind: 'key',
+        keys: ['K_A'],
+        ch: 'a',
+        off: false,
+        capability: 'not-removable:context-sensitive',
+        owners: [{ kind: 'pattern', nodeId: 'p1', label: 'Diacritics' }],
+      },
+    });
+    render(<InfoView />);
+
+    expect(document.body.textContent).toContain('Managed by the Diacritics pattern.');
   });
 });
 
