@@ -49,8 +49,10 @@
 // (Layer A Check #11), not enforced here.
 
 import { useEffect, useMemo, useState, useCallback, type CSSProperties } from "react";
+import type { I18n } from "@lingui/core";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { plural } from "@lingui/core/macro";
+import { msg, plural } from "@lingui/core/macro";
+import { resolveMessage } from "../../lib/i18nResolve.ts";
 import type { MechanismAssignment, MechanismRef } from "@keyboard-studio/contracts";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { displayChar } from "../../lib/irToCarveNodes.ts";
@@ -119,14 +121,21 @@ const SEQ_CONTENT_RESOLVE_OPTIONS: ResolveCharInputOptions = {
 // Indicator ("seqSecond") — a single keystroke. singleGrapheme is
 // grapheme-aware (Intl.Segmenter), so a lone combining mark typed as the
 // indicator is NOT hard-rejected — only more than one grapheme is.
-function buildSeqIndicatorResolveOptions(
-  t: (descriptor: { id: string; message: string }) => string,
-): ResolveCharInputOptions {
+//
+// singleGraphemeReason is user-facing chrome (an error string), but this
+// object is constructed at module scope where no useLingui() is available —
+// buildSeqIndicatorResolveOptions(i18n) below builds the localized version
+// per-render, called from the component (which has a live i18n instance).
+// Takes an optional i18n + resolves via msg()/resolveMessage() rather than a
+// bare `t` parameter — Lingui's macro tracks the specific binding introduced
+// by useLingui(), so a re-bound `t` parameter is a distinct binding the
+// extractor does not follow (see Inspector.tsx's storeBlurb for the same fix).
+function buildSeqIndicatorResolveOptions(i18n?: I18n): ResolveCharInputOptions {
   return {
     multiToken: true,
     singleGrapheme: true,
     blockDelimiters: true,
-    singleGraphemeReason: t({ id: "editor.sequences.indicatorSingleGraphemeReason", message: "Enter one indicator character." }),
+    singleGraphemeReason: resolveMessage(i18n, msg({ id: "editor.sequences.indicatorSingleGraphemeReason", message: "Enter one indicator character." })),
   };
 }
 
@@ -164,8 +173,8 @@ export function SequenceBuilderPanel({
   onApplied,
   onCancel,
 }: SequenceBuilderPanelProps) {
-  const { t } = useLingui();
-  const seqIndicatorResolveOptions = useMemo(() => buildSeqIndicatorResolveOptions(t), [t]);
+  const { t, i18n } = useLingui();
+  const seqIndicatorResolveOptions = useMemo(() => buildSeqIndicatorResolveOptions(i18n), [i18n]);
 
   // Existing sequences already recorded for `char` — rendered as a removable
   // list below the boxes. Derived via partitionSequenceAssignment so this
