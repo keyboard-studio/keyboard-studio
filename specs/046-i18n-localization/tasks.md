@@ -85,14 +85,14 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 ### Tests for User Story 2
 
 - [x] T024 [P] [US2] Extractor test: control fields excluded, prose extracted, from a sample pattern + adaptation-question YAML (#1263)
-- [ ] T025 [P] [US2] `criteria.<lang>.json` satisfies `CriterionSchema`; the 148-row count test still reads only the canonical English `criteria.json` (#1264)
+- [x] T025 [P] [US2] ~~`criteria.<lang>.json` satisfies `CriterionSchema`~~ **re-scoped 2026-07-23** — D8 (T026) chose sidecar extraction over a parallel full-record file, so this now protects the same invariant against the mechanism actually built: `ALL_CRITERIA`'s length is pinned to the raw `criteria.json` it's parsed from (regression test, `packages/contracts/src/types.test.ts`), and `extractCriteriaStrings()`'s output is pinned 1:1 to `ALL_CRITERIA`/`CRITERIA_BY_BAND` with no control-field leakage (`utilities/i18n-content-extract/extract.test.ts`). See research.md D7's supersession note. (#1264)
 
 ### Implementation for User Story 2
 
 - [x] T026 [US2] **Joint engine+content session** (Article VI seam): agree per-string id derivation from a record, extractor location, and loader fallback semantics; record the decision in [research.md](research.md) (#1265)
 - [x] T027 [US2] Build extraction utility `utilities/i18n-content-extract` → flat `content/i18n/en/*.json` from content records (#1266)
 - [ ] T028 [US2] Content i18n loader with English fallback (studio/engine resolves localized prose by active locale) (#1267)
-- [ ] T029 [US2] Localize criteria descriptions → `packages/contracts/data/criteria.<lang>.json`; loader + schema conformance (respects T025) (#1268)
+- [ ] T029 [US2] Localize criteria descriptions — translate `content/i18n/{locale}/criteria.json` (superseded path; was `packages/contracts/data/criteria.<lang>.json`, see research.md D7's supersession note) and wire `resolveContentString("criteria", ...)` into `Criterion.description`/`preSubmitChecklistText` render sites (respects T025) (#1268)
 - [ ] T030 [US2] Activate the Tier B mapping in [crowdin.yml](../../crowdin.yml) (`content/i18n/**`) (#1269)
 - [ ] T031 [US2] Extend the drift gate (or add a content-catalog checker) to cover Tier B extraction freshness; wire into `pnpm lint` (#1270)
 

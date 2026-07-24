@@ -84,6 +84,19 @@ consolidates the decisions with rationale and rejected alternatives.
   the 148-row count test keeps reading only the canonical English file.
 - **Rationale**: The count is a machine-enforced contract; localized copies are
   translations of `description`, not new rows, and must never be counted.
+- **Superseded by D8 (2026-07-23):** once the Tier B seam session (T026)
+  settled on sidecar extraction rather than a parallel full-record file, this
+  decision's literal shape (`packages/contracts/data/criteria.<lang>.json`,
+  loaded and validated through `CriterionSchema`) never got built and isn't
+  planned — criteria descriptions localize via `content/i18n/{locale}/criteria.json`
+  (D8), a flat `content.criteria.<id>.description`/`.checklistText` map, never
+  parsed as a `Criterion[]`. The underlying protection this decision wanted —
+  a localized copy must never perturb the row count or get treated as new
+  canonical data — holds by construction under D8 (the sidecar isn't a
+  `Criterion[]` at all) and is pinned by a regression test in
+  `packages/contracts/src/types.test.ts` (`ALL_CRITERIA`'s length tied to the
+  raw `criteria.json` it's parsed from) plus fidelity/control-field-leak tests
+  in `utilities/i18n-content-extract/extract.test.ts` (T025, re-scoped 2026-07-23).
 
 ## D8 — Tier B seam: id derivation, extractor location, loader fallback (T026)
 
