@@ -54,7 +54,6 @@
   "content.criteria.18_11-tested-with-real-users.description": "The layout has been tested with real target users before submission",
   "content.criteria.18_12-meets-legal-accessibility-requirements.checklistText": "This keyboard complies with any legislated or accessibility requirements for its target locale — if you are unsure whether requirements apply, check before submitting.",
   "content.criteria.18_12-meets-legal-accessibility-requirements.description": "The keyboard meets any applicable legislated, societal, and accessibility requirements for its locale",
-  "content.criteria.18_13-mark-normalization-uniform.description": "Mark-bearing output is uniformly one form - all ready-made characters or all letter-plus-mark sequences, never a mix - so search and backspace behave the same for every accented letter",
   "content.criteria.18_2-touch-rows-within-range.description": "Touch layout uses 4-5 rows on phone and 5 rows on tablet",
   "content.criteria.18_3-keys-per-row-within-range.description": "Touch layout uses at most 10 keys per row on phone and 13 on tablet",
   "content.criteria.18_4-control-keys-stable-across-layers.description": "Backspace, Enter, and other control keys do not move or resize across touch layers",
