@@ -101,18 +101,15 @@ import {
   galleryGhostBtn as ghostBtn,
   galleryInputStyle as inputStyle,
   galleryForwardBtnStyle as forwardBtnStyle,
+  gallerySelectMenuStyle,
 } from "../../lib/galleryTheme.ts";
-
-// SelectMenu's trigger already carries the same colors gallerySelectStyle
-// used to set explicitly (BG_PAGE/BORDER/TEXT_MAIN, byte-identical values —
-// see ui/theme.ts); only a width override is still needed since a native
-// <select> auto-sizes to content but SelectMenu's trigger is width: 100%.
-const selectStyle: CSSProperties = { width: 140, fontSize: 12 };
 import { PATTERN_SEQUENCE, PATTERN_DEADKEY, PATTERN_SWAP, PATTERN_RALT } from "./patternIds.ts";
 
 // Re-exported for existing importers that reach the pattern id constants via
 // this module; the canonical declarations now live in ./patternIds.ts.
 export { PATTERN_SEQUENCE, PATTERN_DEADKEY, PATTERN_SWAP, PATTERN_RALT };
+
+const selectStyle: CSSProperties = gallerySelectMenuStyle(140);
 
 // ---------------------------------------------------------------------------
 // Helpers

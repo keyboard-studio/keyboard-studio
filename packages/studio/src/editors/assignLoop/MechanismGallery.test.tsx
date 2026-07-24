@@ -45,45 +45,7 @@ import type { MechanismAssignment, IRGroup, IRRule, IRStore } from "@keyboard-st
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 import { expectCurrentChar } from "../../test/currentCharChip.ts";
-
-// ---------------------------------------------------------------------------
-// ui/SelectMenu test helpers (#1307: native <select> popups don't open in the
-// VS Code webview — KeyPickerField's key picker and the RALT layer-slot
-// dropdown are now a DOM-rendered button+listbox, not a native <select>).
-// ---------------------------------------------------------------------------
-
-/** Opens a SelectMenu trigger and clicks the option with the given value —
- * the button+listbox equivalent of `fireEvent.change(select, { target: { value } })`.
- * Awaits the listbox actually opening before looking for the option: under a
- * deep/complex render tree the click's state update can land a tick after
- * fireEvent.click returns, so a synchronous check right after can flake. */
-async function changeSelectMenu(trigger: HTMLElement, value: string): Promise<void> {
-  fireEvent.click(trigger);
-  await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
-  const option = trigger.parentElement?.querySelector(`li[data-value="${value}"]`);
-  if (option === null || option === undefined) {
-    throw new Error(`SelectMenu option not found for value "${value}"`);
-  }
-  fireEvent.click(option);
-}
-
-/** Reads a SelectMenu trigger's current value — the button+listbox equivalent
- * of reading `.value` on a native `<select>`. */
-function selectMenuValue(trigger: HTMLElement): string {
-  return trigger.getAttribute("data-value") ?? "";
-}
-
-/** Opens a SelectMenu, collects every option's underlying value, and closes it
- * again — the button+listbox equivalent of `Array.from(select.options).map(o => o.value)`. */
-async function selectMenuOptionValues(trigger: HTMLElement): Promise<string[]> {
-  fireEvent.click(trigger);
-  await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
-  const values = Array.from(
-    trigger.parentElement?.querySelectorAll("li[data-value]") ?? [],
-  ).map((el) => el.getAttribute("data-value") ?? "");
-  fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
-  return values;
-}
+import { changeSelectMenu, selectMenuValue, selectMenuOptionValues } from "../../test/selectMenuTestUtils.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() — variables referenced inside vi.mock() factory closures.
@@ -2081,7 +2043,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
     const secondLayerSelect = screen.getByLabelText(
       /Layer 2 for layer-switch combo/i,
-    ) as HTMLElement;
+    ) as HTMLButtonElement;
     expect(secondLayerSelect.disabled).toBe(false);
     await changeSelectMenu(secondLayerSelect, "SHIFT");
     expect(selectMenuValue(secondLayerSelect)).toBe("SHIFT");

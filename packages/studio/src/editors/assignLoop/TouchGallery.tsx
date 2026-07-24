@@ -92,13 +92,10 @@ import {
   BG_PAGE, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
   galleryPageStyle as pageStyle,
   galleryGhostBtn as ghostBtn,
+  gallerySelectMenuStyle,
 } from "../../lib/galleryTheme.ts";
 
-// SelectMenu's trigger already carries the same colors gallerySelectStyle
-// used to set explicitly (BG_PAGE/BORDER/TEXT_MAIN, byte-identical values —
-// see ui/theme.ts); only a width override is still needed since a native
-// <select> auto-sizes to content but SelectMenu's trigger is width: 100%.
-const selectStyle: CSSProperties = { width: 160, fontSize: 12 };
+const selectStyle: CSSProperties = gallerySelectMenuStyle(160);
 
 // ---------------------------------------------------------------------------
 // Helpers

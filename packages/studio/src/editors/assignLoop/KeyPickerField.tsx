@@ -1,8 +1,8 @@
-// KeyPickerField — a key-picker ui/SelectMenu (#1307: native <select> popups
-// don't open in the VS Code webview) plus an optional "Enter my own
-// character..." custom-character text input, shared by every key-picker
-// dropdown in MechanismGallery (deadkey trigger, S-01 swap, S-08 ralt) and
-// TouchGallery (long-press / flick / multitap / replace host key).
+// KeyPickerField — a key-picker ui/SelectMenu (native <select> popups don't
+// open in the VS Code webview) plus an optional "Enter my own character..."
+// custom-character text input, shared by every key-picker dropdown in
+// MechanismGallery (deadkey trigger, S-01 swap, S-08 ralt) and TouchGallery
+// (long-press / flick / multitap / replace host key).
 //
 // Resolution (which physical key the current selection/typed text maps to)
 // is computed by the pure resolveKeyPickerSelection() helper in
@@ -25,12 +25,9 @@ import {
   reflectCharInput,
   type KeyPickerResolveOptions,
 } from "../../lib/charInput.ts";
-import { BG_PAGE, BORDER, TEXT_MAIN, TEXT_DIM, FONT } from "../../lib/galleryTheme.ts";
+import { BG_PAGE, BORDER, TEXT_MAIN, TEXT_DIM, FONT, gallerySelectMenuStyle } from "../../lib/galleryTheme.ts";
 
-const selectStyle: CSSProperties = {
-  width: 170,
-  fontSize: 12,
-};
+const selectStyle: CSSProperties = gallerySelectMenuStyle(170);
 
 const customInputStyle: CSSProperties = {
   width: 90,

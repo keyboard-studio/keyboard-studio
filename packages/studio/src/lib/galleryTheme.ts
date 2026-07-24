@@ -81,3 +81,13 @@ export const galleryInputStyle: CSSProperties = {
   textAlign: "center",
   boxSizing: "border-box",
 };
+
+/**
+ * SelectMenu's trigger already carries the same colors the pre-migration
+ * native <select> set explicitly (BG_PAGE/BORDER/TEXT_MAIN, byte-identical
+ * values — see ui/theme.ts); only a width override is still needed since a
+ * native <select> auto-sizes to content but SelectMenu's trigger is
+ * width: 100%. Shared by KeyPickerField/MechanismGallery/TouchGallery so a
+ * fourth SelectMenu migration doesn't hand-copy a fourth near-identical const.
+ */
+export const gallerySelectMenuStyle = (width: number): CSSProperties => ({ width, fontSize: 12 });

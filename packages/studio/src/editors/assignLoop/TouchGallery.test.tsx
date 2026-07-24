@@ -21,28 +21,8 @@ import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 import { expectCurrentChar } from "../../test/currentCharChip.ts";
+import { changeSelectMenu } from "../../test/selectMenuTestUtils.ts";
 import { PATTERN_SEQUENCE } from "./patternIds.ts";
-
-// ---------------------------------------------------------------------------
-// ui/SelectMenu test helper (#1307: native <select> popups don't open in the
-// VS Code webview — KeyPickerField's key picker and the flick-direction
-// dropdown are now a DOM-rendered button+listbox, not a native <select>).
-// ---------------------------------------------------------------------------
-
-/** Opens a SelectMenu trigger and clicks the option with the given value —
- * the button+listbox equivalent of `fireEvent.change(select, { target: { value } })`.
- * Awaits the listbox actually opening before looking for the option: under a
- * deep/complex render tree the click's state update can land a tick after
- * fireEvent.click returns, so a synchronous check right after can flake. */
-async function changeSelectMenu(trigger: HTMLElement, value: string): Promise<void> {
-  fireEvent.click(trigger);
-  await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
-  const option = trigger.parentElement?.querySelector(`li[data-value="${value}"]`);
-  if (option === null || option === undefined) {
-    throw new Error(`SelectMenu option not found for value "${value}"`);
-  }
-  fireEvent.click(option);
-}
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() — refs shared across mock closures and test bodies.
@@ -407,7 +387,7 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
 
     const hostKeySelect = screen.queryByRole("button", { name: /host key/i });
     expect(hostKeySelect).not.toBeNull();
-          await changeSelectMenu(hostKeySelect!, "K_A");
+    await changeSelectMenu(hostKeySelect!, "K_A");
 
     const applyBtns2 = screen.queryAllByRole("button");
     const applyBtn = applyBtns2.find((b) => b.textContent?.trim() === "Apply method") ?? null;
@@ -1213,7 +1193,7 @@ describe("TouchGallery — multiple methods per character", () => {
     // Apply method 1: long-press K_A (the chooser's default active method).
     const hostKeySelect1 = screen.queryByRole("button", { name: /host key/i });
     expect(hostKeySelect1).not.toBeNull();
-          await changeSelectMenu(hostKeySelect1!, "K_A");
+    await changeSelectMenu(hostKeySelect1!, "K_A");
     let applyBtn = screen.queryAllByRole("button").find(
       (b) => b.textContent?.trim() === "Apply method",
     ) ?? null;
@@ -1228,7 +1208,7 @@ describe("TouchGallery — multiple methods per character", () => {
 
     const hostKeySelect2 = screen.queryByRole("button", { name: /host key/i });
     expect(hostKeySelect2).not.toBeNull();
-          await changeSelectMenu(hostKeySelect2!, "K_B");
+    await changeSelectMenu(hostKeySelect2!, "K_B");
     applyBtn = screen.queryAllByRole("button").find(
       (b) => b.textContent?.trim() === "Apply method",
     ) ?? null;
@@ -1304,10 +1284,10 @@ describe("TouchGallery — accepting a suggestion stays on the same character", 
 
     const hostKeySelect = screen.queryByRole("button", { name: /host key/i });
     expect(hostKeySelect).not.toBeNull();
-          await changeSelectMenu(hostKeySelect!, "K_B");
+    await changeSelectMenu(hostKeySelect!, "K_B");
     const directionSelect = screen.queryByRole("button", { name: /flick direction/i });
     expect(directionSelect).not.toBeNull();
-          await changeSelectMenu(directionSelect!, "n");
+    await changeSelectMenu(directionSelect!, "n");
 
     const applyBtn = screen.queryAllByRole("button").find(
       (b) => b.textContent?.trim() === "Apply method",
@@ -1698,7 +1678,7 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
     // chooser, appendMechanismToChar dedupes — no second identical chip.
     const hostKeySelect = screen.queryByRole("button", { name: /host key/i });
     expect(hostKeySelect).not.toBeNull();
-          await changeSelectMenu(hostKeySelect!, "K_A");
+    await changeSelectMenu(hostKeySelect!, "K_A");
     const applyBtn = screen.queryAllByRole("button").find(
       (b) => b.textContent?.trim() === "Apply method",
     ) ?? null;
@@ -1724,7 +1704,7 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
     const applyIdenticalLongpress = async () => {
       const hostKeySelect = screen.queryByRole("button", { name: /host key/i });
       expect(hostKeySelect).not.toBeNull();
-              await changeSelectMenu(hostKeySelect!, "K_A");
+      await changeSelectMenu(hostKeySelect!, "K_A");
       const applyBtn = screen.queryAllByRole("button").find(
         (b) => b.textContent?.trim() === "Apply method",
       ) ?? null;
@@ -1796,7 +1776,7 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
     // already "longpress_alternates" — matches buildMechanismRef's key order).
     const hostKeySelect = screen.queryByRole("button", { name: /host key/i });
     expect(hostKeySelect).not.toBeNull();
-          await changeSelectMenu(hostKeySelect!, "K_A");
+    await changeSelectMenu(hostKeySelect!, "K_A");
     const applyBtn = screen.queryAllByRole("button").find(
       (b) => b.textContent?.trim() === "Apply method",
     ) ?? null;
@@ -1836,7 +1816,7 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
 
     const hostKeySelect = screen.queryByRole("button", { name: /host key/i });
     expect(hostKeySelect).not.toBeNull();
-          await changeSelectMenu(hostKeySelect!, "K_A");
+    await changeSelectMenu(hostKeySelect!, "K_A");
     const applyBtn = screen.queryAllByRole("button").find(
       (b) => b.textContent?.trim() === "Apply method",
     ) ?? null;

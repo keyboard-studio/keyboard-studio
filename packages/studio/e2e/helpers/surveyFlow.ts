@@ -160,9 +160,9 @@ export async function driveIdentityLite(
   await surveyAdvance(page).click();
 
   // Q5: Target script (select) — required.
-  // #1307: native <select> popups don't open in the VS Code webview, so this
-  // field is now a ui/SelectMenu (button + DOM-rendered listbox), not a
-  // native <select> — open it, then click the option by its data-value (the
+  // native <select> popups don't open in the VS Code webview, so this field
+  // is now a ui/SelectMenu (button + DOM-rendered listbox), not a native
+  // <select> — open it, then click the option by its data-value (the
   // underlying script value), not Playwright's selectOption(). Same pattern
   // as driveTouchGallery's host-key picker below.
   const targetScriptSelect = page.locator("#il_target_script");
@@ -399,10 +399,10 @@ export async function driveTouchGallery(page: Page): Promise<void> {
   }
 
   const continueButton = page.getByTestId("touch-continue");
-  // #1307: native <select> popups don't open in the VS Code webview, so the
-  // host key picker is now a ui/SelectMenu (button + DOM-rendered listbox),
-  // not a native <select> — open it, then click the option by its
-  // data-value (the underlying vkey), not Playwright's selectOption().
+  // native <select> popups don't open in the VS Code webview, so the host
+  // key picker is now a ui/SelectMenu (button + DOM-rendered listbox), not
+  // a native <select> — open it, then click the option by its data-value
+  // (the underlying vkey), not Playwright's selectOption().
   const hostKeySelect = page.getByRole("button", { name: "Host key for long-press" });
   const applyButton = page.getByRole("button", { name: /^Apply touch method for/ });
 
