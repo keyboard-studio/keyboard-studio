@@ -8,15 +8,15 @@
 // (./i18nResolve.ts), just sourcing from a locale-keyed sidecar JSON lookup
 // (a `(type, id, field)` triple) rather than a Lingui MessageDescriptor.
 import type { I18n } from "@lingui/core";
-import type { Locale } from "./i18n.ts";
 
-// Mirrors ./i18n.ts's DEFAULT_LOCALE by value (not a value-import of it) so
-// this module has no runtime dependency on i18n.ts — i18n.ts imports THIS
-// module (to call activateContentLocale from activateLocale), and a
-// value-level import cycle back would make init-order fragile for no benefit
-// (this constant can't drift: both are English, the one and only source
-// locale, see D6/D2).
-const DEFAULT_LOCALE: Locale = "en";
+// Locale is a plain `string` here, not an import of ./i18n.ts's `Locale`
+// type — i18n.ts imports THIS module (to call activateContentLocale from
+// activateLocale), and even a type-only import back would create a cycle
+// depcruise's no-circular rule flags regardless of the `type` keyword (it
+// analyses the import graph pre-erasure). DEFAULT_LOCALE mirrors i18n.ts's
+// constant by value for the same reason (this constant can't drift: both are
+// English, the one and only source locale, see D6/D2).
+const DEFAULT_LOCALE = "en";
 
 /** The three sidecar catalogs extracted by utilities/i18n-content-extract (T027). */
 export type ContentCatalogType = "patterns" | "adaptationQuestions" | "criteria";
@@ -53,8 +53,8 @@ function buildContentKey(type: ContentCatalogType, id: string, field: string): s
   return `content.${NAMESPACE[type]}.${slugifyIdSegment(id)}.${field}`;
 }
 
-const localeCatalogs = new Map<Locale, Partial<Record<ContentCatalogType, ContentCatalog>>>();
-const activating = new Map<Locale, Promise<void>>();
+const localeCatalogs = new Map<string, Partial<Record<ContentCatalogType, ContentCatalog>>>();
+const activating = new Map<string, Promise<void>>();
 
 /**
  * Lazily load a locale's content-i18n sidecar catalogs (code-split the same
@@ -66,7 +66,7 @@ const activating = new Map<Locale, Promise<void>>();
  * as `activateLocale` in ./i18n.ts — resolveContentString falls back to the
  * English value already in hand rather than propagating a rejection.
  */
-export function activateContentLocale(locale: Locale): Promise<void> {
+export function activateContentLocale(locale: string): Promise<void> {
   if (locale === DEFAULT_LOCALE) return Promise.resolve();
   const inFlight = activating.get(locale);
   if (inFlight !== undefined) return inFlight;
@@ -110,7 +110,7 @@ export function resolveContentString(
 ): string {
   const locale = i18n?.locale;
   if (locale === undefined || locale === DEFAULT_LOCALE) return englishValue;
-  const catalog = localeCatalogs.get(locale as Locale)?.[type];
+  const catalog = localeCatalogs.get(locale)?.[type];
   if (catalog === undefined) return englishValue;
   return catalog[buildContentKey(type, id, field)] ?? englishValue;
 }
@@ -124,7 +124,7 @@ export function resolveContentString(
  * cache directly instead of relying on the mock as the load-bearing mechanism.
  */
 export function _setContentCatalogForTesting(
-  locale: Locale,
+  locale: string,
   catalogs: Partial<Record<ContentCatalogType, ContentCatalog>>,
 ): void {
   localeCatalogs.set(locale, catalogs);
