@@ -2,6 +2,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { ALL_CRITERIA, CRITERIA_BY_BAND } from "@keyboard-studio/contracts";
 import {
   extractAdaptationQuestionStrings,
   extractCriteriaStrings,
@@ -304,16 +305,64 @@ describe("extractCriteriaStrings", () => {
     const strings = extractCriteriaStrings();
     const keys = Object.keys(strings);
 
-    expect(keys.length).toBeGreaterThan(0);
     expect(keys.every((k) => k.startsWith("content.criteria."))).toBe(true);
 
     const checklistKeys = keys.filter((k) => k.endsWith(".checklistText"));
     const descriptionKeys = keys.filter((k) => k.endsWith(".description"));
-    // Every criterion contributes a description; only red-checklist band rows
-    // additionally contribute a checklistText — so checklist count must be
-    // strictly less than the description count (some rows are not that band).
-    expect(checklistKeys.length).toBeLessThan(descriptionKeys.length);
-    expect(checklistKeys.length).toBeGreaterThan(0);
+    // spec 046 D7/T025 (re-scoped): tie the sidecar's counts exactly to the
+    // canonical CriterionSchema-validated catalog, not just non-zero/relative
+    // checks — one description per ALL_CRITERIA row, one checklistText per
+    // red-checklist-band row. Sourced dynamically (not a literal number) so a
+    // legitimate catalog addition doesn't go red for the wrong reason.
+    expect(descriptionKeys.length).toBe(ALL_CRITERIA.length);
+    expect(checklistKeys.length).toBe(CRITERIA_BY_BAND["red-checklist"].length);
+  });
+
+  it("every extracted description is the exact English value from ALL_CRITERIA (no drift, no substitution)", () => {
+    const strings = extractCriteriaStrings();
+    for (const criterion of ALL_CRITERIA) {
+      const key = `content.criteria.${slugifyIdSegment(criterion.id)}.description`;
+      expect(strings[key], key).toBe(criterion.description);
+    }
+  });
+
+  it("only red-checklist criteria contribute checklistText, and its value is the exact preSubmitChecklistText", () => {
+    const strings = extractCriteriaStrings();
+    for (const criterion of ALL_CRITERIA) {
+      const key = `content.criteria.${slugifyIdSegment(criterion.id)}.checklistText`;
+      if (criterion.band === "red-checklist") {
+        expect(strings[key], key).toBe(criterion.preSubmitChecklistText);
+      } else {
+        expect(key in strings, key).toBe(false);
+      }
+    }
+  });
+
+  it("never leaks a control-field value (id/section/band/hook) as an extracted string", () => {
+    // Mirrors extractPatternStrings' control-field guard above — the sidecar
+    // must carry only translatable prose (description/checklistText), never
+    // the identifiers/hooks CriterionSchema also carries on the same record.
+    const values = new Set(Object.values(extractCriteriaStrings()));
+    for (const criterion of ALL_CRITERIA) {
+      expect(values.has(criterion.id), criterion.id).toBe(false);
+      expect(values.has(criterion.section), `${criterion.id}.section`).toBe(false);
+      expect(values.has(criterion.band), `${criterion.id}.band`).toBe(false);
+      if (criterion.principle !== undefined) {
+        expect(values.has(criterion.principle), `${criterion.id}.principle`).toBe(false);
+      }
+      if (criterion.band === "scaffolder-bake") {
+        expect(values.has(criterion.scaffolderRule), `${criterion.id}.scaffolderRule`).toBe(false);
+      }
+      if (criterion.band === "layer-c-enforce") {
+        expect(values.has(criterion.lintRuleId), `${criterion.id}.lintRuleId`).toBe(false);
+      }
+      if (criterion.band === "yellow-survey") {
+        expect(values.has(criterion.surveyQuestionId), `${criterion.id}.surveyQuestionId`).toBe(false);
+      }
+      // red-checklist's own hook, preSubmitChecklistText, is deliberately NOT
+      // checked here — that value IS the legitimately-extracted checklistText
+      // (checking it would trivially fail for every red-checklist row).
+    }
   });
 
   it("slugifies dotted criterion ids", () => {

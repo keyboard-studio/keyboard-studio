@@ -596,6 +596,20 @@ describe("criteriaData loader (#116)", () => {
     expect(sum).toBe(ALL_CRITERIA.length);
   });
 
+  // spec 046 D7/T025: the row-count invariant must keep reading only the
+  // canonical English criteria.json, never a Tier B translation. There is no
+  // locale-parameterized loader here — ALL_CRITERIA is parsed from exactly
+  // one file (../data/criteria.json) at module-init time. This is a
+  // regression trip-wire on that architecture, not a behavioral guarantee:
+  // CriterionSchema.array().parse() never drops rows (it throws on the first
+  // invalid one), so today the two lengths can't diverge — the point is that
+  // a future change adding a second merged-in source (e.g. reading a
+  // `criteria.<lang>.json`) would have to touch this file's length to stay
+  // green, making that change visible in review rather than silent.
+  it("ALL_CRITERIA's length matches the raw criteria.json it is parsed from (no other source merged in)", () => {
+    expect(ALL_CRITERIA.length).toBe(criteriaJsonRaw.length);
+  });
+
   it("CRITERIA_BY_BAND entries match their declared band", () => {
     CRITERIA_BY_BAND["scaffolder-bake"].forEach((c) =>
       expect(c.band).toBe("scaffolder-bake")
