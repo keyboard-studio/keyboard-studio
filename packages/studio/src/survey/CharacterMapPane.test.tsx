@@ -401,6 +401,33 @@ describe("CharacterMapPane — data path", () => {
     expect(within(group).queryByRole("button", { name: /\(U\+00A0\)/ })).toBeNull(); // NBSP separator
   });
 
+  it("shows the yellow base-output legend note when the base produces glyphs", async () => {
+    seedBaseProducing(["a"]);
+    getGroupsResult.set([
+      { block: "Latin", tier: "main", script: "Latn", usedByBase: false, cells: [{ char: "a", isCombiningMark: false }] },
+    ]);
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Characters outlined in yellow are available in your chosen base keyboard/i),
+      ).toBeTruthy();
+    });
+  });
+
+  it("omits the base-output legend note when the base produces nothing", async () => {
+    seedBaseAndLanguage(); // makeTestIR([]) — empty produced set
+    getGroupsResult.set([
+      { block: "Latin", tier: "main", script: "Latn", usedByBase: false, cells: [{ char: "a", isCombiningMark: false }] },
+    ]);
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    expect(
+      screen.queryByText(/Characters outlined in yellow are available in your chosen base keyboard/i),
+    ).toBeNull();
+  });
+
   it("a cell already present in phaseBDraftStore.chars renders aria-pressed=true on mount", async () => {
     seedBaseAndLanguage();
     usePhaseBDraftStore.getState().setAll(["b"]);

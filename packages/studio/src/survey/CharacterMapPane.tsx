@@ -670,6 +670,13 @@ export function CharacterMapPane({
           list you're building on the left.
         </Trans>
       </p>
+      {baseProduced.size > 0 && (
+        <p style={{ margin: 0, fontSize: 12, color: BASE_OUTPUT_BORDER, lineHeight: 1.5 }}>
+          <Trans id="survey.characterMapPane.baseOutputNote">
+            Note: Characters outlined in yellow are available in your chosen base keyboard.
+          </Trans>
+        </p>
+      )}
       <form
         onSubmit={handleRawSubmit}
         style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}

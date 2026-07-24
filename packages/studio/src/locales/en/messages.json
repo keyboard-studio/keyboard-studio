@@ -119,6 +119,7 @@
   "survey.phaseB.charChipEditor.groupAriaLabel": "Accumulated characters — click to remove",
   "editor.trackStep.adaptTitle": "Adapt",
   "survey.characterMapPane.rawInput.addButton": "Add",
+  "survey.characterMapPane.baseOutputNote": "Note: Characters outlined in yellow are available in your chosen base keyboard.",
   "survey.characterMapPane.cell.addAction": "Add",
   "survey.characterMapPane.cell.fromBase": " — from your base keyboard",
   "survey.phaseB.suggestionChip.addAction": "Add",
