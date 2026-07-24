@@ -4,7 +4,7 @@ import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { plural } from '@lingui/core/macro';
 import type { CarveNode, CarveGlyph, StoreRuleDetail, CharLocation } from '../../../lib/irToCarveNodes.ts';
-import { nodeState, MOD_GROUP_DEFS, glyphsTriState, idsTriState, resolveNodeName } from '../../../lib/irToCarveNodes.ts';
+import { nodeState, MOD_GROUP_DEFS, glyphsTriState, idsTriState, resolveNodeName, resolveReferencedByLabel } from '../../../lib/irToCarveNodes.ts';
 import { resolveContentString } from '../../../lib/contentI18n.ts';
 import { ToggleBox } from './ToggleBox.tsx';
 import { GlyphCell } from './GlyphCell.tsx';
@@ -354,6 +354,7 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
     ? nodes.find((n) => n.nodeId === node.referencedByNodeId)
     : undefined;
   const refAlive = refNode !== undefined && nodeState(refNode, isItemDeleted, isDeleted) !== 'off';
+  const referencedByLabel = resolveReferencedByLabel(node, i18n);
   const chips = node.storeChips ?? [];
   const toggleableChips = chips.filter((c) => c.action !== 'disabled');
   const toggleableIds = toggleableChips.map((c) => c.chipId);
@@ -644,12 +645,7 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
           </p>
         </div>
       )}
-      {node.referencedByLabel !== undefined && (() => {
-        const referencedByLabel =
-          node.referencedByNodeId !== undefined
-            ? resolveContentString('patterns', node.referencedByNodeId, 'title', node.referencedByLabel, i18n)
-            : node.referencedByLabel;
-        return (
+      {node.referencedByLabel !== undefined && (
         <div style={{
           marginTop: 18, display: 'flex', gap: 11, padding: '12px 15px', borderRadius: 10,
           background: refAlive ? 'var(--app-surface)' : 'color-mix(in srgb, var(--sil-orange) 9%, var(--app-surface))',
@@ -672,8 +668,7 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
               )}
           </div>
         </div>
-        );
-      })()}
+      )}
     </div>
   );
 }
