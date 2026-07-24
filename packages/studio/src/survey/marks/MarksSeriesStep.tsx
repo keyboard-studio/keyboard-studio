@@ -137,9 +137,10 @@ export function classNeedsMentalModelScreen(
 
 /**
  * The series' phase result: reported on completion (or on the S0 skip). The
- * chosen output form rides along as a studio-local payload extension (see
- * steps/reducer.ts MarksCompleteResult) — the reducer needs it to decide
- * whether to generate stepwise backspace-unwrap stores.
+ * chosen output form is now a real contract field (SurveyPhaseResult.marksOutputForm,
+ * spec 046) — the reducer (steps/reducer.ts MarksCompleteResult) still reads
+ * it off this result to decide whether to generate stepwise backspace-unwrap
+ * stores; carve's needed-set derivation reads it off the merged session.
  */
 function seriesResult(
   worklist = makeEmptyPlacementWorklist(),
@@ -150,7 +151,7 @@ function seriesResult(
     answers: [],
     marksWorklist: worklist,
     ...(outputForm !== undefined ? { marksOutputForm: outputForm } : {}),
-  } as SurveyPhaseResult;
+  };
 }
 
 const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {

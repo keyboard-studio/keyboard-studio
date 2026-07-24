@@ -132,7 +132,7 @@ export type { CldrLoader, CldrFullLoader, ExemplarResult } from "./character-dis
 export { createFetchCldrLoader, createFetchCldrFullLoader } from "./character-discovery/cldr.js";
 // Phase B high-confidence missing-character suggestions (CLDR-grounded, no LLM).
 export { suggestMissingCharacters, neededCharsForLanguage, isCharCoveredForLocale } from "./character-discovery/suggestMissing.js";
-export type { MissingCharSuggestions } from "./character-discovery/suggestMissing.js";
+export type { MissingCharSuggestions, CharNormalizationForm } from "./character-discovery/suggestMissing.js";
 // Case-pair proposal helper for the shift-layer studio feature (bidirectional;
 // distinct from suggestMissing's isCovered coverage check — see casePair.ts docstring).
 export { caseCounterpart } from "./character-discovery/casePair.js";
@@ -158,13 +158,15 @@ export { groupMarkClasses, attestedBasesOf, ATTACHMENT_SIMILARITY_THRESHOLD } fr
 export type { MarkClass } from "./marks/mark-classes.js";
 export { proposeAttachments, deriveCaseCounterparts } from "./marks/attachment-proposals.js";
 export type { AttachmentProposal, ProposedAttachmentState } from "./marks/attachment-proposals.js";
-export { resolveOutputFormProposal, hasDecidablePairs } from "./marks/output-form-policy.js";
+export { resolveOutputFormProposal, hasDecidablePairs, normalizationFormForOutputForm } from "./marks/output-form-policy.js";
 export type { OutputForm, OutputFormProposal } from "./marks/output-form-policy.js";
 export { computeMentalModelPrefills, detectBaseMarkMechanism, PRODUCTIVITY_SPREAD_THRESHOLD } from "./marks/mental-model-prefill.js";
 export type { MentalModelPrefill, MentalModelAnswer, BaseMarkMechanism } from "./marks/mental-model-prefill.js";
 export { buildPlacementWorklist, verifyWorklistCoverage } from "./marks/worklist.js";
 export type { WorklistInputs } from "./marks/worklist.js";
 export { expandCaseCounterpartAttachments } from "./marks/case-fold.js";
+export { deriveCarveNeededSet } from "./marks/carve-needed-set.js";
+export type { CarveNeededSet, DeriveCarveNeededSetArgs } from "./marks/carve-needed-set.js";
 export { applyMarkGuards, MARKS_GUARD_GROUP, MARKS_UNWRAP_FROM_STORE, MARKS_UNWRAP_TO_STORE } from "./pattern-apply/mark-guards.js";
 export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
 

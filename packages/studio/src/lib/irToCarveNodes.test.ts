@@ -1977,6 +1977,93 @@ describe('annotateRemovalRecommendations', () => {
   });
 });
 
+
+// ---------------------------------------------------------------------------
+// annotateRemovalRecommendations — form parameter (spec: carve output-form
+// normalization). Uses explicit \u escapes throughout so the precomposed vs.
+// decomposed literal is unambiguous in source (rather than visually-similar
+// characters that differ only by combining-mark composition).
+// ---------------------------------------------------------------------------
+
+describe('annotateRemovalRecommendations — form parameter (spec: base-plus-mark drives NFD comparison)', () => {
+  const PRECOMPOSED = '\u00e9'; // e-acute, single codepoint (NFC)
+  const DECOMPOSED = '\u0065\u0301'; // e + combining acute accent (NFD)
+
+  it('matches a produced PRECOMPOSED char against a needed DECOMPOSED sequence under NFD (base-plus-mark) — recommendation is none', () => {
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+        nodeId: 'rule-precomposed', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: PRECOMPOSED }],
+      }] }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set([DECOMPOSED]), undefined, 'NFD');
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it('matches a produced DECOMPOSED sequence against a needed PRECOMPOSED char under NFD (base-plus-mark) — recommendation is none', () => {
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+        nodeId: 'rule-decomposed', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: DECOMPOSED }],
+      }] }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set([PRECOMPOSED]), undefined, 'NFD');
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it('ready-made (NFC, the default) still matches a produced PRECOMPOSED char against a needed DECOMPOSED sequence — existing behavior holds', () => {
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+        nodeId: 'rule-precomposed', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: PRECOMPOSED }],
+      }] }],
+    });
+    const nodes = toRailNodes(ir);
+
+    // form omitted entirely — must default to 'NFC', byte-identical to the
+    // pre-046-carve fallback for an undefined marksOutputForm.
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set([DECOMPOSED]), undefined);
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it('a genuinely surplus produced character is still recommended high under NFD (form does not disable the surplus signal)', () => {
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+        nodeId: 'rule-surplus', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: 'z' }],
+      }] }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set([DECOMPOSED]), undefined, 'NFD');
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('high');
+  });
+
+  it('Turkic dotted-I exception (G5) still fires ON TOP of NFD normalization for a tr-tagged keyboard', () => {
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+        nodeId: 'rule-cap-i', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: 'I' }],
+      }] }],
+    });
+    const nodes = toRailNodes(ir);
+
+    // Needed-set has ONLY dotted lowercase 'i' — the Turkic exception must
+    // suppress the case fold even under form NFD (normalization and G5 are
+    // additive, not substitutive).
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set(['i']), 'tr', 'NFD');
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('high');
+  });
+});
 // ---------------------------------------------------------------------------
 // isSimpleRemovableRule — #525 BANNER slice allowlist predicate
 // ---------------------------------------------------------------------------
@@ -2296,6 +2383,63 @@ describe('recommendedRemovalChars', () => {
   });
 });
 
+
+// ---------------------------------------------------------------------------
+// recommendedRemovalChars — form parameter (spec: carve output-form
+// normalization). Sibling seam to annotateRemovalRecommendations above —
+// same PRECOMPOSED/DECOMPOSED pair, explicit \u escapes.
+// ---------------------------------------------------------------------------
+
+describe('recommendedRemovalChars — form parameter (spec: base-plus-mark drives NFD comparison)', () => {
+  const PRECOMPOSED = '\u00e9'; // e-acute, single codepoint (NFC)
+  const DECOMPOSED = '\u0065\u0301'; // e + combining acute accent (NFD)
+
+  it('does NOT recommend a produced PRECOMPOSED char when the needed-set holds the DECOMPOSED sequence, under NFD', () => {
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+        nodeId: 'rule-precomposed', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: PRECOMPOSED }],
+      }] }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set([DECOMPOSED]), form: 'NFD' });
+
+    expect(result.map((r) => r.ch)).toEqual([]);
+  });
+
+  it('does NOT recommend a produced DECOMPOSED sequence when the needed-set holds the PRECOMPOSED char, under NFD', () => {
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+        nodeId: 'rule-decomposed', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: DECOMPOSED }],
+      }] }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set([PRECOMPOSED]), form: 'NFD' });
+
+    expect(result.map((r) => r.ch)).toEqual([]);
+  });
+
+  it('ready-made (NFC, the default) still recognizes a produced PRECOMPOSED char against a needed DECOMPOSED sequence as needed — existing behavior holds', () => {
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+        nodeId: 'rule-precomposed', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: PRECOMPOSED }],
+      }] }],
+    });
+
+    // `form` omitted entirely — must default to 'NFC', byte-identical to the
+    // pre-existing 3-argument call shape used everywhere else in this file.
+    const result = recommendedRemovalChars({ ir, needed: new Set([DECOMPOSED]) });
+
+    expect(result.map((r) => r.ch)).toEqual([]);
+  });
+
+  it('still recommends a genuinely surplus letter under NFD (form does not disable the surplus signal)', () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+    const result = recommendedRemovalChars({ ir, needed: new Set([DECOMPOSED]), form: 'NFD' });
+
+    expect(result.map((r) => r.ch)).toEqual(['y']);
+  });
+});
 // ---------------------------------------------------------------------------
 // coordinatedCollateralForSlots (#525/#931 follow-up — manual-carve safety)
 // ---------------------------------------------------------------------------

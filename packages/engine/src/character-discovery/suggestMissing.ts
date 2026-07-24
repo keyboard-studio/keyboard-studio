@@ -201,25 +201,43 @@ function effectiveScriptIsLatin(bcp47: string, primary: string): boolean {
 }
 
 /**
+ * The two normalization forms the carve-comparison seam chooses between,
+ * driven by the marks series' whole-keyboard output-form decision (see
+ * `marks/output-form-policy.ts`'s `normalizationFormForOutputForm`).
+ * Deliberately narrower than the full `NFC | NFD | NFKC | NFKD` union
+ * `String.prototype.normalize` accepts — compatibility (K) forms are never
+ * an authoring output-form choice here.
+ */
+export type CharNormalizationForm = "NFC" | "NFD";
+
+/**
  * Returns true if the candidate character is considered "covered" by the
  * keyboard's produced set.
  *
- * For most locales: covered if the exact NFC form OR its case-folded counterpart
- * (toUpperCase / toLowerCase) is present in the produced set.
+ * For most locales: covered if the exact form (per `form`) OR its case-folded
+ * counterpart (toUpperCase / toLowerCase) is present in the produced set.
  *
  * For Latin-script Turkic locales (tr, az, kk-Latn, etc.): covered ONLY if the
- * exact NFC form is present, because JS case folding mishandles i / I /
+ * exact form is present, because JS case folding mishandles i / I /
  * dotless-i / dotted-I. Cyrillic-script Turkic (bare kk, kk-Cyrl, az-Cyrl)
  * uses normal case-fold — the dotted-I hazard is Latin-only.
+ *
+ * `ch` is normalized to `form` before every comparison (idempotent if the
+ * caller already normalized it). `produced` is NOT re-normalized here — the
+ * caller is responsible for having built it in the SAME `form` (this is the
+ * "apples to apples" contract the carve gallery comparison depends on; see
+ * `isCharCoveredForLocale`'s doc). Case-folding (G5, the Turkic-aware
+ * exception) always runs IN ADDITION to normalization, never instead of it.
  */
-function isCovered(ch: string, produced: Set<string>, isTurkic: boolean): boolean {
-  if (produced.has(ch)) return true;
+function isCovered(ch: string, produced: Set<string>, isTurkic: boolean, form: CharNormalizationForm = "NFC"): boolean {
+  const normalized = ch.normalize(form);
+  if (produced.has(normalized)) return true;
   if (isTurkic) return false;
   // Case-fold check: uppercase or lowercase counterpart covers the candidate
-  const upper = ch.toUpperCase();
-  if (upper !== ch && produced.has(upper)) return true;
-  const lower = ch.toLowerCase();
-  if (lower !== ch && produced.has(lower)) return true;
+  const upper = normalized.toUpperCase();
+  if (upper !== normalized && produced.has(upper)) return true;
+  const lower = normalized.toLowerCase();
+  if (lower !== normalized && produced.has(lower)) return true;
   return false;
 }
 
@@ -239,8 +257,9 @@ export function isTurkicCaseFoldSuppressed(bcp47: string): boolean {
 
 /**
  * Returns true when `ch` is covered by `coveringSet` under the same
- * exception-aware case fold `isCovered` uses internally — exact NFC match,
- * or (for non-Turkic-Latin locales) its uppercase/lowercase counterpart.
+ * exception-aware case fold `isCovered` uses internally — exact match (in
+ * `form`), or (for non-Turkic-Latin locales) its uppercase/lowercase
+ * counterpart.
  *
  * Exported for the studio's language-driven surplus signal (#525 items 2/4):
  * a keyboard-produced character should count as "needed" if it case-folds
@@ -248,13 +267,27 @@ export function isTurkicCaseFoldSuppressed(bcp47: string): boolean {
  * French keyboard produces "É"; CLDR needed-set has "é"). Reuses `isCovered`
  * directly rather than re-deriving the fold, so the Turkic exception stays
  * in exactly one place.
+ *
+ * `form` (default "NFC", preserving pre-existing behavior) selects the
+ * normalization form `ch` is compared under — additive, so 3-argument call
+ * sites are unaffected. **Contract:** `coveringSet` must already be
+ * normalized to the SAME `form` by the caller; this function normalizes
+ * `ch` but does not re-normalize `coveringSet` per lookup (it can be a large
+ * set checked many times — the carve gallery normalizes it once at
+ * construction, not on every membership test). Passing a `coveringSet` in a
+ * different form than `form` silently breaks the "apples to apples"
+ * comparison this parameter exists to guarantee — see the carve-gallery
+ * callers (`packages/studio/src/lib/irToCarveNodes.ts`) for the intended
+ * usage. Normalization is applied IN ADDITION to the Turkic-aware case fold
+ * below (G5), never instead of it.
  */
 export function isCharCoveredForLocale(
   ch: string,
   coveringSet: ReadonlySet<string>,
   bcp47: string,
+  form: CharNormalizationForm = "NFC",
 ): boolean {
-  return isCovered(ch, coveringSet as Set<string>, isTurkicCaseFoldSuppressed(bcp47));
+  return isCovered(ch, coveringSet as Set<string>, isTurkicCaseFoldSuppressed(bcp47), form);
 }
 
 // ---------------------------------------------------------------------------

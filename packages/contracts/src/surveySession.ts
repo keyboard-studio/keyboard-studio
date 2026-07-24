@@ -6,7 +6,7 @@ import type { AxisFill } from "./axisFill";
 import type { SurveyPhaseResult } from "./surveyPhaseResult";
 import type { MechanismAssignment } from "./assignmentMap";
 import { mergeAssignments } from "./assignmentMap";
-import type { ConfirmedAlphabet, PlacementWorklist } from "./confirmedAlphabet";
+import type { ConfirmedAlphabet, OutputForm, PlacementWorklist } from "./confirmedAlphabet";
 import { deriveConfirmedInventory, makeConfirmedAlphabet } from "./confirmedAlphabet";
 
 /**
@@ -99,9 +99,11 @@ export interface SurveySession {
   confirmedInventory: string[];
   /**
    * Store-wise merged three-store alphabet across all phases (spec 046):
-   * deduped union of `bases`/`marks` (NFC/NFD-normalised respectively,
-   * first-appearance order), deduped order-preserving union of
-   * `attestedStacks`, last-wins `declaredRoles`. **Additive optional** —
+   * deduped union of `bases` (NFC-normalised) and `marks` (compared/deduped
+   * as-authored — combining marks are not independently normalisable the
+   * way base letters are, so `mergeAlphabets` pushes them verbatim), plus a
+   * deduped order-preserving union of `attestedStacks`, last-wins
+   * `declaredRoles`. **Additive optional** —
    * absent when no phase carried an `alphabet`; when present, the session's
    * `confirmedInventory` also contains its derived projection.
    */
@@ -112,6 +114,12 @@ export interface SurveySession {
    * skipped, which produces an *empty* worklist, not an absent one).
    */
   marksWorklist?: PlacementWorklist;
+  /**
+   * The S4 whole-keyboard output-form decision (spec 046): last phase
+   * carrying one wins, mirroring `marksWorklist`. **Additive optional** —
+   * absent until the marks series' output-form station has been confirmed.
+   */
+  marksOutputForm?: OutputForm;
 }
 
 /**
@@ -167,6 +175,12 @@ export function mergePhaseResults(
     if (phase.marksWorklist !== undefined) marksWorklist = phase.marksWorklist;
   }
 
+  // Output-form decision: same last-wins rule as marksWorklist.
+  let marksOutputForm: OutputForm | undefined;
+  for (const phase of phaseResults) {
+    if (phase.marksOutputForm !== undefined) marksOutputForm = phase.marksOutputForm;
+  }
+
   return {
     axes,
     irAxes: { ...irAxes },
@@ -176,6 +190,7 @@ export function mergePhaseResults(
     confirmedInventory,
     ...(alphabet !== undefined ? { alphabet } : {}),
     ...(marksWorklist !== undefined ? { marksWorklist } : {}),
+    ...(marksOutputForm !== undefined ? { marksOutputForm } : {}),
   };
 }
 

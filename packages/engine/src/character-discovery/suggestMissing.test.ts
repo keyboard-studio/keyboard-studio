@@ -723,3 +723,68 @@ describe("isCharCoveredForLocale — reuses isCovered's exception-aware fold", (
     expect(isCharCoveredForLocale("И", needed, "kk")).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 13. isCharCoveredForLocale — `form` parameter (carve-gallery apples-to-apples
+// comparison, following the ratified marksOutputForm decision). Both sides of
+// a carve comparison must be normalized to the SAME form for a match to be
+// meaningful — these tests hold the produced-vs-needed match under NFD as
+// well as under the pre-existing NFC default, and confirm the Turkic
+// case-fold exception (G5) keeps firing on top of normalization, not instead
+// of it.
+// ---------------------------------------------------------------------------
+
+describe("isCharCoveredForLocale — `form` parameter (spec: normalize both sides identically)", () => {
+  const PRECOMPOSED_LOWER_E_ACUTE = "é"; // single codepoint (NFC)
+  const PRECOMPOSED_UPPER_E_ACUTE = "É"; // single codepoint (NFC)
+  const DECOMPOSED_LOWER_E_ACUTE = "é"; // e + combining acute accent (NFD)
+
+  it("defaults to NFC when `form` is omitted — undefined marksOutputForm fallback stays byte-identical", () => {
+    const needed = new Set([PRECOMPOSED_LOWER_E_ACUTE]);
+    // A decomposed candidate still matches under the NFC default, because
+    // isCovered normalizes `ch` before comparing.
+    expect(isCharCoveredForLocale(DECOMPOSED_LOWER_E_ACUTE, needed, "fr")).toBe(true);
+  });
+
+  it("matches a produced precomposed char against a decomposed needed-set entry under NFD", () => {
+    // Simulates: base rule produces "é" (precomposed), the needed-set entry
+    // was built from a base-plus-mark combo (decomposed) — both get
+    // normalized to NFD before comparison, so they match.
+    const needed = new Set([DECOMPOSED_LOWER_E_ACUTE]);
+    expect(isCharCoveredForLocale(PRECOMPOSED_LOWER_E_ACUTE, needed, "fr", "NFD")).toBe(true);
+  });
+
+  it("matches a produced decomposed sequence against a precomposed needed-set entry under NFC", () => {
+    const needed = new Set([PRECOMPOSED_LOWER_E_ACUTE]);
+    expect(isCharCoveredForLocale(DECOMPOSED_LOWER_E_ACUTE, needed, "fr", "NFC")).toBe(true);
+  });
+
+  it("mismatched forms on the two sides do NOT match — proves the seam actually requires normalizing both sides, not just one", () => {
+    // needed-set built (and left) in NFD, but the caller asks for an NFC
+    // comparison without re-normalizing the covering set — the contract
+    // documented on isCharCoveredForLocale: it's the CALLER's job to build
+    // coveringSet in the same form it's comparing under.
+    const neededStillNFD = new Set([DECOMPOSED_LOWER_E_ACUTE]);
+    // "É" upper-cased precomposed normalized to NFC is "É" (unchanged);
+    // toUpperCase() of the NFD-covering-set entry never happens (that's the
+    // producer side's job), so an exact-form mismatch fails to match.
+    expect(isCharCoveredForLocale(PRECOMPOSED_LOWER_E_ACUTE, neededStillNFD, "fr", "NFC")).toBe(false);
+  });
+
+  it("Turkic dotted-I exception (G5) still fires on top of NFD normalization, not instead of it", () => {
+    const needed = new Set(["ı"]); // dotless i (single codepoint; NFC === NFD here)
+    // Turkic exact-match-only rule still suppresses the case fold under NFD.
+    expect(isCharCoveredForLocale("I", needed, "tr", "NFD")).toBe(false);
+    expect(isCharCoveredForLocale("ı", needed, "tr", "NFD")).toBe(true);
+  });
+
+  it("case-fold still runs IN ADDITION to NFD normalization for non-Turkic locales", () => {
+    // French "É" (precomposed uppercase) against a needed-set built from a
+    // decomposed lowercase entry — normalization brings "É" to NFD first
+    // ("E" + combining acute, uppercase base), then the case-fold lowercases
+    // the base letter, matching the decomposed needed entry.
+    const decomposedLowerEAcute = "é";
+    const needed = new Set([decomposedLowerEAcute]);
+    expect(isCharCoveredForLocale(PRECOMPOSED_UPPER_E_ACUTE, needed, "fr", "NFD")).toBe(true); // "É" precomposed uppercase
+  });
+});

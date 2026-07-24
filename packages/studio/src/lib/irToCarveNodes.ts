@@ -13,7 +13,7 @@ import type {
 } from '@keyboard-studio/contracts';
 import { buildProducedSet } from '@keyboard-studio/contracts';
 import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, isCharCoveredForLocale, collectCharContributors, isPlusSeparator, parseSlotId, isCombiningMarkChar } from '@keyboard-studio/engine';
-import type { StoreSlotBlockReason, StoreSlotEditMode, StoreAnalysis, CharContributors } from '@keyboard-studio/engine';
+import type { StoreSlotBlockReason, StoreSlotEditMode, StoreAnalysis, CharContributors, CharNormalizationForm } from '@keyboard-studio/engine';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 
 // ---------------------------------------------------------------------------
@@ -1361,12 +1361,15 @@ function isAlwaysKeepCategory(ch: string): boolean {
  *   them to the set — an unresolved index()/outs()/deadkey/beep output is
  *   "don't know what this produces," not "produces an unwanted character."
  */
-function producedCharsOf(node: CarveNode): Set<string> {
+function producedCharsOf(node: CarveNode, form: CharNormalizationForm = 'NFC'): Set<string> {
   const chars = new Set<string>();
   const add = (raw: string) => {
     const stripped = raw.startsWith('◌') ? raw.slice(1) : raw;
-    const normalized = stripped.normalize('NFC');
-    if (PLACEHOLDER_CHARS.has(normalized)) return;
+    const normalized = stripped.normalize(form);
+    // Placeholder-detection uses NFC regardless of `form`: PLACEHOLDER_CHARS
+    // are ASCII/invariant tokens ('…', '‹dk›', '🔔', '?'), identical under
+    // every normalization form, so this check is unaffected by `form`.
+    if (PLACEHOLDER_CHARS.has(stripped.normalize('NFC'))) return;
     chars.add(normalized);
   };
   for (const g of node.glyphs ?? []) add(g.ch);
@@ -1459,10 +1462,11 @@ function coordinatedDropHitsNeededChar(
   needed: ReadonlySet<string>,
   bcp47: string | null | undefined,
   storesByName: ReadonlyMap<string, IRStore>,
+  form: CharNormalizationForm = 'NFC',
 ): boolean {
   const partners = resolveCoordinatedPartnerItems(mode, itemsIndex, storesByName);
   return partners.some(({ item }) =>
-    isCharCoveredForLocale(item.value.normalize('NFC'), needed, bcp47 ?? ''),
+    isCharCoveredForLocale(item.value, needed, bcp47 ?? '', form),
   );
 }
 
@@ -1521,6 +1525,9 @@ export interface CoordinatedCollateralChar {
  * @param bcp47        Target language, for the Turkic-aware case fold in isCharCoveredForLocale.
  * @param analysis     Optional precomputed analyzeStores(ir) result (see StoreAnalysis doc) —
  *                      pass this when calling for many removals against the same ir.
+ * @param form         Normalization form both `needed` and the resolved collateral
+ *                      character are compared under (default "NFC", preserving
+ *                      pre-existing behavior) — see isCharCoveredForLocale's `form` doc.
  */
 export function coordinatedCollateralForSlots(
   storeSlotIds: readonly string[],
@@ -1528,6 +1535,7 @@ export function coordinatedCollateralForSlots(
   needed: ReadonlySet<string>,
   bcp47?: string | null,
   analysis: StoreAnalysis = analyzeStores(ir),
+  form: CharNormalizationForm = 'NFC',
 ): CoordinatedCollateralChar[] {
   if (storeSlotIds.length === 0) return [];
 
@@ -1553,11 +1561,11 @@ export function coordinatedCollateralForSlots(
       if (targetSlotIds.has(partnerSlotId) || seenPartnerSlotIds.has(partnerSlotId)) continue;
 
       seenPartnerSlotIds.add(partnerSlotId);
-      const ch = item.value.normalize('NFC');
+      const ch = item.value.normalize(form);
       collateral.push({
         ch,
         storeName: partnerStore.name,
-        isNeeded: isCharCoveredForLocale(ch, needed, bcp47 ?? ''),
+        isNeeded: isCharCoveredForLocale(ch, needed, bcp47 ?? '', form),
         slotId: partnerSlotId,
       });
     }
@@ -1643,6 +1651,17 @@ function isStructuralExclusion(node: CarveNode, ir: KeyboardIR, ownedNodeIds: Se
  * French "É") must still count as needed. `bcp47` is required for the Turkic
  * exception check; when omitted (no target language resolved yet), a plain
  * non-Turkic fold is used.
+ *
+ * `form` (default "NFC", preserving pre-046-carve behavior) is the
+ * normalization form the marks series' output-form decision resolves to
+ * (see `normalizationFormForOutputForm` — "ready-made" => "NFC",
+ * "base-plus-mark" => "NFD"). BOTH the produced-character set (via
+ * `producedCharsOf`) and `needed` are normalized to this SAME form before
+ * comparison, so the chosen output form actually drives which combo
+ * grapheme (precomposed vs. decomposed) counts as a match — the "apples to
+ * apples" carve-gallery comparison. `needed`'s members are re-normalized
+ * here rather than trusted as already-`form`-normalized, since callers may
+ * pass sets built against the default NFC assumption.
  */
 export function annotateRemovalRecommendations(
   nodes: CarveNode[],
@@ -1650,10 +1669,12 @@ export function annotateRemovalRecommendations(
   confirmedInventory: ReadonlySet<string>,
   neededChars?: ReadonlySet<string> | null,
   bcp47?: string | null,
+  form: CharNormalizationForm = 'NFC',
 ): CarveNode[] {
+  const renormalize = (set: ReadonlySet<string>): Set<string> => new Set([...set].map((ch) => ch.normalize(form)));
   const needed: ReadonlySet<string> = neededChars
-    ? new Set([...neededChars, ...confirmedInventory])
-    : confirmedInventory;
+    ? renormalize(new Set([...neededChars, ...confirmedInventory]))
+    : renormalize(confirmedInventory);
 
   if (needed.size === 0) {
     return nodes.map((node) => ({ ...node, recommendation: 'none' }));
@@ -1664,7 +1685,7 @@ export function annotateRemovalRecommendations(
   // never in TURKIC_LOCALES, so isCharCoveredForLocale falls back to a plain
   // (non-Turkic) case fold — matching pre-fix exact-match behavior's intent
   // as closely as possible when the target language hasn't resolved yet.
-  const isNeeded = (ch: string): boolean => isCharCoveredForLocale(ch, needed, bcp47 ?? '');
+  const isNeeded = (ch: string): boolean => isCharCoveredForLocale(ch, needed, bcp47 ?? '', form);
 
   // Precomputed ONCE per IR (not per store node) — classifyStoreSlotEdit scans
   // every rule in the IR, mirroring recommendedRemovalChars' perf note below.
@@ -1676,7 +1697,7 @@ export function annotateRemovalRecommendations(
   return nodes.map((node) => {
     if (isStructuralExclusion(node, ir, ownedNodeIds)) return { ...node, recommendation: 'none' };
 
-    const produced = producedCharsOf(node);
+    const produced = producedCharsOf(node, form);
     if (produced.size === 0) return { ...node, recommendation: 'none' };
 
     for (const ch of produced) {
@@ -1691,7 +1712,7 @@ export function annotateRemovalRecommendations(
         // so it runs ONCE per store instead of once per item (#931 perf).
         const mode = classifyStoreSlotEdit(store, ir, analysis);
         for (let i = 0; i < store.items.length; i++) {
-          if (coordinatedDropHitsNeededChar(mode, i, needed, bcp47, analysis.storeByName)) {
+          if (coordinatedDropHitsNeededChar(mode, i, needed, bcp47, analysis.storeByName, form)) {
             return { ...node, recommendation: 'none' };
           }
         }
@@ -1824,16 +1845,25 @@ export interface RecommendedRemovalChar {
  * Returns [] when `needed` is empty — no signal at all yet (mirrors
  * annotateRemovalRecommendations's "no default is a defect until we're
  * sure" stance), so the banner never shows before Phase B/CLDR resolves.
+ *
+ * `form` (default "NFC", preserving pre-046-carve behavior) — see
+ * annotateRemovalRecommendations's matching doc. `buildProducedSet` (from
+ * contracts) always returns NFC; rather than touching that shared helper
+ * (used well beyond carve), its output is re-normalized to `form` here at
+ * this comparison seam, alongside `needed`, so both sides of the
+ * surplus-detection match under the SAME form.
  */
 export function recommendedRemovalChars(args: {
   ir: KeyboardIR;
   needed: ReadonlySet<string>;
   bcp47?: string | null | undefined;
+  form?: CharNormalizationForm;
 }): RecommendedRemovalChar[] {
-  const { ir, needed, bcp47 } = args;
-  if (needed.size === 0) return [];
+  const { ir, needed: rawNeeded, bcp47, form = 'NFC' } = args;
+  if (rawNeeded.size === 0) return [];
+  const needed = new Set([...rawNeeded].map((ch) => ch.normalize(form)));
 
-  const produced = buildProducedSet(ir);
+  const produced = new Set([...buildProducedSet(ir)].map((ch) => ch.normalize(form)));
   const storesById = new Map(ir.stores.map((s) => [s.nodeId, s]));
   const rulesById = new Map<string, IRRule>();
   for (const group of ir.groups) {
@@ -1848,7 +1878,7 @@ export function recommendedRemovalChars(args: {
   const results: RecommendedRemovalChar[] = [];
 
   for (const ch of produced) {
-    if (isCharCoveredForLocale(ch, needed, bcp47 ?? '')) continue; // needed — not a candidate
+    if (isCharCoveredForLocale(ch, needed, bcp47 ?? '', form)) continue; // needed — not a candidate
     if (isAlwaysKeepCategory(ch)) continue; // digit/punctuation/symbol — never a removal candidate
 
     const contributors = collectCharContributors(ir, ch);
@@ -1876,7 +1906,7 @@ export function recommendedRemovalChars(args: {
         if (mode.mode === 'blocked') { allSimple = false; break; }
         // Reuses the `mode` just computed above — coordinatedDropHitsNeededChar
         // takes an already-classified mode rather than re-deriving it (#931 perf).
-        if (coordinatedDropHitsNeededChar(mode, parsed.itemsIndex, needed, bcp47, analysis.storeByName)) {
+        if (coordinatedDropHitsNeededChar(mode, parsed.itemsIndex, needed, bcp47, analysis.storeByName, form)) {
           dependsOnNeeded = true;
           break;
         }

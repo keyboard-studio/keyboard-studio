@@ -16,8 +16,9 @@ import { InfoView, capabilityHint } from '../assignLoop/parts/InfoView.tsx';
 import { InfoIcon, resolveMessage } from '../assignLoop/parts/carveShared.tsx';
 import { ConfirmDialog } from '../assignLoop/parts/ConfirmDialog.tsx';
 import { useHoverInfoStore } from '../../stores/hoverInfoStore.ts';
-import { collectCharContributors, analyzeStores } from '@keyboard-studio/engine';
-import type { CharContributors, StoreAnalysis } from '@keyboard-studio/engine';
+import { collectCharContributors, analyzeStores, deriveCarveNeededSet, normalizationFormForOutputForm } from '@keyboard-studio/engine';
+import type { CharContributors, StoreAnalysis, CharNormalizationForm } from '@keyboard-studio/engine';
+import { nonAlphabetConfirmedInventory } from '@keyboard-studio/contracts';
 import type { KeyboardIR, RemovalCapability } from '@keyboard-studio/contracts';
 import { neededCharsForLanguage } from '../../lib/services.ts';
 
@@ -92,6 +93,14 @@ interface BuildPendingCascadeArgs {
    * introduces, so a re-bound `t` here would be a distinct binding the
    * extractor doesn't follow (see Inspector.tsx's storeBlurb for the same fix). */
   i18n: import('@lingui/core').I18n;
+  /**
+   * Normalization form the marks series' output-form decision resolves to
+   * (see `normalizationFormForOutputForm`) — threaded into
+   * coordinatedCollateralForSlots so a collateral partner char is compared
+   * against `needed` under the SAME form the rest of the carve comparison
+   * uses. Optional; defaults to "NFC" inside coordinatedCollateralForSlots.
+   */
+  form?: CharNormalizationForm | undefined;
 }
 
 /**
@@ -111,7 +120,7 @@ interface BuildPendingCascadeArgs {
  * prevention: the user can still confirm and remove.
  */
 function buildPendingCascade({
-  ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes, needed, bcp47, analysis, i18n,
+  ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes, needed, bcp47, analysis, i18n, form,
 }: BuildPendingCascadeArgs): PendingCascade | null {
   // No IR to analyse → plain single-chip toggle.
   if (ir == null) return null;
@@ -157,7 +166,7 @@ function buildPendingCascade({
   // mode 'drop' only, so a slot classifyStoreSlotEdit would block is never
   // reported as collateral here either). Threads the precomputed `analysis`
   // through so this doesn't re-scan the whole IR on every chip click (#931 perf).
-  const collateral = coordinatedCollateralForSlots(found.storeSlotIds, ir, needed, bcp47, analysis);
+  const collateral = coordinatedCollateralForSlots(found.storeSlotIds, ir, needed, bcp47, analysis, form);
 
   // Plain toggle (no dialog) ONLY for a removable chip that is its char's sole
   // producer, nothing blocked, AND no coordinated collateral. A not-removable
@@ -228,12 +237,49 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   // #525 FOUNDATION slice — the confirmed Phase B inventory drives removal
   // recommendations. session.confirmedInventory is a deduped, NFC-normalized
-  // string[] union across survey phases (see contracts/src/surveySession.ts);
-  // built into a Set here purely for annotateRemovalRecommendations() lookups.
+  // string[] union across survey phases (see contracts/src/surveySession.ts).
   const confirmedInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
-  const confirmedInventorySet = useMemo(
-    () => new Set(confirmedInventory.map((ch) => ch.normalize('NFC'))),
-    [confirmedInventory],
+
+  // #1357 data-derivation prerequisite — carve's needed-set is DERIVED from
+  // the marks series' final answers (spec 046 marksWorklist/marksOutputForm),
+  // not just the flat confirmedInventory (which unconditionally folds in
+  // EVERY attested stack/lone mark regardless of the marks series' own
+  // reachability decisions — see deriveConfirmedInventory). The 3-tier
+  // classification (deriveCarveNeededSet) replaces ONLY the alphabet-derived
+  // slice of confirmedInventory with its refined required/optional split;
+  // any OTHER source of confirmedInventory (manual-flow answers from other
+  // phases, unrelated to the three-store alphabet) is preserved verbatim via
+  // `nonAlphabetConfirmed` below, so nothing that used to count as needed
+  // stops counting except a genuine marks-series BLOCK-CANDIDATE.
+  const alphabet = useWorkingCopyStore((s) => s.session.alphabet);
+  const marksWorklist = useWorkingCopyStore((s) => s.session.marksWorklist);
+  const marksOutputForm = useWorkingCopyStore((s) => s.session.marksOutputForm);
+  // The chosen whole-keyboard output form drives which Unicode normalization
+  // form the carve comparison (produced vs. needed) normalizes BOTH sides
+  // to, so choosing "base-plus-mark" (decomposed) vs. "ready-made"
+  // (precomposed) actually changes what counts as a match — see
+  // normalizationFormForOutputForm's doc. Undefined marksOutputForm (marks
+  // series skipped) degrades to "NFC", byte-identical to pre-existing
+  // behavior.
+  const carveNormalizationForm = useMemo(
+    () => normalizationFormForOutputForm(marksOutputForm),
+    [marksOutputForm],
+  );
+  const carveNeeded = useMemo(
+    () => deriveCarveNeededSet({
+      alphabet,
+      worklist: marksWorklist,
+      ...(marksOutputForm !== undefined ? { outputForm: marksOutputForm } : {}),
+    }),
+    [alphabet, marksWorklist, marksOutputForm],
+  );
+  const nonAlphabetConfirmed = useMemo(
+    () => nonAlphabetConfirmedInventory(confirmedInventory, alphabet),
+    [confirmedInventory, alphabet],
+  );
+  const tieredNeededSet = useMemo(
+    () => new Set([...carveNeeded.requiredPrimary, ...carveNeeded.optionalSecondary, ...nonAlphabetConfirmed]),
+    [carveNeeded, nonAlphabetConfirmed],
   );
 
   // #525 items 2/4 — language-driven surplus signal. Resolved ASYNCHRONOUSLY
@@ -300,26 +346,26 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   // TODO(#525): Track-1 default filtering hooks in here too — a Track 1
   // (new-from-base) author gets different defaults than Track 2 (adapt-existing).
   const recommendedNodes = useMemo(
-    () => (instantiationMode !== null && (confirmedInventorySet.size > 0 || neededChars !== null) && ir
-      ? annotateRemovalRecommendations(nodes, ir, confirmedInventorySet, neededChars, identityBcp47)
+    () => (instantiationMode !== null && (tieredNeededSet.size > 0 || neededChars !== null) && ir
+      ? annotateRemovalRecommendations(nodes, ir, tieredNeededSet, neededChars, identityBcp47, carveNormalizationForm)
       : nodes),
-    [nodes, ir, instantiationMode, confirmedInventorySet, neededChars, identityBcp47],
+    [nodes, ir, instantiationMode, tieredNeededSet, neededChars, identityBcp47, carveNormalizationForm],
   );
 
   // #525 BANNER slice — character-level companion to recommendedNodes above,
   // driving the green removal-recommendation banner's flat checklist. `needed`
-  // is the SAME neededChars ∪ confirmedInventory union annotateRemovalRecommendations
+  // is the SAME neededChars ∪ tieredNeededSet union annotateRemovalRecommendations
   // computes internally, pre-unioned here so recommendedRemovalChars (a pure
   // character-granularity pass) doesn't need to know about the two-signal shape.
   const neededSet = useMemo(
-    () => (neededChars ? new Set([...neededChars, ...confirmedInventorySet]) : confirmedInventorySet),
-    [neededChars, confirmedInventorySet],
+    () => (neededChars ? new Set([...neededChars, ...tieredNeededSet]) : tieredNeededSet),
+    [neededChars, tieredNeededSet],
   );
   const recommendedChars = useMemo(
-    () => (instantiationMode !== null && (confirmedInventorySet.size > 0 || neededChars !== null) && ir
-      ? recommendedRemovalChars({ ir, needed: neededSet, bcp47: identityBcp47 })
+    () => (instantiationMode !== null && (tieredNeededSet.size > 0 || neededChars !== null) && ir
+      ? recommendedRemovalChars({ ir, needed: neededSet, bcp47: identityBcp47, form: carveNormalizationForm })
       : []),
-    [ir, instantiationMode, confirmedInventorySet, neededChars, neededSet, identityBcp47],
+    [ir, instantiationMode, tieredNeededSet, neededChars, neededSet, identityBcp47, carveNormalizationForm],
   );
 
   // Bulk removal from the banner checklist deliberately skips the per-removal
@@ -409,13 +455,13 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       gids.forEach((gid) => deleteItem(gid));
       return;
     }
-    const collateral = coordinatedCollateralForSlots(gids, ir, neededSet, identityBcp47, storeAnalysis);
+    const collateral = coordinatedCollateralForSlots(gids, ir, neededSet, identityBcp47, storeAnalysis, carveNormalizationForm);
     if (collateral.length === 0) {
       gids.forEach((gid) => deleteItem(gid));
       return;
     }
     setPendingBulkCascade({ gids, collateral });
-  }, [ir, deleteItem, restoreItem, neededSet, identityBcp47, storeAnalysis]);
+  }, [ir, deleteItem, restoreItem, neededSet, identityBcp47, storeAnalysis, carveNormalizationForm]);
 
   const handleBulkCascadePrimary = useCallback(() => {
     if (!pendingBulkCascade) return;
@@ -467,11 +513,11 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
     const pending = buildPendingCascade({
       ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes,
-      needed: neededSet, bcp47: identityBcp47, analysis: storeAnalysis, i18n,
+      needed: neededSet, bcp47: identityBcp47, analysis: storeAnalysis, i18n, form: carveNormalizationForm,
     });
     if (pending === null) { handleToggleGlyph(gid); return; }
     setPendingCascade(pending);
-  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities, neededSet, identityBcp47, storeAnalysis, t, i18n]);
+  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities, neededSet, identityBcp47, storeAnalysis, t, i18n, carveNormalizationForm]);
 
   /**
    * Store-chip cascade toggle — same "remove/restore everywhere" contract as
@@ -486,11 +532,11 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       ir, gid: chipId, targetChar: ch,
       clickedLabel: t({ id: 'editor.carve.thisCharacterFallbackLabel', message: 'this character' }),
       isItemDeleted, removalCapabilities, nodes,
-      needed: neededSet, bcp47: identityBcp47, analysis: storeAnalysis, i18n,
+      needed: neededSet, bcp47: identityBcp47, analysis: storeAnalysis, i18n, form: carveNormalizationForm,
     });
     if (pending === null) { handleToggleGlyph(chipId); return; }
     setPendingCascade(pending);
-  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities, neededSet, identityBcp47, storeAnalysis, t, i18n]);
+  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities, neededSet, identityBcp47, storeAnalysis, t, i18n, carveNormalizationForm]);
 
   const handleCascadePrimary = useCallback(() => {
     if (!pendingCascade) return;

@@ -4,6 +4,7 @@ import {
   deriveConfirmedInventory,
   makeConfirmedAlphabet,
   makeEmptyPlacementWorklist,
+  nonAlphabetConfirmedInventory,
   validateConfirmedAlphabet,
 } from "./confirmedAlphabet";
 
@@ -153,5 +154,30 @@ describe("confirmedAlphabetKey", () => {
 
   it("returns a stable key for undefined", () => {
     expect(confirmedAlphabetKey(undefined)).toBe(confirmedAlphabetKey(undefined));
+  });
+});
+
+describe("nonAlphabetConfirmedInventory", () => {
+  it("returns entries not covered by the alphabet's projection", () => {
+    const alphabet = makeConfirmedAlphabet({
+      bases: ["a"],
+      marks: [ACUTE],
+      attestedStacks: [{ base: "a", marks: [ACUTE] }],
+    });
+    // "a", ACUTE, and "á" all come from the alphabet projection; "z" doesn't.
+    const confirmedInventory = ["a", ACUTE, "á", "z"];
+    expect(nonAlphabetConfirmedInventory(confirmedInventory, alphabet)).toEqual(new Set(["z"]));
+  });
+
+  it("treats an undefined alphabet as an empty projection — everything is non-alphabet", () => {
+    expect(nonAlphabetConfirmedInventory(["x", "y"], undefined)).toEqual(new Set(["x", "y"]));
+  });
+
+  it("NFC-normalises confirmedInventory entries before comparing", () => {
+    const alphabet = makeConfirmedAlphabet({ bases: ["a"] });
+    const decomposedEAcute = "e" + ACUTE; // NFD "é"
+    expect(nonAlphabetConfirmedInventory([decomposedEAcute], alphabet)).toEqual(
+      new Set([decomposedEAcute.normalize("NFC")]),
+    );
   });
 });
