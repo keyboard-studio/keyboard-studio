@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-07-22",
+  "lastUpdated": "2026-07-23",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -646,6 +646,14 @@
     "specs/045-lens-vocabulary-source-of-truth": {
       "title": "Feature Specification: Lens-Vocabulary Single Source of Truth",
       "hash": "sha256:0a2e80e975208ecc",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/046-marks-question-series": {
+      "title": "Feature Specification: Mark Composition Model and the Marks Question Series",
+      "hash": "sha256:3833307b9bed16c9",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

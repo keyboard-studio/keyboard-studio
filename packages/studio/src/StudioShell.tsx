@@ -618,8 +618,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     setValidatorFindings(findings);
   }, [findings, setValidatorFindings]);
   const globalFindings = useMemo(() => selectUnmappedFindings(findings), [findings]);
-  // Warning-severity global findings (e.g. the spec-046 mark-normalization
-  // uniformity check) render as a bare advisory line above the step content
+  // Warning-severity global findings render as a bare advisory line above the step content
   // — no card background/border/code-badge/hint-button/location chrome; see
   // the survey-pane render below. Non-warning severities keep the existing
   // boxed LintSummary treatment untouched.

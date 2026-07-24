@@ -31,6 +31,7 @@ import { isPrivateUseCodePoint } from "@keyboard-studio/engine";
 import { isCombining, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { ALL_FILTERS, matchesQuery, type SearchFilters } from "./characterSearch.ts";
 import { TextField, Checkbox } from "../ui/index.ts";
+import { TriangleIcon } from "../editors/assignLoop/parts/carveShared.tsx";
 import { useGlyphFontStack } from "./useGlyphFontStack.ts";
 import { useFontSupportChecker } from "./useFontSupportChecker.ts";
 import {
@@ -91,9 +92,10 @@ type LoadState =
 
 // Stable identity for a group — used as the React list key. Includes `script`
 // because the multi-script grid can carry several groups that share a generic
-// fallback block name (e.g. uncurated scripts all label their letter block
-// "Letters", digits "Digits", punctuation "Punctuation"); without the script
-// the key collides across scripts and React drops/merges same-key sections.
+// fallback block name (e.g. several scripts share the "Digits", "Punctuation",
+// or "Combining marks" fallback labels; the letter fallback is script-qualified
+// like "Latin letters"); without the script the key collides across scripts and
+// React drops/merges same-key sections.
 function groupKey(group: CharacterMapGroup): string {
   return `${group.tier}-${group.script}-${group.block}`;
 }
@@ -959,13 +961,26 @@ export function CharacterMapPane({
                     aria-expanded={!isHidden}
                     aria-controls={gridId}
                     aria-label={hideShowAriaLabel}
-                    style={{ ...secondaryButton, padding: "2px 10px", fontSize: 11, flexShrink: 0 }}
+                    style={{
+                      ...secondaryButton,
+                      padding: "2px 8px",
+                      fontSize: 11,
+                      lineHeight: 1,
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
                   >
-                    {isHidden ? (
-                      <Trans id="survey.characterMapPane.group.showButton">Show</Trans>
-                    ) : (
-                      <Trans id="survey.characterMapPane.group.hideButton">Hide</Trans>
-                    )}
+                    {/* Disclosure triangle — visual only, via the shared
+                        TriangleIcon (editors/assignLoop/parts/carveShared.tsx),
+                        the same module ChevronIcon lives in, following the
+                        same rotate-on-toggle idiom. A plain SVG <path> with no
+                        <title> adds no accessible text of its own, so the
+                        button's accessible name stays entirely on aria-label
+                        above. Pointing right (unrotated) = collapsed/hidden;
+                        rotated 90deg to point down = open/visible. */}
+                    <TriangleIcon open={!isHidden} size={11} />
                   </button>
                 </div>
                 {isHidden ? (

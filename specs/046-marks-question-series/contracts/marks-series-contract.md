@@ -110,18 +110,30 @@ export function decomposeGrapheme(grapheme: string):
   { base: string; marks: string[] } | null;   // null: no known decomposition (incl. PUA)
 ```
 
-## Validator + criteria (FR-022)
+## Validator + criteria (FR-022) — RETIRED 2026-07-23
+
+FR-022 (the mark-normalization uniformity invariant) has been retired by
+explicit maintainer decision: the concern that an accented/diacritic
+character can be typed more than one way is no longer enforced via a
+validator warning. The mechanism previously documented here —
+`checkNormalizationUniformity(ir)` (layer `"B"`, code
+`KM_LINT_MARK_NORMALIZATION_UNIFORM`) and its `layer-c-enforce` criteria
+row — has been removed from the engine; it no longer exists in
+`packages/engine/src/validator/` and the criteria catalog is back to 148
+rows. No replacement mechanism is specified at this time. The contract
+signatures below are retained for historical reference only and are not
+implemented:
 
 ```ts
-// packages/engine/src/validator/layer-b-uniformity.ts — IR-aware, layer-a-prime convention.
-export function checkNormalizationUniformity(ir: KeyboardIR): LintFinding[];
+// REMOVED — packages/engine/src/validator/layer-b-uniformity.ts no longer exists.
+// export function checkNormalizationUniformity(ir: KeyboardIR): LintFinding[];
 // LintFinding.code: "KM_LINT_MARK_NORMALIZATION_UNIFORM", layer: "B"
 ```
 
-Criteria: one new `layer-c-enforce` row carrying
-`lintRuleId: "KM_LINT_MARK_NORMALIZATION_UNIFORM"`; enforced counts bump 148 → 149
-(band split 40/**67**/32/10) in `packages/contracts/src/types.test.ts`,
-`schemas.test.ts`, and `criteria-summary.md`.
+Criteria: the `layer-c-enforce` row carrying
+`lintRuleId: "KM_LINT_MARK_NORMALIZATION_UNIFORM"` has been removed; the
+catalog remains at 148 rows (band split 40/66/32/10) rather than the
+149/**67**/32/10 this section previously described.
 
 ## UI contract (routes / testids consumers and e2e code against)
 
