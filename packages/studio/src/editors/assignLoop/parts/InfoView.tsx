@@ -4,8 +4,9 @@ import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import type { RemovalCapability } from '@keyboard-studio/contracts';
 import type { CarveNode } from '../../../lib/irToCarveNodes.ts';
-import { displayChar } from '../../../lib/irToCarveNodes.ts';
+import { displayChar, resolveNodeName, resolveReferencedByLabel } from '../../../lib/irToCarveNodes.ts';
 import { InfoIcon, resolveMessage } from './carveShared.tsx';
+import { resolveContentString } from '../../../lib/contentI18n.ts';
 import { KeySeq } from './KeySeq.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 
@@ -130,7 +131,7 @@ function infoForNode(node: CarveNode, i18n?: I18n): InfoContent {
     return {
       title: resolveMessage(
         i18n,
-        msg({ id: 'editor.assignLoop.infoView.pattern.title', message: `Pattern: ${{ name: node.name }}` }),
+        msg({ id: 'editor.assignLoop.infoView.pattern.title', message: `Pattern: ${{ name: resolveNodeName(node, i18n) }}` }),
       ),
       body: resolveMessage(
         i18n,
@@ -229,6 +230,7 @@ function infoForNode(node: CarveNode, i18n?: I18n): InfoContent {
       };
     }
     if (u === undefined && node.referencedByLabel !== undefined) {
+      const patternLabel = resolveReferencedByLabel(node, i18n);
       return {
         title: resolveMessage(
           i18n,
@@ -241,7 +243,7 @@ function infoForNode(node: CarveNode, i18n?: I18n): InfoContent {
           i18n,
           msg({
             id: 'editor.assignLoop.infoView.store.patternOwned.body',
-            message: `These characters belong to the "${{ patternLabel: node.referencedByLabel }}" pattern. To change or remove them, work through that pattern rather than editing this list directly.`,
+            message: `These characters belong to the "${{ patternLabel }}" pattern. To change or remove them, work through that pattern rather than editing this list directly.`,
           }),
         ),
       };
@@ -366,7 +368,7 @@ export function InfoView() {
         {isNotRemovable && owningPattern !== undefined && (
           <div style={{ marginBottom: 3, fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
             <Trans id="editor.assignLoop.infoView.managedByPattern">
-              Managed by the {owningPattern.label} pattern.
+              Managed by the {resolveContentString('patterns', owningPattern.nodeId, 'title', owningPattern.label, i18n)} pattern.
             </Trans>
           </div>
         )}

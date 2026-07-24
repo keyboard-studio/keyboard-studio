@@ -33,6 +33,7 @@ export default defineConfig({
       path: PATH_SHIM,
       "path-browserify": PATH_SHIM,
       "@docs": fileURLToPath(new URL("../../docs", import.meta.url)),
+      "@content-i18n": fileURLToPath(new URL("../../content/i18n", import.meta.url)),
     },
   },
   optimizeDeps: {

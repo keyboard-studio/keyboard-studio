@@ -7,7 +7,8 @@
     "allowImportingTsExtensions": true,
     "types": ["vite/client"],
     "paths": {
-      "@docs/*": ["../../docs/*"]
+      "@docs/*": ["../../docs/*"],
+      "@content-i18n/*": ["../../content/i18n/*"]
     }
   },
   "include": ["src/**/*", "tests/**/*", "vite.config.ts"],

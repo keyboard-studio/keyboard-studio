@@ -91,7 +91,7 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 
 - [x] T026 [US2] **Joint engine+content session** (Article VI seam): agree per-string id derivation from a record, extractor location, and loader fallback semantics; record the decision in [research.md](research.md) (#1265)
 - [x] T027 [US2] Build extraction utility `utilities/i18n-content-extract` → flat `content/i18n/en/*.json` from content records (#1266)
-- [ ] T028 [US2] Content i18n loader with English fallback (studio/engine resolves localized prose by active locale) (#1267)
+- [x] T028 [US2] Content i18n loader with English fallback (studio/engine resolves localized prose by active locale) (#1267)
 - [ ] T029 [US2] Localize criteria descriptions — translate `content/i18n/{locale}/criteria.json` (superseded path; was `packages/contracts/data/criteria.<lang>.json`, see research.md D7's supersession note) and wire `resolveContentString("criteria", ...)` into `Criterion.description`/`preSubmitChecklistText` render sites (respects T025) (#1268)
 - [ ] T030 [US2] Activate the Tier B mapping in [crowdin.yml](../../crowdin.yml) (`content/i18n/**`) (#1269)
 - [ ] T031 [US2] Extend the drift gate (or add a content-catalog checker) to cover Tier B extraction freshness; wire into `pnpm lint` (#1270)
