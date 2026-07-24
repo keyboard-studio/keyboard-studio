@@ -88,6 +88,11 @@ export function activateContentLocale(locale: string): Promise<void> {
       if (catalog !== undefined) loaded[type] = catalog;
     }
     localeCatalogs.set(locale, loaded);
+    // Drop the in-flight entry now that localeCatalogs holds the result —
+    // otherwise it never clears and the `localeCatalogs.has(locale)`
+    // fast-path two lines up is permanently unreachable (`inFlight` always
+    // wins first for a locale that has ever been activated).
+    activating.delete(locale);
   });
 
   activating.set(locale, promise);
