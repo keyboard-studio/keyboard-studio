@@ -13,16 +13,20 @@
 //   - Coverage status line: "<N> of <M> added".
 //   - Method chooser: "Type a sequence" always present; "Tap a trigger key, then a letter"
 //     always present (S-02 deadkey is always offered, regardless of char type).
-//   - "Type a sequence" (S-03) is a FLAG only — Apply calls flagCharForSequence
-//     and records no MechanismAssignment; the char is tracked in
-//     sequenceFlaggedChars for the later Sequence Gallery, never counted as
-//     "added"/covered.
+//   - Default method per character is "swap" (S-01), except a decomposable
+//     accented char defaults to "deadkey" (S-02) — see §3c propose-then-
+//     confirm. Selecting "Type a sequence" (S-03) swaps the RIGHT pane's live
+//     preview for SequenceBuilderPanel; that panel's own Apply records a real
+//     multi_char_sequence MechanismAssignment and hands control back
+//     (method -> "swap"), never counted as "added"/covered (a distinct
+//     "Sequences" dimension — see excludeSequenceMechanisms in the component).
 //   - Added chip row appears; chips invoke remove (filters assignment from store).
 //   - Already-produced section collapsed by default; toggle expands it.
 //   - Guards: null base → no-base prompt; empty inventory → survey prompt.
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { screen, fireEvent, act, cleanup, waitFor, within, renderHook } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { render } from "../../test/renderWithI18n.tsx";
 import { MechanismGallery, PATTERN_SEQUENCE, PATTERN_DEADKEY } from "./MechanismGallery.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
@@ -327,29 +331,80 @@ describe("MechanismGallery — sequence method chooser", () => {
     expect(screen.getByText(/Type a sequence/i)).toBeTruthy();
   });
 
-  it("selecting 'Type a sequence' shows explanatory flag copy, no text inputs", async () => {
+  it("selecting 'Type a sequence' swaps the right pane's live preview for the sequence builder", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    // "á" decomposes to a + U+0301, so the §3c default method is deadkey.
-    // Switch to the sequence method to see the flag explanation.
+    // "á" decomposes to a + U+0301, so the §3c default method is deadkey and
+    // the live preview (OSKFrame mock) is showing (visible, not hidden).
+    expect(screen.getByTestId("osk-frame")).toBeTruthy();
+    expect(screen.getByTestId("mechanism-preview-wrapper").style.display).not.toBe("none");
+
+    // Selecting the sequence method is itself the trigger — no separate
+    // Apply needed to open the builder.
     fireEvent.click(screen.getByText(/Type a sequence/i));
-    expect(
-      screen.getByText(/Check this to mark.*as a sequence/i),
-    ).toBeTruthy();
-    expect(screen.queryByLabelText(/First key in sequence/i)).toBeNull();
-    expect(screen.queryByLabelText(/Second key in sequence/i)).toBeNull();
+
+    // The preview stays MOUNTED (never destroyed/recreated — see the
+    // rightContent doc comment: OSKFrame's iframe must never unmount, since
+    // KMW reinit is expensive/unsafe) — only its wrapper is hidden via CSS.
+    expect(screen.getByTestId("osk-frame")).toBeTruthy();
+    expect(screen.getByTestId("mechanism-preview-wrapper").style.display).toBe("none");
+    expect(screen.getByTestId("sequences-content")).toBeTruthy();
+    expect(screen.getByTestId("sequences-indicator")).toBeTruthy();
+    // The generic "Apply method" button is hidden for this method — the
+    // builder owns its own Apply (sequences-apply).
+    expect(screen.queryByRole("button", { name: /Apply method for á/i })).toBeNull();
   });
 
-  it("Apply is enabled immediately for the sequence method (no config needed)", async () => {
+  it("does NOT unmount/recreate the OSKFrame when toggling the sequence method (KMW reinit is expensive/unsafe — see OSKFrame.tsx's own doc comment)", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    const oskFrameBefore = screen.getByTestId("osk-frame");
+
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.click(screen.getByTestId("sequence-builder-cancel"));
+
+    // Same DOM node — proves OSKFrame was never unmounted+remounted across
+    // the round trip (a fresh mount would be a DIFFERENT node reference).
+    expect(screen.getByTestId("osk-frame")).toBe(oskFrameBefore);
+    expect(screen.getByTestId("mechanism-preview-wrapper").style.display).not.toBe("none");
+  });
+
+  it("the builder's own Apply is disabled until Content and Indicator both resolve", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
-    const addBtn = screen.getByRole("button", { name: /Apply method for á/i });
-    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+    const applyBtn = screen.getByTestId("sequences-apply");
+    expect((applyBtn as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+
+    expect((applyBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("Cancel returns to the live preview without recording anything", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+
+    fireEvent.click(screen.getByTestId("sequence-builder-cancel"));
+
+    expect(screen.getByTestId("osk-frame")).toBeTruthy();
+    expect(screen.queryByTestId("sequences-content")).toBeNull();
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments).toHaveLength(0);
   });
 
   it("defaults to the deadkey method (pre-enabled) for a decomposable accented char (§3c)", async () => {
@@ -364,6 +419,14 @@ describe("MechanismGallery — sequence method chooser", () => {
     expect(triggerSelect).toBeTruthy();
     const addBtn = screen.getByRole("button", { name: /Apply method for á/i });
     expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("defaults to the swap method for a plain (non-accented) character", async () => {
+    seedInventory(["z"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(screen.getByLabelText(/Physical key for simple swap/i)).toBeTruthy();
   });
 });
 
@@ -414,33 +477,57 @@ describe("MechanismGallery — deadkey method chooser", () => {
 // Apply — records assignment into the store
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — apply (sequence flag)", () => {
-  it("clicking Apply method flags the char instead of recording an assignment", async () => {
+describe("MechanismGallery — apply (sequence)", () => {
+  it("the builder's Apply records a real multi_char_sequence assignment, not a bare flag", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
-    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
 
     const assignments = useWorkingCopyStore
       .getState()
       .session.assignments.filter((a) => a.modality === "physical");
-    expect(assignments).toHaveLength(0);
-    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.mechanisms[0]?.patternId).toBe(PATTERN_SEQUENCE);
+    expect(assignments[0]?.mechanisms[0]?.strategyId).toBe("S-03");
+    expect(assignments[0]?.mechanisms[0]?.slotValues).toMatchObject({
+      firstLetterOut: "a",
+      secondLetter: "s",
+      collapsedChar: "á",
+    });
   });
 
-  it("the flagged char appears in the 'Flagged for sequences' row, not the 'Added' row", async () => {
+  it("Apply returns the right pane to the live preview (mirrors every other method's Apply)", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
-    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    expect(screen.queryByTestId("sequences-content")).toBeNull();
+    expect(screen.getByTestId("osk-frame")).toBeTruthy();
+  });
+
+  it("a recorded sequence appears in the 'Sequences' row, not the 'Added' row", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
 
     await waitFor(() => {
       expect(
-        screen.getByRole("group", { name: /Characters flagged for sequences/i }),
+        screen.getByRole("group", { name: /Characters with a recorded sequence/i }),
       ).toBeTruthy();
     });
     expect(
@@ -448,13 +535,15 @@ describe("MechanismGallery — apply (sequence flag)", () => {
     ).toBeNull();
   });
 
-  it("flagging does not change the coverage count", async () => {
+  it("a recorded sequence does not change the coverage count", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
-    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
 
     await waitFor(() => {
       const status = screen.getByRole("status");
@@ -462,13 +551,15 @@ describe("MechanismGallery — apply (sequence flag)", () => {
     });
   });
 
-  it("flagging enables Next for the current character", async () => {
+  it("a recorded sequence enables Next for the current character", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
-    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
 
     await waitFor(() => {
       const nextBtn = screen.getByRole("button", { name: /Next character/i });
@@ -476,40 +567,42 @@ describe("MechanismGallery — apply (sequence flag)", () => {
     });
   });
 
-  it("clicking the remove control on the flagged-char chip unflags it", async () => {
+  it("the per-char 'Sequence recorded' badge's remove control strips the recorded assignment", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
-    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
 
     await waitFor(() => {
-      expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
+      expect(screen.getByText(/Sequence recorded/i)).toBeTruthy();
     });
-
-    // Scoped to the "Flagged for sequences" chip row specifically — the
-    // per-char inline flagged indicator (also visible here, since currentChar
-    // is still "á") carries an identical aria-label for its own remove
-    // control, so an unscoped query would be ambiguous.
-    const flaggedGroup = screen.getByRole("group", {
-      name: /Characters flagged for sequences/i,
+    // With only one character in the inventory, the per-char badge's remove
+    // control and the "Sequences" chip row's remove control both render for
+    // "á" simultaneously and share the same aria-label — either one performs
+    // the identical unflagCharForSequence(currentChar) action, so click
+    // whichever resolves first (getAllByRole, not getByRole).
+    const [removeControl] = screen.getAllByRole("button", {
+      name: /Remove recorded sequence for U\+00E1 á/i,
     });
-    fireEvent.click(within(flaggedGroup).getByRole("button", { name: /Remove.*U\+00E1 á/i }));
+    fireEvent.click(removeControl!);
 
     await waitFor(() => {
-      expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
+      expect(getPhaseCPhysicalAssignments()).toHaveLength(0);
     });
   });
 
-  it("a char with BOTH a real mechanism and a sequence flag appears in both rows with distinct, addressable remove controls", async () => {
+  it("a char with BOTH a real mechanism and a recorded sequence appears in both rows with distinct, addressable remove controls", async () => {
     // Coexistence is intentional (the gallery is multi-disposition, not
     // mutually exclusive) — this documents it and guards the P1 fix: the two
     // rows' remove buttons must not share an aria-label pattern.
     // A second character ("é") is seeded so the assertions below can advance
-    // currentChar away from "á" — the per-char inline flagged indicator only
-    // renders for currentChar, so this isolates the two chip-row controls
-    // (Added / Flagged for sequences) under test from that third control.
+    // currentChar away from "á" — the per-char inline "Sequence recorded"
+    // indicator only renders for currentChar, so this isolates the two
+    // chip-row controls (Added / Sequences) under test from that third control.
     seedInventory(["á", "é"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -522,18 +615,20 @@ describe("MechanismGallery — apply (sequence flag)", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
-    // Apply flags á for sequences (resetMethodState returns method to
-    // "sequence" after the swap apply above, so it is already selected).
+    // Record a sequence for á (resetMethodState returns method to "swap"
+    // after the swap apply above, so switch back to the sequence method).
     fireEvent.click(screen.getByText(/Type a sequence/i));
-    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
 
+    // Read the raw (unmerged) Phase C assignments — session.assignments is a
+    // MERGED view that collapses multiple assignment objects sharing the same
+    // (scope, target) down to one, which would hide the two-separate-objects
+    // shape this gallery and SequenceBuilderPanel actually produce (see
+    // getPhaseCPhysicalAssignments below).
     await waitFor(() => {
-      expect(
-        useWorkingCopyStore
-          .getState()
-          .session.assignments.filter((a) => a.modality === "physical"),
-      ).toHaveLength(1);
-      expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
+      expect(getPhaseCPhysicalAssignments()).toHaveLength(2);
     });
 
     // Advance off "á" so only the two chip rows (not the per-char inline
@@ -547,34 +642,34 @@ describe("MechanismGallery — apply (sequence flag)", () => {
     // control. getByLabelText throws on zero or multiple matches, so this
     // itself is the ambiguity assertion.
     const addedChip = screen.getByLabelText("Remove U+00E1 á");
-    const flagChip = screen.getByLabelText("Remove sequence flag for U+00E1 á");
+    const sequenceChip = screen.getByLabelText("Remove recorded sequence for U+00E1 á");
     expect(addedChip).toBeTruthy();
-    expect(flagChip).toBeTruthy();
-    expect(addedChip).not.toBe(flagChip);
+    expect(sequenceChip).toBeTruthy();
+    expect(addedChip).not.toBe(sequenceChip);
 
     // Both rows are present simultaneously.
     expect(
       screen.getByRole("group", { name: /Added characters/i }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("group", { name: /Characters flagged for sequences/i }),
+      screen.getByRole("group", { name: /Characters with a recorded sequence/i }),
     ).toBeTruthy();
   });
 });
 
 // ---------------------------------------------------------------------------
 // Cross-gallery coexistence (P1 fix) — a REAL multi_char_sequence assignment
-// already recorded by the Sequence Gallery (not just the pre-recording
-// sequenceFlaggedChars flag exercised above) must not surface as "Added"/
+// recorded some other way (directly via the store, mirroring what
+// SequenceBuilderPanel's own Apply produces) must not surface as "Added"/
 // covered here, and this gallery's removal controls must never be able to
 // delete it.
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — coexistence with a Sequence-Gallery-recorded assignment (P1)", () => {
+describe("MechanismGallery — coexistence with a separately-recorded sequence assignment (P1)", () => {
   it("a char with a recorded multi_char_sequence assignment does not appear as Added/covered", async () => {
     seedInventory(["ŋ", "x"]);
-    // Simulate the Sequence Gallery having already recorded a real sequence
-    // for "ŋ" (mirrors SequenceGallery.handleApply's own assignment shape).
+    // Simulate a sequence already recorded for "ŋ" (mirrors
+    // SequenceBuilderPanel's own Apply assignment shape).
     useWorkingCopyStore.getState().recordAssignments([
       {
         scope: "individual",
@@ -617,9 +712,9 @@ describe("MechanismGallery — coexistence with a Sequence-Gallery-recorded assi
   it("a char with BOTH a non-sequence mechanism and a separately-recorded sequence assignment still shows as mechanism-covered, and removing its 'Added' chip leaves the sequence assignment untouched", async () => {
     seedInventory(["ŋ", "x"]);
     // Two SEPARATE MechanismAssignment objects for the same target — the
-    // shape MechanismGallery (non-sequence) and SequenceGallery (sequence)
-    // actually produce today (each always appends its own new assignment
-    // object rather than merging into one shared mechanisms array).
+    // shape a non-sequence method and SequenceBuilderPanel actually produce
+    // today (each always appends its own new assignment object rather than
+    // merging into one shared mechanisms array).
     useWorkingCopyStore.getState().recordAssignments([
       {
         scope: "individual",
@@ -652,11 +747,15 @@ describe("MechanismGallery — coexistence with a Sequence-Gallery-recorded assi
     await waitFor(() => {
       expect(screen.getByRole("group", { name: /Added characters/i })).toBeTruthy();
     });
-    const addedChip = screen.getByLabelText(/Remove.*ŋ/);
+    // Exact label (not a loose regex) — "ŋ" also carries a recorded
+    // sequence, which now surfaces its own "Remove recorded sequence for
+    // U+014B ŋ" control (a separate dimension); a loose /Remove.*ŋ/ regex
+    // would ambiguously match both.
+    const addedChip = screen.getByLabelText("Remove U+014B ŋ");
     expect(addedChip).toBeTruthy();
 
     // Removing the "Added" chip strips only the non-sequence mechanism;
-    // the sequence assignment (owned by the Sequence Gallery) survives.
+    // the separately-tracked sequence assignment survives.
     fireEvent.click(addedChip);
 
     await waitFor(() => {
@@ -3276,8 +3375,11 @@ describe("MechanismGallery — custom key option (S-08 ralt)", () => {
 // characters in deadkeyBaseLetter or the deadkey-trigger custom character
 // (both substitute into an unescaped KMN string literal or JSON block). The
 // SWAP/RALT custom-character key pickers are unaffected — they resolve only
-// to a K_ vkey id. (The sequence method's own character boxes were removed
-// in favor of flagCharForSequence — see "apply (sequence flag)" above.)
+// to a K_ vkey id. (The sequence method's own Content/Indicator boxes carry
+// the SAME delimiter guard — see SequenceBuilderPanel.tsx's
+// SEQ_CONTENT_RESOLVE_OPTIONS/buildSeqIndicatorResolveOptions — but live in
+// the right pane now, not this gallery's own MethodChooser; see "apply
+// (sequence)" above for their coverage.)
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — delimiter guard (straight quotes)", () => {
@@ -3352,10 +3454,9 @@ describe("MechanismGallery — delimiter guard (straight quotes)", () => {
 
 // ---------------------------------------------------------------------------
 // Single-grapheme guard (P1) -- deadkeyBaseLetter accepts exactly one
-// grapheme cluster. (The sequence method's own seqFirst/seqSecond boxes,
-// their NFC-normalization tests, and their relaxed-multi-character-context
-// tests were removed along with the inline sequence config UI -- see
-// "apply (sequence flag)" above.)
+// grapheme cluster. (The sequence builder's own Content/Indicator boxes have
+// their own resolve-options coverage in SequenceBuilderPanel's own module —
+// this section is scoped to the deadkey base-letter box only.)
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — single-grapheme guard on character boxes", () => {
@@ -3395,10 +3496,10 @@ describe("MechanismGallery — single-grapheme guard on character boxes", () => 
 
 // ---------------------------------------------------------------------------
 // Multi-token compose (deadkeyBaseLetter) -- space-separated tokens are each
-// independently resolved, then concatenated + NFC-normalized. (The sequence
-// method's own seqFirst/seqSecond relaxed-multi-character-context tests were
-// removed along with the inline sequence config UI -- see "apply (sequence
-// flag)" above.)
+// independently resolved, then concatenated + NFC-normalized. This section is
+// scoped to the deadkey base-letter box only; the sequence builder's own
+// Content box has its own resolve-options coverage in
+// SequenceBuilderPanel.tsx.
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — multi-token compose (deadkey base-letter box)", () => {
@@ -3680,5 +3781,45 @@ describe("MechanismGallery — no in-box placeholders (Fix 1)", () => {
     expect(
       screen.getAllByText("Type a character directly, or a Unicode value like U+00E9."),
     ).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Real-interaction regression (bug report: "I can't click my cursor into any
+// of the fields and type") — uses @testing-library/user-event, which
+// simulates a genuine click-to-focus + per-character keydown/input/keyup
+// sequence (unlike fireEvent.change, which sets a value directly and would
+// pass even if the input never accepted real focus/keystrokes). Proves the
+// Content/Indicator boxes actually accept focus and typed input end to end,
+// through the full gallery (method-card click -> builder mount -> type).
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — sequence builder accepts real click+type (user-event)", () => {
+  it("clicking into Content and Indicator and typing updates their values and the combine-preview", async () => {
+    seedInventory(["á"]);
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+
+    const contentInput = screen.getByTestId("sequences-content") as HTMLInputElement;
+    const indicatorInput = screen.getByTestId("sequences-indicator") as HTMLInputElement;
+
+    await user.click(contentInput);
+    await user.type(contentInput, "a");
+    expect(contentInput.value).toBe("a");
+    expect(document.activeElement).toBe(contentInput);
+
+    await user.click(indicatorInput);
+    await user.type(indicatorInput, "s");
+    expect(indicatorInput.value).toBe("s");
+    expect(document.activeElement).toBe(indicatorInput);
+
+    // Combine-preview reflects both typed values.
+    expect(screen.getByText(/a \+ s/)).toBeTruthy();
+
+    const applyBtn = screen.getByTestId("sequences-apply") as HTMLButtonElement;
+    expect(applyBtn.disabled).toBe(false);
   });
 });
