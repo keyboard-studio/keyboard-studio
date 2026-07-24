@@ -923,11 +923,8 @@ describe("TouchGallery — character-scroll-strip producer badge (integration)",
     // active method) — the same interaction the "multiple methods per
     // character" describe block below uses to record into charTouch, so this
     // test exercises the actual store write, not a hand-built assignment.
-    const hostKeySelect = screen.queryByRole("combobox", { name: /host key/i });
-    expect(hostKeySelect).not.toBeNull();
-    await act(async () => {
-      fireEvent.change(hostKeySelect!, { target: { value: "K_A" } });
-    });
+    const hostKeySelect = screen.getByLabelText(/Host key for long-press/i);
+    await changeSelectMenu(hostKeySelect, "K_A");
     const applyBtn = screen.queryAllByRole("button").find(
       (b) => b.textContent?.trim() === "Apply method",
     ) ?? null;
