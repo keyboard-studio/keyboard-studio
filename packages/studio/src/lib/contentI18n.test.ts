@@ -123,4 +123,17 @@ describe("activateContentLocale", () => {
       resolveContentString("patterns", "capslock_variant", "title", "CapsLock variant", i18nFor("fr")),
     ).toBe("Variante Verr. Maj.");
   });
+
+  it("clears the in-flight entry once settled, so a later call takes the localeCatalogs fast path", async () => {
+    // Regression: the in-flight promise map was never cleared after
+    // resolving, leaving the localeCatalogs.has(locale) fast-path
+    // permanently unreachable (a repeat call always re-returned the same
+    // stale in-flight promise instead). A distinct promise object on the
+    // second call proves the fast path is actually exercised.
+    const first = activateContentLocale("fr");
+    await first;
+    const second = activateContentLocale("fr");
+    expect(second).not.toBe(first);
+    await expect(second).resolves.toBeUndefined();
+  });
 });
