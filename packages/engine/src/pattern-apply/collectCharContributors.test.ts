@@ -312,4 +312,37 @@ describe('collectCharContributors', () => {
     const result = collectCharContributors(ir, nfd);
     expect(result.targetChar).toBe('é');
   });
+
+  // #1357-carve-marks-needed-set G2 guard: a rule whose literal output is a
+  // DECOMPOSED sequence (base char + combining mark(s), two or more IR
+  // elements) that NFC-composes to the queried precomposed targetChar must
+  // still be recognized as a whole-rule single-char producer — verified
+  // empirically already true of the existing NFC-normalize-before-compare
+  // logic (charVals.join('').normalize('NFC') === target); this locks it as a
+  // regression rather than a behavior change.
+  it('whole-rule delete: a decomposed 2-element literal output matches a precomposed target (G2)', () => {
+    const rule = makeRule('r-decomp',
+      [{ kind: 'vkey', name: 'K_E', modifiers: [] }],
+      [{ kind: 'char', value: 'e' }, { kind: 'char', value: '́' }], // e + combining acute
+    );
+    const ir = makeIR({ groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }] });
+    const result = collectCharContributors(ir, 'é'); // precomposed U+00E9
+    expect(result.ruleNodeIds).toEqual(['r-decomp']);
+    expect(result.blocked).toHaveLength(0);
+  });
+
+  it('whole-rule delete: a decomposed 3-element (base + two marks) literal output matches a precomposed target (G2, multi-mark stack)', () => {
+    const rule = makeRule('r-decomp-stack',
+      [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
+      [
+        { kind: 'char', value: 'a' },
+        { kind: 'char', value: '̂' }, // combining circumflex
+        { kind: 'char', value: '̀' }, // combining grave
+      ],
+    );
+    const ir = makeIR({ groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }] });
+    const result = collectCharContributors(ir, 'ầ'); // ầ, precomposed
+    expect(result.ruleNodeIds).toEqual(['r-decomp-stack']);
+    expect(result.blocked).toHaveLength(0);
+  });
 });

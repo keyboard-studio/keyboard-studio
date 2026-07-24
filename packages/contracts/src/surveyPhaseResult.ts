@@ -4,7 +4,7 @@ import type { AnswerType } from "./pattern";
 import type { DiscoveryAxisVector } from "./axes";
 import type { KeyboardIdentity } from "./keyboardIdentity";
 import type { MechanismAssignment } from "./assignmentMap";
-import type { ConfirmedAlphabet, PlacementWorklist } from "./confirmedAlphabet";
+import type { ConfirmedAlphabet, OutputForm, PlacementWorklist } from "./confirmedAlphabet";
 
 /**
  * Survey phase identifiers per spec §8.
@@ -86,4 +86,16 @@ export interface SurveyPhaseResult {
    * {@link mergePhaseResults}. `undefined` for phases that do not run the series.
    */
   marksWorklist?: PlacementWorklist;
+  /**
+   * The S4 whole-keyboard output-form decision (spec 046): "ready-made" or
+   * "base-plus-mark". **Additive** — previously a studio-local payload
+   * extension (`MarksCompleteResult.marksOutputForm` in steps/reducer.ts);
+   * promoted to the contract so carve's needed-set derivation
+   * (`deriveCarveNeededSet`, engine/src/marks/carve-needed-set.ts) can read
+   * it off the merged session rather than a studio-only shape. Last phase
+   * carrying one wins in {@link mergePhaseResults} (mirrors `marksWorklist`).
+   * `undefined` for phases that do not run the series, or before the series'
+   * output-form station has been confirmed.
+   */
+  marksOutputForm?: OutputForm;
 }

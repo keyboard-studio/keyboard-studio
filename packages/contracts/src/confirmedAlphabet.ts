@@ -66,6 +66,16 @@ export interface BlockedCombination {
 }
 
 /**
+ * The S4 whole-keyboard output-form decision (spec 046, FR-013..FR-016):
+ * ready-made single (precomposed) characters vs base-plus-mark sequences.
+ * Canonical home for the union — the engine's `output-form-policy.ts` (which
+ * owns the decision LOGIC, not the type) re-exports this rather than
+ * declaring a divergent copy, since engine depends on contracts and contracts
+ * cannot depend on engine.
+ */
+export type OutputForm = "ready-made" | "base-plus-mark";
+
+/**
  * The classification the marks series hands the mechanism gallery: every
  * relevant unit in exactly one group. Empty on a skipped series (no marks).
  */
@@ -168,6 +178,26 @@ function isPrivateUseChar(ch: string): boolean {
     (cp >= 0xf0000 && cp <= 0xffffd) ||
     (cp >= 0x100000 && cp <= 0x10fffd)
   );
+}
+
+/**
+ * The subset of a session's flat `confirmedInventory` that did NOT come from
+ * the three-store alphabet projection — i.e. entries contributed by some
+ * other survey phase, unrelated to `bases`/`marks`/`attestedStacks`. Carve's
+ * needed-set derivation (`deriveCarveNeededSet`, engine's `carve-needed-set`)
+ * replaces only the alphabet-derived slice of `confirmedInventory` with its
+ * refined tiered classification, so this "everything else" complement must
+ * be re-unioned back in — this is that subtraction, factored out so it
+ * doesn't rely on call sites reproducing `mergePhaseResults`' invariant that
+ * `confirmedInventory` always contains the alphabet's projection.
+ */
+export function nonAlphabetConfirmedInventory(
+  confirmedInventory: readonly string[],
+  alphabet: ConfirmedAlphabet | undefined,
+): Set<string> {
+  const confirmedSet = new Set(confirmedInventory.map((ch) => ch.normalize("NFC")));
+  const alphabetProjection = new Set(deriveConfirmedInventory(alphabet ?? makeConfirmedAlphabet()));
+  return new Set([...confirmedSet].filter((ch) => !alphabetProjection.has(ch)));
 }
 
 /**
