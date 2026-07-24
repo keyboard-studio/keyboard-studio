@@ -117,6 +117,7 @@
   "editor.trackStep.adaptTitle": "Adapt",
   "survey.characterMapPane.rawInput.addButton": "Add",
   "survey.characterMapPane.cell.addAction": "Add",
+  "survey.characterMapPane.cell.fromBase": " — from your base keyboard",
   "survey.phaseB.suggestionChip.addAction": "Add",
   "survey.phaseB.buildList.instructions": "Add <0>your whole alphabet</0> on this page — every character your language uses, not just the special ones. Tick the suggested characters below, then type any that are missing <1>with a space between each character</1>, like this:",
   "survey.characterMapPane.rawInput.ariaLabel": "Add a character by Unicode code point",

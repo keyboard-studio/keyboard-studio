@@ -23,6 +23,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import type { IRGroup } from "@keyboard-studio/contracts";
 import type { CharacterMapGroup } from "../lib/services.ts";
 
 // ---------------------------------------------------------------------------
@@ -119,6 +120,21 @@ function seedBaseAndLanguage(bcp47 = "yo", languageName = "Yoruba"): void {
   useWorkingCopyStore.getState().instantiateFromBase(TEST_BASE, {
     vfs: { files: new Map() },
     ir: makeTestIR([]),
+  });
+  useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: bcp47, language_name: languageName });
+}
+
+/** Seed a base whose IR PRODUCES the given glyphs (one rule per char). */
+function seedBaseProducing(produced: string[], bcp47 = "yo", languageName = "Yoruba"): void {
+  const rules = produced.map((c, i) => ({
+    nodeId: `rule#${i}`,
+    context: [{ kind: "vkey" as const, name: "K_A", modifiers: [] }],
+    output: [{ kind: "char" as const, value: c.normalize("NFC") }],
+  }));
+  const group: IRGroup = { nodeId: "group#main", name: "main", usingKeys: true, readonly: false, rules };
+  useWorkingCopyStore.getState().instantiateFromBase(TEST_BASE, {
+    vfs: { files: new Map() },
+    ir: makeTestIR([group]),
   });
   useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: bcp47, language_name: languageName });
 }
@@ -315,6 +331,38 @@ describe("CharacterMapPane — data path", () => {
     fireEvent.click(within(group).getByRole("button", { name: /Remove a \(U\+0061\)/ }));
     expect(usePhaseBDraftStore.getState().chars).not.toContain("a");
     expect(usePhaseBDraftStore.getState().chars).not.toContain("A");
+  });
+
+  it("tints base-keyboard output glyphs (with an accessible hint) until the author selects them", async () => {
+    // Base produces "a" but not "b".
+    seedBaseProducing(["a"]);
+    getGroupsResult.set([
+      {
+        block: "Latin",
+        tier: "main",
+        script: "Latn",
+        usedByBase: false,
+        cells: [
+          { char: "a", isCombiningMark: false },
+          { char: "b", isCombiningMark: false },
+        ],
+      },
+    ]);
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    // "a" is a base-output glyph → accessible name carries the base hint.
+    expect(
+      screen.getByRole("button", { name: /Add a \(U\+0061\) — from your base keyboard/ }),
+    ).toBeTruthy();
+    // "b" is not produced by the base → no hint.
+    expect(
+      screen.queryByRole("button", { name: /Add b \(U\+0062\) — from your base keyboard/ }),
+    ).toBeNull();
+    // Selecting "a" clears the base tint/hint (it is now a chosen alphabet char).
+    fireEvent.click(screen.getByRole("button", { name: /Add a \(U\+0061\) — from your base keyboard/ }));
+    expect(screen.queryByRole("button", { name: /from your base keyboard/ })).toBeNull();
   });
 
   it("a cell already present in phaseBDraftStore.chars renders aria-pressed=true on mount", async () => {

@@ -22,7 +22,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { parseUPlusNotation, scriptSubtagOf, toUPlusNotation } from "@keyboard-studio/contracts";
+import { buildProducedSet, parseUPlusNotation, scriptSubtagOf, toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
@@ -150,6 +150,12 @@ function parseCodepointInput(raw: string): CodepointParseResult {
 // supported" stub well before reaching this pane, so they never hit this cap.
 export const MAX_CELLS_PER_GROUP = 3000;
 
+// "Produced by the base keyboard, not yet in your alphabet" chip tint. A warm
+// amber that reads on the dark survey surface; paired with an accessible-name
+// hint (never colour alone) so the signal is not colour-dependent.
+const BASE_OUTPUT_BORDER = "#c9a227";
+const BASE_OUTPUT_BG = "rgba(201, 162, 39, 0.16)";
+
 interface CharacterMapPaneProps {
   // Per-group render cap. Defaults to MAX_CELLS_PER_GROUP; overridable only so
   // tests can exercise the exact slice/"Showing N of M" logic with a small cap
@@ -253,6 +259,15 @@ export function CharacterMapPane({
   const hasKnownBlocks = useMemo(
     () => loadState.status === "done" && loadState.groups.some((g) => g.usedByBase),
     [loadState],
+  );
+
+  // Every glyph the base keyboard already produces (NFC). Cells for these are
+  // tinted yellow in the grid UNTIL the author selects them into the alphabet —
+  // a "your base already types this" affordance. Browser-safe, memoized on the
+  // base IR (no I/O). Empty set when there is no base IR.
+  const baseProduced = useMemo<Set<string>>(
+    () => (baseIr !== null ? buildProducedSet(baseIr) : new Set<string>()),
+    [baseIr],
   );
 
 
@@ -714,17 +729,32 @@ export function CharacterMapPane({
                         // the mark fine. A standalone mark must always show the
                         // dotted circle, never a box.
                         const glyphRenders = cell.isCombiningMark || isGlyphSupported(display);
+                        // Yellow "your base keyboard already types this" affordance,
+                        // shown until the author selects the glyph into the alphabet.
+                        const isBaseOutput = !selected && baseProduced.has(cell.char.normalize("NFC"));
                         const actionLabel = selected
                           ? t({ id: "survey.characterMapPane.cell.removeAction", message: "Remove" })
                           : t({ id: "survey.characterMapPane.cell.addAction", message: "Add" });
+                        // Accessible name carries the base-output fact (never colour
+                        // alone) so screen-reader users get the same signal.
+                        const baseOutputHint = isBaseOutput
+                          ? t({
+                              id: "survey.characterMapPane.cell.fromBase",
+                              message: " — from your base keyboard",
+                            })
+                          : "";
                         return (
                           <button
                             key={cell.char}
                             type="button"
                             onClick={() => handleToggle(cell)}
                             aria-pressed={selected}
-                            aria-label={`${actionLabel} ${cell.char} (${cp})`}
-                            style={charChip(selected)}
+                            aria-label={`${actionLabel} ${cell.char} (${cp})${baseOutputHint}`}
+                            style={
+                              isBaseOutput
+                                ? { ...charChip(false), border: `1px solid ${BASE_OUTPUT_BORDER}`, background: BASE_OUTPUT_BG }
+                                : charChip(selected)
+                            }
                           >
                             {glyphRenders ? (
                               <span style={chipGlyph(selected, glyphFontStack)}>{display}</span>
