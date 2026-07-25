@@ -277,7 +277,7 @@ describe("CharScrollStrip — wheel horizontal scroll", () => {
 
     const event = dispatchWheel(strip, { deltaY: 60 });
 
-    expect(strip.scrollLeft).toBe(136); // 100 + 60 * FACTOR (60 * 0.6 = 36)
+    expect(strip.scrollLeft).toBe(100 + 60 * FACTOR); // 100 + 36 = 136
     expect(onSelectChar).not.toHaveBeenCalled();
     expect(event.defaultPrevented).toBe(true);
   });
@@ -298,7 +298,7 @@ describe("CharScrollStrip — wheel horizontal scroll", () => {
 
     dispatchWheel(strip, { deltaY: -60 });
 
-    expect(strip.scrollLeft).toBe(164); // 200 - 60 * FACTOR (60 * 0.6 = 36)
+    expect(strip.scrollLeft).toBe(200 - 60 * FACTOR); // 200 - 36 = 164
     expect(onSelectChar).not.toHaveBeenCalled();
   });
 
@@ -390,7 +390,7 @@ describe("CharScrollStrip — wheel horizontal scroll", () => {
 
     const event = dispatchWheel(strip, { deltaX: 80, deltaY: 0 });
 
-    expect(strip.scrollLeft).toBe(148); // 100 + 80 * FACTOR (80 * 0.6 = 48)
+    expect(strip.scrollLeft).toBe(100 + 80 * FACTOR); // 100 + 48 = 148
     expect(onSelectChar).not.toHaveBeenCalled();
     expect(event.defaultPrevented).toBe(true);
   });
