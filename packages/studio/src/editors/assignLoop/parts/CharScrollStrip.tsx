@@ -54,6 +54,8 @@ import {
 } from "../../../lib/galleryTheme.ts";
 import { ERROR_RED } from "../../../ui/theme.ts";
 
+const WHEEL_SCROLL_FACTOR = 0.6; // dampen wheel delta so the strip pans a bit slower than the raw device delta
+
 export interface CharScrollStripProps {
   /** All characters in this gallery's own walk order (lettersToAdd for MechanismGallery, inventory for TouchGallery). */
   chars: readonly string[];
@@ -84,6 +86,63 @@ export function CharScrollStrip({
 }: CharScrollStripProps) {
   const { t } = useLingui();
   const chipRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const stripRef = useRef<HTMLDivElement | null>(null);
+
+  // Mouse-wheel / horizontal-trackpad panning, scoped to the strip: a plain
+  // `useEffect` + `addEventListener("wheel", ..., { passive: false })` rather
+  // than a JSX `onWheel` prop, because React registers its root-level wheel
+  // listener as passive — `e.preventDefault()` inside a JSX onWheel handler is
+  // silently ignored (and warns) there, so it can't reliably suppress the
+  // page's own scroll when the strip itself consumes the gesture. Being on
+  // this element (not window/document) is what makes panning hover-gated: it
+  // only fires while the pointer is over the char/badge strip. This has no
+  // dependency on `chars`/`currentChar`/`onSelectChar` — it only ever touches
+  // the DOM element's own `scrollLeft`, never the selection — so it mounts
+  // once and is never torn down/re-attached on selection changes.
+  useEffect(() => {
+    // stripRef.current is guaranteed non-null here: the div below is the
+    // ONLY thing this component ever renders (aside from the <style> tag),
+    // and the sole early return (`chars.length === 0` above) happens before
+    // it — so the div is present on every render where this component
+    // renders anything at all. Both callers additionally only mount this
+    // component once their own char list has already settled to non-empty
+    // (MechanismGallery gates on `lettersToAdd.length > 0`; TouchGallery
+    // gates on `currentChar !== null`, which its own sync effect never sets
+    // until `inventory.length > 0`), so this mount-only effect's first (and
+    // only) run always finds the div already committed to the DOM.
+    const el = stripRef.current;
+    if (!el) return;
+
+    function handleWheel(e: WheelEvent) {
+      // Max-magnitude of the two axes: a vertical mouse wheel reports on
+      // deltaY, a horizontal trackpad swipe on deltaX — whichever moved
+      // further drives the pan. This never touches selection, only the
+      // strip's own scrollLeft.
+      const delta =
+        Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+      if (delta === 0) return;
+
+      // No horizontal overflow at all: nothing for this strip to consume,
+      // so don't preventDefault — let the page's own scroll handle the
+      // event.
+      if (el.scrollWidth <= el.clientWidth) return;
+
+      const maxScrollLeft = el.scrollWidth - el.clientWidth;
+      // Already clamped at the edge in the wheeled direction: let the event
+      // pass through (no preventDefault) so the page can still scroll past
+      // this element instead of the gesture being silently swallowed here.
+      if (delta < 0 && el.scrollLeft <= 0) return;
+      if (delta > 0 && el.scrollLeft >= maxScrollLeft) return;
+
+      // The strip can actually move in this direction — pan it and consume
+      // the event so the page underneath doesn't also scroll vertically.
+      el.scrollLeft += delta * WHEEL_SCROLL_FACTOR;
+      e.preventDefault();
+    }
+
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, []);
 
   // Auto-scroll the current chip into view (horizontally only — inline
   // "nearest" never triggers a vertical/page scroll) whenever the selected
@@ -133,6 +192,7 @@ export function CharScrollStrip({
         .ks-char-scroll-strip:hover::-webkit-scrollbar-thumb { background: ${ACCENT}; }
       `}</style>
       <div
+        ref={stripRef}
         className="ks-char-scroll-strip"
         data-testid="char-scroll-strip"
         aria-label={t({

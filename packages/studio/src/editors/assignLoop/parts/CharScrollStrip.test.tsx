@@ -176,6 +176,226 @@ describe("CharScrollStrip — chip click", () => {
   });
 });
 
+describe("CharScrollStrip — wheel horizontal scroll", () => {
+  // The component dampens the raw wheel delta before applying it to
+  // scrollLeft (WHEEL_SCROLL_FACTOR in CharScrollStrip.tsx) — the direction
+  // pick and all boundary/early-return checks still branch on the RAW,
+  // unfactored delta; only the actual `el.scrollLeft +=` step is scaled. Every
+  // expectation below that asserts a concrete post-wheel scrollLeft is
+  // `rawDelta * FACTOR`, not the raw delta itself.
+  const FACTOR = 0.6; // mirrors CharScrollStrip.tsx's WHEEL_SCROLL_FACTOR
+
+  // The listener under test is a native `addEventListener("wheel", ..., {
+  // passive: false })` attached directly to the strip div (see the component's
+  // useEffect), NOT a JSX onWheel prop — so it sits outside React's synthetic
+  // event system entirely. A raw `element.dispatchEvent(new WheelEvent(...))`
+  // reaches it exactly the way a real browser wheel notch would; that's the
+  // mechanism used below rather than RTL's fireEvent.wheel helper, so this
+  // test suite exercises the actual code path (native DOM dispatch) rather
+  // than relying on a testing-library abstraction to happen to line up with
+  // it. cancelable:true matters — the handler conditionally calls
+  // `e.preventDefault()`, and a non-cancelable event makes that a silent
+  // no-op / always-false `defaultPrevented`, which would make several
+  // assertions below vacuous.
+  //
+  // dispatchWheel returns the SAME event instance it dispatched so tests can
+  // read `.defaultPrevented` off it afterward (dispatchEvent's own boolean
+  // return value is the inverse — false means "was prevented" — which reads
+  // backwards at call sites, so we hand back the event instead).
+  function dispatchWheel(el: Element, init: WheelEventInit): WheelEvent {
+    const event = new WheelEvent("wheel", {
+      cancelable: true,
+      bubbles: true,
+      deltaX: 0,
+      deltaY: 0,
+      ...init,
+    });
+    el.dispatchEvent(event);
+    return event;
+  }
+
+  // jsdom does no layout: scrollWidth/clientWidth are hardcoded to 0 on every
+  // element, so a strip left at jsdom's defaults always takes the
+  // `scrollWidth <= clientWidth` early return — a naive wheel test would
+  // "pass" without ever reaching the panning logic. This stubs both as fixed
+  // values via `Object.defineProperty` (own-property override shadows
+  // jsdom's prototype getters) and replaces `scrollLeft` with a real
+  // get/set pair backed by a closure variable, so `el.scrollLeft += delta`
+  // in the handler actually persists between reads — jsdom's own
+  // scrollLeft, even where present, is not guaranteed to accumulate the way
+  // a laid-out browser element would, so this test does not rely on it.
+  function stubOverflowGeometry(
+    el: HTMLElement,
+    opts: { scrollWidth: number; clientWidth: number; scrollLeft?: number },
+  ) {
+    Object.defineProperty(el, "scrollWidth", {
+      value: opts.scrollWidth,
+      configurable: true,
+    });
+    Object.defineProperty(el, "clientWidth", {
+      value: opts.clientWidth,
+      configurable: true,
+    });
+    let current = opts.scrollLeft ?? 0;
+    Object.defineProperty(el, "scrollLeft", {
+      configurable: true,
+      get() {
+        return current;
+      },
+      set(v: number) {
+        current = v;
+      },
+    });
+  }
+
+  it("stubOverflowGeometry actually puts the strip on the overflow (scrolling) path, not the early-return path", () => {
+    // Sanity check for the stub itself, ahead of the behavioral assertions
+    // below: scrollWidth (500) > clientWidth (200) must be true, or every
+    // test in this block would pass vacuously against the early return.
+    const strip = document.createElement("div");
+    stubOverflowGeometry(strip, { scrollWidth: 500, clientWidth: 200, scrollLeft: 0 });
+    expect(strip.scrollWidth).toBe(500);
+    expect(strip.clientWidth).toBe(200);
+    expect(strip.scrollWidth > strip.clientWidth).toBe(true);
+    strip.scrollLeft = 42;
+    expect(strip.scrollLeft).toBe(42); // confirms the get/set pair persists, unlike jsdom's own no-op default
+  });
+
+  it("wheeling down (positive deltaY) over an overflowing strip increases scrollLeft and does NOT call onSelectChar", () => {
+    const onSelectChar = vi.fn();
+    render(
+      <CharScrollStrip
+        chars={["a", "b", "c"]}
+        currentChar="b"
+        onSelectChar={onSelectChar}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+    const strip = screen.getByTestId("char-scroll-strip");
+    stubOverflowGeometry(strip, { scrollWidth: 500, clientWidth: 200, scrollLeft: 100 });
+
+    const event = dispatchWheel(strip, { deltaY: 60 });
+
+    expect(strip.scrollLeft).toBe(136); // 100 + 60 * FACTOR (60 * 0.6 = 36)
+    expect(onSelectChar).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("wheeling up (negative deltaY) while scrollLeft > 0 decreases scrollLeft and does NOT call onSelectChar", () => {
+    const onSelectChar = vi.fn();
+    render(
+      <CharScrollStrip
+        chars={["a", "b", "c"]}
+        currentChar="b"
+        onSelectChar={onSelectChar}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+    const strip = screen.getByTestId("char-scroll-strip");
+    stubOverflowGeometry(strip, { scrollWidth: 500, clientWidth: 200, scrollLeft: 200 });
+
+    dispatchWheel(strip, { deltaY: -60 });
+
+    expect(strip.scrollLeft).toBe(164); // 200 - 60 * FACTOR (60 * 0.6 = 36)
+    expect(onSelectChar).not.toHaveBeenCalled();
+  });
+
+  it("at the left edge (scrollLeft 0), wheeling up releases the event — scrollLeft stays 0, defaultPrevented is false", () => {
+    const onSelectChar = vi.fn();
+    render(
+      <CharScrollStrip
+        chars={["a", "b", "c"]}
+        currentChar="b"
+        onSelectChar={onSelectChar}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+    const strip = screen.getByTestId("char-scroll-strip");
+    stubOverflowGeometry(strip, { scrollWidth: 500, clientWidth: 200, scrollLeft: 0 });
+
+    const event = dispatchWheel(strip, { deltaY: -60 });
+
+    // Boundary check branches on the RAW delta (unaffected by FACTOR), so
+    // this early-returns before the factor is ever applied — 0 is correct
+    // either way, not a value that needs rescaling.
+    expect(strip.scrollLeft).toBe(0);
+    expect(event.defaultPrevented).toBe(false);
+    expect(onSelectChar).not.toHaveBeenCalled();
+  });
+
+  it("at the right edge (scrollLeft === maxScrollLeft), wheeling down releases the event — scrollLeft unchanged, defaultPrevented is false", () => {
+    const onSelectChar = vi.fn();
+    render(
+      <CharScrollStrip
+        chars={["a", "b", "c"]}
+        currentChar="b"
+        onSelectChar={onSelectChar}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+    const strip = screen.getByTestId("char-scroll-strip");
+    // maxScrollLeft = scrollWidth - clientWidth = 500 - 200 = 300
+    stubOverflowGeometry(strip, { scrollWidth: 500, clientWidth: 200, scrollLeft: 300 });
+
+    const event = dispatchWheel(strip, { deltaY: 60 });
+
+    // Boundary check branches on the RAW delta (unaffected by FACTOR), so
+    // this early-returns before the factor is ever applied — 300 is correct
+    // either way, not a value that needs rescaling.
+    expect(strip.scrollLeft).toBe(300);
+    expect(event.defaultPrevented).toBe(false);
+    expect(onSelectChar).not.toHaveBeenCalled();
+  });
+
+  it("with no overflow (scrollWidth <= clientWidth), wheeling does nothing — scrollLeft unchanged, defaultPrevented false", () => {
+    const onSelectChar = vi.fn();
+    render(
+      <CharScrollStrip
+        chars={["a", "b", "c"]}
+        currentChar="b"
+        onSelectChar={onSelectChar}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+    const strip = screen.getByTestId("char-scroll-strip");
+    stubOverflowGeometry(strip, { scrollWidth: 200, clientWidth: 200, scrollLeft: 0 });
+
+    const event = dispatchWheel(strip, { deltaY: 60 });
+
+    // No-overflow early return happens before the raw delta is even read for
+    // direction, let alone scaled — unaffected by FACTOR.
+    expect(strip.scrollLeft).toBe(0);
+    expect(event.defaultPrevented).toBe(false);
+    expect(onSelectChar).not.toHaveBeenCalled();
+  });
+
+  it("a horizontal trackpad swipe (deltaX dominant, deltaY 0) pans by deltaX and does NOT call onSelectChar", () => {
+    const onSelectChar = vi.fn();
+    render(
+      <CharScrollStrip
+        chars={["a", "b", "c"]}
+        currentChar="b"
+        onSelectChar={onSelectChar}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+    const strip = screen.getByTestId("char-scroll-strip");
+    stubOverflowGeometry(strip, { scrollWidth: 500, clientWidth: 200, scrollLeft: 100 });
+
+    const event = dispatchWheel(strip, { deltaX: 80, deltaY: 0 });
+
+    expect(strip.scrollLeft).toBe(148); // 100 + 80 * FACTOR (80 * 0.6 = 48)
+    expect(onSelectChar).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(true);
+  });
+});
+
 describe("CharScrollStrip — full-codepoint testid keying (no first-codepoint collision)", () => {
   it("gives two distinct multi-codepoint graphemes sharing a base codepoint distinct, non-colliding testids", () => {
     // "e" + combining acute (U+0301) vs "e" + combining grave (U+0300) — both
