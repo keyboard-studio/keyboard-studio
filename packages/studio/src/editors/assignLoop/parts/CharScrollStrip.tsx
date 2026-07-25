@@ -110,10 +110,17 @@ export function CharScrollStrip({
     // gates on `currentChar !== null`, which its own sync effect never sets
     // until `inventory.length > 0`), so this mount-only effect's first (and
     // only) run always finds the div already committed to the DOM.
-    const el = stripRef.current;
-    if (!el) return;
+    const stripEl = stripRef.current;
+    if (!stripEl) return;
 
     function handleWheel(e: WheelEvent) {
+      // Re-read the ref inside the handler: this closure escapes into
+      // addEventListener, so TS widens any outer narrowing back to
+      // `HTMLDivElement | null` here — a local guard re-narrows it (and the
+      // ref is stable for the component's lifetime, so this is the same div).
+      const el = stripRef.current;
+      if (!el) return;
+
       // Max-magnitude of the two axes: a vertical mouse wheel reports on
       // deltaY, a horizontal trackpad swipe on deltaX — whichever moved
       // further drives the pan. This never touches selection, only the
@@ -140,8 +147,8 @@ export function CharScrollStrip({
       e.preventDefault();
     }
 
-    el.addEventListener("wheel", handleWheel, { passive: false });
-    return () => el.removeEventListener("wheel", handleWheel);
+    stripEl.addEventListener("wheel", handleWheel, { passive: false });
+    return () => stripEl.removeEventListener("wheel", handleWheel);
   }, []);
 
   // Auto-scroll the current chip into view (horizontally only — inline
