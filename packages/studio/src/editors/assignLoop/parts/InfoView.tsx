@@ -4,9 +4,8 @@ import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import type { RemovalCapability } from '@keyboard-studio/contracts';
 import type { CarveNode } from '../../../lib/irToCarveNodes.ts';
-import { displayChar, resolveNodeName, resolveReferencedByLabel } from '../../../lib/irToCarveNodes.ts';
+import { displayChar, resolveLocationLabel, resolveNodeName, resolveReferencedByLabel } from '../../../lib/irToCarveNodes.ts';
 import { InfoIcon, resolveMessage } from './carveShared.tsx';
-import { resolveContentString } from '../../../lib/contentI18n.ts';
 import { KeySeq } from './KeySeq.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 
@@ -368,7 +367,7 @@ export function InfoView() {
         {isNotRemovable && owningPattern !== undefined && (
           <div style={{ marginBottom: 3, fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
             <Trans id="editor.assignLoop.infoView.managedByPattern">
-              Managed by the {resolveContentString('patterns', owningPattern.nodeId, 'title', owningPattern.label, i18n)} pattern.
+              Managed by the {resolveLocationLabel(owningPattern, i18n)} pattern.
             </Trans>
           </div>
         )}
