@@ -1703,9 +1703,9 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               still worth surfacing here: an author configuring touch access
               may need to know this character is already "in play" as a
               sequence's content/indicator/output on the desktop layout.
-              Read-only — mirrors SequenceGallery's own "Recorded sequences"
-              card style; editing a sequence stays owned by the Sequence
-              Gallery. Shared with MechanismGallery's own bottom list — see
+              Read-only — mirrors the inline SequenceBuilderPanel's "Recorded
+              sequences" card style; editing a sequence stays owned by the
+              sequence builder. Shared with MechanismGallery's own bottom list — see
               UsesSequencesCard.tsx. */}
           <UsesSequencesCard
             currentChar={currentChar}

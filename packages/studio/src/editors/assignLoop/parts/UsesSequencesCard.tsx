@@ -7,9 +7,9 @@
 //
 // Every recorded multi_char_sequence where `char` appears in ANY slot
 // (content, indicator, or output), not just the ones whose output IS `char`.
-// Read-only here — mirrors SequenceGallery's own "Recorded sequences" card
-// style (SequenceGallery.tsx) but editing a sequence stays owned by the
-// Sequence Gallery, so no Remove control is offered.
+// Read-only here — mirrors the inline SequenceBuilderPanel's "Recorded
+// sequences" card style (SequenceBuilderPanel.tsx) but editing a sequence
+// stays owned by the sequence builder, so no Remove control is offered.
 //
 // Data source stays the caller's own concern (see charMechanisms.ts's own
 // header comment): MechanismGallery passes its physical `sessionAssignments`

@@ -12,7 +12,7 @@
 // producers here even though each gallery's own excludeSequenceMechanisms
 // filter (MechanismGallery.tsx) hides sequence-owned assignments from THAT
 // gallery's own "Added"/"Applied methods" chips. That exclusion is a
-// Sequence-Gallery-ownership concern for THIS gallery's own edit surface; the
+// sequence-ownership concern for THIS gallery's own edit surface; the
 // badge is a cross-cutting "how many ways in total" count and must not
 // inherit it. The one type NEVER counted here is TouchGallery's own
 // `touch_inherited` placeholder mechanism — it marks "already reachable via
@@ -30,9 +30,10 @@
 // (PATTERN_SEQUENCE) MechanismRef where `char` appears in ANY slot —
 // `firstLetterOut` (content), `secondLetter` (indicator), or `collapsedChar`
 // (the sequence's own output) — regardless of the assignment's own modality.
-// Sequences are always recorded with modality "physical" (SequenceGallery
-// only ever writes physical assignments), so this scans the FULL assignments
-// list passed in, unfiltered by the `modality` parameter — a caller browsing
+// Sequences are always recorded with modality "physical" (the
+// SequenceBuilderPanel only ever writes physical assignments), so this scans
+// the FULL assignments list passed in, unfiltered by the `modality` parameter
+// — a caller browsing
 // the Touch Gallery still needs to see "this character is the indicator for
 // some other character's desktop sequence", even though touch assignments
 // themselves are a disjoint set.

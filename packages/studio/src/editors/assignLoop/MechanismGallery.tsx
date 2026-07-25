@@ -1129,7 +1129,7 @@ export function MechanismGallery({
   // excludeSequenceMechanisms above. This gallery's whole covered/applied view
   // (coveredChars, appliedForCurrentChar, the "Applied methods" badge row)
   // derives from THIS, never from sessionAssignments directly, so a
-  // Sequence-Gallery-owned assignment can never show as "Added" here nor be
+  // sequence-owned assignment can never show as "Added" here nor be
   // removed via this gallery's own controls.
   const mechanismAssignments = useMemo(
     () => excludeSequenceMechanisms(sessionAssignments),
@@ -2701,10 +2701,10 @@ export function MechanismGallery({
               {/* Sequences using this character (Part 3) — every recorded
                   multi_char_sequence where currentChar appears in ANY slot
                   (content, indicator, or output), not just the ones whose
-                  output IS currentChar. Read-only here — mirrors
-                  SequenceGallery's own "Recorded sequences" card style
-                  (SequenceGallery.tsx) but editing a sequence stays owned by
-                  the Sequence Gallery, so no Remove control is offered.
+                  output IS currentChar. Read-only here — mirrors the inline
+                  SequenceBuilderPanel's "Recorded sequences" card style
+                  (SequenceBuilderPanel.tsx) but editing a sequence stays owned
+                  by the sequence builder, so no Remove control is offered.
                   Shared with TouchGallery's own bottom list — see
                   UsesSequencesCard.tsx. */}
               <UsesSequencesCard
