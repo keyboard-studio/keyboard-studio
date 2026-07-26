@@ -1,6 +1,7 @@
 // Tests for ruleModifier(), modifierLabel(), glyph-shape integration, StoreUsage.patternRefs, crossPairTrigger, and storeRoleLine in irToCarveNodes.ts
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import { I18n } from '@lingui/core';
 import type { IRRule, IRGroup, IRStore, KeyboardIR, Pattern, StoreItem } from '@keyboard-studio/contracts';
 import {
   ruleModifier,
@@ -24,7 +25,10 @@ import {
   isCombining,
   prefixCombiningMark,
   displayChar,
+  resolveNodeName,
+  resolveLocationLabel,
 } from './irToCarveNodes.ts';
+import { _setContentCatalogForTesting, _resetContentI18nForTesting } from './contentI18n.ts';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -2665,5 +2669,63 @@ describe('isCombining / prefixCombiningMark / displayChar — Mark category (Mn/
 
   it('displayChar: double-span mark renders circle+mark+circle end to end', () => {
     expect(displayChar('͡')).toBe('◌͡◌');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveNodeName / resolveLocationLabel — Tier B content-i18n for the Carve
+// editor (spec 046 T028). CarveNode.name / CharLocation.label carry
+// pattern.title verbatim for pattern-kind entries; these resolve it against
+// the active locale (English fallback), leaving group/store/raw names
+// (IR-authoring names, not Pattern content) untouched.
+// ---------------------------------------------------------------------------
+
+describe('resolveNodeName / resolveLocationLabel', () => {
+  function i18nFor(locale: string): I18n {
+    return new I18n({ locale, messages: {} });
+  }
+
+  afterEach(() => {
+    _resetContentI18nForTesting();
+  });
+
+  it('resolveNodeName: translates a pattern node title under an active locale with a seeded catalog', () => {
+    _setContentCatalogForTesting('fr', {
+      patterns: { 'content.pattern.p1.title': 'Diacritiques' },
+    });
+    expect(
+      resolveNodeName({ nodeId: 'p1', kind: 'pattern', name: 'Diacritics' }, i18nFor('fr')),
+    ).toBe('Diacritiques');
+  });
+
+  it('resolveNodeName: falls back to the English name when no i18n instance or no translation is seeded', () => {
+    expect(resolveNodeName({ nodeId: 'p1', kind: 'pattern', name: 'Diacritics' })).toBe('Diacritics');
+    expect(resolveNodeName({ nodeId: 'p1', kind: 'pattern', name: 'Diacritics' }, i18nFor('fr'))).toBe(
+      'Diacritics',
+    );
+  });
+
+  it('resolveNodeName: leaves group/store/raw node names unresolved (not Pattern content)', () => {
+    _setContentCatalogForTesting('fr', {
+      patterns: { 'content.pattern.g1.title': 'should never be looked up' },
+    });
+    expect(resolveNodeName({ nodeId: 'g1', kind: 'group', name: 'main' }, i18nFor('fr'))).toBe('main');
+    expect(resolveNodeName({ nodeId: 's1', kind: 'store', name: 'Vowels' }, i18nFor('fr'))).toBe('Vowels');
+  });
+
+  it('resolveLocationLabel: translates a pattern-kind location label the same way as resolveNodeName', () => {
+    _setContentCatalogForTesting('fr', {
+      patterns: { 'content.pattern.p1.title': 'Diacritiques' },
+    });
+    expect(
+      resolveLocationLabel({ kind: 'pattern', nodeId: 'p1', label: 'Diacritics' }, i18nFor('fr')),
+    ).toBe('Diacritiques');
+  });
+
+  it('resolveLocationLabel: leaves group/store location labels unresolved', () => {
+    expect(resolveLocationLabel({ kind: 'group', nodeId: 'g1', label: 'main' }, i18nFor('fr'))).toBe('main');
+    expect(resolveLocationLabel({ kind: 'store', nodeId: 's1', label: 'Vowels' }, i18nFor('fr'))).toBe(
+      'Vowels',
+    );
   });
 });

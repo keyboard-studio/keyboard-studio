@@ -16,6 +16,7 @@ import type { FiredQuestion } from "../adaptation/firing.ts";
 import { secondaryButton, primaryButton } from "./surveyStyles.ts";
 import { handleEnterToAdvance } from "./enterToAdvance.ts";
 import { resolveMessage } from "../lib/i18nResolve.ts";
+import { resolveContentString } from "../lib/contentI18n.ts";
 
 /** One labelled confirmation row in the prefill summary. */
 export interface PrefillRow {
@@ -49,10 +50,17 @@ const NO_DEFAULT_PLEASE_CHOOSE = msg({
 export function buildScriptAlignmentRows(fired: FiredQuestion[], i18n?: I18n): PrefillRow[] {
   return fired.map((q) => {
     const descriptor = SCRIPT_ALIGNMENT_LABELS[q.id];
+    const provenanceLabel = resolveContentString(
+      "adaptationQuestions",
+      q.id,
+      "provenanceLabel",
+      q.provenanceLabel,
+      i18n,
+    );
     return {
       label: descriptor !== undefined ? resolveMessage(i18n, descriptor) : q.id,
       value: q.prefilledValue ?? resolveMessage(i18n, NO_DEFAULT_PLEASE_CHOOSE),
-      note: `${q.provenanceLabel} (${q.provenanceTier})`,
+      note: `${provenanceLabel} (${q.provenanceTier})`,
     };
   });
 }

@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Trans, useLingui } from "@lingui/react/macro";
 import { msg, plural } from "@lingui/core/macro";
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
-import { toRailNodes, nodeState, buildCharWeb, annotateRemovalRecommendations, recommendedRemovalChars, coordinatedCollateralForSlots, displayChar } from '../../lib/irToCarveNodes.ts';
+import { toRailNodes, nodeState, buildCharWeb, annotateRemovalRecommendations, recommendedRemovalChars, coordinatedCollateralForSlots, displayChar, resolveNodeName, resolveLocationLabel } from '../../lib/irToCarveNodes.ts';
 import type { CarveNode, CharLocation, RecommendedRemovalChar, CoordinatedCollateralChar } from '../../lib/irToCarveNodes.ts';
 import { KIND_COLOR } from '../assignLoop/parts/KindBadge.tsx';
 import { StatusBar } from '../assignLoop/parts/StatusBar.tsx';
@@ -145,7 +145,7 @@ function buildPendingCascade({
   const removableRuleIds = found.ruleNodeIds.filter((id) => !isNotRemovable(id));
   const blockedRuleIds = found.ruleNodeIds.filter(isNotRemovable);
   const ruleLabel = (id: string): string => {
-    for (const node of nodes) if (node.glyphs?.some((g) => g.gid === id)) return node.name;
+    for (const node of nodes) if (node.glyphs?.some((g) => g.gid === id)) return resolveNodeName(node, i18n);
     return resolveMessage(i18n, msg({ id: 'editor.carve.advancedRuleFallbackLabel', message: 'an advanced rule' }));
   };
   const blocked = [
@@ -517,7 +517,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
     for (const node of nodes) {
       if (!node.glyphs) continue;
       const glyph = node.glyphs.find((g) => g.gid === gid);
-      if (glyph) { targetChar = glyph.ch; clickedCapability = glyph.capability; clickedLabel = node.name; break; }
+      if (glyph) { targetChar = glyph.ch; clickedCapability = glyph.capability; clickedLabel = resolveNodeName(node, i18n); break; }
     }
 
     // Glyph not found → do nothing rather than toggle an untracked id.
@@ -606,7 +606,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
     for (const node of nodes) {
       if ((node.kind === 'pattern' || node.kind === 'group') && nodeState(node, isItemDeleted, isDeleted) === 'off') {
         fullOffIds.add(node.nodeId);
-        list.push({ type: 'node', id: node.nodeId, kind: node.kind, label: node.name, count: node.glyphs?.length ?? 0, glyphIds: node.glyphs?.map((g) => g.gid) });
+        list.push({ type: 'node', id: node.nodeId, kind: node.kind, label: resolveNodeName(node, i18n), count: node.glyphs?.length ?? 0, glyphIds: node.glyphs?.map((g) => g.gid) });
       } else if ((node.kind === 'store' || node.kind === 'raw') && isDeleted(node.nodeId)) {
         list.push({ type: 'node', id: node.nodeId, kind: node.kind, label: node.name, count: 1 });
       }
@@ -618,7 +618,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       for (const glyph of node.glyphs) {
         if (deletedItemIds.has(glyph.gid)) {
           seenItemIds.add(glyph.gid);
-          list.push({ type: 'item', id: glyph.gid, ch: glyph.ch, keys: glyph.keys, nodeName: node.name });
+          list.push({ type: 'item', id: glyph.gid, ch: glyph.ch, keys: glyph.keys, nodeName: resolveNodeName(node, i18n) });
         }
       }
     }
@@ -634,7 +634,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       }
     }
     return list;
-  }, [nodes, deletedItemIds, deletedNodeIds, isItemDeleted, isDeleted]);
+  }, [nodes, deletedItemIds, deletedNodeIds, isItemDeleted, isDeleted, i18n]);
 
   const handleRestore = useCallback((item: RemovedItem) => {
     if (item.type === 'item') { restoreItem(item.id); return; }
@@ -652,7 +652,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
       // Orphaned pattern/group — all glyphs removed but node itself not deleted
       if ((node.kind === 'pattern' || node.kind === 'group') && !isDeleted(node.nodeId) && state === 'off') {
-        orphaned.push({ nodeId: node.nodeId, name: node.name });
+        orphaned.push({ nodeId: node.nodeId, name: resolveNodeName(node, i18n) });
       }
 
       if (node.kind !== 'store' || isDeleted(node.nodeId)) continue;
@@ -683,7 +683,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       }
     }
     return { orphanedNodes: orphaned, unusedStoreNodes: unusedStores };
-  }, [nodes, deletedItemIds, deletedNodeIds, isItemDeleted, isDeleted]);
+  }, [nodes, deletedItemIds, deletedNodeIds, isItemDeleted, isDeleted, i18n]);
 
   if (!ir) {
     return (
@@ -918,7 +918,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
                 {(['group', 'pattern', 'store'] as const).map((kind) => {
                   const labels = pendingCascade.contributors.locations
                     .filter((l) => l.kind === kind)
-                    .map((l) => l.label);
+                    .map((l) => resolveLocationLabel(l, i18n));
                   if (labels.length === 0) return null;
                   // Pluralize the kind label only when it has more than one entry.
                   // kind/kindLabel are the raw enum-ish kind string ("group" /
@@ -1055,7 +1055,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
                         {loc.kind}
                       </span>
                       <span style={{ fontFamily: 'var(--app-font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {loc.label}
+                        {resolveLocationLabel(loc, i18n)}
                       </span>
                     </button>
                   </li>

@@ -1,9 +1,12 @@
 // Tests for the base-derived prefill confirmation rows. refs #369.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
+import { I18n } from "@lingui/core";
 import { makeBaseKeyboard, type BaseKeyboard, type BaseKeyboardInit } from "@keyboard-studio/contracts";
-import { buildPrefillRows } from "./Prefill.tsx";
+import { buildPrefillRows, buildScriptAlignmentRows } from "./Prefill.tsx";
 import type { IdentityLiteResult } from "./IdentityLite.tsx";
+import type { FiredQuestion } from "../adaptation/firing.ts";
+import { _setContentCatalogForTesting, _resetContentI18nForTesting } from "../lib/contentI18n.ts";
 
 function base(overrides: Partial<BaseKeyboardInit> = {}): BaseKeyboard {
   return makeBaseKeyboard({
@@ -59,5 +62,42 @@ describe("buildPrefillRows", () => {
     const byLabel = Object.fromEntries(rows.map((r) => [r.label, r.value]));
     expect(byLabel["Script class (A2)"]).toBe("abugida");
     expect(byLabel["Routing group (§9)"]).toBe("non-roman");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildScriptAlignmentRows — Tier B content-i18n for the provenance chip
+// (spec 046 T028). Mirrors the resolveNodeName/resolveLocationLabel coverage
+// in irToCarveNodes.test.ts for this loader's third render site.
+// ---------------------------------------------------------------------------
+
+function firedQuestion(overrides: Partial<FiredQuestion> = {}): FiredQuestion {
+  return {
+    id: "q_sa1_target_script_spread",
+    prefilledValue: "Latn",
+    provenanceLabel: "Corpus majority script",
+    provenanceTier: "content-derived",
+    ...overrides,
+  };
+}
+
+describe("buildScriptAlignmentRows", () => {
+  afterEach(() => {
+    _resetContentI18nForTesting();
+  });
+
+  it("translates the provenance label under an active locale with a seeded catalog", () => {
+    _setContentCatalogForTesting("fr", {
+      adaptationQuestions: {
+        "content.adaptationQuestion.q_sa1_target_script_spread.provenanceLabel": "Script majoritaire du corpus",
+      },
+    });
+    const rows = buildScriptAlignmentRows([firedQuestion()], new I18n({ locale: "fr", messages: {} }));
+    expect(rows[0]?.note).toBe("Script majoritaire du corpus (content-derived)");
+  });
+
+  it("falls back to the English provenance label when no translation is seeded", () => {
+    const rows = buildScriptAlignmentRows([firedQuestion()], new I18n({ locale: "fr", messages: {} }));
+    expect(rows[0]?.note).toBe("Corpus majority script (content-derived)");
   });
 });
