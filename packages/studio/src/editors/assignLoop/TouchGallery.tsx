@@ -1741,13 +1741,19 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               "Previous character" button, which only ever stepped back one
               position). Each chip's badge is the produces-count for that
               character in THIS gallery's modality (touch) — see
-              charMechanisms.ts. */}
+              charMechanisms.ts. `inheritedChars` feeds the seed-reachable
+              set into that count so a character this gallery reports as
+              "already in the touch layout" badges as produced (>=1) rather
+              than red 0 — both before and after its suggestion is accepted
+              (the accepted touch_inherited placeholder is still not counted,
+              so accepting cannot double-count it). */}
           <CharScrollStrip
             chars={inventory}
             currentChar={currentChar}
             onSelectChar={handleSelectChar}
             assignments={charTouchAssignments}
             modality="touch"
+            inheritedChars={detectedChars}
           />
 
           {/* FR-008 completion gate message — set by handleContinue when
