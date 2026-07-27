@@ -55,7 +55,12 @@ describe("run", () => {
 
     const result = run({ patternsDir, adaptationQuestionsDir, outDir, check: false });
 
-    expect(result.changed).toEqual(["patterns.json", "adaptationQuestions.json", "criteria.json"]);
+    expect(result.changed).toEqual([
+      "patterns.json",
+      "adaptationQuestions.json",
+      "criteria.json",
+      "flowQuestions.json",
+    ]);
     const patterns = JSON.parse(readFileSync(join(outDir, "patterns.json"), "utf8"));
     expect(patterns["content.pattern.sample_pattern.title"]).toBe("Sample title");
     const adaptationQuestions = JSON.parse(

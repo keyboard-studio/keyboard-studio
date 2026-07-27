@@ -6,6 +6,7 @@ import { ALL_CRITERIA, CRITERIA_BY_BAND } from "@keyboard-studio/contracts";
 import {
   extractAdaptationQuestionStrings,
   extractCriteriaStrings,
+  extractFlowQuestionStrings,
   extractPatternStrings,
   slugifyIdSegment,
 } from "./extract.js";
@@ -374,5 +375,60 @@ describe("extractCriteriaStrings", () => {
       return segments.length !== 4;
     });
     expect(anyDottedKeyLeaked).toBe(false);
+  });
+});
+
+describe("extractFlowQuestionStrings", () => {
+  it("extracts the identity-lite prompt/help_text keys from the live Phase A registry", () => {
+    const strings = extractFlowQuestionStrings();
+
+    expect(strings["content.flowQuestion.il_language_english.prompt"]).toBe(
+      "What is your language called in English?",
+    );
+    expect(strings["content.flowQuestion.il_language_english.help_text"]).toContain(
+      "Start typing your language's English name",
+    );
+    expect(strings["content.flowQuestion.il_language_autonym.prompt"]).toBe(
+      "What is your language called in your own language?",
+    );
+    expect(strings["content.flowQuestion.il_language_code.prompt"]).toBe(
+      "Confirm your language's code",
+    );
+  });
+
+  it("excludes control fields — no key names a control field, and no fixture value leaks as a catalog value", () => {
+    const strings = extractFlowQuestionStrings();
+    const keys = Object.keys(strings);
+
+    // A key is `content.flowQuestion.<id>.<field>` (or `...option.<value>.label`).
+    // None of the control field NAMES ever appear as a trailing key segment.
+    for (const controlField of ["type", "required", "next", "id", "options_source", "engine_resolved", "advisory"]) {
+      expect(
+        keys.some((k) => k.endsWith(`.${controlField}`)),
+        `no key should end with .${controlField}`,
+      ).toBe(false);
+    }
+
+    // Fixture values are test vectors, not rendered prose — they must never
+    // surface as a catalog value. il_language_english's fixtures include
+    // "Hausa", "Swahili", "Ainu", etc.; il_language_code's include "hau", "hin".
+    const values = new Set(Object.values(strings));
+    for (const fixtureValue of ["Hausa", "Swahili", "Ainu", "hau", "hin"]) {
+      expect(values.has(fixtureValue), fixtureValue).toBe(false);
+    }
+  });
+
+  it("drops empty/whitespace-only fields (proxy: a field absent from the live definition emits no key)", () => {
+    const strings = extractFlowQuestionStrings();
+    // il_language_code declares no `label` field — the same trim-and-skip
+    // guard that would drop an empty/whitespace-only string also drops an
+    // absent one, so this exercises the same code path.
+    expect("content.flowQuestion.il_language_code.label" in strings).toBe(false);
+  });
+
+  it("excludes registry.reserve.ts's demoted modules (spec 050 D2; US2 forward-guard)", () => {
+    const strings = extractFlowQuestionStrings();
+    const keys = Object.keys(strings);
+    expect(keys.some((k) => k.includes("language_name_english"))).toBe(false);
   });
 });

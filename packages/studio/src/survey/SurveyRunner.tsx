@@ -19,6 +19,7 @@ import { QuestionField } from "./QuestionField.tsx";
 import { debugPinsStore } from "../stores/debugPinsStore.ts";
 import { secondaryButton, primaryButton } from "./surveyStyles.ts";
 import { handleEnterToAdvance } from "./enterToAdvance.ts";
+import { interpolate } from "./interpolate.ts";
 
 // ---------------------------------------------------------------------------
 // Condition evaluator
@@ -148,10 +149,8 @@ function toSurveyAnswer(
 // ---------------------------------------------------------------------------
 // Template interpolation
 // ---------------------------------------------------------------------------
-
-function interpolate(text: string, ctx: SurveyContext): string {
-  return text.replace(/\{\{(\w+)\}\}/g, (_, key: string) => ctx[key] ?? `{{${key}}}`);
-}
+// interpolate() itself lives in ./interpolate.ts (a leaf module QuestionField
+// can also import — see that file's docstring for why the split exists).
 
 function interpolateQuestion(q: FlowQuestion, ctx: SurveyContext): FlowQuestion {
   return {
@@ -689,6 +688,7 @@ export function SurveyRunner({
         <QuestionField
           question={displayQ}
           value={value}
+          context={context}
           onChange={(v) => setCurrentValue(v)}
           onEntryResolved={(entry) => onEntryResolvedRef.current?.(currentQId, entry)}
           {...(advanceOnSelect === true ? { onSelectAdvance: requestAdvance } : {})}

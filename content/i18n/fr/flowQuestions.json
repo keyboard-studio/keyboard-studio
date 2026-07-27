@@ -1,0 +1,8 @@
+{
+  "content.flowQuestion.il_language_autonym.help_text": "Le nom que votre communauté utilise pour la langue, dans votre propre orthographe et vos propres caractères. Par exemple : Fà', Kiswahili, हिन्दी. Choisissez un nom suggéré ou saisissez le vôtre — modifiez-le pour qu'il corresponde à votre orthographe.",
+  "content.flowQuestion.il_language_autonym.prompt": "Comment votre langue est-elle appelée dans votre propre langue ?",
+  "content.flowQuestion.il_language_code.help_text": "Il s'agit du code standard de la langue que vous avez choisie — il figurera sur le clavier terminé. Il est rempli automatiquement à partir de votre choix ci-dessus ; ne le modifiez que si vous avez besoin d'un code différent, ou saisissez-en un directement si votre langue ne figurait pas dans la liste.",
+  "content.flowQuestion.il_language_code.prompt": "Confirmez le code de votre langue",
+  "content.flowQuestion.il_language_english.help_text": "Commencez à taper le nom anglais de votre langue et choisissez-le dans la liste (par exemple : Hausa, Swahili, Hindi). Lorsque deux langues partagent le même nom, la liste affiche la région et le nom local pour vous aider à choisir la bonne. Si votre langue n'est pas répertoriée, saisissez simplement son nom anglais et continuez — le texte libre est toujours accepté.",
+  "content.flowQuestion.il_language_english.prompt": "Comment votre langue est-elle appelée en anglais ?"
+}

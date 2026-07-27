@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { FlowQuestion } from "./types.ts";
+import type { FlowQuestion, SurveyContext } from "./types.ts";
 import type { LintFinding, LanguageSummary } from "@keyboard-studio/contracts";
 import { LintChip } from "../lint/LintChip.tsx";
 import { loadLangtags } from "../lib/langtagsDefaults.ts";
@@ -22,6 +22,8 @@ import type { RadioOption } from "../ui/RadioGroup.tsx";
 import type { MultiSelectOption } from "../ui/MultiSelect.tsx";
 import { helpText, TEXT_DIM } from "./surveyStyles.ts";
 import { normalizeForCompare } from "../lib/normalizeForCompare.ts";
+import { resolveContentString, slugifyIdSegment } from "../lib/contentI18n.ts";
+import { interpolate } from "./interpolate.ts";
 
 
 interface FieldProps {
@@ -44,6 +46,15 @@ interface FieldProps {
    * combobox fields (Q1 name picker, Q2/region options) call it.
    */
   onSelectAdvance?: (value: string) => void;
+  /**
+   * Survey answer context (spec 050 US1 fix) — carries `{{token}}` values
+   * (e.g. `base_name`, `language_name`) so a resolved Tier B content-i18n
+   * string can be interpolated AFTER catalog resolution, not before. Optional
+   * and defaults to `{}` at the QuestionField boundary so existing/test
+   * callers that don't pass it keep today's no-op-interpolation behavior
+   * (an empty context leaves any `{{token}}` in the string as-is).
+   */
+  context?: SurveyContext;
 }
 
 function stringValue(v: string | string[] | undefined): string {
@@ -624,8 +635,8 @@ function StyledCombobox({
 // →  ui SelectMenu
 // ---------------------------------------------------------------------------
 
-function SelectField({ question, value, onChange }: FieldProps) {
-  const { t } = useLingui();
+function SelectField({ question, value, onChange, context }: FieldProps) {
+  const { t, i18n } = useLingui();
   const strVal = stringValue(value);
   // Leading placeholder option — matches the hardcoded "— Select one —" entry
   // of the now-removed ui/Dropdown (always first, selectable to reset to
@@ -633,7 +644,19 @@ function SelectField({ question, value, onChange }: FieldProps) {
   // wrapped in t()).
   const selectOptions: SelectMenuOption[] = [
     { value: "", label: t({ id: "survey.selectField.placeholder", message: "— Select one —" }) },
-    ...(question.options ?? []).map((opt) => ({ value: opt.value, label: opt.label })),
+    ...(question.options ?? []).map((opt) => ({
+      value: opt.value,
+      label: interpolate(
+        resolveContentString(
+          "flowQuestions",
+          question.id,
+          `option.${slugifyIdSegment(opt.value)}.label`,
+          opt.label,
+          i18n,
+        ),
+        context ?? {},
+      ),
+    })),
   ];
   return (
     <SelectMenu
@@ -651,11 +674,21 @@ function SelectField({ question, value, onChange }: FieldProps) {
 // Radio group  →  ui RadioGroup (mode="list")
 // ---------------------------------------------------------------------------
 
-function RadioField({ question, value, onChange }: FieldProps) {
+function RadioField({ question, value, onChange, context }: FieldProps) {
+  const { i18n } = useLingui();
   const strVal = stringValue(value);
   const radioOptions: RadioOption[] = (question.options ?? []).map((opt) => ({
     value: opt.value,
-    label: opt.label,
+    label: interpolate(
+      resolveContentString(
+        "flowQuestions",
+        question.id,
+        `option.${slugifyIdSegment(opt.value)}.label`,
+        opt.label,
+        i18n,
+      ),
+      context ?? {},
+    ),
     ...(opt.note !== undefined ? { note: opt.note } : {}),
   }));
   return (
@@ -692,7 +725,8 @@ function BoolField({ question, value, onChange }: FieldProps) {
 // Multi-select (checkboxes)  →  ui MultiSelect
 // ---------------------------------------------------------------------------
 
-function MultiSelectField({ question, value, onChange }: FieldProps) {
+function MultiSelectField({ question, value, onChange, context }: FieldProps) {
+  const { i18n } = useLingui();
   const arrVal = arrayValue(value);
   const options = question.options ?? [];
 
@@ -708,7 +742,16 @@ function MultiSelectField({ question, value, onChange }: FieldProps) {
 
   const msOptions: MultiSelectOption[] = options.map((opt) => ({
     value: opt.value,
-    label: opt.label,
+    label: interpolate(
+      resolveContentString(
+        "flowQuestions",
+        question.id,
+        `option.${slugifyIdSegment(opt.value)}.label`,
+        opt.label,
+        i18n,
+      ),
+      context ?? {},
+    ),
   }));
 
   return (
@@ -726,10 +769,27 @@ function MultiSelectField({ question, value, onChange }: FieldProps) {
 // Notice (read-only; no input)  →  ui Notice
 // ---------------------------------------------------------------------------
 
-function NoticeField({ question }: Pick<FieldProps, "question">) {
+function NoticeField({ question, context }: Pick<FieldProps, "question" | "context">) {
+  const { i18n } = useLingui();
+  const ctx = context ?? {};
+  const resolvedBody =
+    question.body !== undefined
+      ? interpolate(resolveContentString("flowQuestions", question.id, "body", question.body, i18n), ctx)
+      : undefined;
+  const resolvedHelpText =
+    question.help_text !== undefined
+      ? interpolate(
+          resolveContentString("flowQuestions", question.id, "help_text", question.help_text, i18n),
+          ctx,
+        )
+      : undefined;
+  const resolvedPrompt =
+    question.prompt !== undefined
+      ? interpolate(resolveContentString("flowQuestions", question.id, "prompt", question.prompt, i18n), ctx)
+      : undefined;
   return (
     <Notice>
-      {question.body ?? question.help_text ?? question.prompt}
+      {resolvedBody ?? resolvedHelpText ?? resolvedPrompt}
     </Notice>
   );
 }
@@ -747,6 +807,8 @@ export interface QuestionFieldProps {
   onEntryResolved?: (entry: LanguageSummary | null) => void;
   /** Auto-advance callback for dropdown selections — see FieldProps.onSelectAdvance. */
   onSelectAdvance?: (value: string) => void;
+  /** Survey answer context for `{{token}}` interpolation — see FieldProps.context. */
+  context?: SurveyContext;
 }
 
 export function QuestionField({
@@ -756,13 +818,31 @@ export function QuestionField({
   findingsByQuestionId,
   onEntryResolved,
   onSelectAdvance,
+  context,
 }: QuestionFieldProps) {
   // Findings are associated to questions by id via a caller-supplied map.
   // LintFinding has no questionId field by design (see contracts/lintFinding.ts);
   // the survey<->lint bridge owns the mapping.
   const relevant = findingsByQuestionId?.[question.id] ?? [];
 
-  const labelText = question.prompt ?? question.label ?? question.id;
+  const { i18n } = useLingui();
+  const ctx = context ?? {};
+  const resolvedPrompt =
+    question.prompt !== undefined
+      ? interpolate(resolveContentString("flowQuestions", question.id, "prompt", question.prompt, i18n), ctx)
+      : undefined;
+  const resolvedLabel =
+    question.label !== undefined
+      ? interpolate(resolveContentString("flowQuestions", question.id, "label", question.label, i18n), ctx)
+      : undefined;
+  const labelText = resolvedPrompt ?? resolvedLabel ?? question.id;
+  const resolvedHelpText =
+    question.help_text !== undefined
+      ? interpolate(
+          resolveContentString("flowQuestions", question.id, "help_text", question.help_text, i18n),
+          ctx,
+        )
+      : undefined;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -786,8 +866,8 @@ export function QuestionField({
         );
       })()}
 
-      {question.help_text !== undefined && question.type !== "notice" && (
-        <p style={helpText}>{question.help_text}</p>
+      {resolvedHelpText !== undefined && question.type !== "notice" && (
+        <p style={helpText}>{resolvedHelpText}</p>
       )}
 
       {question.type === "text" || question.type === "short_text" ? (
@@ -801,15 +881,30 @@ export function QuestionField({
           {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
         />
       ) : question.type === "select" ? (
-        <SelectField question={question} value={value} onChange={onChange} />
+        <SelectField
+          question={question}
+          value={value}
+          onChange={onChange}
+          {...(context !== undefined ? { context } : {})}
+        />
       ) : question.type === "radio" ? (
-        <RadioField question={question} value={value} onChange={onChange} />
+        <RadioField
+          question={question}
+          value={value}
+          onChange={onChange}
+          {...(context !== undefined ? { context } : {})}
+        />
       ) : question.type === "bool" ? (
         <BoolField question={question} value={value} onChange={onChange} />
       ) : question.type === "multi_select" ? (
-        <MultiSelectField question={question} value={value} onChange={onChange} />
+        <MultiSelectField
+          question={question}
+          value={value}
+          onChange={onChange}
+          {...(context !== undefined ? { context } : {})}
+        />
       ) : question.type === "notice" ? (
-        <NoticeField question={question} />
+        <NoticeField question={question} {...(context !== undefined ? { context } : {})} />
       ) : null}
 
       {relevant.length > 0 && (
