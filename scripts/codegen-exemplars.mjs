@@ -42,6 +42,32 @@ const DEFAULT_OUT = join(OUT_DIR, "exemplars.generated.json");
 const SIZE_BUDGET_BYTES = 2 * 1024 * 1024;
 
 /**
+ * Plausibility floors: the minimum number of locales each source must yield
+ * before its output is treated as real data.
+ *
+ * These exist because "the source read cleanly and found nothing" and "the
+ * source is not actually there" are indistinguishable downstream — both hand
+ * `buildIndex` an empty map, and it dutifully writes a valid, well-formed,
+ * catastrophically incomplete index. The observed failure: `data/sldr/sldr/`
+ * left holding its 26 letter directories with zero XML files inside (an
+ * interrupted or cleaned extract). `existsSync(SLDR_TREE)` is satisfied by
+ * that shell, so the run printed `[OK] 0 SLDR locales with a main exemplar
+ * set` and emitted a CLDR-only index — dropping the ~1,600 SLDR-only locales
+ * that are the entire reason this feature exists. Nothing failed. Only the
+ * byte-for-byte determinism test in exemplarCodegen.test.ts noticed, and only
+ * because a correct artifact happened to be committed to compare against.
+ *
+ * A bare `size === 0` check would not be enough: a partial extract is just as
+ * wrong and looks more convincing. So these are floors, not zero-checks.
+ *
+ * Set well below the real counts at the current pins (CLDR 48.2.0 -> 766,
+ * SLDR 922a7879 -> 1980) so ordinary upstream churn never trips them. A pin
+ * bump that genuinely shrinks a source below its floor should lower the floor
+ * in the same commit — deliberately, the way the CLDR version pin is bumped.
+ */
+const SOURCE_FLOORS = { cldr: 400, sldr: 1000 };
+
+/**
  * The four tiers in scope, mapped to their abbreviated index keys. LDML's
  * `index` tier is deliberately absent: it is titlecased and would duplicate
  * the whole alphabet in uppercase.
@@ -407,6 +433,42 @@ export function serializeIndex(index) {
   return JSON.stringify({ version: index.version, locales: sortedLocales }, null, 2) + "\n";
 }
 
+/**
+ * Checks one source's yield against its {@link SOURCE_FLOORS} plausibility
+ * floor. Returns the operator-facing failure message, or `null` when the
+ * count is credible.
+ *
+ * Returns rather than exiting so the rule is a pure function the build-time
+ * contract tests can exercise directly (`fail()` would take the test process
+ * down with it). `main` is what turns a message into an exit.
+ *
+ * @param source  "cldr" | "sldr" — selects the floor and the remedy text.
+ * @param size    Locales the reader actually yielded.
+ * @returns Failure message, or null when `size` clears the floor.
+ */
+export function sourceFloorError(source, size) {
+  const floor = SOURCE_FLOORS[source];
+  if (floor === undefined) throw new Error(`unknown exemplar source "${source}"`);
+  if (size >= floor) return null;
+
+  const remedy =
+    source === "sldr"
+      ? "The SLDR extract is missing or incomplete — `data/sldr/sldr/` can be left holding " +
+        "empty letter directories by an interrupted or cleaned fetch, which the existence " +
+        "check above cannot tell from a real extract. Run `pnpm run fetch-sldr` and retry."
+      : "The CLDR package is present but yielded almost nothing — check that " +
+        "`cldr-misc-full`'s `main/` directory is fully installed, then run `pnpm install` " +
+        "and retry.";
+
+  return (
+    `${source.toUpperCase()} yielded only ${size} locales with a main exemplar set, ` +
+    `below the plausibility floor of ${floor}.\n        ${remedy}\n        ` +
+    "Writing the index anyway would produce a valid but silently incomplete artifact. " +
+    "If upstream genuinely shrank this far, lower SOURCE_FLOORS in this script in the " +
+    "same commit as the pin bump."
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -439,6 +501,8 @@ async function main() {
   console.log(`[OK] reading CLDR ${cldrPin.version} from ${rel(cldrMainDir)}`);
   const cldr = readCldr(cldrMainDir);
   console.log(`[OK] ${cldr.size} CLDR locales with a main exemplar set`);
+  const cldrShortfall = sourceFloorError("cldr", cldr.size);
+  if (cldrShortfall !== null) fail(cldrShortfall);
 
   if (!existsSync(SLDR_TREE)) {
     fail(`${rel(SLDR_TREE)} not found — run \`pnpm run fetch-sldr\` first.`);
@@ -446,6 +510,10 @@ async function main() {
   console.log(`[OK] reading SLDR @ ${sldrPin.commit.slice(0, 12)} from ${rel(SLDR_TREE)}`);
   const sldr = readSldr(SLDR_TREE);
   console.log(`[OK] ${sldr.size} SLDR locales with a main exemplar set`);
+  // The existsSync above only proves the directory is there; this proves it
+  // has contents. An empty/partial extract must never reach buildIndex.
+  const sldrShortfall = sourceFloorError("sldr", sldr.size);
+  if (sldrShortfall !== null) fail(sldrShortfall);
 
   let built;
   try {

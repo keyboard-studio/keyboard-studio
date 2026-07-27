@@ -354,6 +354,58 @@ describe("codegen-exemplars determinism (obligation T8, FR-013/SC-005)", () => {
     }
   }, 120_000);
 
+  // -------------------------------------------------------------------------
+  // Source plausibility floors — "the source read cleanly and found nothing"
+  // must not be mistaken for real data. The concrete miss this guards: an
+  // interrupted/cleaned `pnpm run fetch-sldr` leaves data/sldr/sldr/ holding
+  // its 26 letter directories with no XML inside, which the existsSync check
+  // in main() cannot distinguish from a real extract, so the codegen emitted a
+  // valid CLDR-only index (~1,600 SLDR-only locales silently dropped) and
+  // printed [OK].
+  // -------------------------------------------------------------------------
+
+  it("accepts the real locale counts at the current pins", async () => {
+    const { sourceFloorError } = await loadScript("codegen-exemplars.mjs");
+    // Counts observed at CLDR 48.2.0 / SLDR 922a7879. The floors must sit far
+    // enough below these that ordinary upstream churn never trips them.
+    expect(sourceFloorError("cldr", 766)).toBeNull();
+    expect(sourceFloorError("sldr", 1980)).toBeNull();
+  });
+
+  it("rejects an empty source rather than writing an incomplete index", async () => {
+    const { sourceFloorError } = await loadScript("codegen-exemplars.mjs");
+    expect(sourceFloorError("sldr", 0)).toMatch(/below the plausibility floor/);
+    expect(sourceFloorError("sldr", 0)).toMatch(/pnpm run fetch-sldr/);
+    expect(sourceFloorError("cldr", 0)).toMatch(/below the plausibility floor/);
+  });
+
+  it("rejects a PARTIAL source too, not just an empty one", async () => {
+    // A half-extracted tree is as wrong as an empty one and looks more
+    // convincing — which is why these are floors, not zero-checks.
+    const { sourceFloorError } = await loadScript("codegen-exemplars.mjs");
+    expect(sourceFloorError("sldr", 300)).toMatch(/only 300 locales/);
+    expect(sourceFloorError("cldr", 12)).toMatch(/only 12 locales/);
+  });
+
+  it("names the source that fell short, so the message is actionable", async () => {
+    const { sourceFloorError } = await loadScript("codegen-exemplars.mjs");
+    expect(sourceFloorError("sldr", 0)).toMatch(/^SLDR/);
+    expect(sourceFloorError("cldr", 0)).toMatch(/^CLDR/);
+    // The remedies differ — a missing extract vs a partial npm install.
+    expect(sourceFloorError("cldr", 0)).toMatch(/pnpm install/);
+  });
+
+  it("throws on an unknown source rather than silently passing it", async () => {
+    const { sourceFloorError } = await loadScript("codegen-exemplars.mjs");
+    expect(() => sourceFloorError("nope", 0)).toThrow(/unknown exemplar source/);
+  });
+
+  // The healthy-checkout side of this guard (that it is not trigger-happy and
+  // the real counts clear both floors end to end) is already proven by
+  // "regenerating the committed index reproduces it byte for byte" above,
+  // which runs the whole script as a subprocess and would exit non-zero if
+  // either floor fired. No second full-codegen run is added here for it.
+
   it("fails loudly on an exemplar set the canonical parser rejects", async () => {
     const { buildIndex } = await loadScript("codegen-exemplars.mjs");
     const { parseUnicodeSet } = await import("./cldr.js");
