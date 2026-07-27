@@ -12,6 +12,9 @@
  *     `PROD === false` and therefore defers to `NODE_ENV`. That covers the
  *     wiring (per-call evaluation, argument pass-through, suppression) for
  *     every method.
+ *
+ * `error` is deliberately ungated and is asserted separately: it must survive
+ * into a production build, because several call sites have no other signal.
  */
 
 import { describe, it, expect, vi, afterEach, type MockInstance } from "vitest";
@@ -19,6 +22,9 @@ import { devLog, isProductionEnv } from "./devLog.js";
 
 const METHODS = ["log", "info", "warn", "error", "debug"] as const;
 type Method = (typeof METHODS)[number];
+
+/** The methods the production gate actually suppresses — everything but `error`. */
+const GATED_METHODS = ["log", "info", "warn", "debug"] as const;
 
 /** Silence and record every console method devLog fronts. */
 function spyConsole(): Record<Method, MockInstance> {
@@ -80,11 +86,23 @@ describe("devLog", () => {
     }
   });
 
-  it("suppresses every method when the gate reports production", () => {
+  it("suppresses the dev-only methods when the gate reports production", () => {
     vi.stubEnv("NODE_ENV", "production");
     const spies = spyConsole();
-    for (const m of METHODS) devLog[m]("should not appear");
-    for (const m of METHODS) expect(spies[m]).not.toHaveBeenCalled();
+    for (const m of GATED_METHODS) devLog[m]("should not appear");
+    for (const m of GATED_METHODS) expect(spies[m]).not.toHaveBeenCalled();
+  });
+
+  it("still logs errors when the gate reports production", () => {
+    // `error` is ungated on purpose: silent-degrade sites (the studio step
+    // machine's null-track invariant, a failed touch-layout serialisation)
+    // have no UI mirror, so devtools is the only place the failure surfaces.
+    vi.stubEnv("NODE_ENV", "production");
+    const spies = spyConsole();
+    const cause = new Error("boom");
+    devLog.error("[site] failed:", cause);
+    expect(spies.error).toHaveBeenCalledTimes(1);
+    expect(spies.error).toHaveBeenCalledWith("[site] failed:", cause);
   });
 
   it("re-evaluates the gate on every call rather than caching it", () => {
