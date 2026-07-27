@@ -26,10 +26,13 @@ jobs:
         # Don't also set `version` here -- action-setup@v4 errors on a conflict.
         uses: pnpm/action-setup@v4
 
-      - name: Set up Node 22
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          # Single pin shared with local dev. A floating "22" resolves to the
+          # newest 22.x here while a dev box can sit on an older patch --
+          # @lingui/cli needs >= 22.19.0 and no-ops silently below it.
+          node-version-file: .nvmrc
           cache: pnpm
 
       - name: Install dependencies
