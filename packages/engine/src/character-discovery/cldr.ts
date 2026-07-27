@@ -14,10 +14,21 @@ export type CldrLoader = (locale: string) => Promise<string | null>;
  * cannot simply strip subtags — we probe from most specific to language-only
  * and take the first hit:
  *
- *   ewo-Latn   -> ["ewo-Latn", "ewo"]
- *   sr-Latn    -> ["sr-Latn", "sr"]        (first candidate hits)
- *   pt-BR      -> ["pt-BR", "pt"]
- *   ha-Latn-NG -> ["ha-Latn-NG", "ha-Latn", "ha-NG", "ha"]
+ *   ewo-Latn       -> ["ewo-Latn", "ewo"]
+ *   sr-Latn        -> ["sr-Latn", "sr"]        (first candidate hits)
+ *   pt-BR          -> ["pt-BR", "pt"]
+ *   ha-Latn-NG     -> ["ha-Latn-NG", "ha-Latn", "ha-NG", "ha"]
+ *   ca-ES-valencia -> ["ca-ES-valencia", "ca-ES", "ca"]
+ *
+ * Variant subtags and private-use (`-x-…`) sequences are PRESERVED on the most
+ * specific candidate. CLDR ships `be-tarask`, `ca-ES-valencia` and `el-polyton`
+ * as directories in their own right, and SLDR carries 54 alternative
+ * orthographies as `<tag>_x_<name>` files (`noa_x_alt`, `cak_x_central`, …).
+ * Those are different orthographies, not conflicting data: dropping the suffix
+ * would lose their exemplar sets AND silently overwrite the base locale's entry
+ * when the index is keyed.
+ *
+ *   noa-x-alt      -> ["noa-x-alt", "noa"]
  *
  * Shared by the live CLDR fetch loader below and the offline sourcing path
  * (`exemplarSource.ts`), which re-exports it — one candidate ladder, not two.
@@ -32,15 +43,27 @@ export function exemplarLocaleCandidates(tag: string): string[] {
   const language = (parts[0] as string).toLowerCase();
   let script: string | undefined;
   let region: string | undefined;
+  const variants: string[] = [];
+  const privateUse: string[] = [];
+  let inPrivateUse = false;
   for (const part of parts.slice(1)) {
-    if (script === undefined && /^[A-Za-z]{4}$/.test(part)) {
+    if (inPrivateUse) {
+      privateUse.push(part.toLowerCase());
+    } else if (part.toLowerCase() === "x") {
+      inPrivateUse = true;
+    } else if (script === undefined && /^[A-Za-z]{4}$/.test(part)) {
       script = (part[0] as string).toUpperCase() + part.slice(1).toLowerCase();
     } else if (region === undefined && /^([A-Za-z]{2}|\d{3})$/.test(part)) {
       region = part.toUpperCase();
+    } else if (/^([A-Za-z\d]{5,8}|\d[A-Za-z\d]{3})$/.test(part)) {
+      variants.push(part.toLowerCase());
     }
-    // Variants/extensions are dropped — neither source has such directories.
+    // Other extension singletons are dropped.
   }
+  const suffix = privateUse.length === 0 ? [] : ["x", ...privateUse];
   const candidates = [
+    [language, script, region, ...variants, ...suffix],
+    [language, script, region, ...variants],
     [language, script, region],
     [language, script],
     [language, region],
@@ -177,6 +200,7 @@ type SetToken =
   | { kind: "dash"; spacedBefore: boolean; spacedAfter: boolean };
 
 const HEX4 = /^[0-9a-fA-F]{4}$/;
+const HEX8 = /^[0-9a-fA-F]{8}$/;
 
 function isHighSurrogate(cp: number): boolean {
   return cp >= 0xd800 && cp <= 0xdbff;
@@ -190,17 +214,43 @@ function isLowSurrogate(cp: number): boolean {
  * Returns the decoded string plus the index of the last consumed unit.
  *
  * Handles `\uXXXX` (including a surrogate pair written as two consecutive
- * `\uXXXX` escapes), `\x{...}`, `\\`, and `\<any>` (the literal character).
- * A trailing lone backslash decodes to the empty string rather than throwing —
- * the pre-existing lenient behaviour for truncated input.
+ * `\uXXXX` escapes), `\UXXXXXXXX`, `\x{...}`, `\\`, and `\<any>` (the literal
+ * character). A trailing lone backslash decodes to the empty string rather
+ * than throwing — the pre-existing lenient behaviour for truncated input.
  *
  * SLDR exemplar sets use `‌`/`‍` (ZWNJ/ZWJ) and CLDR uses `\uXXXX`
  * in 147 of its 3064 exemplar sets, so without this the parser injected the
  * stray ASCII characters `u`, `2`, `0`, `C` into authors' alphabets.
+ *
+ * A backslash followed by a DIGIT throws: LDML has no `\NNN` numeric escape,
+ * so `\0327` is a mistyped `̧` (it occurs once in SLDR, in `vut.xml`) and
+ * decoding it leniently would inject the characters `0`, `3`, `2`, `7` into
+ * that language's alphabet — precisely the class of silent corruption this
+ * parser was rewritten to stop.
  */
-function decodeEscape(chars: readonly string[], i: number): { value: string; next: number } {
+function decodeEscape(
+  chars: readonly string[],
+  i: number,
+  source: string,
+): { value: string; next: number } {
   const n = chars[i + 1];
   if (n === undefined) return { value: "", next: i + 1 };
+
+  if (n === "U") {
+    const hex = chars.slice(i + 2, i + 10).join("");
+    if (HEX8.test(hex)) {
+      const cp = parseInt(hex, 16);
+      if (cp <= 0x10ffff) return { value: String.fromCodePoint(cp), next: i + 9 };
+    }
+    throw new UnsupportedUnicodeSetError("malformed \\UXXXXXXXX escape", source);
+  }
+
+  if (/[0-9]/.test(n)) {
+    throw new UnsupportedUnicodeSetError(
+      `malformed numeric escape \\${n} (LDML has no \\NNN form — likely a mistyped \\u)`,
+      source,
+    );
+  }
 
   if (n === "u") {
     const hex = chars.slice(i + 2, i + 6).join("");
@@ -261,7 +311,7 @@ function tokenizeUnicodeSet(body: string, source: string): SetToken[] {
     }
 
     if (c === "\\") {
-      const { value, next } = decodeEscape(chars, i);
+      const { value, next } = decodeEscape(chars, i, source);
       i = next;
       if (value !== "") {
         tokens.push({ kind: "char", value, escaped: true, spacedBefore: pendingSpace });
@@ -312,7 +362,7 @@ function tokenizeUnicodeSet(body: string, source: string): SetToken[] {
  * character would read as "missing" on one side of a comparison.
  *
  * Supported: literal characters, `a-z` ranges, `{..}` digraph clusters,
- * `\uXXXX` / `\x{...}` / `\\` / `\<any>` escapes.
+ * `\uXXXX` / `\UXXXXXXXX` / `\x{...}` / `\\` / `\<any>` escapes.
  * Rejected (throws `UnsupportedUnicodeSetError`): set difference, intersection,
  * and complement — see that class's doc for why silence was the wrong answer.
  *
@@ -398,8 +448,13 @@ export interface ExemplarResult {
  * is a single codepoint and differs from the original.
  * Matches kbgen behaviour — only adds single-codepoint uppercase forms to avoid
  * polluting the set with multi-char titlecase sequences.
+ *
+ * Exported so the offline sourcing path can build an identical `ExemplarResult`
+ * without a second copy of this rule. Note this is a CONSUMER-side derivation:
+ * `SourcedInventory` itself never synthesizes case counterparts, so it stays a
+ * faithful record of what the source attested.
  */
-function augmentSpecialsWithUppercase(specials: Set<string>): void {
+export function augmentSpecialsWithUppercase(specials: Set<string>): void {
   for (const ch of [...specials]) {
     const up = ch.toUpperCase();
     if (up !== ch && [...up].length === 1) specials.add(up);

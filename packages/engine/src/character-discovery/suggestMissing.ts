@@ -38,8 +38,14 @@
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { buildProducedSet, scriptSubtagOf } from "@keyboard-studio/contracts";
-import type { CldrFullLoader } from "./cldr.js";
+import type { CldrFullLoader, ExemplarResult } from "./cldr.js";
 import { loadExemplarsFromFull, parseUnicodeSet } from "./cldr.js";
+import {
+  inventoryToExemplarResult,
+  loadExemplarSource,
+  neededCharsFromInventory,
+  sourceExemplars,
+} from "./exemplarSource.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -291,13 +297,43 @@ export function isCharCoveredForLocale(
 }
 
 // ---------------------------------------------------------------------------
+// Sourcing seam
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolves a locale's exemplars through the SINGLE sourcing path (FR-015).
+ *
+ * With no `loader`, this reads the committed offline index — CLDR *and* SLDR,
+ * no network. Passing a `loader` selects the legacy live-CLDR path, which is
+ * now a test-injection seam and an opt-in live-refresh route rather than the
+ * authoring path; every existing caller and test keeps working unchanged.
+ *
+ * The confidence gate differs deliberately between the two: the offline path
+ * defers to `sourceExemplars`, whose gate is per-source and lets an
+ * SLDR-backed `qaa`-`qtz` tag through (research R7). Gating those would discard
+ * exactly the minority-language coverage this feature exists to deliver.
+ */
+async function resolveExemplars(
+  bcp47: string,
+  loader: CldrFullLoader | undefined,
+): Promise<ExemplarResult | null> {
+  if (loader !== undefined) {
+    if (failsConfidenceGate(bcp47)) return null;
+    return loadExemplarsFromFull(bcp47, loader);
+  }
+  await loadExemplarSource();
+  const inv = sourceExemplars(bcp47);
+  return inv === null ? null : inventoryToExemplarResult(inv);
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /**
  * Returns the characters a target language needs that the given base keyboard
  * does not already produce, split into main (core alphabet) and auxiliary
- * (loanword) tiers sourced from CLDR.
+ * (loanword) tiers.
  *
  * Returns null when the gate conditions above are not met (no verified data).
  * Returns a result with empty arrays when the keyboard already covers all CLDR
@@ -305,22 +341,20 @@ export function isCharCoveredForLocale(
  *
  * @param args.bcp47        - BCP47 tag of the target language (e.g. "yo", "fr-CM").
  * @param args.baseIr       - Parsed KeyboardIR of the base keyboard being adapted.
- * @param args.loader       - CldrFullLoader (use createFetchCldrFullLoader()).
+ * @param args.loader       - Optional. Omit for the offline index (the authoring
+ *                            path); pass a CldrFullLoader for live CLDR refresh
+ *                            or test injection.
  * @param args.languageName - Optional human-readable name echoed into the result.
  */
 export async function suggestMissingCharacters(args: {
   bcp47: string;
   baseIr: KeyboardIR;
-  loader: CldrFullLoader;
+  loader?: CldrFullLoader;
   languageName?: string;
 }): Promise<MissingCharSuggestions | null> {
   const { bcp47, baseIr, loader, languageName } = args;
 
-  // --- Confidence gate ---
-  if (failsConfidenceGate(bcp47)) return null;
-
-  // --- Fetch CLDR exemplars ---
-  const exemplars = await loadExemplarsFromFull(bcp47, loader);
+  const exemplars = await resolveExemplars(bcp47, loader);
   if (exemplars === null) return null;
 
   // --- Filter to letter candidates ---
@@ -391,9 +425,17 @@ export async function suggestMissingCharacters(args: {
  */
 export async function neededCharsForLanguage(args: {
   bcp47: string;
-  loader: CldrFullLoader;
+  loader?: CldrFullLoader;
 }): Promise<Set<string> | null> {
   const { bcp47, loader } = args;
+
+  // Offline path (the authoring path): the sourced inventory already carries
+  // all four tiers, so the union is just its character list.
+  if (loader === undefined) {
+    await loadExemplarSource();
+    const inv = sourceExemplars(bcp47);
+    return inv === null ? null : neededCharsFromInventory(inv);
+  }
 
   if (failsConfidenceGate(bcp47)) return null;
 

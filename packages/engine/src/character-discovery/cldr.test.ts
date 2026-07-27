@@ -303,6 +303,21 @@ describe("parseUnicodeSet escapes (research R9)", () => {
     expect([...r.used]).toEqual(["\u{10480}"]);
   });
 
+  it("decodes \\UXXXXXXXX (SLDR uses it for Miao/Yi supplementary letters)", () => {
+    const r = parseUnicodeSet("[\\U00016F8F]");
+    expect([...r.used]).toEqual(["\u{16F8F}"]);
+  });
+
+  it("throws on a malformed \\NNN numeric escape rather than injecting its digits", () => {
+    // SLDR's vut.xml writes \0327 where it means ̧ COMBINING CEDILLA.
+    // Lenient decoding would seed Vute's alphabet with 0, 3, 2 and 7.
+    expect(() => parseUnicodeSet("[a \\0327]")).toThrow(UnsupportedUnicodeSetError);
+  });
+
+  it("throws on a truncated \\U escape", () => {
+    expect(() => parseUnicodeSet("[\\U0016F8]")).toThrow(UnsupportedUnicodeSetError);
+  });
+
   it("decodes \\x{...}", () => {
     const r = parseUnicodeSet("[\\x{1E9E}]");
     expect([...r.used]).toEqual(["ẞ"]);
@@ -399,6 +414,24 @@ describe("exemplarLocaleCandidates (research R10)", () => {
       "ha-NG",
       "ha",
     ]);
+  });
+
+  it("preserves a CLDR variant subtag as its own candidate", () => {
+    // CLDR ships be-tarask / ca-ES-valencia / el-polyton as real directories;
+    // collapsing them onto the base locale loses the orthography AND overwrites
+    // the base locale's entry when the index is keyed.
+    expect(exemplarLocaleCandidates("be-tarask")).toEqual(["be-tarask", "be"]);
+    expect(exemplarLocaleCandidates("ca-ES-valencia")).toEqual([
+      "ca-ES-valencia",
+      "ca-ES",
+      "ca",
+    ]);
+    expect(exemplarLocaleCandidates("be_TARASK")).toEqual(["be-tarask", "be"]);
+  });
+
+  it("preserves an SLDR private-use orthography suffix", () => {
+    expect(exemplarLocaleCandidates("noa_x_alt")).toEqual(["noa-x-alt", "noa"]);
+    expect(exemplarLocaleCandidates("cak-x-central")).toEqual(["cak-x-central", "cak"]);
   });
 
   it("returns a single candidate for a bare language tag", () => {
