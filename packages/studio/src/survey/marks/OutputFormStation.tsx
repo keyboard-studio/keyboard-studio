@@ -13,6 +13,7 @@
 // "normalization" — asserted mechanically in the station's tests.
 
 import { Trans, useLingui } from "@lingui/react/macro";
+import { composeStack } from "@keyboard-studio/contracts";
 import type { OutputForm, OutputFormProposal, PosturePair } from "@keyboard-studio/engine";
 import {
   ACCENT,
@@ -40,7 +41,7 @@ export interface OutputFormStationProps {
 export function backspaceSteps(pair: PosturePair, form: OutputForm): string[] {
   const { base, marks } = pair.stack;
   if (form === "ready-made") {
-    return [(base + marks.join("")).normalize("NFC"), ""];
+    return [composeStack({ base, marks }), ""];
   }
   const steps: string[] = [];
   for (let k = marks.length; k >= 0; k--) {

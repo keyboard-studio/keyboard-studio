@@ -7916,13 +7916,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.8260869565217391,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -8141,13 +8143,15 @@
           "value": "Avst"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.8260869565217391,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Avst → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "partially",
@@ -49730,13 +49734,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -49953,13 +49959,15 @@
           "value": "Lisu"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Lisu → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -50092,13 +50100,15 @@
           "value": "mixed"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -50318,13 +50328,15 @@
           "value": "Lisu"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Lisu → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -54911,13 +54923,19 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 3,
+          "notes": "3 inputtable combining mark(s) on a alphabet base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "᠋",
+            "᠌",
+            "᠍"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -55134,13 +55152,15 @@
           "value": "Mong"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Mong → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -55273,13 +55293,19 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 3,
+          "notes": "3 inputtable combining mark(s) on a alphabet base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "᠋",
+            "᠌",
+            "᠍"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -55493,13 +55519,15 @@
           "value": "Mong"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Mong → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -59011,13 +59039,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -59238,13 +59268,15 @@
           "value": "Olck"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Olck → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -59376,13 +59408,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.2857142857142857,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -59611,13 +59645,15 @@
           "value": "Ital"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.2857142857142857,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Ital → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -60121,13 +60157,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.4423076923076923,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -60348,13 +60386,15 @@
           "value": "Osma"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.4423076923076923,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Osma → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -66889,13 +66929,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.6698113207547169,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -67114,13 +67156,15 @@
           "value": "Sora"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.6698113207547169,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Sora → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "partially",
@@ -82709,13 +82753,21 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.9411764705882353,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 5,
+          "notes": "5 inputtable combining mark(s) on a alphabet base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𖫰",
+            "𖫱",
+            "𖫲",
+            "𖫳",
+            "𖫴"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -82939,13 +82991,15 @@
           "value": "Bass"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.9411764705882353,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Bass → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "partially",
@@ -84598,13 +84652,32 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 16,
+          "notes": "16 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𑰯",
+            "𑰰",
+            "𑰱",
+            "𑰲",
+            "𑰳",
+            "𑰴",
+            "𑰵",
+            "𑰶",
+            "𑰸",
+            "𑰹",
+            "𑰺",
+            "𑰻",
+            "𑰼",
+            "𑰽",
+            "𑰾",
+            "𑰿"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -84821,13 +84894,15 @@
           "value": "Bhks"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Bhks → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -91219,13 +91294,18 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 2,
+          "notes": "2 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "ᝒ",
+            "ᝓ"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -91449,13 +91529,15 @@
           "value": "Buhd"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Buhd → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -102467,13 +102549,31 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.9642857142857143,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 15,
+          "notes": "15 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𑤰",
+            "𑤱",
+            "𑤲",
+            "𑤳",
+            "𑤴",
+            "𑤵",
+            "𑤷",
+            "𑤸",
+            "𑤻",
+            "𑤼",
+            "𑤽",
+            "𑤾",
+            "𑥀",
+            "𑥂",
+            "𑥃"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -102675,13 +102775,15 @@
           "value": "Diak"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.9642857142857143,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Diak → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -102810,13 +102912,31 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 15,
+          "notes": "15 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𑠬",
+            "𑠭",
+            "𑠮",
+            "𑠯",
+            "𑠰",
+            "𑠱",
+            "𑠲",
+            "𑠳",
+            "𑠴",
+            "𑠵",
+            "𑠶",
+            "𑠷",
+            "𑠸",
+            "𑠹",
+            "𑠺"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -103032,13 +103152,15 @@
           "value": "Dogr"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Dogr → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -107732,13 +107854,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.53125,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -107956,13 +108080,15 @@
           "value": "Osma"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.53125,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Osma → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -109192,13 +109318,15 @@
           "value": "mixed"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.6039603960396039,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -109421,13 +109549,15 @@
           "value": "Elba"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.6039603960396039,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Elba → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -169142,13 +169272,26 @@
           "value": "mixed"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.7611940298507462,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 10,
+          "notes": "10 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𑶊",
+            "𑶋",
+            "𑶌",
+            "𑶍",
+            "𑶎",
+            "𑶐",
+            "𑶑",
+            "𑶓",
+            "𑶔",
+            "𑶗"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -169371,13 +169514,15 @@
           "value": "Gong"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.7611940298507462,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Gong → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -169507,13 +169652,26 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.6981132075471699,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 10,
+          "notes": "10 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𑶊",
+            "𑶋",
+            "𑶌",
+            "𑶍",
+            "𑶎",
+            "𑶐",
+            "𑶑",
+            "𑶓",
+            "𑶔",
+            "𑶗"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -169730,13 +169888,15 @@
           "value": "Gong"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.6981132075471699,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Gong → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -172901,13 +173061,20 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.9583333333333334,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 4,
+          "notes": "4 inputtable combining mark(s) on a alphabet base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𐴤",
+            "𐴥",
+            "𐴦",
+            "𐴧"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -173109,13 +173276,15 @@
           "value": "Rohg"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.9583333333333334,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Rohg → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -173245,13 +173414,20 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 4,
+          "notes": "4 inputtable combining mark(s) on a alphabet base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𐴤",
+            "𐴥",
+            "𐴦",
+            "𐴧"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -173467,13 +173643,15 @@
           "value": "Rohg"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Rohg → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -181071,13 +181249,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "abjad base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -181279,13 +181459,15 @@
           "value": "Phli"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Phli → abjad family",
+          "provenanceTier": "content-derived",
+          "value": "abjad"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -187903,13 +188085,27 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.8620689655172413,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 11,
+          "notes": "11 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𑼴",
+            "𑼵",
+            "𑼶",
+            "𑼷",
+            "𑼸",
+            "𑼹",
+            "𑼺",
+            "𑼾",
+            "𑼿",
+            "𑽀",
+            "𑽂"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -188111,13 +188307,15 @@
           "value": "Kawi"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.8620689655172413,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Kawi → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -189358,13 +189556,29 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 13,
+          "notes": "13 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𐨁",
+            "𐨂",
+            "𐨃",
+            "𐨅",
+            "𐨆",
+            "𐨌",
+            "𐨍",
+            "𐨎",
+            "𐨏",
+            "𐨸",
+            "𐨹",
+            "𐨺",
+            "𐨿"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -189584,13 +189798,15 @@
           "value": "Khar"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Khar → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -190883,13 +191099,29 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 13,
+          "notes": "13 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𑈬",
+            "𑈭",
+            "𑈮",
+            "𑈯",
+            "𑈰",
+            "𑈱",
+            "𑈲",
+            "𑈳",
+            "𑈴",
+            "𑈵",
+            "𑈶",
+            "𑈷",
+            "𑈾"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -191109,13 +191341,15 @@
           "value": "Khoj"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Khoj → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -191247,13 +191481,28 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.896551724137931,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 12,
+          "notes": "12 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𑋟",
+            "𑋠",
+            "𑋡",
+            "𑋢",
+            "𑋣",
+            "𑋤",
+            "𑋥",
+            "𑋦",
+            "𑋧",
+            "𑋨",
+            "𑋩",
+            "𑋪"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -191473,13 +191722,15 @@
           "value": "Sind"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.896551724137931,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Sind → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -191611,13 +191862,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.6417910447761195,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "abugida base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -191841,13 +192094,15 @@
           "value": "Krai"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.6417910447761195,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Krai → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -203719,13 +203974,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.30952380952380953,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -203947,13 +204204,15 @@
           "value": "Lyci"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.30952380952380953,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Lyci → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -204084,13 +204343,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.35,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -204308,13 +204569,15 @@
           "value": "Lydi"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.35,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Lydi → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -204823,13 +205086,20 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 4,
+          "notes": "4 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𑻳",
+            "𑻴",
+            "𑻵",
+            "𑻶"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -205049,13 +205319,15 @@
           "value": "Maka"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Maka → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -207583,13 +207855,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -207805,13 +208079,15 @@
           "value": "Mong"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Mong → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -208316,13 +208592,19 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.5862068965517242,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 3,
+          "notes": "3 inputtable combining mark(s) on a abjad base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𐫥",
+            "𐫦",
+            "︀"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -208524,13 +208806,15 @@
           "value": "Mani"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.5862068965517242,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Mani → abjad family",
+          "provenanceTier": "content-derived",
+          "value": "abjad"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -209029,13 +209313,52 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 36,
+          "notes": "36 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𑲒",
+            "𑲓",
+            "𑲔",
+            "𑲕",
+            "𑲖",
+            "𑲗",
+            "𑲘",
+            "𑲙",
+            "𑲚",
+            "𑲛",
+            "𑲜",
+            "𑲝",
+            "𑲞",
+            "𑲟",
+            "𑲠",
+            "𑲡",
+            "𑲢",
+            "𑲣",
+            "𑲤",
+            "𑲥",
+            "𑲦",
+            "𑲧",
+            "𑲩",
+            "𑲪",
+            "𑲫",
+            "𑲬",
+            "𑲭",
+            "𑲮",
+            "𑲯",
+            "𑲰",
+            "𑲱",
+            "𑲲",
+            "𑲳",
+            "𑲴",
+            "𑲵",
+            "𑲶"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -209238,13 +209561,15 @@
           "value": "Marc"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Marc → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -209373,13 +209698,36 @@
           "value": "mixed"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.945,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 20,
+          "notes": "20 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "ऺ",
+            "ॖ",
+            "ॗ",
+            "𑴱",
+            "𑴲",
+            "𑴳",
+            "𑴴",
+            "𑴵",
+            "𑴶",
+            "𑴺",
+            "𑴼",
+            "𑴽",
+            "𑴿",
+            "𑵀",
+            "𑵁",
+            "𑵂",
+            "𑵃",
+            "𑵄",
+            "𑵅",
+            "𑵇"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -209599,13 +209947,15 @@
           "value": "Gonm"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.945,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Gonm → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -215345,13 +215695,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "abugida base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -215572,13 +215924,15 @@
           "value": "Mult"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Mult → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -216860,13 +217214,20 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.7619047619047619,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 4,
+          "notes": "4 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𞓬",
+            "𞓭",
+            "𞓮",
+            "𞓯"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -217068,13 +217429,15 @@
           "value": "Nagm"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.7619047619047619,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Nagm → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -217598,13 +217961,19 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.9565217391304348,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 3,
+          "notes": "3 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𑧞",
+            "𑧟",
+            "𑧠"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -217807,13 +218176,15 @@
           "value": "Nand"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.9565217391304348,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Nand → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -228576,13 +228947,23 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.8709677419354839,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 7,
+          "notes": "7 inputtable combining mark(s) on a alphabet base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𞄰",
+            "𞄱",
+            "𞄲",
+            "𞄳",
+            "𞄴",
+            "𞄵",
+            "𞄶"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -228795,13 +229176,15 @@
           "value": "Hmnp"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.8709677419354839,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Hmnp → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "partially",
@@ -230814,13 +231197,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.752,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -231041,13 +231426,15 @@
           "value": "Hung"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.752,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Hung → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "partially",
@@ -231518,13 +231905,28 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 12,
+          "notes": "12 inputtable combining mark(s) on a alphabet base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "̀",
+            "̆",
+            "̇",
+            "̈",
+            "̓",
+            "҃",
+            "⃛",
+            "𐍶",
+            "𐍷",
+            "𐍸",
+            "𐍹",
+            "𐍺"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -231745,13 +232147,15 @@
           "value": "Perm"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Perm → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -232243,13 +232647,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.6547619047619048,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "abjad base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -232470,13 +232876,15 @@
           "value": "Sogo"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.6547619047619048,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Sogo → abjad family",
+          "provenanceTier": "content-derived",
+          "value": "abjad"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -232605,13 +233013,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.06808510638297871,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -232824,13 +233234,15 @@
           "value": "Orkh"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.06808510638297871,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Orkh → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -232961,13 +233373,20 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 4,
+          "notes": "4 inputtable combining mark(s) on a abjad base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𐾂",
+            "𐾃",
+            "𐾄",
+            "𐾅"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -233183,13 +233602,15 @@
           "value": "Ougr"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Ougr → abjad family",
+          "provenanceTier": "content-derived",
+          "value": "abjad"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -237434,13 +237855,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -237642,13 +238065,15 @@
           "value": "Pauc"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Pauc → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -266848,13 +267273,34 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 18,
+          "notes": "18 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𑖯",
+            "𑖰",
+            "𑖱",
+            "𑖲",
+            "𑖳",
+            "𑖴",
+            "𑖵",
+            "𑖸",
+            "𑖹",
+            "𑖺",
+            "𑖻",
+            "𑖼",
+            "𑖽",
+            "𑖾",
+            "𑖿",
+            "𑗀",
+            "𑗜",
+            "𑗝"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -267071,13 +267517,15 @@
           "value": "Sidd"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Sidd → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -289405,13 +289853,36 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 20,
+          "notes": "20 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "ᰤ",
+            "ᰥ",
+            "ᰦ",
+            "ᰧ",
+            "ᰨ",
+            "ᰩ",
+            "ᰪ",
+            "ᰫ",
+            "ᰬ",
+            "ᰭ",
+            "ᰮ",
+            "ᰯ",
+            "ᰰ",
+            "ᰱ",
+            "ᰲ",
+            "ᰳ",
+            "ᰴ",
+            "ᰵ",
+            "ᰶ",
+            "᰷"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -289627,13 +290098,15 @@
           "value": "Lepc"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Lepc → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -290542,13 +291015,15 @@
           "value": "mixed"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -290751,13 +291226,15 @@
           "value": "Lisu"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Lisu → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -290886,13 +291363,15 @@
           "value": "mixed"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -291098,13 +291577,15 @@
           "value": "Lisu"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Lisu → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -293907,13 +294388,14 @@
           "value": "mixed"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "undetermined",
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notApplicable": true,
+          "notes": "script family syllabary composes whole syllables/morphemes; a combining-mark repertoire does not apply",
+          "provenanceTier": "content-derived"
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -294134,13 +294616,15 @@
           "value": "Mend"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.6754385964912281,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Mend → syllabary family",
+          "provenanceTier": "content-derived",
+          "value": "syllabary"
         },
         "spare-key-budget": {
           "analysisOutcome": "partially",
@@ -306836,13 +307320,25 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 9,
+          "notes": "9 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "ꪰ",
+            "ꪲ",
+            "ꪳ",
+            "ꪴ",
+            "ꪷ",
+            "ꪸ",
+            "ꪾ",
+            "꪿",
+            "꫁"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -307062,13 +307558,15 @@
           "value": "Tavt"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Tavt → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -307963,13 +308461,21 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 5,
+          "notes": "5 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "ꪰ",
+            "ꪳ",
+            "ꪷ",
+            "ꪾ",
+            "꫁"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -308188,13 +308694,15 @@
           "value": "Tavt"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Tavt → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -320003,13 +320511,43 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.7580645161290323,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 27,
+          "notes": "27 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𑩑",
+            "𑩒",
+            "𑩓",
+            "𑩔",
+            "𑩕",
+            "𑩖",
+            "𑩗",
+            "𑩘",
+            "𑩙",
+            "𑩚",
+            "𑩛",
+            "𑪊",
+            "𑪋",
+            "𑪌",
+            "𑪍",
+            "𑪎",
+            "𑪏",
+            "𑪐",
+            "𑪑",
+            "𑪒",
+            "𑪓",
+            "𑪔",
+            "𑪕",
+            "𑪖",
+            "𑪗",
+            "𑪘",
+            "𑪙"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -320229,13 +320767,15 @@
           "value": "Soyo"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.7580645161290323,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Soyo → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -325294,13 +325834,18 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 2,
+          "notes": "2 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "ᝲ",
+            "ᝳ"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -325519,13 +326064,15 @@
           "value": "Tagb"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Tagb → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -334535,13 +335082,15 @@
           "value": "mixed"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.5398230088495575,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -334764,13 +335313,15 @@
           "value": "Todr"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.5398230088495575,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Todr → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -336373,13 +336924,17 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "1 inputtable combining mark(s) on a alphabet base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𞊮"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -336601,13 +337156,15 @@
           "value": "Toto"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Toto → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -337117,13 +337674,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.9285714285714286,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "abjad base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -337325,13 +337884,15 @@
           "value": "Ugar"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.9285714285714286,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Ugar → abjad family",
+          "provenanceTier": "content-derived",
+          "value": "abjad"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -344129,13 +344690,15 @@
           "value": "mixed"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -344360,13 +344923,15 @@
           "value": "Wara"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Wara → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -346381,13 +346946,15 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
+          "confidenceClass": "confident",
+          "consistency": 1,
           "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "notes": "alphabet base with no inputtable combining marks",
+          "provenanceTier": "content-derived",
+          "value": []
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "fully",
@@ -346607,13 +347174,15 @@
           "value": "Yezi"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "fully",
+          "analyzedCoverage": 1,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Yezi → alphabet family",
+          "provenanceTier": "content-derived",
+          "value": "alphabet"
         },
         "spare-key-budget": {
           "analysisOutcome": "fully",
@@ -348638,13 +349207,38 @@
           "value": "caseless"
         },
         "combining-mark-repertoire": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.8181818181818181,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no concretely-scripted output (empty/opaque-only or parse failure); combining-mark repertoire undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 22,
+          "notes": "22 inputtable combining mark(s) on a abugida base",
+          "provenanceTier": "content-derived",
+          "value": [
+            "𑨁",
+            "𑨂",
+            "𑨃",
+            "𑨄",
+            "𑨅",
+            "𑨆",
+            "𑨇",
+            "𑨈",
+            "𑨉",
+            "𑨊",
+            "𑨳",
+            "𑨴",
+            "𑨵",
+            "𑨶",
+            "𑨷",
+            "𑨸",
+            "𑨹",
+            "𑨻",
+            "𑨼",
+            "𑨽",
+            "𑨾",
+            "𑩇"
+          ]
         },
         "declared-bcp47-tags": {
           "analysisOutcome": "partially",
@@ -348865,13 +349459,15 @@
           "value": "Zanb"
         },
         "script-family": {
-          "analysisOutcome": "fallback-only",
-          "analyzedCoverage": 0,
+          "analysisOutcome": "partially",
+          "analyzedCoverage": 0.8181818181818181,
           "confidence": null,
-          "confidenceClass": "undetermined",
-          "evidenceSize": 0,
-          "notes": "no dominant script or unmapped ISO-15924 code (or parse failure); script family undetermined",
-          "provenanceTier": "default-fallback"
+          "confidenceClass": "confident",
+          "consistency": 1,
+          "evidenceSize": 1,
+          "notes": "dominant script Zanb → abugida family",
+          "provenanceTier": "content-derived",
+          "value": "abugida"
         },
         "spare-key-budget": {
           "analysisOutcome": "fallback-only",
@@ -348990,9 +349586,9 @@
         "undetermined": 0
       },
       "combining-mark-repertoire": {
-        "content": 845,
+        "content": 903,
         "declared": 0,
-        "fallback": 82,
+        "fallback": 24,
         "undetermined": 0
       },
       "declared-bcp47-tags": {
@@ -349104,9 +349700,9 @@
         "undetermined": 2
       },
       "script-family": {
-        "content": 845,
+        "content": 903,
         "declared": 0,
-        "fallback": 82,
+        "fallback": 24,
         "undetermined": 0
       },
       "spare-key-budget": {
@@ -349220,7 +349816,7 @@
       },
       {
         "file": "utilities/facet-index/data/iso15924-script-family.json",
-        "sha256": "ddd8faa65c4cd35b4ca150133ea654a1bab1bcc464ca51b20f01dc8e49bc7d99"
+        "sha256": "67bba11242cbd566824854689f51be2b0d1694c3d7ef4baf1a3bcb199c517eec"
       },
       {
         "file": "scripts/langtags-version.json",
