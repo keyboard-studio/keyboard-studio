@@ -3,7 +3,7 @@
   "specName": "CLDR/SLDR exemplars",
   "branch": "044-cldr-sldr-exemplars",
   "currentStep": "specify",
-  "status": "specified",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -11,6 +11,14 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-07-20T05:29:27.025Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-27T18:32:45.561Z"
     }
-  ]
+  ],
+  "telemetryInstanceId": "f468c429-9229-4781-9c7a-9d9d9fd0b63a"
 }
