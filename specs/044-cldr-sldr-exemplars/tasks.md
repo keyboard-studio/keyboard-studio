@@ -139,7 +139,7 @@ Monorepo (`pnpm -r`). Engine library `packages/engine/src/`, studio SPA `package
 
 **Independent Test**: For `ewo-Latn`, reach the discovery page, press Continue then Done — the alphabet is recorded with 0 characters typed (SC-010). Choose option 2 instead and the alphabet contains only what the author typed (SC-009).
 
-> **GATE — Content sign-off required before T046 (Article VI split).** The offer's wording and what the accept covers (Engine's proposed default: `main` only, with `auxiliary`/`punctuation`/`numbers` offered separately in their 047 sections) are **Content-owned** per the §12/§13 team split. Do not implement the copy or the tier scope without that sign-off; the store and plumbing tasks below are Engine-owned and unblocked.
+> **GATE — Content sign-off: CLEARED (maintainer, 2026-07-27).** The offer's wording and what the accept covers are **Content-owned** per the §12/§13 team split. The maintainer signed off on the Engine defaults as shipped: `main` tier only (with `auxiliary`/`punctuation`/`numbers` reaching the author through their own 047 breakdown sections), and the copy now in the catalogs. Wording remains a catalog edit — every user-visible string is behind an i18n id, so revising it later needs no code change.
 
 ### Tests for the prefill
 
@@ -183,7 +183,7 @@ Monorepo (`pnpm -r`). Engine library `packages/engine/src/`, studio SPA `package
 - **US3 (Phase 3)**: depends on Phase 1 (pins) + Phase 2 (parser + candidates). **BLOCKS US1 and US2** — the index is their substrate
 - **US1 (Phase 4)**: depends on Phase 3
 - **US2 (Phase 5)**: depends on Phase 2 (T008 does most of the data work) and Phase 3; independently testable from US1
-- **Prefill (Phase 6)**: depends on US1 (needs a real `SourcedInventory`). T046/T047 are unblocked; **T048–T052 are gated on Content sign-off**
+- **Prefill (Phase 6)**: depends on US1 (needs a real `SourcedInventory`). T046/T047 are unblocked; T048–T052 were gated on Content sign-off, **cleared by the maintainer 2026-07-27** (see the gate note in Phase 6)
 - **Polish (Phase 7)**: depends on all desired stories
 
 ### Within Each Story

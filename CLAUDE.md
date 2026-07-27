@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-Package manager is **pnpm 9** (Node ≥ 22 — `@lingui/cli` uses `node:fs.globSync`). Run from the repo root unless noted.
+Package manager is **pnpm 9** (Node **≥ 22.19.0** — `@lingui/cli` uses `node:fs.globSync`, and its CLI entry is gated on `import.meta.main`, which does not exist before 22.19. On an older Node every `lingui` subcommand exits 0 having printed nothing and written nothing — `messages:extract` appears to succeed while producing no diff, and `i18n-catalog-lint` then misreports every committed catalog as an orphan. The floor is in the root [package.json](package.json) `engines` and [.nvmrc](.nvmrc)). Run from the repo root unless noted.
 
 | Task | Command |
 |------|---------|

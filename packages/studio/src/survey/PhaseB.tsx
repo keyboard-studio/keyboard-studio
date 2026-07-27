@@ -21,7 +21,7 @@
 
 import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { plural } from "@lingui/core/macro";
+import { msg, plural } from "@lingui/core/macro";
 import type { SurveyAnswer, SurveyPhaseResult, LintFinding, PlacementMap } from "@keyboard-studio/contracts";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
@@ -1539,6 +1539,27 @@ const UNCONFIRMED_CONFIDENCES = new Set([
   "tentative",
 ]);
 
+// The attribution wordings as extractable descriptors.
+//
+// These MUST be `msg` macro descriptors rather than inline `t({ id, message })`
+// objects: `attributionText` below receives `t` as a PARAMETER, and the babel
+// macro only rewrites `t(...)` where it can see the `useLingui()` binding in
+// the same scope. An inline object there still renders correctly at runtime
+// (it reaches `i18n._` and falls back to `message`), but the extractor never
+// sees the id, so the string cannot be translated. Three of these were rescued
+// by accident — `ExemplarAttribution` below repeats them as <Trans> under the
+// same ids — but `fromText` has no component twin and was invisible to Crowdin.
+const MSG_FROM_CLDR = msg({ id: "survey.phaseB.exemplars.fromCldr", message: "from CLDR" });
+const MSG_FROM_TEXT = msg({
+  id: "survey.phaseB.exemplars.fromText",
+  message: "from your text sample",
+});
+const MSG_FROM_SLDR_UNCONFIRMED = msg({
+  id: "survey.phaseB.exemplars.fromSldrUnconfirmed",
+  message: "from SLDR (machine-generated — please check)",
+});
+const MSG_FROM_SLDR = msg({ id: "survey.phaseB.exemplars.fromSldr", message: "from SLDR" });
+
 /**
  * The same attribution as a plain string, for a `title` / `aria-label` where a
  * component cannot go. Kept beside `ExemplarAttribution` so the two wordings
@@ -1550,18 +1571,15 @@ function attributionText(
   t: ReturnType<typeof useLingui>["t"],
 ): string {
   if (source === "cldr") {
-    return t({ id: "survey.phaseB.exemplars.fromCldr", message: "from CLDR" });
+    return t(MSG_FROM_CLDR);
   }
   if (source === "text") {
-    return t({ id: "survey.phaseB.exemplars.fromText", message: "from your text sample" });
+    return t(MSG_FROM_TEXT);
   }
   if (confidence !== undefined && UNCONFIRMED_CONFIDENCES.has(confidence)) {
-    return t({
-      id: "survey.phaseB.exemplars.fromSldrUnconfirmed",
-      message: "from SLDR (machine-generated — please check)",
-    });
+    return t(MSG_FROM_SLDR_UNCONFIRMED);
   }
-  return t({ id: "survey.phaseB.exemplars.fromSldr", message: "from SLDR" });
+  return t(MSG_FROM_SLDR);
 }
 
 function ExemplarAttribution({

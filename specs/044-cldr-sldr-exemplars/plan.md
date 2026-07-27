@@ -77,14 +77,15 @@ step, prebuild scripts
 | **III. Single working copy** | ✅ PASS | Prefill mutates the existing Phase B draft store; no second working copy, no intermediate serialization. |
 | **IV. Validator layering / one debounce** | ✅ PASS | No validator or debounce involvement. Index lookup is synchronous and outside the 300 ms cycle. |
 | **V. VirtualFS only during authoring** | ✅ PASS — **and improved** | Removes the last author-time network dependency in this path. All fetching moves to prebuild; nothing is written to host disk during authoring. |
-| **VI. Team boundaries** | ⚠️ **SPLIT — declare both** | *Engine* owns fetch/codegen/pin/index + the sourcing service + the store seeding. *Content* owns the proposal copy, the tier section labels, and **the decision of which tiers arrive pre-ticked** (R8). Content sign-off required on that split before implementation. |
+| **VI. Team boundaries** | ✅ PASS — **split declared, signed off 2026-07-27** | *Engine* owns fetch/codegen/pin/index + the sourcing service + the store seeding. *Content* owns the proposal copy, the tier section labels, and **the decision of which tiers arrive pre-ticked** (R8). The maintainer signed off on Engine's proposed default (`main` tier only) and the shipped copy. |
 | **VII. Out of scope for v1** | ✅ PASS | Enumeration only (FR-014): no wordlists, frequency corpora, or prediction. No LDML *output* — SLDR LDML is read as a data source, which is not "LDML output". |
 | **VIII. House conventions** | ✅ PASS | Codegen logs use `[OK]`/`[WARN]`/`[ERROR]`; no emoji; docs use markdown links; no issue numbers in shipped code. |
 
 **Post-Phase 1 re-evaluation**: no new violations. The one flagged item (Article VI
-split) is a sign-off requirement, not a violation — no boundary is crossed, both sides
-are declared. See [Complexity Tracking](#complexity-tracking) for the two items that
-need explicit user ratification.
+split) was a sign-off requirement, not a violation — no boundary is crossed, both sides
+are declared — and the maintainer cleared it on 2026-07-27. See
+[Complexity Tracking](#complexity-tracking) for the two items that need explicit user
+ratification.
 
 ## Project Structure
 
@@ -172,8 +173,9 @@ Sequencing that `/speckit-tasks` should preserve:
 3. **US1 (SLDR coverage)** — precedence + attribution over the built index.
 4. **US2 (punctuation/numbers tiers)** — mostly free once R0 lands; the work is the 047
    section wiring.
-5. **Prefill (FR-016/017)** — last. The R8 delta is **approved and in the spec**; the one
-   remaining gate is the Content sign-off on tier tick-state (Article VI).
+5. **Prefill (FR-016/017)** — last. The R8 delta is **approved and in the spec**; the
+   Content sign-off on tier tick-state (Article VI) was cleared by the maintainer on
+   2026-07-27, so no gates remain.
 
 ## Complexity Tracking
 
