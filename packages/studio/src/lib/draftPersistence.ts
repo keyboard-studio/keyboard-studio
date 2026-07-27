@@ -587,7 +587,20 @@ export function loadDraft(projectKey: string): boolean {
     const restoredFont = isPhaseBFontValue(envelope.phaseBDraft?.selectedFont)
       ? envelope.phaseBDraft.selectedFont
       : DEFAULT_PHASE_B_FONT;
-    applyPhaseBDraftSnapshot({ chars: restoredChars, selectedFont: restoredFont });
+    // Exemplar-attested `{..}` clusters, restored the same tolerant way: a
+    // record written before they were recorded has no field, and a malformed
+    // one degrades to none rather than discarding an otherwise-good draft.
+    // Kept OUT of `chars` on the way back in, exactly as on the way out — the
+    // clusters' constituent letters are the alphabet; the clusters are a note
+    // about it.
+    const restoredDigraphs = Array.isArray(envelope.phaseBDraft?.exemplarDigraphs)
+      ? envelope.phaseBDraft.exemplarDigraphs.filter((d): d is string => typeof d === "string")
+      : [];
+    applyPhaseBDraftSnapshot({
+      chars: restoredChars,
+      exemplarDigraphs: restoredDigraphs,
+      selectedFont: restoredFont,
+    });
 
     _draftRestoredThisBoot = true;
     return true;

@@ -98,6 +98,18 @@ export interface SurveySession {
    */
   confirmedInventory: string[];
   /**
+   * Deduped union of all phases' `attestedDigraphs` — the multi-letter units
+   * the exemplar sources wrote as `{..}` clusters. Held ALONGSIDE
+   * `confirmedInventory`, never inside it: the constituent letters are what
+   * gets typed and they are already in the inventory; this is the record that
+   * they also form a unit. See {@link SurveyPhaseResult.attestedDigraphs}.
+   *
+   * **Additive optional** — absent when no phase attested a cluster, so
+   * existing literal `SurveySession` objects stay valid (unlike
+   * `confirmedInventory`, which is required).
+   */
+  attestedDigraphs?: string[];
+  /**
    * Store-wise merged three-store alphabet across all phases (spec 046):
    * deduped union of `bases` (NFC-normalised) and `marks` (compared/deduped
    * as-authored — combining marks are not independently normalisable the
@@ -160,6 +172,22 @@ export function mergePhaseResults(
     for (const raw of phase.confirmedInventory ?? []) pushInventory(raw);
   }
 
+  // Attested multi-letter clusters: same dedupe/normalise rule as the
+  // inventory, but a SEPARATE list and a separate `seen` set — a cluster must
+  // never suppress or be suppressed by a single character, and must never leak
+  // into `confirmedInventory` (see SurveyPhaseResult.attestedDigraphs).
+  const seenDigraphs = new Set<string>();
+  const attestedDigraphs: string[] = [];
+  for (const phase of phaseResults) {
+    for (const raw of phase.attestedDigraphs ?? []) {
+      const d = raw.normalize("NFC").trim();
+      if (d.length > 0 && !seenDigraphs.has(d)) {
+        seenDigraphs.add(d);
+        attestedDigraphs.push(d);
+      }
+    }
+  }
+
   // Three-store alphabet (spec 046): store-wise deduped union across phases;
   // stacks dedupe on their exact ordered shape; declared roles are last-wins.
   const alphabet = mergeAlphabets(phaseResults.map((p) => p.alphabet));
@@ -188,6 +216,7 @@ export function mergePhaseResults(
     selectedPatternIds,
     assignments,
     confirmedInventory,
+    ...(attestedDigraphs.length > 0 ? { attestedDigraphs } : {}),
     ...(alphabet !== undefined ? { alphabet } : {}),
     ...(marksWorklist !== undefined ? { marksWorklist } : {}),
     ...(marksOutputForm !== undefined ? { marksOutputForm } : {}),

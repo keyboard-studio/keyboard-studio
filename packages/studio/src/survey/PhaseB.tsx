@@ -958,6 +958,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   const selectedFont = usePhaseBDraftStore((s) => s.selectedFont);
   const setSelectedFont = usePhaseBDraftStore((s) => s.setSelectedFont);
   const provenance = usePhaseBDraftStore((s) => s.provenance);
+  const exemplarDigraphs = usePhaseBDraftStore((s) => s.exemplarDigraphs);
   const removeChar = usePhaseBDraftStore((s) => s.remove);
   const doneDisabled = chars.length === 0;
 
@@ -1124,6 +1125,10 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
               phase: "B",
               answers: [],
               confirmedInventory: nfcDedup(chars, derivedUppercases),
+              // Alongside the inventory, never inside it: the cluster's own
+              // letters are already in `chars`, so a keyboard needs no extra
+              // key for "dz" — this is the record that d+z also form a unit.
+              ...(exemplarDigraphs.length > 0 ? { attestedDigraphs: exemplarDigraphs } : {}),
             });
           }}
           className="ks-focus-ring ks-hit-target"

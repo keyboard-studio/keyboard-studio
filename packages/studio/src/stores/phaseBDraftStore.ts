@@ -106,6 +106,24 @@ export interface PhaseBDraftState {
   provenance: Record<string, DraftProvenance>;
 
   /**
+   * Multi-letter units the exemplar source wrote as `{..}` clusters — Ewondo's
+   * `dz`/`kp`/`ng`/`nk`/`ts`.
+   *
+   * A SIBLING of `chars`, never a member of it. The letters that make up a
+   * cluster are what the author types, and the exemplar parse already
+   * contributes them individually; the cluster itself is a fact ABOUT the
+   * orthography, not a character to place on a key. It is recorded here so it
+   * survives to the phase result (and from there to the session) instead of
+   * being discarded with the parse — see
+   * `SurveyPhaseResult.attestedDigraphs` for what later operations want it for.
+   *
+   * Accumulates across seeds (proposal sources union, like `provenance`), and
+   * takes no part in the pick/derive model: nothing downstream of `picks`
+   * reads it.
+   */
+  exemplarDigraphs: string[];
+
+  /**
    * Proposed characters the author removed. STICKY: `seedFromProposal` must
    * never re-propose these, so declining a suggestion once is not undone by a
    * later re-derivation. Removing an AUTHORED character does not add it here —
@@ -376,6 +394,7 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
   controls: [],
   lastPick: null,
   provenance: {},
+  exemplarDigraphs: [],
   rejected: [],
   proposalConfidence: {},
   exemplarMethodDeclined: false,
@@ -449,7 +468,16 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
       [],
       mainChars.flatMap((ch) => casePairOf(ch, bcp47)),
     );
-    set({ proposalConfidence: { ...get().proposalConfidence, [inv.source]: inv.confidence } });
+    // The source's `{..}` clusters ride alongside, NOT into the alphabet: the
+    // parse already contributed each cluster's constituent letters to
+    // `inv.characters`, so "dz" would be a third thing to place on a key when
+    // the author only needs `d` and `z`. Union across seeds, so applying a
+    // second source (or re-applying via the page-2 affordance) accumulates
+    // rather than replaces — matching how provenance treats proposal sources.
+    set({
+      proposalConfidence: { ...get().proposalConfidence, [inv.source]: inv.confidence },
+      exemplarDigraphs: nfcDedup(get().exemplarDigraphs, inv.digraphs),
+    });
     for (const ch of proposed) {
       addWithProvenance(set, get, ch, inv.source);
     }
@@ -472,6 +500,7 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
       controls: [],
       lastPick: null,
       provenance: {},
+      exemplarDigraphs: [],
       proposalConfidence: {},
       // `rejected` and `exemplarMethodDeclined` deliberately SURVIVE a reset:
       // both record a decision the author made about proposals, and reset() runs
@@ -564,6 +593,12 @@ export interface PhaseBDraftSnapshot {
   declaredRoles?: Record<string, DeclaredRole>;
   /** Per-character origin (spec 044). Absent in pre-044 snapshots. */
   provenance?: Record<string, DraftProvenance>;
+  /**
+   * Exemplar-attested `{..}` clusters. Absent in snapshots taken before they
+   * were recorded. Restored directly rather than through `setAll` — they are
+   * not picks and must not reach the alphabet.
+   */
+  exemplarDigraphs?: string[];
   /** Proposals the author removed. Absent in pre-044 snapshots. */
   rejected?: string[];
   /** Per-source confidence of the proposals seeded. Absent in pre-044 snapshots. */
@@ -580,6 +615,7 @@ export function snapshotPhaseBDraft(): PhaseBDraftSnapshot {
     chars: s.chars,
     declaredRoles: s.declaredRoles,
     provenance: s.provenance,
+    exemplarDigraphs: s.exemplarDigraphs,
     rejected: s.rejected,
     proposalConfidence: s.proposalConfidence,
     exemplarMethodDeclined: s.exemplarMethodDeclined,
@@ -602,6 +638,7 @@ export function applyPhaseBDraftSnapshot(snapshot: PhaseBDraftSnapshot): void {
   usePhaseBDraftStore.setState({
     declaredRoles: snapshot.declaredRoles ?? {},
     provenance: snapshot.provenance ?? {},
+    exemplarDigraphs: snapshot.exemplarDigraphs ?? [],
     rejected: snapshot.rejected ?? [],
     proposalConfidence: snapshot.proposalConfidence ?? {},
     exemplarMethodDeclined: snapshot.exemplarMethodDeclined ?? false,

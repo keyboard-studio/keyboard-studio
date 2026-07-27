@@ -215,6 +215,8 @@ describe("phaseBDraftStore — snapshotPhaseBDraft/applyPhaseBDraftSnapshot roun
       // Spec 044 additions: setAll attributes everything it does not already
       // know to the author, and the sticky proposal decisions start clear.
       provenance: { a: "author", b: "author", "ɛ": "author" },
+      // No proposal was seeded, so no source attested any `{..}` cluster.
+      exemplarDigraphs: [],
       rejected: [],
       proposalConfidence: {},
       exemplarMethodDeclined: false,
@@ -428,14 +430,18 @@ describe("phaseBDraftStore — category split (spec 047)", () => {
 // ---------------------------------------------------------------------------
 
 /** Minimal SourcedInventory fixture — only what seedFromProposal reads. */
-function inventory(chars: string[], source: "cldr" | "sldr" = "cldr"): SourcedInventory {
+function inventory(
+  chars: string[],
+  source: "cldr" | "sldr" = "cldr",
+  digraphs: string[] = [],
+): SourcedInventory {
   const confidence = source === "cldr" ? "approved" : "generated";
   return {
     resolvedTag: "test",
     source,
     confidence,
     characters: chars.map((char) => ({ char, tier: "main" as const, source, confidence })),
-    digraphs: [],
+    digraphs,
   };
 }
 
@@ -460,6 +466,33 @@ describe("phaseBDraftStore — seedFromProposal (spec 044 FR-016)", () => {
     expect(s.chars).toContain("A");
     expect(s.chars).toContain("Ŋ");
     expect(s.provenance["A"]).toBe("cldr");
+  });
+
+  it("records the source's digraph clusters WITHOUT putting them in the alphabet", () => {
+    // Ewondo's shape: the parse contributes d/z/k/p as typable letters and the
+    // clusters separately. "dz" must never become a character to place on a key.
+    usePhaseBDraftStore
+      .getState()
+      .seedFromProposal(inventory(["d", "z", "k", "p"], "cldr", ["dz", "kp"]));
+    const s = usePhaseBDraftStore.getState();
+    expect(s.exemplarDigraphs).toEqual(["dz", "kp"]);
+    expect(s.chars).not.toContain("dz");
+    expect(s.chars).not.toContain("kp");
+    expect(s.bases).not.toContain("dz");
+    expect(s.chars).toContain("d");
+    expect(s.chars).toContain("z");
+  });
+
+  it("unions digraphs across seeds rather than replacing them", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["a"], "cldr", ["dz"]));
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["b"], "sldr", ["dz", "ng"]));
+    expect(usePhaseBDraftStore.getState().exemplarDigraphs).toEqual(["dz", "ng"]);
+  });
+
+  it("clears digraphs on reset, like the rest of the proposal payload", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["a"], "cldr", ["dz"]));
+    usePhaseBDraftStore.getState().reset();
+    expect(usePhaseBDraftStore.getState().exemplarDigraphs).toEqual([]);
   });
 
   it("is idempotent", () => {
