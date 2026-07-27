@@ -45,9 +45,22 @@
 import { create } from "zustand";
 import type { AttestedStack, ConfirmedAlphabet, DeclaredRole } from "@keyboard-studio/contracts";
 import { makeConfirmedAlphabet } from "@keyboard-studio/contracts";
+import type { SourcedInventory } from "@keyboard-studio/engine";
 import { decomposeGrapheme, isCombiningMarkChar, isPrivateUseCodePoint, glyphCategory } from "@keyboard-studio/engine";
-import { nfcDedup } from "../survey/charNormUtils.ts";
+import { casePairOf, nfcDedup } from "../survey/charNormUtils.ts";
 import { DEFAULT_PHASE_B_FONT, type PhaseBFontValue } from "../survey/surveyStyles.ts";
+
+/**
+ * Where a character in the draft came from (spec 044 FR-017).
+ *
+ * `"author"` is the STRONGEST claim: a character the designer typed or picked
+ * survives any re-seed, and removing it is not treated as rejecting a proposal.
+ * The rest are proposal origins. `"text"` is not produced here — it is reserved
+ * for the text-sample surface owned by spec 050, and is present so 044 does not
+ * bake in the assumption that exemplars are the only proposal source. Proposal
+ * sources UNION rather than override (see `seedFromProposal`).
+ */
+export type DraftProvenance = SourcedInventory["source"] | "author" | "text";
 
 /** One designer pick: a whole grapheme, plus the declared role for PUA picks. */
 interface DraftPick {
@@ -86,6 +99,29 @@ export interface PhaseBDraftState {
   lastPick: LastPickContribution | null;
 
   /**
+   * Per-character origin (spec 044 FR-004/FR-017), keyed by NFC grapheme.
+   * Drives the proposed-vs-authored affordance. Only characters currently in
+   * the draft appear here.
+   */
+  provenance: Record<string, DraftProvenance>;
+
+  /**
+   * Proposed characters the author removed. STICKY: `seedFromProposal` must
+   * never re-propose these, so declining a suggestion once is not undone by a
+   * later re-derivation. Removing an AUTHORED character does not add it here —
+   * re-proposal was never at issue for a character the author typed.
+   */
+  rejected: string[];
+
+  /**
+   * True once the author has declined the exemplar discovery method for this
+   * working copy (spec 044 FR-016a). Sticky across Phase B re-entry: the offer
+   * is never re-asserted as the default, though the apply affordance stays
+   * reachable on page 2.
+   */
+  exemplarMethodDeclined: boolean;
+
+  /**
    * The font applied to every character glyph rendered while building the
    * alphabet (chip editor, suggestion chips, character map) — set via the
    * font-selection dropdown at the top of the Phase B build-list step.
@@ -106,11 +142,45 @@ export interface PhaseBDraftState {
   /** Add if absent, remove if present (NFC-normalized before comparison). */
   toggle: (c: string) => void;
 
+  /**
+   * Add a character on behalf of a PROPOSAL source rather than the author.
+   * Separate from `add` so the ordinary UI path can never accidentally record a
+   * pick as machine-proposed — `add` always means "the author did this".
+   */
+  addProposed: (c: string, source: DraftProvenance, opts?: { role?: DeclaredRole }) => void;
+
   /** Replace the whole list wholesale (drop-in for the old setChars callers). */
   setAll: (next: string[]) => void;
 
   /** Set the font applied to all Phase B character glyphs. */
   setSelectedFont: (font: PhaseBFontValue) => void;
+
+  /**
+   * Seed the draft from a sourced exemplar inventory (spec 044 FR-016).
+   *
+   * Seeds the `main` tier plus 047's existing case-counterpart derivation, so
+   * accepting fills a usable alphabet in one action rather than a lowercase-only
+   * half of one. The other three tiers are offered separately in their own 047
+   * breakdown sections; they are deliberately not folded in here.
+   *
+   * Contract:
+   *  - **Idempotent** — calling it twice with the same inventory is a no-op the
+   *    second time.
+   *  - **Never clobbers an author pick** — a character the designer typed keeps
+   *    `"author"` provenance even if a proposal also contains it.
+   *  - **Respects `rejected`** — a proposed character the author removed is not
+   *    re-proposed.
+   *  - **Unions, does not override** — a second proposal source composes with
+   *    this one; each character keeps its own attribution.
+   *
+   * @param inv   the sourced inventory to propose from
+   * @param bcp47 target tag, forwarded to the case-counterpart derivation so
+   *              the Turkic dotted-I system is not mangled
+   */
+  seedFromProposal: (inv: SourcedInventory, bcp47?: string) => void;
+
+  /** Record that the author declined the exemplar method (FR-016a). Sticky. */
+  declineExemplarMethod: () => void;
 
   /** Clear back to an empty alphabet (font selection is left untouched). */
   reset: () => void;
@@ -296,30 +366,33 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
   separators: [],
   controls: [],
   lastPick: null,
+  provenance: {},
+  rejected: [],
+  exemplarMethodDeclined: false,
   selectedFont: DEFAULT_PHASE_B_FONT,
 
   add: (c, opts) => {
-    const nfc = c.normalize("NFC");
-    if (nfc.length === 0) return;
-    const chars = nfcDedup(get().chars, [c]);
-    if (!picks.some((p) => p.grapheme === nfc)) {
-      const before = deriveStores(picks);
-      picks = [
-        ...picks,
-        { grapheme: nfc, ...(opts?.role !== undefined ? { role: opts.role } : {}) },
-      ];
-      const after = deriveStores(picks);
-      set({ ...after, chars, lastPick: contribution(before, after, nfc) });
-    } else {
-      set({ chars });
-    }
+    addWithProvenance(set, get, c, "author", opts);
+  },
+
+  addProposed: (c, source, opts) => {
+    addWithProvenance(set, get, c, source, opts);
   },
 
   remove: (c) => {
     const nfc = c.normalize("NFC");
+    const origin = get().provenance[nfc];
     picks = picks.filter((p) => p.grapheme !== nfc);
     const chars = get().chars.filter((x) => x !== nfc);
-    set({ ...deriveStores(picks), chars, lastPick: null });
+    const provenance = { ...get().provenance };
+    delete provenance[nfc];
+    // Removing a PROPOSED character is a rejection — remember it so a later
+    // re-derivation does not put it straight back. Removing an AUTHORED one is
+    // just an edit; it was never going to be re-proposed.
+    const isProposal = origin !== undefined && origin !== "author";
+    const rejected =
+      isProposal && !get().rejected.includes(nfc) ? [...get().rejected, nfc] : get().rejected;
+    set({ ...deriveStores(picks), chars, provenance, rejected, lastPick: null });
   },
 
   toggle: (c) => {
@@ -342,10 +415,36 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
       const role = roles[grapheme];
       return role !== undefined ? { grapheme, role } : { grapheme };
     });
-    set({ ...deriveStores(picks), chars: next, lastPick: null });
+    // Provenance follows the new list: retained characters keep their origin,
+    // anything newly present came from the author (setAll is the chip-editor /
+    // snapshot-restore path, never a proposal), and entries for removed
+    // characters are dropped. A wholesale replace is NOT a per-character
+    // rejection, so `rejected` is untouched here — `remove()` owns that.
+    const prior = usePhaseBDraftStore.getState().provenance;
+    const provenance: Record<string, DraftProvenance> = {};
+    for (const g of deduped) provenance[g] = prior[g] ?? "author";
+    set({ ...deriveStores(picks), chars: next, provenance, lastPick: null });
   },
 
   setSelectedFont: (font) => set({ selectedFont: font }),
+
+  seedFromProposal: (inv, bcp47) => {
+    // The main tier only — the alphabet. The auxiliary/punctuation/numbers
+    // tiers reach the author through their own 047 breakdown sections.
+    const mainChars = inv.characters.filter((c) => c.tier === "main").map((c) => c.char);
+    // 047's case derivation: the sources attest lowercase, but an alphabet
+    // without its uppercase half is not one the author can accept and move on
+    // from. `casePairOf` carries the Turkic-aware fold.
+    const proposed = nfcDedup(
+      [],
+      mainChars.flatMap((ch) => casePairOf(ch, bcp47)),
+    );
+    for (const ch of proposed) {
+      addWithProvenance(set, get, ch, inv.source);
+    }
+  },
+
+  declineExemplarMethod: () => set({ exemplarMethodDeclined: true }),
 
   reset: () => {
     picks = [];
@@ -361,9 +460,70 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
       separators: [],
       controls: [],
       lastPick: null,
+      provenance: {},
+      // `rejected` and `exemplarMethodDeclined` deliberately SURVIVE a reset:
+      // both record a decision the author made about proposals, and reset() runs
+      // on every entry to the build-list screen. Clearing them would re-propose
+      // characters the author already removed and re-assert an offer they
+      // already declined. resetPhaseBDraftDecisions() clears them for a genuinely
+      // new working copy.
     });
   },
 }));
+
+/**
+ * Shared add path for both the author (`add`) and proposal sources
+ * (`addProposed`).
+ *
+ * Provenance only ever strengthens: once a character is `"author"` it stays
+ * `"author"`, so an author's pick survives a re-seed. A character already
+ * present from one proposal source keeps that source rather than being
+ * overwritten by a second — proposal sources UNION (spec 044 T053), and each
+ * character keeps the attribution the UI shows next to it.
+ */
+function addWithProvenance(
+  set: (partial: Partial<PhaseBDraftState>) => void,
+  get: () => PhaseBDraftState,
+  c: string,
+  origin: DraftProvenance,
+  opts?: { role?: DeclaredRole },
+): void {
+  const nfc = c.normalize("NFC");
+  if (nfc.length === 0) return;
+
+  const isProposal = origin !== "author";
+  // A proposal never resurrects something the author explicitly removed.
+  if (isProposal && get().rejected.includes(nfc)) return;
+
+  // An explicit author add always UPGRADES the origin to "author" — the
+  // designer touching a proposed character makes it theirs, and it must then
+  // survive any re-seed. A proposal add never overwrites an existing origin, so
+  // the first source to attest a character keeps the attribution the UI shows.
+  const existing = get().provenance[nfc];
+  const nextOrigin: DraftProvenance = origin === "author" ? "author" : (existing ?? origin);
+  const provenance = { ...get().provenance, [nfc]: nextOrigin };
+
+  const chars = nfcDedup(get().chars, [c]);
+  if (!picks.some((p) => p.grapheme === nfc)) {
+    const before = deriveStores(picks);
+    picks = [...picks, { grapheme: nfc, ...(opts?.role !== undefined ? { role: opts.role } : {}) }];
+    const after = deriveStores(picks);
+    set({ ...after, chars, provenance, lastPick: contribution(before, after, nfc) });
+  } else {
+    set({ chars, provenance });
+  }
+}
+
+/**
+ * Clear the sticky proposal decisions (`rejected`, `exemplarMethodDeclined`).
+ *
+ * Those are per-working-copy, not per-visit: `reset()` runs every time the
+ * build-list screen is entered and must not undo them. Call this when a genuinely
+ * new working copy is instantiated.
+ */
+export function resetPhaseBDraftDecisions(): void {
+  usePhaseBDraftStore.setState({ rejected: [], exemplarMethodDeclined: false });
+}
 
 /** The three-store ConfirmedAlphabet the current draft resolves to (spec 046). */
 export function draftConfirmedAlphabet(): ConfirmedAlphabet {
@@ -390,13 +550,26 @@ export function draftConfirmedAlphabet(): ConfirmedAlphabet {
 export interface PhaseBDraftSnapshot {
   chars: string[];
   declaredRoles?: Record<string, DeclaredRole>;
+  /** Per-character origin (spec 044). Absent in pre-044 snapshots. */
+  provenance?: Record<string, DraftProvenance>;
+  /** Proposals the author removed. Absent in pre-044 snapshots. */
+  rejected?: string[];
+  /** Whether the exemplar method was declined. Absent in pre-044 snapshots. */
+  exemplarMethodDeclined?: boolean;
   selectedFont: PhaseBFontValue;
 }
 
 /** Build a serializable snapshot of the CURRENT phase-B draft alphabet. */
 export function snapshotPhaseBDraft(): PhaseBDraftSnapshot {
   const s = usePhaseBDraftStore.getState();
-  return { chars: s.chars, declaredRoles: s.declaredRoles, selectedFont: s.selectedFont };
+  return {
+    chars: s.chars,
+    declaredRoles: s.declaredRoles,
+    provenance: s.provenance,
+    rejected: s.rejected,
+    exemplarMethodDeclined: s.exemplarMethodDeclined,
+    selectedFont: s.selectedFont,
+  };
 }
 
 /**
@@ -407,7 +580,16 @@ export function snapshotPhaseBDraft(): PhaseBDraftSnapshot {
  * `setSelectedFont`.
  */
 export function applyPhaseBDraftSnapshot(snapshot: PhaseBDraftSnapshot): void {
-  usePhaseBDraftStore.setState({ declaredRoles: snapshot.declaredRoles ?? {} });
+  // Restore the sticky proposal decisions and the prior provenance BEFORE
+  // setAll: setAll preserves the origin of any character already known and
+  // attributes the rest to the author, so a restored draft keeps its
+  // proposed-vs-authored distinction instead of flattening to "author".
+  usePhaseBDraftStore.setState({
+    declaredRoles: snapshot.declaredRoles ?? {},
+    provenance: snapshot.provenance ?? {},
+    rejected: snapshot.rejected ?? [],
+    exemplarMethodDeclined: snapshot.exemplarMethodDeclined ?? false,
+  });
   usePhaseBDraftStore.getState().setAll(snapshot.chars);
   usePhaseBDraftStore.getState().setSelectedFont(snapshot.selectedFont);
 }

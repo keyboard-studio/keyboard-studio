@@ -15,11 +15,13 @@
 // unambiguous at the byte level regardless of tool/editor normalization.
 
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import type { SourcedInventory } from "@keyboard-studio/engine";
 import {
   usePhaseBDraftStore,
   draftConfirmedAlphabet,
   snapshotPhaseBDraft,
   applyPhaseBDraftSnapshot,
+  resetPhaseBDraftDecisions,
 } from "./phaseBDraftStore.ts";
 import { DEFAULT_PHASE_B_FONT } from "../survey/surveyStyles.ts";
 
@@ -207,7 +209,16 @@ describe("phaseBDraftStore — snapshotPhaseBDraft/applyPhaseBDraftSnapshot roun
     usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
 
     const snapshot = snapshotPhaseBDraft();
-    expect(snapshot).toEqual({ chars: ["a", "b", "ɛ"], declaredRoles: {}, selectedFont: "charis-sil" });
+    expect(snapshot).toEqual({
+      chars: ["a", "b", "ɛ"],
+      declaredRoles: {},
+      // Spec 044 additions: setAll attributes everything it does not already
+      // know to the author, and the sticky proposal decisions start clear.
+      provenance: { a: "author", b: "author", "ɛ": "author" },
+      rejected: [],
+      exemplarMethodDeclined: false,
+      selectedFont: "charis-sil",
+    });
 
     usePhaseBDraftStore.getState().reset();
     usePhaseBDraftStore.getState().setSelectedFont(DEFAULT_PHASE_B_FONT);
@@ -407,5 +418,240 @@ describe("phaseBDraftStore — category split (spec 047)", () => {
     expect(s.symbols).toEqual([]);
     expect(s.separators).toEqual([]);
     expect(s.controls).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 044 — propose-then-confirm: provenance, rejection stickiness, and the
+// invariant that seeding a proposal must not disturb anything 047 relies on.
+// ---------------------------------------------------------------------------
+
+/** Minimal SourcedInventory fixture — only what seedFromProposal reads. */
+function inventory(chars: string[], source: "cldr" | "sldr" = "cldr"): SourcedInventory {
+  const confidence = source === "cldr" ? "approved" : "generated";
+  return {
+    resolvedTag: "test",
+    source,
+    confidence,
+    characters: chars.map((char) => ({ char, tier: "main" as const, source, confidence })),
+    digraphs: [],
+  };
+}
+
+describe("phaseBDraftStore — seedFromProposal (spec 044 FR-016)", () => {
+  afterEach(() => {
+    resetPhaseBDraftDecisions();
+  });
+
+  it("seeds the main tier and tags every character with its source", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["ŋ", "ɔ"], "sldr"));
+    const s = usePhaseBDraftStore.getState();
+    expect(s.chars).toContain("ŋ");
+    expect(s.provenance["ŋ"]).toBe("sldr");
+    expect(s.provenance["ɔ"]).toBe("sldr");
+  });
+
+  it("derives the uppercase counterpart alongside each lowercase letter", () => {
+    // 047's case derivation: an alphabet without its uppercase half is not one
+    // the author can accept and move on from.
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["a", "ŋ"]));
+    const s = usePhaseBDraftStore.getState();
+    expect(s.chars).toContain("A");
+    expect(s.chars).toContain("Ŋ");
+    expect(s.provenance["A"]).toBe("cldr");
+  });
+
+  it("is idempotent", () => {
+    const inv = inventory(["a", "b"]);
+    usePhaseBDraftStore.getState().seedFromProposal(inv);
+    const first = { ...usePhaseBDraftStore.getState() };
+    usePhaseBDraftStore.getState().seedFromProposal(inv);
+    const second = usePhaseBDraftStore.getState();
+    expect(second.chars).toEqual(first.chars);
+    expect(second.provenance).toEqual(first.provenance);
+    expect(second.bases).toEqual(first.bases);
+  });
+
+  it("does not clobber an author-entered character that is also proposed", () => {
+    usePhaseBDraftStore.getState().add("ŋ");
+    expect(usePhaseBDraftStore.getState().provenance["ŋ"]).toBe("author");
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["ŋ", "ɔ"]));
+    // The stronger claim wins and survives the seed.
+    expect(usePhaseBDraftStore.getState().provenance["ŋ"]).toBe("author");
+    expect(usePhaseBDraftStore.getState().provenance["ɔ"]).toBe("cldr");
+  });
+
+  it("an author-entered character survives a RE-seed", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["ŋ"]));
+    usePhaseBDraftStore.getState().add("ŋ"); // author confirms it as their own
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["ŋ"]));
+    expect(usePhaseBDraftStore.getState().provenance["ŋ"]).toBe("author");
+    expect(usePhaseBDraftStore.getState().chars.filter((c) => c === "ŋ")).toHaveLength(1);
+  });
+});
+
+describe("phaseBDraftStore — rejection is sticky (spec 044 FR-017)", () => {
+  afterEach(() => {
+    resetPhaseBDraftDecisions();
+  });
+
+  it("removing a PROPOSED character records it as rejected", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["ŋ", "ɔ"]));
+    usePhaseBDraftStore.getState().remove("ŋ");
+    expect(usePhaseBDraftStore.getState().rejected).toContain("ŋ");
+    expect(usePhaseBDraftStore.getState().chars).not.toContain("ŋ");
+  });
+
+  it("a rejected character is never re-proposed", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["ŋ", "ɔ"]));
+    usePhaseBDraftStore.getState().remove("ŋ");
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["ŋ", "ɔ"]));
+    expect(usePhaseBDraftStore.getState().chars).not.toContain("ŋ");
+    expect(usePhaseBDraftStore.getState().provenance["ŋ"]).toBeUndefined();
+  });
+
+  it("the author can still add a rejected character back deliberately", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["ŋ"]));
+    usePhaseBDraftStore.getState().remove("ŋ");
+    usePhaseBDraftStore.getState().add("ŋ");
+    expect(usePhaseBDraftStore.getState().chars).toContain("ŋ");
+    expect(usePhaseBDraftStore.getState().provenance["ŋ"]).toBe("author");
+  });
+
+  it("removing an AUTHORED character does not add it to rejected", () => {
+    usePhaseBDraftStore.getState().add("ŋ");
+    usePhaseBDraftStore.getState().remove("ŋ");
+    expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
+  });
+
+  it("rejection survives reset() — reset runs on every build-list entry", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["ŋ"]));
+    usePhaseBDraftStore.getState().remove("ŋ");
+    usePhaseBDraftStore.getState().reset();
+    expect(usePhaseBDraftStore.getState().rejected).toContain("ŋ");
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["ŋ", "ɔ"]));
+    expect(usePhaseBDraftStore.getState().chars).not.toContain("ŋ");
+  });
+
+  it("resetPhaseBDraftDecisions clears the sticky decisions for a new working copy", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["ŋ"]));
+    usePhaseBDraftStore.getState().remove("ŋ");
+    usePhaseBDraftStore.getState().declineExemplarMethod();
+    resetPhaseBDraftDecisions();
+    expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
+    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(false);
+  });
+});
+
+describe("phaseBDraftStore — declined exemplar method (spec 044 FR-016a)", () => {
+  afterEach(() => {
+    resetPhaseBDraftDecisions();
+  });
+
+  it("starts undeclined and becomes sticky once declined", () => {
+    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(false);
+    usePhaseBDraftStore.getState().declineExemplarMethod();
+    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(true);
+    usePhaseBDraftStore.getState().reset();
+    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(true);
+  });
+
+  it("declining does not prevent a later deliberate apply", () => {
+    usePhaseBDraftStore.getState().declineExemplarMethod();
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["ŋ"]));
+    expect(usePhaseBDraftStore.getState().chars).toContain("ŋ");
+  });
+});
+
+describe("phaseBDraftStore — proposal sources union rather than override (spec 044 T053)", () => {
+  afterEach(() => {
+    resetPhaseBDraftDecisions();
+  });
+
+  it("a second proposal source composes with the first", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["ŋ"], "cldr"));
+    usePhaseBDraftStore.getState().addProposed("ɔ", "text");
+    const s = usePhaseBDraftStore.getState();
+    expect(s.chars).toEqual(expect.arrayContaining(["ŋ", "ɔ"]));
+    expect(s.provenance["ŋ"]).toBe("cldr");
+    expect(s.provenance["ɔ"]).toBe("text");
+  });
+
+  it("a character both sources propose keeps its first attribution, not the last", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["ŋ"], "sldr"));
+    usePhaseBDraftStore.getState().addProposed("ŋ", "text");
+    expect(usePhaseBDraftStore.getState().provenance["ŋ"]).toBe("sldr");
+  });
+
+  it("a second source does not remove the first source's characters", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["a", "b"]));
+    usePhaseBDraftStore.getState().addProposed("c", "text");
+    expect(usePhaseBDraftStore.getState().chars).toEqual(expect.arrayContaining(["a", "b", "c"]));
+  });
+});
+
+describe("phaseBDraftStore — 047 invariants survive seeding (spec 044 obligation P7)", () => {
+  afterEach(() => {
+    resetPhaseBDraftDecisions();
+  });
+
+  it("chars stays the COMPLETE inventory after a seed", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["a", "ŋ", "7", "?"]));
+    const s = usePhaseBDraftStore.getState();
+    for (const ch of ["a", "A", "ŋ", "Ŋ", "7", "?"]) {
+      expect(s.chars, `${ch} missing from chars`).toContain(ch);
+    }
+  });
+
+  it("each captured non-mark/non-PUA character lands in exactly one category array", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["a", "7", "?", "+"]));
+    const s = usePhaseBDraftStore.getState();
+    const categories = [s.bases, s.numbers, s.punctuation, s.symbols, s.separators, s.controls];
+    for (const ch of s.chars) {
+      if (s.marks.includes(ch)) continue;
+      const hits = categories.filter((arr) => arr.includes(ch)).length;
+      expect(hits, `${ch} landed in ${hits} category arrays`).toBe(1);
+    }
+  });
+
+  it("routes a seeded digit to numbers and a seeded precomposed letter to bases + marks", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["7", PRECOMPOSED_E_ACUTE]));
+    const s = usePhaseBDraftStore.getState();
+    expect(s.numbers).toContain("7");
+    expect(s.bases).toContain("e");
+    expect(s.marks).toContain("́");
+  });
+
+  it("the seeded draft still resolves to a valid ConfirmedAlphabet", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["a", "ŋ"]));
+    const alphabet = draftConfirmedAlphabet();
+    expect(alphabet.bases).toContain("a");
+    expect(alphabet.bases).toContain("ŋ");
+  });
+
+  it("a snapshot round-trip preserves provenance and the sticky decisions", () => {
+    usePhaseBDraftStore.getState().seedFromProposal(inventory(["ŋ", "ɔ"], "sldr"));
+    usePhaseBDraftStore.getState().add("q");
+    usePhaseBDraftStore.getState().remove("ɔ");
+    usePhaseBDraftStore.getState().declineExemplarMethod();
+    const snap = snapshotPhaseBDraft();
+
+    usePhaseBDraftStore.getState().reset();
+    resetPhaseBDraftDecisions();
+    applyPhaseBDraftSnapshot(snap);
+
+    const s = usePhaseBDraftStore.getState();
+    expect(s.provenance["ŋ"]).toBe("sldr");
+    expect(s.provenance["q"]).toBe("author");
+    expect(s.rejected).toContain("ɔ");
+    expect(s.exemplarMethodDeclined).toBe(true);
+  });
+
+  it("a pre-044 snapshot without the new fields restores as all-author", () => {
+    applyPhaseBDraftSnapshot({ chars: ["a", "b"], selectedFont: DEFAULT_PHASE_B_FONT });
+    const s = usePhaseBDraftStore.getState();
+    expect(s.provenance).toEqual({ a: "author", b: "author" });
+    expect(s.rejected).toEqual([]);
+    expect(s.exemplarMethodDeclined).toBe(false);
   });
 });
