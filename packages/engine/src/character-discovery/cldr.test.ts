@@ -4,6 +4,8 @@ import {
   loadExemplars,
   scriptBlockChars,
   createFetchCldrLoader,
+  createFetchCldrFullLoader,
+  cldrLocaleCandidates,
 } from "./cldr.js";
 
 describe("parseUnicodeSet", () => {
@@ -176,7 +178,7 @@ describe("createFetchCldrLoader", () => {
     const result = await loader("fr");
     expect(result).toBe("[a b c é ñ]");
     expect(mockFetch).toHaveBeenCalledWith(
-      "https://raw.githubusercontent.com/unicode-org/cldr-json/46.1.0/cldr-json/cldr-misc-full/main/fr/characters.json",
+      "https://raw.githubusercontent.com/unicode-org/cldr-json/refs/heads/main/cldr-json/cldr-misc-full/main/fr/characters.json",
     );
   });
 
@@ -206,5 +208,78 @@ describe("createFetchCldrLoader", () => {
     const loader = createFetchCldrLoader(mockFetch);
     const result = await loader("fr");
     expect(result).toBeNull();
+  });
+});
+
+describe("cldrLocaleCandidates", () => {
+  it("falls back from a default-script tag to the language-only CLDR directory", () => {
+    // CLDR has cldr-misc-full/main/ewo, not .../ewo-Latn
+    expect(cldrLocaleCandidates("ewo-Latn")).toEqual(["ewo-Latn", "ewo"]);
+  });
+
+  it("keeps the script-bearing candidate first so sr-Latn/zh-Hant still resolve", () => {
+    expect(cldrLocaleCandidates("sr-Latn")).toEqual(["sr-Latn", "sr"]);
+    expect(cldrLocaleCandidates("zh-Hant")).toEqual(["zh-Hant", "zh"]);
+  });
+
+  it("normalizes subtag casing and underscore separators", () => {
+    expect(cldrLocaleCandidates("PT_br")).toEqual(["pt-BR", "pt"]);
+    expect(cldrLocaleCandidates("ewo-latn")).toEqual(["ewo-Latn", "ewo"]);
+  });
+
+  it("orders language-script-region down to language-only", () => {
+    expect(cldrLocaleCandidates("ha-Latn-NG")).toEqual([
+      "ha-Latn-NG",
+      "ha-Latn",
+      "ha-NG",
+      "ha",
+    ]);
+  });
+
+  it("drops variants and returns [] for an empty tag", () => {
+    expect(cldrLocaleCandidates("ca-ES-valencia")).toEqual(["ca-ES", "ca"]);
+    expect(cldrLocaleCandidates("")).toEqual([]);
+  });
+});
+
+describe("createFetchCldrFullLoader locale fallback", () => {
+  function jsonResponse(payload: unknown): Response {
+    return { ok: true, status: 200, json: async () => payload } as unknown as Response;
+  }
+  function notFound(): Response {
+    return { ok: false, status: 404, json: async () => { throw new Error("404"); } } as unknown as Response;
+  }
+
+  it("retries the minimal locale after a 404 on the script-bearing tag", async () => {
+    const payload = {
+      main: { ewo: { characters: { exemplarCharacters: "[a á b c]" } } },
+    };
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(notFound())
+      .mockResolvedValueOnce(jsonResponse(payload));
+
+    const result = await createFetchCldrFullLoader(mockFetch)("ewo-Latn");
+
+    expect(result?.main).toBe("[a á b c]");
+    expect(mockFetch.mock.calls.map((c) => c[0])).toEqual([
+      "https://raw.githubusercontent.com/unicode-org/cldr-json/refs/heads/main/cldr-json/cldr-misc-full/main/ewo-Latn/characters.json",
+      "https://raw.githubusercontent.com/unicode-org/cldr-json/refs/heads/main/cldr-json/cldr-misc-full/main/ewo/characters.json",
+    ]);
+  });
+
+  it("returns null once every candidate 404s", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(notFound());
+    expect(await createFetchCldrFullLoader(mockFetch)("qqq-Zzzz")).toBeNull();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("reads the sole main entry when its key does not match the fetched directory", async () => {
+    const payload = {
+      main: { "ewo-Latn": { characters: { exemplarCharacters: "[a b]" } } },
+    };
+    const mockFetch = vi.fn().mockResolvedValue(jsonResponse(payload));
+    const result = await createFetchCldrFullLoader(mockFetch)("ewo");
+    expect(result?.main).toBe("[a b]");
   });
 });

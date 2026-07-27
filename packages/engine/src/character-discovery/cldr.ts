@@ -1,7 +1,56 @@
+/**
+ * CLDR exemplar source: the tip of unicode-org/cldr-json's `main` branch, so
+ * exemplar data tracks the latest published CLDR rather than a frozen release.
+ * (Locale directories are stable across releases; only their contents grow.)
+ */
 const CLDR_BASE =
-  "https://raw.githubusercontent.com/unicode-org/cldr-json/46.1.0/cldr-json/cldr-misc-full/main";
+  "https://raw.githubusercontent.com/unicode-org/cldr-json/refs/heads/main/cldr-json/cldr-misc-full/main";
 
 export type CldrLoader = (locale: string) => Promise<string | null>;
+
+/**
+ * Normalizes a BCP47 tag to CLDR's subtag casing (`ewo-latn` -> `ewo-Latn`,
+ * `pt_br` -> `pt-BR`) and returns the CLDR locale-directory candidates to try,
+ * most specific first.
+ *
+ * CLDR's `cldr-misc-full/main/` directories are keyed by *minimal* locale ids:
+ * a directory exists for `ewo`, not `ewo-Latn`, because Latn is Ewondo's
+ * default script. Some locales genuinely need a subtag (`sr-Latn`, `zh-Hant`,
+ * `pt-BR`), so we cannot simply strip subtags — we probe from most specific to
+ * language-only and take the first hit:
+ *
+ *   ewo-Latn -> ["ewo-Latn", "ewo"]
+ *   sr-Latn  -> ["sr-Latn", "sr"]        (first candidate hits)
+ *   pt-BR    -> ["pt-BR", "pt"]
+ *   ha-Latn-NG -> ["ha-Latn-NG", "ha-Latn", "ha-NG", "ha"]
+ *
+ * Exported for testing.
+ */
+export function cldrLocaleCandidates(tag: string): string[] {
+  const parts = tag.trim().replace(/_/g, "-").split("-").filter((p) => p.length > 0);
+  if (parts.length === 0) return [];
+
+  const language = (parts[0] as string).toLowerCase();
+  let script: string | undefined;
+  let region: string | undefined;
+  for (const part of parts.slice(1)) {
+    if (script === undefined && /^[A-Za-z]{4}$/.test(part)) {
+      script = part[0]!.toUpperCase() + part.slice(1).toLowerCase();
+    } else if (region === undefined && /^([A-Za-z]{2}|\d{3})$/.test(part)) {
+      region = part.toUpperCase();
+    }
+    // Variants/extensions are dropped — CLDR misc-full has no such directories.
+  }
+
+  const candidates = [
+    [language, script, region],
+    [language, script],
+    [language, region],
+    [language],
+  ].map((subtags) => subtags.filter((s) => s !== undefined).join("-"));
+
+  return [...new Set(candidates)];
+}
 
 /**
  * A loader that returns both the main and auxiliary exemplar raw strings for a
@@ -21,7 +70,7 @@ export type CldrFullLoader = (
 } | null>;
 
 /**
- * Builds a CldrLoader that fetches from the CLDR 46.1.0 CDN.
+ * Builds a CldrLoader that fetches from the CLDR CDN (cldr-json main).
  * On non-200 or network error, returns null so callers can fall back gracefully.
  *
  * Returns only the main exemplar string. For auxiliary exemplar support, use
@@ -37,27 +86,32 @@ export function createFetchCldrLoader(fetchImpl?: typeof fetch): CldrLoader {
 
 /**
  * Builds a CldrFullLoader that fetches both the main and auxiliary exemplar sets
- * from the CLDR 46.1.0 CDN in a single HTTP request.
+ * from the CLDR CDN (cldr-json main) in a single HTTP request.
  * On non-200 or network error, returns null so callers can fall back gracefully.
  */
 export function createFetchCldrFullLoader(fetchImpl?: typeof fetch): CldrFullLoader {
   const doFetch = fetchImpl ?? globalThis.fetch.bind(globalThis);
   return async (locale: string) => {
-    const url = `${CLDR_BASE}/${locale}/characters.json`;
-    let r: Response;
-    try {
-      r = await doFetch(url);
-    } catch {
-      return null;
+    // Probe the CLDR locale-directory candidates most-specific-first; a tag
+    // carrying a default subtag (ewo-Latn) only resolves at its minimal form.
+    for (const candidate of cldrLocaleCandidates(locale)) {
+      const url = `${CLDR_BASE}/${candidate}/characters.json`;
+      let r: Response;
+      try {
+        r = await doFetch(url);
+      } catch {
+        return null;
+      }
+      if (!r.ok) continue;
+      let j: unknown;
+      try {
+        j = await r.json();
+      } catch {
+        return null;
+      }
+      return extractExemplarPair(j, candidate);
     }
-    if (!r.ok) return null;
-    let j: unknown;
-    try {
-      j = await r.json();
-    } catch {
-      return null;
-    }
-    return extractExemplarPair(j, locale);
+    return null;
   };
 }
 
@@ -69,7 +123,13 @@ function extractExemplarPair(
   const root = j as Record<string, unknown>;
   const main = root["main"];
   if (typeof main !== "object" || main === null) return null;
-  const localeData = (main as Record<string, unknown>)[locale];
+  const mainMap = main as Record<string, unknown>;
+  // characters.json keys `main` by the locale id of the directory it came from.
+  // Prefer the exact key; fall back to the payload's sole locale entry so a
+  // casing or minimization mismatch doesn't silently drop the exemplars.
+  const mainKeys = Object.keys(mainMap);
+  const key = locale in mainMap ? locale : mainKeys.length === 1 ? (mainKeys[0] as string) : undefined;
+  const localeData = key === undefined ? undefined : mainMap[key];
   if (typeof localeData !== "object" || localeData === null) return null;
   const characters = (localeData as Record<string, unknown>)["characters"];
   if (typeof characters !== "object" || characters === null) return null;
