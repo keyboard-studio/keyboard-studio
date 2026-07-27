@@ -1,0 +1,4 @@
+# Raw SLDR dataset — build input, ~70 MB / ~2700 XML files, reproducibly fetched
+# against a pinned version + checksum (spec 044).
+# SOURCES.json and LICENSE are committed; the raw data tree is not.
+sldr/
