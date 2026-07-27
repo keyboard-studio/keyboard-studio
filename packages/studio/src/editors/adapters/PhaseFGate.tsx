@@ -1,0 +1,113 @@
+// PhaseFGate — the Phase F ("help") hard-gate wrapper (the Phase F hard gate).
+//
+// Unlike the gallery leave-warnings (MechanismGallery / TouchGallery),
+// there is NO "come back later" escape at Phase F: the author must finish
+// every inventory character in every modality actually engaged this session
+// before advancing past "help" (advance.ts's "help" case reads
+// AdvanceContext.allCharactersImplemented and refuses to advance while it is
+// false — see StepHost's context build, which computes the SAME value this
+// component derives independently for display).
+//
+// "No dead button" (contract requirement): rather than let the author fill
+// out Phase F and hit an inert Done button, this wraps the normal Phase F
+// content in a blocking ConfirmDialog (single action, no secondaryLabel) that
+// explains WHY (which characters, which modality) and routes them back to the
+// relevant gallery via the session store's `advance` primitive.
+//
+// Coverage truth is the SAME shared helper (lib/unimplementedInventory.ts)
+// both galleries use — do not fork the definition here.
+
+import { useMemo } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
+import { inventoryCoverageGate } from "../../lib/unimplementedInventory.ts";
+import { ConfirmDialog } from "../assignLoop/parts/ConfirmDialog.tsx";
+import { PhaseFStepFactoryComponent } from "./flowStepOptions.tsx";
+import type { EditorStepProps } from "../../steps/types.ts";
+
+export function PhaseFGate(props: EditorStepProps): React.ReactElement {
+  const { t } = useLingui();
+
+  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
+  const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
+  const confirmedInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  const sessionAdvance = useSurveySessionStore((s) => s.advance);
+  const { lettersToAdd } = useInventoryDiff();
+
+  const desktopAssignments = useMemo(
+    () =>
+      (phaseResults.find((p) => p.phase === "C")?.assignments ?? []).filter(
+        (a) => a.modality === "physical",
+      ),
+    [phaseResults],
+  );
+  // Single shared selector (lib/unimplementedInventory.ts) — do not re-derive
+  // the desktop-always / touch-only-if-authored booleans locally; StepHost's
+  // gate and OutputScreen's download gate call the same function.
+  const gate = useMemo(
+    () =>
+      inventoryCoverageGate({
+        desktopAssignments,
+        lettersToAdd,
+        touchLayoutJson,
+        confirmedInventory,
+      }),
+    [desktopAssignments, lettersToAdd, touchLayoutJson, confirmedInventory],
+  );
+  const { unimplementedDesktop, unimplementedTouch, blockedOnDesktop, blockedOnTouch, blocked } = gate;
+
+  const totalCount = unimplementedDesktop.length + (blockedOnTouch ? unimplementedTouch.length : 0);
+  const countLabel = t({
+    id: "editor.help.unimplementedGate.count",
+    message: plural(totalCount, { one: "# character", other: "# characters" }),
+  });
+
+  // Named string locals computed BEFORE the JSX below — the message body
+  // must not embed conditional (`&&`) JSX expressions as direct <Trans>
+  // children (see the module comments in MechanismGallery/TouchGallery on
+  // why that broke the fr catalog before).
+  const desktopGalleryLabel = t({
+    id: "editor.assignLoop.mechanismGalleryHeading",
+    message: "Mechanism Gallery",
+  });
+  const touchGalleryLabel = t({ id: "editor.assignLoop.touchGalleryHeading", message: "Touch Gallery" });
+  const uncoveredCharsList = [
+    ...(blockedOnDesktop ? [`${unimplementedDesktop.join(", ")} (desktop)`] : []),
+    ...(blockedOnTouch ? [`${unimplementedTouch.join(", ")} (touch)`] : []),
+  ].join("; ");
+  const targetGalleryLabel = blockedOnDesktop ? desktopGalleryLabel : touchGalleryLabel;
+
+  // Routes back to whichever gallery still has work — desktop first (it
+  // gates touch's own completion too, so fixing it first is always correct).
+  const handleGoBack = () => {
+    sessionAdvance(blockedOnDesktop ? "mechanisms" : "touch");
+  };
+
+  return (
+    <>
+      <PhaseFStepFactoryComponent {...props} />
+      <ConfirmDialog
+        open={blocked}
+        title={t({
+          id: "editor.help.unimplementedGate.title",
+          message: "Finish your keyboard before continuing",
+        })}
+        body={
+          <div>
+            <p style={{ margin: 0 }}>
+              <Trans id="editor.help.unimplementedGate.message">
+                {countLabel} still need an implementation before you can finish:{" "}
+                {uncoveredCharsList}. Go back to the {targetGalleryLabel} to finish them.
+              </Trans>
+            </p>
+          </div>
+        }
+        primaryLabel={t({ id: "editor.help.unimplementedGate.goBack", message: "Go back and finish" })}
+        onPrimary={handleGoBack}
+      />
+    </>
+  );
+}

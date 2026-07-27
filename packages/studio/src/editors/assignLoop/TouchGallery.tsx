@@ -56,9 +56,10 @@
 
 import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
 import type { I18n } from "@lingui/core";
-import { msg } from "@lingui/core/macro";
+import { msg, plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { resolveMessage } from "../../lib/i18nResolve.ts";
+import { ConfirmDialog } from "./parts/ConfirmDialog.tsx";
 import type { TouchAssignment, MechanismRef, TouchLayoutIR } from "@keyboard-studio/contracts";
 import { createVirtualFS, toUPlusNotation, isDecomposableAccented, formatUncoveredTouchMessage } from "@keyboard-studio/contracts";
 import type { DesktopModifications } from "@keyboard-studio/engine";
@@ -787,6 +788,16 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // edit (see the touchKey-keyed effect below) rather than left stale once
   // the author starts fixing the gap.
   const [uncoveredMessage, setUncoveredMessage] = useState<string | null>(null);
+  // Raw uncovered chars backing the leave-warning modal below (count + list) —
+  // tracked alongside uncoveredMessage (the formatted inline banner text)
+  // rather than re-parsed from it.
+  const [uncoveredChars, setUncoveredChars] = useState<string[]>([]);
+  // Soft-warning modal (the gallery leave-warning): "Go back and finish" (stay) vs. "Come back
+  // later" (defer — proceeds with completion anyway). Distinct from the
+  // FR-008 inline gate message above, which still refuses the *default*
+  // Done/Skip-from-last action outright; this modal is the explicit escape
+  // hatch layered on top of it.
+  const [showUnimplementedWarning, setShowUnimplementedWarning] = useState(false);
 
   // Clear a stale gate message as soon as the author makes another edit —
   // "cleared when coverage passes or edits change" (T016b): re-running
@@ -797,35 +808,47 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // edit (or a fresh handleContinue re-check) should.
   useEffect(() => {
     setUncoveredMessage(null);
+    setUncoveredChars([]);
+    setShowUnimplementedWarning(false);
   }, [touchKey]);
 
-  // Completion — emit only explicitly-configured characters. Declared before
-  // usePositionalCharNav below because the hook calls it directly when
-  // forward navigation reaches the last character (the last character's
-  // forward button IS the phase completion, not a further navigation step).
-  //
-  // FR-008 gate: before completing, re-run touchCoverage on the same layout
-  // lint audits (layoutForLintAndGate — includes current Phase E edits).
-  // While any inventory char is uncovered, refuse to call onComplete and
-  // surface an inline message naming the uncovered chars instead.
-  const handleContinue = useCallback(() => {
-    // Emit only chars where a real (non-inherited) or inherited assignment was
-    // explicitly accepted — everything in charTouch was put there by the user.
-    // `.some()` rather than `mechanisms[0]` (regression 3, multi-method): a
-    // character can carry several mechanisms, so any real (non-inherited) one
-    // qualifies it, not just whichever happens to be first in the array.
+  // Emit only chars where a real (non-inherited) or inherited assignment was
+  // explicitly accepted — everything in charTouch was put there by the user.
+  // `.some()` rather than `mechanisms[0]` (regression 3, multi-method): a
+  // character can carry several mechanisms, so any real (non-inherited) one
+  // qualifies it, not just whichever happens to be first in the array.
+  // Shared by the "already covered" completion path and the leave-warning
+  // modal's "Come back later" (deferred completion) below.
+  const finalizeCompletion = useCallback(() => {
     const assignments: TouchAssignment[] = [...charTouch.values()].filter((a) =>
       a.mechanisms.some((m) => m.patternId !== "touch_inherited"),
     );
+    onComplete(assignments);
+  }, [charTouch, onComplete]);
+
+  // Completion — declared before usePositionalCharNav below because the hook
+  // calls it directly when forward navigation reaches the last character (the
+  // last character's forward button IS the phase completion, not a further
+  // navigation step).
+  //
+  // FR-008 gate: before completing, re-run touchCoverage on the same layout
+  // lint audits (layoutForLintAndGate — includes current Phase E edits).
+  // While any inventory char is uncovered, refuse the default Done/Skip
+  // action and surface an inline message + the leave-warning modal (the gallery leave-warning)
+  // naming the uncovered chars — "Come back later" (onSecondary below) is the
+  // only path that still completes with characters unimplemented.
+  const handleContinue = useCallback(() => {
     if (layoutForLintAndGate !== null) {
       const { uncovered } = touchCoverage(layoutForLintAndGate, inventory);
       if (uncovered.length > 0) {
         setUncoveredMessage(uncovered.map((c) => formatUncoveredTouchMessage(c)).join("; "));
+        setUncoveredChars([...uncovered]);
+        setShowUnimplementedWarning(true);
         return;
       }
     }
-    onComplete(assignments);
-  }, [charTouch, onComplete, layoutForLintAndGate, inventory]);
+    finalizeCompletion();
+  }, [layoutForLintAndGate, inventory, finalizeCompletion]);
 
   // Positional Back/Next/Skip/Previous navigation + suggestion-dismissal
   // tracking — shared with MechanismGallery via usePositionalCharNav so the
@@ -1764,7 +1787,24 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     </>
   );
 
+  const unimplementedTouchCountLabel = t({
+    id: "editor.touch.unimplemented.count",
+    message: plural(uncoveredChars.length, {
+      one: "# character",
+      other: "# characters",
+    }),
+  });
+  // Named string locals computed BEFORE the JSX below — no inline ternary /
+  // .join() embedded as direct <Trans> children (see MechanismGallery's
+  // matching leave-warning for the same convention).
+  const uncoveredTouchVerb = t({
+    id: "editor.touch.unimplemented.verb",
+    message: plural(uncoveredChars.length, { one: "has", other: "have" }),
+  });
+  const uncoveredCharsList = uncoveredChars.join(", ");
+
   return (
+    <>
     <AssignLoopShell
       headingText={t({ id: "editor.assignLoop.touchGalleryHeading", message: "Touch Gallery" })}
       modalityLabel={t({ id: "editor.assignLoop.modality.touch", message: "Touch" })}
@@ -1783,5 +1823,34 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
         />
       }
     />
+      <ConfirmDialog
+        open={showUnimplementedWarning}
+        title={t({
+          id: "editor.touch.unimplemented.title",
+          message: "Finish these characters before leaving?",
+        })}
+        body={
+          <div>
+            <p style={{ margin: "0 0 10px" }}>
+              <Trans id="editor.touch.unimplemented.message">
+                {unimplementedTouchCountLabel} still {uncoveredTouchVerb} no
+                touch mechanism: {uncoveredCharsList}. You can finish them now, or come back to
+                this gallery later.
+              </Trans>
+            </p>
+          </div>
+        }
+        primaryLabel={t({ id: "editor.touch.unimplemented.stay", message: "Go back and finish" })}
+        secondaryLabel={t({ id: "editor.touch.unimplemented.defer", message: "Come back later" })}
+        // Escape/backdrop must map to the STAY action, not the proceed-forward
+        // "Come back later" — dismissing a modal is a cancel, not a confirm.
+        dismissAction="primary"
+        onPrimary={() => setShowUnimplementedWarning(false)}
+        onSecondary={() => {
+          setShowUnimplementedWarning(false);
+          finalizeCompletion();
+        }}
+      />
+    </>
   );
 }

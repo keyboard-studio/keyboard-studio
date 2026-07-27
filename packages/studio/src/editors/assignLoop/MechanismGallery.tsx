@@ -102,6 +102,8 @@ import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
 import { RemovableChipRow } from "./parts/RemovableChipRow.tsx";
+import { ConfirmDialog } from "./parts/ConfirmDialog.tsx";
+import { unimplementedDesktopChars } from "../../lib/unimplementedInventory.ts";
 import { SequenceBuilderPanel, hasSequenceForChar } from "./SequenceBuilderPanel.tsx";
 import { RadioGroup } from "../../ui/RadioGroup.tsx";
 import { SelectMenu, type SelectMenuOption } from "../../ui/SelectMenu.tsx";
@@ -1376,6 +1378,29 @@ export function MechanismGallery({
     [currentChar, placementMap],
   );
 
+  // Whole-inventory leave-warning (soft gate) — computed from the SAME
+  // MechanismAssignment map + lettersToAdd scope this gallery already uses
+  // for coveredChars, via the shared unimplementedDesktopChars helper (do not
+  // fork this definition — see lib/unimplementedInventory.ts). Non-empty only
+  // when at least one character in lettersToAdd resolves to zero mechanisms.
+  const unimplementedChars = useMemo(
+    () => unimplementedDesktopChars(sessionAssignments, lettersToAdd),
+    [sessionAssignments, lettersToAdd],
+  );
+  const [showUnimplementedWarning, setShowUnimplementedWarning] = useState(false);
+
+  // Intercepts the forward-completion action (Done/Continue) ONLY — never
+  // Back, never per-character Next. If uncovered characters remain, holds
+  // navigation and opens the warning modal instead of calling onComplete;
+  // "Come back later" (onSecondary below) proceeds with the real onComplete.
+  const handleForwardComplete = useCallback(() => {
+    if (unimplementedChars.length > 0) {
+      setShowUnimplementedWarning(true);
+      return;
+    }
+    onComplete?.();
+  }, [unimplementedChars, onComplete]);
+
   // Positional Back/Next/Skip/Previous navigation + suggestion-dismissal
   // tracking — shared with TouchGallery via usePositionalCharNav so the two
   // galleries cannot drift (see that hook for the Back/Next/Previous
@@ -1396,7 +1421,7 @@ export function MechanismGallery({
     list: lettersToAdd,
     currentChar,
     setCurrentChar,
-    onComplete,
+    onComplete: handleForwardComplete,
     onBack,
   });
 
@@ -2084,7 +2109,7 @@ export function MechanismGallery({
     locked && onComplete !== undefined
       ? {
           label: t({ id: "editor.assignLoop.continueButton", message: "Continue →" }),
-          onClick: onComplete,
+          onClick: handleForwardComplete,
           testId: "mechanisms-continue",
           ariaLabel: t({ id: "editor.assignLoop.continueAriaLabel", message: "Continue (desktop layout locked)" }),
           disabled: false,
@@ -2093,7 +2118,7 @@ export function MechanismGallery({
       : lettersToAdd.length === 0
         ? {
             label: doneLabel,
-            onClick: onComplete,
+            onClick: handleForwardComplete,
             testId: "mechanisms-continue",
             disabled: false,
             style: forwardBtnStyle,
@@ -2797,7 +2822,25 @@ export function MechanismGallery({
   // Two-pane layout
   // ---------------------------------------------------------------------------
 
+  const unimplementedCountLabel = t({
+    id: "editor.mechanisms.unimplemented.count",
+    message: plural(unimplementedChars.length, {
+      one: "# character",
+      other: "# characters",
+    }),
+  });
+  // Named string locals computed BEFORE the JSX below — no inline ternary /
+  // .join() embedded as direct <Trans> children (this is the exact pattern
+  // that broke the fr catalog before; see currentCharDisplay elsewhere in
+  // this file for the established convention).
+  const unimplementedVerb = t({
+    id: "editor.mechanisms.unimplemented.verb",
+    message: plural(unimplementedChars.length, { one: "has", other: "have" }),
+  });
+  const unimplementedCharsList = unimplementedChars.join(", ");
+
   return (
+    <>
     <AssignLoopShell
       headingText={t({ id: "editor.assignLoop.mechanismGalleryHeading", message: "Mechanism Gallery" })}
       modalityLabel={t({ id: "editor.assignLoop.modality.desktop", message: "Desktop" })}
@@ -2852,5 +2895,34 @@ export function MechanismGallery({
         </>
       }
     />
+      <ConfirmDialog
+        open={showUnimplementedWarning}
+        title={t({
+          id: "editor.mechanisms.unimplemented.title",
+          message: "Finish these characters before leaving?",
+        })}
+        body={
+          <div>
+            <p style={{ margin: "0 0 10px" }}>
+              <Trans id="editor.mechanisms.unimplemented.message">
+                {unimplementedCountLabel} still {unimplementedVerb} no
+                physical (desktop) mechanism: {unimplementedCharsList}. You can finish them
+                now, or come back to this gallery later.
+              </Trans>
+            </p>
+          </div>
+        }
+        primaryLabel={t({ id: "editor.mechanisms.unimplemented.stay", message: "Go back and finish" })}
+        secondaryLabel={t({ id: "editor.mechanisms.unimplemented.defer", message: "Come back later" })}
+        // Escape/backdrop must map to the STAY action, not the proceed-forward
+        // "Come back later" — dismissing a modal is a cancel, not a confirm.
+        dismissAction="primary"
+        onPrimary={() => setShowUnimplementedWarning(false)}
+        onSecondary={() => {
+          setShowUnimplementedWarning(false);
+          onComplete?.();
+        }}
+      />
+    </>
   );
 }

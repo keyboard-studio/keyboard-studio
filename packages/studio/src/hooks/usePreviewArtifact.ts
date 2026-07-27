@@ -10,8 +10,17 @@
 // across hash navigation, so selecting/instantiating on Output works
 // standalone and handleDownload reads the settled store state regardless of
 // which screen triggered the compile.
+//
+// canDownload ALSO gates on inventory coverage (the Phase F hard-gate truth,
+// spec §7.7 / §10 criterion 18.6) — not just compile-readiness. This is the
+// authoritative enforcement point: OutputScreen is directly reachable via
+// #output (nav link or a typed/bookmarked hash) without ever passing through
+// advance.ts's "help" gate or PhaseFGate, so the artifact must not be
+// emittable here either, independent of how the screen was reached. Computed
+// via the SAME shared selector (lib/unimplementedInventory.ts) StepHost and
+// PhaseFGate use — do not fork the definition a fourth time.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BaseKeyboard, CompilerDiagnostic } from "@keyboard-studio/contracts";
 import {
   useKeyboardArtifact,
@@ -22,6 +31,8 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { instantiateFromBaseIfConfirmed } from "../lib/confirmRebase.ts";
 import { useWorkingCopyTransform } from "./useWorkingCopyTransform.ts";
 import { serializeWorkingCopy } from "../lib/serializeWorkingCopy.ts";
+import { useInventoryDiff } from "./useInventoryDiff.ts";
+import { inventoryCoverageGate, type InventoryCoverageGate } from "../lib/unimplementedInventory.ts";
 
 export type PickerMode = "open" | "scaffold";
 
@@ -46,6 +57,13 @@ export interface PreviewArtifact {
   downloadError: string | null;
   downloadWarnings: string[];
   handleDownload: () => Promise<void>;
+
+  // Inventory coverage gate — the same desktop-always/touch-only-if-authored
+  // truth StepHost and PhaseFGate compute (lib/unimplementedInventory.ts).
+  // canDownload already folds `!coverageGate.blocked` in; this is exposed
+  // separately so OutputScreen can render WHY (which characters, which
+  // modality) rather than a silently-disabled button.
+  coverageGate: InventoryCoverageGate;
 
   // Identity warning
   showIdentityWarn: boolean;
@@ -190,14 +208,49 @@ export function usePreviewArtifact(): PreviewArtifact {
     (storeIdentity?.keyboardId === undefined ||
       storeIdentity.keyboardId === storeBaseKeyboard.id);
 
+  // Inventory coverage gate inputs — same shape StepHost/PhaseFGate build.
+  const phaseResultsForGate = useWorkingCopyStore((s) => s.phaseResults);
+  const touchLayoutJsonForGate = useWorkingCopyStore((s) => s.touchLayoutJson);
+  const confirmedInventoryForGate = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  const { lettersToAdd: lettersToAddForGate } = useInventoryDiff();
+  const desktopAssignmentsForGate = useMemo(
+    () =>
+      (phaseResultsForGate.find((p) => p.phase === "C")?.assignments ?? []).filter(
+        (a) => a.modality === "physical",
+      ),
+    [phaseResultsForGate],
+  );
+  const coverageGate = useMemo(
+    () =>
+      inventoryCoverageGate({
+        desktopAssignments: desktopAssignmentsForGate,
+        lettersToAdd: lettersToAddForGate,
+        touchLayoutJson: touchLayoutJsonForGate,
+        confirmedInventory: confirmedInventoryForGate,
+      }),
+    [desktopAssignmentsForGate, lettersToAddForGate, touchLayoutJsonForGate, confirmedInventoryForGate],
+  );
+
   // canDownload: require the compile to be ready AND the working copy to be
-  // instantiated (baseVfs + baseIr available in the store). The serializer
-  // builds the zip from the store's baseVfs, not from stage.vfs, so the
-  // download contains the full projected working copy including assignments.
-  const canDownload = stage.kind === "ready" && isInstantiated;
+  // instantiated (baseVfs + baseIr available in the store) AND every
+  // inventory character implemented in every modality actually engaged this
+  // session (the Phase F hard-gate truth — see the module comment above).
+  // The serializer builds the zip from the store's baseVfs, not from
+  // stage.vfs, so the download contains the full projected working copy
+  // including assignments.
+  const canDownload = stage.kind === "ready" && isInstantiated && !coverageGate.blocked;
 
   const handleDownload = useCallback(async () => {
     if (stage.kind !== "ready") return;
+    // Defense-in-depth: the emit-download button is already disabled while
+    // coverage.blocked (canDownload), but handleDownload must refuse the
+    // emission itself too — this is the authoritative gate, not just a
+    // disabled affordance. A caller invoking this outside the normal button
+    // click (tests, a future programmatic path) must not bypass it.
+    if (coverageGate.blocked) {
+      setDownloadError("Finish every inventory character before downloading.");
+      return;
+    }
     setDownloading(true);
     setDownloadError(null);
     setDownloadWarnings([]);
@@ -250,7 +303,7 @@ export function usePreviewArtifact(): PreviewArtifact {
     } finally {
       setDownloading(false);
     }
-  }, [stage, revokeZipUrl]);
+  }, [stage, revokeZipUrl, coverageGate.blocked]);
 
   return {
     baseKeyboard,
@@ -268,6 +321,7 @@ export function usePreviewArtifact(): PreviewArtifact {
     downloadError,
     downloadWarnings,
     handleDownload,
+    coverageGate,
     showIdentityWarn,
   };
 }

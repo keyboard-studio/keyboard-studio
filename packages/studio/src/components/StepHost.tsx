@@ -43,6 +43,8 @@ import { navigateTo } from "../lib/navigate.ts";
 import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
 import type { SurveyContext } from "../steps/types.ts";
 import { ACCENT, ERROR_RED, TEXT_DIM, BORDER } from "../ui/theme.ts";
+import { useInventoryDiff } from "../hooks/useInventoryDiff.ts";
+import { inventoryCoverageGate } from "../lib/unimplementedInventory.ts";
 
 // ---------------------------------------------------------------------------
 // isSurveyPhaseResult — shape guard for the generic completion path.
@@ -124,6 +126,29 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   const setCharactersSubStage = useSurveySessionStore((s) => s.setCharactersSubStage);
 
   const recordPhase = useWorkingCopyStore((s) => s.recordPhase);
+
+  // ---------------------------------------------------------------------------
+  // Phase F hard-gate inputs — derived via the SAME shared helper
+  // (lib/unimplementedInventory.ts) the two galleries use for their leave-
+  // warnings, so "is character X implemented" never forks across the three
+  // call sites. touchLayoutJson === null means touch was never authored (or a
+  // truly-untouched import-adapt needed no emission — see
+  // buildTouchLayoutJson's R11 matrix) — either way, a desktop-only session
+  // must not be blocked on touch.
+  // ---------------------------------------------------------------------------
+  const phaseResultsForGate = useWorkingCopyStore((s) => s.phaseResults);
+  const touchLayoutJsonForGate = useWorkingCopyStore((s) => s.touchLayoutJson);
+  const confirmedInventoryForGate = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  const { lettersToAdd: lettersToAddForGate } = useInventoryDiff();
+  const desktopAssignmentsForGate = (
+    phaseResultsForGate.find((p) => p.phase === "C")?.assignments ?? []
+  ).filter((a) => a.modality === "physical");
+  const allCharactersImplemented = !inventoryCoverageGate({
+    desktopAssignments: desktopAssignmentsForGate,
+    lettersToAdd: lettersToAddForGate,
+    touchLayoutJson: touchLayoutJsonForGate,
+    confirmedInventory: confirmedInventoryForGate,
+  }).blocked;
 
   // ---------------------------------------------------------------------------
   // Terminal: done — survey-complete panel
@@ -246,6 +271,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
       // (both "import-adapt" | "reseed-from-desktop" | null) — no cast needed,
       // same as selectedTrack above (Track mirror).
       touchSeedSource: postMutationState.touchSeedSource,
+      allCharactersImplemented,
     });
 
     // 4. Session advance to next step.

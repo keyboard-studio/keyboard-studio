@@ -9,7 +9,7 @@
 //
 // Defect B regression is covered in StudioShell.test.tsx.
 
-import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
+import { describe, it, expect, afterEach, vi, beforeEach, beforeAll } from "vitest";
 import { screen, fireEvent, act, cleanup, waitFor, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { TouchGallery, buildTouchMechanismRef } from "./TouchGallery.tsx";
@@ -205,6 +205,23 @@ function runTransform(kbId: string) {
   fn(vfs, kbId);
   return vfs;
 }
+
+// jsdom does not implement HTMLDialogElement.showModal()/close() — the same
+// shim + rationale as CarveGallery.test.tsx / ConfirmDialog.test.tsx. Needed
+// here because the leave-warning modal (ConfirmDialog) now mounts whenever
+// the FR-008 gate finds uncovered characters.
+beforeAll(() => {
+  if (typeof HTMLDialogElement.prototype.showModal !== 'function') {
+    HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
+      this.setAttribute('open', '');
+    };
+  }
+  if (typeof HTMLDialogElement.prototype.close !== 'function') {
+    HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
+      this.removeAttribute('open');
+    };
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Teardown
@@ -1120,6 +1137,96 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
       expect(onComplete).toHaveBeenCalledOnce();
     });
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Leave-warning modal (the same ConfirmDialog contract MechanismGallery uses,
+// see MechanismGallery.test.tsx's own "leave-warning modal open/closed state"
+// suite) — TouchGallery's version fires from the SAME handleContinue gate as
+// the FR-008 inline-alert refusal above, so the modal and the alert always
+// open together on a refused completion attempt. Queried via the native
+// <dialog open> attribute rather than button presence: ConfirmDialog always
+// renders both buttons regardless of `open`, so a bare button-exists query
+// cannot distinguish "modal is showing" from "modal is mounted but closed".
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — leave-warning modal open/closed state", () => {
+  it("does NOT open the dialog when completion succeeds with every character covered", async () => {
+    const onComplete = vi.fn();
+    seedStore({ withInventory: ["a"] }); // "a" is already covered by the default scaffold.
+    const { container } = await act(async () =>
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(onComplete).toHaveBeenCalledOnce();
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+  });
+
+  it("opens the dialog (native <dialog open> attribute) alongside the inline alert when the completion gate refuses", async () => {
+    seedStore({ withInventory: ["中"] });
+    const { container } = await act(async () =>
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(container.querySelector("dialog")?.hasAttribute("open")).toBe(true);
+  });
+
+  it('"Go back and finish" (primary) closes the dialog and does NOT complete — the author stays in the gallery able to finish "中"', async () => {
+    const onComplete = vi.fn();
+    seedStore({ withInventory: ["中"] });
+    const { container } = await act(async () =>
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(container.querySelector("dialog")?.hasAttribute("open")).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: /Go back and finish/i }));
+
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+    // Still on "中" — the method chooser is still available to actually cover it.
+    expectCurrentChar("中");
+    expect(screen.getByLabelText(/Host key for long-press/i)).toBeTruthy();
+  });
+
+  it("Escape (the native <dialog> cancel event) does NOT proceed — it stays in the gallery, same as \"Go back and finish\" (P1(a))", async () => {
+    const onComplete = vi.fn();
+    seedStore({ withInventory: ["中"] });
+    const { container } = await act(async () =>
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    const dialog = container.querySelector("dialog")!;
+    expect(dialog.hasAttribute("open")).toBe(true);
+
+    fireEvent(dialog, new Event("cancel", { cancelable: true }));
+
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(dialog.hasAttribute("open")).not.toBe(true);
+    expectCurrentChar("中");
+  });
+
+  it("the ← back to previous character control never opens the leave-warning modal, even while the current character remains uncovered", async () => {
+    seedStore({ withInventory: ["中", "日"] });
+    const { container } = await act(async () =>
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />),
+    );
+    // Advance to "日" without covering "中" — Skip is pure forward nav.
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    await waitFor(() => {
+      expectCurrentChar("日");
+    });
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+
+    // Back to the still-uncovered "中" — a DIFFERENT control from the forward
+    // Done/Skip-on-last path that triggers the modal, and must never open it.
+    fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
+    await waitFor(() => {
+      expectCurrentChar("中");
+    });
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
   });
 });
 

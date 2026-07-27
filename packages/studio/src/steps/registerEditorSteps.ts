@@ -36,6 +36,7 @@ import {
   ProjectNameStepFactoryComponent,
   PhaseFStepFactoryComponent,
 } from "../editors/adapters/flowStepOptions.tsx";
+import { PhaseFGate } from "../editors/adapters/PhaseFGate.tsx";
 
 // ---------------------------------------------------------------------------
 // Helper for common step structure
@@ -189,11 +190,13 @@ export const touchStep: EditorStep = step({
  * Help step: Phase F question phase (Help & Tips).
  * Spine descriptor; content resolves through PhaseF survey runner (T028).
  * spec 029: PhaseFStepFactoryComponent matches mounted component (SC-005).
+ * Wrapped in PhaseFGate — the hard "every character implemented" gate (the Phase F hard gate)
+ * layered on top of PhaseFStepFactoryComponent; see PhaseFGate.tsx.
  */
 export const helpStep: EditorStep = step({
   id: "help",
   title: "Help & Tips",
-  component: PhaseFStepFactoryComponent,
+  component: PhaseFGate,
   flowRefs: ["phase_f_helpdocs"],
 });
 
