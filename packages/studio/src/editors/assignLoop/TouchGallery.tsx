@@ -73,7 +73,6 @@ import type {
   TouchLayoutIR,
 } from "@keyboard-studio/contracts";
 import {
-  createVirtualFS,
   toUPlusNotation,
   isDecomposableAccented,
   formatUncoveredTouchMessage,
@@ -98,8 +97,6 @@ import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { promoteOnManualEdit } from "./touchBehavior.ts";
 import { displayChar } from "../../lib/irToCarveNodes.ts";
 import { isMutateSeamEnabled } from "../../flags/mutateFlag.ts";
-import { LintSummary } from "../../lint/index.ts";
-import { useTouchLint } from "../../hooks/useTouchLint.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type {
   ScaffoldSpec,
@@ -777,9 +774,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const markGalleryIntroSeen = useWorkingCopyStore(
     (s) => s.markGalleryIntroSeen,
   );
-
-  // Derive keyboardId from identity (Track 1) or baseKeyboard (Track 2).
-  const keyboardId = identity?.keyboardId ?? baseKeyboard?.id ?? null;
 
   // ---------------------------------------------------------------------------
   // Live OSK preview — right pane wiring
@@ -1517,44 +1511,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     [method],
   );
 
-  // Projected VFS for lint — clones baseVfs and overwrites the touch layout path
-  // with the same touchLayoutJson the preview uses (lint, preview, output agree
-  // per the spec 035 R11 emission matrix — see the touchLayoutJson memo above).
-  // When touchLayoutJson is null — baseIr not yet set, the R11 matrix said
-  // "don't emit", or the emit pipeline failed — lint sees the raw baseVfs
-  // (the shipped file, if any, stays verbatim — a byte-preserving no-op).
-  // keyboardId in deps so the path key stays correct if the id changes.
-  const editedVfsForLint = useMemo(() => {
-    if (baseVfs === null) return null;
-    if (touchLayoutJson === null || keyboardId === null) return baseVfs;
-    const cloned = createVirtualFS(baseVfs.entries());
-    cloned.set(`source/${keyboardId}.keyman-touch-layout`, touchLayoutJson);
-    return cloned;
-  }, [baseVfs, touchLayoutJson, keyboardId]);
-
-  // Touch lint context (spec 035 FR-008/18.6) — feeds KM_LINT_TOUCH_UNCOVERED
-  // alongside 18.1–18.5. `layoutForLintAndGate` is the SAME layout the
-  // completion gate in handleContinue checks (edits included when
-  // touchLayoutJson is non-null, else the effective seed) so lint and the
-  // gate cannot drift. null when baseIr has not loaded — useTouchLint treats
-  // a null/undefined context as "run the context-free checks only".
-  const touchLintContext = useMemo(
-    () =>
-      layoutForLintAndGate !== null
-        ? { layout: layoutForLintAndGate, inventory }
-        : null,
-    [layoutForLintAndGate, inventory],
-  );
-
-  // Touch lint — runs on the projected (edited) VFS so checks 18.1–18.5 reflect
-  // Phase E edits. The existing 300ms debounce inside useTouchLint is unchanged
-  // (fs + context are debounced together — Constitution IV, no second timer).
-  const { touchFindings, touchLintRunning } = useTouchLint(
-    editedVfsForLint,
-    keyboardId,
-    touchLintContext,
-  );
-
   // ---------------------------------------------------------------------------
   // Shared styles — defined before guards so they can be referenced in guard renders
   // ---------------------------------------------------------------------------
@@ -2043,27 +1999,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
         />
       )}
 
-      {/* Lint summary — Layer C touch checks (18.1–18.5) */}
-      <div>
-        <p
-          style={{
-            margin: "0 0 8px",
-            fontSize: 11,
-            color: TEXT_DIM,
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-            fontFamily: FONT,
-          }}
-        >
-          <Trans id="editor.assignLoop.touch.layoutChecksHeading">
-            Touch layout checks
-          </Trans>
-          {touchLintRunning
-            ? ` ${t({ id: "editor.assignLoop.touch.runningSuffix", message: "(running...)" })}`
-            : ""}
-        </p>
-        <LintSummary findings={touchFindings} />
-      </div>
     </div>
   );
 
