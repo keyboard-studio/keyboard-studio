@@ -26,7 +26,7 @@ export {
 // ---------------------------------------------------------------------------
 
 import type { CSSProperties } from "react";
-import { BG_PAGE, BORDER, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION } from "../ui/theme.ts";
+import { BG_PAGE, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION } from "../ui/theme.ts";
 
 /** Base page-level style shared by the mechanism/sequence/touch galleries' guard/content branches. */
 export const galleryPageStyle: CSSProperties = {
@@ -92,3 +92,46 @@ export const galleryInputStyle: CSSProperties = {
  * fourth SelectMenu migration doesn't hand-copy a fourth near-identical const.
  */
 export const gallerySelectMenuStyle = (width: number): CSSProperties => ({ width, fontSize: 12 });
+
+/**
+ * Transparent, full-width method-card header button — shared by
+ * MethodChooser (MechanismGallery.tsx) and TouchMethodChooser
+ * (TouchGallery.tsx); byte-identical across both prior to consolidation.
+ */
+export const galleryHeaderBtnStyle: CSSProperties = {
+  width: "100%",
+  padding: "10px 14px",
+  background: "transparent",
+  border: "none",
+  color: TEXT_MAIN,
+  fontSize: 13,
+  fontFamily: FONT,
+  cursor: "pointer",
+  textAlign: "left",
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+};
+
+/**
+ * Inline config-panel wrapper shown below an expanded method-card header —
+ * shared by MethodChooser and TouchMethodChooser.
+ */
+export const galleryConfigStyle: CSSProperties = {
+  padding: "0 14px 12px",
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+};
+
+/**
+ * Method-card container style — active card gets an accent border and dark
+ * highlight background; shared by MethodChooser and TouchMethodChooser.
+ */
+export const galleryCardStyle = (active: boolean): CSSProperties => ({
+  borderRadius: 8,
+  border: `1px solid ${active ? ACCENT : BORDER}`,
+  background: active ? "#0d2840" : BG_PAGE,
+  overflow: "hidden",
+  transition: "border-color 120ms ease, background 120ms ease",
+});

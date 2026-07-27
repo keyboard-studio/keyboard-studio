@@ -100,16 +100,20 @@ import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
+import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
+import { RemovableChipRow } from "./parts/RemovableChipRow.tsx";
 import { SequenceBuilderPanel, hasSequenceForChar } from "./SequenceBuilderPanel.tsx";
 import { RadioGroup } from "../../ui/RadioGroup.tsx";
 import { SelectMenu, type SelectMenuOption } from "../../ui/SelectMenu.tsx";
 import {
-  BG_PAGE, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
-  galleryPageStyle as pageStyle,
+  BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
   galleryGhostBtn as ghostBtn,
   galleryInputStyle as inputStyle,
   galleryForwardBtnStyle as forwardBtnStyle,
   gallerySelectMenuStyle,
+  galleryHeaderBtnStyle as headerBtnStyle,
+  galleryConfigStyle as configStyle,
+  galleryCardStyle as cardStyle,
 } from "../../lib/galleryTheme.ts";
 import {
   PATTERN_SEQUENCE, PATTERN_DEADKEY, PATTERN_SWAP, PATTERN_RALT,
@@ -482,33 +486,13 @@ const VALID_DEADKEY_TRIGGER_KEYS: ReadonlySet<string> = new Set(
 // SelectMenus); the base-key picker itself uses KeyPickerField, which carries
 // its own internal style.
 
-// Static styles shared across MethodChooser renders — none depend on props or
-// state, so they are hoisted to module scope rather than recreated per render.
-const headerBtnStyle: CSSProperties = {
-  width: "100%",
-  padding: "10px 14px",
-  background: "transparent",
-  border: "none",
-  color: TEXT_MAIN,
-  fontSize: 13,
-  fontFamily: FONT,
-  cursor: "pointer",
-  textAlign: "left",
-  display: "flex",
-  flexDirection: "column",
-  gap: 4,
-};
-
-const configStyle: CSSProperties = {
-  padding: "0 14px 12px",
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-};
-
-// pageStyle, ghostBtn, and inputStyle are imported (aliased) from
-// ../../lib/galleryTheme.ts — shared byte-for-byte with SequenceBuilderPanel.tsx
-// (and, for pageStyle/ghostBtn, TouchGallery.tsx) rather than redefined here.
+// ghostBtn, inputStyle, headerBtnStyle, configStyle, and cardStyle are
+// imported (aliased) from ../../lib/galleryTheme.ts — shared byte-for-byte
+// with SequenceBuilderPanel.tsx (and, for ghostBtn/headerBtnStyle/
+// configStyle/cardStyle, TouchGallery.tsx) rather than redefined here. The
+// page-level wrapper style (pageStyle) is no longer imported directly here —
+// it's used via GalleryEmptyState.tsx (the no-base-keyboard/no-inventory
+// guards) rather than inline.
 
 function MethodChooser({
   currentChar,
@@ -606,14 +590,8 @@ function MethodChooser({
     ? displayChar(deadkeyBaseLetterDisplay)
     : t({ id: "editor.assignLoop.deadkeyBaseLetterPlaceholder", message: "[base letter]" });
 
-  // Each method is one card: transparent header button + inline config when selected.
-  const cardStyle = (active: boolean): CSSProperties => ({
-    borderRadius: 8,
-    border: `1px solid ${active ? ACCENT : BORDER}`,
-    background: active ? "#0d2840" : BG_PAGE,
-    overflow: "hidden",
-    transition: "border-color 120ms ease, background 120ms ease",
-  });
+  // Each method is one card: transparent header button + inline config when
+  // selected. cardStyle is imported from ../../lib/galleryTheme.ts.
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1999,29 +1977,14 @@ export function MechanismGallery({
 
   if (selectedBaseKeyboard === null) {
     return (
-      <div style={{ ...pageStyle, padding: "24px 32px" }}>
-        <div style={{ maxWidth: 780, margin: "0 auto" }}>
-          {onBack !== undefined && (
-            <button type="button" onClick={onBack} style={ghostBtn}>
-              <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
-            </button>
-          )}
-          <div
-            style={{
-              maxWidth: 560,
-              margin: "60px auto",
-              textAlign: "center",
-              color: TEXT_DIM,
-            }}
-          >
-            <p style={{ fontSize: 15 }}>
-              <Trans id="editor.assignLoop.noBaseKeyboardSelected">
-                No base keyboard selected. Go back to choose a starting point.
-              </Trans>
-            </p>
-          </div>
-        </div>
-      </div>
+      <GalleryEmptyState
+        {...(onBack !== undefined ? { onBack } : {})}
+        message={
+          <Trans id="editor.assignLoop.noBaseKeyboardSelected">
+            No base keyboard selected. Go back to choose a starting point.
+          </Trans>
+        }
+      />
     );
   }
 
@@ -2031,30 +1994,15 @@ export function MechanismGallery({
 
   if (inventory.length === 0) {
     return (
-      <div style={{ ...pageStyle, padding: "24px 32px" }}>
-        <div style={{ maxWidth: 780, margin: "0 auto" }}>
-          {onBack !== undefined && (
-            <button type="button" onClick={onBack} style={ghostBtn}>
-              <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
-            </button>
-          )}
-          <div
-            style={{
-              maxWidth: 560,
-              margin: "60px auto",
-              textAlign: "center",
-              color: TEXT_DIM,
-            }}
-          >
-            <p style={{ fontSize: 15 }}>
-              <Trans id="editor.assignLoop.noInventoryConfirmed">
-                No inventory confirmed yet. Complete the Survey (Phase B) to
-                confirm which characters your keyboard must produce.
-              </Trans>
-            </p>
-          </div>
-        </div>
-      </div>
+      <GalleryEmptyState
+        {...(onBack !== undefined ? { onBack } : {})}
+        message={
+          <Trans id="editor.assignLoop.noInventoryConfirmed">
+            No inventory confirmed yet. Complete the Survey (Phase B) to
+            confirm which characters your keyboard must produce.
+          </Trans>
+        }
+      />
     );
   }
 
@@ -2771,124 +2719,52 @@ export function MechanismGallery({
 
           {/* Added chip row — characters already configured, removable */}
           {coveredChars.size > 0 && (
-            <div>
-              <p
-                style={{
-                  margin: "0 0 6px",
-                  fontSize: 11,
-                  color: TEXT_DIM,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                <Trans id="editor.assignLoop.addedHeading">Added</Trans>
-              </p>
-              <div
-                role="group"
-                aria-label={t({ id: "editor.assignLoop.addedGroupAriaLabel", message: "Added characters — click to remove" })}
-                style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
-              >
-                {[...coveredChars].map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => handleRemoveCovered(c)}
-                    aria-label={t({
-                      id: "editor.assignLoop.removeCharacterAriaLabel",
-                      message: `Remove ${{ notation: toUPlusNotation(c) }} ${{ char: c }}`,
-                    })}
-                    title={t({
-                      id: "editor.assignLoop.removeCharacterTitle",
-                      message: `${{ notation: toUPlusNotation(c) }} — click to remove`,
-                    })}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 4,
-                      padding: "4px 8px",
-                      background: "#0d2218",
-                      border: "1px solid #238636",
-                      borderRadius: 16,
-                      color: "#56d364",
-                      fontSize: 13,
-                      fontFamily: "monospace",
-                      cursor: "pointer",
-                      lineHeight: 1.3,
-                    }}
-                  >
-                    {displayChar(c)}
-                    <span
-                      aria-hidden="true"
-                      style={{ fontSize: 11, color: "#56d364", opacity: 0.7 }}
-                    >
-                      &times;
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <RemovableChipRow
+              heading={<Trans id="editor.assignLoop.addedHeading">Added</Trans>}
+              groupAriaLabel={t({ id: "editor.assignLoop.addedGroupAriaLabel", message: "Added characters — click to remove" })}
+              chipBackground="#0d2218"
+              chipBorder="#238636"
+              chipColor="#56d364"
+              items={[...coveredChars].map((c) => ({
+                key: c,
+                label: displayChar(c),
+                onClick: () => handleRemoveCovered(c),
+                ariaLabel: t({
+                  id: "editor.assignLoop.removeCharacterAriaLabel",
+                  message: `Remove ${{ notation: toUPlusNotation(c) }} ${{ char: c }}`,
+                }),
+                title: t({
+                  id: "editor.assignLoop.removeCharacterTitle",
+                  message: `${{ notation: toUPlusNotation(c) }} — click to remove`,
+                }),
+              }))}
+            />
           )}
 
           {/* Sequences chip row — chars with a recorded multi_char_sequence
               assignment, tracked separately from "Added" (see
               excludeSequenceMechanisms). */}
           {sequenceRecordedChars.length > 0 && (
-            <div>
-              <p
-                style={{
-                  margin: "0 0 6px",
-                  fontSize: 11,
-                  color: TEXT_DIM,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                <Trans id="editor.assignLoop.sequencesHeading">Sequences</Trans>
-              </p>
-              <div
-                role="group"
-                aria-label={t({ id: "editor.assignLoop.sequencesGroupAriaLabel", message: "Characters with a recorded sequence — click to remove" })}
-                style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
-              >
-                {sequenceRecordedChars.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => unflagCharForSequence(c)}
-                    aria-label={t({
-                      id: "editor.assignLoop.removeSequenceAssignmentListAriaLabel",
-                      message: `Remove recorded sequence for ${{ notation: toUPlusNotation(c) }} ${{ char: c }}`,
-                    })}
-                    title={t({
-                      id: "editor.assignLoop.removeSequenceAssignmentTitle",
-                      message: `${{ notation: toUPlusNotation(c) }} — click to remove`,
-                    })}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 4,
-                      padding: "4px 8px",
-                      background: "#1c2a3a",
-                      border: "1px solid #58a6ff",
-                      borderRadius: 16,
-                      color: "#58a6ff",
-                      fontSize: 13,
-                      fontFamily: "monospace",
-                      cursor: "pointer",
-                      lineHeight: 1.3,
-                    }}
-                  >
-                    {displayChar(c)}
-                    <span
-                      aria-hidden="true"
-                      style={{ fontSize: 11, color: "#58a6ff", opacity: 0.7 }}
-                    >
-                      &times;
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <RemovableChipRow
+              heading={<Trans id="editor.assignLoop.sequencesHeading">Sequences</Trans>}
+              groupAriaLabel={t({ id: "editor.assignLoop.sequencesGroupAriaLabel", message: "Characters with a recorded sequence — click to remove" })}
+              chipBackground="#1c2a3a"
+              chipBorder="#58a6ff"
+              chipColor="#58a6ff"
+              items={sequenceRecordedChars.map((c) => ({
+                key: c,
+                label: displayChar(c),
+                onClick: () => unflagCharForSequence(c),
+                ariaLabel: t({
+                  id: "editor.assignLoop.removeSequenceAssignmentListAriaLabel",
+                  message: `Remove recorded sequence for ${{ notation: toUPlusNotation(c) }} ${{ char: c }}`,
+                }),
+                title: t({
+                  id: "editor.assignLoop.removeSequenceAssignmentTitle",
+                  message: `${{ notation: toUPlusNotation(c) }} — click to remove`,
+                }),
+              }))}
+            />
           )}
       </>
 
