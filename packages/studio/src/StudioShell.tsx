@@ -40,6 +40,7 @@ import { manifest } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { StepHost } from "./components/StepHost.tsx";
 import { ResumeDraftBanner } from "./components/ResumeDraftBanner.tsx";
+import { SurveyResetButton } from "./components/SurveyResetButton.tsx";
 import {
   loadDraftMeta,
   applyDraft,
@@ -772,12 +773,22 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   const rightPct = 100 - leftPct;
 
+  // Corner reset — visible on every survey step (both layouts). Wired to the
+  // same handleStartOver as the terminal panels' "Start over", so it clears
+  // stores + draft directly and never trips the rebase-confirm dialog.
+  const resetButton = <SurveyResetButton onReset={handleStartOver} />;
+
   // Full-screen steps (carve/mechanisms/touch) bypass the two-pane layout.
   // StepHost returns the full-screen container; SurveyView renders it directly.
   // This reproduces the pre-Stage-5 early-return pattern without per-step branches
   // in SurveyView — the decision is data-driven via step.layout (R4, FR-002).
   if (activeStepIsFullScreen) {
-    return stepHost;
+    return (
+      <>
+        {stepHost}
+        {resetButton}
+      </>
+    );
   }
 
   return (
@@ -870,6 +881,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           </>
         )}
       </section>
+
+      {resetButton}
     </div>
   );
 }
