@@ -130,13 +130,26 @@ describe("discovery-method offer (obligation P2, FR-016)", () => {
     expect(screen.getByTestId("exemplar-offer-preview").textContent).toContain("ŋ");
   });
 
-  it("elides a long preview rather than dumping the whole alphabet", async () => {
-    const many = Array.from({ length: 40 }, (_, i) => String.fromCodePoint(0x61 + (i % 26)));
-    getSourcedExemplars.set(inventory([...new Set(many)]));
+  it("shows the whole alphabet as cards — the list is never truncated", async () => {
+    const many = [...new Set(Array.from({ length: 40 }, (_, i) => String.fromCodePoint(0x61 + (i % 26))))];
+    getSourcedExemplars.set(inventory(many));
     renderPhaseB();
     await exemplarRadio();
     const preview = await screen.findByTestId("exemplar-offer-preview");
-    expect(preview.textContent).toContain("more");
+    // No "+N more" elision — every character is present, one card each.
+    expect(preview.textContent).not.toContain("more");
+    for (const c of many) {
+      expect(preview.querySelector(`[aria-label^="${c} "]`)).not.toBeNull();
+    }
+  });
+
+  it("renders a floating diacritic with the dotted circle (U+25CC)", async () => {
+    // U+0301 COMBINING ACUTE ACCENT — a bare mark must be visible standalone.
+    getSourcedExemplars.set(inventory(["a", "́"]));
+    renderPhaseB();
+    await exemplarRadio();
+    const preview = await screen.findByTestId("exemplar-offer-preview");
+    expect(preview.textContent).toContain("◌́");
   });
 
   it("does not pre-select the offer once it has been declined (FR-016a)", async () => {

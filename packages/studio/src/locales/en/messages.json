@@ -89,7 +89,6 @@
   "dashboard.strategyTree.secondaryPass.addArrow": "→ add",
   "survey.phaseB.charChipEditor.addButton": "+ Add",
   "editor.assignLoop.ralt.addLayerButton": "+ Add layer",
-  "survey.phaseB.intro.exemplars.more": "+{elided} more",
   "editor.assignLoop.statusBar.removedCountButton": "<0>{0}</0> removed",
   "editor.assignLoop.statusBar.keptLine": "<0>{kept}</0> of {total} characters kept",
   "editor.assignLoop.inspector.noLongerReferenced": "<0>No longer referenced.</0> {referencedByLabel} was removed, so this store is now unused and safe to drop.",

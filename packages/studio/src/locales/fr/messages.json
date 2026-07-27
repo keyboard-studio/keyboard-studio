@@ -89,7 +89,6 @@
   "dashboard.strategyTree.secondaryPass.addArrow": "→ ajouter",
   "survey.phaseB.charChipEditor.addButton": "+ Ajouter",
   "editor.assignLoop.ralt.addLayerButton": "+ Ajouter une couche",
-  "survey.phaseB.intro.exemplars.more": "",
   "editor.assignLoop.statusBar.removedCountButton": "<0>{0}</0> supprimé(s)",
   "editor.assignLoop.statusBar.keptLine": "<0>{kept}</0> caractères conservés sur {total}",
   "editor.assignLoop.inspector.noLongerReferenced": "<0>Plus référencé.</0> {referencedByLabel} a été supprimé, donc ce magasin est maintenant inutilisé et peut être supprimé sans risque.",

@@ -1465,17 +1465,19 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
 // The author is being asked to accept a proposed alphabet, so what is being
 // proposed has to be visible at the point of the decision, not one click away
 // (obligation P2). Shows the source, its confidence, how many characters, and
-// a preview of the actual main set.
+// the actual main set.
+//
+// The character list is shown IN FULL and is never truncated — the author
+// cannot confirm an alphabet they cannot see. Each character is a read-only
+// card matching the chips on the build-list page (glyph + code-point label);
+// a floating diacritic renders with the dotted circle (U+25CC) via displayChar
+// so a bare combining mark is visible standalone, the same treatment as the
+// breakdown and character-map pages.
 // ---------------------------------------------------------------------------
-
-/** How many main-tier characters to show before eliding. */
-const EXEMPLAR_PREVIEW_LIMIT = 24;
 
 function ExemplarOfferDetail({ inventory }: { inventory: SourcedInventory }) {
   const glyphFontStack = useGlyphFontStack();
   const main = charactersInTier(inventory, "main");
-  const preview = main.slice(0, EXEMPLAR_PREVIEW_LIMIT);
-  const elided = main.length - preview.length;
 
   return (
     <div
@@ -1491,24 +1493,27 @@ function ExemplarOfferDetail({ inventory }: { inventory: SourcedInventory }) {
           {{ n: main.length }} characters
         </Trans>
       </p>
-      <p
+      <div
         data-testid="exemplar-offer-preview"
-        style={{
-          margin: 0,
-          fontSize: 16,
-          lineHeight: 1.6,
-          wordBreak: "break-word",
-          fontFamily: glyphFontStack,
-        }}
+        style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
       >
-        {preview.join(" ")}
-        {elided > 0 && (
-          <span style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-            {" "}
-            <Trans id="survey.phaseB.intro.exemplars.more">+{{ elided }} more</Trans>
-          </span>
-        )}
-      </p>
+        {main.map((c) => {
+          const { title } = codepointLabel(c);
+          return (
+            <span
+              key={c}
+              title={title}
+              aria-label={`${displayChar(c)} (${title})`}
+              // Read-only VIEW card (not a toggle/remove button) — no pointer
+              // cursor, matching AlphabetBreakdown's chips.
+              style={{ ...charChip(false), cursor: "default" }}
+            >
+              <span style={chipGlyph(true, glyphFontStack)}>{displayChar(c)}</span>
+              <CpLabel grapheme={c} />
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }
