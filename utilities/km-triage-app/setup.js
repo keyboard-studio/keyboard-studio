@@ -59,7 +59,13 @@ const manifest = {
     issues: 'write',
     contents: 'read',
     metadata: 'read',
-    checks: 'read',
+    // MUST be 'write', not 'read'. The triage publishes the `km-triage/review`
+    // check_run (check-progress.js POSTs /repos/.../check-runs), and that check
+    // is a required status check in the `main: CI + integrity` ruleset — so a
+    // read-only App produces a bot that authenticates fine, reviews fine, and
+    // then cannot unblock a single merge. Failure mode is a 403 at publish time,
+    // long after setup looked successful.
+    checks: 'write',
   },
   default_events: [],
 };
@@ -85,7 +91,7 @@ function homePage() {
       <input type="hidden" name="manifest" id="manifest-input">
       <button type="submit">Create GitHub App on github.com</button>
     </form>
-    <p style="margin-top:48px;color:#888;font-size:13px;">Permissions requested: PRs read/write, Issues read/write, Contents read, Checks read, Metadata read. No webhooks.</p>
+    <p style="margin-top:48px;color:#888;font-size:13px;">Permissions requested: PRs read/write, Issues read/write, Contents read, Checks read/write, Metadata read. No webhooks.</p>
     <script>document.getElementById('manifest-input').value = ${manifestJsLiteral};</script>
   `);
 }
