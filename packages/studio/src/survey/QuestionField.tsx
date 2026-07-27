@@ -627,9 +627,10 @@ function StyledCombobox({
 function SelectField({ question, value, onChange }: FieldProps) {
   const { t } = useLingui();
   const strVal = stringValue(value);
-  // Leading placeholder option — matches ui/Dropdown's own hardcoded "— Select
-  // one —" entry (always first, selectable to reset to unanswered), now
-  // actually localized (Dropdown's was a plain string, never wrapped in t()).
+  // Leading placeholder option — matches the hardcoded "— Select one —" entry
+  // of the now-removed ui/Dropdown (always first, selectable to reset to
+  // unanswered), now actually localized (Dropdown's was a plain string, never
+  // wrapped in t()).
   const selectOptions: SelectMenuOption[] = [
     { value: "", label: t({ id: "survey.selectField.placeholder", message: "— Select one —" }) },
     ...(question.options ?? []).map((opt) => ({ value: opt.value, label: opt.label })),

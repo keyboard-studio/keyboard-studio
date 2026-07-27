@@ -9,7 +9,7 @@
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { AttestedStack } from "@keyboard-studio/contracts";
-import { toUPlusNotation } from "@keyboard-studio/contracts";
+import { composeStack, stackKey, toUPlusNotation } from "@keyboard-studio/contracts";
 import { BORDER, TEXT_MAIN, mutedParaFlush, sectionHeading } from "../surveyStyles.ts";
 
 export interface StackingStationProps {
@@ -20,14 +20,6 @@ export interface StackingStationProps {
   /** Per-stack confirmation, keyed by the stack's ordered shape. */
   confirmed: Record<string, boolean>;
   onConfirmChange: (stackKey: string, next: boolean) => void;
-}
-
-export function stackKey(stack: AttestedStack): string {
-  return `${stack.base} ${stack.marks.join(" ")}`;
-}
-
-function composed(stack: AttestedStack): string {
-  return (stack.base + stack.marks.join("")).normalize("NFC");
 }
 
 export function StackingStation({
@@ -144,10 +136,10 @@ export function StackingStation({
                     onChange={(e) => onConfirmChange(key, e.target.checked)}
                     aria-label={t({
                       id: "survey.marks.stacking.checkboxAriaLabel",
-                      message: `Allow ${{ composed: composed(stack) }} (${{ marks: stack.marks.map((m) => toUPlusNotation(m)).join(" + ") }})`,
+                      message: `Allow ${{ composed: composeStack(stack) }} (${{ marks: stack.marks.map((m) => toUPlusNotation(m)).join(" + ") }})`,
                     })}
                   />
-                  <span style={{ fontSize: 18 }}>{composed(stack)}</span>
+                  <span style={{ fontSize: 18 }}>{composeStack(stack)}</span>
                 </label>
               );
             })}

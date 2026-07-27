@@ -78,7 +78,7 @@ export function casePairOf(c: string, bcp47?: string): string[] {
 // ---------------------------------------------------------------------------
 
 /** The uppercase counterpart of `b` when `b` is a cased lowercase letter, else null. */
-function upperCounterpartOf(b: string, bcp47?: string): string | null {
+export function upperCounterpartOf(b: string, bcp47?: string): string | null {
   const cc = caseCounterpart(b, bcp47);
   return cc?.direction === "toUpper" ? cc.counterpart : null;
 }

@@ -1,6 +1,7 @@
 // SelectMenu — a custom, DOM-rendered single-select dropdown.
 //
-// WHY this exists instead of the native-<select>-backed ui/Dropdown.tsx:
+// WHY this exists instead of a native-<select>-backed dropdown (the
+// now-removed ui/Dropdown.tsx):
 // native <select> popups do not open in the VS Code Simple Browser /
 // Electron webview — clicking the control does nothing visible. SelectMenu
 // renders its option list as an ordinary absolutely-positioned <ul>, which
@@ -40,9 +41,9 @@ export interface SelectMenuProps {
   ariaLabel?: string;
   /**
    * Style override merged onto the trigger button, on top of the default
-   * `TRIGGER_STYLE` — same "callers may override, merged not replaced" idiom
-   * as `ui/Dropdown.tsx`, and applied to the same element Dropdown applies
-   * its override to (the visible control), not the outer wrapper. Lets a
+   * `TRIGGER_STYLE` — the "callers may override, merged not replaced" idiom
+   * inherited from the now-removed `ui/Dropdown.tsx`, applied to the visible
+   * control (the trigger button), not the outer wrapper. Lets a
    * caller size the control (e.g. a fixed width) the way a native `<select>`
    * would otherwise auto-size to its content.
    */
