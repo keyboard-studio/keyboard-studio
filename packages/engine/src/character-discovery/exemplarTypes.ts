@@ -52,17 +52,10 @@ export const EXEMPLAR_CONFIDENCE_RANK: readonly ExemplarConfidence[] = [
 ];
 
 /**
- * Rank index of a draft status — lower is more confident. An unrecognized or
- * absent status resolves to "approved" (rank 0), matching LDML's default of
- * "no draft attribute means the value is final".
+ * Narrows an arbitrary LDML draft string to a known confidence, or "approved".
+ * An unrecognized or absent status resolves to "approved", matching LDML's
+ * default of "no draft attribute means the value is final".
  */
-export function confidenceRank(confidence: string | undefined): number {
-  if (confidence === undefined) return 0;
-  const i = EXEMPLAR_CONFIDENCE_RANK.indexOf(confidence as ExemplarConfidence);
-  return i === -1 ? 0 : i;
-}
-
-/** Narrows an arbitrary LDML draft string to a known confidence, or "approved". */
 export function toExemplarConfidence(draft: string | undefined): ExemplarConfidence {
   if (draft === undefined) return "approved";
   return EXEMPLAR_CONFIDENCE_RANK.includes(draft as ExemplarConfidence)

@@ -42,14 +42,6 @@ export type {
   SourcedInventory,
 } from "./exemplarTypes.js";
 
-/** Index tier key -> tier name. */
-const TIER_FOR_KEY: Record<string, ExemplarTier> = {
-  m: "main",
-  a: "auxiliary",
-  p: "punctuation",
-  n: "numbers",
-};
-
 const KEY_FOR_TIER: Record<ExemplarTier, keyof IndexTierSets> = {
   main: "m",
   auxiliary: "a",
@@ -242,11 +234,6 @@ export function sourceExemplars(bcp47: string): SourcedInventory | null {
  */
 export function charactersInTier(inv: SourcedInventory, tier: ExemplarTier): string[] {
   return inv.characters.filter((c) => c.tier === tier).map((c) => c.char);
-}
-
-/** Tier name for an index tier key — exported for the index's own tests. */
-export function tierForKey(key: string): ExemplarTier | undefined {
-  return TIER_FOR_KEY[key];
 }
 
 /**
