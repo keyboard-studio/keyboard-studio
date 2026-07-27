@@ -16,6 +16,7 @@
  * documented here and accepted for v1.
  */
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { KeyboardIR, KeyChord } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
@@ -194,7 +195,7 @@ export function generateCorpus(ir: KeyboardIR): CorpusResult {
     for (let d = 0; d <= D7_DEADKEY_DEPTH; d++) {
       theoretical += Math.pow(v, d) * s;
     }
-    console.info(
+    devLog.info(
       `[corpus] D7 corpus truncated at MAX_CORPUS_SIZE=${MAX_CORPUS_SIZE}; ` +
         `generated ${corpus.length} of theoretical ${theoretical} sequences.`,
     );

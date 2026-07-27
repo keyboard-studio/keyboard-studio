@@ -54,11 +54,21 @@ export default [
           destructuredArrayIgnorePattern: "^_",
         },
       ],
-      // Disallow console.* calls — use a structured logger instead. The
-      // eslint-disable-next-line suppression comments previously guarding
-      // deliberate console calls in compiler/index.ts were removed in #447;
-      // this rule activates that removal.
+      // Disallow console.* calls in shipped code — route intentional
+      // diagnostics through the `devLog` helper (@keyboard-studio/contracts/
+      // dev-log), which prints in dev/test/CLI and goes inert in a production
+      // build. That helper holds the single sanctioned console sink; every
+      // other call site should use it, so a warning here means a stray call.
       "no-console": "warn",
+    },
+  },
+  {
+    // Tests, codegen determinism harnesses, and other *.test.ts files run
+    // only under vitest/Node and log freely for diagnostics — they never
+    // reach a production bundle, so the no-console gate does not apply.
+    files: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "no-console": "off",
     },
   },
 ];

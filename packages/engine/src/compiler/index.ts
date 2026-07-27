@@ -12,6 +12,7 @@
 // source of truth for the compiler version; there is no separate fetch
 // or vendoring step.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type {
   CompilerService,
   CompileResult,
@@ -255,7 +256,7 @@ export async function compile(
   // Build the kmc-kmn callback surface bridging to VFS.
   const callbacks = {
     reportMessage(message: Record<string, unknown>): void {
-      console.info("[kmcmplib] reportMessage:", message);
+      devLog.info("[kmcmplib] reportMessage:", message);
       // kmc-kmn message shape (per kmn-compiler-messages.js): the
       // factories return { code, message, ... } where `message` is the
       // human-readable text. Older / lower-level shapes use `text` or
@@ -425,10 +426,10 @@ export async function compile(
     });
   }
 
-  console.info(
+  devLog.info(
     `[kmcmplib] artifacts: ${artifacts.map((a) => `${a.filename}(${a.sizeBytes})`).join(", ")}`,
   );
-  console.info(`[kmcmplib] diagnostics: ${diagnostics.length}`, diagnostics);
+  devLog.info(`[kmcmplib] diagnostics: ${diagnostics.length}`, diagnostics);
 
   const hasFatal = diagnostics.some(
     (d) => d.severity === "fatal" || d.severity === "error",

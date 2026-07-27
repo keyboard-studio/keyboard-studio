@@ -249,3 +249,18 @@ export type {
 // Inventory diff (spec §8): static extraction of a keyboard's produced glyph set.
 export { producedGlyphs, collectFromOutput } from "./inventory/producedGlyphs.js";
 export type { ProducedGlyphsOptions } from "./inventory/producedGlyphs.js";
+
+// Inventory diff (spec §8): needed-vs-produced coverage delta.
+//
+// Intentionally unwired for now — a pure, tested primitive published ahead of
+// its caller, not leftover rebase debris. It is the coverage-diff half of the
+// Phase B worklist derivation sketched in docs/design-notes/survey-flow-rework.md;
+// the caller lands with that rework. Landed here deliberately (see the "My
+// keyboards" PR discussion) rather than split out, so the primitive and the
+// design note that motivates it stay together in history.
+//
+// If you are about to flag this as dead code: it is reachable and tested via
+// computeInventoryDelta.test.ts, and the lack of a production caller is the
+// documented state above, not an oversight.
+export { computeInventoryDelta } from "./inventory/computeInventoryDelta.js";
+export type { InventoryDelta } from "./inventory/computeInventoryDelta.js";

@@ -15,6 +15,7 @@
 // Research decisions: R1 (advance owns the fork), R2 (signature), R3 (mapping),
 // R9 (boundary).
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { manifest } from "./manifest.ts";
 
 // ---------------------------------------------------------------------------
@@ -194,7 +195,7 @@ export function advance(
         // upstream. Log the violation and default to the copy path (project_name) —
         // copy is the safer default because it does NOT skip a step. Do NOT silently
         // route as adapt (which skips project_name and could confuse the user).
-        console.error(
+        devLog.error(
           "[advance] invariant violation: selectedTrack is null at track step. " +
           "trackOptions.onCommit must set selectedTrack before calling onComplete. " +
           "Defaulting to copy path (project_name) to avoid silent wrong-fork routing."

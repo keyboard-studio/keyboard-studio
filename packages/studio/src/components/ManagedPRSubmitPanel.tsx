@@ -39,6 +39,8 @@ import {
   publishManagedPRErrorMessage,
   isPublishManagedPRError,
 } from "../lib/publishManagedPRErrorMessage.ts";
+import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
+import { recordProjectSubmission } from "../lib/draftPersistence.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -200,6 +202,15 @@ export function ManagedPRSubmitPanel({
   const emailId = useId();
   const copyrightId = useId();
 
+  // Self-contained useGitHubAuth() call (same idiom as MyKeyboardsList) so
+  // this panel can transition the active "My keyboards" project to
+  // status:"submitted" on a successful publish without threading the token
+  // down as a prop. `accessToken` (the primitive, not the whole `token`
+  // object) is what recordProjectSubmission below actually needs, and is
+  // what the handleSubmit dependency array tracks.
+  const { token } = useGitHubAuth();
+  const accessToken = token?.accessToken ?? null;
+
   const [authorName, setAuthorName] = useState<string>(
     prefill?.displayName ?? "",
   );
@@ -289,6 +300,14 @@ export function ManagedPRSubmitPanel({
         proxyEndpoint: getManagedPRProxyEndpoint(),
       });
       setSubmitState({ kind: "success", prUrl: result.prUrl });
+
+      // Transition the active "My keyboards" project to status:"submitted"
+      // (per specs/047-my-keyboards) rather than leaving it as an
+      // in-progress draft — see draftPersistence.ts's recordProjectSubmission
+      // docstring. Fire-and-forget: this is bookkeeping for the "My
+      // keyboards" list, not load-bearing for the success state already
+      // rendered above.
+      void recordProjectSubmission(result.prUrl, accessToken);
     } catch (err: unknown) {
       let message: string;
       if (isPublishManagedPRError(err)) {
@@ -304,7 +323,7 @@ export function ManagedPRSubmitPanel({
       }
       setSubmitState({ kind: "error", message });
     }
-  }, [submitEnabled, authorName, email, t, i18n]);
+  }, [submitEnabled, authorName, email, t, i18n, accessToken]);
 
   // ---------------------------------------------------------------------------
   // Success state — show PR link, no git jargon.

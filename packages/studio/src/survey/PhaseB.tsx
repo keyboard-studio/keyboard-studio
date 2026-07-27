@@ -19,6 +19,7 @@
 // SurveyPhaseResult.confirmedInventory (additive contract field). The gallery
 // reads this via session.confirmedInventory (mergePhaseResults union).
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { msg, plural } from "@lingui/core/macro";
@@ -258,7 +259,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
     if (unusual.length > 0) {
       // FR-003: no in-UI alert is required — a console log makes the unusual
       // separator/format/control characters discoverable to the developer.
-      console.info(
+      devLog.info(
         "[phase-b] kept unusual invisible character(s): " +
           unusual.map((u) => codepointLabel(u).title).join(", "),
       );
