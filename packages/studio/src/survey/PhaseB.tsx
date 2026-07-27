@@ -43,13 +43,13 @@ import { codepointLabel } from "./codepointLabel.ts";
 import { collate, codePointCompare } from "./collation.ts";
 import { glyphCategory, isCombiningMarkChar, caseCounterpart } from "@keyboard-studio/engine";
 import { displayChar, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
-import { suggestMissingChars } from "../lib/services.ts";
+import { suggestMissingChars, charactersInTier } from "../lib/services.ts";
 import type {
   MissingCharSuggestions,
   ExemplarSource,
   SourcedInventory,
 } from "../lib/services.ts";
-import { useSourcedExemplars, tierChars } from "./useSourcedExemplars.ts";
+import { useSourcedExemplars } from "./useSourcedExemplars.ts";
 import { RadioGroup, SelectMenu } from "../ui/index.ts";
 import {
   BG_PAGE,
@@ -1472,7 +1472,7 @@ const EXEMPLAR_PREVIEW_LIMIT = 24;
 
 function ExemplarOfferDetail({ inventory }: { inventory: SourcedInventory }) {
   const glyphFontStack = useGlyphFontStack();
-  const main = tierChars(inventory, "main");
+  const main = charactersInTier(inventory, "main");
   const preview = main.slice(0, EXEMPLAR_PREVIEW_LIMIT);
   const elided = main.length - preview.length;
 

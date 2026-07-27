@@ -19,7 +19,9 @@ import type {
   ExemplarSource,
   SourcedCharacter,
   SourcedInventory,
+  ExemplarTier,
 } from "@keyboard-studio/engine";
+import { charactersInTier } from "@keyboard-studio/engine";
 import { mockBaseBrowser, mockOutputService, mockPatternLibrary, mockScaffolder } from "@keyboard-studio/contracts/mocks";
 import { getBackendUrl } from "./githubOAuth.ts";
 import { localBaseBrowser, LOCAL_PROXY_BASE } from "./localBaseBrowser.ts";
@@ -213,7 +215,8 @@ export async function sourcedExemplars(bcp47: string): Promise<SourcedInventory 
   return sourceExemplars(bcp47);
 }
 
-export type { SourcedInventory, SourcedCharacter, ExemplarSource };
+export type { SourcedInventory, SourcedCharacter, ExemplarSource, ExemplarTier };
+export { charactersInTier };
 
 // Re-export the type so callers can use it without a direct engine import.
 export type { MissingCharSuggestions };

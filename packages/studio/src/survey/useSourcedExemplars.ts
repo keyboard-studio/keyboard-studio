@@ -54,8 +54,3 @@ export function useSourcedExemplars(bcp47: string | undefined): SourcedExemplars
 
   return state;
 }
-
-/** Characters of one tier, in the order the source attested them. */
-export function tierChars(inv: SourcedInventory, tier: string): string[] {
-  return inv.characters.filter((c) => c.tier === tier).map((c) => c.char);
-}

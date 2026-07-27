@@ -222,11 +222,12 @@ function isLowSurrogate(cp: number): boolean {
  * in 147 of its 3064 exemplar sets, so without this the parser injected the
  * stray ASCII characters `u`, `2`, `0`, `C` into authors' alphabets.
  *
- * A backslash followed by a DIGIT throws: LDML has no `\NNN` numeric escape,
- * so `\0327` is a mistyped `̧` (it occurs once in SLDR, in `vut.xml`) and
- * decoding it leniently would inject the characters `0`, `3`, `2`, `7` into
- * that language's alphabet — precisely the class of silent corruption this
- * parser was rewritten to stop.
+ * A backslash followed by a DIGIT throws: no CLDR/SLDR exemplar set in the
+ * pinned corpus legitimately uses ICU's `\ooo` octal escape, so `\0327` is a
+ * mistyped `̧` (it occurs once in SLDR, in `vut.xml`) and decoding it
+ * leniently would inject the characters `0`, `3`, `2`, `7` into that
+ * language's alphabet — precisely the class of silent corruption this parser
+ * was rewritten to stop.
  */
 function decodeEscape(
   chars: readonly string[],
@@ -247,7 +248,7 @@ function decodeEscape(
 
   if (/[0-9]/.test(n)) {
     throw new UnsupportedUnicodeSetError(
-      `malformed numeric escape \\${n} (LDML has no \\NNN form — likely a mistyped \\u)`,
+      `malformed numeric escape \\${n} (this corpus has no legitimate \\ooo octal use — likely a mistyped \\u)`,
       source,
     );
   }
