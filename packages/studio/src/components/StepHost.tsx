@@ -27,7 +27,7 @@
 //   The effect table STEPS_WITH_APPLY_COMPLETION gates applyStepCompletion per
 //   step without any per-step host branch.
 //
-// FR-009: pane scaffolding (resizable panes, OSK, useValidator, instantiatedRef)
+// FR-009: pane scaffolding (resizable panes, OSK, useValidator, instantiatedForBaseIdRef)
 //   remain in SurveyView. StepHost only decides which container a step renders into.
 
 import type { ReactNode, CSSProperties } from "react";

@@ -27,6 +27,7 @@
 // Boundary: editors/adapters/ → stores/ and hooks/ is allowed by depcruise.
 
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { confirmRebaseTo } from "../../lib/confirmRebase.ts";
 import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { ScaffoldForm } from "../panels/ScaffoldForm.tsx";
@@ -140,10 +141,18 @@ export function TrackOneIdentityPanelAdapter(_props: EditorStepProps) {
 // click) from COMMIT (the single "Choose this keyboard" button). Preview
 // writes setLocalBase (which drives the live compile pipeline in StudioShell)
 // and clears baseConfirmed WITHOUT calling onComplete — the wizard does not
-// advance and the working copy is not instantiated. Commit sets
-// baseConfirmed=true (which arms StudioShell's single-instantiation effect,
-// see StudioShell.tsx) BEFORE calling onComplete, preserving the R7
-// "writes before advance" ordering.
+// advance and the working copy is not instantiated. Commit runs the F1
+// rebase-confirm gate (confirmRebaseTo) SYNCHRONOUSLY, before doing anything
+// else: window.confirm is itself synchronous, so a Cancel returns immediately
+// and neither baseConfirmed nor onComplete ever fire — the wizard stays on
+// the picker and the working copy/draft are untouched. Only on confirm (or
+// when no confirm was needed) does it set baseConfirmed=true (which arms
+// StudioShell's single-instantiation effect, see StudioShell.tsx) BEFORE
+// calling onComplete, preserving the R7 "writes before advance" ordering.
+// See docs/design-notes/switch-base-popup-behavior-log.md (F1) for why this
+// check cannot live in StudioShell's effect: an effect runs AFTER the click
+// that already triggered advance() — it can observe a cancelled confirm but
+// can no longer un-advance the wizard.
 // ---------------------------------------------------------------------------
 
 /**
@@ -183,6 +192,10 @@ export function BaseResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
       }}
       onConfirm={() => {
         if (localBase) {
+          // F1 fix: resolve the rebase question SYNCHRONOUSLY, before any
+          // advance-driving write. Cancel aborts here — base/draft/wizard
+          // all stay exactly as they were (see the module comment above).
+          if (!confirmRebaseTo(localBase.id)) return;
           // R7: setBaseConfirmed fires before onComplete → host → advance.
           setBaseConfirmed(true);
           onComplete({ base: localBase });

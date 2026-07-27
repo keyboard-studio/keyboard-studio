@@ -81,6 +81,12 @@ vi.mock("./hooks/useWorkingCopyTransform.ts", () => ({
 
 vi.mock("./lib/confirmRebase.ts", () => ({
   instantiateFromBaseIfConfirmed: vi.fn(),
+  // BaseResolutionAdapter's onConfirm now calls confirmRebaseTo synchronously
+  // (F1 fix) BEFORE these tests' commit-gating assertions run; the working
+  // copy in every scenario here starts uninstantiated (afterEach resets it),
+  // so the real predicate would already return true — mocked to true directly
+  // so these tests keep exercising ONLY the commit-gating effect under test.
+  confirmRebaseTo: vi.fn(() => true),
 }));
 
 vi.mock("./lib/navigate.ts", () => ({
@@ -244,8 +250,39 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
     expect(instantiateSpy).toHaveBeenCalledWith(
       expect.objectContaining({ id: BASE_B.id }),
       expect.anything(),
+      { skipConfirm: true },
     );
     expect(useSurveySessionStore.getState().baseConfirmed).toBe(true);
+  });
+
+  // P1 regression (double-instantiation guard) sibling of the F1 fix: the F1
+  // change made instantiatedForBaseIdRef id-aware (was a plain boolean) so a
+  // genuinely different base can re-instantiate later in the same session —
+  // this test locks down that the ORIGINAL P1 guarantee (a REPEAT settle for
+  // the SAME already-committed base id is a no-op) still holds under the new
+  // id-aware ref.
+  it("a second compile settle for the SAME already-committed base does not instantiate again (P1 regression)", async () => {
+    await renderAtChooseBase();
+
+    fireEvent.click(screen.getByTestId("preview-b"));
+    settleFor(BASE_B);
+    fireEvent.click(screen.getByTestId("commit"));
+
+    expect(instantiateSpy).toHaveBeenCalledTimes(1);
+    expect(useSurveySessionStore.getState().baseConfirmed).toBe(true);
+
+    // setScaffoldSpec() (Track 1) triggers a SECOND compile run for the SAME
+    // base that was just committed — onInstantiate re-fires and the stage
+    // transitions to "ready" again (a new object reference), re-running the
+    // single-instantiation effect (its `artifactStage` dependency) with
+    // `baseConfirmed` already true from the commit above.
+    settleFor(BASE_B);
+
+    // instantiatedForBaseIdRef already recorded BASE_B from the first commit —
+    // doCommit's own per-base-id guard must short-circuit before
+    // applyStepCompletion (and therefore instantiateFromBaseIfConfirmed) runs
+    // a second time for the same id.
+    expect(instantiateSpy).toHaveBeenCalledTimes(1);
   });
 
   // NOTE (PR #1174 follow-up): via the REAL UI this scenario is now
@@ -277,6 +314,7 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
     expect(instantiateSpy).toHaveBeenCalledWith(
       expect.objectContaining({ id: BASE_B.id }),
       expect.anything(),
+      { skipConfirm: true },
     );
   });
 
@@ -385,6 +423,7 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
     expect(instantiateSpy).toHaveBeenCalledWith(
       expect.objectContaining({ id: BASE_B.id }),
       expect.anything(),
+      { skipConfirm: true },
     );
   });
 });

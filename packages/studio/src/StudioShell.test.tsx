@@ -21,11 +21,14 @@
 // picture. Navigation to a starting stage is achieved by clicking through the
 // sequence of mocked buttons that lead up to it.
 
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { useState, useEffect } from "react";
 import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
+import { useSurveySessionStore, snapshotTraversal } from "./stores/surveySessionStore.ts";
+import { snapshotWorkingCopyData } from "./lib/persistWorkingCopy.ts";
+import type { OnInstantiateCallback, Stage } from "./hooks/useKeyboardArtifact.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted — must precede vi.mock() calls
@@ -499,8 +502,35 @@ vi.mock("./components/OskModeToggle.tsx", () => ({
 // Mock heavy hooks so WASM / VFS are never touched.
 // ---------------------------------------------------------------------------
 
+// Opt-in controllable useKeyboardArtifact mock (precedent:
+// StudioShell.previewCommitGating.test.tsx's `hoisted`/`settleFor`). By
+// default every test still gets the original static `{ kind: "idle" }` stage
+// with onInstantiate never firing — nothing here changes unless a test
+// explicitly drives `artifactHoisted.onInstantiateRef.current` /
+// `artifactHoisted.stageSetters` (see the "resume draft banner" describe
+// block's F1/P1 regression test below).
+const artifactHoisted = vi.hoisted(() => ({
+  onInstantiateRef: { current: null as OnInstantiateCallback | null },
+  stageSetters: [] as Array<(s: Stage) => void>,
+}));
+
 vi.mock("./hooks/useKeyboardArtifact.ts", () => ({
-  useKeyboardArtifact: () => ({ stage: { kind: "idle" }, retry: vi.fn(), recompile: vi.fn() }),
+  useKeyboardArtifact: (
+    _base: unknown,
+    _spec: unknown,
+    _transform: unknown,
+    onInstantiate: OnInstantiateCallback | null | undefined,
+  ) => {
+    artifactHoisted.onInstantiateRef.current = onInstantiate ?? null;
+    const [stage, setStage] = useState<Stage>({ kind: "idle" });
+    useEffect(() => {
+      artifactHoisted.stageSetters.push(setStage);
+      return () => {
+        artifactHoisted.stageSetters = artifactHoisted.stageSetters.filter((f) => f !== setStage);
+      };
+    }, []);
+    return { stage, retry: vi.fn(), recompile: vi.fn() };
+  },
 }));
 
 vi.mock("./hooks/useWorkingCopyTransform.ts", () => ({
@@ -509,6 +539,11 @@ vi.mock("./hooks/useWorkingCopyTransform.ts", () => ({
 
 vi.mock("./lib/confirmRebase.ts", () => ({
   instantiateFromBaseIfConfirmed: vi.fn(),
+  // BaseResolutionAdapter's onConfirm calls confirmRebaseTo synchronously
+  // (F1 fix) before advancing; every scenario here starts from a fresh,
+  // uninstantiated working copy, so mocking it to always allow keeps these
+  // tests exercising the same flows as before the fix.
+  confirmRebaseTo: vi.fn(() => true),
 }));
 
 // Mock buildTouchLayoutJson so Defect B tests never call real engine code.
@@ -557,6 +592,10 @@ import { navigateTo } from "./lib/navigate.ts";
 import { markVisited } from "./lib/firstVisit.ts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS } from "@keyboard-studio/contracts";
+import { instantiateFromBaseIfConfirmed, confirmRebaseTo } from "./lib/confirmRebase.ts";
+
+const instantiateSpy = instantiateFromBaseIfConfirmed as ReturnType<typeof vi.fn>;
+const confirmRebaseToSpy = confirmRebaseTo as ReturnType<typeof vi.fn>;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -635,6 +674,11 @@ function advanceToF() {
 // ---------------------------------------------------------------------------
 // Teardown
 // ---------------------------------------------------------------------------
+
+beforeEach(() => {
+  artifactHoisted.onInstantiateRef.current = null;
+  artifactHoisted.stageSetters = [];
+});
 
 afterEach(() => {
   cleanup();
@@ -1179,6 +1223,78 @@ describe("StudioShell — resume draft banner", () => {
     expect(JSON.parse(localStorage.getItem("ks.studio.projects.index") ?? "[]")).toEqual([]);
     // Discard does not hydrate — the wizard stays on "identity" (untouched).
     expect(screen.getByTestId("stage-identity")).toBeTruthy();
+  });
+
+  // F1/P1 regression: résumé pre-seeds instantiatedForBaseIdRef with the
+  // restored base id (see StudioShell.tsx handleResumeDraft) so a compile
+  // settle that fires AFTER résumé — for that SAME base — does not re-run
+  // doCommit (no second instantiateFromBaseIfConfirmed call) and, since it
+  // never reaches BaseResolutionAdapter.onConfirm, never pops the rebase
+  // confirm dialog either.
+  it("a pipeline settle for the restored base AFTER résumé does not re-instantiate or confirm", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+
+    // Build a REAL working-copy + traversal snapshot (base confirmed, exactly
+    // as a session that reached choose_base's commit before the reload) using
+    // the top-level (pre-resetModules) stores, then hand it to the legacy
+    // draft key the same way seedResumableDraft() does above — migrateLegacyDraft()
+    // adopts it into the per-project scheme when the FRESH module loads.
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+      vfs: createVirtualFS([]),
+      ir: makeTestIR([]),
+    });
+    useSurveySessionStore.getState().setLocalBase(basicKbdus);
+    useSurveySessionStore.getState().setBaseConfirmed(true);
+    useSurveySessionStore.getState().advance("choose_base");
+
+    localStorage.setItem(
+      "ks.studio.draft",
+      JSON.stringify({
+        version: 1,
+        savedAt: Date.now(),
+        survey: snapshotTraversal(),
+        workingCopy: snapshotWorkingCopyData(),
+      }),
+    );
+
+    // The snapshot is captured — the top-level stores are no longer needed for
+    // this test and must not leak into later tests in this file.
+    useWorkingCopyStore.getState().reset();
+    useSurveySessionStore.getState().reset();
+
+    await renderFreshStudioShell();
+
+    expect(screen.getByTestId("resume-draft-banner")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("resume-draft"));
+    expect(screen.queryByTestId("resume-draft-banner")).toBeNull();
+    // Sanity: résumé actually restored the base into the fresh store/UI.
+    expect(screen.getByTestId("stage-base")).toBeTruthy();
+
+    // Simulate the compile pipeline settling AGAIN for the restored base
+    // (e.g. Track 1's setScaffoldSpec() triggering a second compile run) —
+    // fires onInstantiate then transitions the artifact stage to "ready",
+    // mirroring the real pipeline's run() ordering.
+    act(() => {
+      artifactHoisted.onInstantiateRef.current?.(basicKbdus, {
+        vfs: createVirtualFS([]),
+        ir: makeTestIR([]),
+        removalCapabilities: new Map(),
+      });
+      for (const setStage of artifactHoisted.stageSetters) {
+        setStage({
+          kind: "ready",
+          compileResult: {},
+          jsBlobUrl: "blob:test",
+          vfs: createVirtualFS([]),
+          scaffoldWarnings: [],
+          keyboardId: basicKbdus.id,
+        } as unknown as Stage);
+      }
+    });
+
+    expect(instantiateSpy).not.toHaveBeenCalled();
+    expect(confirmRebaseToSpy).not.toHaveBeenCalled();
   });
 });
 

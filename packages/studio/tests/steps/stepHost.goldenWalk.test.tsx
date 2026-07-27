@@ -451,6 +451,10 @@ vi.mock("../../src/hooks/useWorkingCopyTransform.ts", () => ({
 
 vi.mock("../../src/lib/confirmRebase.ts", () => ({
   instantiateFromBaseIfConfirmed: vi.fn(),
+  // BaseResolutionAdapter's onConfirm calls confirmRebaseTo synchronously
+  // (F1 fix) before advancing; this suite's working copy starts uninstantiated
+  // in every walk, so mocking it to always allow preserves prior behavior.
+  confirmRebaseTo: vi.fn(() => true),
 }));
 
 vi.mock("../../src/lib/buildTouchLayoutJson.ts", () => ({

@@ -148,7 +148,7 @@ export function usePreviewArtifact(): PreviewArtifact {
   // discarding the survey answers and leaving nothing valid to submit. So skip
   // entirely when the store already holds a working copy for this same base;
   // only genuinely NEW bases picked via this screen's own picker fall through to
-  // instantiate. Mirrors StudioShell's instantiatedRef gate, keyed on the store
+  // instantiate. Mirrors StudioShell's instantiatedForBaseIdRef gate, keyed on the store
   // (survives this screen's own mount/unmount) rather than a per-mount ref.
   const onInstantiate = useCallback<OnInstantiateCallback>((base, { vfs, ir, removalCapabilities }) => {
     const current = useWorkingCopyStore.getState().baseKeyboard;

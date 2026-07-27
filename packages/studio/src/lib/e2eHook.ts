@@ -23,6 +23,21 @@ export interface KsE2EHook {
   getWorkingIr: () => KeyboardIR | null;
   /** nodeIds currently marked deleted via the carve gallery. */
   getDeletedNodeIds: () => string[];
+  /**
+   * The instantiated working copy's base keyboard id, or null before
+   * instantiation. Added for the F1 (switch-base rebase) regression spec —
+   * lets a test assert which base the WORKING COPY is on, independent of
+   * what the wizard's UI currently displays (the whole point of F1 is that
+   * those two could silently disagree).
+   */
+  getBaseKeyboardId: () => string | null;
+  /**
+   * Count of recorded survey phase results on the working copy. Added for the
+   * F1 regression spec to assert that a cancelled rebase (or a same-base
+   * re-confirm) preserves recorded edits, while a confirmed genuine switch
+   * clears them.
+   */
+  getPhaseResultsCount: () => number;
 }
 
 declare global {
@@ -45,5 +60,7 @@ export function installE2eHook(): void {
   window.__ksE2E__ = {
     getWorkingIr: () => useWorkingCopyStore.getState().ir,
     getDeletedNodeIds: () => [...useWorkingCopyStore.getState().deletedNodeIds],
+    getBaseKeyboardId: () => useWorkingCopyStore.getState().baseKeyboard?.id ?? null,
+    getPhaseResultsCount: () => useWorkingCopyStore.getState().phaseResults.length,
   };
 }
