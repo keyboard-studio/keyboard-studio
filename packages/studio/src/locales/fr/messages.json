@@ -475,7 +475,6 @@
   "editor.trackStep.adaptDescription": "Modifier ce clavier sur place, en conservant son nom et son identifiant.",
   "editor.assignLoop.methodLabel.multiKeySequence": "Séquence multi-touches",
   "editor.assignLoop.touch.mechanismLabel.multitap": "appuis multiples",
-  "profile.myKeyboards.label": "Mes claviers",
   "profile.myKeyboards.sectionAriaLabel": "Mes claviers",
   "profile.myKeyboards.heading": "Mes claviers",
   "survey.characterMapPane.searchFilter.name": "Nom",

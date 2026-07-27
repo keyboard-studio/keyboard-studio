@@ -475,7 +475,6 @@
   "editor.trackStep.adaptDescription": "Modify this keyboard in place, keeping its name and ID.",
   "editor.assignLoop.methodLabel.multiKeySequence": "Multi-key sequence",
   "editor.assignLoop.touch.mechanismLabel.multitap": "multitap",
-  "profile.myKeyboards.label": "My keyboards",
   "profile.myKeyboards.sectionAriaLabel": "My keyboards",
   "profile.myKeyboards.heading": "My keyboards",
   "survey.characterMapPane.searchFilter.name": "Name",
