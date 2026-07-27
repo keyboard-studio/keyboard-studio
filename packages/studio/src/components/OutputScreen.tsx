@@ -12,13 +12,28 @@
 // on a prior visit to PreviewScreen. The Zustand working-copy store persists
 // across hash navigation so handleDownload reads the settled store regardless
 // of which screen ran the compile.
+//
+// Coverage gate (the P0 fix — the Phase F hard-gate closure): this screen is
+// directly reachable via #output without ever passing through advance.ts's
+// "help" case or PhaseFGate — a nav-bar click, a typed hash, or a bookmark all
+// land here regardless of survey progress. canDownload (from usePreviewArtifact)
+// already folds in `!coverageGate.blocked`, so the button/PR-submit path can
+// never emit while inventory characters remain unimplemented; this screen
+// additionally renders WHY (which characters, which modality) and a control
+// back to the relevant gallery, rather than a silently-disabled button — the
+// same explanatory pattern PhaseFGate uses, reusing the identical shared
+// selector (lib/unimplementedInventory.ts via usePreviewArtifact).
 
 import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
+import { formatCoverageBannerParts } from "../lib/unimplementedInventory.ts";
 import { useResizablePanes } from "../hooks/useResizablePanes.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { navigateTo } from "../lib/navigate.ts";
 import { TOUCH_STEP_ID } from "../steps/reducer.ts";
 import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
 import { ScaffoldForm } from "../editors/panels/ScaffoldForm.tsx";
@@ -60,6 +75,7 @@ export function OutputScreen() {
     downloadError,
     downloadWarnings,
     handleDownload,
+    coverageGate,
     showIdentityWarn,
   } = artifact;
 
@@ -69,6 +85,52 @@ export function OutputScreen() {
   // name + email from the stored identity claims.
   const { login: ghLogin } = useGitHubAuth();
   const { identity: googleIdentity } = useGoogleAuth();
+
+  // ---------------------------------------------------------------------------
+  // Coverage-blocked explanation (P0 fix) — mirrors PhaseFGate's display
+  // exactly, off the SAME shared gate. Named string locals computed BEFORE
+  // the JSX below; no conditional JSX as direct <Trans> children.
+  // ---------------------------------------------------------------------------
+  const {
+    unimplementedDesktop,
+    unimplementedTouch,
+    blockedOnDesktop,
+    blockedOnTouch,
+    blocked: coverageBlocked,
+    touchLayoutCorrupted,
+  } = coverageGate;
+  const sessionBackToUnfinishedGallery = useSurveySessionStore((s) => s.backToUnfinishedGallery);
+  const coverageTotalCount =
+    unimplementedDesktop.length + (blockedOnTouch ? unimplementedTouch.length : 0);
+  const coverageCountLabel = t({
+    id: "output.coverageBlocked.count",
+    message: plural(coverageTotalCount, { one: "# character", other: "# characters" }),
+  });
+  const mechanismGalleryLabel = t({
+    id: "editor.assignLoop.mechanismGalleryHeading",
+    message: "Mechanism Gallery",
+  });
+  const touchGalleryLabel = t({ id: "editor.assignLoop.touchGalleryHeading", message: "Touch Gallery" });
+  const { uncoveredCharsList: coverageUncoveredCharsList, targetGalleryLabel: coverageTargetGalleryLabel } =
+    formatCoverageBannerParts(coverageGate, {
+      desktopLabel: mechanismGalleryLabel,
+      touchLabel: touchGalleryLabel,
+    });
+  const handleGoToGallery = () => {
+    // Route back into the survey wizard at whichever gallery still has
+    // work — desktop first (it gates touch's own completion too, so fixing
+    // it first is always correct — same ordering as PhaseFGate) — EXCEPT a
+    // corrupted touch layout, which can only be fixed by re-deriving it in
+    // the touch gallery and so takes priority. This is a BACK action
+    // (backToUnfinishedGallery), not the forward-push `advance` — see that
+    // store action's docstring for the P0 regression a forward-push here
+    // would reproduce (a stale history entry a later ordinary Back traversal
+    // would resurface as Phase F).
+    sessionBackToUnfinishedGallery(
+      touchLayoutCorrupted ? "touch" : blockedOnDesktop ? "mechanisms" : "touch",
+    );
+    navigateTo("survey");
+  };
 
   // Output-time staleness gate. staleSteps.has(TOUCH_STEP_ID) already implies
   // the touch step was completed (a touchLayoutJson side-car was written) and
@@ -104,15 +166,21 @@ export function OutputScreen() {
         message:
           "Download unavailable — the touch layout is out of date. Return to the Touch step and re-complete it before downloading.",
       })
-    : canDownload
+    : coverageBlocked
       ? t({
-          id: "output.download.aria.ready",
-          message: `Download keyboard ${downloadKeyboardId} as zip`,
+          id: "output.download.aria.coverageBlocked",
+          message:
+            "Download unavailable — finish every inventory character before downloading. See the banner below for details.",
         })
-      : t({
-          id: "output.download.aria.notReady",
-          message: "Download unavailable until compile completes",
-        });
+      : canDownload
+        ? t({
+            id: "output.download.aria.ready",
+            message: `Download keyboard ${downloadKeyboardId} as zip`,
+          })
+        : t({
+            id: "output.download.aria.notReady",
+            message: "Download unavailable until compile completes",
+          });
 
   return (
     <div
@@ -218,6 +286,47 @@ export function OutputScreen() {
                 </Trans>
               </div>
             )}
+            {/* Coverage-blocked explanation (P0 fix) — WHY download/submit is
+                unavailable, not just a disabled button. Reuses the same
+                shared gate (lib/unimplementedInventory.ts) and explanatory
+                pattern as PhaseFGate: count + which characters + which
+                modality + a control back to the relevant gallery. */}
+            {coverageBlocked && (
+              <div
+                role="alert"
+                style={{ ...warningBannerStyle, color: "#f85149", borderColor: "#f85149", lineHeight: 1.5 }}
+              >
+                {"[ERROR] "}
+                {touchLayoutCorrupted ? (
+                  <Trans id="output.status.coverageBlocked.touchCorrupted">
+                    Your touch layout couldn't be read and may be corrupted. Re-derive it
+                    from the {coverageTargetGalleryLabel} to continue.
+                  </Trans>
+                ) : (
+                  <Trans id="output.status.coverageBlocked">
+                    {coverageCountLabel} still need an implementation before you can
+                    download or submit: {coverageUncoveredCharsList}. Go back to the{" "}
+                    {coverageTargetGalleryLabel} to finish them.
+                  </Trans>
+                )}{" "}
+                <button
+                  type="button"
+                  data-testid="output-coverage-goto-gallery"
+                  onClick={handleGoToGallery}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    color: "#f85149",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                    font: "inherit",
+                  }}
+                >
+                  <Trans id="output.status.coverageBlocked.goto">Go finish them now</Trans>
+                </button>
+              </div>
+            )}
             {downloadError !== null && (
               <div role="alert" style={{ fontSize: 11, color: "#f0a0a0", marginTop: 4 }}>
                 {downloadError}
@@ -295,17 +404,28 @@ export function OutputScreen() {
             {/* Option B (org-mediated PR) submit — PRIMARY submit action per
                 docs/github-integration.md §1a. Calls the backend proxy; the
                 user never sees a branch or PR workflow. Gated on canDownload
-                (compile ready + working copy instantiated), same guard as the
-                zip download. Attribution prefill from whichever identity
-                provider is active. */}
+                (compile ready + working copy instantiated + inventory
+                coverage — same P0 gate as the zip download), plus the
+                touchStale/coverageBlocked flags below purely for the
+                explanatory aria-label (canSubmit already forbids the
+                emission either way). Attribution prefill from whichever
+                identity provider is active. */}
             <ManagedPRSubmitPanel
               canSubmit={canDownload}
-              outputBlocked={touchStale}
-              outputBlockedReason={t({
-                id: "output.submit.outputBlockedReason.touchStale",
-                message:
-                  "the touch layout is out of date — return to the Touch step and re-complete it",
-              })}
+              outputBlocked={touchStale || coverageBlocked}
+              outputBlockedReason={
+                touchStale
+                  ? t({
+                      id: "output.submit.outputBlockedReason.touchStale",
+                      message:
+                        "the touch layout is out of date — return to the Touch step and re-complete it",
+                    })
+                  : t({
+                      id: "output.submit.outputBlockedReason.coverageBlocked",
+                      message:
+                        "some inventory characters still need an implementation — see the banner above",
+                    })
+              }
               prefill={submitPrefill}
             />
 

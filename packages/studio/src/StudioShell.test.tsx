@@ -552,6 +552,7 @@ import { SurveyView, StudioShell } from "./StudioShell.tsx";
 import { navigateTo } from "./lib/navigate.ts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS } from "@keyboard-studio/contracts";
+import { saveDraft, loadDraft, deriveProjectKeyFromWorkingCopy } from "./lib/draftPersistence.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1415,5 +1416,132 @@ describe("T029 — runtime step order matches manifest spine order", () => {
 
     // lockDesktop effect: desktopLocked becomes true.
     expect(useWorkingCopyStore.getState().desktopLocked).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: rehydrating a corrupted persisted draft must not runaway-render
+// (freeze report filed against commit b7c9a2c, "sanitize persisted step
+// history so Back never resurfaces the Phase F gate").
+//
+// Placed LAST in this file deliberately: draftPersistence.wasDraftRestoredThisBoot()
+// is a module-level flag that flips false -> true on the first successful
+// loadDraft() and never resets (see draftPersistence.ts / draftPersistence.test.ts's
+// own ordering note) — a successful loadDraft() here would otherwise make every
+// SurveyView mount in a LATER test skip its own mount-time reset(), which is
+// exactly the kind of ordering hazard draftPersistence.test.ts already
+// documents. No test after this one depends on a fresh reset.
+// ---------------------------------------------------------------------------
+
+describe("rehydrate of a corrupted persisted draft does not runaway-render (freeze regression)", () => {
+  it("loadDraft() + mounting SurveyView on a stale-help-in-history record notifies a bounded number of times and leaves history reference-stable", async () => {
+    // Build a legitimately-walked position via real instantiate + advance(),
+    // then corrupt `history` exactly the way an OLDER, pre-P0-fix build would
+    // have persisted it: a stale "help" entry left behind while activeStepId
+    // is anywhere other than "done" (see surveySessionStore.ts's
+    // sanitizeHistory doc comment for the corruption class this repairs).
+    const fakeIr = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+      vfs: createVirtualFS([]),
+      ir: fakeIr,
+    });
+    useSurveySessionStore.getState().advance("choose_base");
+    useSurveySessionStore.getState().advance("track");
+    useSurveySessionStore.getState().advance("characters");
+    useSurveySessionStore.getState().advance("marks");
+    useSurveySessionStore.getState().advance("carve");
+    useSurveySessionStore.setState({
+      activeStepId: "mechanisms",
+      history: [...useSurveySessionStore.getState().history, "help"],
+    });
+
+    const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    expect(projectKey).not.toBeNull();
+    saveDraft(projectKey!);
+
+    // Cold reset — simulate a fresh page boot with nothing live to inherit from.
+    useWorkingCopyStore.getState().reset();
+    useSurveySessionStore.getState().reset();
+
+    // Count every notification the survey-session store fires from the start
+    // of rehydrate onward. A runaway render/setState loop shows up here as an
+    // unbounded (or very large) count within this synchronous test; a correct,
+    // idempotent rehydrate + mount fires only a handful of times.
+    let notifyCount = 0;
+    const unsubscribe = useSurveySessionStore.subscribe(() => {
+      notifyCount += 1;
+    });
+
+    expect(loadDraft(projectKey!)).toBe(true);
+    // Sanitized immediately at rehydrate — "help" never resurfaces live.
+    expect(useSurveySessionStore.getState().history).not.toContain("help");
+    expect(useSurveySessionStore.getState().activeStepId).toBe("mechanisms");
+
+    const historyAfterLoad = useSurveySessionStore.getState().history;
+
+    // Mount the real component tree on top of the rehydrated state, exactly
+    // as main.tsx -> StudioShell would on a real boot. If rehydrate (or any
+    // effect it triggers) forms a render -> setState -> render cycle, this
+    // either hangs (test times out) or notifyCount grows unboundedly.
+    await act(async () => {
+      render(<SurveyView baseKeyboard={basicKbdus} />);
+    });
+
+    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+
+    // Idempotence / reference-stability invariant: having already been
+    // sanitized once, the live history must not have been reallocated again
+    // by mount, and total store churn must stay small and bounded.
+    expect(useSurveySessionStore.getState().history).toBe(historyAfterLoad);
+    expect(notifyCount).toBeLessThan(10);
+
+    unsubscribe();
+  });
+
+  it("resuming directly AT the real (unmocked) PhaseFGate after rehydrate does not runaway-render", async () => {
+    // Second real-code-path scenario: unlike the "mechanisms" case above
+    // (where PhaseFGate never mounts), this resumes with activeStepId ===
+    // "help" itself, so the actual PhaseFGate wrapper (ConfirmDialog +
+    // backToUnfinishedGallery wiring) is on-screen and exercised, not just
+    // the mocked step body inside it.
+    const fakeIr = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+      vfs: createVirtualFS([]),
+      ir: fakeIr,
+    });
+    useSurveySessionStore.getState().advance("choose_base");
+    useSurveySessionStore.getState().advance("track");
+    useSurveySessionStore.getState().advance("characters");
+    useSurveySessionStore.getState().advance("marks");
+    useSurveySessionStore.getState().advance("carve");
+    useSurveySessionStore.getState().advance("mechanisms");
+    useSurveySessionStore.setState({ activeStepId: "help" });
+
+    const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    expect(projectKey).not.toBeNull();
+    saveDraft(projectKey!);
+
+    useWorkingCopyStore.getState().reset();
+    useSurveySessionStore.getState().reset();
+
+    let notifyCount = 0;
+    const unsubscribe = useSurveySessionStore.subscribe(() => {
+      notifyCount += 1;
+    });
+
+    expect(loadDraft(projectKey!)).toBe(true);
+    expect(useSurveySessionStore.getState().activeStepId).toBe("help");
+
+    await act(async () => {
+      render(<SurveyView baseKeyboard={basicKbdus} />);
+    });
+
+    // PhaseFGate's wrapped step body renders (empty confirmedInventory means
+    // the coverage gate is unblocked, so the ConfirmDialog stays closed and
+    // "stage-F" is what's visible).
+    expect(screen.getByTestId("stage-F")).toBeTruthy();
+    expect(notifyCount).toBeLessThan(10);
+
+    unsubscribe();
   });
 });

@@ -46,7 +46,7 @@ import { PreviewScreen } from "./components/PreviewScreen.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
-import { Trans } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { LocaleSwitcher } from "./components/LocaleSwitcher.tsx";
@@ -59,6 +59,7 @@ import { StepHost } from "./components/StepHost.tsx";
 import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
 import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
+import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
 
 // Bind the manifest into the store's staleness actions.
 // Called once at module load; avoids a circular static import in the store
@@ -143,9 +144,19 @@ const NAV_ITEMS: NavItem[] = [
 
 interface NavBarProps {
   active: RouteId;
+  /**
+   * P0 fix UX signal (not the authoritative enforcement — that lives in
+   * OutputScreen/usePreviewArtifact's canDownload gate, which is reachable
+   * regardless of how #output was navigated to). Dims the Output tab and
+   * marks it aria-disabled with an explanatory title so the block is obvious
+   * BEFORE the click, not just after landing on a disabled download button.
+   */
+  outputBlocked?: boolean;
+  /** Tooltip / aria explanation shown while outputBlocked is true. */
+  outputBlockedTitle?: string;
 }
 
-function NavBar({ active }: NavBarProps) {
+function NavBar({ active, outputBlocked = false, outputBlockedTitle }: NavBarProps) {
   return (
     <nav
       aria-label="Studio navigation"
@@ -165,17 +176,21 @@ function NavBar({ active }: NavBarProps) {
       <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
         {NAV_ITEMS.map(({ id, label }) => {
           const isActive = id === active;
+          const isBlocked = id === "output" && outputBlocked;
           return (
             <a
               key={id}
               href={`#${id}`}
               aria-current={isActive ? "page" : undefined}
+              aria-disabled={isBlocked ? "true" : undefined}
+              title={isBlocked ? outputBlockedTitle : undefined}
               style={{
                 padding: "4px 12px",
                 fontSize: 14,
                 fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
                 textDecoration: "none",
-                color: isActive ? "#6ea8fe" : "#e6edf3",
+                color: isBlocked ? "#6e7681" : isActive ? "#6ea8fe" : "#e6edf3",
+                opacity: isBlocked ? 0.6 : 1,
                 borderBottom: isActive ? "2px solid #6ea8fe" : "2px solid transparent",
                 lineHeight: "40px",
                 whiteSpace: "nowrap",
@@ -897,6 +912,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
 export function StudioShell() {
   const route = useRoute();
+  const { t } = useLingui();
 
   const selectedBaseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
 
@@ -943,6 +959,16 @@ export function StudioShell() {
     [desktopLocked, touchLayoutJson, staleSteps, validatorFindings],
   );
 
+  // ---------------------------------------------------------------------------
+  // Output nav-link UX signal (P0 fix) — NOT the authoritative enforcement
+  // (that is OutputScreen's canDownload gate via usePreviewArtifact, which
+  // still applies regardless of how #output was reached). This is purely so
+  // the block is visible on the tab itself before the click. Same shared hook
+  // (hooks/useInventoryCoverageGate.ts) as StepHost/PhaseFGate/OutputScreen —
+  // do not re-derive the desktop-always/touch-only-if-authored booleans here.
+  // ---------------------------------------------------------------------------
+  const outputNavBlocked = useInventoryCoverageGate().blocked;
+
   let content: ReactNode;
   switch (route) {
     case "welcome":
@@ -977,7 +1003,14 @@ export function StudioShell() {
           background: "var(--bg)",
         }}
       >
-        <NavBar active={route} />
+        <NavBar
+          active={route}
+          outputBlocked={outputNavBlocked}
+          outputBlockedTitle={t({
+            id: "studio.nav.outputBlocked.title",
+            message: "Finish every inventory character before you can access Output",
+          })}
+        />
         <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
           {content}
         </div>
