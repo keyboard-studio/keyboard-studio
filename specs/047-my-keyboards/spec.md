@@ -18,13 +18,15 @@ Today the studio persists **one** in-progress keyboard per author: one localStor
 
 ## Motivation
 
-An author who starts a second keyboard today silently overwrites the first draft — both client-side (`ks.studio.draft` is a single overwritten key) and server-side (one row keyed by `github_user_id`). There is no way to see, resume, or even discover that a prior draft existed once a new one has been started. Once an author submits a keyboard, all record of it disappears from the studio entirely — the PR lives only on GitHub, with no link back from the tool that produced it. "My keyboards" closes both gaps: multiple concurrent drafts, and a durable, in-studio record of what's been submitted.
+An author who starts a second keyboard today silently loses the first draft — both client-side (spec 034's VR-5 single-project policy *deletes* the previously-active project's draft the moment a working copy is instantiated under a different key) and server-side (one row keyed by `github_user_id`). There is no way to see, resume, or even discover that a prior draft existed once a new one has been started. Once an author submits a keyboard, all record of it disappears from the studio entirely — the PR lives only on GitHub, with no link back from the tool that produced it. "My keyboards" closes both gaps: multiple concurrent drafts, and a durable, in-studio record of what's been submitted.
 
 ## Current state (ground truth)
 
-The design below is additive to what already exists on `dev`; implementers should read these before writing code, not rely on this section as a substitute:
+> **Port note (read this first).** This spec was originally written against the `dev` branch, whose client draft engine was `draftAutosave.ts` writing a single `ks.studio.draft` key. **That is not what shipped.** The feature was ported onto `main`'s existing draft engine ([draftPersistence.ts](../../packages/studio/src/lib/draftPersistence.ts)), which had *already* moved to per-project keys in spec 034. The sections below have been rewritten to describe `main`'s scheme — the keys, module names, and migration story here are the ones in the code. Where this spec previously described `ks.studio.*` keys or a `draftAutosave.ts` module, that was the pre-port design; it is superseded, not merely renamed.
 
-- **Client drafts are single-slot.** [packages/studio/src/lib/draftAutosave.ts](../../packages/studio/src/lib/draftAutosave.ts) writes one `StudioDraft` (`{version, savedAt, survey, workingCopy}`, defined in [packages/studio/src/lib/draftTypes.ts](../../packages/studio/src/lib/draftTypes.ts)) to the single localStorage key `ks.studio.draft`, overwritten on every save. `startCloudSync()` mirrors that one draft to the server on a coarse debounce.
+The design below is additive to what already exists on `main`; implementers should read these before writing code, not rely on this section as a substitute:
+
+- **Client drafts are per-project already, but only one may exist at a time.** [packages/studio/src/lib/draftPersistence.ts](../../packages/studio/src/lib/draftPersistence.ts) writes a `DurableDraft` (defined in [draftTypes.ts](../../packages/studio/src/lib/draftTypes.ts)) to a namespaced, versioned key per project — `ks.draft.<projectKey>.v1` — plus a `ks.draft.active` pointer naming which project the current session belongs to. So the *key scheme* needs no migration. What enforces single-slot behavior is a **policy**, not the keys: spec 034's VR-5 (`replaceActiveDraftIfDifferentProject`, called from `StudioShell`'s `onInstantiate`) clears the previously-active project's draft whenever a working copy is instantiated under a different key. Lifting that policy is this feature's real client-side work — see [Superseded: spec 034 VR-5](#superseded-spec-034-vr-5). `startCloudSync()` mirrors the active project's draft to the server on a coarse debounce.
 - **Server drafts are single-row-per-user.** [utilities/oauth-backend/src/draft-store.ts](../../utilities/oauth-backend/src/draft-store.ts) (`DraftStore` / `MemoryDraftStore`) and [draft-handlers.ts](../../utilities/oauth-backend/src/draft-handlers.ts) key everything on the numeric GitHub user id. `DraftMeta` ([draft-schemas.ts](../../utilities/oauth-backend/src/draft-schemas.ts)) already carries a `keyboardId` field, but it is reserved and always `null` today. The Vercel glue — [api/drafts/index.ts](../../api/drafts/index.ts) (GET/PUT/DELETE dispatched on `req.method`), [api/drafts/content.ts](../../api/drafts/content.ts), [api/drafts/_store.ts](../../api/drafts/_store.ts) (Postgres metadata row + Blob payload) — all assume one row per user.
 - **[api/drafts/schema.sql](../../api/drafts/schema.sql) already documents the intended migration**: primary key moves from `github_user_id` alone to `(github_user_id, draft_id)`, with a new `draft_id` column — annotated "no other column changes" at the time it was written. This spec adds two more columns (`status`, `pr_url`) beyond what that comment anticipated; see [Server data model](#server-data-model).
 - **The profile page has a disabled placeholder.** [ProfileScreen.tsx](../../packages/studio/src/components/ProfileScreen.tsx) (~lines 300–309) renders a disabled "My keyboards" button with a "Coming soon" caption. Routing is hash-based via `navigateTo` / `RouteId` in [packages/studio/src/lib/navigate.ts](../../packages/studio/src/lib/navigate.ts); `navigateTo` takes no parameters beyond the route id, and a `"profile"` route already exists.
@@ -69,19 +71,24 @@ An author with two drafts in flight clicks Resume on the second card. The studio
 
 ---
 
-### User Story 3 — Existing single-draft author is migrated without loss (Priority: P1)
+### User Story 3 — Pre-index drafts are adopted without loss (Priority: P1)
 
-An author who has been using the studio before this feature ships has one draft sitting under the legacy `ks.studio.draft` key. After the client upgrade, they open "My keyboards" and see that draft listed — it was adopted into the new per-project scheme, not stranded or silently dropped.
+An author who has been using the studio before this feature ships has one or more drafts sitting under `main`'s existing `ks.draft.<projectKey>.v1` keys, saved before `ks.draftIndex.v1` existed. After the client upgrade, they open "My keyboards" and see those drafts listed — adopted into the index, not stranded because the index happened to arrive later than the records.
 
-**Why this priority**: Without this, shipping the feature destroys every in-progress keyboard authors already have. This is a correctness gate on the release, not an enhancement.
+**Why this priority**: Without this, shipping the feature hides every in-progress keyboard authors already have. This is a correctness gate on the release, not an enhancement.
 
-**Independent Test**: Seed `ks.studio.draft` with a legacy-shape `StudioDraft` (no project index, no active-project pointer) in a jsdom environment; run the migration step; assert exactly one entry appears in the new project index and the legacy key is gone afterward.
+> **Restated post-port.** The pre-port version of this story described migrating a single legacy `ks.studio.draft` key into the per-project scheme. On `main` there is no such key and no key-scheme change to migrate (see the Port note under [Current state](#current-state-ground-truth)) — the records are *already* at `ks.draft.<projectKey>.v1`. The real gap is narrower and one level up: `main` has written those records since spec 034 but never wrote an index, and `listDrafts()` reads only the index, so a pre-index draft is on disk yet invisible in the UI. That, not a key migration, is what this story now covers.
+
+**Independent Test**: In a jsdom environment, save a draft through the real `saveDraft` path, then delete `ks.draftIndex.v1` (reproducing a record written before the index existed); call `listDrafts()`; assert the draft is listed. See the `US3/SC-003` block in [draftPersistence.test.ts](../../packages/studio/src/lib/draftPersistence.test.ts).
 
 **Acceptance Scenarios**:
 
-1. **Given** a legacy `ks.studio.draft` with an instantiated working copy, **When** the client loads post-upgrade, **Then** the draft is adopted under a `projectKey` derived from `identity.keyboardId ?? baseKeyboard.id`, and it appears in the project index.
-2. **Given** a legacy draft with no working copy yet (survey-only progress, pre base-selection), **When** migrated, **Then** it is adopted under a synthetic fallback key (no keyboard id exists yet to derive from) rather than being discarded for lack of a "real" project key.
-3. **Given** migration has already run once, **When** the client loads again, **Then** it does not re-adopt (the legacy key is gone; migration is a one-shot, idempotent no-op on subsequent loads).
+1. **Given** a valid `ks.draft.<projectKey>.v1` record with no matching index row, **When** the author opens "My keyboards", **Then** the record is adopted into the index (`status: "draft"`, `prUrl: null` — a pre-index record carries no submission state) and appears in the list.
+2. **Given** reconciliation has already run, **When** it runs again, **Then** it adopts nothing and creates no duplicate row (idempotent).
+3. **Given** a record that cannot be adopted — version mismatch (VR-1), malformed (VR-3), or never really instantiated (VR-2) — **When** reconciliation runs, **Then** the record is **skipped and left in place**, never deleted: enumeration is not the place to destroy data, and a version-mismatched record remains `loadDraft`'s to discard when the author actually opens it.
+4. **Given** an already-indexed project whose row is `status: "submitted"`, **When** reconciliation runs, **Then** the row is untouched (not reverted to `"draft"`).
+
+**Not applicable post-port**: the pre-port scenario "a legacy draft with no working copy yet is adopted under a synthetic `__pending__` key" is unreachable on `main`'s engine — `saveDraft`'s VR-2 guard refuses to persist before instantiation, so no such record exists to adopt. `PENDING_PROJECT_KEY` remains exported for interface parity only (see its docstring).
 
 ---
 
@@ -134,23 +141,23 @@ projectKey = workingCopy.identity?.keyboardId ?? workingCopy.baseKeyboard?.id ??
 
 `identity.keyboardId` (Track 1, author-chosen, validated by `validateKeyboardId` per [spec.md §10 Layer A check #1](../../spec.md) — see [packages/engine/src/scaffolder/index.ts](../../packages/engine/src/scaffolder/index.ts)) wins when set, since it is what the output layer renames the VFS to; `baseKeyboard.id` (the base's own stable id, [packages/contracts/src/baseKeyboard.ts](../../packages/contracts/src/baseKeyboard.ts)) is the Track 2 / pre-rename fallback. When neither exists yet (survey-only progress, no working copy instantiated — see [persistWorkingCopy.ts](../../packages/studio/src/lib/persistWorkingCopy.ts)'s `instantiationMode === null` guard), there is no project key: at most one such pre-instantiation draft can exist at a time (the survey has not branched into a project yet), so it is kept under a single reserved slot, `projectKey = "__pending__"`, promoted to a real key the moment a working copy is instantiated and the draft is next saved.
 
-**Storage keys** (replacing the single `ks.studio.draft`):
+**Storage keys.** Only the index key is new; the other two already exist on `main` (spec 034) and are unchanged by this feature. All three live in [draftPersistence.ts](../../packages/studio/src/lib/draftPersistence.ts).
 
-| Key | Shape | Purpose |
-|---|---|---|
-| `ks.studio.projects.index` | `ProjectIndexEntry[]` | Lightweight list for "My keyboards" — no working-copy payload. |
-| `ks.studio.project.<projectKey>` | `StudioDraft` (unchanged shape from [draftTypes.ts](../../packages/studio/src/lib/draftTypes.ts)) | The full per-project draft record — same `{version, savedAt, survey, workingCopy}` shape as today, one per project. |
-| `ks.studio.activeProject` | `string \| null` | Which `projectKey` the current survey session belongs to. Set on instantiate, on Resume, and read on `StudioShell` mount to decide which per-project record to load. |
+| Key | New? | Shape | Purpose |
+|---|---|---|---|
+| `ks.draftIndex.v1` | **new** | `ProjectIndexEntry[]` | Lightweight list for "My keyboards" — no working-copy payload. Upserted by `saveDraft`, removed from by `clearDraft`, and backfilled for pre-index records by `reconcileProjectIndex`. |
+| `ks.draft.<projectKey>.v1` | existing | `DurableDraft` ([draftTypes.ts](../../packages/studio/src/lib/draftTypes.ts)) | The full per-project draft record, one per project. Shape unchanged by this feature. |
+| `ks.draft.active` | existing | `string \| null` | Which `projectKey` the current survey session belongs to. Set on instantiate, on Resume, and read on `StudioShell` mount to decide which per-project record to load. |
 
 ```ts
 interface ProjectIndexEntry {
   projectKey: string;
   savedAt: number;
-  activeStepId: SurveySessionSnapshot["activeStepId"];
-  label: string | null;      // same deriveLabel() logic as today's DraftMeta
-  langTag: string | null;    // identity.bcp47 ?? baseKeyboard's language tag, for the card badge
+  activeStepId: ActiveStepId;  // from stores/surveySessionStore.ts
+  label: string | null;        // same deriveLabel() logic as DraftMeta
+  langTag: string | null;      // identity.bcp47 ?? baseKeyboard's language tag, for the card badge
   status: "draft" | "submitted";
-  prUrl: string | null;      // set only when status === "submitted"
+  prUrl: string | null;        // set only when status === "submitted"
 }
 ```
 
@@ -237,21 +244,43 @@ The client transport ([serverDraftStore.ts](../../packages/studio/src/lib/server
 
 ---
 
+## Superseded: spec 034 VR-5
+
+Spec 034's **VR-5** ("single-project replace-or-warn") required that instantiating a working copy under a different `projectKey` than the active one *replace* the prior project's draft — a clean delete, never a silent merge. It was the right answer to the question it faced: one draft slot, two projects, so a project switch could not be distinguished from abandonment.
+
+**This feature removes the premise, so VR-5 is retired rather than relaxed.** Once several drafts co-exist by design, deleting the project being switched away from is exactly the data loss [SC-001](#success-criteria) forbids: the author starts keyboard B and finds keyboard A gone from "My keyboards." There is no remaining sense in which navigating to a new base implies discarding the old project.
+
+Concretely:
+
+- `replaceActiveDraftIfDifferentProject()` is **deleted** from [draftPersistence.ts](../../packages/studio/src/lib/draftPersistence.ts), along with its call site in `StudioShell`'s `onInstantiate`. It is not kept as an uncalled export — a live function whose whole contract is "destroy the other project's draft" is a hazard for the next caller who reaches for it by name.
+- Deleting a draft is now always an explicit author action, served by `discardActiveDraft()` on the start-over paths ([WelcomeScreen](../../packages/studio/src/components/WelcomeScreen.tsx)'s "start over" and `StudioShell`'s own reset) and by the per-card delete in "My keyboards".
+- Spec 034's VR-5 tests are replaced by an `SC-001` block in [draftPersistence.test.ts](../../packages/studio/src/lib/draftPersistence.test.ts) asserting the inverse guarantee — two drafts survive a project switch, and only `discardActiveDraft` removes one — so the old behavior cannot silently return.
+
+Spec 034's data-model.md and contracts/persistence.md keep their VR-5 text as the historical record of the single-project MVP; this section is the amendment that supersedes it. The VR-1..VR-4 validation rules are untouched.
+
+---
+
 ## Migration
 
 ### Client
 
-Run once, on `StudioShell` mount, before autosave/cloud-sync start:
+There is **no key-scheme migration** — `main` already stores drafts at `ks.draft.<projectKey>.v1` (see the Port note under [Current state](#current-state-ground-truth)). What is needed instead is **index reconciliation**, because the records predate the index.
 
-1. If `ks.studio.projects.index` already exists, migration has already run — no-op (idempotent).
-2. Else, read the legacy `ks.studio.draft` key (same `readDraft()` validation as today: version check, TTL check via `loadDraftMeta()`'s existing expiry rule).
-3. If absent or expired/malformed, initialize an empty index and stop.
-4. If present, derive its `projectKey` (working copy present → `identity.keyboardId ?? baseKeyboard.id`; no working copy → the `"__pending__"` reserved slot from [Client data model](#client-data-model)), write it to `ks.studio.project.<projectKey>`, add one `ProjectIndexEntry` to the new index, set `ks.studio.activeProject = projectKey`, and remove the legacy `ks.studio.draft` key.
-5. The equivalent adoption runs server-side the first time a signed-in author's client pushes post-upgrade: `PUT /drafts?draftId=X` against a backend whose table still has the pre-migration `default`-keyed row simply creates a new, distinct row (a legacy server row is not auto-renamed to the newly-derived `draftId` — it remains reachable at the `default` slot only via the back-compat path, i.e. by an old client or by an explicit `draftId=default` call). This is acceptable: the client-side adoption in step 4 is what an upgraded client actually needs, and the server's `default` row is naturally superseded on the next real save.
+`reconcileProjectIndex()` in [draftPersistence.ts](../../packages/studio/src/lib/draftPersistence.ts) is called from `listDrafts()` — the read path — rather than from a `StudioShell` mount hook, so a pre-index draft is listed on the author's very first visit to "My keyboards" regardless of boot ordering. It:
+
+1. Snapshots the localStorage key list (before touching the index, since adopting a row writes `ks.draftIndex.v1` and can reorder keys mid-enumeration).
+2. Selects keys matching `ks.draft.<projectKey>.v1`. The `.v1` suffix requirement excludes `ks.draft.active`; the index key itself has a different prefix (`ks.draftI`, not `ks.draft.`).
+3. Skips any projectKey already present in the index — so an existing row, including a `"submitted"` one, is never rewritten.
+4. For the remainder, parses the record and adopts it via the same `buildIndexEntry` the normal save path uses. Records failing VR-1 (version), VR-3 (malformed), or VR-2 (not instantiated) are skipped and **left in place** — never deleted.
+5. Returns the number of rows adopted (0 in the steady state, which is what makes calling it from `listDrafts` cheap: only records *missing* a row are ever parsed).
+
+Idempotent by construction: after the first pass every record has a row, so subsequent passes adopt nothing.
 
 ### Server
 
 Schema migration (above) is a one-time deploy-time DDL run, not a runtime code path — no handler-level "migrate on first request" logic. `MemoryDraftStore`'s in-test/dev-server equivalent needs no migration since it starts empty every process.
+
+No server-side row adoption is attempted either. The first time a signed-in author's upgraded client pushes, `PUT /drafts?draftId=X` against a table that still holds the pre-migration `default`-keyed row simply creates a new, distinct row; the legacy row is not auto-renamed to the newly-derived `draftId` and stays reachable at the `default` slot only via the back-compat path (an old client, or an explicit `draftId=default` call). This is acceptable: the client-side reconciliation above is what an upgraded client actually needs, and the server's `default` row is naturally superseded on the next real save.
 
 ---
 
@@ -286,7 +315,7 @@ Replaces the disabled placeholder in [ProfileScreen.tsx](../../packages/studio/s
 
 - **SC-001**: An author can have two or more drafts simultaneously without either overwriting the other, client-side and server-side.
 - **SC-002**: Resuming project B when project A is also in progress restores exactly B's working copy and survey state; A's stored record is byte-for-byte unchanged.
-- **SC-003**: Every pre-existing single `ks.studio.draft` on a real (non-synthetic) test fixture is discoverable in "My keyboards" post-upgrade — zero silent data loss across the migration.
+- **SC-003**: Every pre-existing `ks.draft.<projectKey>.v1` record written before `ks.draftIndex.v1` existed is discoverable in "My keyboards" post-upgrade, and no record is deleted by the reconciliation pass — zero silent data loss. (Restated post-port; see [User Story 3](#user-story-3--pre-index-drafts-are-adopted-without-loss-priority-p1).)
 - **SC-004**: A successful managed-PR submission produces a `status: "submitted"` entry with a working `prUrl`, and the project is no longer offered as Resumable.
 - **SC-005**: `pnpm typecheck`, `pnpm --filter @keyboard-studio/oauth-backend test`, and `pnpm --filter @keyboard-studio/studio test` are green with `POSTGRES_URL` / `DATABASE_URL` / `BLOB_READ_WRITE_TOKEN` all unset.
 - **SC-006**: A client that predates this feature (calls `/drafts` with no `draftId`) continues to function unmodified against the upgraded backend.

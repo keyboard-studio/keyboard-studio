@@ -4,8 +4,11 @@
 // This module is the reload-survival counterpart to persistWorkingCopy.ts
 // (which snapshots to sessionStorage across an OAuth redirect only). The
 // durable draft persists BOTH the working copy AND the traversal state (the
-// "where am I in the walk" position), keyed per-project so a future
-// multi-project index (US3a / FR-014) is additive rather than a migration.
+// "where am I in the walk" position), keyed per-project so the multi-project
+// index (US3a / FR-014) is additive rather than a key-scheme migration. The
+// one thing additive-ness does NOT give for free: drafts written before the
+// index existed have no index row, so "My keyboards" would not list them.
+// `reconcileProjectIndex` adopts those on read (US3 / SC-003).
 //
 // See specs/034-mvp-authoring-walk/contracts/persistence.md (the UI contract)
 // and specs/034-mvp-authoring-walk/data-model.md (the DurableDraft envelope).
@@ -91,8 +94,9 @@ const ACTIVE_PROJECT_KEY = "ks.draft.active" as const;
  * (no working-copy payload) so the list can render without deserializing
  * every project's full `DurableDraft`. Kept up to date by `saveDraft` (upsert)
  * and `clearDraft` (remove) — every write to a per-project draft record has a
- * matching write to this index, so it can never drift out of sync with which
- * `ks.draft.<projectKey>.v1` records actually exist.
+ * matching write to this index, so no new drift can originate in this build.
+ * Drafts written before this key existed are backfilled by
+ * `reconcileProjectIndex` (US3 / SC-003).
  */
 export const DRAFT_INDEX_KEY = "ks.draftIndex.v1" as const;
 
@@ -192,9 +196,11 @@ export function clearActiveProjectKey(): void {
 // Ported from the dev reference implementation's project-index scheme
 // (draftAutosave.ts) onto main's `ks.draftIndex.v1` key. Every helper here is
 // a plain localStorage read/write over `ProjectIndexEntry[]`; the actual
-// upsert/remove call sites live in `saveDraft`/`clearDraft` below, so the
-// index can never observably drift from the set of `ks.draft.<key>.v1`
-// records that actually exist.
+// upsert/remove call sites live in `saveDraft`/`clearDraft` below, so no NEW
+// drift from the set of `ks.draft.<key>.v1` records can originate in this
+// build. Records written BEFORE the index existed (main has persisted
+// per-project drafts since spec 034) are the one pre-existing source of drift,
+// and `reconcileProjectIndex` below adopts them on read — see its doc comment.
 // ---------------------------------------------------------------------------
 
 function readProjectIndex(): ProjectIndexEntry[] {
@@ -288,10 +294,102 @@ function buildServerMeta(
 }
 
 /**
+ * Adopt every `ks.draft.<projectKey>.v1` record that has no matching
+ * `ks.draftIndex.v1` row into the index. Returns how many rows were adopted
+ * (0 in the steady state).
+ *
+ * WHY THIS EXISTS (US3 / SC-003 — zero silent data loss). `saveDraft` and
+ * `clearDraft` keep the index in lockstep with the draft records *they* write,
+ * so no drift can originate here. But the per-project draft records predate
+ * the index: main's draft engine has been writing `ks.draft.<key>.v1` since
+ * spec 034 while `DRAFT_INDEX_KEY` only arrives with "My keyboards" (US3a).
+ * Every draft an author saved before this feature ships therefore exists on
+ * disk with no index row, and since `listDrafts` reads only the index, those
+ * drafts would be invisible in "My keyboards" — present in localStorage,
+ * unreachable from the UI — until the author happened to re-save that exact
+ * project. This is the real shape of the legacy-draft gap; there is no
+ * separate legacy single-slot key to migrate (main never had one — see the
+ * key-scheme note in specs/047-my-keyboards/spec.md).
+ *
+ * Read-only with respect to draft records: unlike `loadDraft`, a record this
+ * pass cannot adopt is SKIPPED, never deleted. Enumeration is not the place to
+ * destroy data — a version-mismatched record is still `loadDraft`'s to discard
+ * (VR-1) at the point the author actually opens it.
+ *
+ * Skipped (and why):
+ * - version mismatch (VR-1) — not resumable under this build's envelope.
+ * - malformed / unparseable (VR-3) — no trustworthy row to synthesize.
+ * - `workingCopy` not really instantiated (VR-2) — `loadDraft` refuses these,
+ *   so a card for one would render a Resume button that does nothing. Note
+ *   `saveDraft`'s own VR-2 guard means main never writes such a record.
+ *
+ * Idempotent: a second call adopts nothing, because the first gave every
+ * record an index row. Adopted rows land as `status: "draft"` / `prUrl: null`
+ * — a pre-index record carries no submission state by construction.
+ */
+export function reconcileProjectIndex(): number {
+  // Snapshot the key list BEFORE touching the index: adopting a row writes
+  // DRAFT_INDEX_KEY, which can itself change localStorage's key ordering
+  // mid-enumeration.
+  const keys: string[] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key !== null) keys.push(key);
+    }
+  } catch {
+    return 0; // VR-4: a security/quota failure must never throw into boot.
+  }
+
+  const suffix = `.v${DRAFT_VERSION}`;
+  const indexed = new Set(readProjectIndex().map((e) => e.projectKey));
+  let adopted = 0;
+
+  for (const key of keys) {
+    // `ks.draft.active` (no `.v1` suffix) and `ks.draftIndex.v1` (different
+    // prefix — "ks.draftI" !== "ks.draft.") both fall out here.
+    if (!key.startsWith(DRAFT_KEY_PREFIX) || !key.endsWith(suffix)) continue;
+    const projectKey = key.slice(DRAFT_KEY_PREFIX.length, key.length - suffix.length);
+    if (projectKey === "" || indexed.has(projectKey)) continue;
+
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw === null) continue;
+      const envelope = JSON.parse(raw) as DurableDraft;
+      if (envelope === null || typeof envelope !== "object") continue;
+      if (envelope.version !== DRAFT_VERSION) continue;
+      if (typeof envelope.savedAt !== "number") continue;
+      if (envelope.traversal === null || typeof envelope.traversal !== "object") continue;
+      if (
+        envelope.workingCopy === null ||
+        typeof envelope.workingCopy !== "object" ||
+        envelope.workingCopy.instantiationMode === null
+      ) {
+        continue;
+      }
+      upsertIndexEntry(buildIndexEntry(projectKey, envelope));
+      indexed.add(projectKey);
+      adopted += 1;
+    } catch {
+      continue; // VR-3: unparseable/wrong-shaped — skip, leave the record alone.
+    }
+  }
+
+  return adopted;
+}
+
+/**
  * The local "My keyboards" project list, newest-saved first. Public entry
  * point for `MyKeyboardsList` (ported from the dev reference implementation).
+ *
+ * Reconciles first (see `reconcileProjectIndex`) so a pre-index draft is
+ * listed on the author's very first visit to "My keyboards" rather than
+ * depending on a boot hook having run. Idempotent and cheap in the steady
+ * state: the scan parses only records that are MISSING an index row, which is
+ * none once the first call has adopted them.
  */
 export function listDrafts(): ProjectIndexEntry[] {
+  reconcileProjectIndex();
   return [...readProjectIndex()].sort((a, b) => b.savedAt - a.savedAt);
 }
 
@@ -523,25 +621,21 @@ export function clearDraft(projectKey: string): void {
   removeIndexEntry(projectKey);
 }
 
-/**
- * VR-5 single-project MVP guard (FR-009 / US3 AS-4): instantiating a working
- * copy under a DIFFERENT projectKey than the currently-active one must be
- * well-defined — replace, never silently merge two projects' state into one
- * record.
- *
- * For the MVP this is a clean REPLACE (no confirmation prompt): the prior
- * project's draft is cleared outright. Call this BEFORE the new
- * instantiation's own autosave starts writing under `newProjectKey` (see
- * StudioShell's onInstantiate). The active pointer is left untouched here —
- * the new project's own saveDraft/installDraftAutosave call repoints it to
- * `newProjectKey` immediately after.
- */
-export function replaceActiveDraftIfDifferentProject(newProjectKey: string): void {
-  const prevKey = resolveActiveProjectKey();
-  if (prevKey !== null && prevKey !== newProjectKey) {
-    clearDraft(prevKey);
-  }
-}
+// REMOVED (spec 047 US3a supersedes spec 034 VR-5):
+// `replaceActiveDraftIfDifferentProject(newProjectKey)` used to clear the
+// previously-active project's draft whenever a working copy was instantiated
+// under a different projectKey — the single-project MVP's answer to "two
+// projects, one draft slot: replace, never silently merge."
+//
+// "My keyboards" removes the premise. Several drafts now co-exist by design,
+// so a project switch is no longer evidence that the previous project was
+// abandoned, and clearing it would violate SC-001 (an author starts keyboard B
+// and finds keyboard A gone from their list). Deleting a draft is now always
+// something the author asked for, which is what `discardActiveDraft` is for.
+//
+// Deliberately deleted rather than kept as an uncalled export: a live function
+// whose whole contract is "destroy the other project's draft" is a hazard for
+// the next caller who reaches for it by name.
 
 /**
  * Discard the currently-active project's persisted draft entirely: clears
@@ -832,7 +926,11 @@ export function loadDraftMeta(): DraftMeta | null {
 // alongside `installDraftAutosave`'s ~500ms one, exactly as
 // `AUTOSAVE_DEBOUNCE_MS` already is relative to the validator's 300ms cycle —
 // neither touches the validation path or produces preview feedback, so
-// neither is "a second debounce cycle" in the D3 sense. This timer is
+// neither is "a second debounce cycle" in the D3 sense. That reading is now
+// RATIFIED rather than argued from here: D3's scope clause (CLAUDE.md, and the
+// dated clarification under D3 in docs/spec-signoff.md) states the test
+// explicitly — a timer falls under D3 iff it emits diagnostics. This one does
+// not. This timer is
 // deliberately coarser (20s) than the local autosave: the server push only
 // needs to be eventually-consistent, so requests are batched aggressively.
 // Two checkpoints — the tab becoming hidden and page unload (keepalive

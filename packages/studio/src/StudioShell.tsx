@@ -23,7 +23,6 @@ import {
   deriveProjectKeyFromWorkingCopy,
   discardActiveDraft,
   installDraftAutosave,
-  replaceActiveDraftIfDifferentProject,
   startCloudSync,
   wasDraftRestoredThisBoot,
 } from "./lib/draftPersistence.ts";
@@ -509,17 +508,22 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       if (instantiatedRef.current) return;
       instantiatedRef.current = true;
 
-      // T025 (spec 034 US3, VR-5 / FR-009 / AS-4): a durable draft from a
-      // DIFFERENT project may already be active (e.g. the author abandoned an
-      // earlier in-progress keyboard without "start over" and picked a new
-      // base). This is the instantiation entry point, so it is where a genuine
-      // project switch first becomes visible — replace the prior project's
-      // draft now, BEFORE this instantiation's own autosave (below) starts
-      // writing under the new key. MVP policy: clean replace, never silent
-      // merge (a confirm-before-overwrite UX is the non-MVP alternative the
-      // contract also permits, deferred).
-      replaceActiveDraftIfDifferentProject(base.id);
-
+      // Spec 034's VR-5 used to call `replaceActiveDraftIfDifferentProject`
+      // here: picking a new base DELETED the previously active project's
+      // draft, because the studio could hold only one draft at a time and a
+      // project switch was therefore indistinguishable from abandonment.
+      //
+      // "My keyboards" (spec 047 US3a) is precisely the feature that makes
+      // several drafts co-exist, so that implicit delete is now the direct
+      // negation of SC-001 — it would let an author start keyboard B and find
+      // keyboard A silently gone from their list. The clear-on-switch is
+      // removed, not merely relaxed: there is no longer any sense in which a
+      // project switch implies discarding the project being switched away
+      // from. Abandonment stays explicit, via `discardActiveDraft` on the
+      // start-over paths (WelcomeScreen's "start over" and this shell's own
+      // reset below) — the author's own instruction, not an inference from
+      // navigation. See specs/047-my-keyboards/spec.md ("Superseded: spec
+      // 034 VR-5").
       // Reads via getState() escape hatch (not a selector) to avoid a stale closure — the callback is memoised with empty deps.
       const track = useSurveySessionStore.getState().selectedTrack;
       applyStepCompletion(
