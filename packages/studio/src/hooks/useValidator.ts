@@ -1,3 +1,4 @@
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useState, useEffect } from "react";
 import type { LintFinding } from "@keyboard-studio/contracts";
 import { validateWithOracle } from "@keyboard-studio/engine";
@@ -38,7 +39,7 @@ export function useValidator(kmnSource: string | null): ValidatorResult {
         if (cancelled) return;
         // An unexpected rejection must stay user-visible (#606): surface the
         // synthetic VALIDATOR_ERROR_FINDING rather than silently clearing to [].
-        console.error("[useValidator] validateWithOracle threw:", err);
+        devLog.error("[useValidator] validateWithOracle threw:", err);
         setFindings([VALIDATOR_ERROR_FINDING]);
       })
       .finally(() => {

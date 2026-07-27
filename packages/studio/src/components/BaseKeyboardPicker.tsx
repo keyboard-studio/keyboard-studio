@@ -3,6 +3,7 @@
 // exact script/BCP-47 match first, then name/id substring (AC#1).
 // CJK/Ethiopic guard lives in OSKFrame, not here.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useEffect, useState, useDeferredValue, useMemo, useRef, useId } from "react";
 import type { CSSProperties } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -67,7 +68,7 @@ async function loadCorpus(): Promise<Map<string, string>> {
     return map;
   } catch {
     _corpusCache = "failed";
-    console.warn("[BaseKeyboardPicker] import-corpus.json not available - import-status badges suppressed");
+    devLog.warn("[BaseKeyboardPicker] import-corpus.json not available - import-status badges suppressed");
     return new Map();
   }
 }
@@ -275,7 +276,7 @@ export function BaseKeyboardPicker({
         (err: unknown) => {
           if (cancelled) return;
           const message = err instanceof Error ? err.message : String(err);
-          console.error("[BaseKeyboardPicker] listAll() failed:", err);
+          devLog.error("[BaseKeyboardPicker] listAll() failed:", err);
           setError(message);
           setLoading(false);
         },

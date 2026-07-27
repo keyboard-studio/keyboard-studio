@@ -54,6 +54,7 @@
 //
 // Single 300 ms debounce contract upheld — no second timer introduced.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
@@ -715,7 +716,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
         seedSource: resolvedSeedSource,
       }).layout;
     } catch (err) {
-      console.error("[TouchGallery] detectionSeedLayout derivation failed:", err);
+      devLog.error("[TouchGallery] detectionSeedLayout derivation failed:", err);
       return null;
     }
   }, [baseIr, baseVfs, mods, resolvedSeedSource]);
@@ -731,7 +732,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       try {
         return parseTouchLayout(touchLayoutJson);
       } catch (err) {
-        console.error("[TouchGallery] layoutForLintAndGate derivation failed:", err);
+        devLog.error("[TouchGallery] layoutForLintAndGate derivation failed:", err);
         return detectionSeedLayout;
       }
     }
@@ -903,7 +904,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       const uncoveredSet = new Set(uncovered);
       return new Set(inventory.filter((c) => !uncoveredSet.has(c)));
     } catch (err) {
-      console.error("[TouchGallery] detectedChars coverage failed", err);
+      devLog.error("[TouchGallery] detectedChars coverage failed", err);
       return new Set<string>();
     }
     // inventoryKey is the stable primitive proxy for `inventory` (declared

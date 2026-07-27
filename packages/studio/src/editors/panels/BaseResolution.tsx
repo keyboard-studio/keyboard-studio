@@ -5,6 +5,7 @@
 // accept a suggestion or pick any base.
 // The chosen base then back-fills the prefill confirmations. refs #369.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useEffect, useMemo, useState } from "react";
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
@@ -117,7 +118,7 @@ export function BaseResolution({
         },
         (err) => {
           if (!live) return;
-          console.error("[BaseResolution] listAll() failed:", err);
+          devLog.error("[BaseResolution] listAll() failed:", err);
           setError(t({ id: "editor.baseResolution.loadError", message: "Could not load base keyboards." }));
           setLoading(false);
         },

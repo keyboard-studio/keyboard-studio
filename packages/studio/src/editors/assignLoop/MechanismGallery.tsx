@@ -39,6 +39,7 @@
 //                           modifier_as_layer_switch (S-08)
 // (must match the `id:` fields in content/patterns/ — see PATTERN_* constants)
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import {
   useState,
   useEffect,
@@ -1253,7 +1254,7 @@ export function MechanismGallery({
           if (p !== undefined) {
             map.set(p.id, p);
           } else {
-            console.warn(
+            devLog.warn(
               "[MechanismGallery] getById() returned undefined for a patternId",
             );
           }
@@ -1263,7 +1264,7 @@ export function MechanismGallery({
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error("[MechanismGallery] filterFor error:", err);
+        devLog.error("[MechanismGallery] filterFor error:", err);
         setLoadError(msg);
         setLoading(false);
       });
@@ -1470,7 +1471,7 @@ export function MechanismGallery({
       };
     } else {
       markSuggestionResolved(currentChar);
-      console.warn(`[MechanismGallery] handleSuggestionAccept: unrecognised strategyId "${suggestion.strategyId}" — dismissing suggestion`);
+      devLog.warn(`[MechanismGallery] handleSuggestionAccept: unrecognised strategyId "${suggestion.strategyId}" — dismissing suggestion`);
       return;
     }
     recordAssignments([...sessionAssignments, assignment]);
