@@ -22,6 +22,7 @@ import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 import { expectCurrentChar } from "../../test/currentCharChip.ts";
 import { changeSelectMenu } from "../../test/selectMenuTestUtils.ts";
+import { installDialogShim } from "../../test/dialogShim.ts";
 import { PATTERN_SEQUENCE } from "./patternIds.ts";
 
 // ---------------------------------------------------------------------------
@@ -206,22 +207,11 @@ function runTransform(kbId: string) {
   return vfs;
 }
 
-// jsdom does not implement HTMLDialogElement.showModal()/close() — the same
-// shim + rationale as CarveGallery.test.tsx / ConfirmDialog.test.tsx. Needed
-// here because the leave-warning modal (ConfirmDialog) now mounts whenever
-// the FR-008 gate finds uncovered characters.
-beforeAll(() => {
-  if (typeof HTMLDialogElement.prototype.showModal !== 'function') {
-    HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
-      this.setAttribute('open', '');
-    };
-  }
-  if (typeof HTMLDialogElement.prototype.close !== 'function') {
-    HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
-      this.removeAttribute('open');
-    };
-  }
-});
+// jsdom does not implement HTMLDialogElement.showModal()/close() — shared
+// shim (test/dialogShim.ts); see that module for rationale. Needed here
+// because the leave-warning modal (ConfirmDialog) now mounts whenever the
+// FR-008 gate finds uncovered characters.
+beforeAll(installDialogShim);
 
 // ---------------------------------------------------------------------------
 // Teardown

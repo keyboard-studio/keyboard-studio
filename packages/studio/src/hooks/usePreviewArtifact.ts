@@ -31,12 +31,8 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { instantiateFromBaseIfConfirmed } from "../lib/confirmRebase.ts";
 import { useWorkingCopyTransform } from "./useWorkingCopyTransform.ts";
 import { serializeWorkingCopy } from "../lib/serializeWorkingCopy.ts";
-import { useInventoryDiff } from "./useInventoryDiff.ts";
-import {
-  inventoryCoverageGate,
-  selectDesktopAssignments,
-  type InventoryCoverageGate,
-} from "../lib/unimplementedInventory.ts";
+import { useInventoryCoverageGate } from "./useInventoryCoverageGate.ts";
+import type { InventoryCoverageGate } from "../lib/unimplementedInventory.ts";
 
 export type PickerMode = "open" | "scaffold";
 
@@ -212,25 +208,9 @@ export function usePreviewArtifact(): PreviewArtifact {
     (storeIdentity?.keyboardId === undefined ||
       storeIdentity.keyboardId === storeBaseKeyboard.id);
 
-  // Inventory coverage gate inputs — same shape StepHost/PhaseFGate build.
-  const phaseResultsForGate = useWorkingCopyStore((s) => s.phaseResults);
-  const touchLayoutJsonForGate = useWorkingCopyStore((s) => s.touchLayoutJson);
-  const confirmedInventoryForGate = useWorkingCopyStore((s) => s.session.confirmedInventory);
-  const { lettersToAdd: lettersToAddForGate } = useInventoryDiff();
-  const desktopAssignmentsForGate = useMemo(
-    () => selectDesktopAssignments(phaseResultsForGate),
-    [phaseResultsForGate],
-  );
-  const coverageGate = useMemo(
-    () =>
-      inventoryCoverageGate({
-        desktopAssignments: desktopAssignmentsForGate,
-        lettersToAdd: lettersToAddForGate,
-        touchLayoutJson: touchLayoutJsonForGate,
-        confirmedInventory: confirmedInventoryForGate,
-      }),
-    [desktopAssignmentsForGate, lettersToAddForGate, touchLayoutJsonForGate, confirmedInventoryForGate],
-  );
+  // Inventory coverage gate — same shared hook StepHost/PhaseFGate use
+  // (hooks/useInventoryCoverageGate.ts).
+  const coverageGate = useInventoryCoverageGate();
 
   // canDownload: require the compile to be ready AND the working copy to be
   // instantiated (baseVfs + baseIr available in the store) AND every

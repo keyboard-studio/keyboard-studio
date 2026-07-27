@@ -50,6 +50,7 @@ import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 import { expectCurrentChar } from "../../test/currentCharChip.ts";
 import { changeSelectMenu, selectMenuValue, selectMenuOptionValues } from "../../test/selectMenuTestUtils.ts";
+import { installDialogShim } from "../../test/dialogShim.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() — variables referenced inside vi.mock() factory closures.
@@ -240,22 +241,11 @@ function instantiateWorkingCopy(opts: { mnemonic?: boolean; caps?: boolean } = {
   useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: seedVfs, ir });
 }
 
-// jsdom does not implement HTMLDialogElement.showModal()/close() — the same
-// shim + rationale as CarveGallery.test.tsx / ConfirmDialog.test.tsx. Needed
-// here because the leave-warning modal (ConfirmDialog) now mounts whenever
-// the whole-inventory unimplemented-characters check finds a gap.
-beforeAll(() => {
-  if (typeof HTMLDialogElement.prototype.showModal !== 'function') {
-    HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
-      this.setAttribute('open', '');
-    };
-  }
-  if (typeof HTMLDialogElement.prototype.close !== 'function') {
-    HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
-      this.removeAttribute('open');
-    };
-  }
-});
+// jsdom does not implement HTMLDialogElement.showModal()/close() — shared
+// shim (test/dialogShim.ts); see that module for rationale. Needed here
+// because the leave-warning modal (ConfirmDialog) now mounts whenever the
+// whole-inventory unimplemented-characters check finds a gap.
+beforeAll(installDialogShim);
 
 afterEach(() => {
   cleanup();

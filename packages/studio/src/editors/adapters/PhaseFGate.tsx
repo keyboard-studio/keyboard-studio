@@ -22,17 +22,11 @@
 // Coverage truth is the SAME shared helper (lib/unimplementedInventory.ts)
 // both galleries use — do not fork the definition here.
 
-import { useMemo } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
-import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
-import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
-import {
-  inventoryCoverageGate,
-  formatCoverageBannerParts,
-  selectDesktopAssignments,
-} from "../../lib/unimplementedInventory.ts";
+import { useInventoryCoverageGate } from "../../hooks/useInventoryCoverageGate.ts";
+import { formatCoverageBannerParts } from "../../lib/unimplementedInventory.ts";
 import { ConfirmDialog } from "../assignLoop/parts/ConfirmDialog.tsx";
 import { PhaseFStepFactoryComponent } from "./flowStepOptions.tsx";
 import type { EditorStepProps } from "../../steps/types.ts";
@@ -40,26 +34,12 @@ import type { EditorStepProps } from "../../steps/types.ts";
 export function PhaseFGate(props: EditorStepProps): React.ReactElement {
   const { t } = useLingui();
 
-  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
-  const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
-  const confirmedInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
   const sessionBackToUnfinishedGallery = useSurveySessionStore((s) => s.backToUnfinishedGallery);
-  const { lettersToAdd } = useInventoryDiff();
 
-  const desktopAssignments = useMemo(() => selectDesktopAssignments(phaseResults), [phaseResults]);
-  // Single shared selector (lib/unimplementedInventory.ts) — do not re-derive
+  // Single shared hook (hooks/useInventoryCoverageGate.ts) — do not re-derive
   // the desktop-always / touch-only-if-authored booleans locally; StepHost's
-  // gate and OutputScreen's download gate call the same function.
-  const gate = useMemo(
-    () =>
-      inventoryCoverageGate({
-        desktopAssignments,
-        lettersToAdd,
-        touchLayoutJson,
-        confirmedInventory,
-      }),
-    [desktopAssignments, lettersToAdd, touchLayoutJson, confirmedInventory],
-  );
+  // gate and OutputScreen's download gate use the same hook.
+  const gate = useInventoryCoverageGate();
   const { unimplementedDesktop, unimplementedTouch, blockedOnDesktop, blockedOnTouch, blocked, touchLayoutCorrupted } =
     gate;
 

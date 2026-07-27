@@ -349,6 +349,7 @@
   "output.submit.button.ariaFormIncomplete": "Renseignez votre nom, votre e-mail et la confirmation de droit d’auteur pour soumettre",
   "editor.assignLoop.inspector.filterLabel": "Filtrer",
   "survey.surveyRunner.finishButton": "Terminer",
+  "studio.nav.outputBlocked.title": "",
   "editor.mechanisms.unimplemented.title": "",
   "editor.touch.unimplemented.title": "",
   "editor.help.unimplementedGate.title": "",

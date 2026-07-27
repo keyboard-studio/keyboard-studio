@@ -349,6 +349,7 @@
   "output.submit.button.ariaFormIncomplete": "Fill in your name, email, and copyright confirmation to submit",
   "editor.assignLoop.inspector.filterLabel": "Filter",
   "survey.surveyRunner.finishButton": "Finish",
+  "studio.nav.outputBlocked.title": "Finish every inventory character before you can access Output",
   "editor.mechanisms.unimplemented.title": "Finish these characters before leaving?",
   "editor.touch.unimplemented.title": "Finish these characters before leaving?",
   "editor.help.unimplementedGate.title": "Finish your keyboard before continuing",

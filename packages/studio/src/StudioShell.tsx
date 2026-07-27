@@ -44,7 +44,7 @@ import { PreviewScreen } from "./components/PreviewScreen.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
-import { Trans } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { LocaleSwitcher } from "./components/LocaleSwitcher.tsx";
@@ -57,8 +57,7 @@ import { StepHost } from "./components/StepHost.tsx";
 import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
 import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
-import { useInventoryDiff } from "./hooks/useInventoryDiff.ts";
-import { inventoryCoverageGate, selectDesktopAssignments } from "./lib/unimplementedInventory.ts";
+import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
 
 // Bind the manifest into the store's staleness actions.
 // Called once at module load; avoids a circular static import in the store
@@ -877,6 +876,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
 export function StudioShell() {
   const route = useRoute();
+  const { t } = useLingui();
 
   const selectedBaseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
 
@@ -927,23 +927,11 @@ export function StudioShell() {
   // Output nav-link UX signal (P0 fix) — NOT the authoritative enforcement
   // (that is OutputScreen's canDownload gate via usePreviewArtifact, which
   // still applies regardless of how #output was reached). This is purely so
-  // the block is visible on the tab itself before the click. Same shared
-  // selector (lib/unimplementedInventory.ts) as StepHost/PhaseFGate/OutputScreen
-  // — do not re-derive the desktop-always/touch-only-if-authored booleans here.
+  // the block is visible on the tab itself before the click. Same shared hook
+  // (hooks/useInventoryCoverageGate.ts) as StepHost/PhaseFGate/OutputScreen —
+  // do not re-derive the desktop-always/touch-only-if-authored booleans here.
   // ---------------------------------------------------------------------------
-  const phaseResultsForNav = useWorkingCopyStore((s) => s.phaseResults);
-  const confirmedInventoryForNav = useWorkingCopyStore((s) => s.session.confirmedInventory);
-  const { lettersToAdd: lettersToAddForNav } = useInventoryDiff();
-  const outputNavBlocked = useMemo(
-    () =>
-      inventoryCoverageGate({
-        desktopAssignments: selectDesktopAssignments(phaseResultsForNav),
-        lettersToAdd: lettersToAddForNav,
-        touchLayoutJson,
-        confirmedInventory: confirmedInventoryForNav,
-      }).blocked,
-    [phaseResultsForNav, lettersToAddForNav, touchLayoutJson, confirmedInventoryForNav],
-  );
+  const outputNavBlocked = useInventoryCoverageGate().blocked;
 
   let content: ReactNode;
   switch (route) {
@@ -982,7 +970,10 @@ export function StudioShell() {
         <NavBar
           active={route}
           outputBlocked={outputNavBlocked}
-          outputBlockedTitle="Finish every inventory character before you can access Output"
+          outputBlockedTitle={t({
+            id: "studio.nav.outputBlocked.title",
+            message: "Finish every inventory character before you can access Output",
+          })}
         />
         <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
           {content}

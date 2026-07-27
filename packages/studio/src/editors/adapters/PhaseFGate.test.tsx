@@ -31,17 +31,11 @@ import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
+import { installDialogShim } from "../../test/dialogShim.ts";
 
-// jsdom does not implement HTMLDialogElement.showModal()/close() — same shim
-// ConfirmDialog.test.tsx / MechanismGallery.test.tsx use.
-beforeAll(() => {
-  HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
-    this.setAttribute("open", "");
-  };
-  HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
-    this.removeAttribute("open");
-  };
-});
+// jsdom does not implement HTMLDialogElement.showModal()/close() — shared
+// shim (test/dialogShim.ts); see that module for rationale.
+beforeAll(installDialogShim);
 
 // PhaseFGate always renders the real Phase F step content ahead of the
 // blocking dialog (`<PhaseFStepFactoryComponent {...props} />`) — stub it so
