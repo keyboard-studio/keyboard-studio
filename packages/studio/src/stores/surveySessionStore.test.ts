@@ -277,4 +277,95 @@ describe("surveySessionStore", () => {
     expect(getStore().activeStepId).toBe(stepBefore);
     expect([...getStore().history]).toEqual(historyBefore);
   });
+
+  // ---------------------------------------------------------------------------
+  // P0 follow-up: "Going back from the mechanism gallery brings me to Phase F."
+  //
+  // Root cause: applyTraversalSnapshot (../lib/draftPersistence.ts's loadDraft)
+  // patches `history` directly from whatever was serialized to localStorage by
+  // a PRIOR page load — including a session that ran the OLDER, buggy build
+  // (the one backToUnfinishedGallery's fix in this same store addressed) that
+  // pushed a stale "help" entry onto `history` via the forward-push advance()
+  // primitive. Shipping the store fix does not repair an already-persisted
+  // draft: a returning author's localStorage record still carries the bad
+  // entry, so `history` arrives at rehydrate already violating the walked-
+  // path invariant, and an ordinary popHistory() then resurfaces "help".
+  //
+  // These tests reproduce that exact shape (a "help" entry sitting in history
+  // while activeStepId is "mechanisms", constructed via applyTraversalSnapshot
+  // exactly as loadDraft would apply a persisted record — never via advance(),
+  // which cannot itself produce this) and assert the invariant: Back from any
+  // step never lands on a step at-or-ahead-of it in the spine (never "help"
+  // when the walk hasn't reached it), regardless of how `history` got there.
+  // ---------------------------------------------------------------------------
+  describe("corrupted/persisted history sanitization (P0 follow-up)", () => {
+    it("applyTraversalSnapshot repairs a stale 'help' entry immediately on rehydrate", () => {
+      const snapshot = snapshotTraversal();
+      applyTraversalSnapshot({
+        ...snapshot,
+        activeStepId: "mechanisms",
+        history: ["identity", "choose_base", "track", "characters", "marks", "carve", "help"],
+      });
+
+      // Sanitized the moment the draft is restored — "help" never lands in
+      // the live store, not just at the next pop.
+      expect(getStore().activeStepId).toBe("mechanisms");
+      expect(getStore().history).not.toContain("help");
+      expect(getStore().history).toEqual([
+        "identity", "choose_base", "track", "characters", "marks", "carve",
+      ]);
+    });
+
+    it("popHistory from a corrupted stack (stale 'help' on top) lands on an earlier spine step, never 'help'", () => {
+      const snapshot = snapshotTraversal();
+      applyTraversalSnapshot({
+        ...snapshot,
+        activeStepId: "mechanisms",
+        history: ["identity", "choose_base", "track", "characters", "marks", "carve", "help"],
+      });
+
+      getStore().popHistory();
+
+      expect(getStore().activeStepId).not.toBe("help");
+      expect(getStore().activeStepId).toBe("carve");
+    });
+
+    it("self-heals even without applyTraversalSnapshot's rehydrate pass (direct setState corruption)", () => {
+      // Bypass applyTraversalSnapshot entirely to prove popHistory() ITSELF
+      // enforces the invariant — belt-and-suspenders alongside the rehydrate
+      // fix, in case `history` is ever corrupted by some other path.
+      useSurveySessionStore.setState({
+        activeStepId: "mechanisms",
+        history: ["identity", "choose_base", "track", "characters", "marks", "carve", "help"],
+      });
+
+      getStore().popHistory();
+
+      expect(getStore().activeStepId).not.toBe("help");
+      expect(getStore().activeStepId).toBe("carve");
+    });
+
+    it("does not disturb a well-formed history stack (no false-positive sanitization)", () => {
+      const store = getStore();
+      store.advance("choose_base");
+      store.advance("track");
+      store.advance("characters");
+      store.advance("marks");
+      store.advance("carve");
+      store.advance("mechanisms");
+
+      const snapshot = snapshotTraversal();
+      expect(snapshot.history).toEqual([
+        "identity", "choose_base", "track", "characters", "marks", "carve",
+      ]);
+
+      applyTraversalSnapshot(snapshot);
+
+      // Nothing dropped — a valid, well-ordered stack round-trips unchanged.
+      expect(getStore().history).toEqual(snapshot.history);
+
+      getStore().popHistory();
+      expect(getStore().activeStepId).toBe("carve");
+    });
+  });
 });
