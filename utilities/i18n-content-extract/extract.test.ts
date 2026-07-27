@@ -10,6 +10,11 @@ import {
   extractPatternStrings,
   slugifyIdSegment,
 } from "./extract.js";
+import { phaseARegistry } from "../../packages/studio/src/survey/questions/registry.a.ts";
+import { phaseBRegistry } from "../../packages/studio/src/survey/questions/registry.b.ts";
+import { phaseFRegistry } from "../../packages/studio/src/survey/questions/registry.f.ts";
+import { phaseGRegistry } from "../../packages/studio/src/survey/questions/registry.g.ts";
+import { reserveRegistry } from "../../packages/studio/src/survey/questions/registry.reserve.ts";
 
 const dirs: string[] = [];
 function tempDir(): string {
@@ -430,5 +435,68 @@ describe("extractFlowQuestionStrings", () => {
     const strings = extractFlowQuestionStrings();
     const keys = Object.keys(strings);
     expect(keys.some((k) => k.includes("language_name_english"))).toBe(false);
+  });
+
+  // --- US2: coverage generalizes to every LIVE phase registry (A/B/F/G),
+  // not just the identity-lite Phase A questions. These assertions are derived
+  // from the live registries themselves, so a newly-added live question is
+  // automatically in scope — the gap can't silently reappear in a new flow.
+
+  it("covers questions from every live phase registry (A/B/F/G), not only Phase A", () => {
+    const strings = extractFlowQuestionStrings();
+    const keys = Object.keys(strings);
+    const idsWithKeys = new Set(
+      keys.map((k) => k.slice("content.flowQuestion.".length).split(".")[0]),
+    );
+
+    // Every live registry must contribute at least one question to the catalog.
+    for (const [phase, registry] of [
+      ["A", phaseARegistry],
+      ["B", phaseBRegistry],
+      ["F", phaseFRegistry],
+      ["G", phaseGRegistry],
+    ] as const) {
+      const registryIds = Object.keys(registry).map(slugifyIdSegment);
+      const covered = registryIds.filter((id) => idsWithKeys.has(id));
+      expect(
+        covered.length,
+        `phase ${phase} registry contributes no flow-question keys`,
+      ).toBeGreaterThan(0);
+    }
+
+    // Spot-check one representative id per non-A phase resolves to its prose,
+    // so the generalization is anchored to real render text, not just a count.
+    expect(strings["content.flowQuestion.pb_typing_approach.prompt"]).toBe(
+      "How would you most naturally type an accented letter on this keyboard?",
+    );
+    expect(strings["content.flowQuestion.pf_welcome_paragraph.prompt"]).toBe(
+      "In 1–3 sentences, what is this keyboard for?",
+    );
+    expect(strings["content.flowQuestion.project_display_name.prompt"]).toBe(
+      "What is the display name for your new keyboard?",
+    );
+  });
+
+  it("emits no key for any registry.reserve.ts module id (D2 — full reserve sweep)", () => {
+    const strings = extractFlowQuestionStrings();
+    const idsWithKeys = new Set(
+      Object.keys(strings).map((k) =>
+        k.slice("content.flowQuestion.".length).split(".")[0],
+      ),
+    );
+    // No reserve-only id may appear. Ids that also live in a live registry
+    // (none today, but be robust to future promotion) are excluded from the
+    // ban so this stays a reserve-*exclusion* check, not a duplicate-id check.
+    const liveIds = new Set(
+      [phaseARegistry, phaseBRegistry, phaseFRegistry, phaseGRegistry].flatMap(
+        (r) => Object.keys(r).map(slugifyIdSegment),
+      ),
+    );
+    for (const reserveId of Object.keys(reserveRegistry).map(slugifyIdSegment)) {
+      if (liveIds.has(reserveId)) continue;
+      expect(idsWithKeys.has(reserveId), `reserve id "${reserveId}" leaked`).toBe(
+        false,
+      );
+    }
   });
 });
