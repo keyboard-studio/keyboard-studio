@@ -1,6 +1,7 @@
 import './index.css';
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { AppRoot } from "./AppRoot.tsx";
 import { StudioShell } from "./StudioShell.tsx";
 import { LintDemo } from "./lint/index.ts";
 import { OAuthCallbackScreen } from "./components/OAuthCallbackScreen.tsx";
@@ -78,7 +79,7 @@ async function mountApp(): Promise<void> {
 
   createRoot(rootEl).render(
     <StrictMode>
-      {isDemoLint ? <LintDemo /> : <StudioShell />}
+      <AppRoot>{isDemoLint ? <LintDemo /> : <StudioShell />}</AppRoot>
     </StrictMode>,
   );
 }
@@ -98,7 +99,9 @@ async function mountCallbackScreen(provider: OAuthProvider): Promise<void> {
 
   createRoot(rootEl).render(
     <StrictMode>
-      <OAuthCallbackScreen provider={provider} />
+      <AppRoot>
+        <OAuthCallbackScreen provider={provider} />
+      </AppRoot>
     </StrictMode>,
   );
 }

@@ -44,8 +44,6 @@ import { FlowMapView } from "./dashboard/DashboardView.tsx";
 import { runCompleteness } from "./dashboard/completeness.ts";
 import { PreviewScreen } from "./components/PreviewScreen.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
-import { i18n } from "@lingui/core";
-import { I18nProvider } from "@lingui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
@@ -991,30 +989,31 @@ export function StudioShell() {
       break;
   }
 
+  // NOTE: the <I18nProvider> lives in AppRoot, ABOVE this component — never
+  // here. StudioShell calls useLingui() itself (below, for the nav tooltip),
+  // and a component cannot consume a context it renders: that combination
+  // returned a null context and blanked the app in production builds, where
+  // Lingui's dev-only invariant is stripped. See AppRoot.tsx.
   return (
-    <I18nProvider i18n={i18n}>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          height: "100vh",
-          width: "100vw",
-          overflow: "hidden",
-          background: "var(--bg)",
-        }}
-      >
-        <NavBar
-          active={route}
-          outputBlocked={outputNavBlocked}
-          outputBlockedTitle={t({
-            id: "studio.nav.outputBlocked.title",
-            message: "Finish every inventory character before you can access Output",
-          })}
-        />
-        <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-          {content}
-        </div>
-      </div>
-    </I18nProvider>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+        width: "100vw",
+        overflow: "hidden",
+        background: "var(--bg)",
+      }}
+    >
+      <NavBar
+        active={route}
+        outputBlocked={outputNavBlocked}
+        outputBlockedTitle={t({
+          id: "studio.nav.outputBlocked.title",
+          message: "Finish every inventory character before you can access Output",
+        })}
+      />
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{content}</div>
+    </div>
   );
 }
