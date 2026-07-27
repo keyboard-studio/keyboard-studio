@@ -143,6 +143,20 @@ describe("discovery-method offer (obligation P2, FR-016)", () => {
     }
   });
 
+  it("orders letters by ICU collation and trails bare diacritics by code point", async () => {
+    // Out-of-order input with two bare combining marks (U+0301 acute after
+    // U+0300 grave) interspersed among unsorted letters.
+    getSourcedExemplars.set(inventory(["ɛ", "́", "a", "b", "̀"]));
+    renderPhaseB();
+    await exemplarRadio();
+    const preview = await screen.findByTestId("exemplar-offer-preview");
+    const order = [...preview.querySelectorAll("[aria-label]")].map(
+      (el) => el.getAttribute("aria-label")?.charAt(0),
+    );
+    // Letters (ICU) first: a, b, ɛ — then bare marks by code point: ◌̀, ◌́.
+    expect(order).toEqual(["a", "b", "ɛ", "◌", "◌"]);
+  });
+
   it("renders a floating diacritic with the dotted circle (U+25CC)", async () => {
     // U+0301 COMBINING ACUTE ACCENT — a bare mark must be visible standalone.
     getSourcedExemplars.set(inventory(["a", "́"]));

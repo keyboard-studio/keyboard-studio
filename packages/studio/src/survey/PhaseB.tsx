@@ -1478,6 +1478,13 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
 function ExemplarOfferDetail({ inventory }: { inventory: SourcedInventory }) {
   const glyphFontStack = useGlyphFontStack();
   const main = charactersInTier(inventory, "main");
+  // ICU collation, matching the "Your alphabet" list and the breakdown
+  // sections: letters (and letter+mark combos) by default ICU order; bare
+  // combining marks have no meaningful dictionary position, so they sort by
+  // raw code point and trail the letters (spec 047 refinement).
+  const bareMarks = main.filter(isCombiningMarkChar).sort(codePointCompare);
+  const letters = collate(main.filter((c) => !isCombiningMarkChar(c)));
+  const ordered = [...letters, ...bareMarks];
 
   return (
     <div
@@ -1497,7 +1504,7 @@ function ExemplarOfferDetail({ inventory }: { inventory: SourcedInventory }) {
         data-testid="exemplar-offer-preview"
         style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
       >
-        {main.map((c) => {
+        {ordered.map((c) => {
           const { title } = codepointLabel(c);
           return (
             <span
