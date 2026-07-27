@@ -198,3 +198,119 @@ describe("QuestionField content-i18n wiring — placeholder interpolation", () =
     expect(screen.queryByText(/\{\{base_name\}\}/)).toBeNull();
   });
 });
+
+// SelectField and MultiSelectField run the SAME resolveFlowText option-label
+// path as RadioField (the block above), but the render surfaces differ, so the
+// resolve-then-interpolate ordering is asserted directly for each per a triage
+// coverage finding. SelectMenu renders only the *selected* option's label on
+// its collapsed trigger, so these seed `value` to surface it without opening
+// the menu; MultiSelect renders every option label unconditionally.
+describe("QuestionField content-i18n wiring — option labels (select)", () => {
+  const selectQuestion: FlowQuestion = {
+    id: "pb_additional_methods",
+    type: "select",
+    prompt: "Add characters another way?",
+    options: [
+      { value: "linguist", label: "Review the suggested list for {{language_name}}" },
+      { value: "picker", label: "Browse the character grid" },
+    ],
+  };
+
+  afterEach(() => {
+    _resetContentI18nForTesting();
+  });
+
+  it("resolves the fr option label AND interpolates its {{token}} after resolution", () => {
+    _setContentCatalogForTesting("fr", {
+      flowQuestions: {
+        "content.flowQuestion.pb_additional_methods.option.linguist.label":
+          "Examiner la liste suggérée pour {{language_name}}",
+      },
+    });
+
+    renderAtLocale(
+      <QuestionField
+        question={selectQuestion}
+        value="linguist"
+        onChange={() => {}}
+        context={{ language_name: "Hausa" }}
+      />,
+      "fr",
+    );
+
+    // The collapsed trigger shows the selected option's resolved+interpolated label.
+    expect(screen.getByText("Examiner la liste suggérée pour Hausa")).toBeTruthy();
+    expect(screen.queryByText(/\{\{language_name\}\}/)).toBeNull();
+  });
+
+  it("falls back to the English option label and still interpolates (locale en)", () => {
+    renderAtLocale(
+      <QuestionField
+        question={selectQuestion}
+        value="linguist"
+        onChange={() => {}}
+        context={{ language_name: "Hausa" }}
+      />,
+      "en",
+    );
+
+    expect(screen.getByText("Review the suggested list for Hausa")).toBeTruthy();
+    expect(screen.queryByText(/\{\{language_name\}\}/)).toBeNull();
+  });
+});
+
+describe("QuestionField content-i18n wiring — option labels (multi_select)", () => {
+  const multiQuestion: FlowQuestion = {
+    id: "pb_additional_methods",
+    type: "multi_select",
+    prompt: "Pick methods",
+    options: [
+      { value: "linguist", label: "Review the suggested list for {{language_name}}" },
+      { value: "picker", label: "Browse the character grid" },
+    ],
+  };
+
+  afterEach(() => {
+    _resetContentI18nForTesting();
+  });
+
+  it("resolves the fr option labels AND interpolates the {{token}} after resolution", () => {
+    _setContentCatalogForTesting("fr", {
+      flowQuestions: {
+        "content.flowQuestion.pb_additional_methods.option.linguist.label":
+          "Examiner la liste suggérée pour {{language_name}}",
+        "content.flowQuestion.pb_additional_methods.option.picker.label":
+          "Parcourir la grille de caractères",
+      },
+    });
+
+    renderAtLocale(
+      <QuestionField
+        question={multiQuestion}
+        value={[]}
+        onChange={() => {}}
+        context={{ language_name: "Hausa" }}
+      />,
+      "fr",
+    );
+
+    expect(screen.getByText("Examiner la liste suggérée pour Hausa")).toBeTruthy();
+    expect(screen.getByText("Parcourir la grille de caractères")).toBeTruthy();
+    expect(screen.queryByText(/\{\{language_name\}\}/)).toBeNull();
+  });
+
+  it("falls back to the English option labels and still interpolates (locale en)", () => {
+    renderAtLocale(
+      <QuestionField
+        question={multiQuestion}
+        value={[]}
+        onChange={() => {}}
+        context={{ language_name: "Hausa" }}
+      />,
+      "en",
+    );
+
+    expect(screen.getByText("Review the suggested list for Hausa")).toBeTruthy();
+    expect(screen.getByText("Browse the character grid")).toBeTruthy();
+  });
+});
