@@ -35,8 +35,8 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
-import { casePairOf } from "./charNormUtils.ts";
-import { isPrivateUseCodePoint, caseCounterpart, glyphCategory } from "@keyboard-studio/engine";
+import { casePairOf, isFoldedUppercase } from "./charNormUtils.ts";
+import { isPrivateUseCodePoint, glyphCategory } from "@keyboard-studio/engine";
 import { isCombining, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { matchesQuery } from "./characterSearch.ts";
 import { Checkbox } from "../ui/index.ts";
@@ -54,6 +54,7 @@ import { ZoomControl } from "./characterMap/ZoomControl.tsx";
 import { useSearchFiltersPopover } from "./characterMap/useSearchFiltersPopover.ts";
 import { SearchFiltersPopover } from "./characterMap/SearchFiltersPopover.tsx";
 import { CharacterMapGroupSection } from "./characterMap/CharacterMapGroupSection.tsx";
+import { mergeBlocksAcrossTiers } from "./characterMap/mergeBlocks.ts";
 
 // Re-exported so CharacterMapPane.test.tsx's zoom-control block (which derives
 // expected boundary percentages/iteration counts from these constants rather
@@ -226,18 +227,24 @@ export function CharacterMapPane({
     //      because some languages use digits word-formingly. Punctuation,
     //      symbols, separators, and control/format characters move to a later
     //      dedicated page.
-    const cased = loadState.groups
+    const byTier = loadState.groups
       .map((g) => ({
         ...g,
         cells: g.cells.filter((c) => {
           const nfc = c.char.normalize("NFC");
-          if (caseCounterpart(nfc, bcp47)?.direction === "toLower") return false;
+          if (isFoldedUppercase(nfc, bcp47)) return false;
           if (c.isCombiningMark) return true; // marks (\p{M}) — glyphCategory folds these to "control"
           const cat = glyphCategory(nfc);
           return cat === "letter" || cat === "number";
         }),
       }))
       .filter((g) => g.cells.length > 0);
+    // One section per Unicode block, cells in codepoint order — see
+    // mergeBlocks.ts. Without this the exemplar tiers emit duplicate stub
+    // sections ("Latin Extended-B — main" holding only the five selected
+    // exemplar characters) ahead of the full block further down, instead of
+    // those characters sitting highlighted in place inside it.
+    const cased = mergeBlocksAcrossTiers(byTier);
     const q = query.trim();
     if (q !== "") {
       return cased
