@@ -1,0 +1,35 @@
+// Shared source mappings for `@keyboard-studio/contracts` and its subpath
+// exports, for the `utilities/*` tools.
+//
+// Why this file exists: the utilities run under `tsx` straight from source,
+// with no package build. Every contracts entry point they can reach must
+// therefore be mapped to `src/`, or the import resolves to a `dist/` file
+// that no build produced and the tool dies on ERR_MODULE_NOT_FOUND at
+// runtime. That failure already shipped once (the `corpus-staleness` lane,
+// when `./dev-log` was added but not mapped here).
+//
+// A single wildcard (`contracts/*` -> `src/*`) cannot replace these: the
+// export names deliberately do not mirror the source layout — `./dev-log` is
+// `utils/devLog.ts`, `./criteria` is `criteriaData.ts`, and `./fixtures` and
+// `./mocks` are directory barrels. Keep this list in step with the `exports`
+// map in packages/contracts/package.json; adding an export means adding it
+// here in the same change.
+{
+  "compilerOptions": {
+    "paths": {
+      "@keyboard-studio/contracts": ["../packages/contracts/src/index.ts"],
+      "@keyboard-studio/contracts/mocks": [
+        "../packages/contracts/src/mocks/index.ts"
+      ],
+      "@keyboard-studio/contracts/fixtures": [
+        "../packages/contracts/src/fixtures/index.ts"
+      ],
+      "@keyboard-studio/contracts/criteria": [
+        "../packages/contracts/src/criteriaData.ts"
+      ],
+      "@keyboard-studio/contracts/dev-log": [
+        "../packages/contracts/src/utils/devLog.ts"
+      ]
+    }
+  }
+}
