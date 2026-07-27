@@ -44,9 +44,15 @@ const ADAPTATION_QUESTIONS_DIR = path.join(REPO_ROOT, "content", "adaptation-que
 const CRITERIA_DATA_PATH = path.join(REPO_ROOT, "packages", "contracts", "data", "criteria.json");
 const SOURCE_LOCALE = "en";
 const CATALOG_FILES = ["patterns.json", "adaptationQuestions.json", "criteria.json"];
-
-const problems = [];
-const warnings = [];
+// Parity-only catalogs (spec 050 T014): their English source is TS
+// question-definition modules (packages/studio/src/survey/questions/**), which
+// this plain-JS tool cannot re-extract the way it re-derives the other three
+// from YAML / criteria.json (research.md D7). So we do NOT freshness-check them
+// here — that is delegated to the extractor CLI's `--check` mode, wired into
+// `pnpm lint` as its own step. We only verify each target locale's key set
+// matches the COMMITTED en/flowQuestions.json (whose freshness that CLI step
+// separately guarantees).
+const PARITY_ONLY_FILES = ["flowQuestions.json"];
 
 // D8 id derivation (research.md): a record id may itself contain literal
 // dots (e.g. a criterion id like "4.3-copyright-holder-is-authorized") —
@@ -167,7 +173,7 @@ function extractCriteriaStrings() {
   return out;
 }
 
-function checkFreshness(name, fresh, englishDir) {
+function checkFreshness(problems, warnings, englishDir, name, fresh) {
   const committed = readCatalog(path.join(englishDir, name));
   if (committed === null) {
     problems.push(`[en/${name}] committed catalog is missing entirely — run the extractor.`);
@@ -193,14 +199,14 @@ function checkFreshness(name, fresh, englishDir) {
   }
 }
 
-function checkTargetLocaleParity(name, freshEnglish) {
-  if (!existsSync(CONTENT_I18N_DIR)) return;
-  const locales = readdirSync(CONTENT_I18N_DIR, { withFileTypes: true })
+function checkTargetLocaleParity(problems, contentI18nDir, name, freshEnglish) {
+  if (!existsSync(contentI18nDir)) return;
+  const locales = readdirSync(contentI18nDir, { withFileTypes: true })
     .filter((d) => d.isDirectory() && d.name !== SOURCE_LOCALE)
     .map((d) => d.name);
 
   for (const locale of locales) {
-    const file = path.join(CONTENT_I18N_DIR, locale, name);
+    const file = path.join(contentI18nDir, locale, name);
     if (!existsSync(file)) continue; // hasn't started translating this catalog yet — not a gap
     const target = readCatalog(file);
     const missing = keySet(freshEnglish).filter((k) => !(k in target));
@@ -215,18 +221,48 @@ function checkTargetLocaleParity(name, freshEnglish) {
   }
 }
 
+/**
+ * Pure check core, parameterized so it can run against a temp content/i18n
+ * tree in tests instead of the real repo (spec 050 T013). Returns the
+ * accumulated problems/warnings rather than exiting, so callers decide how to
+ * report. `freshCatalogs` supplies the freshly-extracted English maps for the
+ * freshness-checked `CATALOG_FILES`; `parityOnlyFiles` are key-set-checked
+ * against their committed en/*.json (see PARITY_ONLY_FILES).
+ */
+function lint({ contentI18nDir, freshCatalogs, parityOnlyFiles }) {
+  const problems = [];
+  const warnings = [];
+  const englishDir = path.join(contentI18nDir, SOURCE_LOCALE);
+
+  for (const name of CATALOG_FILES) {
+    checkFreshness(problems, warnings, englishDir, name, freshCatalogs[name]);
+    checkTargetLocaleParity(problems, contentI18nDir, name, freshCatalogs[name]);
+  }
+
+  for (const name of parityOnlyFiles) {
+    const committedEnglish = readCatalog(path.join(englishDir, name));
+    if (committedEnglish === null) {
+      problems.push(`[en/${name}] committed catalog is missing entirely — run the extractor.`);
+      continue;
+    }
+    checkTargetLocaleParity(problems, contentI18nDir, name, committedEnglish);
+  }
+
+  return { problems, warnings };
+}
+
 function main() {
-  const fresh = {
+  const freshCatalogs = {
     "patterns.json": extractPatternStrings(),
     "adaptationQuestions.json": extractAdaptationQuestionStrings(),
     "criteria.json": extractCriteriaStrings(),
   };
 
-  const englishDir = path.join(CONTENT_I18N_DIR, SOURCE_LOCALE);
-  for (const name of CATALOG_FILES) {
-    checkFreshness(name, fresh[name], englishDir);
-    checkTargetLocaleParity(name, fresh[name]);
-  }
+  const { problems, warnings } = lint({
+    contentI18nDir: CONTENT_I18N_DIR,
+    freshCatalogs,
+    parityOnlyFiles: PARITY_ONLY_FILES,
+  });
 
   if (warnings.length > 0) {
     console.warn("[WARN] content-i18n-lint: English source prose changed under existing ids.");
@@ -249,4 +285,8 @@ function main() {
   console.log("[OK] content-i18n-lint: Tier B content catalogs are in sync.");
 }
 
-main();
+module.exports = { lint, slugifyIdSegment, CATALOG_FILES, PARITY_ONLY_FILES };
+
+// Only run when invoked directly (`node index.js`), not when index.test.js
+// imports `lint` for testing.
+if (require.main === module) main();
