@@ -8,14 +8,6 @@ import tsParser from "@typescript-eslint/parser";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import reactHooks from "eslint-plugin-react-hooks";
 
-// `no-console` is a CI gate, not a local-dev nuisance. Console calls are a
-// normal part of iterating locally, so the rule stays silent during
-// interactive development and only fires where it matters — CI, where a
-// stray console.* left in a diff should block the lane. CI runners set
-// `CI=true` (GitHub Actions, most providers); everything else is treated as
-// dev. Override with `CI=1 pnpm lint` locally to reproduce the gated run.
-const isCI = process.env.CI === "true" || process.env.CI === "1";
-
 export default [
   {
     ignores: [

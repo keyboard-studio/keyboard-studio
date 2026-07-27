@@ -51,8 +51,11 @@ jobs:
 
       # The scanner imports the codec/recognizer source via tsx; no package
       # build is required. --check writes nothing and exits 1 on drift.
-      # TSX_TSCONFIG_PATH makes tsx use the scanner's tsconfig (the
-      # @keyboard-studio/contracts paths mapping) regardless of cwd.
+      # TSX_TSCONFIG_PATH makes tsx use the scanner's tsconfig regardless of
+      # cwd. That tsconfig maps every @keyboard-studio/contracts entry point
+      # the scanner reaches — root plus subpaths (dev-log, pulled in by the
+      # validator modules) — to contracts *source*; without a mapping the
+      # subpath resolves to a dist/ file no build has produced.
       - name: Check import-corpus is up to date
         env:
           TSX_TSCONFIG_PATH: utilities/supportability-scanner/tsconfig.json

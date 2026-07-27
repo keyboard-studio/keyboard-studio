@@ -24,8 +24,8 @@
       "import": "./dist/criteriaData.js"
     },
     "./dev-log": {
-      "types": "./dist/devLog.d.ts",
-      "import": "./dist/devLog.js"
+      "types": "./dist/utils/devLog.d.ts",
+      "import": "./dist/utils/devLog.js"
     }
   },
   "files": [

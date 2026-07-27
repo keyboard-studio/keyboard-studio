@@ -26,21 +26,39 @@ const globalEnv = globalThis as unknown as {
   process?: { env?: Record<string, string | undefined> };
 };
 
+/**
+ * The gate's decision, split out from the environment reads so it can be
+ * unit-tested. Vite replaces `import.meta.env.PROD` with a literal at build
+ * time, so the read itself is a compile-time constant that no test can vary —
+ * only the decision it feeds is testable. Exported for that purpose; callers
+ * should use `devLog` rather than reimplementing the gate.
+ *
+ * @param viteProd `import.meta.env.PROD`, or `undefined` outside Vite.
+ * @param nodeEnv `process.env.NODE_ENV`, or `undefined` when unset.
+ */
+export function isProductionEnv(
+  viteProd: boolean | undefined,
+  nodeEnv: string | undefined,
+): boolean {
+  if (viteProd === true) return true;
+  // "Can't tell" (no Vite flag, no NODE_ENV) falls through to dev, so Node
+  // CLIs and tests keep their logs.
+  return nodeEnv === "production";
+}
+
 function isProduction(): boolean {
+  let viteProd: boolean | undefined;
   try {
     // Vite replaces this member expression with a literal at build time;
     // the cast keeps tsc happy without pulling in Vite's ambient env types.
-    if (
-      (import.meta as unknown as { env: { PROD?: boolean } }).env.PROD === true
-    ) {
-      return true;
-    }
+    viteProd = (import.meta as unknown as { env: { PROD?: boolean } }).env.PROD;
   } catch {
     // Not a Vite context (Node CLI / vitest): `import.meta.env` is undefined
-    // and the property read throws — fall through to the Node check below.
+    // and the property read throws — leave viteProd undefined and let
+    // NODE_ENV decide.
   }
 
-  return globalEnv.process?.env?.NODE_ENV === "production";
+  return isProductionEnv(viteProd, globalEnv.process?.env?.NODE_ENV);
 }
 
 function gated(method: ConsoleMethod) {
