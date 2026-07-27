@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-07-23",
+  "lastUpdated": "2026-07-27",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -654,6 +654,14 @@
     "specs/046-marks-question-series": {
       "title": "Feature Specification: Mark Composition Model and the Marks Question Series",
       "hash": "sha256:3833307b9bed16c9",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/044-cldr-sldr-exemplars": {
+      "title": "Feature Specification: CLDR/SLDR exemplars",
+      "hash": "sha256:efb413d2330a32fc",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

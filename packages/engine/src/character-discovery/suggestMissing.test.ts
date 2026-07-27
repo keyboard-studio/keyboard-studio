@@ -788,3 +788,87 @@ describe("isCharCoveredForLocale — `form` parameter (spec: normalize both side
     expect(isCharCoveredForLocale(PRECOMPOSED_UPPER_E_ACUTE, needed, "fr", "NFD")).toBe(true); // "É" precomposed uppercase
   });
 });
+
+// ---------------------------------------------------------------------------
+// 12. Spec 044 — the offline sourcing path (no loader) and the script
+//     cross-check with all four tiers live.
+//
+// Before spec 044 the punctuation and numbers tiers were read under CLDR key
+// names that have never existed (research R0), so they were always null and
+// three quarters of the "needed" signal never reached surplus detection. Now
+// that they flow, the cross-check must SURFACE out-of-script characters rather
+// than dropping them: a Latin quotation mark in an Arabic locale's punctuation
+// set is genuinely needed, and silently discarding it would re-introduce the
+// over-removal these tiers were added to fix.
+// ---------------------------------------------------------------------------
+
+describe("spec 044 — offline sourcing path (no loader)", () => {
+  it("suggestMissingCharacters resolves without a loader", async () => {
+    const ir = emptyIr;
+    const result = await suggestMissingCharacters({ bcp47: "ewo", baseIr: ir });
+    expect(result).not.toBeNull();
+    expect(result!.bcp47).toBe("ewo");
+  });
+
+  it("suggests from an SLDR-only language's real alphabet", async () => {
+    const result = await suggestMissingCharacters({ bcp47: "ebk", baseIr: emptyIr });
+    expect(result).not.toBeNull();
+    // Eastern Bontok's accented vowels — CLDR has no ebk locale at all.
+    expect(result!.main).toContain("ó");
+  });
+
+  it("still returns null for a tag neither source covers", async () => {
+    expect(await suggestMissingCharacters({ bcp47: "zxx-Qaai", baseIr: emptyIr })).toBeNull();
+  });
+
+  it("still honours the confidence gate without a loader", async () => {
+    for (const tag of ["und", "zh", "ms"]) {
+      expect(await suggestMissingCharacters({ bcp47: tag, baseIr: emptyIr })).toBeNull();
+    }
+  });
+
+  it("neededCharsForLanguage resolves without a loader", async () => {
+    const needed = await neededCharsForLanguage({ bcp47: "ewo" });
+    expect(needed).not.toBeNull();
+    expect(needed!.size).toBeGreaterThan(0);
+  });
+});
+
+describe("spec 044 — all four tiers reach the needed set", () => {
+  it("includes locale punctuation and locale digits, not just letters", async () => {
+    const needed = await neededCharsForLanguage({ bcp47: "ewo" });
+    expect(needed).not.toBeNull();
+    expect(needed!.has("ŋ")).toBe(true); // main
+    expect(needed!.has("x")).toBe(true); // auxiliary
+    expect(needed!.has("?")).toBe(true); // punctuation
+    expect(needed!.has("7")).toBe(true); // numbers
+  });
+
+  it("surfaces Persian's own digits rather than only ASCII ones", async () => {
+    const needed = await neededCharsForLanguage({ bcp47: "fa-IR" });
+    expect(needed!.has("۵")).toBe(true);
+  });
+
+  it("surfaces out-of-script punctuation instead of dropping it", async () => {
+    // Arabic's punctuation tier contains Latin-script marks (parentheses,
+    // quotation marks). Nothing filters on script here, and nothing should:
+    // dropping them would mark real keyboard characters as surplus.
+    const needed = await neededCharsForLanguage({ bcp47: "ar-EG" });
+    expect(needed).not.toBeNull();
+    const latinPunct = [...needed!].filter(
+      (ch) => (ch.codePointAt(0) ?? 0) < 0x80 && /[\p{P}\p{S}]/u.test(ch),
+    );
+    expect(latinPunct.length).toBeGreaterThan(0);
+  });
+
+  it("keeps the LETTER suggestion audience unpolluted by punctuation and digits", async () => {
+    // suggestMissingCharacters is the letter-suggestion audience; the three new
+    // tiers must not start proposing "?" and "7" as keys to add.
+    const result = await suggestMissingCharacters({ bcp47: "ewo", baseIr: emptyIr });
+    expect(result).not.toBeNull();
+    for (const ch of [...result!.main, ...result!.auxiliary]) {
+      expect(/^\p{L}$/u.test(ch)).toBe(true);
+      expect((ch.codePointAt(0) ?? 0) > 0x7f).toBe(true);
+    }
+  });
+});

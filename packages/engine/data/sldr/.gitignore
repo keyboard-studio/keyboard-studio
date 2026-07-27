@@ -1,0 +1,5 @@
+# Raw SLDR locale tree — build input, ~13 MB compressed, reproducibly fetched by
+# scripts/fetch-sldr.mjs at the commit pinned in scripts/sldr-version.json.
+# Run `pnpm run fetch-sldr` to download.
+# SOURCES.json and LICENSE are committed; the extracted tree is not.
+sldr/

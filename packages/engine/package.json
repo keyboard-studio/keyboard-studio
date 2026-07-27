@@ -54,6 +54,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "cldr-misc-full": "48.2.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.6"
   }

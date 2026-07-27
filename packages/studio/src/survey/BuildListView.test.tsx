@@ -23,12 +23,17 @@ import type { SurveyPhaseResult, IRGroup, IRRule } from "@keyboard-studio/contra
 // vi.hoisted — mutable reference shared across all mock factories.
 // ---------------------------------------------------------------------------
 
-const { getSuggestResult } = vi.hoisted(() => {
+const { getSuggestResult, getSourcedExemplars } = vi.hoisted(() => {
   let _result: import("../lib/services.ts").MissingCharSuggestions | null = null;
+  let _inventory: import("../lib/services.ts").SourcedInventory | null = null;
   return {
     getSuggestResult: {
       get: () => _result,
       set: (v: import("../lib/services.ts").MissingCharSuggestions | null) => { _result = v; },
+    },
+    getSourcedExemplars: {
+      get: () => _inventory,
+      set: (v: import("../lib/services.ts").SourcedInventory | null) => { _inventory = v; },
     },
   };
 });
@@ -44,6 +49,11 @@ vi.mock("../lib/services.ts", () => ({
     _baseIr: unknown,
     _languageName?: string,
   ) => getSuggestResult.get(),
+  // Spec 044: the IntroChooser resolves a sourced exemplar inventory to decide
+  // whether to offer the "start from the alphabet we already have" option.
+  // Null here keeps every test in this file on the pre-044 two-option list;
+  // the offer itself is covered in PhaseBExemplarPrefill.test.tsx.
+  sourcedExemplars: async (_bcp47: string) => getSourcedExemplars.get(),
 }));
 
 // ---------------------------------------------------------------------------
