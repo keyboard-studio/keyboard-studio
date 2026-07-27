@@ -7,6 +7,13 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@vercel/blob':
+        specifier: ^2.0.0
+        version: 2.6.1
+      '@vercel/postgres':
+        specifier: ^0.10.0
+        version: 0.10.0
     devDependencies:
       '@crowdin/cli':
         specifier: ^4.14.4
