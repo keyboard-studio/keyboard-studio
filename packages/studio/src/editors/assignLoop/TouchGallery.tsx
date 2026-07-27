@@ -45,8 +45,8 @@
 //     it); a truly-untouched import-adapt leaves the shipped file verbatim.
 //   - "Touch preview" label matches MechanismGallery's "Live preview" label style.
 //
-// Touch lint (Layer C checks 18.1–18.6, including the KM_LINT_TOUCH_UNCOVERED
-// coverage guard) stays below the character cards, same position as before.
+// The inline touch-lint panel that surfaced Layer C findings below the
+// character cards has been removed; only the FR-008 completion gate remains.
 // FR-008 completion gate: handleContinue re-runs touchCoverage on the same
 // layout lint audits and refuses to complete (surfacing an inline message)
 // while any inventory char is unreachable — see `layoutForLintAndGate` and
