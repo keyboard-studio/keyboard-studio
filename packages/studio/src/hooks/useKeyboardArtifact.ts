@@ -1,3 +1,4 @@
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BaseKeyboard, VirtualFS, KeyboardIR, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
@@ -424,7 +425,7 @@ export function useKeyboardArtifact(
                 try {
                   ir = { ...ir, touchLayout: engine.parseTouchLayout(touchText) };
                 } catch (e) {
-                  console.warn("[useKeyboardArtifact] parseTouchLayout failed, falling back to generated default:", e);
+                  devLog.warn("[useKeyboardArtifact] parseTouchLayout failed, falling back to generated default:", e);
                   // Leave ir.touchLayout undefined; fall back to the generated default.
                 }
               }

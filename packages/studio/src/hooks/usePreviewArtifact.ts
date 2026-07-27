@@ -11,6 +11,7 @@
 // standalone and handleDownload reads the settled store state regardless of
 // which screen triggered the compile.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BaseKeyboard, CompilerDiagnostic } from "@keyboard-studio/contracts";
 import {
@@ -215,7 +216,7 @@ export function usePreviewArtifact(): PreviewArtifact {
       // missing patterns, identity-injection failures). Warn-only: the
       // download still proceeds so the user is not silently blocked.
       if (result.warnings.length > 0) {
-        console.warn("[studio] download projection warnings:", result.warnings);
+        devLog.warn("[studio] download projection warnings:", result.warnings);
         setDownloadWarnings(result.warnings);
       }
 

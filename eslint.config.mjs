@@ -8,6 +8,14 @@ import tsParser from "@typescript-eslint/parser";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import reactHooks from "eslint-plugin-react-hooks";
 
+// `no-console` is a CI gate, not a local-dev nuisance. Console calls are a
+// normal part of iterating locally, so the rule stays silent during
+// interactive development and only fires where it matters — CI, where a
+// stray console.* left in a diff should block the lane. CI runners set
+// `CI=true` (GitHub Actions, most providers); everything else is treated as
+// dev. Override with `CI=1 pnpm lint` locally to reproduce the gated run.
+const isCI = process.env.CI === "true" || process.env.CI === "1";
+
 export default [
   {
     ignores: [
@@ -54,11 +62,21 @@ export default [
           destructuredArrayIgnorePattern: "^_",
         },
       ],
-      // Disallow console.* calls — use a structured logger instead. The
-      // eslint-disable-next-line suppression comments previously guarding
-      // deliberate console calls in compiler/index.ts were removed in #447;
-      // this rule activates that removal.
+      // Disallow console.* calls in shipped code — route intentional
+      // diagnostics through the `devLog` helper (@keyboard-studio/contracts/
+      // dev-log), which prints in dev/test/CLI and goes inert in a production
+      // build. That helper holds the single sanctioned console sink; every
+      // other call site should use it, so a warning here means a stray call.
       "no-console": "warn",
+    },
+  },
+  {
+    // Tests, codegen determinism harnesses, and other *.test.ts files run
+    // only under vitest/Node and log freely for diagnostics — they never
+    // reach a production bundle, so the no-console gate does not apply.
+    files: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "no-console": "off",
     },
   },
 ];

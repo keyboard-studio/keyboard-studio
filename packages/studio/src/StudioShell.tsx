@@ -10,6 +10,7 @@
 //   #output             — OutputScreen: "ship it" — Download .zip +
 //                         SignUpPanel (no interactive OSK)
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import { ResizeHandle } from "./components/ResizeHandle.tsx";
@@ -553,7 +554,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         setSurveyPatternMap(map);
       })
       .catch((err: unknown) => {
-        console.error("[SurveyView] pattern load for preview failed:", err);
+        devLog.error("[SurveyView] pattern load for preview failed:", err);
       });
   }, [sessionAssignments]);
 

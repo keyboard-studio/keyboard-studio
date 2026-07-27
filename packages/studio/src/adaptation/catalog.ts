@@ -9,6 +9,7 @@
 // relative to THIS file (packages/studio/src/adaptation/), so the repo-root
 // content/ tree is four levels up.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { parse } from "yaml";
 
 export type QuestionFamily = "script-alignment" | "inheritance-posture" | "trust-policy";
@@ -48,12 +49,12 @@ export function loadAdaptationCatalog(rawByPath: Record<string, string>): Questi
     try {
       parsed = parse(raw);
     } catch (e) {
-      console.warn(`[adaptation catalog] YAML parse error in ${path}: ${String(e)}`);
+      devLog.warn(`[adaptation catalog] YAML parse error in ${path}: ${String(e)}`);
       continue;
     }
     const rec = coerce(parsed);
     if (rec === null) {
-      console.warn(`[adaptation catalog] skipping ${path}: does not match record schema`);
+      devLog.warn(`[adaptation catalog] skipping ${path}: does not match record schema`);
       continue;
     }
     records.push(rec);
