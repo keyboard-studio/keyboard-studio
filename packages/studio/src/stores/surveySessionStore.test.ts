@@ -345,6 +345,35 @@ describe("surveySessionStore", () => {
       expect(getStore().activeStepId).toBe("carve");
     });
 
+    it("drops ALL stale 'help' entries when TWO sit in a corrupted stack, not just one", () => {
+      // Two independent stale "help" entries at different positions — e.g. a
+      // draft corrupted across two separate old-build sessions. sanitizeHistory
+      // filters the whole array, so both must go, not just whichever a naive
+      // "find and remove the first/last one" fix would catch.
+      const snapshot = snapshotTraversal();
+      applyTraversalSnapshot({
+        ...snapshot,
+        activeStepId: "mechanisms",
+        history: [
+          "identity", "help", "choose_base", "track", "characters", "marks", "carve", "help",
+        ],
+      });
+
+      // Sanitized immediately on rehydrate — neither "help" entry survives,
+      // and the entries around them keep their relative order.
+      expect(getStore().history).not.toContain("help");
+      expect(getStore().history).toEqual([
+        "identity", "choose_base", "track", "characters", "marks", "carve",
+      ]);
+
+      // popHistory from what's left still lands on "carve" (the new top),
+      // never resurfaces "help" — belt-and-suspenders like the single-entry
+      // case above.
+      getStore().popHistory();
+      expect(getStore().activeStepId).not.toBe("help");
+      expect(getStore().activeStepId).toBe("carve");
+    });
+
     it("does not disturb a well-formed history stack (no false-positive sanitization)", () => {
       const store = getStore();
       store.advance("choose_base");

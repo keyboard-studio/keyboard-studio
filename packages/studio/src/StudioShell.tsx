@@ -58,7 +58,7 @@ import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
 import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
 import { useInventoryDiff } from "./hooks/useInventoryDiff.ts";
-import { inventoryCoverageGate } from "./lib/unimplementedInventory.ts";
+import { inventoryCoverageGate, selectDesktopAssignments } from "./lib/unimplementedInventory.ts";
 
 // Bind the manifest into the store's staleness actions.
 // Called once at module load; avoids a circular static import in the store
@@ -937,9 +937,7 @@ export function StudioShell() {
   const outputNavBlocked = useMemo(
     () =>
       inventoryCoverageGate({
-        desktopAssignments: (phaseResultsForNav.find((p) => p.phase === "C")?.assignments ?? []).filter(
-          (a) => a.modality === "physical",
-        ),
+        desktopAssignments: selectDesktopAssignments(phaseResultsForNav),
         lettersToAdd: lettersToAddForNav,
         touchLayoutJson,
         confirmedInventory: confirmedInventoryForNav,

@@ -103,8 +103,8 @@ describe("unimplementedTouchChars", () => {
     expect(unimplementedTouchChars(touchLayoutJsonWith(["á"]), [])).toEqual([]);
   });
 
-  it("returns [] when the stored JSON fails to parse — malformed JSON is treated as 'nothing to gate on'", () => {
-    expect(unimplementedTouchChars("{ not json", ["á", "é"])).toEqual([]);
+  it("returns the FULL inventory (fail closed) when the stored JSON fails to parse — a corrupted layout must never silently satisfy the gate", () => {
+    expect(unimplementedTouchChars("{ not json", ["á", "é"])).toEqual(["á", "é"]);
   });
 
   it("returns only the inventory characters absent from the rendered layout", () => {
@@ -193,6 +193,52 @@ describe("inventoryCoverageGate", () => {
       confirmedInventory: ["á"],
     });
     expect(gate.blockedOnDesktop).toBe(false);
+    expect(gate.blockedOnTouch).toBe(true);
+    expect(gate.blocked).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// inventoryCoverageGate — touchLayoutCorrupted: the three touch-modality
+// cases (absent / valid / corrupted) the gate must tell apart. A corrupted
+// persisted touch layout must FAIL CLOSED (block, with `touchLayoutCorrupted`
+// set) rather than silently satisfying the gate like "absent" does.
+// ---------------------------------------------------------------------------
+
+describe("inventoryCoverageGate — touchLayoutCorrupted", () => {
+  it("absent (touchLayoutJson === null): not blocked, not corrupted", () => {
+    const gate = inventoryCoverageGate({
+      desktopAssignments: [swapAssignment("á")],
+      lettersToAdd: ["á"],
+      touchLayoutJson: null,
+      confirmedInventory: ["á", "é"],
+    });
+    expect(gate.touchLayoutCorrupted).toBe(false);
+    expect(gate.blockedOnTouch).toBe(false);
+    expect(gate.blocked).toBe(false);
+  });
+
+  it("valid (fully covered): not blocked, not corrupted", () => {
+    const gate = inventoryCoverageGate({
+      desktopAssignments: [swapAssignment("á")],
+      lettersToAdd: ["á"],
+      touchLayoutJson: touchLayoutJsonWith(["á"]),
+      confirmedInventory: ["á"],
+    });
+    expect(gate.touchLayoutCorrupted).toBe(false);
+    expect(gate.blockedOnTouch).toBe(false);
+    expect(gate.blocked).toBe(false);
+  });
+
+  it("corrupted (non-null, unparseable touchLayoutJson): blocked === true, touchLayoutCorrupted === true, and unimplementedTouch is the FULL touch inventory (fail closed) — not silently treated as covered", () => {
+    const gate = inventoryCoverageGate({
+      desktopAssignments: [swapAssignment("á")],
+      lettersToAdd: ["á"],
+      touchLayoutJson: "{ not json",
+      confirmedInventory: ["á", "é", "í"],
+    });
+    expect(gate.touchLayoutCorrupted).toBe(true);
+    expect(gate.unimplementedTouch).toEqual(["á", "é", "í"]);
     expect(gate.blockedOnTouch).toBe(true);
     expect(gate.blocked).toBe(true);
   });

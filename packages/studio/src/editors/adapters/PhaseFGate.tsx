@@ -28,7 +28,11 @@ import { plural } from "@lingui/core/macro";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
-import { inventoryCoverageGate, formatUncoveredCharsList } from "../../lib/unimplementedInventory.ts";
+import {
+  inventoryCoverageGate,
+  formatCoverageBannerParts,
+  selectDesktopAssignments,
+} from "../../lib/unimplementedInventory.ts";
 import { ConfirmDialog } from "../assignLoop/parts/ConfirmDialog.tsx";
 import { PhaseFStepFactoryComponent } from "./flowStepOptions.tsx";
 import type { EditorStepProps } from "../../steps/types.ts";
@@ -42,13 +46,7 @@ export function PhaseFGate(props: EditorStepProps): React.ReactElement {
   const sessionBackToUnfinishedGallery = useSurveySessionStore((s) => s.backToUnfinishedGallery);
   const { lettersToAdd } = useInventoryDiff();
 
-  const desktopAssignments = useMemo(
-    () =>
-      (phaseResults.find((p) => p.phase === "C")?.assignments ?? []).filter(
-        (a) => a.modality === "physical",
-      ),
-    [phaseResults],
-  );
+  const desktopAssignments = useMemo(() => selectDesktopAssignments(phaseResults), [phaseResults]);
   // Single shared selector (lib/unimplementedInventory.ts) — do not re-derive
   // the desktop-always / touch-only-if-authored booleans locally; StepHost's
   // gate and OutputScreen's download gate call the same function.
@@ -62,7 +60,8 @@ export function PhaseFGate(props: EditorStepProps): React.ReactElement {
       }),
     [desktopAssignments, lettersToAdd, touchLayoutJson, confirmedInventory],
   );
-  const { unimplementedDesktop, unimplementedTouch, blockedOnDesktop, blockedOnTouch, blocked } = gate;
+  const { unimplementedDesktop, unimplementedTouch, blockedOnDesktop, blockedOnTouch, blocked, touchLayoutCorrupted } =
+    gate;
 
   const totalCount = unimplementedDesktop.length + (blockedOnTouch ? unimplementedTouch.length : 0);
   const countLabel = t({
@@ -79,20 +78,23 @@ export function PhaseFGate(props: EditorStepProps): React.ReactElement {
     message: "Mechanism Gallery",
   });
   const touchGalleryLabel = t({ id: "editor.assignLoop.touchGalleryHeading", message: "Touch Gallery" });
-  const uncoveredCharsList = [
-    ...(blockedOnDesktop ? [`${formatUncoveredCharsList(unimplementedDesktop)} (desktop)`] : []),
-    ...(blockedOnTouch ? [`${formatUncoveredCharsList(unimplementedTouch)} (touch)`] : []),
-  ].join("; ");
-  const targetGalleryLabel = blockedOnDesktop ? desktopGalleryLabel : touchGalleryLabel;
+  const { uncoveredCharsList, targetGalleryLabel } = formatCoverageBannerParts(gate, {
+    desktopLabel: desktopGalleryLabel,
+    touchLabel: touchGalleryLabel,
+  });
 
   // Routes back to whichever gallery still has work — desktop first (it
-  // gates touch's own completion too, so fixing it first is always correct).
-  // A BACK action (backToUnfinishedGallery), not `advance` — see the module
-  // comment and that action's docstring for why: `advance` would push a
-  // stale "help" entry onto history that a later ordinary Back traversal
-  // would resurface.
+  // gates touch's own completion too, so fixing it first is always correct)
+  // — EXCEPT when the touch layout is corrupted: that can only be fixed by
+  // re-deriving it in the touch gallery, so it takes priority over the
+  // desktop-first ordering. A BACK action (backToUnfinishedGallery), not
+  // `advance` — see the module comment and that action's docstring for why:
+  // `advance` would push a stale "help" entry onto history that a later
+  // ordinary Back traversal would resurface.
   const handleGoBack = () => {
-    sessionBackToUnfinishedGallery(blockedOnDesktop ? "mechanisms" : "touch");
+    sessionBackToUnfinishedGallery(
+      touchLayoutCorrupted ? "touch" : blockedOnDesktop ? "mechanisms" : "touch",
+    );
   };
 
   return (
@@ -107,10 +109,17 @@ export function PhaseFGate(props: EditorStepProps): React.ReactElement {
         body={
           <div>
             <p style={{ margin: 0 }}>
-              <Trans id="editor.help.unimplementedGate.message">
-                {countLabel} still need an implementation before you can finish:{" "}
-                {uncoveredCharsList}. Go back to the {targetGalleryLabel} to finish them.
-              </Trans>
+              {touchLayoutCorrupted ? (
+                <Trans id="editor.help.unimplementedGate.touchCorrupted">
+                  Your touch layout couldn't be read and may be corrupted. Re-derive it
+                  from the {targetGalleryLabel} to continue.
+                </Trans>
+              ) : (
+                <Trans id="editor.help.unimplementedGate.message">
+                  {countLabel} still need an implementation before you can finish:{" "}
+                  {uncoveredCharsList}. Go back to the {targetGalleryLabel} to finish them.
+                </Trans>
+              )}
             </p>
           </div>
         }

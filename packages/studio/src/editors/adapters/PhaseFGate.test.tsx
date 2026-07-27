@@ -13,9 +13,10 @@
 //
 // Root-cause fix: `pnpm --filter @keyboard-studio/studio messages:extract`
 // regenerated the catalogs from current source; the fix here additionally
-// mirrors the `en` text into `fr` for the ids that were affected (translator
-// catch-up, not a fresh regression) and adds `formatUncoveredCharsList`
-// truncation so a long inventory doesn't blow up the banner.
+// adds `formatUncoveredCharsList` truncation so a long inventory doesn't blow
+// up the banner. The affected `fr` keys are left as empty-string placeholders
+// per the repo's untranslated-key convention (pending translation, not
+// mirrored `en` text) — `i18n-catalog-lint` passes with placeholders.
 //
 // Renders through the real `en`-activated <I18nProvider> (via
 // `../../test/renderWithI18n.tsx`), which loads the actual committed
@@ -28,6 +29,7 @@ import { render } from "../../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
+import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 
 // jsdom does not implement HTMLDialogElement.showModal()/close() — same shim
@@ -65,6 +67,16 @@ function seedInstantiatedWorkingCopy(inventory: string[]) {
     answers: [],
     confirmedInventory: inventory,
   });
+}
+
+function swapAssignment(target: string): MechanismAssignment {
+  return {
+    scope: "individual",
+    target,
+    modality: "physical",
+    mechanisms: [{ patternId: "simple_swap", strategyId: "S-01", slotValues: { kmnRules: `+ [K_X] > U+0000` } }],
+    source: "user",
+  };
 }
 
 beforeEach(resetStores);
@@ -112,6 +124,38 @@ describe("PhaseFGate — coverage-blocked dialog", () => {
     // ...but the inline list is capped with a "+N more" suffix rather than
     // rendering all 34 glyphs.
     expect(bodyText).toMatch(/\+22 more/);
+  });
+
+  it("renders the distinct 'touch layout corrupted' message (not the generic count) when touchLayoutJson fails to parse, and still offers the route back to the Touch Gallery", async () => {
+    const inventory = ["á", "é"];
+    seedInstantiatedWorkingCopy(inventory);
+    // Desktop fully covered — the corrupted-touch message must appear even
+    // though desktop has no gaps of its own, proving it isn't just riding
+    // along on a desktop-blocked banner.
+    useWorkingCopyStore.getState().recordAssignments([
+      swapAssignment("á"),
+      swapAssignment("é"),
+    ]);
+    // A non-empty, unparseable touch layout — the FAIL-CLOSED corrupted case.
+    useWorkingCopyStore.getState().setTouchLayoutJson("{ this is not valid JSON");
+
+    const { PhaseFGate } = await import("./PhaseFGate.tsx");
+    const { container } = render(<PhaseFGate onComplete={vi.fn()} />);
+
+    expect(container.querySelector("dialog")?.hasAttribute("open")).toBe(true);
+    const bodyText = document.body.textContent ?? "";
+    expect(bodyText).toMatch(/couldn't be read and may be corrupted/i);
+    expect(bodyText).toContain("Touch Gallery");
+    // The generic "N characters still need an implementation" copy must NOT
+    // appear — the corrupted case replaces it entirely, it doesn't append to it.
+    expect(bodyText).not.toMatch(/characters? still need an implementation/);
+
+    // The route-back action is still present and still targets the touch
+    // gallery — corrupted touch takes priority over desktop-first ordering
+    // even though desktop is (deliberately, here) fully covered already.
+    const goBackBtn = screen.getByRole("button", { name: /go back and finish/i });
+    fireEvent.click(goBackBtn);
+    expect(useSurveySessionStore.getState().activeStepId).toBe("touch");
   });
 });
 

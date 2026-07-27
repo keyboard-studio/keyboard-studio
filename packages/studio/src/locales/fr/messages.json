@@ -919,6 +919,8 @@
   "editor.carve.rulesLookGood": "Vos règles ont l'air bonnes",
   "output.submit.success.heading": "Votre soumission est en cours d’examen.",
   "editor.carve.yourTargetLanguageFallback": "votre langue cible",
+  "output.status.coverageBlocked.touchCorrupted": "",
+  "editor.help.unimplementedGate.touchCorrupted": "",
   "survey.characterMapPane.zoom.announceZoom": "Zoom {percent} %",
   "survey.characterMapPane.zoom.zoomIn": "Zoom avant",
   "survey.characterMapPane.zoom.zoomOut": "Zoom arrière",

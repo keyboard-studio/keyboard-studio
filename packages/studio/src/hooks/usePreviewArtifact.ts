@@ -32,7 +32,11 @@ import { instantiateFromBaseIfConfirmed } from "../lib/confirmRebase.ts";
 import { useWorkingCopyTransform } from "./useWorkingCopyTransform.ts";
 import { serializeWorkingCopy } from "../lib/serializeWorkingCopy.ts";
 import { useInventoryDiff } from "./useInventoryDiff.ts";
-import { inventoryCoverageGate, type InventoryCoverageGate } from "../lib/unimplementedInventory.ts";
+import {
+  inventoryCoverageGate,
+  selectDesktopAssignments,
+  type InventoryCoverageGate,
+} from "../lib/unimplementedInventory.ts";
 
 export type PickerMode = "open" | "scaffold";
 
@@ -214,10 +218,7 @@ export function usePreviewArtifact(): PreviewArtifact {
   const confirmedInventoryForGate = useWorkingCopyStore((s) => s.session.confirmedInventory);
   const { lettersToAdd: lettersToAddForGate } = useInventoryDiff();
   const desktopAssignmentsForGate = useMemo(
-    () =>
-      (phaseResultsForGate.find((p) => p.phase === "C")?.assignments ?? []).filter(
-        (a) => a.modality === "physical",
-      ),
+    () => selectDesktopAssignments(phaseResultsForGate),
     [phaseResultsForGate],
   );
   const coverageGate = useMemo(

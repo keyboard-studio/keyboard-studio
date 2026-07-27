@@ -16,9 +16,30 @@
 // implemented" imports one of the two functions below rather than re-deriving
 // coverage locally.
 
-import type { MechanismAssignment } from "@keyboard-studio/contracts";
+import type { MechanismAssignment, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { uncoveredTargets } from "@keyboard-studio/contracts";
 import { parseTouchLayout, touchCoverage } from "@keyboard-studio/engine";
+
+/**
+ * Desktop/physical Phase C assignments, pulled out of the working copy's
+ * `phaseResults` array — the identical `.find(phase === "C") ?? [] .filter
+ * (modality === "physical")` expression that StudioShell, StepHost,
+ * PhaseFGate, usePreviewArtifact, and MechanismGallery all need to build
+ * `InventoryCoverageInputs.desktopAssignments`.
+ *
+ * Only for the plain "physical assignments" shape used by the coverage gate.
+ * Callers that need an ADDITIONAL filter beyond modality (e.g.
+ * deriveDesktopModifications and TouchGallery's `scope === "individual"`
+ * placement derivation) do not use this helper — re-derive locally rather
+ * than force a mismatched filter through here.
+ */
+export function selectDesktopAssignments(
+  phaseResults: readonly SurveyPhaseResult[],
+): MechanismAssignment[] {
+  return (phaseResults.find((p) => p.phase === "C")?.assignments ?? []).filter(
+    (a) => a.modality === "physical",
+  );
+}
 
 /**
  * Desktop/physical: characters in `lettersToAdd` (the base-diffed inventory —
@@ -34,27 +55,71 @@ export function unimplementedDesktopChars(
 }
 
 /**
- * Touch: characters in `inventory` (the FULL confirmed inventory — touch
- * coverage is evaluated against the actual rendered layout, which may already
- * reach a character via inheritance from the seed layout) with no reachable
- * touch mechanism.
+ * Result of {@link computeTouchState} — the touch-modality state
+ * `inventoryCoverageGate` (and `unimplementedTouchChars`, which is a thin
+ * projection of this) need to distinguish the three cases spec §7.7 / §10
+ * criterion 18.6 care about for touch: absent, valid, corrupted. See
+ * `computeTouchState`'s docstring for what each case means.
+ */
+interface TouchState {
+  readonly uncovered: string[];
+  /**
+   * True only for the CORRUPTED case (a non-empty `touchLayoutJson` that
+   * fails to parse, or that `touchCoverage` cannot walk) — never true for
+   * "absent" (null/empty) or "valid".
+   */
+  readonly corrupted: boolean;
+}
+
+/**
+ * Touch coverage state for the FULL confirmed `inventory` (touch coverage is
+ * evaluated against the actual rendered layout, which may already reach a
+ * character via inheritance from the seed layout), distinguishing the three
+ * cases the coverage gate must tell apart:
  *
- * Returns `[]` when no touch layout has been authored yet (`touchLayoutJson`
- * is `null`) or when the stored JSON fails to parse — callers use this to
- * mean "nothing to gate on", never "fully covered" as a false-positive signal
- * for a phase the author hasn't reached.
+ * 1. **Absent** — `touchLayoutJson` is `null` or `""`: touch has not been
+ *    authored this session. `uncovered: []`, `corrupted: false` — "nothing to
+ *    gate on", never a false-positive full-covered signal.
+ * 2. **Valid** — the JSON parses and `touchCoverage` walks it normally.
+ *    `uncovered` is the real uncovered set, `corrupted: false`.
+ * 3. **Corrupted** — a non-empty `touchLayoutJson` that fails to parse, or
+ *    that `touchCoverage` cannot process. FAILS CLOSED: `uncovered` is the
+ *    entire `inventory` (every touch character is treated as unimplemented,
+ *    so the gate blocks) and `corrupted: true`, so callers can surface a
+ *    distinct "couldn't be read" message rather than the generic
+ *    uncovered-count copy. A corrupted persisted layout must never silently
+ *    satisfy the hard gate this feature exists to enforce.
+ */
+function computeTouchState(
+  touchLayoutJson: string | null,
+  inventory: readonly string[],
+): TouchState {
+  if (touchLayoutJson === null || touchLayoutJson === "") {
+    return { uncovered: [], corrupted: false };
+  }
+  try {
+    const layout = parseTouchLayout(touchLayoutJson);
+    return { uncovered: [...touchCoverage(layout, inventory).uncovered], corrupted: false };
+  } catch {
+    return { uncovered: [...inventory], corrupted: true };
+  }
+}
+
+/**
+ * Touch: characters in `inventory` with no reachable touch mechanism — the
+ * `uncovered` half of {@link computeTouchState}. See that function's
+ * docstring for the absent/valid/corrupted case breakdown; a corrupted
+ * layout returns the FULL inventory here (fail closed), not `[]`. Callers
+ * that also need to distinguish "genuinely fully covered" from "corrupted,
+ * so treated as fully uncovered" should use `inventoryCoverageGate`'s
+ * `touchLayoutCorrupted` flag rather than inferring it from this return
+ * value alone.
  */
 export function unimplementedTouchChars(
   touchLayoutJson: string | null,
   inventory: readonly string[],
 ): string[] {
-  if (touchLayoutJson === null) return [];
-  try {
-    const layout = parseTouchLayout(touchLayoutJson);
-    return [...touchCoverage(layout, inventory).uncovered];
-  } catch {
-    return [];
-  }
+  return computeTouchState(touchLayoutJson, inventory).uncovered;
 }
 
 /**
@@ -82,6 +147,16 @@ export interface InventoryCoverageGate {
   readonly blockedOnDesktop: boolean;
   /** Touch is only in scope once a touch layout has been authored this session. */
   readonly blockedOnTouch: boolean;
+  /**
+   * True when the persisted `touchLayoutJson` is non-empty but fails to
+   * parse or fails `touchCoverage`'s walk — the FAIL-CLOSED corrupted case
+   * (see `computeTouchState`). When true, `unimplementedTouch` is the FULL
+   * touch inventory (not a genuinely-computed uncovered set) and
+   * `blockedOnTouch`/`blocked` are always true — callers should show a
+   * distinct "your touch layout couldn't be read" message rather than the
+   * generic uncovered-count copy.
+   */
+  readonly touchLayoutCorrupted: boolean;
   /** True while ANY modality actually engaged this session still has gaps. */
   readonly blocked: boolean;
 }
@@ -125,17 +200,59 @@ export function inventoryCoverageGate(inputs: InventoryCoverageInputs): Inventor
     inputs.desktopAssignments,
     inputs.lettersToAdd,
   );
-  const unimplementedTouch = unimplementedTouchChars(
-    inputs.touchLayoutJson,
-    inputs.confirmedInventory,
-  );
+  const touchState = computeTouchState(inputs.touchLayoutJson, inputs.confirmedInventory);
   const blockedOnDesktop = unimplementedDesktop.length > 0;
-  const blockedOnTouch = inputs.touchLayoutJson !== null && unimplementedTouch.length > 0;
+  // Corrupted always blocks (fail closed) once a layout was actually
+  // authored (touchLayoutJson !== null) — computeTouchState only ever sets
+  // `corrupted: true` for a non-empty string, so this can't misfire on the
+  // "absent" case.
+  const blockedOnTouch =
+    inputs.touchLayoutJson !== null && (touchState.corrupted || touchState.uncovered.length > 0);
   return {
     unimplementedDesktop,
-    unimplementedTouch,
+    unimplementedTouch: touchState.uncovered,
+    touchLayoutCorrupted: touchState.corrupted,
     blockedOnDesktop,
     blockedOnTouch,
     blocked: blockedOnDesktop || blockedOnTouch,
   };
+}
+
+/**
+ * Display-ready pieces of the "still blocked, go finish these" banner —
+ * PhaseFGate and OutputScreen both render the same uncovered-char-list join
+ * (with "(desktop)"/"(touch)" suffixes) and the same
+ * `blockedOnDesktop`-ternary target-gallery selection off an
+ * {@link InventoryCoverageGate}; this is the single place that composes them
+ * so the two banners can't drift. Labels are passed in (rather than looked up
+ * here) because they are `t({...})`-resolved lingui strings — this module has
+ * no i18n dependency of its own.
+ *
+ * When `gate.touchLayoutCorrupted` is true, `unimplementedTouch` is the FULL
+ * touch inventory (fail-closed, not a genuinely-computed uncovered set), so
+ * it is deliberately omitted from `uncoveredCharsList` here — callers render
+ * a distinct "your touch layout couldn't be read" message instead of the
+ * generic count/list for that case (see PhaseFGate.tsx / OutputScreen.tsx).
+ * `targetGalleryLabel` always resolves to the touch gallery when corrupted,
+ * regardless of `blockedOnDesktop` — re-deriving the touch layout there is
+ * the only fix for corruption.
+ */
+export function formatCoverageBannerParts(
+  gate: InventoryCoverageGate,
+  labels: { readonly desktopLabel: string; readonly touchLabel: string },
+): { readonly uncoveredCharsList: string; readonly targetGalleryLabel: string } {
+  const { unimplementedDesktop, unimplementedTouch, blockedOnDesktop, blockedOnTouch, touchLayoutCorrupted } =
+    gate;
+  const uncoveredCharsList = [
+    ...(blockedOnDesktop ? [`${formatUncoveredCharsList(unimplementedDesktop)} (desktop)`] : []),
+    ...(blockedOnTouch && !touchLayoutCorrupted
+      ? [`${formatUncoveredCharsList(unimplementedTouch)} (touch)`]
+      : []),
+  ].join("; ");
+  const targetGalleryLabel = touchLayoutCorrupted
+    ? labels.touchLabel
+    : blockedOnDesktop
+      ? labels.desktopLabel
+      : labels.touchLabel;
+  return { uncoveredCharsList, targetGalleryLabel };
 }

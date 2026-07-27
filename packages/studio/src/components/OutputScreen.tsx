@@ -26,7 +26,7 @@
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
-import { formatUncoveredCharsList } from "../lib/unimplementedInventory.ts";
+import { formatCoverageBannerParts } from "../lib/unimplementedInventory.ts";
 import { useResizablePanes } from "../hooks/useResizablePanes.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
@@ -91,8 +91,14 @@ export function OutputScreen() {
   // exactly, off the SAME shared gate. Named string locals computed BEFORE
   // the JSX below; no conditional JSX as direct <Trans> children.
   // ---------------------------------------------------------------------------
-  const { unimplementedDesktop, unimplementedTouch, blockedOnDesktop, blockedOnTouch, blocked: coverageBlocked } =
-    coverageGate;
+  const {
+    unimplementedDesktop,
+    unimplementedTouch,
+    blockedOnDesktop,
+    blockedOnTouch,
+    blocked: coverageBlocked,
+    touchLayoutCorrupted,
+  } = coverageGate;
   const sessionBackToUnfinishedGallery = useSurveySessionStore((s) => s.backToUnfinishedGallery);
   const coverageTotalCount =
     unimplementedDesktop.length + (blockedOnTouch ? unimplementedTouch.length : 0);
@@ -105,20 +111,24 @@ export function OutputScreen() {
     message: "Mechanism Gallery",
   });
   const touchGalleryLabel = t({ id: "editor.assignLoop.touchGalleryHeading", message: "Touch Gallery" });
-  const coverageUncoveredCharsList = [
-    ...(blockedOnDesktop ? [`${formatUncoveredCharsList(unimplementedDesktop)} (desktop)`] : []),
-    ...(blockedOnTouch ? [`${formatUncoveredCharsList(unimplementedTouch)} (touch)`] : []),
-  ].join("; ");
-  const coverageTargetGalleryLabel = blockedOnDesktop ? mechanismGalleryLabel : touchGalleryLabel;
+  const { uncoveredCharsList: coverageUncoveredCharsList, targetGalleryLabel: coverageTargetGalleryLabel } =
+    formatCoverageBannerParts(coverageGate, {
+      desktopLabel: mechanismGalleryLabel,
+      touchLabel: touchGalleryLabel,
+    });
   const handleGoToGallery = () => {
     // Route back into the survey wizard at whichever gallery still has
     // work — desktop first (it gates touch's own completion too, so fixing
-    // it first is always correct — same ordering as PhaseFGate). This is a
-    // BACK action (backToUnfinishedGallery), not the forward-push `advance`
-    // — see that store action's docstring for the P0 regression a
-    // forward-push here would reproduce (a stale history entry a later
-    // ordinary Back traversal would resurface as Phase F).
-    sessionBackToUnfinishedGallery(blockedOnDesktop ? "mechanisms" : "touch");
+    // it first is always correct — same ordering as PhaseFGate) — EXCEPT a
+    // corrupted touch layout, which can only be fixed by re-deriving it in
+    // the touch gallery and so takes priority. This is a BACK action
+    // (backToUnfinishedGallery), not the forward-push `advance` — see that
+    // store action's docstring for the P0 regression a forward-push here
+    // would reproduce (a stale history entry a later ordinary Back traversal
+    // would resurface as Phase F).
+    sessionBackToUnfinishedGallery(
+      touchLayoutCorrupted ? "touch" : blockedOnDesktop ? "mechanisms" : "touch",
+    );
     navigateTo("survey");
   };
 
@@ -287,11 +297,18 @@ export function OutputScreen() {
                 style={{ ...warningBannerStyle, color: "#f85149", borderColor: "#f85149", lineHeight: 1.5 }}
               >
                 {"[ERROR] "}
-                <Trans id="output.status.coverageBlocked">
-                  {coverageCountLabel} still need an implementation before you can
-                  download or submit: {coverageUncoveredCharsList}. Go back to the{" "}
-                  {coverageTargetGalleryLabel} to finish them.
-                </Trans>{" "}
+                {touchLayoutCorrupted ? (
+                  <Trans id="output.status.coverageBlocked.touchCorrupted">
+                    Your touch layout couldn't be read and may be corrupted. Re-derive it
+                    from the {coverageTargetGalleryLabel} to continue.
+                  </Trans>
+                ) : (
+                  <Trans id="output.status.coverageBlocked">
+                    {coverageCountLabel} still need an implementation before you can
+                    download or submit: {coverageUncoveredCharsList}. Go back to the{" "}
+                    {coverageTargetGalleryLabel} to finish them.
+                  </Trans>
+                )}{" "}
                 <button
                   type="button"
                   data-testid="output-coverage-goto-gallery"

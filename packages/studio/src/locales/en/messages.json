@@ -919,6 +919,8 @@
   "editor.carve.rulesLookGood": "Your rules look good",
   "output.submit.success.heading": "Your submission is being reviewed.",
   "editor.carve.yourTargetLanguageFallback": "your target language",
+  "output.status.coverageBlocked.touchCorrupted": "Your touch layout couldn't be read and may be corrupted. Re-derive it from the {coverageTargetGalleryLabel} to continue.",
+  "editor.help.unimplementedGate.touchCorrupted": "Your touch layout couldn't be read and may be corrupted. Re-derive it from the {targetGalleryLabel} to continue.",
   "survey.characterMapPane.zoom.announceZoom": "Zoom {percent}%",
   "survey.characterMapPane.zoom.zoomIn": "Zoom in",
   "survey.characterMapPane.zoom.zoomOut": "Zoom out",

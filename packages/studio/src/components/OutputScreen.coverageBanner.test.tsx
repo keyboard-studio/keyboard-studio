@@ -24,6 +24,7 @@ import { render } from "../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
+import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import type { Stage } from "../hooks/useKeyboardArtifact.ts";
 
@@ -67,6 +68,16 @@ function seedInstantiatedWorkingCopy(inventory: string[]) {
   });
 }
 
+function swapAssignment(target: string): MechanismAssignment {
+  return {
+    scope: "individual",
+    target,
+    modality: "physical",
+    mechanisms: [{ patternId: "simple_swap", strategyId: "S-01", slotValues: { kmnRules: `+ [K_X] > U+0000` } }],
+    source: "user",
+  };
+}
+
 beforeEach(resetStore);
 afterEach(() => {
   cleanup();
@@ -103,6 +114,33 @@ describe("OutputScreen — coverage-blocked banner", () => {
     const bodyText = document.body.textContent ?? "";
     expect(bodyText).toContain("34 characters");
     expect(bodyText).toMatch(/\+22 more/);
+  });
+
+  it("renders the distinct 'touch layout corrupted' message (not the generic count) when touchLayoutJson fails to parse, and still offers the route back to the Touch Gallery", async () => {
+    const inventory = ["á", "é"];
+    seedInstantiatedWorkingCopy(inventory);
+    // Desktop fully covered — the corrupted-touch message must appear even
+    // though desktop has no gaps of its own.
+    useWorkingCopyStore.getState().recordAssignments([
+      swapAssignment("á"),
+      swapAssignment("é"),
+    ]);
+    // A non-empty, unparseable touch layout — the FAIL-CLOSED corrupted case.
+    useWorkingCopyStore.getState().setTouchLayoutJson("{ this is not valid JSON");
+
+    const { OutputScreen } = await import("./OutputScreen.tsx");
+    render(<OutputScreen />);
+
+    const bodyText = document.body.textContent ?? "";
+    expect(bodyText).toMatch(/couldn't be read and may be corrupted/i);
+    expect(bodyText).toContain("Touch Gallery");
+    expect(bodyText).not.toMatch(/characters? still need an implementation/);
+
+    // The route-back action ("Go finish them now") is still present and
+    // still targets the touch gallery.
+    const goToGalleryBtn = screen.getByTestId("output-coverage-goto-gallery");
+    fireEvent.click(goToGalleryBtn);
+    expect(useSurveySessionStore.getState().activeStepId).toBe("touch");
   });
 });
 

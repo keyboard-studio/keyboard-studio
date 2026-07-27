@@ -103,7 +103,10 @@ import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
 import { RemovableChipRow } from "./parts/RemovableChipRow.tsx";
 import { ConfirmDialog } from "./parts/ConfirmDialog.tsx";
-import { unimplementedDesktopChars } from "../../lib/unimplementedInventory.ts";
+import {
+  unimplementedDesktopChars,
+  selectDesktopAssignments,
+} from "../../lib/unimplementedInventory.ts";
 import { SequenceBuilderPanel, hasSequenceForChar } from "./SequenceBuilderPanel.tsx";
 import { RadioGroup } from "../../ui/RadioGroup.tsx";
 import { SelectMenu, type SelectMenuOption } from "../../ui/SelectMenu.tsx";
@@ -1097,13 +1100,7 @@ export function MechanismGallery({
 
   // Read Phase C assignments directly (not the merged session.assignments view)
   // so multiple methods per character are preserved.
-  const sessionAssignments = useMemo(
-    () =>
-      (phaseResults.find((p) => p.phase === "C")?.assignments ?? []).filter(
-        (a) => a.modality === "physical",
-      ),
-    [phaseResults],
-  );
+  const sessionAssignments = useMemo(() => selectDesktopAssignments(phaseResults), [phaseResults]);
 
   // sessionAssignments with sequence assignments/mechanisms excluded — see
   // excludeSequenceMechanisms above. This gallery's whole covered/applied view
