@@ -5,6 +5,7 @@
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useState, useEffect, useRef } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
+import type { I18n } from "@lingui/core";
 import type { FlowQuestion, SurveyContext } from "./types.ts";
 import type { LintFinding, LanguageSummary } from "@keyboard-studio/contracts";
 import { LintChip } from "../lint/LintChip.tsx";
@@ -56,6 +57,29 @@ interface FieldProps {
    * (an empty context leaves any `{{token}}` in the string as-is).
    */
   context?: SurveyContext;
+}
+
+/**
+ * Resolve a flow-question Tier-B content string for the active locale, then
+ * interpolate `{{token}}`s from the survey context. Resolution MUST precede
+ * interpolation (see interpolate.ts) — a translated catalog value carries its
+ * own `{{token}}` placeholders, so the *resolved* string is what gets
+ * interpolated, never the English value that fed resolveContentString.
+ * `field` is the catalog field segment (e.g. "prompt", "help_text", or
+ * `option.<slug>.label`); `englishValue` is the raw record value used as the
+ * fallback and the resolution seed.
+ */
+function resolveFlowText(
+  question: FlowQuestion,
+  field: string,
+  englishValue: string,
+  i18n: I18n,
+  ctx: SurveyContext,
+): string {
+  return interpolate(
+    resolveContentString("flowQuestions", question.id, field, englishValue, i18n),
+    ctx,
+  );
 }
 
 function stringValue(v: string | string[] | undefined): string {
@@ -647,14 +671,11 @@ function SelectField({ question, value, onChange, context }: FieldProps) {
     { value: "", label: t({ id: "survey.selectField.placeholder", message: "— Select one —" }) },
     ...(question.options ?? []).map((opt) => ({
       value: opt.value,
-      label: interpolate(
-        resolveContentString(
-          "flowQuestions",
-          question.id,
-          `option.${slugifyIdSegment(opt.value)}.label`,
-          opt.label,
-          i18n,
-        ),
+      label: resolveFlowText(
+        question,
+        `option.${slugifyIdSegment(opt.value)}.label`,
+        opt.label,
+        i18n,
         context ?? {},
       ),
     })),
@@ -680,14 +701,11 @@ function RadioField({ question, value, onChange, context }: FieldProps) {
   const strVal = stringValue(value);
   const radioOptions: RadioOption[] = (question.options ?? []).map((opt) => ({
     value: opt.value,
-    label: interpolate(
-      resolveContentString(
-        "flowQuestions",
-        question.id,
-        `option.${slugifyIdSegment(opt.value)}.label`,
-        opt.label,
-        i18n,
-      ),
+    label: resolveFlowText(
+      question,
+      `option.${slugifyIdSegment(opt.value)}.label`,
+      opt.label,
+      i18n,
       context ?? {},
     ),
     ...(opt.note !== undefined ? { note: opt.note } : {}),
@@ -743,14 +761,11 @@ function MultiSelectField({ question, value, onChange, context }: FieldProps) {
 
   const msOptions: MultiSelectOption[] = options.map((opt) => ({
     value: opt.value,
-    label: interpolate(
-      resolveContentString(
-        "flowQuestions",
-        question.id,
-        `option.${slugifyIdSegment(opt.value)}.label`,
-        opt.label,
-        i18n,
-      ),
+    label: resolveFlowText(
+      question,
+      `option.${slugifyIdSegment(opt.value)}.label`,
+      opt.label,
+      i18n,
       context ?? {},
     ),
   }));
@@ -775,18 +790,15 @@ function NoticeField({ question, context }: Pick<FieldProps, "question" | "conte
   const ctx = context ?? {};
   const resolvedBody =
     question.body !== undefined
-      ? interpolate(resolveContentString("flowQuestions", question.id, "body", question.body, i18n), ctx)
+      ? resolveFlowText(question, "body", question.body, i18n, ctx)
       : undefined;
   const resolvedHelpText =
     question.help_text !== undefined
-      ? interpolate(
-          resolveContentString("flowQuestions", question.id, "help_text", question.help_text, i18n),
-          ctx,
-        )
+      ? resolveFlowText(question, "help_text", question.help_text, i18n, ctx)
       : undefined;
   const resolvedPrompt =
     question.prompt !== undefined
-      ? interpolate(resolveContentString("flowQuestions", question.id, "prompt", question.prompt, i18n), ctx)
+      ? resolveFlowText(question, "prompt", question.prompt, i18n, ctx)
       : undefined;
   return (
     <Notice>
@@ -830,19 +842,16 @@ export function QuestionField({
   const ctx = context ?? {};
   const resolvedPrompt =
     question.prompt !== undefined
-      ? interpolate(resolveContentString("flowQuestions", question.id, "prompt", question.prompt, i18n), ctx)
+      ? resolveFlowText(question, "prompt", question.prompt, i18n, ctx)
       : undefined;
   const resolvedLabel =
     question.label !== undefined
-      ? interpolate(resolveContentString("flowQuestions", question.id, "label", question.label, i18n), ctx)
+      ? resolveFlowText(question, "label", question.label, i18n, ctx)
       : undefined;
   const labelText = resolvedPrompt ?? resolvedLabel ?? question.id;
   const resolvedHelpText =
     question.help_text !== undefined
-      ? interpolate(
-          resolveContentString("flowQuestions", question.id, "help_text", question.help_text, i18n),
-          ctx,
-        )
+      ? resolveFlowText(question, "help_text", question.help_text, i18n, ctx)
       : undefined;
 
   return (

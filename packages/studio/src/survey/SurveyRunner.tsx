@@ -20,7 +20,6 @@ import { QuestionField } from "./QuestionField.tsx";
 import { debugPinsStore } from "../stores/debugPinsStore.ts";
 import { secondaryButton, primaryButton } from "./surveyStyles.ts";
 import { handleEnterToAdvance } from "./enterToAdvance.ts";
-import { interpolate } from "./interpolate.ts";
 
 // ---------------------------------------------------------------------------
 // Condition evaluator
@@ -150,23 +149,13 @@ function toSurveyAnswer(
 // ---------------------------------------------------------------------------
 // Template interpolation
 // ---------------------------------------------------------------------------
-// interpolate() itself lives in ./interpolate.ts (a leaf module QuestionField
-// can also import — see that file's docstring for why the split exists).
-
-function interpolateQuestion(q: FlowQuestion, ctx: SurveyContext): FlowQuestion {
-  return {
-    ...q,
-    ...(q.prompt !== undefined ? { prompt: interpolate(q.prompt, ctx) } : {}),
-    ...(q.help_text !== undefined ? { help_text: interpolate(q.help_text, ctx) } : {}),
-    ...(q.body !== undefined ? { body: interpolate(q.body, ctx) } : {}),
-    ...(q.options !== undefined ? {
-      options: q.options.map((opt) => ({
-        ...opt,
-        label: interpolate(opt.label, ctx),
-      })),
-    } : {}),
-  };
-}
+// `{{token}}` interpolation of a question's prompt/label/help_text/body and
+// option labels happens in QuestionField (see its `resolveFlowText`), AFTER
+// Tier-B content-i18n catalog resolution — a translated catalog value carries
+// its own tokens, so only the resolved string may be interpolated. SurveyRunner
+// therefore hands QuestionField the RAW question (plus any dynamic options) and
+// does NOT pre-interpolate it here: doing so would redundantly process the
+// English fallback and cannot see the translated string's tokens at all.
 
 // ---------------------------------------------------------------------------
 // advanceThrough — moved before SurveyRunner so it is in scope for render-time
@@ -424,15 +413,16 @@ export function SurveyRunner({
     );
   }
 
-  const baseDisplayQ = interpolateQuestion(currentQ, context);
   // Dynamic datalist options (spec 030 US2): when the caller supplies non-empty
   // options for this question (e.g. the resolved entry's local names), they
-  // override the static options; the field still accepts free text.
+  // override the static options; the field still accepts free text. The raw
+  // question is handed to QuestionField as-is — it resolves the active-locale
+  // Tier-B catalog string and interpolates `{{token}}`s itself (see above).
   const dynamicOptions = getSeedOptionsRef.current?.(currentQId);
   const displayQ: FlowQuestion =
     dynamicOptions !== undefined && dynamicOptions.length > 0
-      ? { ...baseDisplayQ, options: dynamicOptions }
-      : baseDisplayQ;
+      ? { ...currentQ, options: dynamicOptions }
+      : currentQ;
   const stepNum = stack.length;
 
   const canGoBack = stack.length > 1 || onBack !== undefined;
