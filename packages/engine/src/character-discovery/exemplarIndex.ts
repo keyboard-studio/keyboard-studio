@@ -61,15 +61,6 @@ export function loadExemplarIndex(): Promise<ExemplarIndex> {
 }
 
 /**
- * The already-loaded index, or null when `loadExemplarIndex()` has not resolved
- * yet. Lets the sourcing path expose a SYNCHRONOUS `sourceExemplars` for
- * callers that have already awaited the warm-up.
- */
-export function peekExemplarIndex(): ExemplarIndex | null {
-  return loaded;
-}
-
-/**
  * O(1) lookup of one locale-directory id. `localeId` must already be
  * canonical (lowercase language, Titlecase script, UPPERCASE region) — use
  * `exemplarLocaleCandidates` to produce it.
