@@ -1,10 +1,19 @@
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { describe, it, expect, vi } from "vitest";
 import {
   parseUnicodeSet,
   loadExemplars,
+  loadExemplarsFromFull,
   scriptBlockChars,
   createFetchCldrLoader,
+  createFetchCldrFullLoader,
+  exemplarLocaleCandidates,
+  UnsupportedUnicodeSetError,
 } from "./cldr.js";
+
+/** Resolves cldr-misc-full relative to this package, not to vitest's cwd. */
+const cldrRequire = createRequire(import.meta.url);
 
 describe("parseUnicodeSet", () => {
   it("parses basic chars", () => {
@@ -206,5 +215,215 @@ describe("createFetchCldrLoader", () => {
     const loader = createFetchCldrLoader(mockFetch);
     const result = await loader("fr");
     expect(result).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 044 · research R0 — tier-key defect
+//
+// Asserted against the REAL pinned cldr-misc-full payload rather than a
+// hand-written mock: a mock would just re-state whichever key shape the
+// implementation happens to read, which is exactly the mistake that let
+// "exemplarCharacters-type-auxiliary" survive. cldr-misc-full is a build-time
+// devDependency of this package (the same data codegen-exemplars bakes).
+// ---------------------------------------------------------------------------
+
+describe("CLDR tier keys (research R0)", () => {
+  function realCldrCharacters(locale: string): Record<string, unknown> {
+    const payloadPath = cldrRequire.resolve(`cldr-misc-full/main/${locale}/characters.json`);
+    const json = JSON.parse(readFileSync(payloadPath, "utf8")) as {
+      main: Record<string, { characters: Record<string, unknown> }>;
+    };
+    return (json.main[locale] as { characters: Record<string, unknown> }).characters;
+  }
+
+  function loaderFor(locale: string) {
+    const payload = { main: { [locale]: { characters: realCldrCharacters(locale) } } };
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => payload,
+    } as unknown as Response);
+    return createFetchCldrFullLoader(mockFetch);
+  }
+
+  it.each(["fr", "ewo"])(
+    "%s yields non-empty auxiliary, punctuation and numbers tiers",
+    async (locale) => {
+      const pair = await loaderFor(locale)(locale);
+      expect(pair).not.toBeNull();
+      expect(pair!.main.length).toBeGreaterThan(0);
+      expect(pair!.auxiliary).not.toBeNull();
+      expect(parseUnicodeSet(pair!.auxiliary as string).used.size).toBeGreaterThan(0);
+      expect(pair!.punctuation).not.toBeNull();
+      expect(parseUnicodeSet(pair!.punctuation as string).used.size).toBeGreaterThan(0);
+      expect(pair!.numbers).not.toBeNull();
+      expect(parseUnicodeSet(pair!.numbers as string).used.size).toBeGreaterThan(0);
+    },
+  );
+
+  it("ewo auxiliary is exactly CLDR's [c j q x]", async () => {
+    const pair = await loaderFor("ewo")("ewo");
+    const aux = parseUnicodeSet(pair!.auxiliary as string);
+    expect([...aux.used].sort()).toEqual(["c", "j", "q", "x"]);
+  });
+
+  it("reaches all four tiers through loadExemplarsFromFull", async () => {
+    const result = await loadExemplarsFromFull("ewo", loaderFor("ewo"));
+    expect(result).not.toBeNull();
+    expect(result!.auxiliary.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 044 · research R9 — parser defects
+// ---------------------------------------------------------------------------
+
+describe("parseUnicodeSet escapes (research R9)", () => {
+  it("decodes \\uXXXX instead of emitting u, 2, 0, C", () => {
+    const r = parseUnicodeSet("[a \\u200C b]");
+    expect(r.used.has("a")).toBe(true);
+    expect(r.used.has("b")).toBe(true);
+    expect(r.used.has("‌")).toBe(true);
+    for (const stray of ["u", "2", "0", "C"]) {
+      expect(r.used.has(stray)).toBe(false);
+    }
+    expect(r.used.size).toBe(3);
+  });
+
+  it("decodes \\u200D (ZWJ) the same way", () => {
+    const r = parseUnicodeSet("[\\u200D]");
+    expect([...r.used]).toEqual(["‍"]);
+  });
+
+  it("combines a surrogate pair written as two \\uXXXX escapes", () => {
+    // U+1E9E LATIN CAPITAL LETTER SHARP S as a UTF-16 surrogate pair is not
+    // applicable (BMP), so use U+10480 OSMANYA LETTER ALEF (D801 DC80).
+    const r = parseUnicodeSet("[\\uD801\\uDC80]");
+    expect([...r.used]).toEqual(["\u{10480}"]);
+  });
+
+  it("decodes \\x{...}", () => {
+    const r = parseUnicodeSet("[\\x{1E9E}]");
+    expect([...r.used]).toEqual(["ẞ"]);
+  });
+
+  it("decodes \\\\ to a literal backslash", () => {
+    const r = parseUnicodeSet("[a \\\\ b]");
+    expect(r.used.has("\\")).toBe(true);
+    expect(r.used.size).toBe(3);
+  });
+
+  it("throws on set difference rather than emitting brackets and the whole range", () => {
+    expect(() => parseUnicodeSet("[[a-z]-[aeiou]]")).toThrow(UnsupportedUnicodeSetError);
+  });
+
+  it("throws on set intersection", () => {
+    expect(() => parseUnicodeSet("[[a-z]&[a-f]]")).toThrow(UnsupportedUnicodeSetError);
+  });
+
+  it("throws on set complement", () => {
+    expect(() => parseUnicodeSet("[^a-z]")).toThrow(UnsupportedUnicodeSetError);
+  });
+
+  it("still parses an escaped-bracket punctuation set unchanged", () => {
+    const r = parseUnicodeSet("[! , \\- . \\: \\[ \\]]");
+    expect([...r.used].sort()).toEqual(["!", ",", "-", ".", ":", "[", "]"]);
+  });
+
+  it("treats a spaced hyphen as a literal, not a range operator", () => {
+    const r = parseUnicodeSet("[a - z]");
+    expect([...r.used].sort()).toEqual(["-", "a", "z"]);
+  });
+
+  it("expands a range whose endpoints are escapes", () => {
+    const r = parseUnicodeSet("[\\u0041-\\u0043]");
+    expect([...r.used].sort()).toEqual(["A", "B", "C"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 044 · FR-009 — everything the parser emits is NFC
+// ---------------------------------------------------------------------------
+
+/** Every character (and digraph) a parse yields must equal its own NFC form. */
+function expectAllNfc(set: ReturnType<typeof parseUnicodeSet>): void {
+  for (const ch of set.used) expect(ch).toBe(ch.normalize("NFC"));
+  for (const d of set.digraphs) expect(d).toBe(d.normalize("NFC"));
+}
+
+describe("parseUnicodeSet NFC normalization (FR-009)", () => {
+  it("composes an NFD sequence written as base + combining mark", () => {
+    // "e" U+0065 followed by U+0301 COMBINING ACUTE, written as one cluster.
+    const r = parseUnicodeSet("[{é}]");
+    expect(r.digraphs).toEqual(["é"]);
+    expectAllNfc(r);
+  });
+
+  it("holds across every tier of a real CLDR locale", () => {
+    const payloadPath = cldrRequire.resolve("cldr-misc-full/main/vi/characters.json");
+    const json = JSON.parse(readFileSync(payloadPath, "utf8")) as {
+      main: Record<string, { characters: Record<string, unknown> }>;
+    };
+    const characters = (json.main["vi"] as { characters: Record<string, unknown> }).characters;
+    for (const key of ["exemplarCharacters", "auxiliary", "punctuation", "numbers"]) {
+      const raw = characters[key];
+      if (typeof raw !== "string") continue;
+      expectAllNfc(parseUnicodeSet(raw));
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 044 · research R10 — the shared locale candidate ladder
+// ---------------------------------------------------------------------------
+
+describe("exemplarLocaleCandidates (research R10)", () => {
+  it("falls back from ewo-Latn to ewo", () => {
+    expect(exemplarLocaleCandidates("ewo-Latn")).toEqual(["ewo-Latn", "ewo"]);
+  });
+
+  it("keeps sr-Latn as the first candidate", () => {
+    expect(exemplarLocaleCandidates("sr-Latn")[0]).toBe("sr-Latn");
+  });
+
+  it("normalizes subtag casing and underscores", () => {
+    expect(exemplarLocaleCandidates("pt_br")).toEqual(["pt-BR", "pt"]);
+    expect(exemplarLocaleCandidates("EWO-latn")).toEqual(["ewo-Latn", "ewo"]);
+  });
+
+  it("ladders script and region independently", () => {
+    expect(exemplarLocaleCandidates("ha-Latn-NG")).toEqual([
+      "ha-Latn-NG",
+      "ha-Latn",
+      "ha-NG",
+      "ha",
+    ]);
+  });
+
+  it("returns a single candidate for a bare language tag", () => {
+    expect(exemplarLocaleCandidates("fr")).toEqual(["fr"]);
+  });
+
+  it("returns [] for an empty tag", () => {
+    expect(exemplarLocaleCandidates("")).toEqual([]);
+  });
+
+  it("resolves ewo-Latn through the fetch loader by trying ewo second", async () => {
+    const mockFetch = vi.fn(async (url: string) => {
+      if (url.includes("/ewo-Latn/")) {
+        return { ok: false, status: 404, json: async () => ({}) } as unknown as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ main: { ewo: { characters: { exemplarCharacters: "[a b]" } } } }),
+      } as unknown as Response;
+    });
+    const loader = createFetchCldrFullLoader(mockFetch as unknown as typeof fetch);
+    const pair = await loader("ewo-Latn");
+    expect(pair).not.toBeNull();
+    expect(pair!.main).toBe("[a b]");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });

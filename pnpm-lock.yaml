@@ -82,6 +82,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      cldr-misc-full:
+        specifier: 48.2.0
+        version: 48.2.0(cldr-core@48.2.0)
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -1369,6 +1372,14 @@ packages:
   chownr@3.0.0:
     resolution: {integrity: sha512-+IxzY9BZOQd/XuYPRmrvEVjF/nqj5kgT4kEq7VofrDoM1MxoRjEWkrCC3EtLi59TVawxTAn+orJwFQcrqEN1+g==}
     engines: {node: '>=18'}
+
+  cldr-core@48.2.0:
+    resolution: {integrity: sha512-zfmLothncSwfv2jlevoSrgI2VGgH8SDGHXst6jUEotHA8nq9Igeg9jzdJDFtBso9pgJuG89DK16TzrmZDdo2Bg==}
+
+  cldr-misc-full@48.2.0:
+    resolution: {integrity: sha512-dSc2Tr53dQcUGwsTinamEeoP2YXOhQrIZ+SyeuUrv4MzJOSjT/Q0qkSmX11ZwfcTbYSkIqbrgALQLhAm1yf5fA==}
+    peerDependencies:
+      cldr-core: 48.2.0
 
   cli-cursor@5.0.0:
     resolution: {integrity: sha512-aCj4O5wKyszjMmDT4tZj93kxyydN/K5zPWSCe6/0AV/AA1pqe5ZBIw0a2ZfPQV7lL5/yb5HsUreJ6UFAF1tEQw==}
@@ -3650,6 +3661,12 @@ snapshots:
       readdirp: 5.0.0
 
   chownr@3.0.0: {}
+
+  cldr-core@48.2.0: {}
+
+  cldr-misc-full@48.2.0(cldr-core@48.2.0):
+    dependencies:
+      cldr-core: 48.2.0
 
   cli-cursor@5.0.0:
     dependencies:
