@@ -57,9 +57,12 @@ const KEY_FOR_TIER: Record<ExemplarTier, keyof IndexTierSets> = {
  * Macrolanguage primary subtags too broad to seed from when used bare. A
  * macrolanguage plus a region or script narrower passes.
  *
- * "sw" (Swahili) is deliberately absent, matching `suggestMissing.ts`: its
- * member languages share the same Latin orthography, so the bare tag's
- * exemplars are representative.
+ * Add entries here only for tags whose member languages have substantially
+ * different orthographies — i.e. where a single exemplar set would mislead.
+ *
+ * "sw" (Swahili) is deliberately absent: its member languages (swh, swc, …)
+ * share the same Latin orthography and inventory, so the bare tag's exemplars
+ * are representative, and gating it would block valid suggestions for no gain.
  */
 const MACROLANGUAGE_SUBTAGS = new Set(["ms", "zh", "ar", "fa"]);
 

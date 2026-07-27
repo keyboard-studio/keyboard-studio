@@ -42,6 +42,7 @@ import type { CldrFullLoader, ExemplarResult } from "./cldr.js";
 import { loadExemplarsFromFull, parseUnicodeSet } from "./cldr.js";
 import {
   inventoryToExemplarResult,
+  isGatedTag,
   loadExemplarSource,
   neededCharsFromInventory,
   sourceExemplars,
@@ -63,19 +64,6 @@ export interface MissingCharSuggestions {
 // ---------------------------------------------------------------------------
 // Internal constants
 // ---------------------------------------------------------------------------
-
-/**
- * Well-known macrolanguage primary subtags that are too broad to give confident
- * character suggestions when used without a region or script narrower.
- * Add entries here only for tags that have substantially different orthographies
- * across their member languages (i.e. where a single exemplar set would mislead).
- *
- * Note: "sw" (Swahili) is deliberately excluded from this set. Its member
- * languages (swh, swc, etc.) share the same Latin orthography and inventory,
- * so CLDR "sw" exemplars are representative — gating bare "sw" provides no
- * benefit and blocks valid character suggestions.
- */
-const MACROLANGUAGE_SUBTAGS = new Set(["ms", "zh", "ar", "fa"]);
 
 /**
  * Turkic locales for which JS case folding may be incorrect (dotted-I hazard).
@@ -105,50 +93,6 @@ const TURKIC_DEFAULT_SCRIPT: Record<string, string> = {
 function primarySubtag(bcp47: string): string {
   const idx = bcp47.indexOf("-");
   return idx === -1 ? bcp47.toLowerCase() : bcp47.slice(0, idx).toLowerCase();
-}
-
-/**
- * Returns true when the BCP47 tag contains at least one subtag beyond the
- * primary language subtag (e.g. "zh-Hant", "ms-MY", "ar-MA").
- */
-function hasSubtagNarrower(bcp47: string): boolean {
-  return bcp47.indexOf("-") !== -1;
-}
-
-/**
- * Returns true when the primary language subtag matches the ISO 639-3
- * private-use range: qaa through qtz.
- */
-function isPrivateUseSubtag(primary: string): boolean {
-  return /^q[a-t][a-z]$/.test(primary);
-}
-
-/**
- * Returns true for the confidence gate: we refuse to produce suggestions and
- * return null instead, because the tag does not identify a specific language
- * with a reliable CLDR exemplar set.
- */
-function failsConfidenceGate(bcp47: string): boolean {
-  const primary = primarySubtag(bcp47);
-
-  // "und" language subtag — explicitly undefined language
-  if (primary === "und") return true;
-
-  // Script-only tags such as "Latn" or "Arab" (no language subtag).
-  // A script subtag is 4 characters with initial uppercase; if primary is
-  // 4 chars and matches a script-subtag pattern, the tag is script-only.
-  // In BCP47, primary language subtags are 2-3 alpha chars (ISO 639).
-  // Any primary subtag longer than 3 chars that is not "und" is unusual;
-  // we treat a 4-char initial-uppercase primary as a script subtag.
-  if (/^[A-Z][a-z]{3}$/.test(bcp47.slice(0, 4)) && primary.length === 4) return true;
-
-  // Private-use range (ISO 639-3 reservation: qaa-qtz)
-  if (isPrivateUseSubtag(primary)) return true;
-
-  // Un-narrowed macrolanguage (bare primary with no region/script suffix)
-  if (MACROLANGUAGE_SUBTAGS.has(primary) && !hasSubtagNarrower(bcp47)) return true;
-
-  return false;
 }
 
 /**
@@ -308,17 +252,19 @@ export function isCharCoveredForLocale(
  * now a test-injection seam and an opt-in live-refresh route rather than the
  * authoring path; every existing caller and test keeps working unchanged.
  *
- * The confidence gate differs deliberately between the two: the offline path
- * defers to `sourceExemplars`, whose gate is per-source and lets an
- * SLDR-backed `qaa`-`qtz` tag through (research R7). Gating those would discard
- * exactly the minority-language coverage this feature exists to deliver.
+ * Both paths run the SAME gate — `exemplarSource.ts`'s `isGatedTag` — but with
+ * different sources, and that is where the one deliberate divergence lives: the
+ * live path asks it as `"cldr"`, while the offline path defers to
+ * `sourceExemplars`, which asks per-source and so lets an SLDR-backed
+ * `qaa`-`qtz` tag through (research R7). Gating those would discard exactly the
+ * minority-language coverage this feature exists to deliver.
  */
 async function resolveExemplars(
   bcp47: string,
   loader: CldrFullLoader | undefined,
 ): Promise<ExemplarResult | null> {
   if (loader !== undefined) {
-    if (failsConfidenceGate(bcp47)) return null;
+    if (isGatedTag(bcp47, "cldr")) return null;
     return loadExemplarsFromFull(bcp47, loader);
   }
   await loadExemplarSource();
@@ -437,7 +383,8 @@ export async function neededCharsForLanguage(args: {
     return inv === null ? null : neededCharsFromInventory(inv);
   }
 
-  if (failsConfidenceGate(bcp47)) return null;
+  // Live-CLDR path, so the gate is asked as "cldr" — see `resolveExemplars`.
+  if (isGatedTag(bcp47, "cldr")) return null;
 
   // Fetch the raw pair directly (rather than going through
   // loadExemplarsFromFull, which only parses main+auxiliary) so the
