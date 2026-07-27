@@ -3,6 +3,7 @@
 // and calls onChange when the user modifies it.
 
 import { useState, useEffect, useRef } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { FlowQuestion } from "./types.ts";
 import type { LintFinding, LanguageSummary } from "@keyboard-studio/contracts";
 import { LintChip } from "../lint/LintChip.tsx";
@@ -10,16 +11,17 @@ import { loadLangtags } from "../lib/langtagsDefaults.ts";
 import {
   TextField,
   Textarea,
-  Dropdown,
+  SelectMenu,
   RadioGroup,
   Notice,
   Label,
   MultiSelect,
 } from "../ui/index.ts";
-import type { DropdownOption } from "../ui/Dropdown.tsx";
+import type { SelectMenuOption } from "../ui/SelectMenu.tsx";
 import type { RadioOption } from "../ui/RadioGroup.tsx";
 import type { MultiSelectOption } from "../ui/MultiSelect.tsx";
 import { helpText, TEXT_DIM } from "./surveyStyles.ts";
+import { normalizeForCompare } from "../lib/normalizeForCompare.ts";
 
 
 interface FieldProps {
@@ -60,6 +62,10 @@ function TextFieldControl({ question, value, onChange }: FieldProps) {
   const isMultiLine = question.type === "text";
   const strVal = stringValue(value);
   if (isMultiLine) {
+    // `type: "text"` questions are the survey's genuinely open-ended fields
+    // (long-form description prompts, e.g. phase_f_helpdocs) — the exact case
+    // Textarea reserves `resize="vertical"` for (#536). Opt in explicitly so
+    // these keep the resize handle they had before the resize:none default.
     return (
       <Textarea
         id={question.id}
@@ -67,6 +73,7 @@ function TextFieldControl({ question, value, onChange }: FieldProps) {
         value={strVal}
         onChange={(e) => onChange(e.target.value)}
         rows={4}
+        resize="vertical"
       />
     );
   }
@@ -85,6 +92,7 @@ function TextFieldControl({ question, value, onChange }: FieldProps) {
 // ---------------------------------------------------------------------------
 
 function AutocompleteField({ question, value, onChange, onEntryResolved, onSelectAdvance }: FieldProps) {
+  const { t } = useLingui();
   // `@langtags_names` (spec 030 US1): the English-name-first picker. It shows
   // the language NAME in the field and reports the resolved entry via
   // onEntryResolved so homonyms (same name, different code) can be told apart.
@@ -95,7 +103,10 @@ function AutocompleteField({ question, value, onChange, onEntryResolved, onSelec
         value={value}
         onChange={onChange}
         valueMode="name"
-        placeholder="Type your language name in English…"
+        placeholder={t({
+          id: "survey.questionField.autocomplete.namePlaceholder",
+          message: "Type your language name in English…",
+        })}
         {...(onEntryResolved !== undefined ? { onEntryResolved } : {})}
         {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
       />
@@ -126,7 +137,10 @@ function AutocompleteField({ question, value, onChange, onEntryResolved, onSelec
         value={value}
         onChange={onChange}
         valueMode="code"
-        placeholder="Search by name, autonym, or code…"
+        placeholder={t({
+          id: "survey.questionField.autocomplete.codePlaceholder",
+          message: "Search by name, autonym, or code…",
+        })}
         {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
       />
     );
@@ -172,15 +186,14 @@ function StyledOptionsField({ question, value, onChange, onSelectAdvance }: Fiel
   // own-script autonyms in both value and label (IdentityLite.getSeedOptions),
   // matching the dedup key in IdentityLite.getSeedOptions and the comparison in
   // LangtagsComboboxField.resolveTyped.
-  const q = typed.trim().normalize("NFC").toLowerCase();
+  const q = normalizeForCompare(typed);
   const exact = allOptions.some((o) => o.value.normalize("NFC") === typed.normalize("NFC"));
   const shown =
     q === "" || exact
       ? allOptions
       : allOptions.filter(
           (o) =>
-            o.label.normalize("NFC").toLowerCase().includes(q) ||
-            o.value.normalize("NFC").toLowerCase().includes(q),
+            normalizeForCompare(o.label).includes(q) || normalizeForCompare(o.value).includes(q),
         );
 
   return (
@@ -257,6 +270,7 @@ function LangtagsComboboxField({
   valueMode,
   placeholder,
 }: FieldProps & LangtagsComboboxExtras) {
+  const { t } = useLingui();
   const strVal = stringValue(value);
   const [options, setOptions] = useState<LanguageSummary[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -328,17 +342,44 @@ function LangtagsComboboxField({
     // ref.current is the current prop, so this path is unchanged.
     const onResolved = onEntryResolvedRef.current;
     if (onResolved === undefined) return;
-    // NFC-normalize before case-folding so NFC/NFD variants of the same name
+    // Normalize before case-folding so NFC/NFD variants of the same name
     // compare equal — matches the own-name dedup key in IdentityLite.getSeedOptions.
-    const trimmed = text.trim().normalize("NFC").toLowerCase();
+    const trimmed = normalizeForCompare(text);
     if (trimmed === "") {
       onResolved(null);
       return;
     }
-    const exact = results.filter(
-      (r) => (r.englishName ?? "").normalize("NFC").toLowerCase() === trimmed,
-    );
-    onResolved(exact.length === 1 ? exact[0]! : null);
+    // Match the primary English name OR any alternate English name (langtags
+    // aliases, e.g. "Otuo" → Ghotuo) so a resolvable alias seeds downstream
+    // fields, not just the canonical name. Alternate names live on
+    // LanguageDefaults (getLanguageDefaults), not the LanguageSummary row, so
+    // read them through the loaded module.
+    const mod = modRef.current;
+    const primaryMatch = (r: LanguageSummary): boolean =>
+      normalizeForCompare(r.englishName ?? "") === trimmed;
+    const aliasMatch = (r: LanguageSummary): boolean => {
+      const altNames = mod?.getLanguageDefaults(r.code)?.englishNames;
+      return altNames?.some((n) => normalizeForCompare(n) === trimmed) ?? false;
+    };
+
+    // The primary English name takes precedence over aliases: a *unique*
+    // primary-name match resolves even when the same text is also an alias of a
+    // different entry. This keeps alias resolution strictly additive — it never
+    // turns a query that previously auto-resolved (by primary name) into an
+    // ambiguous null. Aliases decide only when no single primary name matches.
+    // This precedence is local to resolveTyped: lookupByName folds aliases into
+    // the same ranking tier as the primary name (it has no primary-over-alias
+    // precedence of its own), so there is nothing there to mirror.
+    const primary = results.filter(primaryMatch);
+    if (primary.length >= 1) {
+      // >1 primary match is genuinely ambiguous by canonical name alone → null.
+      onResolved(primary.length === 1 ? primary[0]! : null);
+      return;
+    }
+    // No primary-name match: fall back to aliases. An alias shared by >1 entry
+    // stays ambiguous (null), same as an ambiguous primary name.
+    const byAlias = results.filter(aliasMatch);
+    onResolved(byAlias.length === 1 ? byAlias[0]! : null);
   }
 
   function handleType(text: string): void {
@@ -381,7 +422,7 @@ function LangtagsComboboxField({
       id={question.id}
       value={strVal}
       options={comboOptions}
-      placeholder={loaded ? placeholder : "Loading languages…"}
+      placeholder={loaded ? placeholder : t({ id: "survey.questionField.langtagsCombobox.loading", message: "Loading languages…" })}
       required={question.required === true}
       onType={handleType}
       onSelect={handleSelect}
@@ -484,9 +525,13 @@ function StyledCombobox({
     }
   }
 
+  // Issue #536: sized to --control-h (34px) instead of a fixed padded box;
+  // `.ks-control .ks-focus-ring .ks-hit-target` (index.css) give this the
+  // same accent-ring focus + >=44px touch target as every other single-line
+  // control (TextField, Dropdown).
   const inputStyle: React.CSSProperties = {
     width: "100%",
-    padding: "8px 10px",
+    padding: "0 10px",
     background: "#0d1117",
     border: "1px solid #30363d",
     borderRadius: 6,
@@ -518,6 +563,7 @@ function StyledCombobox({
         onFocus={openList}
         // Delay close so an option's onMouseDown registers before blur.
         onBlur={() => setTimeout(() => isMountedRef.current && setOpen(false), 120)}
+        className="ks-control ks-focus-ring ks-hit-target"
         style={inputStyle}
       />
       {showList && (
@@ -574,20 +620,28 @@ function StyledCombobox({
 }
 
 // ---------------------------------------------------------------------------
-// Select (native <select>)  →  ui Dropdown
+// Select (native <select> does not open in the VS Code webview — #1307)
+// →  ui SelectMenu
 // ---------------------------------------------------------------------------
 
 function SelectField({ question, value, onChange }: FieldProps) {
+  const { t } = useLingui();
   const strVal = stringValue(value);
-  const dropdownOptions: DropdownOption[] = (question.options ?? []).map(
-    (opt) => ({ value: opt.value, label: opt.label }),
-  );
+  // Leading placeholder option — matches the hardcoded "— Select one —" entry
+  // of the now-removed ui/Dropdown (always first, selectable to reset to
+  // unanswered), now actually localized (Dropdown's was a plain string, never
+  // wrapped in t()).
+  const selectOptions: SelectMenuOption[] = [
+    { value: "", label: t({ id: "survey.selectField.placeholder", message: "— Select one —" }) },
+    ...(question.options ?? []).map((opt) => ({ value: opt.value, label: opt.label })),
+  ];
   return (
-    <Dropdown
+    <SelectMenu
       id={question.id}
-      aria-required={question.required === true}
+      ariaLabelledby={`label-${question.id}`}
+      required={question.required === true}
       value={strVal}
-      options={dropdownOptions}
+      options={selectOptions}
       onChange={(v) => onChange(v)}
     />
   );
@@ -645,7 +699,9 @@ function MultiSelectField({ question, value, onChange }: FieldProps) {
   if (options.length === 0 && question.options_source !== undefined) {
     return (
       <p style={{ fontSize: 13, color: TEXT_DIM, fontStyle: "italic" }}>
-        Dynamic options ({question.options_source}) not loaded in this build.
+        <Trans id="survey.questionField.multiSelect.dynamicOptionsNotLoaded">
+          Dynamic options ({question.options_source}) not loaded in this build.
+        </Trans>
       </p>
     );
   }

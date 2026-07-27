@@ -81,6 +81,9 @@ export { isParallelIndexFanOut } from "./recognizer/rules/parallel-index-fanout.
 export { createScaffolderService, renameFilesInVfs } from "./scaffolder/index.js";
 export { scaffoldIR, resetIdentity } from "./scaffolder/scaffold-ir.js";
 export { scaffoldTouchLayout, buildMinimalPhoneTouchLayout } from "./scaffolder/index.js";
+// spec 035 — touch coverage guard (FR-008/SC-003).
+export { touchCoverage } from "./pattern-apply/touchCoverage.js";
+export type { TouchCoverageResult } from "./pattern-apply/touchCoverage.js";
 export type { ScaffolderServiceOptions } from "./scaffolder/index.js";
 export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffolder/scaffold-ir.js";
 
@@ -128,15 +131,100 @@ export type { LLMCompleter } from "./character-discovery/CharacterDiscoveryServi
 export type { CldrLoader, CldrFullLoader, ExemplarResult } from "./character-discovery/cldr.js";
 export { createFetchCldrLoader, createFetchCldrFullLoader } from "./character-discovery/cldr.js";
 // Phase B high-confidence missing-character suggestions (CLDR-grounded, no LLM).
-export { suggestMissingCharacters } from "./character-discovery/suggestMissing.js";
-export type { MissingCharSuggestions } from "./character-discovery/suggestMissing.js";
+export { suggestMissingCharacters, neededCharsForLanguage, isCharCoveredForLocale } from "./character-discovery/suggestMissing.js";
+export type { MissingCharSuggestions, CharNormalizationForm } from "./character-discovery/suggestMissing.js";
 // Case-pair proposal helper for the shift-layer studio feature (bidirectional;
 // distinct from suggestMissing's isCovered coverage check — see casePair.ts docstring).
 export { caseCounterpart } from "./character-discovery/casePair.js";
+// Phase B tiered/browsable character-map candidate builder (right pane).
+// Reuses the cldr.ts exemplar-loading path; CHARACTER_MAP_BLOCKS is a
+// SEPARATE, multi-block-per-script table from cldr.ts's calibrated SCRIPT_BLOCKS.
+export { buildCharacterMap, CHARACTER_MAP_BLOCKS, isCombiningMarkChar, isPrivateUseCodePoint } from "./character-discovery/characterMap.js";
+export type { CharacterMapTier, CharacterMapCell, CharacterMapGroup } from "./character-discovery/characterMap.js";
+// Whole-grapheme decomposition for the three-store confirmed alphabet (spec 046):
+// one base + ordered combining marks; null for PUA / plain letters / digraphs.
+export { decomposeGrapheme } from "./character-discovery/decompose.js";
+export type { GraphemeDecomposition } from "./character-discovery/decompose.js";
+// spec 047 — pure Unicode General-Category classifier for the inventory breakdown.
+export { glyphCategory } from "./character-discovery/glyphCategory.js";
+export type { GlyphCategory } from "./character-discovery/glyphCategory.js";
+
+// Marks question series (spec 046): pure engine functions behind the S0-S5
+// stations — the shared posture table is the single source the facet, the S4
+// proposal, the unwrap stores, and the blocking rules all read.
+export { nfcPostureOfInventory, aggregateInventoryPosture } from "./marks/nfc-posture-of-inventory.js";
+export type { PosturePair, InventoryPosture } from "./marks/nfc-posture-of-inventory.js";
+export { groupMarkClasses, attestedBasesOf, ATTACHMENT_SIMILARITY_THRESHOLD } from "./marks/mark-classes.js";
+export type { MarkClass } from "./marks/mark-classes.js";
+export { proposeAttachments, deriveCaseCounterparts } from "./marks/attachment-proposals.js";
+export type { AttachmentProposal, ProposedAttachmentState } from "./marks/attachment-proposals.js";
+export { resolveOutputFormProposal, hasDecidablePairs, normalizationFormForOutputForm } from "./marks/output-form-policy.js";
+export type { OutputForm, OutputFormProposal } from "./marks/output-form-policy.js";
+export { computeMentalModelPrefills, detectBaseMarkMechanism, PRODUCTIVITY_SPREAD_THRESHOLD } from "./marks/mental-model-prefill.js";
+export type { MentalModelPrefill, MentalModelAnswer, BaseMarkMechanism } from "./marks/mental-model-prefill.js";
+export { buildPlacementWorklist, verifyWorklistCoverage } from "./marks/worklist.js";
+export type { WorklistInputs } from "./marks/worklist.js";
+export { expandCaseCounterpartAttachments } from "./marks/case-fold.js";
+export { deriveCarveNeededSet } from "./marks/carve-needed-set.js";
+export type { CarveNeededSet, DeriveCarveNeededSetArgs } from "./marks/carve-needed-set.js";
+export { applyMarkGuards, MARKS_GUARD_GROUP, MARKS_UNWRAP_FROM_STORE, MARKS_UNWRAP_TO_STORE } from "./pattern-apply/mark-guards.js";
+export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
-export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyStoreSlotRemovals, classifyStoreSlotEdit, parseSlotId, collectCharContributors, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment } from "./pattern-apply/index.js";
-export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, CharContributors, ShiftAssignmentPlan } from "./pattern-apply/index.js";
+export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, describeStorePairing, analyzeStores, parseSlotId, collectCharContributors, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap, isPlusSeparator } from "./pattern-apply/index.js";
+export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, DesktopModifications, ApplyDesktopModificationsResult, ApplyDesktopModificationsToRawJsonResult, PropagateDesktopLayersToTouchResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, StorePairingDescription, StoreAnalysis, CharContributors, ShiftAssignmentPlan, ModifierToken } from "./pattern-apply/index.js";
+
+// Facet-transform (spec 039): switch a base's source-construction facet value on
+// the working copy — propose-then-confirm, KeyboardIR copy-return, gated commit.
+export {
+  proposeFacetTransform,
+  applyFacetTransform,
+  TRANSITION_MATRIX,
+  GATE_FACETS,
+  FACET_IMPACT_CLASS,
+  findTransition,
+  isGateFacet,
+  DEFAULT_HOUSE_TARGET_POLICY,
+  resolveHouseTarget,
+  MIGRATION_RULES,
+  foldSplitModifiersToNamed,
+  renderSourceDiff,
+  composeOutputToNfc,
+  producedSetDelta,
+  opaqueInventory,
+} from "./facet-transform/index.js";
+export type {
+  TransformImpactClass,
+  LossProfile,
+  CauseTag,
+  ConfidenceClass,
+  PreviewKind,
+  DefaultDisposition,
+  UserDisposition,
+  ProposalStatus,
+  ExceptionSite,
+  SourceFacetMeasurement,
+  FacetTransition,
+  MigrationRule as FacetMigrationRule,
+  RewriteResult,
+  SiteLedgerEntry,
+  CompanionRewrite,
+  DerivedParameterReview,
+  HouseTargetPolicyRow,
+  HouseTargetResolution,
+  AffectedSite,
+  SourceDiffRow,
+  TransformPreview,
+  TransformProposal,
+  ProducedSetDelta,
+  TransformRefusal,
+  CommitFailure,
+  CommitResult,
+  TransformRequest,
+  ProposeOptions,
+  ApplyFacetTransformOptions,
+  InjectedSimulate,
+} from "./facet-transform/index.js";
 
 // Inventory diff (spec §8): static extraction of a keyboard's produced glyph set.
 export { producedGlyphs, collectFromOutput } from "./inventory/producedGlyphs.js";

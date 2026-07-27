@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-07-11",
+  "lastUpdated": "2026-07-23",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -146,7 +146,7 @@
     },
     "§11": {
       "title": "11. criteria.md compliance",
-      "hash": "sha256:6aa6972138b421d3",
+      "hash": "sha256:c88a4687ad623fd7",
       "status": "implemented",
       "implements": [
         "packages/contracts/data/criteria.json",
@@ -238,7 +238,7 @@
     },
     "§19": {
       "title": "19. Reference",
-      "hash": "sha256:fa3a2e620edb7356",
+      "hash": "sha256:64495957b7332fde",
       "status": "reference",
       "implements": [],
       "decisions": [],
@@ -278,7 +278,7 @@
     },
     "specs/005-pattern-schema": {
       "title": "Feature spec — Pattern schema (spec.md §5)",
-      "hash": "sha256:269db42c81a1c560",
+      "hash": "sha256:f208af38b56ebfb3",
       "status": "implemented",
       "implements": [
         "packages/contracts/src/pattern.ts",
@@ -317,7 +317,7 @@
     },
     "docs/architecture.md": {
       "title": "Keyboard Studio — architecture & meta-flow",
-      "hash": "sha256:d464dcc5f43f4acc",
+      "hash": "sha256:e4a06bb7282b85dd",
       "status": "reference",
       "implements": [],
       "decisions": [],
@@ -550,6 +550,110 @@
     "specs/033-qu-mutate-track": {
       "title": "Feature Specification: Mutate track — route the track fork through the manifest reducer/mutate seam, replacing the hand-coded StudioShell fork",
       "hash": "sha256:9e0f03bccf2c8d77",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/035-mobile-touch-derivation": {
+      "title": "Feature Specification: Mobile/touch layout derivation",
+      "hash": "sha256:f41ade5918875aec",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/040-desktop-base-layout-fallthrough": {
+      "title": "Feature Specification: Desktop base-layout fall-through in the script facet",
+      "hash": "sha256:0fc200a6c3354ce9",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/042-store-range-notation": {
+      "title": "Feature Specification: KMN store range notation (`X .. Y`)",
+      "hash": "sha256:2aa572f95f2ac91f",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/034-mvp-authoring-walk": {
+      "title": "Feature Specification: MVP end-to-end authoring walk",
+      "hash": "sha256:0e99f3f72e7db885",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/036-glottolog-catalog": {
+      "title": "Feature Specification: Glottolog classification catalog + related-keyboard-base bridge",
+      "hash": "sha256:3511545d8a8ea43a",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/036-keyboard-facet-index": {
+      "title": "Feature Specification: Per-Keyboard Facet Index",
+      "hash": "sha256:8f09b07eb90c6422",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/037-facet-classifiers": {
+      "title": "Feature Specification: Deterministic Facet Classifiers (Script + Two Representative Facets)",
+      "hash": "sha256:57f2966926f2d478",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/038-adaptation-questions": {
+      "title": "Feature Specification: En-Masse Adaptation Preference Questions",
+      "hash": "sha256:3538f1ba62f789a4",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/039-facet-transform": {
+      "title": "Feature Specification: Facet Transform Engine",
+      "hash": "sha256:4e1de5eafeddd550",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/041-construction-facet-classifiers": {
+      "title": "Feature Specification: Construction Facet Classifiers",
+      "hash": "sha256:7974b0e191dbbd26",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "docs/lens-model.md": {
+      "title": "How the four analytic lenses compose",
+      "hash": "sha256:71d55e64ebebad72",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/045-lens-vocabulary-source-of-truth": {
+      "title": "Feature Specification: Lens-Vocabulary Single Source of Truth",
+      "hash": "sha256:0a2e80e975208ecc",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/046-marks-question-series": {
+      "title": "Feature Specification: Mark Composition Model and the Marks Question Series",
+      "hash": "sha256:3833307b9bed16c9",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

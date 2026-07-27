@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import type { PlacementMap } from "@keyboard-studio/contracts";
 
 /**
- * Lazily loads docs/placement-priors.json and converts it to a PlacementMap.
- * Returns null while loading, on success, or on error (graceful degradation).
+ * Lazily loads packages/engine/data/placement-priors.json and converts it to
+ * a PlacementMap. Returns null while loading, on success, or on error
+ * (graceful degradation).
  */
 export function usePlacementPriors(): PlacementMap | null {
   const [placementMap, setPlacementMap] = useState<PlacementMap | null>(null);
@@ -12,12 +13,12 @@ export function usePlacementPriors(): PlacementMap | null {
     let cancelled = false;
     (async () => {
       try {
-        const [mod, { corpusPriorsToPlacementMap }] = await Promise.all([
-          import("@docs/placement-priors.json"),
+        const [mod, { corpusPriorsToPlacementMap, parsePlacementPriorsJSON }] = await Promise.all([
+          import("@keyboard-studio/engine/data/placement-priors.json"),
           import("@keyboard-studio/engine/placement"),
         ]);
         if (cancelled) return;
-        const priors = (mod.default ?? mod) as import("@keyboard-studio/engine/placement").PlacementPriorsJSON;
+        const priors = parsePlacementPriorsJSON(mod.default ?? mod);
         setPlacementMap(corpusPriorsToPlacementMap(priors));
       } catch (err) {
         if (!cancelled) {

@@ -14,7 +14,8 @@
 // Inspector, ConfirmDialog) runs for real — this is a render-based test.
 
 import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from 'vitest';
-import { render, cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { render } from '../../test/renderWithI18n.tsx';
 import type { IRRule, IRGroup, IRStore, KeyboardIR, RemovalCapability } from '@keyboard-studio/contracts';
 import { createVirtualFS } from '@keyboard-studio/contracts';
 import { basicKbdus } from '@keyboard-studio/contracts/fixtures';
@@ -37,9 +38,20 @@ beforeAll(() => {
   }
 });
 
-const { collectCharContributorsMock } = vi.hoisted(() => ({
-  collectCharContributorsMock: vi.fn(),
-}));
+const { collectCharContributorsMock, neededCharsResult, neededCharsPerBcp47 } = vi.hoisted(() => {
+  let _needed: Set<string> | null = null;
+  return {
+    collectCharContributorsMock: vi.fn(),
+    neededCharsResult: {
+      get: () => _needed,
+      set: (v: Set<string> | null) => { _needed = v; },
+    },
+    // Review fix 8 — per-bcp47 deferred overrides, for tests that need to
+    // control resolution ORDER across a bcp47 change (the stale-language
+    // race). Empty by default — falls through to neededCharsResult above.
+    neededCharsPerBcp47: new Map<string, Promise<Set<string> | null>>(),
+  };
+});
 
 vi.mock('@keyboard-studio/engine', async () => {
   const actual = await vi.importActual<typeof import('@keyboard-studio/engine')>('@keyboard-studio/engine');
@@ -49,9 +61,32 @@ vi.mock('@keyboard-studio/engine', async () => {
   };
 });
 
+// #525 items 2/4 — neededCharsForLanguage does a real CLDR network fetch when
+// unmocked; stub it so the suite stays deterministic/offline. Defaults to
+// null (no CLDR signal) so existing tests keep their inventory-only behavior;
+// individual tests can set neededCharsResult to exercise the surplus signal,
+// or register a per-bcp47 deferred promise (deferNeededChars below) to control
+// resolution order.
+vi.mock('../../lib/services.ts', () => ({
+  neededCharsForLanguage: async (bcp47: string) => {
+    const deferred = neededCharsPerBcp47.get(bcp47);
+    return deferred !== undefined ? deferred : neededCharsResult.get();
+  },
+}));
+
+/** Registers a pending neededCharsForLanguage(bcp47) call; returns the resolver. */
+function deferNeededChars(bcp47: string): (result: Set<string> | null) => void {
+  let resolve!: (v: Set<string> | null) => void;
+  const promise = new Promise<Set<string> | null>((r) => { resolve = r; });
+  neededCharsPerBcp47.set(bcp47, promise);
+  return resolve;
+}
+
 afterEach(() => {
   cleanup();
   collectCharContributorsMock.mockReset();
+  neededCharsResult.set(null);
+  neededCharsPerBcp47.clear();
 });
 
 beforeEach(() => {
@@ -481,5 +516,359 @@ describe('CarveGallery — store-chip cascade (#523)', () => {
 
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(useWorkingCopyStore.getState().isItemDeleted('store#s#0')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Coordinated collateral (manual-carve safety, #525/#931 follow-up). A
+// manual removal that hits a store paired via classifyStoreSlotEdit's
+// coordinatedWith ALSO drops the partner store's aligned character at the
+// same index — collectCharContributors never names that partner slot
+// directly, so this must never be silent. Fixture mirrors the Cameroon
+// `dk(1) any(dkf) > index(dkt,2)` cross-pairing idiom (same shape as the
+// engine's applyStoreSlotRemovals.test.ts and irToCarveNodes.test.ts
+// coordinatedCollateralForSlots fixtures) — collectCharContributors is
+// mocked, but classifyStoreSlotEdit/analyzeStores run for REAL against the
+// ir, so the pairing resolution itself is not faked.
+// ---------------------------------------------------------------------------
+
+function makeCrossPairedIr(dktChar: string): KeyboardIR {
+  return makeIR(
+    [{
+      nodeId: 'g-main', name: 'main', usingKeys: true, readonly: false,
+      rules: [{
+        nodeId: 'rule-fanout',
+        context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'dkf' }],
+        output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }],
+      }],
+    }],
+    [
+      makeStore('store#dkf', 'dkf', ['a']),
+      makeStore('store#dkt', 'dkt', [dktChar]),
+    ],
+  );
+}
+
+describe('CarveGallery — coordinated collateral (manual carve safety, #525/#931 follow-up)', () => {
+  it('opens the dialog (no longer a silent plain-toggle) and flags a needed collateral character from the paired store', () => {
+    const ir = makeCrossPairedIr('α');
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => ({
+      ...emptyContributors(ch),
+      storeSlotIds: ['store#dkf#0'],
+    }));
+
+    renderGallery(ir);
+    // The author has confirmed 'α' as part of their inventory — it's "needed".
+    useWorkingCopyStore.setState((s) => ({ session: { ...s.session, confirmedInventory: ['α'] } }));
+
+    fireEvent.click(screen.getByTestId('carve-card-store#dkf'));
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkf#0')).toBe(false);
+
+    // Previously (pre-fix) this was a plain-toggle: sole producer, nothing
+    // blocked. It must now open the dialog because of the collateral.
+    fireEvent.click(screen.getByRole('button', { name: 'a' }));
+
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog).not.toBeNull();
+    expect(dialog.textContent).toContain('Remove "a" everywhere?');
+    expect(dialog.textContent).toContain('α');
+    expect(dialog.textContent).toContain('dkt');
+    expect(dialog.textContent).toContain('needed for your language');
+
+    // Awareness, not prevention — the user can still confirm.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, remove everywhere' }));
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkf#0')).toBe(true);
+    // P1 fix: the CONFIRMED collateral partner slot ('dkt' at the same index)
+    // must ALSO be persisted as deleted — not just displayed in the dialog —
+    // so the Gallery's kept/removed state matches what export-time
+    // applyStoreSlotRemovals will actually do.
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkt#0')).toBe(true);
+  });
+
+  it('shows plain (non-flagged) collateral text when the partner character is not needed', () => {
+    const ir = makeCrossPairedIr('γ');
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => ({
+      ...emptyContributors(ch),
+      storeSlotIds: ['store#dkf#0'],
+    }));
+
+    renderGallery(ir);
+    useWorkingCopyStore.setState((s) => ({ session: { ...s.session, confirmedInventory: ['α'] } }));
+
+    fireEvent.click(screen.getByTestId('carve-card-store#dkf'));
+    fireEvent.click(screen.getByRole('button', { name: 'a' }));
+
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog.textContent).toContain('γ');
+    expect(dialog.textContent).toContain('dkt');
+    expect(dialog.textContent).not.toContain('needed for your language');
+  });
+
+  it('a sole-producer char with NO coordinated collateral still plain-toggles (regression guard, unpaired store)', () => {
+    // Reuses the existing #523 fixture shape: an unpaired store, no
+    // classifyStoreSlotEdit coordinatedWith partner — collateral must be [].
+    const ir = makeIR(
+      [makeGroup('g-main', 'main', [])],
+      [makeStore('store#s', 'sX', ['a'])],
+    );
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => ({
+      ...emptyContributors(ch),
+      storeSlotIds: ['store#s#0'],
+    }));
+
+    renderGallery(ir);
+    useWorkingCopyStore.setState((s) => ({ session: { ...s.session, confirmedInventory: ['α'] } }));
+
+    fireEvent.click(screen.getByTestId('carve-card-store#s'));
+    fireEvent.click(screen.getByRole('button', { name: 'a' }));
+
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#s#0')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P0 — bulk store-toggle routed through the collateral guard. A store card's
+// master ToggleBox (Rail.tsx) drops EVERY toggleable chip in the store at
+// once via handleSetManyGlyphs — this must aggregate coordinated collateral
+// across the WHOLE batch into ONE confirm dialog, not a silent bulk drop.
+// ---------------------------------------------------------------------------
+
+function makeBulkCrossPairedIr(): KeyboardIR {
+  return makeIR(
+    [{
+      nodeId: 'g-main', name: 'main', usingKeys: true, readonly: false,
+      rules: [{
+        nodeId: 'rule-fanout',
+        context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'dkf' }],
+        output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }],
+      }],
+    }],
+    [
+      makeStore('store#dkf', 'dkf', ['a', 'b']),
+      makeStore('store#dkt', 'dkt', ['α', 'β']),
+    ],
+  );
+}
+
+describe('CarveGallery — bulk store-toggle collateral guard (P0)', () => {
+  it('aggregates coordinated collateral across the whole batch into ONE dialog; confirming marks BOTH the batch slots and the collateral partner slots deleted', () => {
+    const ir = makeBulkCrossPairedIr();
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => emptyContributors(ch));
+
+    renderGallery(ir);
+    useWorkingCopyStore.setState((s) => ({ session: { ...s.session, confirmedInventory: ['β'] } }));
+
+    // Master toggle for the whole 'dkf' store — drops BOTH its slots at once.
+    const dkfCard = screen.getByTestId('carve-card-store#dkf');
+    // A harmless prior interaction (select the card) forces a render flush
+    // after the setState above, mirroring the existing single-chip
+    // collateral tests' "click the card, THEN click the trigger" sequencing.
+    fireEvent.click(dkfCard);
+    fireEvent.click(within(dkfCard).getByRole('button', { name: 'Remove' }));
+
+    // Exactly one dialog, aggregating collateral for BOTH indices.
+    expect(screen.getAllByRole('alertdialog')).toHaveLength(1);
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog.textContent).toContain('α');
+    expect(dialog.textContent).toContain('β');
+    expect(dialog.textContent).toContain('dkt');
+    expect(dialog.textContent).toContain('needed for your language');
+
+    // Nothing deleted yet — the dialog gated the batch.
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkf#0')).toBe(false);
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkf#1')).toBe(false);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, remove everywhere' }));
+
+    // Both batch slots AND both collateral partner slots are now persisted as deleted.
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkf#0')).toBe(true);
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkf#1')).toBe(true);
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkt#0')).toBe(true);
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkt#1')).toBe(true);
+  });
+
+  it('applies the batch immediately (no dialog) when the batch carries no coordinated collateral', () => {
+    const ir = makeIR(
+      [makeGroup('g-main', 'main', [])],
+      [makeStore('store#s', 'sX', ['a', 'b'])],
+    );
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => emptyContributors(ch));
+
+    renderGallery(ir);
+
+    const card = screen.getByTestId('carve-card-store#s');
+    fireEvent.click(within(card).getByRole('button', { name: 'Remove' }));
+
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#s#0')).toBe(true);
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#s#1')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 12. Review fix 5 — component-level test for the CLDR-driven 'high' path.
+// #525 BANNER slice update: the per-node Rail badge this test originally
+// exercised is retired; the assertions now target the green RemovalBanner
+// (the single surface for the character-level recommendation signal).
+// ---------------------------------------------------------------------------
+
+describe('CarveGallery — language-driven surplus recommendation (removal banner)', () => {
+  it('lists a character surplus under the resolved CLDR needed-set in the banner checklist, but not a character that is needed', async () => {
+    const ir = makeIR([
+      makeGroup('g-main', 'main', [makeSimpleRule('r-z', 'K_Z', 'z')]),
+      makeGroup('g-second', 'second', [makeSimpleRule('r-q', 'K_Q', 'q')]),
+    ]);
+    const caps = new Map<string, RemovalCapability>([
+      ['r-z', 'removable:simple'],
+      ['r-q', 'removable:simple'],
+    ]);
+    // recommendedRemovalChars resolves producers via collectCharContributors —
+    // map each character to the rule that actually produces it so the
+    // allowlist (isSimpleRemovableRule) can see a real, simple producer.
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => {
+      if (ch === 'z') return { ...emptyContributors(ch), ruleNodeIds: ['r-z'] };
+      if (ch === 'q') return { ...emptyContributors(ch), ruleNodeIds: ['r-q'] };
+      return emptyContributors(ch);
+    });
+    neededCharsResult.set(new Set(['q']));
+
+    renderGallery(ir, caps);
+
+    // 'z' is absent from the resolved needed-set — surplus, banner shows and
+    // lists exactly one character.
+    await screen.findByText(/We recommend removing 1 character/);
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    expect(screen.getByRole('checkbox', { name: 'Remove U+007A' })).not.toBeNull();
+    // 'q' IS in the resolved needed-set — never listed.
+    expect(screen.queryByRole('checkbox', { name: 'Remove U+0071' })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 13. Review fix 8/4 — stale-language race: an in-flight fetch for the OLD
+// bcp47 resolving AFTER the bcp47 changes must not overwrite the newer
+// language's result (the cancelled-guard in the useEffect). #525 BANNER
+// slice update: assertions retargeted from the retired Rail badge to the
+// RemovalBanner summary text.
+// ---------------------------------------------------------------------------
+
+describe('CarveGallery — stale-language race (cancelled-guard)', () => {
+  it('an older in-flight fetch resolving out of order does not overwrite the newer bcp47 result', async () => {
+    const ir = makeIR([makeGroup('g-main', 'main', [makeSimpleRule('r-z', 'K_Z', 'z')])]);
+    const caps = new Map<string, RemovalCapability>([['r-z', 'removable:simple']]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) =>
+      ch === 'z' ? { ...emptyContributors(ch), ruleNodeIds: ['r-z'] } : emptyContributors(ch),
+    );
+
+    // basicKbdus.languages[0] === 'en' — instantiateFromExisting seeds identity.bcp47 with it.
+    const resolveOld = deferNeededChars('en');
+    renderGallery(ir, caps);
+
+    // Old fetch still pending — no recommendation signal yet.
+    expect(screen.queryByText(/We recommend removing/)).toBeNull();
+
+    // Language changes mid-flight, before the 'en' fetch resolves.
+    const resolveNew = deferNeededChars('fr');
+    useWorkingCopyStore.getState().setIdentity({ bcp47: 'fr' });
+
+    // Newer ('fr') fetch resolves first, WITHOUT 'z' — surplus, banner shows.
+    resolveNew(new Set(['q']));
+    await screen.findByText(/We recommend removing 1 character/);
+
+    // Older ('en') fetch resolves LATER, WITH 'z' — if the cancelled-guard
+    // didn't hold, this would overwrite neededChars and the banner would
+    // disappear (since 'z' would suddenly be "needed").
+    resolveOld(new Set(['z']));
+    await Promise.resolve();
+    expect(screen.getByText(/We recommend removing 1 character/)).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 14. #525 BANNER slice — RemovalBanner show/hide, expand, and
+// "Remove all selected" (checked-subset cascade removal).
+// ---------------------------------------------------------------------------
+
+describe('CarveGallery — removal banner (#525 BANNER slice)', () => {
+  it('is hidden when there is no recommendation signal at all (no confirmed inventory, no CLDR needed-set)', () => {
+    const ir = makeIR([makeGroup('g-main', 'main', [makeSimpleRule('r-z', 'K_Z', 'z')])]);
+    const caps = new Map<string, RemovalCapability>([['r-z', 'removable:simple']]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => emptyContributors(ch));
+
+    renderGallery(ir, caps);
+
+    expect(screen.queryByText(/We recommend removing/)).toBeNull();
+  });
+
+  it('shows the correct count and, once expanded, checklist entries for every surplus character — a needed character never appears', async () => {
+    const ir = makeIR([
+      makeGroup('g-main', 'main', [
+        makeSimpleRule('r-a', 'K_A', 'a'),
+        makeSimpleRule('r-b', 'K_B', 'b'),
+        makeSimpleRule('r-q', 'K_Q', 'q'),
+      ]),
+    ]);
+    const caps = new Map<string, RemovalCapability>([
+      ['r-a', 'removable:simple'],
+      ['r-b', 'removable:simple'],
+      ['r-q', 'removable:simple'],
+    ]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => {
+      if (ch === 'a') return { ...emptyContributors(ch), ruleNodeIds: ['r-a'] };
+      if (ch === 'b') return { ...emptyContributors(ch), ruleNodeIds: ['r-b'] };
+      return emptyContributors(ch);
+    });
+    neededCharsResult.set(new Set(['q'])); // only 'q' is needed — 'a' and 'b' are surplus
+
+    renderGallery(ir, caps);
+
+    await screen.findByText(/We recommend removing 2 characters/);
+
+    // Collapsed by default — the checklist isn't in the DOM yet.
+    expect(screen.queryByRole('checkbox', { name: 'Remove U+0061' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
+
+    expect(screen.getByRole('checkbox', { name: 'Remove U+0061' })).not.toBeNull(); // 'a'
+    expect(screen.getByRole('checkbox', { name: 'Remove U+0062' })).not.toBeNull(); // 'b'
+    // 'q' is needed — never listed, regardless of expansion state.
+    expect(screen.queryByRole('checkbox', { name: 'Remove U+0071' })).toBeNull();
+  });
+
+  it('"Remove all selected" removes only the still-checked characters, leaving an unchecked one untouched', async () => {
+    const ir = makeIR([
+      makeGroup('g-main', 'main', [
+        makeSimpleRule('r-a', 'K_A', 'a'),
+        makeSimpleRule('r-b', 'K_B', 'b'),
+      ]),
+    ]);
+    const caps = new Map<string, RemovalCapability>([
+      ['r-a', 'removable:simple'],
+      ['r-b', 'removable:simple'],
+    ]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => {
+      if (ch === 'a') return { ...emptyContributors(ch), ruleNodeIds: ['r-a'] };
+      if (ch === 'b') return { ...emptyContributors(ch), ruleNodeIds: ['r-b'] };
+      return emptyContributors(ch);
+    });
+    neededCharsResult.set(new Set(['q'])); // neither 'a' nor 'b' is needed
+
+    renderGallery(ir, caps);
+    await screen.findByText(/We recommend removing 2 characters/);
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
+
+    // Both pre-checked by default.
+    const checkboxA = screen.getByRole('checkbox', { name: 'Remove U+0061' });
+    const checkboxB = screen.getByRole('checkbox', { name: 'Remove U+0062' });
+    expect((checkboxA as HTMLInputElement).checked).toBe(true);
+    expect((checkboxB as HTMLInputElement).checked).toBe(true);
+
+    // Uncheck 'a' — only 'b' should be removed.
+    fireEvent.click(checkboxA);
+    fireEvent.click(screen.getByRole('button', { name: /Remove all selected \(1\)/ }));
+
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(false);
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-b')).toBe(true);
   });
 });

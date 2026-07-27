@@ -14,6 +14,7 @@ import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
 import { detectBaseLayoutFamily } from "../placement/filters.js";
 import { scaffoldIR, sanitizeDisplayName, kmnStringEscape } from "./scaffold-ir.js";
+import { assetFileExtensions } from "../shared/siblingAssetStores.js";
 
 export { scaffoldIR, resetIdentity } from "./scaffold-ir.js";
 export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffold-ir.js";
@@ -72,6 +73,12 @@ function escapeForRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// Build a word-boundary-anchored matcher for a literal id token, so a base id
+// that is a prefix of another token (e.g. `base_id_extra`) is not over-rewritten.
+function buildIdTokenRegex(baseId: string): RegExp {
+  return new RegExp(`(?<![\\w])${escapeForRegex(baseId)}(?![\\w])`, "g");
+}
+
 /**
  * Rewrite file-path references in .kps XML text.
  * Mirrors kmc-copy's copyKpsSourceFile (../keyman/developer/src/kmc-copy/src/KeymanProjectCopier.ts):
@@ -82,7 +89,7 @@ function escapeForRegex(s: string): string {
  */
 function rewriteKpsFilePaths(xml: string, baseId: string, keyboardId: string): string {
   const escaped = escapeForRegex(baseId);
-  const tokenRe = new RegExp(`(?<![\\w])${escaped}(?![\\w])`, "g");
+  const tokenRe = buildIdTokenRegex(baseId);
   let out = xml.replace(
     /(<Name\b[^>]*>)([^<]*)(<\/Name>)/gi,
     (m, open: string, value: string, close: string) => {
@@ -112,6 +119,26 @@ function rewriteKvksKbdname(xml: string, baseId: string, keyboardId: string): st
   );
 }
 
+/**
+ * Rewrite a Keyman project file (.kpj) so its per-file <Filename>/<Filepath>
+ * references to the id-basename source files (e.g. `<baseId>.kmn`,
+ * `source\<baseId>.kps`) point at the new id after a rename. Only the base-id
+ * *token* inside <Filename>/<Filepath> element text is rewritten (word-boundary
+ * anchored), so file GUIDs (<ID>id_…</ID>), display <Name>s, and files that do
+ * not use the id as their basename (HISTORY.md, LICENSE.md, README.md) are left
+ * untouched. The compiler flags the loader/compiler actually read
+ * (parseKpjFlags) are content-independent of this; the rewrite exists so the
+ * emitted project stays coherent when opened in Keyman Developer.
+ */
+function rewriteKpjFilePaths(xml: string, baseId: string, keyboardId: string): string {
+  const tokenRe = buildIdTokenRegex(baseId);
+  return xml.replace(
+    /(<(Filename|Filepath)\b[^>]*>)([^<]*)(<\/\2>)/gi,
+    (_m, open: string, _tag: string, value: string, close: string) =>
+      `${open}${value.replace(tokenRe, keyboardId)}${close}`
+  );
+}
+
 /** @internal Exported for unit testing only. */
 export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: string): void {
   // Sibling-file extensions that conventionally use the keyboard id as
@@ -120,17 +147,11 @@ export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: str
   // in subdirectories (e.g. source/welcome/welcome.htm) are not touched.
   // `.css`, `.htm`, and `.js` mirror the path-bearing system stores
   // (&KMW_EMBEDCSS, &KMW_HELPFILE, &KMW_EMBEDJS) so the renamed file path
-  // matches the rewritten store reference.
-  const extensions = [
-    ".kmn",
-    ".kps",
-    ".kvks",
-    ".keyman-touch-layout",
-    ".ico",
-    ".css",
-    ".htm",
-    ".js",
-  ];
+  // matches the rewritten store reference. The asset-store extensions
+  // (`.kvks`, `.keyman-touch-layout`, `.ico`, `.css`, `.htm`, `.js`) come from
+  // the canonical siblingAssetStores table; `.kmn`/`.kps` are the keyboard's
+  // own source/project files, not asset-store entries, and stay separate.
+  const extensions = [".kmn", ".kps", ...assetFileExtensions()];
   for (const ext of extensions) {
     const oldPath = `source/${baseId}${ext}`;
     const entry = vfs.get(oldPath);
@@ -156,19 +177,21 @@ export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: str
     vfs.set(`source/help/${keyboardId}.php`, helpEntry.content, helpEntry.isBinary);
   }
 
-  // Root-level `<baseId>.kpj` project file. Unlike the `source/` siblings above
-  // it lives at the VFS root (that is where fetchKeyboardSourceToVfs writes it,
-  // and where compile() looks it up as `<keyboardId>.kpj` for compiler flags).
-  // Without this rename the flags — CompilerWarningsAsErrors, WarnDeprecatedCode
-  // — are silently lost after an id change and the compile falls back to
-  // defaults. The modern `.kpj` names files by auto-discovery (an <Options>-only
-  // project), so the base id appears only in the filename, not the content: a
-  // plain move suffices, no content rewrite.
+  // The .kpj project file lives at the VFS ROOT (`<baseId>.kpj`), not under
+  // source/, so the extension loop above never sees it. compile() looks it up
+  // as `<keyboardId>.kpj`; without this rename the file keeps the old id,
+  // compile() misses it, and the base keyboard's compiler flags are silently
+  // dropped (falls back to defaults). Rename it and rewrite its internal
+  // <Filename>/<Filepath> references so the emitted project stays coherent.
   const oldKpj = `${baseId}.kpj`;
   const kpjEntry = vfs.get(oldKpj);
   if (kpjEntry !== undefined) {
     vfs.delete(oldKpj);
-    vfs.set(`${keyboardId}.kpj`, kpjEntry.content, kpjEntry.isBinary);
+    let content = kpjEntry.content;
+    if (!kpjEntry.isBinary && typeof content === "string") {
+      content = rewriteKpjFilePaths(content, baseId, keyboardId);
+    }
+    vfs.set(`${keyboardId}.kpj`, content, kpjEntry.isBinary);
   }
 
   // Rewrite `.kmw-keyboard-<baseId>` selectors in every *.css entry.

@@ -16,6 +16,10 @@ import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  loadFacetScripts,
+  resolveKeyboardScript,
+} from "./facet-script-lookup.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const STUDIO_DIR = path.resolve(SCRIPT_DIR, "..");
@@ -29,6 +33,13 @@ const REPO_BRANCH = process.env["KEYBOARDS_REPO_BRANCH"] ?? "master";
 
 const OUT_DIR = path.join(STUDIO_DIR, "dist", "local-kbd-api");
 const OUT_FILE = path.join(OUT_DIR, "list");
+
+// Mirrors DEFAULT_FACET_INDEX_PATH in vite-plugins/localKeyboards.ts.
+const FACET_INDEX_PATH = path.join(
+  REPO_ROOT,
+  "docs",
+  "keyboard-facet-index.json",
+);
 
 const STORE_NAME_RE = /^\s*store\s*\(\s*&NAME\s*\)\s*'([^']*)'/im;
 const STORE_VERSION_RE = /^\s*store\s*\(\s*&VERSION\s*\)\s*'([^']*)'/im;
@@ -60,7 +71,15 @@ function ensureClone(target) {
   if (fs.existsSync(gitDir)) {
     log(`refreshing existing clone at ${target}`);
     try {
-      run("git", ["-C", target, "fetch", "--depth", "1", "origin", REPO_BRANCH]);
+      run("git", [
+        "-C",
+        target,
+        "fetch",
+        "--depth",
+        "1",
+        "origin",
+        REPO_BRANCH,
+      ]);
       run("git", ["-C", target, "reset", "--hard", `origin/${REPO_BRANCH}`]);
       return;
     } catch (e) {
@@ -72,8 +91,10 @@ function ensureClone(target) {
   log(`cloning ${REPO_URL} (branch=${REPO_BRANCH}, depth=1) -> ${target}`);
   run("git", [
     "clone",
-    "--depth", "1",
-    "--branch", REPO_BRANCH,
+    "--depth",
+    "1",
+    "--branch",
+    REPO_BRANCH,
     REPO_URL,
     target,
   ]);
@@ -114,9 +135,16 @@ function parseKmnMetadata(kmnPath) {
   }
 }
 
-function scan(keyboardsRepoRoot, sourceRepoSlug) {
+function scan(keyboardsRepoRoot, sourceRepoSlug, facetIndexPath) {
   const releaseDir = path.join(keyboardsRepoRoot, "release");
   if (!fs.existsSync(releaseDir)) return [];
+  const facetScripts = loadFacetScripts(facetIndexPath);
+  if (facetScripts.size === 0) {
+    log(
+      `no script facets loaded from ${facetIndexPath} — ` +
+        "falling back to .kps declared-tag script derivation",
+    );
+  }
   const out = [];
   for (const vendor of fs.readdirSync(releaseDir)) {
     const vendorDir = path.join(releaseDir, vendor);
@@ -148,9 +176,9 @@ function scan(keyboardsRepoRoot, sourceRepoSlug) {
       const entry = {
         id,
         path: `release/${vendor}/${id}`,
-        // [SCAFFOLD] script hardcoded to "Latn" — mirrors localKeyboards.ts;
-        // derive from .kpj BaseLanguage once that parsing lands.
-        script: "Latn",
+        // Facet-index script facet > .kps declared tags > "Latn" — mirrors
+        // localKeyboards.ts via the shared facet-script-lookup module.
+        script: resolveKeyboardScript(id, languages, facetScripts),
         targets: ["windows", "macosx", "linux", "web"],
         displayName: meta.name !== "" ? meta.name : id,
         version: meta.version,
@@ -177,10 +205,12 @@ function main() {
   }
   const repoDir = resolveRepoDir();
   const slug = repoSlugFromUrl(REPO_URL);
-  const catalog = scan(repoDir, slug);
+  const catalog = scan(repoDir, slug, FACET_INDEX_PATH);
   fs.mkdirSync(OUT_DIR, { recursive: true });
   fs.writeFileSync(OUT_FILE, JSON.stringify(catalog), "utf8");
-  log(`emitted ${catalog.length} keyboards to ${path.relative(STUDIO_DIR, OUT_FILE)}`);
+  log(
+    `emitted ${catalog.length} keyboards to ${path.relative(STUDIO_DIR, OUT_FILE)}`,
+  );
 }
 
 main();

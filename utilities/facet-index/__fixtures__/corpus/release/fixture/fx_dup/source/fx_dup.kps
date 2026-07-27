@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+  <Info>
+    <Name value="Fixture Dup (source, canonical)"/>
+    <Version value="2.0"/>
+  </Info>
+  <Keyboards>
+    <Keyboard>
+      <Name>Fixture Dup (source, canonical)</Name>
+      <ID>fx_dup</ID>
+      <Version>2.0</Version>
+      <Languages>
+        <Language ID="ar-Arab" Name="Arabic"/>
+      </Languages>
+      <Targets>windows macosx linux web</Targets>
+    </Keyboard>
+  </Keyboards>
+</Package>

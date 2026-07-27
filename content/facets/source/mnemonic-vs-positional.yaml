@@ -1,0 +1,57 @@
+# source.mnemonic-vs-positional — whether the chosen base's key-binding
+# model is mnemonic (keys bound by character mnemonic, &MNEMONICLAYOUT) or
+# positional (keys bound by physical VK). A gate, not a transform: mnemonic
+# layouts compile Windows-desktop-only, which closes off further authoring
+# choices rather than proposing a default value.
+
+id: source.mnemonic-vs-positional
+family: source
+title: Source mnemonic vs positional binding
+description: >
+  Whether the chosen base's .kmn declares &MNEMONICLAYOUT (mnemonic:
+  key-binding by character rather than physical position), a positional
+  binding (rules keyed by VK code), or mixes both across rule groups.
+  Gates the mnemonic-eligibility of downstream authoring choices — mnemonic
+  layouts compile Windows-desktop-only — rather than proposing a default.
+
+valueType: enum
+values: [mnemonic, positional, mixed]
+
+modality: physical
+
+derivations:
+  - kind: computed
+    source: "planned:mnemonic-vs-positional-of-kmn"
+    sourceStatus: planned
+    notes: >
+      Reads the base's &MNEMONICLAYOUT store value and cross-checks rule
+      keystroke references (named/character keys vs explicit VK codes) to
+      classify the base's key-binding model.
+
+consumers:
+  prefills: []
+  proposes:
+    - "base-eligibility:mnemonic-gate"
+
+provenanceLabel: "whether your source keyboard binds keys by character or by position"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+notes: >
+  Mnemonic compiles Windows-desktop-only; reads &MNEMONICLAYOUT.
+
+transformImpactClass: gate
+houseTargetPolicy: null
+invertibility: not-applicable
+implications: >
+  A mnemonic base only compiles on Windows desktop, so this is an
+  eligibility gate rather than a proposed default: choosing to keep the
+  base mnemonic closes off cross-platform authoring for this adaptation,
+  and choosing to reroute to a positional-only strategy set is a scope
+  decision, not a value the classifier can silently pick.
+exceptionSites: []
+causePredicates: []

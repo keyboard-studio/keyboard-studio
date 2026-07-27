@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { createElement } from "react";
 import type { LintFinding } from "@keyboard-studio/contracts";
 import { buildFindingsByQuestionId, selectUnmappedFindings } from "./lintToQuestion";

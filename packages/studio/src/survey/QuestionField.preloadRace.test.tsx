@@ -15,7 +15,8 @@
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { useState } from "react";
-import { render, cleanup, waitFor, fireEvent, screen } from "@testing-library/react";
+import { cleanup, waitFor, fireEvent, screen } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import type { LanguageSummary } from "@keyboard-studio/contracts";
 
 const SWAHILI: LanguageSummary = { code: "sw", englishName: "Swahili", autonym: "Kiswahili" };

@@ -465,3 +465,27 @@ describe("buildProducedSet — opaque fragment producedOutput", () => {
     expect(buildProducedSet(ir, { includeSpace: true }).has(" ")).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Range-store interior inheritance (spec 042, FR-011 / contract C13)
+// ---------------------------------------------------------------------------
+
+describe("buildProducedSet — range-store interior (spec 042)", () => {
+  it("a store whose items are the full U+0904..U+0914 interior contributes all 17 codepoints via index()", () => {
+    // The engine codec (parseStoreItems) expands `store(rng) U+0904 .. U+0914`
+    // to these 17 char items; this test fixes the consumer contract: given the
+    // expanded items, buildProducedSet inherits the whole interior with NO
+    // change to its own source. (Contracts is the dependency root and cannot
+    // import the engine parser, so the expanded store is constructed directly.)
+    const rangeChars = Array.from({ length: 17 }, (_, k) => String.fromCodePoint(0x0904 + k)).join("");
+    const rng = makeStore("rng", rangeChars);
+    const ir = makeTestIR(
+      [makeGroup([makeRule([{ kind: "index", storeRef: "rng", offset: 1 }])])],
+      [rng],
+    );
+    const result = buildProducedSet(ir);
+    for (let k = 0; k < 17; k++) {
+      expect(result.has(String.fromCodePoint(0x0904 + k))).toBe(true);
+    }
+  });
+});

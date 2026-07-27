@@ -304,6 +304,33 @@ export function buildLibraryReserveNodes(
   });
 }
 
+/**
+ * Compute the Leftover set: registry modules used by NO LIVE flow (whether or not
+ * they appear in a proposed flow). These are questions kept for reference / future
+ * reuse — registered (spec-022 no-delete) but not run by the live survey.
+ *
+ * Distinct from BOTH computeReserveNodes (per-flow, inline in a drill-down) and
+ * buildLibraryReserveNodes (in NO flow at all). The Leftover section exists so a
+ * live flow never has to carry its own not-in-flow modules as reserve clog: those
+ * modules surface here instead. Nodes carry kind:"library-not-in-flow" /
+ * region:"leftover" so they render in the Flow Map's dedicated Leftover section.
+ *
+ * @param registry       the (merged) question registry — the universe of questions
+ * @param inAnyLiveFlow  union of every question id listed in any LIVE flow
+ * @param flowId         synthetic flow id stamped on the nodes (default "leftover")
+ */
+export function buildLeftoverNodes(
+  registry: Readonly<Record<string, QuestionModule>>,
+  inAnyLiveFlow: ReadonlySet<string>,
+  flowId = "leftover",
+): GraphNode[] {
+  const leftoverIds = Object.keys(registry).filter((id) => !inAnyLiveFlow.has(id));
+  return leftoverIds.flatMap((id) => {
+    const mod = registry[id];
+    return mod ? [reserveNodeFor(mod, flowId, "leftover")] : [];
+  });
+}
+
 // ---------------------------------------------------------------------------
 // T031 / C8 / FR-010: buildManifestStepGraph
 //

@@ -86,9 +86,9 @@ describe("useValidatorFindings", () => {
     const expected = buildFindingsByQuestionId(findings);
     expect(result.current).toEqual(expected);
     // pb_standard_letters from INVENTORY_FINDING
-    expect(result.current["pb_standard_letters"]).toBeDefined();
+    expect(result.current["pb_standard_letters"]).toHaveLength(1);
     // language_name_english from DISPLAY_NAME_FINDING
-    expect(result.current["language_name_english"]).toBeDefined();
+    expect(result.current["language_name_english"]).toHaveLength(1);
   });
 
   it("updates when validatorFindings changes in the store", () => {

@@ -12,6 +12,11 @@
 // AC#2: Ordering — a carve of a char plus an S-01 assignment of the same char
 //       in one projection ends with the keycap POPULATED (Step 3.5 assignment
 //       labels win over the Step 1.5 blank).
+// AC#3 (spec-034 T007, FR-005/AS-4): A whole-rule carve of a base character
+//       NOT in the author's declared alphabet removes that character's
+//       producing rule from the desktop `.kmn` layout AND blanks its `.kvks`
+//       desktop-OSK keycap, while a declared-alphabet character's rule and
+//       keycap are left fully intact.
 
 import { describe, it, expect } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
@@ -89,6 +94,44 @@ function makeVfs(keyboardId: string) {
     { path: `source/${keyboardId}.kmn`, content: "c stub\n", isBinary: false },
     { path: `source/${keyboardId}.kvks`, content: KVKS, isBinary: false },
     { path: `source/${keyboardId}.keyman-touch-layout`, content: TOUCH_LAYOUT, isBinary: false },
+  ]);
+}
+
+/**
+ * Simple two-key desktop layout IR: a base ('a', kept — in the declared
+ * alphabet) and a base ('q', carved — a base character absent from the
+ * declared alphabet), each produced by its own whole vkey-context rule (no
+ * stores/deadkeys involved). Used by AC#3 to prove the desktop `.kmn` rule
+ * itself is removed by a whole-rule carve, not just its keycap label.
+ */
+function makeSimpleDesktopIr() {
+  const keepRule: IRRule = {
+    nodeId: "rule#keep_a",
+    context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
+    output: [{ kind: "char", value: "a" }],
+  };
+  const carveRule: IRRule = {
+    nodeId: "rule#carve_q",
+    context: [{ kind: "vkey", name: "K_Q", modifiers: [] }],
+    output: [{ kind: "char", value: "q" }],
+  };
+  return makeTestIR([makeGroup("group#main", "main", [keepRule, carveRule])], []);
+}
+
+const SIMPLE_KVKS = `<visualkeyboard>
+<header><version>10.0</version></header>
+<encoding name="unicode" fontname="Arial">
+<layer shift="">
+<key vkey="K_A">a</key>
+<key vkey="K_Q">q</key>
+</layer>
+</encoding>
+</visualkeyboard>`;
+
+function makeSimpleVfs(keyboardId: string) {
+  return createVirtualFS([
+    { path: `source/${keyboardId}.kmn`, content: "c stub\n", isBinary: false },
+    { path: `source/${keyboardId}.kvks`, content: SIMPLE_KVKS, isBinary: false },
   ]);
 }
 
@@ -172,5 +215,41 @@ describe("projectWorkingCopyVfs carve keycaps end-to-end — real engine, no moc
     const kvks = vfs.get("source/test_kb.kvks")?.content as string;
     // Step 1.5 blanked K_E, then Step 3.5 wrote the assigned é back onto it.
     expect(kvks).toContain('<key vkey="K_E">é</key>');
+  });
+
+  it("AC#3: a whole-rule carve of a base char absent from the declared alphabet removes it from the desktop .kmn AND blanks its .kvks keycap, leaving a declared-alphabet char untouched", () => {
+    const ir = makeSimpleDesktopIr();
+    const vfs = makeSimpleVfs("test_kb");
+
+    // Author declared an alphabet of just 'a' — 'q' is a base character the
+    // base keyboard has but the author doesn't want, so its whole rule is
+    // carved (deletedNodeIds), the same path CarveGallery's rule-level delete
+    // takes.
+    const { warnings } = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: ir,
+      deletedNodeIds: new Set(["rule#carve_q"]),
+      deletedItemIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
+    expect(warnings).toHaveLength(0);
+
+    // Desktop layout (.kmn): the carved rule's vkey context is gone entirely —
+    // pressing K_Q no longer produces anything — while the kept rule's vkey
+    // context survives.
+    const kmn = vfs.get("source/test_kb.kmn")?.content as string;
+    expect(kmn).not.toContain("[K_Q]");
+    expect(kmn).toContain("[K_A]");
+
+    // OSK preview (.kvks): the carved char's keycap is blanked in place (the
+    // <key> element and layer structure survive); the kept char's keycap is
+    // untouched.
+    const kvks = vfs.get("source/test_kb.kvks")?.content as string;
+    expect(kvks).toContain('<key vkey="K_Q"></key>');
+    expect(kvks).toContain('<key vkey="K_A">a</key>');
   });
 });

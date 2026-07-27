@@ -1,0 +1,36 @@
+# spare-key-budget — spec 043 US2 (rule-structure archetype).
+#
+# Axis A7: how much room the base has to place MORE characters, read from how
+# saturated its SHIFT and AltGr (RALT) planes are over the stock kbdus physical
+# key set (~47 keys). The base/unshifted plane is the always-occupied primary
+# layer on desktop (rules or OS fall-through), so it carries no spare budget and
+# is excluded; reserved Ctrl/Alt system chords are excluded (not placement slots).
+#   many         — SHIFT plane less than half bound (lots of primary room)
+#   ralt-only    — SHIFT at least half bound but AltGr not (room is the AltGr plane)
+#   fully-booked — both SHIFT and AltGr at least half bound (little room anywhere)
+# Half-of-N is the deterministic, auditable saturation boundary (the same banding
+# style added-char-count uses for axis A1).
+id: spare-key-budget
+title: Spare-key budget (axis A7)
+description: >
+  How much room the base has to place more characters — many, ralt-only, or
+  fully-booked — from SHIFT/AltGr-plane saturation over the stock kbdus key set.
+  Lets the §7.2 selector weigh whether a candidate base can absorb the target's
+  extra characters without displacing existing ones (axis A7).
+valueType: enum
+limits:
+  values:
+    - many
+    - ralt-only
+    - fully-booked
+  open: false
+likelihoodSemantics: >
+  a single keyboard-level budget determination (`consistency` 1); the bound
+  shift/AltGr key counts over the stock set are carried in `notes` and
+  `evidenceSize`.
+derivation:
+  archetype: rule-structure
+  classifierId: spare-key-budget-classifier
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [source.spare-key-budget]
+schemaVersion: 1

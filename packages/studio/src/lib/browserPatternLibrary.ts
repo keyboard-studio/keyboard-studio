@@ -5,20 +5,24 @@
 // Glob path: from the Vite root (packages/studio), the content tree is at
 // ../../content/patterns/**/*.yaml  →  resolves to keyboard-studio/content/patterns.
 //
-// RawPattern -> Pattern mapping and strategy-partition ranking are shared
-// with the engine (packages/engine/src/pattern-library/loader.ts's
-// toPattern, filterFor.ts's rankPatterns), re-exported from the engine's
-// main entry. Both are pure (no node:fs/node:path), so importing them here
-// does not pull Node-only code into the browser bundle — the studio already
-// statically imports this same entry point elsewhere (e.g. workingCopyStore,
-// services.ts) without issue.
+// RawPattern -> Pattern mapping (toPattern) lives in
+// @keyboard-studio/contracts (schemas.ts, next to RawPatternSchema) — the
+// single source of truth shared with the engine's node loader
+// (packages/engine/src/pattern-library/loader.ts). Strategy-partition
+// ranking (rankPatterns) is shared with the engine (filterFor.ts),
+// re-exported from the engine's main entry. Both are pure (no
+// node:fs/node:path), so importing them here does not pull Node-only code
+// into the browser bundle — the studio already statically imports the
+// engine's entry point elsewhere (e.g. workingCopyStore, services.ts)
+// without issue.
 //
 // PatternSchema is imported from "@keyboard-studio/engine/pattern-schema"
 // via the dedicated "./pattern-schema" export added to the engine's package.json.
 // This closes the drift window: the schema is now a single source of truth.
 
 import { parse } from "yaml";
-import { toPattern, rankPatterns } from "@keyboard-studio/engine";
+import { toPattern } from "@keyboard-studio/contracts";
+import { rankPatterns } from "@keyboard-studio/engine";
 import { PatternSchema } from "@keyboard-studio/engine/pattern-schema";
 import type {
   Pattern,

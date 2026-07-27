@@ -10,8 +10,13 @@
 - **F2 (byte-identical-to-P4b, FR-016)**: with the flag off, produced IR + observable survey behavior are byte-identical to P4b; turning it off fully restores P0–P4b with no other code change (the defined rollback, SC-008).
 - **F3 (no live toggle)**: mid-session flipping is out of scope (build/deploy-time global).
 
+### Flag-flip preconditions (production)
+
+- **F4 (output-time touch-staleness gate — HARD PRECONDITION, tracked as issue #1141)**: before `VITE_KM_MUTATE_SEAM=1` is ever flipped on in production, output MUST refuse (or rebuild) while `touch` is in `staleSteps` after step completion — a stale `.keyman-touch-layout` side-car (derived from `touchLayoutJson`, written only at touch-step completion via the reducer R2 build path) must never ship. Under the seam ON, `repropagate()` updates only `ir.touchLayout` (the OSK preview) and never rebuilds that side-car, so without this gate a mechanics edit made after the Touch step re-opens `touch` staleness invisibly at output time. **[OK] Satisfied**: `OutputScreen`'s download path and `ManagedPRSubmitPanel`'s submit path both refuse while `staleSteps.has("touch")` is true.
+
 ### Test obligations
 - Flag off: full-spine output byte-identical to P4b, **zero** `mutate()` calls (SC-008). Flag on: `mutate()` is the write path. Both states demonstrated.
+- F4: with the seam on, editing a mechanics step after Touch completion re-marks `touch` stale; both `OutputScreen` download and `ManagedPRSubmitPanel` submit MUST refuse (predicate `staleSteps.has("touch")`) until touch is re-completed — a stale touch side-car MUST never reach output (issue #1141).
 
 ## Real per-spine-prefix validator — `dashboard/completeness.ts` C4 (EDIT) + `engine/src/validator`
 

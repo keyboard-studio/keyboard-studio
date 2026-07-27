@@ -87,10 +87,10 @@ describe("Button — style pass-through", () => {
     expect(btn.style.background).toBe("rgb(35, 134, 54)");
   });
 
-  it("forwards className to the button element", () => {
+  it("forwards className to the button element, merged with the shared ks-* classes", () => {
     const { container } = render(<Button className="my-btn">Click</Button>);
     const btn = container.querySelector("button") as HTMLButtonElement;
-    expect(btn.className).toBe("my-btn");
+    expect(btn.className.split(" ")).toContain("my-btn");
   });
 
   it("forwards aria-disabled attribute from caller", () => {

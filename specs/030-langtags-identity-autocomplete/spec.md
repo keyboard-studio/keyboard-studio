@@ -44,9 +44,15 @@ name → code confirmation) and resolved three implementation choices:
 - Q: What does the code confirmation (Q3) pre-fill — the canonical subtag or the
   3-letter code? → A: **The 3-letter ISO 639-3 code** (`hau`, `hin`), falling back
   to the canonical bare subtag when the entry carries no 639-3 code. The author can
-  override. Consequence accepted: the assembled tag is e.g. `hau-Latn` rather than
-  the canonical `ha-Latn`; canonicalization can be added at tag-assembly only if
-  Layer-A validation later objects.
+  override. **This is a deliberate departure from RFC 5646 (BCP47) canonical form**,
+  which prefers the shortest registered subtag (`ha`, not `hau`) — not an oversight
+  to be quietly fixed later. Rationale: the 3-letter code is the SIL/Ethnologue
+  convention the target authors already recognize, and the confirmation step means
+  the author reviews and accepts it regardless of which form is shown. Consequence
+  accepted as part of that choice: the assembled tag is e.g. `hau-Latn` rather than
+  the canonical `ha-Latn`. Canonicalization, if ever wanted, is deferred to
+  tag-assembly time under Layer-A validation — it is not a defect in this seed
+  step.
 - Q: Is the separate region step kept now that the picker shows region inline? →
   A: **Kept as a conditional refinement.** It fires only when the picked language's
   code has more than one region variant (same code, different regional orthography),

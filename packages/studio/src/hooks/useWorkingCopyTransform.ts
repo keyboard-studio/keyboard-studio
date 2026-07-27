@@ -18,6 +18,9 @@
 //   2. Assignments — applyAssignmentsToVfs on the carved .kmn. If no patternMap
 //      is provided (SurveyView path), this step is skipped (no assignments
 //      to apply until Phase C completes).
+//   2.5 Layer propagation — propagateDesktopLayersToTouch surfaces any S-08
+//      generalized modifier-combo layer onto the touch layout injected at
+//      step 0 (no-op when the VFS has no touch layout file).
 //   3. Identity — applyIdentityStubMutation writes &NAME (display name) into the
 //      .kmn so the compiled keyboard's spacebar shows the new name.
 //

@@ -3,18 +3,20 @@
 // for resizing the two-pane layout. Hover state is local (purely visual).
 
 import { useState } from "react";
+import { useLingui } from "@lingui/react/macro";
 
 interface ResizeHandleProps {
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
 }
 
 export function ResizeHandle({ onPointerDown }: ResizeHandleProps) {
+  const { t } = useLingui();
   const [hovered, setHovered] = useState(false);
 
   return (
     <div
       role="separator"
-      aria-label="Resize panes"
+      aria-label={t({ id: "resizeHandle.ariaLabel", message: "Resize panes" })}
       aria-orientation="vertical"
       onPointerDown={onPointerDown}
       onMouseEnter={() => setHovered(true)}

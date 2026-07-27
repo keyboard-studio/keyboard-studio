@@ -102,4 +102,14 @@ describe("checkIndexBounds", () => {
     expect(findings.length).toBeGreaterThan(0);
     findings.forEach((f) => expect(f.severity).toBe("warning"));
   });
+
+  // Regression — an index(...) shape inside a comment or quoted value is prose,
+  // not a real call, and must not be validated (false-positive guard).
+  it("ignores an index(...) shape inside a trailing c comment", () => {
+    expect(checkIndexBounds(`+ "a" > "b" c uses index(store1, 2) pattern`)).toEqual([]);
+  });
+
+  it("ignores an index(...) shape inside a quoted value", () => {
+    expect(checkIndexBounds(`store(s) "index(y, 1) example"`)).toEqual([]);
+  });
 });

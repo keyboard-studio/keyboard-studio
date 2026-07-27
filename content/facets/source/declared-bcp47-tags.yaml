@@ -1,0 +1,50 @@
+# source.declared-bcp47-tags — the BCP47 language tags the chosen base's .kps
+# declares, with a claim-vs-actual cross-check against what the base's rules
+# actually produce. A read-only provenance/quality signal for base selection.
+# Measurement ships in spec 043's keyboard-facet-index; session consumption is
+# planned.
+
+id: source.declared-bcp47-tags
+family: source
+title: Source declared BCP47 tags
+description: >
+  The BCP47 language tags the chosen base's .kps declares, plus a claim-vs-actual
+  cross-check: a declared tag whose explicit script subtag disagrees with the
+  base's dominant produced script (or tags declared with no concrete script
+  produced) is flagged as a mismatch — a corpus smell surfaced for the author.
+
+valueType: set
+
+modality: both
+
+derivations:
+  - kind: computed
+    source: "planned:declared-bcp47-tags-of-kps"
+    sourceStatus: planned
+    notes: >
+      Reads the .kps <Languages> tags and cross-checks explicit script subtags
+      against the base's produced characters, produced by the keyboard-facet-index
+      declared-bcp47-tags classifier (spec 043); session consumption is planned.
+
+consumers:
+  prefills: []
+  proposes:
+    - "gate:declared-languages"
+
+provenanceLabel: "the languages your source keyboard says it is for"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+transformImpactClass: gate
+houseTargetPolicy: null
+invertibility: not-applicable
+implications: >
+  A read-only provenance signal — it does not transform the keyboard; it surfaces
+  which languages the base claims and flags a claim-vs-actual script mismatch so
+  the author can judge whether the base really targets their language.
+exceptionSites: []
+causePredicates: []

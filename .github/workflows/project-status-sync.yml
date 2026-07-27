@@ -60,9 +60,22 @@ jobs:
                   }
                 }
               }`;
-              const res = await github.graphql(q, { owner, repo, num });
-              const issue = res.repository.issue;
-              if (!issue) { core.info(`#${num}: not found, skipping`); return; }
+              // github.graphql throws GraphqlResponseError on partial errors. A linked
+              // #N that is a PR or a deleted issue yields data.repository.issue === null
+              // with a NOT_FOUND error — recover that and let the skip guard below run.
+              // Any other error (permissions, rate limit, transport) must still fail
+              // loudly, so re-throw unless every error is a NOT_FOUND with a data payload.
+              let res;
+              try {
+                res = await github.graphql(q, { owner, repo, num });
+              } catch (e) {
+                const onlyNotFound = e.data && Array.isArray(e.errors) && e.errors.length > 0
+                  && e.errors.every((err) => err.type === 'NOT_FOUND');
+                if (!onlyNotFound) { throw e; }
+                res = e.data;
+              }
+              const issue = res.repository?.issue;
+              if (!issue) { core.info(`#${num}: not an open issue on this repo (PR or missing), skipping`); return; }
               const item = issue.projectItems.nodes.find(n => n.project.id === PROJECT_ID);
               if (!item) { core.info(`#${num}: not on the board, skipping`); return; }
               await github.graphql(`mutation($p:ID!,$i:ID!,$f:ID!,$o:String!){

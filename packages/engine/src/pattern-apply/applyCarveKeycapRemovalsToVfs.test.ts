@@ -354,7 +354,20 @@ describe("applyCarveKeycapRemovalsToVfs — NFC comparison", () => {
 });
 
 describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
-  it("derives a char from a carved slot of an output store", () => {
+  it("derives a char from a carved slot of an output store (coordinated cross-pair drop, #931)", () => {
+    // outX is cross-paired with inX (index(out,1) resolves to the SAME
+    // rule's any(inX) context element) — classifyStoreSlotEdit now returns
+    // "drop" (coordinatedWith: ["inX"]), never "blocked", for a resolved
+    // pairing, so the carved slot's char must still be derived.
+    const inStore: IRStore = {
+      nodeId: "store#in",
+      name: "inX",
+      items: [
+        { kind: "char", value: "e" },
+        { kind: "char", value: "a" },
+      ],
+      isSystem: false,
+    };
     const outStore: IRStore = {
       nodeId: "store#out",
       name: "out",
@@ -364,10 +377,12 @@ describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
       ],
       isSystem: false,
     };
-    const fanOut = makeRuleWithOutput("rule#fan", [
-      { kind: "index", storeRef: "out", offset: 1 },
-    ]);
-    const ir = makeIR([makeGroup("group#0", [fanOut])], [outStore]);
+    const fanOut: IRRule = {
+      nodeId: "rule#fan",
+      context: [{ kind: "any", storeRef: "inX" }],
+      output: [{ kind: "index", storeRef: "out", offset: 1 }],
+    };
+    const ir = makeIR([makeGroup("group#0", [fanOut])], [inStore, outStore]);
 
     const texts = collectCarvedKeycapTexts(ir, removalsOf({ slotIds: ["store#out#0"] }));
     expect([...texts]).toEqual(["é"]);
@@ -442,11 +457,17 @@ describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
     ]).toEqual(["é"]);
   });
 
-  it("a blocked CROSS-pair store keeps its chars — the refused slot still produces", () => {
+  it("a resolved CROSS-pair store carves its char — coordinated drop, not a refused block (#931)", () => {
     // outX is fed by any(inX) via index(outX, 1) (cross-pair: typing inX[i]
-    // produces outX[i]) AND is itself an any() source elsewhere → dual-use →
-    // blocked. The carve on outX#0 is refused by applyStoreSlotRemovals, so
-    // é keeps being produced by typing "e" and must keep its keycap.
+    // produces outX[i]) AND is itself an any() source in a SEPARATE rule.
+    // Under the OLD engine contract that combination was coarse "dual-use" —
+    // blocked outright. Under the pairing-graph contract, the resolved
+    // index(outX,1)/any(inX) pairing in rule#cross is independently sufficient
+    // to classify outX as "drop" (coordinatedWith: ["inX"]); the unrelated
+    // any(outX) usage in rule#otheruse does not add outX to
+    // unresolvedIndexOutputNames, so nothing blocks the carve. The refused-
+    // slot survivor guard therefore does not apply here: é is carved for real,
+    // and its keycap must blank.
     const inStore: IRStore = {
       nodeId: "store#in",
       name: "inX",
@@ -464,19 +485,19 @@ describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
       context: [{ kind: "any", storeRef: "inX" }],
       output: [{ kind: "index", storeRef: "outX", offset: 1 }],
     };
-    const dualUseRule: IRRule = {
-      nodeId: "rule#dualuse",
+    const otherUseRule: IRRule = {
+      nodeId: "rule#otheruse",
       context: [{ kind: "any", storeRef: "outX" }],
       output: [{ kind: "char", value: "x" }],
     };
     const ir = makeIR(
-      [makeGroup("group#0", [crossRule, dualUseRule])],
+      [makeGroup("group#0", [crossRule, otherUseRule])],
       [inStore, outStore],
     );
 
-    expect(
-      collectCarvedKeycapTexts(ir, removalsOf({ slotIds: ["store#out#0"] })).size,
-    ).toBe(0);
+    expect([
+      ...collectCarvedKeycapTexts(ir, removalsOf({ slotIds: ["store#out#0"] })),
+    ]).toEqual(["é"]);
   });
 
   it("ignores input-only stores when looking for survivors", () => {

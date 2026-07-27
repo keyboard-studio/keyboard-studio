@@ -31,6 +31,7 @@ import {
 } from "@keyboard-studio/contracts";
 import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
 import type { Step } from "../steps/types.ts";
+import { isSequenceAssignmentForChar } from "../editors/assignLoop/patternIds.ts";
 
 // ---------------------------------------------------------------------------
 // Manifest binding — avoids a static import of steps/manifest.ts which would
@@ -114,8 +115,6 @@ export type IdentityPatch = Partial<{
   bcp47: string;
   /** Human-readable display name for the new keyboard. */
   displayName: string;
-  /** Raw target script subtag as entered by the user (e.g. "Latn", "Deva"). */
-  targetScript: string;
   /**
    * New keyboard identifier chosen by the author (Track 1 only).
    *
@@ -202,6 +201,16 @@ export interface WorkingCopyState {
   session: SurveySession;
   /** Desktop layout lock — prevents further physical edits until unlocked. */
   desktopLocked: boolean;
+  /**
+   * De-duplicated, insertion-ordered list of characters flagged (via
+   * flagCharForSequence) for later sequence definition. Dates from the
+   * retired standalone Sequence Gallery step; MechanismGallery's inline
+   * sequence builder (SequenceBuilderPanel) records real
+   * multi_char_sequence assignments directly instead of flagging, so no
+   * current UI call site populates this list — see flagCharForSequence's
+   * own doc comment.
+   */
+  sequenceFlaggedChars: string[];
   /**
    * Serialized JSON for the `.keyman-touch-layout` artifact, derived from
    * scaffoldTouchLayout(ir) at Phase E completion. Written into the cloned
@@ -310,6 +319,15 @@ export interface WorkingCopyState {
    * consume. Routing them through {@link setIR} silently wipes those deletions.
    */
   setWorkingIR: (ir: KeyboardIR) => void;
+  /**
+   * Commit a facet-transform result (spec 039). Writes the transform's `nextIr`
+   * via the overlay-preserving {@link setWorkingIR} seam, and — when the transform
+   * changed the produced-character set — re-seeds the IR-derived discovery axes so
+   * `session.axes` and downstream `selectStrategy()`/gallery reads re-derive
+   * against the new produced set (FR-013 / research D11). A no-op axis re-seed
+   * when `producedSetChanged` is false.
+   */
+  commitFacetTransform: (nextIr: KeyboardIR, producedSetChanged: boolean) => void;
   /** Clear the carve working IR and reset carve deletion state. */
   clearIR: () => void;
   /** Mark a node as deleted and push to undo stack. */
@@ -383,6 +401,16 @@ export interface WorkingCopyState {
   ) => void;
   /** Mark a gallery's one-time intro splash as seen for this working-copy session. */
   markGalleryIntroSeen: (gallery: "mechanism" | "touch") => void;
+  /**
+   * Flag a character for later sequence assignment (idempotent add).
+   * Tracked-for-Sequence-Gallery only — never emitted as a MechanismAssignment.
+   */
+  flagCharForSequence: (char: string) => void;
+  /**
+   * Remove a character from the sequence-flagged list.
+   * Tracked-for-Sequence-Gallery only — never emitted as a MechanismAssignment.
+   */
+  unflagCharForSequence: (char: string) => void;
   /**
    * Reset the entire working copy to initial state. Clears all slots
    * including base keyboard, base VFS, base IR, identity, carve IR,
@@ -621,13 +649,14 @@ const INITIAL_SURVEY = remerge({}, []);
 export type WorkingCopyData = Omit<
   WorkingCopyState,
   // actions are excluded from the data snapshot
-  | "setIR" | "setWorkingIR" | "clearIR" | "deleteNode" | "undoDelete" | "restoreNode"
+  | "setIR" | "setWorkingIR" | "commitFacetTransform" | "clearIR" | "deleteNode" | "undoDelete" | "restoreNode"
   | "isDeleted" | "deleteItem" | "restoreItem" | "isItemDeleted" | "keepAll" | "restoreAll"
   | "cascadeDelete"
   | "cascadeRestore"
   | "recordPhase" | "recordAssignments"
   | "setIrAxes" | "lockDesktop" | "unlockDesktop"
   | "setTouchLayoutJson" | "setTouchDraft" | "markGalleryIntroSeen" | "reset"
+  | "flagCharForSequence" | "unflagCharForSequence"
   | "instantiateFromBase" | "instantiateFromExisting" | "setIdentity" | "isInstantiated"
   | "markStale" | "clearStale"
   | "setValidatorFindings"
@@ -651,6 +680,7 @@ const INITIAL_STATE: WorkingCopyData = {
   // survey slots
   ...INITIAL_SURVEY,
   desktopLocked: false,
+  sequenceFlaggedChars: [],
   touchLayoutJson: null,
   touchDraft: null,
   galleryIntrosSeen: { mechanism: false, touch: false },
@@ -679,6 +709,19 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // untouched so the carve-deletion overlay survives a mutate-seam write.
   setWorkingIR: (ir) =>
     set({ ir }),
+
+  // spec 039 — commit a facet-transform result. Overlay-preserving write; when the
+  // produced-character set changed, re-derive the IR-seeded axes (markInputOrder)
+  // from the new IR so strategy/gallery picks do not go stale (FR-013 / D11).
+  commitFacetTransform: (nextIr, producedSetChanged) =>
+    set((s) => {
+      if (!producedSetChanged) return { ir: nextIr };
+      // Drop the cached IR-derived axis so seedIrAxesFromBaseIr re-derives it
+      // from the new IR; survey-derived axes (phaseResults) are re-merged as-is.
+      const { markInputOrder: _drop, ...preserved } = s.irAxes;
+      const reseeded = seedIrAxesFromBaseIr(nextIr, preserved);
+      return { ir: nextIr, ...remerge(reseeded, s.phaseResults) };
+    }),
 
   clearIR: () =>
     set({ ir: null, deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),
@@ -753,14 +796,18 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   cascadeDelete: (ruleNodeIds, storeSlotIds) => {
     if (ruleNodeIds.length === 0 && storeSlotIds.length === 0) return;
     set((s) => {
-      // Route BOTH whole-rule deletes and store-slot nul-fills through the ITEM
+      // Route BOTH whole-rule deletes and store-slot drops through the ITEM
       // channel (deletedItemIds). The chip grid and kept-counts reflect deletion
       // via isItemDeleted(gid) — and for a simple-rule chip gid === rule.nodeId —
       // so using the item channel dims every affected chip, matching the single-
       // glyph delete path (deleteItem). projectWorkingCopyVfs folds bare node ids
       // in deletedItemIds into whole-node deletions on emit, so the rules are
       // still dropped from the compiled keyboard.
-      const allItems = [...ruleNodeIds, ...storeSlotIds];
+      // Dedup: a caller-supplied id could appear in both ruleNodeIds and
+      // storeSlotIds (or repeat within one), which would otherwise let the
+      // same id appear twice in this undo entry's itemIds. Latent-safety
+      // only — no caller currently passes overlapping ids.
+      const allItems = [...new Set([...ruleNodeIds, ...storeSlotIds])];
       const nextItems = new Set([...s.deletedItemIds, ...allItems]);
       const batchEntry: UndoEntry = { k: 'batch', nodeIds: [], itemIds: allItems };
       return {
@@ -834,6 +881,51 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       galleryIntrosSeen: { ...s.galleryIntrosSeen, [gallery]: true },
     })),
 
+  // Idempotent add — tracked for the (now-retired) standalone Sequence
+  // Gallery only, never emitted. MechanismGallery's inline sequence builder
+  // (SequenceBuilderPanel) records real assignments directly and no longer
+  // calls this action — sequenceFlaggedChars/flagCharForSequence are unused
+  // by any current UI call site and are candidates for a later simplify pass.
+  // Left in place (and still store-tested) rather than removed in this
+  // change, per the "don't touch what isn't asked" rule.
+  flagCharForSequence: (char) =>
+    set((s) =>
+      s.sequenceFlaggedChars.includes(char)
+        ? s
+        : { sequenceFlaggedChars: [...s.sequenceFlaggedChars, char] },
+    ),
+
+  // ALSO strips any recorded individual-scope multi_char_sequence
+  // (PATTERN_SEQUENCE) assignment for `char` from Phase C — this stripping
+  // half of the action is still actively used by MechanismGallery's
+  // "Sequence recorded"/"Sequences" remove controls (which now key
+  // reachability off a recorded PATTERN_SEQUENCE assignment via
+  // hasSequenceForChar, not off sequenceFlaggedChars membership — see
+  // SequenceBuilderPanel.tsx). The sequenceFlaggedChars-membership half below
+  // is a no-op in that flow (the char generally isn't in the list at all
+  // since flagCharForSequence is no longer called) but is harmless and kept
+  // for the retired-gallery call shape. Done here, in the one store action,
+  // so every call site (both MechanismGallery chip-remove buttons) is
+  // covered without duplicating the filter at each call site.
+  unflagCharForSequence: (char) => {
+    // Delegate the Phase C merge to recordAssignments — the single place that
+    // already knows how to splice a new assignments array back into
+    // phaseResults (preserving the existing Phase C's answers/
+    // selectedPatternIds) and remerge. Only touch Phase C when it already
+    // exists, matching the prior no-op behavior for an as-yet-unrecorded
+    // working copy.
+    const phaseC = get().phaseResults.find((p) => p.phase === "C");
+    if (phaseC !== undefined) {
+      const strippedAssignments = (phaseC.assignments ?? []).filter(
+        (a) => !isSequenceAssignmentForChar(a, char),
+      );
+      get().recordAssignments(strippedAssignments);
+    }
+    set((s) => ({
+      sequenceFlaggedChars: s.sequenceFlaggedChars.filter((c) => c !== char),
+    }));
+  },
+
   reset: () => {
     // Clear the module-level re-opened roots so clearStale after reset is correct.
     _reopenedRoots = new Set();
@@ -887,6 +979,10 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // runs when there is nothing to preserve.
       ...remerge(seedIrAxesFromBaseIr(ir, preservedIrAxes), preservedPhaseResults),
       desktopLocked: false,
+      // Reset unconditionally: a fresh/re-instantiated working copy has no
+      // flags, and flagging only happens in Phase C (well after instantiation
+      // settles), so no in-flight value can be lost here.
+      sequenceFlaggedChars: [],
       touchLayoutJson: null,
       touchDraft: null,
       galleryIntrosSeen: { mechanism: false, touch: false },
@@ -939,6 +1035,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // still in flight.
       ...remerge(seedIrAxesFromBaseIr(ir, preservedIrAxes), preservedPhaseResults),
       desktopLocked: false,
+      sequenceFlaggedChars: [],
       touchLayoutJson: null,
       touchDraft: null,
       galleryIntrosSeen: { mechanism: false, touch: false },

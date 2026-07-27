@@ -37,9 +37,9 @@
  */
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
-import { buildProducedSet } from "@keyboard-studio/contracts";
+import { buildProducedSet, scriptSubtagOf } from "@keyboard-studio/contracts";
 import type { CldrFullLoader } from "./cldr.js";
-import { loadExemplarsFromFull } from "./cldr.js";
+import { loadExemplarsFromFull, parseUnicodeSet } from "./cldr.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -175,9 +175,8 @@ function letterFilter(chars: string[]): string[] {
  * default-script fallback (step 2) only covers those primaries.
  *
  * Detection order:
- *   1. Look for an explicit 4-letter alpha script subtag in any position after
- *      the primary subtag (BCP47: variant subtags are >=5 chars or digit-led;
- *      a 4-alpha subtag here is a script code). Compare case-insensitively to
+ *   1. Look for an explicit script subtag via the shared scriptSubtagOf()
+ *      helper (@keyboard-studio/contracts). Compare case-insensitively to
  *      "latn".
  *   2. If no explicit script subtag is present, fall back to TURKIC_DEFAULT_SCRIPT
  *      for the primary. This map is only consulted for primaries already in
@@ -190,15 +189,9 @@ function letterFilter(chars: string[]): string[] {
  *                default-script fallback — pass it rather than re-deriving.
  */
 function effectiveScriptIsLatin(bcp47: string, primary: string): boolean {
-  const parts = bcp47.split("-");
-  // Skip the primary subtag (index 0) and look for a 4-letter alpha script subtag.
-  // BCP47: variant subtags are >=5 chars or digit-led; a 4-alpha subtag is a script code.
-  for (let i = 1; i < parts.length; i++) {
-    const part = parts[i]!;
-    if (/^[A-Za-z]{4}$/.test(part)) {
-      // Found an explicit script subtag.
-      return part.toLowerCase() === "latn";
-    }
+  const explicit = scriptSubtagOf(bcp47);
+  if (explicit !== undefined) {
+    return explicit.toLowerCase() === "latn";
   }
   // No explicit script subtag — use the locale default.
   // Unreachable in practice: every TURKIC_LOCALES primary has a TURKIC_DEFAULT_SCRIPT entry;
@@ -208,26 +201,93 @@ function effectiveScriptIsLatin(bcp47: string, primary: string): boolean {
 }
 
 /**
+ * The two normalization forms the carve-comparison seam chooses between,
+ * driven by the marks series' whole-keyboard output-form decision (see
+ * `marks/output-form-policy.ts`'s `normalizationFormForOutputForm`).
+ * Deliberately narrower than the full `NFC | NFD | NFKC | NFKD` union
+ * `String.prototype.normalize` accepts — compatibility (K) forms are never
+ * an authoring output-form choice here.
+ */
+export type CharNormalizationForm = "NFC" | "NFD";
+
+/**
  * Returns true if the candidate character is considered "covered" by the
  * keyboard's produced set.
  *
- * For most locales: covered if the exact NFC form OR its case-folded counterpart
- * (toUpperCase / toLowerCase) is present in the produced set.
+ * For most locales: covered if the exact form (per `form`) OR its case-folded
+ * counterpart (toUpperCase / toLowerCase) is present in the produced set.
  *
  * For Latin-script Turkic locales (tr, az, kk-Latn, etc.): covered ONLY if the
- * exact NFC form is present, because JS case folding mishandles i / I /
+ * exact form is present, because JS case folding mishandles i / I /
  * dotless-i / dotted-I. Cyrillic-script Turkic (bare kk, kk-Cyrl, az-Cyrl)
  * uses normal case-fold — the dotted-I hazard is Latin-only.
+ *
+ * `ch` is normalized to `form` before every comparison (idempotent if the
+ * caller already normalized it). `produced` is NOT re-normalized here — the
+ * caller is responsible for having built it in the SAME `form` (this is the
+ * "apples to apples" contract the carve gallery comparison depends on; see
+ * `isCharCoveredForLocale`'s doc). Case-folding (G5, the Turkic-aware
+ * exception) always runs IN ADDITION to normalization, never instead of it.
  */
-function isCovered(ch: string, produced: Set<string>, isTurkic: boolean): boolean {
-  if (produced.has(ch)) return true;
+function isCovered(ch: string, produced: Set<string>, isTurkic: boolean, form: CharNormalizationForm = "NFC"): boolean {
+  const normalized = ch.normalize(form);
+  if (produced.has(normalized)) return true;
   if (isTurkic) return false;
   // Case-fold check: uppercase or lowercase counterpart covers the candidate
-  const upper = ch.toUpperCase();
-  if (upper !== ch && produced.has(upper)) return true;
-  const lower = ch.toLowerCase();
-  if (lower !== ch && produced.has(lower)) return true;
+  const upper = normalized.toUpperCase();
+  if (upper !== normalized && produced.has(upper)) return true;
+  const lower = normalized.toLowerCase();
+  if (lower !== normalized && produced.has(lower)) return true;
   return false;
+}
+
+/**
+ * Returns true when case-fold matching must be suppressed for `bcp47`
+ * (the Turkic dotted-I hazard — see the module docstring). Exposed so
+ * callers outside this module (e.g. the studio's surplus-recommendation
+ * pass, #525 items 2/4) can reuse the exact same exception-aware fold that
+ * `isCovered`/`suggestMissingCharacters` already use, rather than
+ * re-deriving a naive `toLowerCase()` comparison that would mis-handle
+ * Turkic i/İ/ı/I.
+ */
+export function isTurkicCaseFoldSuppressed(bcp47: string): boolean {
+  const primary = primarySubtag(bcp47);
+  return TURKIC_LOCALES.has(primary) && effectiveScriptIsLatin(bcp47, primary);
+}
+
+/**
+ * Returns true when `ch` is covered by `coveringSet` under the same
+ * exception-aware case fold `isCovered` uses internally — exact match (in
+ * `form`), or (for non-Turkic-Latin locales) its uppercase/lowercase
+ * counterpart.
+ *
+ * Exported for the studio's language-driven surplus signal (#525 items 2/4):
+ * a keyboard-produced character should count as "needed" if it case-folds
+ * to a CLDR exemplar, even though CLDR exemplars are lowercase-only (e.g.
+ * French keyboard produces "É"; CLDR needed-set has "é"). Reuses `isCovered`
+ * directly rather than re-deriving the fold, so the Turkic exception stays
+ * in exactly one place.
+ *
+ * `form` (default "NFC", preserving pre-existing behavior) selects the
+ * normalization form `ch` is compared under — additive, so 3-argument call
+ * sites are unaffected. **Contract:** `coveringSet` must already be
+ * normalized to the SAME `form` by the caller; this function normalizes
+ * `ch` but does not re-normalize `coveringSet` per lookup (it can be a large
+ * set checked many times — the carve gallery normalizes it once at
+ * construction, not on every membership test). Passing a `coveringSet` in a
+ * different form than `form` silently breaks the "apples to apples"
+ * comparison this parameter exists to guarantee — see the carve-gallery
+ * callers (`packages/studio/src/lib/irToCarveNodes.ts`) for the intended
+ * usage. Normalization is applied IN ADDITION to the Turkic-aware case fold
+ * below (G5), never instead of it.
+ */
+export function isCharCoveredForLocale(
+  ch: string,
+  coveringSet: ReadonlySet<string>,
+  bcp47: string,
+  form: CharNormalizationForm = "NFC",
+): boolean {
+  return isCovered(ch, coveringSet as Set<string>, isTurkicCaseFoldSuppressed(bcp47), form);
 }
 
 // ---------------------------------------------------------------------------
@@ -300,4 +360,64 @@ export async function suggestMissingCharacters(args: {
     main: missingMain,
     auxiliary: missingAux,
   };
+}
+
+/**
+ * Returns the full set of characters a target language needs, per CLDR —
+ * i.e. the exemplar characters themselves (main + auxiliary tiers), not the
+ * subset missing from any particular keyboard. This is the "needed" signal
+ * for language-driven surplus detection (issue #525 items 2/4): a keyboard
+ * character NOT in this set (and not otherwise confirmed by the author) is a
+ * candidate for removal.
+ *
+ * Reuses cldr.ts's existing fetch/parse (loadExemplarsFromFull) rather than
+ * re-deriving CLDR access — sibling to suggestMissingCharacters, which reuses
+ * the same loader for the complementary "what's missing" question.
+ *
+ * Unlike suggestMissingCharacters's `main`/`auxiliary` fields (which are
+ * filtered to non-ASCII \p{L} "specials" — the letter-suggestion audience),
+ * this returns the RAW exemplar sets (ExemplarResult.used + .auxiliary),
+ * which for most scripts already include the ASCII range (e.g. Latin
+ * "a-z") — the full inventory a language actually needs, not just the
+ * gap-filling suggestions.
+ *
+ * Returns null on the same confidence-gate conditions suggestMissingCharacters
+ * uses for its first four gates — und/script-only tag, ISO 639-3 private-use
+ * primary (qaa-qtz), un-narrowed macrolanguage (bare "ms"/"zh"/"ar"/"fa"), or
+ * no CLDR locale match for the tag. (The fifth gate — empty main exemplar set
+ * after \p{L}-filtering — is specific to the letter-suggestion audience and
+ * does not apply here: the raw exemplar set legitimately covers ASCII-only
+ * scripts.) All characters are NFC-normalized, matching the rest of this module.
+ */
+export async function neededCharsForLanguage(args: {
+  bcp47: string;
+  loader: CldrFullLoader;
+}): Promise<Set<string> | null> {
+  const { bcp47, loader } = args;
+
+  if (failsConfidenceGate(bcp47)) return null;
+
+  // Fetch the raw pair directly (rather than going through
+  // loadExemplarsFromFull, which only parses main+auxiliary) so the
+  // punctuation/numbers tiers below don't require a second network round
+  // trip for the same locale.
+  const pair = await loader(bcp47);
+  if (pair === null) return null;
+
+  const needed = new Set(parseUnicodeSet(pair.main).used);
+  if (pair.auxiliary !== null) {
+    for (const ch of parseUnicodeSet(pair.auxiliary).used) needed.add(ch);
+  }
+  // Punctuation + numbers exemplar tiers (#525 fix — over-removal): locale
+  // punctuation (French "« »") and locale digits (Persian Eastern-Arabic-Indic
+  // "۰۱۲…") are needed characters too, not just the letter tiers, so they
+  // must be protected from the language-driven surplus signal.
+  if (pair.punctuation !== null) {
+    for (const ch of parseUnicodeSet(pair.punctuation).used) needed.add(ch);
+  }
+  if (pair.numbers !== null) {
+    for (const ch of parseUnicodeSet(pair.numbers).used) needed.add(ch);
+  }
+
+  return needed;
 }

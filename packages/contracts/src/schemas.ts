@@ -17,12 +17,24 @@
 // @see spec.md §11 / §14 Decision 4 (Criterion four-band model)
 
 import { z } from "zod";
-import type { Pattern, PatternQuestion, TestVector, DemoObject } from "./pattern";
+import type { Pattern, PatternCategory, PatternQuestion, TestVector, DemoObject } from "./pattern";
+import { makePattern } from "./pattern";
 import type { Criterion } from "./criteria";
 import type { RemovalCapability } from "./removalCapability";
 import type { TouchKeyProvenance, TouchKeyIR, TouchLayoutIR } from "./keyboard-ir";
 import type { AxisFill, AxisFillSource } from "./axisFill";
+import type {
+  AttachmentState,
+  AttestedStack,
+  BlockedCombination,
+  ConfirmedAlphabet,
+  DeclaredRole,
+  MarkUnit,
+  OutputForm,
+  PlacementWorklist,
+} from "./confirmedAlphabet";
 import type { Scale, ScriptClass } from "./axes";
+import type { StrategyId } from "./strategy";
 
 // ---------------------------------------------------------------------------
 // Leaf enums — mirror the string-literal unions in the contract types.
@@ -139,7 +151,7 @@ export const IRNodeRefSchema = z.object({
 // ---------------------------------------------------------------------------
 
 /** The conservative default provenance for an untagged/legacy touch key (FR-009). */
-const DEFAULT_TOUCH_PROVENANCE: TouchKeyProvenance = "hand-set";
+export const DEFAULT_TOUCH_PROVENANCE: TouchKeyProvenance = "hand-set";
 
 /**
  * Add `| undefined` to every optional (`?:`) property of `T`, recursively.
@@ -407,6 +419,117 @@ export const RawPatternSchema = z
 
 export type RawPattern = z.infer<typeof RawPatternSchema>;
 
+// Convenience alias for the provenance item type used in PatternInit.
+type ProvenanceItem = { keyboard: string; rule?: string; notes?: string };
+
+/**
+ * Map a validated {@link RawPattern} to the contracts {@link Pattern} shape
+ * by delegating to {@link makePattern}, which handles all optional-field
+ * spreading internally (satisfying `exactOptionalPropertyTypes`).
+ *
+ * Each optional field is hoisted into a typed local before being passed so
+ * that `exactOptionalPropertyTypes` sees a narrowed non-undefined value
+ * rather than `T | undefined`.
+ *
+ * Single source of truth for RawPattern -> Pattern normalisation, imported
+ * by both the engine's node loader (`engine/src/pattern-library/loader.ts`)
+ * and the studio's browser loader (`studio/src/lib/browserPatternLibrary.ts`)
+ * so the two environments cannot silently diverge on how a YAML pattern
+ * becomes a `Pattern`. This function has no `node:fs`/Vite dependency, so
+ * importing it into the browser bundle is safe.
+ */
+export function toPattern(data: RawPattern): Pattern {
+  // Required fields — always present after schema validation.
+  const base = {
+    id: String(data.id),
+    title: String(data.title),
+    description: String(data.description),
+    category: data.category as PatternCategory,
+    appliesTo: data.appliesTo,
+    questions: data.questions as Parameters<typeof makePattern>[0]["questions"],
+    kmnFragment: data.kmnFragment,
+    tests: data.tests as Parameters<typeof makePattern>[0]["tests"],
+    validatedForFamilies: data.validatedForFamilies,
+    sourceKeyboards: data.sourceKeyboards,
+    reviewedBy: String(data.reviewedBy),
+    reviewDate: String(data.reviewDate),
+  };
+
+  // Optional fields — each narrowed to its non-undefined type so the spread
+  // satisfies exactOptionalPropertyTypes on PatternInit.
+  const strategyId = data.strategyId as StrategyId | undefined;
+  const combinesWith = data.combinesWith as StrategyId[] | undefined;
+  const provenance = data.provenance as ProvenanceItem[] | undefined;
+  const demo = data.demo as string | DemoObject | null | undefined;
+
+  return makePattern({
+    ...base,
+    ...(strategyId !== undefined ? { strategyId } : {}),
+    ...(combinesWith !== undefined ? { combinesWith } : {}),
+    // null (authored "no fragment") and undefined both coerce to omitted —
+    // Pattern types these as `?: string`, so only a real string is forwarded.
+    ...(typeof data.touchLayoutFragment === "string"
+      ? { touchLayoutFragment: data.touchLayoutFragment }
+      : {}),
+    ...(typeof data.reorderRules === "string" ? { reorderRules: data.reorderRules } : {}),
+    ...(data.frequencyInCorpus !== undefined
+      ? { frequencyInCorpus: data.frequencyInCorpus }
+      : {}),
+    ...(provenance !== undefined ? { provenance } : {}),
+    ...(demo !== undefined ? { demo } : {}),
+    ...(data.group_visibility !== undefined
+      ? { group_visibility: data.group_visibility }
+      : {}),
+    ...(data.priority !== undefined ? { priority: data.priority } : {}),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// ConfirmedAlphabet + PlacementWorklist (spec 046 marks question series).
+// Mirrors of the additive contract types in confirmedAlphabet.ts — the
+// three-store alphabet model and the mechanism-gallery handoff. Validated at
+// the session/phase-result boundaries where the stores are persisted.
+// ---------------------------------------------------------------------------
+
+export const DeclaredRoleSchema = z.enum(["letter", "mark"]);
+
+export const AttestedStackSchema = z.object({
+  base: z.string().min(1),
+  // Order-preserving: closest-to-base first; at least one mark per stack.
+  marks: z.array(z.string().min(1)).min(1),
+});
+
+export const ConfirmedAlphabetSchema = z.object({
+  bases: z.array(z.string().min(1)),
+  marks: z.array(z.string().min(1)),
+  attestedStacks: z.array(AttestedStackSchema),
+  declaredRoles: z.record(z.string(), DeclaredRoleSchema),
+});
+
+export const AttachmentStateSchema = z.enum(["attested", "plausible-accepted", "blocked"]);
+
+export const MarkInputOrderSchema = z.enum(["prefix", "postfix"]);
+
+export const MarkUnitSchema = z.object({
+  mark: z.string().min(1),
+  inputOrder: MarkInputOrderSchema,
+});
+
+export const BlockedCombinationSchema = z.object({
+  base: z.string().min(1),
+  mark: z.string().min(1),
+});
+
+export const PlacementWorklistSchema = z.object({
+  ownLetterUnits: z.array(z.string()),
+  markUnits: z.array(MarkUnitSchema),
+  blockedCombinations: z.array(BlockedCombinationSchema),
+});
+
+// The S4 whole-keyboard output-form decision (spec 046). Carried on
+// SurveyPhaseResult/SurveySession as `marksOutputForm`.
+export const OutputFormSchema = z.enum(["ready-made", "base-plus-mark"]);
+
 // ---------------------------------------------------------------------------
 // Compile-time drift guards.
 //
@@ -467,6 +590,24 @@ type _TouchKeyProvenanceGuard = Expect<
 // (you cannot widen the annotation without also widening `LooseOptional<TouchKeyIR>`,
 // which is pinned to the contract). These aliases pin the inferred OUTPUT back
 // to the contract as belt-and-braces.
+// ConfirmedAlphabet + PlacementWorklist (spec 046) — the three-store alphabet
+// model and the gallery handoff must stay in lockstep with confirmedAlphabet.ts.
+type _DeclaredRoleGuard = Expect<AssignableTo<z.infer<typeof DeclaredRoleSchema>, DeclaredRole>>;
+type _AttestedStackGuard = Expect<AssignableTo<z.infer<typeof AttestedStackSchema>, AttestedStack>>;
+type _ConfirmedAlphabetGuard = Expect<
+  AssignableTo<z.infer<typeof ConfirmedAlphabetSchema>, ConfirmedAlphabet>
+>;
+type _AttachmentStateGuard = Expect<
+  AssignableTo<z.infer<typeof AttachmentStateSchema>, AttachmentState>
+>;
+type _MarkUnitGuard = Expect<AssignableTo<z.infer<typeof MarkUnitSchema>, MarkUnit>>;
+type _BlockedCombinationGuard = Expect<
+  AssignableTo<z.infer<typeof BlockedCombinationSchema>, BlockedCombination>
+>;
+type _PlacementWorklistGuard = Expect<
+  AssignableTo<z.infer<typeof PlacementWorklistSchema>, PlacementWorklist>
+>;
+type _OutputFormGuard = Expect<AssignableTo<z.infer<typeof OutputFormSchema>, OutputForm>>;
 type _TouchKeyIRGuard = Expect<AssignableTo<z.infer<typeof TouchKeyIRSchema>, TouchKeyIR>>;
 // TouchLayoutIR is guarded on its `platforms` slice (the touch-key + provenance
 // payload — the spec-014 durability target). `nodeIds` is intentionally not run

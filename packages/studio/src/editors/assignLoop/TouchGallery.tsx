@@ -1,5 +1,3 @@
-// TODO(P4a shell extraction): see MechanismGallery.tsx for the extraction note.
-
 // TouchGallery — Phase E "touch mechanisms" flow (character-by-character redesign).
 //
 // Mirrors MechanismGallery's character-by-character loop — adapted for touch
@@ -26,44 +24,89 @@
 //     character configured.
 //   - Positional Back/Next/last-character navigation walks inventory by
 //     index; a skipped-over character is never treated as resolved.
-//   - Desktop edits are NOT transferred to mobile — the touch layout is
-//     seeded from a fixed minimal QWERTY layout, not derived from IR rules.
+//   - Desktop work (carve removals + Phase C letter placements) IS replayed
+//     onto the touch seed (spec 035 R3/R11): the touch layout is derived from
+//     scaffoldTouchLayout(baseIr) (reseed) or the shipped .keyman-touch-layout
+//     (import-adapt), with the locked desktop modifications applied on BOTH
+//     paths — see the `mods`/`touchLayoutJson` memos below.
+//   - The "already in touch layout" detection seed (`detectionSeedLayout`,
+//     powering the auto-detected "already" suggestion and the "already
+//     covered" chars in the coverage guard below) is SEED-SOURCE-AWARE
+//     (spec 035 contracts/simplification.md): import-adapt walks the shipped
+//     layout with desktop mods replayed, reseed walks a fresh scaffold with
+//     mods replayed — never the author's own Phase E edits (see
+//     `deriveSeedLayout` in buildTouchLayoutJson.ts, and the
+//     `detectionSeedLayout` memo below).
 //
 // RIGHT pane: live phone-mode OSK preview.
 //   - useKeyboardArtifact + OSKFrame wiring. Runs exclusively in touch mode.
-//   - VFS transform injects a minimal hardcoded phone layout when the keyboard
-//     has no existing .keyman-touch-layout; existing touch files are left as-is.
+//   - VFS transform injects the derived touch layout per the spec 035 R11
+//     emission matrix (reseed always; import-adapt when mods/edits warrant
+//     it); a truly-untouched import-adapt leaves the shipped file verbatim.
 //   - "Touch preview" label matches MechanismGallery's "Live preview" label style.
 //
-// Touch lint (Layer C checks 18.1–18.5) stays below the character cards,
-// same position as before.
+// Touch lint (Layer C checks 18.1–18.6, including the KM_LINT_TOUCH_UNCOVERED
+// coverage guard) stays below the character cards, same position as before.
+// FR-008 completion gate: handleContinue re-runs touchCoverage on the same
+// layout lint audits and refuses to complete (surfacing an inline message)
+// while any inventory char is unreachable — see `layoutForLintAndGate` and
+// `uncoveredMessage` below.
 //
 // Single 300 ms debounce contract upheld — no second timer introduced.
 
 import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
-import type { TouchAssignment, MechanismRef } from "@keyboard-studio/contracts";
-import { createVirtualFS, toUPlusNotation, isDecomposableAccented } from "@keyboard-studio/contracts";
-import { buildTouchLayoutJson } from "../../lib/buildTouchLayoutJson.ts";
+import type { I18n } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { resolveMessage } from "../../lib/i18nResolve.ts";
+import type { TouchAssignment, MechanismRef, TouchLayoutIR } from "@keyboard-studio/contracts";
+import { createVirtualFS, toUPlusNotation, isDecomposableAccented, formatUncoveredTouchMessage } from "@keyboard-studio/contracts";
+import type { DesktopModifications } from "@keyboard-studio/engine";
+import { parseTouchLayout, touchCoverage } from "@keyboard-studio/engine";
+import { buildTouchLayoutJson, deriveSeedLayout } from "../../lib/buildTouchLayoutJson.ts";
 import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";
+import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
+import { extractMechanismHostKey } from "../../lib/extractMechanismHostKey.ts";
+import { shouldEmitTouchLayout, resolveTouchSeedSource } from "../../lib/touchEmission.ts";
+import { ErrorText } from "../../ui/index.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { promoteOnManualEdit } from "./touchBehavior.ts";
+import { displayChar } from "../../lib/irToCarveNodes.ts";
 import { isMutateSeamEnabled } from "../../flags/mutateFlag.ts";
 import { LintSummary } from "../../lint/index.ts";
 import { useTouchLint } from "../../hooks/useTouchLint.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec, VfsTransform } from "../../hooks/useKeyboardArtifact.ts";
-import { scaffoldTouchLayout } from "@keyboard-studio/engine";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
+import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
+import { AssignLoopShell } from "./AssignLoopShell.tsx";
+import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
+import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
+import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
+import { RemovableChipRow } from "./parts/RemovableChipRow.tsx";
+import { SelectMenu } from "../../ui/SelectMenu.tsx";
 import { KEY_OPTIONS, VALID_HOST_KEYS } from "../../lib/keyOptions.ts";
+import { resolveKeyPickerSelection, resolvedVkeyOf } from "../../lib/charInput.ts";
 import {
-  BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
+  BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
+  galleryGhostBtn as ghostBtn,
+  gallerySelectMenuStyle,
+  galleryHeaderBtnStyle as headerBtnStyle,
+  galleryConfigStyle as configStyle,
+  galleryCardStyle as cardStyle,
 } from "../../lib/galleryTheme.ts";
+
+const selectStyle: CSSProperties = gallerySelectMenuStyle(160);
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** The empty/no-op DesktopModifications — the mods memo's fallback when baseIr is null. */
+const EMPTY_MODS: DesktopModifications = { removals: [], placements: [] };
 
 /** Strip K_ prefix from a key id for user-facing display. */
 function hostKeyShortLabel(keyId: string): string {
@@ -79,77 +122,40 @@ function dirArrow(dir: string): string {
   return dir;
 }
 
-/** Produce a human-readable label for a single configured mechanism chip. */
-function touchMechanismLabel(target: string, m: MechanismRef): string {
+/** Produce a human-readable label for a single configured mechanism chip.
+ * Takes an optional i18n + resolves via msg()/resolveMessage() rather than a
+ * bare `t` parameter — Lingui's macro tracks the specific binding introduced
+ * by useLingui(), so a re-bound `t` parameter is a distinct binding the
+ * extractor does not follow (see Inspector.tsx's storeBlurb for the same fix). */
+function touchMechanismLabel(target: string, m: MechanismRef, i18n?: I18n): string {
   const patternId = m.patternId;
   const sv = m.slotValues ?? {};
   const hkShort = sv["hostKey"] ? hostKeyShortLabel(sv["hostKey"]) : "";
-  if (patternId === "touch_inherited") return `${target} · inherited`;
-  if (patternId === "longpress_alternates") return `${target} · long-press ${hkShort}`;
+  if (patternId === "touch_inherited") {
+    return `${target} · ${resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.mechanismLabel.inherited", message: "inherited" }))}`;
+  }
+  if (patternId === "longpress_alternates") {
+    return `${target} · ${resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.mechanismLabel.longpress", message: "long-press" }))} ${hkShort}`;
+  }
   if (patternId === "flick_gestures") {
     const dir = sv["direction"] ?? "";
-    return `${target} · flick ${hkShort} ${dirArrow(dir)}`.trimEnd();
+    return `${target} · ${resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.mechanismLabel.flick", message: "flick" }))} ${hkShort} ${dirArrow(dir)}`.trimEnd();
   }
-  if (patternId === "multitap") return `${target} · multitap ${hkShort}`;
-  if (patternId === "touch_key_replace") return `${target} · replace ${hkShort}`;
+  if (patternId === "multitap") {
+    return `${target} · ${resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.mechanismLabel.multitap", message: "multitap" }))} ${hkShort}`;
+  }
+  if (patternId === "touch_key_replace") {
+    return `${target} · ${resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.mechanismLabel.replace", message: "replace" }))} ${hkShort}`;
+  }
   return target;
 }
 
-const selectStyle: CSSProperties = {
-  background: BG_PAGE,
-  border: `1px solid ${BORDER}`,
-  borderRadius: 4,
-  color: TEXT_MAIN,
-  fontSize: 12,
-  padding: "4px 8px",
-  fontFamily: FONT,
-};
 
-// Static styles shared across TouchMethodChooser renders — none depend on
-// props or state, so they are hoisted to module scope rather than recreated
-// per render.
-const headerBtnStyle: CSSProperties = {
-  width: "100%",
-  padding: "10px 14px",
-  background: "transparent",
-  border: "none",
-  color: TEXT_MAIN,
-  fontSize: 13,
-  fontFamily: FONT,
-  cursor: "pointer",
-  textAlign: "left",
-  display: "flex",
-  flexDirection: "column",
-  gap: 4,
-};
-
-const configStyle: CSSProperties = {
-  padding: "0 14px 12px",
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-};
-
-// Static page-level styles shared by TouchGallery's guard/content branches —
-// none depend on props or state.
-const pageStyle: CSSProperties = {
-  background: BG_PAGE,
-  height: "100%",
-  boxSizing: "border-box",
-  fontFamily: FONT,
-  color: TEXT_MAIN,
-};
-
-const ghostBtn: CSSProperties = {
-  padding: "8px 18px",
-  background: "transparent",
-  border: `1px solid ${BORDER}`,
-  borderRadius: 6,
-  color: TEXT_DIM,
-  fontSize: 13,
-  cursor: "pointer",
-  fontFamily: "inherit",
-};
+// ghostBtn, headerBtnStyle, configStyle, and cardStyle are imported
+// (aliased) from ../../lib/galleryTheme.ts — shared byte-for-byte with
+// MechanismGallery.tsx rather than redefined here. The page-level wrapper
+// style (pageStyle) is no longer imported directly here — it's used via
+// GalleryEmptyState.tsx (the no-inventory guard) rather than inline.
 
 // ---------------------------------------------------------------------------
 // Touch method type
@@ -160,7 +166,40 @@ const ghostBtn: CSSProperties = {
 // "already" suggestion (handleSuggestionAccept), and Skip moves on without an
 // assignment. The pattern-apply engine still understands the touch_inherited
 // patternId those suggestions produce.
-type TouchMethod = "touch_key_replace" | "longpress_alternates" | "flick_gestures" | "multitap";
+export type TouchMethod = "touch_key_replace" | "longpress_alternates" | "flick_gestures" | "multitap";
+
+// ---------------------------------------------------------------------------
+// buildTouchMechanismRef — pure mechanism builder (exported for direct unit
+// testing of the resolved-vkey invariant below).
+//
+// Always writes the RESOLVED physical key into slotValues.hostKey — never the
+// raw "__custom__" sentinel or unresolved typed text. Returns null when
+// `resolvedHostKey` is null, so the invariant is enforced HERE rather than
+// solely by the canApply gate at the call site (see TouchGallery's
+// buildMechanismRef closure and handleApply below, which mirror
+// MechanismGallery's `if (resolvedSwapVkey === null) return;` style).
+// ---------------------------------------------------------------------------
+
+export function buildTouchMechanismRef(
+  method: TouchMethod,
+  resolvedHostKey: string | null,
+  flickDirection: string,
+  char: string,
+): MechanismRef | null {
+  if (resolvedHostKey === null) return null;
+  const hk = resolvedHostKey;
+  if (method === "longpress_alternates") {
+    return { patternId: "longpress_alternates", slotValues: { hostKey: hk, char } };
+  }
+  if (method === "flick_gestures") {
+    return { patternId: "flick_gestures", slotValues: { hostKey: hk, direction: flickDirection, char } };
+  }
+  if (method === "touch_key_replace") {
+    return { patternId: "touch_key_replace", slotValues: { hostKey: hk, char } };
+  }
+  // multitap
+  return { patternId: "multitap", slotValues: { hostKey: hk, char } };
+}
 
 // ---------------------------------------------------------------------------
 // TouchMethodChooser — 4 expandable cards
@@ -172,17 +211,26 @@ interface TouchMethodChooserProps {
   onMethodChange: (m: TouchMethod) => void;
   hostKey: string;
   onHostKeyChange: (v: string) => void;
+  hostKeyCustomChar: string;
+  onHostKeyCustomCharChange: (v: string) => void;
   flickDirection: string;
   onFlickDirectionChange: (v: string) => void;
 }
 
-const FLICK_DIRECTIONS: ReadonlyArray<{ value: string; label: string }> = [
-  { value: "",  label: "-- choose direction --" },
-  { value: "n", label: "Up (north)" },
-  { value: "s", label: "Down (south)" },
-  { value: "e", label: "Right (east)" },
-  { value: "w", label: "Left (west)" },
-];
+// Chrome (option labels); built per-render via the optional-i18n +
+// msg()/resolveMessage() pattern (see Inspector.tsx's storeBlurb) rather than
+// a bare `t` parameter — Lingui's macro tracks the specific binding
+// introduced by useLingui(), so a re-bound `t` parameter is a distinct
+// binding the extractor does not follow.
+function buildFlickDirections(i18n?: I18n): ReadonlyArray<{ value: string; label: string }> {
+  return [
+    { value: "", label: resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.flickChoosePlaceholder", message: "-- choose direction --" })) },
+    { value: "n", label: resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.flickUp", message: "Up (north)" })) },
+    { value: "s", label: resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.flickDown", message: "Down (south)" })) },
+    { value: "e", label: resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.flickRight", message: "Right (east)" })) },
+    { value: "w", label: resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.flickLeft", message: "Left (west)" })) },
+  ];
+}
 
 function TouchMethodChooser({
   currentChar,
@@ -190,21 +238,25 @@ function TouchMethodChooser({
   onMethodChange,
   hostKey,
   onHostKeyChange,
+  hostKeyCustomChar,
+  onHostKeyCustomCharChange,
   flickDirection,
   onFlickDirectionChange,
 }: TouchMethodChooserProps) {
-  const cardStyle = (active: boolean): CSSProperties => ({
-    borderRadius: 8,
-    border: `1px solid ${active ? ACCENT : BORDER}`,
-    background: active ? "#0d2840" : BG_PAGE,
-    overflow: "hidden",
-    transition: "border-color 120ms ease, background 120ms ease",
-  });
+  const { t, i18n } = useLingui();
+  const flickDirections = buildFlickDirections(i18n);
+  // Named local for the dotted-circle-wrapped char used in the <Trans> macros
+  // below — a simple identifier extracts as a NAMED lingui placeholder (e.g.
+  // {currentCharDisplay}), whereas calling displayChar() inline inside the
+  // macro collapses it to a POSITIONAL {0}/{1}, which is what broke the fr
+  // catalog (see the module-level fix note near MechanismGallery's twin).
+  const currentCharDisplay = displayChar(currentChar);
+  // cardStyle is imported from ../../lib/galleryTheme.ts.
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-        How to reach it on touch:
+        <Trans id="editor.assignLoop.touch.howToReachIt">How to reach it on touch:</Trans>
       </p>
 
       {/* 1. Long-press on a key */}
@@ -216,17 +268,19 @@ function TouchMethodChooser({
           style={headerBtnStyle}
         >
           <span style={{ fontWeight: 600, color: method === "longpress_alternates" ? ACCENT : TEXT_MAIN }}>
-            Long-press on a key
+            <Trans id="editor.assignLoop.touch.method.longpress.title">Long-press on a key</Trans>
           </span>
           {method !== "longpress_alternates" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              Hold a key to reveal {currentChar} as a long-press option.
+              <Trans id="editor.assignLoop.touch.method.longpress.summary">
+                Hold a key to reveal {currentCharDisplay} as a long-press option.
+              </Trans>
             </span>
           )}
         </button>
         {method === "longpress_alternates" && (
           <div style={configStyle}>
-            <label
+            <div
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -234,20 +288,20 @@ function TouchMethodChooser({
                 fontSize: 12,
                 color: TEXT_DIM,
                 fontFamily: FONT,
+                flexWrap: "wrap",
               }}
             >
-              Host key:
-              <select
+              <span><Trans id="editor.assignLoop.touch.hostKeyLabel">Host key:</Trans></span>
+              <KeyPickerField
                 value={hostKey}
-                onChange={(e) => onHostKeyChange(e.target.value)}
-                aria-label="Host key for long-press"
-                style={selectStyle}
-              >
-                {KEY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </label>
+                onChange={onHostKeyChange}
+                customChar={hostKeyCustomChar}
+                onCustomCharChange={onHostKeyCustomCharChange}
+                options={KEY_OPTIONS}
+                selectAriaLabel={t({ id: "editor.assignLoop.touch.longpress.hostKeySelectAriaLabel", message: "Host key for long-press" })}
+                customInputAriaLabel={t({ id: "editor.assignLoop.touch.longpress.hostKeyCustomAriaLabel", message: "Custom character for long-press host key" })}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -261,17 +315,19 @@ function TouchMethodChooser({
           style={headerBtnStyle}
         >
           <span style={{ fontWeight: 600, color: method === "flick_gestures" ? ACCENT : TEXT_MAIN }}>
-            Swipe a key (flick)
+            <Trans id="editor.assignLoop.touch.method.flick.title">Swipe a key (flick)</Trans>
           </span>
           {method !== "flick_gestures" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              Swipe a key in a direction to produce {currentChar}.
+              <Trans id="editor.assignLoop.touch.method.flick.summary">
+                Swipe a key in a direction to produce {currentCharDisplay}.
+              </Trans>
             </span>
           )}
         </button>
         {method === "flick_gestures" && (
           <div style={configStyle}>
-            <label
+            <div
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -279,20 +335,20 @@ function TouchMethodChooser({
                 fontSize: 12,
                 color: TEXT_DIM,
                 fontFamily: FONT,
+                flexWrap: "wrap",
               }}
             >
-              Host key:
-              <select
+              <span><Trans id="editor.assignLoop.touch.hostKeyLabel">Host key:</Trans></span>
+              <KeyPickerField
                 value={hostKey}
-                onChange={(e) => onHostKeyChange(e.target.value)}
-                aria-label="Host key for flick"
-                style={selectStyle}
-              >
-                {KEY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </label>
+                onChange={onHostKeyChange}
+                customChar={hostKeyCustomChar}
+                onCustomCharChange={onHostKeyCustomCharChange}
+                options={KEY_OPTIONS}
+                selectAriaLabel={t({ id: "editor.assignLoop.touch.flick.hostKeySelectAriaLabel", message: "Host key for flick" })}
+                customInputAriaLabel={t({ id: "editor.assignLoop.touch.flick.hostKeyCustomAriaLabel", message: "Custom character for flick host key" })}
+              />
+            </div>
             <label
               style={{
                 display: "flex",
@@ -303,17 +359,14 @@ function TouchMethodChooser({
                 fontFamily: FONT,
               }}
             >
-              Direction:
-              <select
+              <Trans id="editor.assignLoop.touch.directionLabel">Direction:</Trans>
+              <SelectMenu
                 value={flickDirection}
-                onChange={(e) => onFlickDirectionChange(e.target.value)}
-                aria-label="Flick direction"
+                onChange={onFlickDirectionChange}
+                ariaLabel={t({ id: "editor.assignLoop.touch.flickDirectionAriaLabel", message: "Flick direction" })}
+                options={flickDirections}
                 style={selectStyle}
-              >
-                {FLICK_DIRECTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+              />
             </label>
           </div>
         )}
@@ -328,17 +381,19 @@ function TouchMethodChooser({
           style={headerBtnStyle}
         >
           <span style={{ fontWeight: 600, color: method === "multitap" ? ACCENT : TEXT_MAIN }}>
-            Tap multiple times (multitap)
+            <Trans id="editor.assignLoop.touch.method.multitap.title">Tap multiple times (multitap)</Trans>
           </span>
           {method !== "multitap" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              Tap a key rapidly more than once to reach {currentChar}.
+              <Trans id="editor.assignLoop.touch.method.multitap.summary">
+                Tap a key rapidly more than once to reach {currentCharDisplay}.
+              </Trans>
             </span>
           )}
         </button>
         {method === "multitap" && (
           <div style={configStyle}>
-            <label
+            <div
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -346,20 +401,20 @@ function TouchMethodChooser({
                 fontSize: 12,
                 color: TEXT_DIM,
                 fontFamily: FONT,
+                flexWrap: "wrap",
               }}
             >
-              Host key:
-              <select
+              <span><Trans id="editor.assignLoop.touch.hostKeyLabel">Host key:</Trans></span>
+              <KeyPickerField
                 value={hostKey}
-                onChange={(e) => onHostKeyChange(e.target.value)}
-                aria-label="Host key for multitap"
-                style={selectStyle}
-              >
-                {KEY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </label>
+                onChange={onHostKeyChange}
+                customChar={hostKeyCustomChar}
+                onCustomCharChange={onHostKeyCustomCharChange}
+                options={KEY_OPTIONS}
+                selectAriaLabel={t({ id: "editor.assignLoop.touch.multitap.hostKeySelectAriaLabel", message: "Host key for multitap" })}
+                customInputAriaLabel={t({ id: "editor.assignLoop.touch.multitap.hostKeyCustomAriaLabel", message: "Custom character for multitap host key" })}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -373,17 +428,19 @@ function TouchMethodChooser({
           style={headerBtnStyle}
         >
           <span style={{ fontWeight: 600, color: method === "touch_key_replace" ? ACCENT : TEXT_MAIN }}>
-            Replace a key
+            <Trans id="editor.assignLoop.touch.method.replace.title">Replace a key</Trans>
           </span>
           {method !== "touch_key_replace" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              Make a key type {currentChar} directly on the touch keyboard.
+              <Trans id="editor.assignLoop.touch.method.replace.summary">
+                Make a key type {currentCharDisplay} directly on the touch keyboard.
+              </Trans>
             </span>
           )}
         </button>
         {method === "touch_key_replace" && (
           <div style={configStyle}>
-            <label
+            <div
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -391,22 +448,24 @@ function TouchMethodChooser({
                 fontSize: 12,
                 color: TEXT_DIM,
                 fontFamily: FONT,
+                flexWrap: "wrap",
               }}
             >
-              Host key:
-              <select
+              <span><Trans id="editor.assignLoop.touch.hostKeyLabel">Host key:</Trans></span>
+              <KeyPickerField
                 value={hostKey}
-                onChange={(e) => onHostKeyChange(e.target.value)}
-                aria-label="Host key to replace"
-                style={selectStyle}
-              >
-                {KEY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </label>
+                onChange={onHostKeyChange}
+                customChar={hostKeyCustomChar}
+                onCustomCharChange={onHostKeyCustomCharChange}
+                options={KEY_OPTIONS}
+                selectAriaLabel={t({ id: "editor.assignLoop.touch.replace.hostKeySelectAriaLabel", message: "Host key to replace" })}
+                customInputAriaLabel={t({ id: "editor.assignLoop.touch.replace.hostKeyCustomAriaLabel", message: "Custom character for the key to replace" })}
+              />
+            </div>
             <p style={{ margin: 0, fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}>
-              Make a key type {currentChar} directly on the touch keyboard.
+              <Trans id="editor.assignLoop.touch.method.replace.summary">
+                Make a key type {currentCharDisplay} directly on the touch keyboard.
+              </Trans>
             </p>
           </div>
         )}
@@ -418,6 +477,66 @@ function TouchMethodChooser({
 // TouchPreviewPane is now GalleryPreviewPane (shared component) — see GalleryPreviewPane.tsx.
 
 // ---------------------------------------------------------------------------
+// SuggestionActions — Accept/Deny button pair shared by the three suggestion-
+// card variants (longpress/replace/already) rendered in TouchGallery's
+// leftContent below. The three variants differ only in message text, the
+// accept handler, and the aria-labels — style is byte-identical across all
+// three, so it is hoisted to module scope here rather than repeated per card.
+// ---------------------------------------------------------------------------
+
+const suggestionAcceptBtnStyle: CSSProperties = {
+  padding: "5px 14px",
+  background: "#238636",
+  border: "none",
+  borderRadius: 5,
+  color: "#e6edf3",
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: "pointer",
+  fontFamily: FONT,
+};
+
+const suggestionDenyBtnStyle: CSSProperties = {
+  padding: "5px 14px",
+  background: "transparent",
+  border: `1px solid ${BORDER}`,
+  borderRadius: 5,
+  color: TEXT_DIM,
+  fontSize: 12,
+  cursor: "pointer",
+  fontFamily: FONT,
+};
+
+/** Message text style shared by all three suggestion-card variants. */
+const suggestionMessageStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 12,
+  color: "#56d364",
+  fontFamily: FONT,
+  fontWeight: 600,
+};
+
+interface SuggestionActionsProps {
+  onAccept: () => void;
+  onDeny: () => void;
+  acceptAriaLabel: string;
+  denyAriaLabel: string;
+}
+
+function SuggestionActions({ onAccept, onDeny, acceptAriaLabel, denyAriaLabel }: SuggestionActionsProps) {
+  return (
+    <div style={{ display: "flex", gap: 8 }}>
+      <button type="button" onClick={onAccept} aria-label={acceptAriaLabel} style={suggestionAcceptBtnStyle}>
+        <Trans id="editor.assignLoop.suggestion.acceptButton">Accept</Trans>
+      </button>
+      <button type="button" onClick={onDeny} aria-label={denyAriaLabel} style={suggestionDenyBtnStyle}>
+        <Trans id="editor.assignLoop.suggestion.denyButton">Deny</Trans>
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // TouchGallery — main component
 // ---------------------------------------------------------------------------
 
@@ -425,17 +544,31 @@ export interface TouchGalleryProps {
   onComplete: (assignments: TouchAssignment[]) => void;
   /**
    * Called when the user clicks Back on the very first character (or from the
-   * empty-inventory guard). Should navigate back to Phase C ("mechanisms").
-   * Phase C will be in its locked/read-only state — no unlock is performed.
+   * empty-inventory guard). Spec 035 R12 (re-entry path): the host wires this
+   * to the "touch_seed_source" chooser step — NOT directly to "mechanisms" —
+   * so a returning author can reconsider Import vs Reseed even when the fork
+   * was skipped this pass (a recorded, non-stale choice routes straight from
+   * mechanisms to touch). The chooser's own Back is what reaches "mechanisms"
+   * (locked/read-only; no unlock is performed).
    */
   onBack: () => void;
 }
 
 export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
+  const { t, i18n } = useLingui();
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const identity = useWorkingCopyStore((s) => s.identity);
   const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+
+  // spec 035 R3/R11 — the carve overlay + Phase C assignments feed
+  // deriveDesktopModifications (mods memo below); touchSeedSource feeds the
+  // R11 emission matrix. Read here (not inline in the memo) so the mods/
+  // emission memos below can depend on stable primitives.
+  const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
+  const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
+  const touchSeedSourceStored = useSurveySessionStore((s) => s.touchSeedSource);
 
   // Character inventory — same source MechanismGallery uses.
   const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
@@ -492,10 +625,49 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     [charTouch],
   );
 
-  // Build applied touch layout JSON only when the author has made real (non-inherited)
-  // touch edits. When there are no such edits, return null so the VFS is left
-  // untouched and KMW renders its own polished native default (or the keyboard's
-  // shipped .keyman-touch-layout file is used verbatim).
+  // Stable array of charTouch's values, memoized on the Map reference itself
+  // (charTouch is only ever replaced immutably on a real edit — see
+  // setCharTouch call sites — so this recomputes exactly when touchKey would,
+  // not on every unrelated render). Fed to CharScrollStrip's `assignments`
+  // prop: passing `[...charTouch.values()]` inline there would build a new
+  // array identity every render and thrash that component's own
+  // useMemo([chars, assignments, modality]).
+  const charTouchAssignments = useMemo(() => [...charTouch.values()], [charTouch]);
+
+  // Stable primitive key so the mods memo only recomputes when the carve
+  // overlay or Phase C assignments actually change (the Set/array identities
+  // are replaced immutably on every mutation, so a size/length-based key is a
+  // cheap, correct proxy — same precedent as touchKey above).
+  const modsDepsKey = `${deletedNodeIds.size}:${deletedItemIds.size}:${phaseResults.length}`;
+
+  // Desktop modifications to replay onto the touch seed (spec 035 R3) — carve
+  // removals (Phase D) + Phase C individual letter placements. Fed to
+  // buildTouchLayoutJson on BOTH derivation paths and to the R11 emission
+  // matrix below (mods.length > 0 can trigger emission even with zero Phase E
+  // edits).
+  const mods = useMemo<DesktopModifications>(() => {
+    if (baseIr === null) return EMPTY_MODS;
+    return deriveDesktopModifications(baseIr, deletedNodeIds, deletedItemIds, phaseResults);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseIr, modsDepsKey]);
+
+  // Resolved seed-source choice (spec 035 R4/R11) — the raw store value may be
+  // null (defensive: author somehow reached touch without the fork); the
+  // Entity-5 default is applied here via resolveTouchSeedSource so preview,
+  // lint, and this component's own emission decision agree.
+  const resolvedSeedSource = useMemo(
+    () => resolveTouchSeedSource(touchSeedSourceStored, resolveBaseTouchJson(baseVfs) !== undefined),
+    [touchSeedSourceStored, baseVfs],
+  );
+
+  // Build the derived touch layout JSON per the spec 035 R11 emission matrix:
+  //   - "reseed-from-desktop" -> ALWAYS derive + emit (even with zero Phase E
+  //     edits and empty mods — SC-002 requires the file to exist).
+  //   - "import-adapt" AND (mods non-empty OR >=1 real Phase E edit) -> derive
+  //     + emit.
+  //   - "import-adapt" with empty mods and no real edit -> emit NOTHING (the
+  //     shipped file, if any, is used verbatim — a byte-preserving no-op).
+  //   - buildTouchLayoutJson returning null (engine failure) -> emit nothing.
   //
   // "Real edit" = an assignment with at least one mechanism whose patternId
   // !== "touch_inherited" (an assignment may carry several mechanisms — issue
@@ -505,22 +677,74 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     const appliedEdits = [...charTouch.values()].filter((a) =>
       a.mechanisms.some((m) => m.patternId !== "touch_inherited"),
     );
-    if (appliedEdits.length === 0) return null;
     if (baseIr === null) return null;
-    // Case B: base ships a touch layout → apply faithfully onto raw JSON copy.
-    // Case A: no shipped touch layout (or baseVfs not yet loaded) → IR-based path.
-    return buildTouchLayoutJson(baseIr, appliedEdits, resolveBaseTouchJson(baseVfs)).json;
+    if (!shouldEmitTouchLayout(resolvedSeedSource, mods, appliedEdits.length > 0)) return null;
+    // Case B: base ships a touch layout AND the author chose import-adapt →
+    // apply faithfully onto raw JSON copy. Case A (including reseed, which
+    // must NOT receive the shipped layout — R10 discards it): IR-based path.
+    const baseTouchJson =
+      resolvedSeedSource === "reseed-from-desktop" ? undefined : resolveBaseTouchJson(baseVfs);
+    return buildTouchLayoutJson(baseIr, appliedEdits, {
+      ...(baseTouchJson !== undefined ? { baseTouchJson } : {}),
+      mods,
+      seedSource: resolvedSeedSource,
+    }).json;
     // touchKey drives re-evaluation when charTouch changes (Map identity is
     // not stable; the key is). baseIr is a stable snapshot post-lockDesktop.
     // baseVfs is stable after instantiation but included for correctness.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseIr, touchKey, baseVfs]);
+  }, [baseIr, touchKey, baseVfs, mods, resolvedSeedSource]);
 
-  // VFS transform: inject the generated touch layout only when the author has
-  // made real (non-inherited) touch edits. When touchLayoutJson is null — either
-  // because no real edits exist or because the emit pipeline failed — leave the
-  // VFS untouched so KMW renders its own polished native default (or the
-  // keyboard's shipped .keyman-touch-layout file is used verbatim).
+  // The seed layout for the chosen seed source, with desktop mods (spec 035
+  // R3) replayed but NO Phase E edits — via `deriveSeedLayout`
+  // (buildTouchLayoutJson.ts), the shared seed-derivation implementation
+  // also used by buildTouchLayoutJson's own Case A branch; do not duplicate
+  // the Case A/B branching inline here. Depends only on
+  // baseIr/baseVfs/mods/resolvedSeedSource (NOT touchKey/charTouch — the
+  // author's own edits are deliberately excluded, per spec 035
+  // simplification.md: "already in layout" means already in the SEED). null
+  // only when baseIr has not loaded yet.
+  const detectionSeedLayout = useMemo<TouchLayoutIR | null>(() => {
+    if (baseIr === null) return null;
+    try {
+      const baseTouchJson =
+        resolvedSeedSource === "reseed-from-desktop" ? undefined : resolveBaseTouchJson(baseVfs);
+      return deriveSeedLayout(baseIr, {
+        ...(baseTouchJson !== undefined ? { baseTouchJson } : {}),
+        mods,
+        seedSource: resolvedSeedSource,
+      }).layout;
+    } catch (err) {
+      console.error("[TouchGallery] detectionSeedLayout derivation failed:", err);
+      return null;
+    }
+  }, [baseIr, baseVfs, mods, resolvedSeedSource]);
+
+  // The layout the lint (18.6 touch-coverage guard) and the stage-completion
+  // gate (FR-008) both audit: the derived layout INCLUDING current Phase E
+  // edits when touchLayoutJson is non-null (the R11 matrix decided to emit),
+  // else the effective seed (detectionSeedLayout) — a truly-untouched
+  // import-adapt with a shipped layout still has a real layout to check
+  // coverage against even though nothing is emitted yet.
+  const layoutForLintAndGate = useMemo<TouchLayoutIR | null>(() => {
+    if (touchLayoutJson !== null) {
+      try {
+        return parseTouchLayout(touchLayoutJson);
+      } catch (err) {
+        console.error("[TouchGallery] layoutForLintAndGate derivation failed:", err);
+        return detectionSeedLayout;
+      }
+    }
+    return detectionSeedLayout;
+  }, [touchLayoutJson, detectionSeedLayout]);
+
+  // VFS transform: inject the derived touch layout whenever touchLayoutJson
+  // is non-null (the R11 matrix above already decided emission — reseed
+  // always, import-adapt only when mods/edits warrant it). When
+  // touchLayoutJson is null — either the R11 matrix said "don't emit" or the
+  // emit pipeline failed — leave the VFS untouched so KMW renders its own
+  // polished native default (or the keyboard's shipped .keyman-touch-layout
+  // file is used verbatim, a byte-preserving no-op).
   const vfsTransform = useMemo<VfsTransform>(
     () => (vfs, kbId) => {
       if (touchLayoutJson !== null) {
@@ -557,10 +781,33 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inventoryKey]);
 
+  // FR-008 completion gate: names of chars with no reachable touch mechanism
+  // on the final layout, formatted for display near the completion control.
+  // Set by handleContinue when it refuses to complete; cleared on the next
+  // edit (see the touchKey-keyed effect below) rather than left stale once
+  // the author starts fixing the gap.
+  const [uncoveredMessage, setUncoveredMessage] = useState<string | null>(null);
+
+  // Clear a stale gate message as soon as the author makes another edit —
+  // "cleared when coverage passes or edits change" (T016b): re-running
+  // handleContinue will re-surface the message if the edit didn't fix it.
+  // Deliberately keyed on touchKey only (not currentChar): the message lists
+  // ALL uncovered inventory chars at once, not per-character state, so simply
+  // navigating to a different character must NOT clear it — only an actual
+  // edit (or a fresh handleContinue re-check) should.
+  useEffect(() => {
+    setUncoveredMessage(null);
+  }, [touchKey]);
+
   // Completion — emit only explicitly-configured characters. Declared before
   // usePositionalCharNav below because the hook calls it directly when
   // forward navigation reaches the last character (the last character's
   // forward button IS the phase completion, not a further navigation step).
+  //
+  // FR-008 gate: before completing, re-run touchCoverage on the same layout
+  // lint audits (layoutForLintAndGate — includes current Phase E edits).
+  // While any inventory char is uncovered, refuse to call onComplete and
+  // surface an inline message naming the uncovered chars instead.
   const handleContinue = useCallback(() => {
     // Emit only chars where a real (non-inherited) or inherited assignment was
     // explicitly accepted — everything in charTouch was put there by the user.
@@ -570,8 +817,15 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     const assignments: TouchAssignment[] = [...charTouch.values()].filter((a) =>
       a.mechanisms.some((m) => m.patternId !== "touch_inherited"),
     );
+    if (layoutForLintAndGate !== null) {
+      const { uncovered } = touchCoverage(layoutForLintAndGate, inventory);
+      if (uncovered.length > 0) {
+        setUncoveredMessage(uncovered.map((c) => formatUncoveredTouchMessage(c)).join("; "));
+        return;
+      }
+    }
     onComplete(assignments);
-  }, [charTouch, onComplete]);
+  }, [charTouch, onComplete, layoutForLintAndGate, inventory]);
 
   // Positional Back/Next/Skip/Previous navigation + suggestion-dismissal
   // tracking — shared with MechanismGallery via usePositionalCharNav so the
@@ -585,7 +839,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     hasAnotherCharAfterCurrent,
     handleNext,
     handleBack,
-    handlePreviousChar,
+    handleSelectChar,
     suggestionResolved,
     markSuggestionResolved,
   } = usePositionalCharNav({
@@ -618,10 +872,21 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   }, [charTouch, suggestionResolved]);
 
   // ---------------------------------------------------------------------------
-  // Phase C desktop assignments + detected-chars from scaffoldTouchLayout
+  // Phase C desktop assignments + detected-chars from the seed-source derivation
   // ---------------------------------------------------------------------------
-
-  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
+  // (phaseResults is read near the top of the component alongside the other
+  // spec 035 R3 mods inputs — deletedNodeIds/deletedItemIds/touchSeedSource.)
+  //
+  // detectedChars ("already in touch layout" — powers the "already" suggestion,
+  // Accept → touch_inherited) is derived from detectionSeedLayout (the chosen
+  // seed source + replayed desktop mods, see the `detectionSeedLayout` memo
+  // above) via the shared engine touchCoverage traversal, rather than an
+  // inline scaffoldTouchLayout(baseIr) walk — see spec 035
+  // contracts/simplification.md. touchCoverage's `uncovered` set is inverted
+  // against `inventory` (touchCoverage only ever answers "is this inventory
+  // char reachable", so a covered-set derived this way is a faithful
+  // replacement for the old any-char scaffold-walk set: the suggestion logic
+  // below only ever queries inventory chars).
 
   const desktopAssignments = useMemo(
     () =>
@@ -632,35 +897,19 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   );
 
   const detectedChars = useMemo<Set<string>>(() => {
-    if (baseIr === null) return new Set<string>();
+    if (detectionSeedLayout === null) return new Set<string>();
     try {
-      const layout = scaffoldTouchLayout(baseIr);
-      const set = new Set<string>();
-      const push = (t?: string) => {
-        if (t && t.length > 0 && !t.startsWith("*")) set.add(t);
-      };
-      for (const p of layout.platforms) {
-        for (const layer of p.layers) {
-          for (const row of layer.rows) {
-            for (const k of row.keys) {
-              push(k.text);
-              push(k.output);
-              (k.sk ?? []).forEach((s) => { push(s.text); push(s.output); });
-              (k.multitap ?? []).forEach((s) => { push(s.text); push(s.output); });
-              if (k.flick) {
-                Object.values(k.flick).forEach((s) => {
-                  if (s) { push(s.text); push(s.output); }
-                });
-              }
-            }
-          }
-        }
-      }
-      return set;
-    } catch {
+      const { uncovered } = touchCoverage(detectionSeedLayout, inventory);
+      const uncoveredSet = new Set(uncovered);
+      return new Set(inventory.filter((c) => !uncoveredSet.has(c)));
+    } catch (err) {
+      console.error("[TouchGallery] detectedChars coverage failed", err);
       return new Set<string>();
     }
-  }, [baseIr]);
+    // inventoryKey is the stable primitive proxy for `inventory` (declared
+    // above, before this memo) — same precedent as touchKey/modsDepsKey.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detectionSeedLayout, inventoryKey]);
 
   // ---------------------------------------------------------------------------
   // Per-character suggestion computation
@@ -680,48 +929,11 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     if (da) {
       const m = da.mechanisms[0];
       if (!m) return { kind: "none" };
-      const pid = m.patternId;
-      const sid = m.strategyId ?? "";
-      const sv = m.slotValues ?? {};
-
-      // simple_swap / S-01 → replace suggestion
-      if (pid === "simple_swap" || sid === "S-01") {
-        const match = (sv["kmnRules"] ?? "").match(/\+\s*\[([A-Z0-9_]+)\]/);
-        const hk = match?.[1] ?? "";
-        return { kind: "replace", hostKey: hk };
-      }
-
-      // deadkey_single_tap / S-02 → longpress from baseLetters
-      if (pid === "deadkey_single_tap" || sid === "S-02") {
-        const baseLetters = sv["baseLetters"] ?? "";
-        const firstLetter = baseLetters[0];
-        let hk = "";
-        if (firstLetter && /^[a-zA-Z]$/.test(firstLetter)) {
-          hk = `K_${firstLetter.toUpperCase()}`;
-        }
-        return { kind: "longpress", hostKey: hk };
-      }
-
-      // modifier_as_layer_switch / S-08 → longpress from altgrKeyList
-      if (pid === "modifier_as_layer_switch" || sid === "S-08") {
-        const match = (sv["altgrKeyList"] ?? "").match(/\[RALT\s+([A-Z0-9_]+)\]/);
-        const hk = match?.[1] ?? "";
-        return { kind: "longpress", hostKey: hk };
-      }
-
-      // multi_char_sequence / S-03 → longpress best-effort
-      if (pid === "multi_char_sequence" || sid === "S-03") {
-        const firstOut = sv["firstLetterOut"] ?? "";
-        const firstChar = firstOut[0];
-        let hk = "";
-        if (firstChar && /^[a-zA-Z]$/.test(firstChar)) {
-          hk = `K_${firstChar.toUpperCase()}`;
-        }
-        return { kind: "longpress", hostKey: hk };
-      }
-
-      // Assignment exists but unrecognized pattern
-      return { kind: "none" };
+      // Shared host-key extraction (packages/studio/src/lib/extractMechanismHostKey.ts) —
+      // an unrecognized pattern/strategy returns undefined.
+      const result = extractMechanismHostKey(m);
+      if (!result) return { kind: "none" };
+      return result;
     }
 
     // No desktop assignment
@@ -748,7 +960,17 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
   const [method, setMethod] = useState<TouchMethod>("longpress_alternates");
   const [hostKey, setHostKey] = useState("");
+  const [hostKeyCustomChar, setHostKeyCustomChar] = useState("");
   const [flickDirection, setFlickDirection] = useState("");
+
+  // Resolved host key — shared by canApply, buildMechanismRef, and the
+  // manual-edit promotion below. One resolution helper (charInput.ts),
+  // consulted here and by KeyPickerField's own feedback rendering, so there
+  // is exactly one place the "__custom__" -> real vkey mapping lives.
+  const resolvedHostKey = useMemo(
+    () => resolvedVkeyOf(resolveKeyPickerSelection(hostKey, hostKeyCustomChar)),
+    [hostKey, hostKeyCustomChar],
+  );
 
   // Whether the suggestion card must stay hidden for the current character —
   // true once explicitly resolved (Accept/Deny — persisted in
@@ -788,6 +1010,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   useEffect(() => {
     setMethod("longpress_alternates");
     setHostKey("");
+    setHostKeyCustomChar("");
     setFlickDirection("");
   }, [currentChar]);
 
@@ -797,10 +1020,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
   const canApply = useMemo(() => {
     if (currentChar === null) return false;
-    if (method === "flick_gestures") return hostKey !== "" && flickDirection !== "";
+    if (method === "flick_gestures") return resolvedHostKey !== null && flickDirection !== "";
     // longpress_alternates, multitap, and touch_key_replace require a host key.
-    return hostKey !== "";
-  }, [currentChar, method, hostKey, flickDirection]);
+    return resolvedHostKey !== null;
+  }, [currentChar, method, resolvedHostKey, flickDirection]);
 
   // ---------------------------------------------------------------------------
   // Build a mechanism from current method state
@@ -811,19 +1034,13 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
    * method/hostKey/flickDirection state. Callers append this to a char's
    * existing `mechanisms[]` via {@link appendMechanismToChar} (regression 3,
    * multi-method — multiple methods per character) rather than overwriting the assignment.
+   *
+   * Thin wrapper over {@link buildTouchMechanismRef} (module scope, exported
+   * for direct unit testing) using current component state — see that
+   * function for the resolved-vkey invariant this delegates to.
    */
-  function buildMechanismRef(char: string): MechanismRef {
-    if (method === "longpress_alternates") {
-      return { patternId: "longpress_alternates", slotValues: { hostKey, char } };
-    }
-    if (method === "flick_gestures") {
-      return { patternId: "flick_gestures", slotValues: { hostKey, direction: flickDirection, char } };
-    }
-    if (method === "touch_key_replace") {
-      return { patternId: "touch_key_replace", slotValues: { hostKey, char } };
-    }
-    // multitap
-    return { patternId: "multitap", slotValues: { hostKey, char } };
+  function buildMechanismRef(char: string): MechanismRef | null {
+    return buildTouchMechanismRef(method, resolvedHostKey, flickDirection, char);
   }
 
   /**
@@ -958,26 +1175,33 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // appendMechanismToChar (regression 3, multi-method) rather than
     // overwriting the assignment (regression: replace) — a second Apply for
     // the same character adds another chip instead of clobbering the first.
+    // buildMechanismRef enforces the resolved-vkey invariant locally (returns
+    // null when resolvedHostKey is null) — canApply already implies this on
+    // the happy path, but this early-return is the defense-in-depth mirror of
+    // that invariant, matching MechanismGallery's `if (resolvedSwapVkey ===
+    // null) return;` style.
     const ref = buildMechanismRef(currentChar);
+    if (ref === null) return;
     setCharTouch((prev) => appendMechanismToChar(prev, currentChar, ref));
     // spec-014 FR-014/R4: a manual edit to the host touch key PROMOTES it to
     // `hand-set` in the working IR so subsequent re-propagation never clobbers
     // the author's edit. Flag-gated — off ⇒ byte-identical to P4b (no IR write).
     // Logic lives in touchBehavior.ts; this call site stays thin.
-    if (isMutateSeamEnabled() && hostKey !== "") {
+    if (isMutateSeamEnabled() && resolvedHostKey !== null) {
       const store = useWorkingCopyStore.getState();
       const ir = store.ir;
       // INCREMENTAL patch (promote host key to hand-set) — use the
       // overlay-preserving setter so carve deletions are not wiped. setIR would
       // clear deletedNodeIds/deletedItemIds/undoStack. See workingCopyStore.
-      if (ir !== null) store.setWorkingIR(promoteOnManualEdit(ir, hostKey));
+      if (ir !== null) store.setWorkingIR(promoteOnManualEdit(ir, resolvedHostKey));
     }
     // Reset method inputs but stay on currentChar — user must click Next to advance.
     setMethod("longpress_alternates");
     setHostKey("");
+    setHostKeyCustomChar("");
     setFlickDirection("");
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentChar, canApply, method, hostKey, flickDirection]);
+  }, [currentChar, canApply, method, hostKey, resolvedHostKey, flickDirection]);
 
   // "Skip this character" is pure forward navigation — it records nothing,
   // so it is identical to handleNext (advance one position, or complete from
@@ -1019,14 +1243,21 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
         method === "touch_key_replace"
       ) {
         setHostKey(keyId);
+        // Tapping a real key sets the picker to that key; clear the paired
+        // custom-char text so re-opening "Enter my own character..." starts
+        // clean instead of re-showing stale (possibly invalid) text.
+        setHostKeyCustomChar("");
       }
     },
     [method],
   );
 
   // Projected VFS for lint — clones baseVfs and overwrites the touch layout path
-  // with the same touchLayoutJson the preview uses (lint, preview, output agree).
-  // When touchLayoutJson is null (baseIr not yet set) lint sees the raw baseVfs.
+  // with the same touchLayoutJson the preview uses (lint, preview, output agree
+  // per the spec 035 R11 emission matrix — see the touchLayoutJson memo above).
+  // When touchLayoutJson is null — baseIr not yet set, the R11 matrix said
+  // "don't emit", or the emit pipeline failed — lint sees the raw baseVfs
+  // (the shipped file, if any, stays verbatim — a byte-preserving no-op).
   // keyboardId in deps so the path key stays correct if the id changes.
   const editedVfsForLint = useMemo(() => {
     if (baseVfs === null) return null;
@@ -1036,9 +1267,21 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     return cloned;
   }, [baseVfs, touchLayoutJson, keyboardId]);
 
+  // Touch lint context (spec 035 FR-008/18.6) — feeds KM_LINT_TOUCH_UNCOVERED
+  // alongside 18.1–18.5. `layoutForLintAndGate` is the SAME layout the
+  // completion gate in handleContinue checks (edits included when
+  // touchLayoutJson is non-null, else the effective seed) so lint and the
+  // gate cannot drift. null when baseIr has not loaded — useTouchLint treats
+  // a null/undefined context as "run the context-free checks only".
+  const touchLintContext = useMemo(
+    () => (layoutForLintAndGate !== null ? { layout: layoutForLintAndGate, inventory } : null),
+    [layoutForLintAndGate, inventory],
+  );
+
   // Touch lint — runs on the projected (edited) VFS so checks 18.1–18.5 reflect
-  // Phase E edits. The existing 300ms debounce inside useTouchLint is unchanged.
-  const { touchFindings, touchLintRunning } = useTouchLint(editedVfsForLint, keyboardId);
+  // Phase E edits. The existing 300ms debounce inside useTouchLint is unchanged
+  // (fs + context are debounced together — Constitution IV, no second timer).
+  const { touchFindings, touchLintRunning } = useTouchLint(editedVfsForLint, keyboardId, touchLintContext);
 
   // ---------------------------------------------------------------------------
   // Shared styles — defined before guards so they can be referenced in guard renders
@@ -1057,30 +1300,17 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
   if (inventory.length === 0) {
     return (
-      <div style={{ ...pageStyle, padding: "24px 32px" }}>
-        <div style={{ maxWidth: 560, margin: "0 auto" }}>
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="Back to mechanisms"
-            style={ghostBtn}
-          >
-            &larr; Back
-          </button>
-          <div
-            style={{
-              margin: "60px auto",
-              textAlign: "center",
-              color: TEXT_DIM,
-            }}
-          >
-            <p style={{ fontSize: 15 }}>
-              No characters in inventory yet. Complete the Survey (Phase B) to
-              confirm which characters your keyboard must produce.
-            </p>
-          </div>
-        </div>
-      </div>
+      <GalleryEmptyState
+        wrapperMaxWidth={560}
+        onBack={onBack}
+        backAriaLabel={t({ id: "editor.assignLoop.touch.backToMechanismsAriaLabel", message: "Back to mechanisms" })}
+        message={
+          <Trans id="editor.assignLoop.touch.noInventory">
+            No characters in inventory yet. Complete the Survey (Phase B) to
+            confirm which characters your keyboard must produce.
+          </Trans>
+        }
+      />
     );
   }
 
@@ -1091,30 +1321,34 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   if (showIntro) {
     return (
       <GalleryIntroSplash
-        eyebrow="Next step · Touch"
-        title="Welcome to the Touch Gallery"
+        eyebrow={t({ id: "editor.assignLoop.touch.intro.eyebrow", message: "Next step · Touch" })}
+        title={t({ id: "editor.assignLoop.touch.intro.title", message: "Welcome to the Touch Gallery" })}
         body={
-          <>
+          <Trans id="editor.assignLoop.touch.intro.body">
             Your desktop layout is locked in. Now you&rsquo;ll set how each
             character is reached on phones and tablets, where there is no
             physical keyboard.
-          </>
+          </Trans>
         }
         bullets={[
-          <>You&rsquo;ll go character by character, just like the desktop gallery.</>,
-          <>
+          <Trans id="editor.assignLoop.touch.intro.bullet1" key="bullet1">
+            You&rsquo;ll go character by character, just like the desktop gallery.
+          </Trans>,
+          <Trans id="editor.assignLoop.touch.intro.bullet2" key="bullet2">
             Pick a touch method &mdash; long-press, flick, multitap, or replace
             &mdash; or Skip characters that already work.
-          </>,
-          <>These choices apply to touch only and never change your desktop layout.</>,
+          </Trans>,
+          <Trans id="editor.assignLoop.touch.intro.bullet3" key="bullet3">
+            These choices apply to touch only and never change your desktop layout.
+          </Trans>,
         ]}
-        startAriaLabel="Start the touch gallery"
+        startAriaLabel={t({ id: "editor.assignLoop.touch.intro.startAriaLabel", message: "Start the touch gallery" })}
         onStart={() => {
           markGalleryIntroSeen("touch");
           setShowIntro(false);
         }}
         onBack={onBack}
-        backAriaLabel="Back to mechanisms (Phase C)"
+        backAriaLabel={t({ id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel", message: "Back to mechanisms (Phase C)" })}
       />
     );
   }
@@ -1122,6 +1356,14 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // ---------------------------------------------------------------------------
   // Left pane content
   // ---------------------------------------------------------------------------
+
+  // Named local for the dotted-circle-wrapped current char, used inside the
+  // <Trans> suggestion-card macros below. A simple identifier extracts as a
+  // NAMED lingui placeholder; calling displayChar() inline in the macro
+  // collapses it to a POSITIONAL {0}/{1} (the cause of the fr catalog
+  // mismatch this fix addresses). Null only when currentChar is null, in
+  // which case none of the guarded blocks below render it.
+  const currentCharDisplay = currentChar !== null ? displayChar(currentChar) : null;
 
   const leftContent = (
     <div
@@ -1139,57 +1381,44 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       <p
         role="status"
         aria-live="polite"
-        aria-label={`${charTouch.size} of ${totalChars} characters configured`}
+        aria-label={t({
+          id: "editor.assignLoop.touch.coverageAriaLabel",
+          message: `${{ configured: charTouch.size }} of ${{ total: totalChars }} characters configured`,
+        })}
         style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
       >
-        {charTouch.size} of {totalChars} configured
+        <Trans id="editor.assignLoop.touch.coverageLine">
+          {charTouch.size} of {totalChars} configured
+        </Trans>
       </p>
 
       {/* Per-char UI */}
       {currentChar !== null && (
         <>
-          {/* Character heading card (identical to MechanismGallery's) */}
-          <div
+          {/* "Touch mapping" section header — the character-heading card that
+              used to live here (glyph + U+ notation) is gone; the
+              CharScrollStrip below now shows both on the selected chip
+              directly (see CharScrollStrip.tsx). This label is kept so the
+              "you're now configuring this character's touch access" cue
+              doesn't disappear along with the card. */}
+          <p
             style={{
-              background: BG_CARD,
-              border: `1px solid ${BORDER}`,
-              borderRadius: 10,
-              padding: "16px 18px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 6,
+              margin: 0,
+              fontSize: 12,
+              color: TEXT_DIM,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
             }}
           >
-            <p
-              style={{
-                margin: 0,
-                fontSize: 12,
-                color: TEXT_DIM,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-              }}
-            >
-              Touch mapping
-            </p>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-              <span
-                style={{ fontSize: 36, fontFamily: "monospace", lineHeight: 1 }}
-                aria-label={`${toUPlusNotation(currentChar)} ${currentChar}`}
-              >
-                {currentChar}
-              </span>
-              <span style={{ fontSize: 13, color: TEXT_DIM }}>
-                {toUPlusNotation(currentChar)}
-              </span>
-            </div>
-          </div>
+            <Trans id="editor.assignLoop.touch.mappingEyebrow">Touch mapping</Trans>
+          </p>
 
-          {/* Top toolbar row — Back (left) + a right-aligned forward cluster
-              (right), on the same horizontal level. The cluster holds the
-              previous-character button (rendered on every character,
-              disabled on the first) immediately to the left of the primary
-              forward action (Next character/Done); it carries marginLeft:
-              "auto" (rather than each button) so it holds position. */}
+          {/* Top toolbar row — Back (left) + the primary forward action
+              (right), on the same horizontal level; it carries marginLeft:
+              "auto" so it holds position. The old "Previous character"
+              button that used to sit in this cluster has been replaced by
+              the CharScrollStrip below (any character, not just the
+              immediately-previous one, is reachable via its chips). */}
           <div
             style={{
               display: "flex",
@@ -1203,12 +1432,12 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               onClick={handleBack}
               aria-label={
                 currentIdx <= 0
-                  ? "Back to mechanisms (Phase C)"
-                  : "Back to previous character"
+                  ? t({ id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel", message: "Back to mechanisms (Phase C)" })
+                  : t({ id: "editor.assignLoop.touch.backToPreviousCharacterAriaLabel", message: "Back to previous character" })
               }
               style={ghostBtn}
             >
-              &larr; Back
+              <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
             </button>
             <div
               style={{
@@ -1218,36 +1447,16 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 gap: 8,
               }}
             >
-              {/* Previous character — rendered on every character, including
-                  the first one, where it is DISABLED (there is nowhere
-                  further back to step; the separate Back button handles
-                  exiting the phase from the first character). Always steps
-                  back exactly one position, ungated by configured status on
-                  the character being left. This block is only reached when
-                  currentChar !== null (per-char UI), so no separate null
-                  check is needed here. */}
-              <button
-                type="button"
-                data-testid="touch-prev-char"
-                onClick={handlePreviousChar}
-                disabled={currentIdx <= 0}
-                aria-label="Previous character"
-                style={{
-                  ...ghostBtn,
-                  fontSize: 13,
-                  ...(currentIdx <= 0
-                    ? { color: TEXT_DIM, opacity: 0.5, cursor: "not-allowed" }
-                    : {}),
-                }}
-              >
-                &laquo; Previous character
-              </button>
               <button
                 type="button"
                 data-testid="touch-continue"
                 onClick={handleNext}
                 disabled={!canGoNext}
-                aria-label={hasAnotherCharAfterCurrent ? "Next character" : "Done"}
+                aria-label={
+                  hasAnotherCharAfterCurrent
+                    ? t({ id: "editor.assignLoop.nextCharacterAriaLabel", message: "Next character" })
+                    : t({ id: "editor.assignLoop.doneButton", message: "Done" })
+                }
                 style={{
                   padding: "9px 20px",
                   background: canGoNext ? "#238636" : "#21262d",
@@ -1260,17 +1469,46 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                   fontFamily: FONT,
                 }}
               >
-                {hasAnotherCharAfterCurrent ? "Next character →" : "Done"}
+                {hasAnotherCharAfterCurrent
+                  ? t({ id: "editor.assignLoop.nextCharacterButton", message: "Next character →" })
+                  : t({ id: "editor.assignLoop.doneButton", message: "Done" })}
               </button>
             </div>
           </div>
+
+          {/* Character scroll strip — horizontal, all of inventory; click
+              any chip to jump straight to that character (replaces the old
+              "Previous character" button, which only ever stepped back one
+              position). Each chip's badge is the produces-count for that
+              character in THIS gallery's modality (touch) — see
+              charMechanisms.ts. */}
+          <CharScrollStrip
+            chars={inventory}
+            currentChar={currentChar}
+            onSelectChar={handleSelectChar}
+            assignments={charTouchAssignments}
+            modality="touch"
+          />
+
+          {/* FR-008 completion gate message — set by handleContinue when
+              touchCoverage finds an inventory char with no reachable touch
+              mechanism on the final layout; cleared on the next edit.
+              ErrorText tone="warning" renders role="alert" + the canonical
+              WARNING color (#d29922), matching other gate-message sites. */}
+          {uncoveredMessage !== null && (
+            <ErrorText tone="warning">
+              <Trans id="editor.assignLoop.touch.cannotFinishYet">
+                Cannot finish yet — {uncoveredMessage}.
+              </Trans>
+            </ErrorText>
+          )}
 
           {/* Suggestion card (shown until accepted/dismissed; skipped entirely
               when there is no suggestion to offer) */}
           {!showChooser && (
             <div
               role="note"
-              aria-label="Touch access method suggestion"
+              aria-label={t({ id: "editor.assignLoop.touch.suggestion.ariaLabel", message: "Touch access method suggestion" })}
               style={{
                 background: "#0d2218",
                 border: "1px solid #238636",
@@ -1283,162 +1521,64 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             >
               {suggestion.kind === "longpress" && (
                 <>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 12,
-                      color: "#56d364",
-                      fontFamily: FONT,
-                      fontWeight: 600,
-                    }}
-                  >
-                    Suggested: long-press{" "}
-                    {suggestion.hostKey ? hostKeyShortLabel(suggestion.hostKey) : "a key"}{" "}
-                    to reach {currentChar}
+                  <p style={suggestionMessageStyle}>
+                    <Trans id="editor.assignLoop.touch.suggestion.longpressText">
+                      Suggested: long-press{" "}
+                      {suggestion.hostKey
+                        ? hostKeyShortLabel(suggestion.hostKey)
+                        : t({ id: "editor.assignLoop.touch.aKeyPlaceholder", message: "a key" })}{" "}
+                      to reach {currentCharDisplay}
+                    </Trans>
                   </p>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={handleUseSuggestion}
-                      aria-label={`Use suggested long-press method for ${toUPlusNotation(currentChar)} ${currentChar}`}
-                      style={{
-                        padding: "5px 14px",
-                        background: "#238636",
-                        border: "none",
-                        borderRadius: 5,
-                        color: "#e6edf3",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        fontFamily: FONT,
-                      }}
-                    >
-                      Accept
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSuggestionChange}
-                      aria-label="Choose a different touch method"
-                      style={{
-                        padding: "5px 14px",
-                        background: "transparent",
-                        border: `1px solid ${BORDER}`,
-                        borderRadius: 5,
-                        color: TEXT_DIM,
-                        fontSize: 12,
-                        cursor: "pointer",
-                        fontFamily: FONT,
-                      }}
-                    >
-                      Deny
-                    </button>
-                  </div>
+                  <SuggestionActions
+                    onAccept={handleUseSuggestion}
+                    onDeny={handleSuggestionChange}
+                    acceptAriaLabel={t({
+                      id: "editor.assignLoop.touch.suggestion.useLongpressAriaLabel",
+                      message: `Use suggested long-press method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+                    })}
+                    denyAriaLabel={t({ id: "editor.assignLoop.touch.chooseDifferentMethodAriaLabel", message: "Choose a different touch method" })}
+                  />
                 </>
               )}
               {suggestion.kind === "replace" && (
                 <>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 12,
-                      color: "#56d364",
-                      fontFamily: FONT,
-                      fontWeight: 600,
-                    }}
-                  >
-                    Suggested: replace{" "}
-                    {suggestion.hostKey ? hostKeyShortLabel(suggestion.hostKey) : "a key"}{" "}
-                    with {currentChar}
+                  <p style={suggestionMessageStyle}>
+                    <Trans id="editor.assignLoop.touch.suggestion.replaceText">
+                      Suggested: replace{" "}
+                      {suggestion.hostKey
+                        ? hostKeyShortLabel(suggestion.hostKey)
+                        : t({ id: "editor.assignLoop.touch.aKeyPlaceholder", message: "a key" })}{" "}
+                      with {currentCharDisplay}
+                    </Trans>
                   </p>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={handleUseSuggestion}
-                      aria-label={`Use suggested replace method for ${toUPlusNotation(currentChar)} ${currentChar}`}
-                      style={{
-                        padding: "5px 14px",
-                        background: "#238636",
-                        border: "none",
-                        borderRadius: 5,
-                        color: "#e6edf3",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        fontFamily: FONT,
-                      }}
-                    >
-                      Accept
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSuggestionChange}
-                      aria-label="Choose a different touch method"
-                      style={{
-                        padding: "5px 14px",
-                        background: "transparent",
-                        border: `1px solid ${BORDER}`,
-                        borderRadius: 5,
-                        color: TEXT_DIM,
-                        fontSize: 12,
-                        cursor: "pointer",
-                        fontFamily: FONT,
-                      }}
-                    >
-                      Deny
-                    </button>
-                  </div>
+                  <SuggestionActions
+                    onAccept={handleUseSuggestion}
+                    onDeny={handleSuggestionChange}
+                    acceptAriaLabel={t({
+                      id: "editor.assignLoop.touch.suggestion.useReplaceAriaLabel",
+                      message: `Use suggested replace method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+                    })}
+                    denyAriaLabel={t({ id: "editor.assignLoop.touch.chooseDifferentMethodAriaLabel", message: "Choose a different touch method" })}
+                  />
                 </>
               )}
               {suggestion.kind === "already" && (
                 <>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 12,
-                      color: "#56d364",
-                      fontFamily: FONT,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {currentChar} is already on the touch keyboard. Keep it as is?
+                  <p style={suggestionMessageStyle}>
+                    <Trans id="editor.assignLoop.touch.suggestion.alreadyText">
+                      {currentCharDisplay} is already on the touch keyboard. Keep it as is?
+                    </Trans>
                   </p>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={handleSuggestionAccept}
-                      aria-label={`Keep ${toUPlusNotation(currentChar)} ${currentChar} as already in touch layout`}
-                      style={{
-                        padding: "5px 14px",
-                        background: "#238636",
-                        border: "none",
-                        borderRadius: 5,
-                        color: "#e6edf3",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        fontFamily: FONT,
-                      }}
-                    >
-                      Accept
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSuggestionChange}
-                      aria-label="Make changes to touch method"
-                      style={{
-                        padding: "5px 14px",
-                        background: "transparent",
-                        border: `1px solid ${BORDER}`,
-                        borderRadius: 5,
-                        color: TEXT_DIM,
-                        fontSize: 12,
-                        cursor: "pointer",
-                        fontFamily: FONT,
-                      }}
-                    >
-                      Deny
-                    </button>
-                  </div>
+                  <SuggestionActions
+                    onAccept={handleSuggestionAccept}
+                    onDeny={handleSuggestionChange}
+                    acceptAriaLabel={t({
+                      id: "editor.assignLoop.touch.suggestion.keepAlreadyAriaLabel",
+                      message: `Keep ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }} as already in touch layout`,
+                    })}
+                    denyAriaLabel={t({ id: "editor.assignLoop.touch.makeChangesAriaLabel", message: "Make changes to touch method" })}
+                  />
                 </>
               )}
             </div>
@@ -1453,10 +1593,29 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               onMethodChange={setMethod}
               hostKey={hostKey}
               onHostKeyChange={setHostKey}
+              hostKeyCustomChar={hostKeyCustomChar}
+              onHostKeyCustomCharChange={setHostKeyCustomChar}
               flickDirection={flickDirection}
               onFlickDirectionChange={setFlickDirection}
             />
           )}
+
+          {/* Sequences using this character (Part 3) — every recorded
+              multi_char_sequence where currentChar appears in ANY slot
+              (content, indicator, or output). Sequences are a desktop-only
+              (physical) concept — sourced from desktopAssignments — but
+              still worth surfacing here: an author configuring touch access
+              may need to know this character is already "in play" as a
+              sequence's content/indicator/output on the desktop layout.
+              Read-only — mirrors the inline SequenceBuilderPanel's "Recorded
+              sequences" card style; editing a sequence stays owned by the
+              sequence builder. Shared with MechanismGallery's own bottom list — see
+              UsesSequencesCard.tsx. */}
+          <UsesSequencesCard
+            currentChar={currentChar}
+            assignments={desktopAssignments}
+            modality="touch"
+          />
 
           {/* Apply + Skip. Back and Next/Done live in the shared top toolbar
               row above so the forward-advance control is spatially
@@ -1467,7 +1626,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 type="button"
                 onClick={handleApply}
                 disabled={!canApply}
-                aria-label={`Apply touch method for ${toUPlusNotation(currentChar)} ${currentChar}`}
+                aria-label={t({
+                  id: "editor.assignLoop.touch.applyMethodAriaLabel",
+                  message: `Apply touch method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+                })}
                 style={{
                   padding: "9px 20px",
                   background: canApply ? BLUE_ACTION : "#21262d",
@@ -1480,13 +1642,16 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                   fontFamily: FONT,
                 }}
               >
-                Apply method
+                <Trans id="editor.assignLoop.applyMethodButton">Apply method</Trans>
               </button>
             )}
             <button
               type="button"
               onClick={handleNext}
-              aria-label={`Skip this character (${toUPlusNotation(currentChar)} ${currentChar})`}
+              aria-label={t({
+                id: "editor.assignLoop.skipCharacterAriaLabel",
+                message: `Skip this character (${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }})`,
+              })}
               style={{
                 background: "transparent",
                 border: "none",
@@ -1498,7 +1663,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 textDecoration: "underline",
               }}
             >
-              Skip this character
+              <Trans id="editor.assignLoop.skipCharacterButton">Skip this character</Trans>
             </button>
           </div>
         </>
@@ -1506,59 +1671,35 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
       {/* Configured chip row */}
       {charTouch.size > 0 && (
-        <div>
-          <p
-            style={{
-              margin: "0 0 6px",
-              fontSize: 11,
-              color: TEXT_DIM,
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-            }}
-          >
-            Configured
-          </p>
-          <div
-            role="group"
-            aria-label="Configured characters — click to remove"
-            style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
-          >
-            {[...charTouch.entries()].flatMap(([c, assignment]) =>
-              assignment.mechanisms.map((m, i) => (
-                <button
-                  key={`${c}-${i}`}
-                  type="button"
-                  onClick={() => handleRemoveMechanism(c, i)}
-                  aria-label={`Remove ${toUPlusNotation(c)} ${touchMechanismLabel(c, m)}`}
-                  title={`${toUPlusNotation(c)} — click to remove`}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    padding: "4px 10px",
-                    background: "#0d2218",
-                    border: "1px solid #238636",
-                    borderRadius: 16,
-                    color: "#56d364",
-                    fontSize: 12,
-                    fontFamily: "monospace",
-                    cursor: "pointer",
-                    lineHeight: 1.3,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {touchMechanismLabel(c, m)}
-                  <span
-                    aria-hidden="true"
-                    style={{ fontSize: 11, color: "#56d364", opacity: 0.7 }}
-                  >
-                    &times;
-                  </span>
-                </button>
-              )),
-            )}
-          </div>
-        </div>
+        <RemovableChipRow
+          heading={<Trans id="editor.assignLoop.touch.configuredHeading">Configured</Trans>}
+          groupAriaLabel={t({ id: "editor.assignLoop.touch.configuredGroupAriaLabel", message: "Configured characters — click to remove" })}
+          chipBackground="#0d2218"
+          chipBorder="#238636"
+          chipColor="#56d364"
+          chipPadding="4px 10px"
+          chipFontSize={12}
+          chipWhiteSpaceNowrap
+          items={[...charTouch.entries()].flatMap(([c, assignment]) =>
+            assignment.mechanisms.map((m, i) => ({
+              key: `${c}-${i}`,
+              // Visible chip label only — routes the target through
+              // displayChar() so a standalone combining mark shows the
+              // dotted circle; the aria-label below keeps the raw target
+              // (via touchMechanismLabel(c, ...)) untouched.
+              label: touchMechanismLabel(displayChar(c), m, i18n),
+              onClick: () => handleRemoveMechanism(c, i),
+              ariaLabel: t({
+                id: "editor.assignLoop.touch.removeMechanismAriaLabel",
+                message: `Remove ${{ notation: toUPlusNotation(c) }} ${{ label: touchMechanismLabel(c, m, i18n) }}`,
+              }),
+              title: t({
+                id: "editor.assignLoop.removeCharacterTitle",
+                message: `${{ notation: toUPlusNotation(c) }} — click to remove`,
+              }),
+            })),
+          )}
+        />
       )}
 
       {/* Lint summary — Layer C touch checks (18.1–18.5) */}
@@ -1573,8 +1714,8 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             fontFamily: FONT,
           }}
         >
-          Touch layout checks
-          {touchLintRunning ? " (running...)" : ""}
+          <Trans id="editor.assignLoop.touch.layoutChecksHeading">Touch layout checks</Trans>
+          {touchLintRunning ? ` ${t({ id: "editor.assignLoop.touch.runningSuffix", message: "(running...)" })}` : ""}
         </p>
         <LintSummary findings={touchFindings} />
       </div>
@@ -1582,130 +1723,65 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   );
 
   // ---------------------------------------------------------------------------
-  // Two-pane layout (matching MechanismGallery exactly)
+  // Two-pane layout (via the shared AssignLoopShell)
   // ---------------------------------------------------------------------------
 
-  return (
-    <div
-      style={{
-        ...pageStyle,
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        overflow: "hidden",
-      }}
-    >
-      {/* Header — title + modality label, the character counter, and the
-          description, all in a single row. The primary forward action now
-          sits in the top toolbar row of the left pane (see leftContent),
-          paired with the Back button, rather than here. */}
-      <div
-        style={{
-          borderBottom: `1px solid ${BORDER}`,
-          flexShrink: 0,
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "baseline",
-          gap: 16,
-          flexWrap: "wrap",
-          padding: "16px 24px 14px",
-        }}
-      >
-        <h1
-          style={{
-            margin: 0,
-            fontSize: "1.05rem",
-            fontWeight: 600,
-            color: ACCENT,
-            fontFamily: FONT,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          Mechanism Gallery
-          <span
-            style={{
-              fontSize: 12,
-              color: TEXT_DIM,
-              textTransform: "uppercase" as const,
-              letterSpacing: "0.06em",
-              fontWeight: 400,
-            }}
-          >
-            Touch
-          </span>
-        </h1>
-        {totalChars > 0 && (
-          <span
-            aria-label={`Character ${currentIdx + 1} of ${totalChars}`}
-            style={{
-              fontSize: 12,
-              color: TEXT_DIM,
-              fontFamily: FONT,
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-            }}
-          >
-            Character {Math.max(currentIdx + 1, 1)} of {totalChars}
-          </span>
-        )}
+  const headerExtras = (
+    <>
+      {totalChars > 0 && (
         <span
+          aria-label={t({
+            id: "editor.assignLoop.touch.characterCounterAriaLabel",
+            message: `Character ${{ n: currentIdx + 1 }} of ${{ total: totalChars }}`,
+          })}
           style={{
-            fontSize: 13,
+            fontSize: 12,
             color: TEXT_DIM,
             fontFamily: FONT,
-            flex: 1,
-            minWidth: 0,
+            whiteSpace: "nowrap",
+            flexShrink: 0,
           }}
         >
-          For each character, choose how it appears on the touch keyboard. Your
-          desktop layout is locked — these apply to phone and tablet only.
+          <Trans id="editor.assignLoop.touch.characterCounter">
+            Character {Math.max(currentIdx + 1, 1)} of {totalChars}
+          </Trans>
         </span>
-      </div>
-
-      {/* Two-pane body */}
-      <div
+      )}
+      <span
         style={{
+          fontSize: 13,
+          color: TEXT_DIM,
+          fontFamily: FONT,
           flex: 1,
-          display: "flex",
-          flexDirection: "row",
-          overflow: "hidden",
+          minWidth: 0,
         }}
       >
-        {/* LEFT pane */}
-        <div
-          style={{
-            flexBasis: "45%",
-            flexShrink: 0,
-            borderRight: `1px solid ${BORDER}`,
-            overflowY: "auto",
-            boxSizing: "border-box",
-          }}
-        >
-          {leftContent}
-        </div>
+        <Trans id="editor.assignLoop.touch.headerDescription">
+          For each character, choose how it appears on the touch keyboard. Your
+          desktop layout is locked — these apply to phone and tablet only.
+        </Trans>
+      </span>
+    </>
+  );
 
-        {/* RIGHT pane */}
-        <div
-          style={{
-            flexGrow: 1,
-            overflowY: "auto",
-            padding: "24px 20px",
-            boxSizing: "border-box",
-          }}
-        >
-          <GalleryPreviewPane
-            baseKeyboard={baseKeyboard}
-            stage={stage}
-            retry={retry}
-            {...(handleKeyTap !== undefined ? { onKeyTap: handleKeyTap } : {})}
-            defaultOskMode="touch"
-            heading="Touch preview"
-            warningLabel="Preview warnings:"
-          />
-        </div>
-      </div>
-    </div>
+  return (
+    <AssignLoopShell
+      headingText={t({ id: "editor.assignLoop.touchGalleryHeading", message: "Touch Gallery" })}
+      modalityLabel={t({ id: "editor.assignLoop.modality.touch", message: "Touch" })}
+      modalityLabelPlacement="inline"
+      headerExtras={headerExtras}
+      leftContent={leftContent}
+      rightContent={
+        <GalleryPreviewPane
+          baseKeyboard={baseKeyboard}
+          stage={stage}
+          retry={retry}
+          {...(handleKeyTap !== undefined ? { onKeyTap: handleKeyTap } : {})}
+          defaultOskMode="touch"
+          heading={t({ id: "editor.assignLoop.touch.previewHeading", message: "Touch preview" })}
+          warningLabel={t({ id: "editor.assignLoop.touch.previewWarnings", message: "Preview warnings:" })}
+        />
+      }
+    />
   );
 }

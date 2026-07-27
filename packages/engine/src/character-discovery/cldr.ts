@@ -13,7 +13,12 @@ export type CldrLoader = (locale: string) => Promise<string | null>;
  */
 export type CldrFullLoader = (
   locale: string,
-) => Promise<{ main: string; auxiliary: string | null } | null>;
+) => Promise<{
+  main: string;
+  auxiliary: string | null;
+  punctuation: string | null;
+  numbers: string | null;
+} | null>;
 
 /**
  * Builds a CldrLoader that fetches from the CLDR 46.1.0 CDN.
@@ -37,7 +42,7 @@ export function createFetchCldrLoader(fetchImpl?: typeof fetch): CldrLoader {
  */
 export function createFetchCldrFullLoader(fetchImpl?: typeof fetch): CldrFullLoader {
   const doFetch = fetchImpl ?? globalThis.fetch.bind(globalThis);
-  return async (locale: string): Promise<{ main: string; auxiliary: string | null } | null> => {
+  return async (locale: string) => {
     const url = `${CLDR_BASE}/${locale}/characters.json`;
     let r: Response;
     try {
@@ -56,7 +61,10 @@ export function createFetchCldrFullLoader(fetchImpl?: typeof fetch): CldrFullLoa
   };
 }
 
-function extractExemplarPair(j: unknown, locale: string): { main: string; auxiliary: string | null } | null {
+function extractExemplarPair(
+  j: unknown,
+  locale: string,
+): { main: string; auxiliary: string | null; punctuation: string | null; numbers: string | null } | null {
   if (typeof j !== "object" || j === null) return null;
   const root = j as Record<string, unknown>;
   const main = root["main"];
@@ -70,9 +78,16 @@ function extractExemplarPair(j: unknown, locale: string): { main: string; auxili
   if (typeof exemplar !== "string") return null;
   // Auxiliary exemplar set: CLDR JSON key is "exemplarCharacters-type-auxiliary"
   const auxExemplar = charMap["exemplarCharacters-type-auxiliary"];
+  // Punctuation + numbers exemplar tiers (#525 fix — locale punctuation like
+  // French "« »" and locale digits like Persian Eastern-Arabic-Indic "۰۱۲…"
+  // must count as "needed" for surplus detection, not just the letter tiers).
+  const punctuationExemplar = charMap["exemplarCharacters-type-punctuation"];
+  const numbersExemplar = charMap["exemplarCharacters-type-numbers"];
   return {
     main: exemplar,
     auxiliary: typeof auxExemplar === "string" ? auxExemplar : null,
+    punctuation: typeof punctuationExemplar === "string" ? punctuationExemplar : null,
+    numbers: typeof numbersExemplar === "string" ? numbersExemplar : null,
   };
 }
 

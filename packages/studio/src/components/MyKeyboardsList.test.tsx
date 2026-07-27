@@ -10,7 +10,8 @@
 // `listServerDrafts`, which is stubbed per-test to control the cloud list.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { MyKeyboardsList } from "./MyKeyboardsList.tsx";
 import { useGitHubAuth, type UseGitHubAuthResult } from "../hooks/useGitHubAuth.ts";
 import { listServerDrafts, type ServerDraftMeta } from "../lib/serverDraftStore.ts";

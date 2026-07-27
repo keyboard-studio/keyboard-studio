@@ -11,8 +11,11 @@ import type {
   RemovalCapability,
   StoreItem,
 } from '@keyboard-studio/contracts';
-import { isParallelIndexFanOut, classifyStoreSlotEdit } from '@keyboard-studio/engine';
-import type { StoreSlotBlockReason } from '@keyboard-studio/engine';
+import { buildProducedSet } from '@keyboard-studio/contracts';
+import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, isCharCoveredForLocale, collectCharContributors, isPlusSeparator, parseSlotId, isCombiningMarkChar } from '@keyboard-studio/engine';
+import type { StoreSlotBlockReason, StoreSlotEditMode, StoreAnalysis, CharContributors, CharNormalizationForm } from '@keyboard-studio/engine';
+import type { I18n } from '@lingui/core';
+import { resolveContentString } from './contentI18n.ts';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 
 // ---------------------------------------------------------------------------
@@ -39,6 +42,24 @@ export const MOD_GROUP_DEFS: ModGroupDef[] = [
 /**
  * Classify the modifier set of an IRRule into a ModifierLayer bucket.
  * // parallels classifyModifiers() in scaffoldTouchLayout.ts — keep buckets in sync
+ *
+ * DISPLAY-ONLY classification, deliberately NOT routed through
+ * `modifierCombos.ts`'s `canonicalizeCombo` (chirality unification: e.g.
+ * `CTRL+RALT` and `CTRL+LALT` both demote to generic `[CTRL ALT]`; also no
+ * LCTRL handling here). This function — along with `prettyMod` and
+ * `modifierLabel` below — feeds only `CarveGlyph.modifierLayer` /
+ * `modifierLabel`, render-only inputs to the Carve Rail/Inspector's fixed
+ * 4-bucket display (base/shift/altgr/other). Nothing here reaches emitted
+ * `.kmn`, the VFS, or the S-08 combo-authoring path (that path canonicalizes
+ * via `MechanismGallery.tsx`, which does use `canonicalizeCombo`). This
+ * mirrors the same already-documented decision for `scaffoldTouchLayout.ts`'s
+ * `classifyModifiers` (see the module doc header of
+ * `packages/engine/src/pattern-apply/modifierCombos.ts`).
+ *
+ * Known cosmetic limitation from the naive per-token check: a bare
+ * `[NCAPS K_X]` rule (no other modifiers) buckets to `'other'` here rather
+ * than `'base'`, since `canonicalizeCombo`'s NCAPS-collapse isn't applied.
+ * Low-severity — left as a future follow-up rather than pulled in now.
  */
 export function ruleModifier(rule: IRRule): ModifierLayer {
   const vkeyEl = rule.context.find((el) => el.kind === 'vkey');
@@ -108,16 +129,51 @@ export function modifierLabel(rule: IRRule): string {
 }
 
 // ---------------------------------------------------------------------------
-// isCombining — true for Unicode non-spacing marks (Mn category, all scripts)
+// isCombining — true for the full Unicode Mark category (Mn/Mc/Me, all
+// scripts). General_Category M is the correct test (km-domain, spec 046
+// follow-up): many Mc marks (e.g. Devanagari vowel signs) have canonical
+// combining class (ccc) 0, so a ccc-based test under-detects — General_Category
+// is required, not ccc. Sk "modifier symbol" characters (U+00B4 ACUTE ACCENT,
+// U+02DC SMALL TILDE, etc.) are DELIBERATELY EXCLUDED: they are free-standing
+// spacing characters, not marks that attach to a base, and must never get a
+// dotted-circle prefix. (U+02CA MODIFIER LETTER ACUTE ACCENT is General_Category
+// Lm, not Sk, but is excluded from \p{M} for the same reason: it's a
+// free-standing letter, not an attaching mark.)
+//
+// Thin alias over the engine's isCombiningMarkChar (characterMap.ts) — both
+// predicates test the same \p{M} class, so there is no reason to keep a
+// separate studio-local regex. Kept as a local name (rather than updating
+// every call site to import isCombiningMarkChar directly) to minimize churn.
 // ---------------------------------------------------------------------------
 
 export const isCombining = (ch: string) => {
-  return /^\p{Mn}$/u.test(ch ?? '');
+  return isCombiningMarkChar(ch ?? '');
 };
+
+// Double-span combining marks (U+0360-0362) visually span TWO base
+// characters (e.g. U+0361 COMBINING DOUBLE INVERTED BREVE ties two letters
+// together) — a single leading dotted circle misrepresents them, since the
+// mark has nothing to "attach to" on its right. Rendered standalone as
+// circle + mark + circle instead (km-domain guidance).
+const DOUBLE_SPAN_MARKS = new Set(['͠', '͡', '͢']);
+
+// Prefix a combining mark with U+25CC DOTTED CIRCLE so it's visible standalone
+// (Unicode's standard convention for showing a combining mark in isolation).
+// Double-span marks (see DOUBLE_SPAN_MARKS) get a circle on BOTH sides.
+// Parameterized on the caller's own combining-ness test rather than computing
+// it internally: displayChar() keys off isCombining() (now a thin alias for
+// the engine's isCombiningMarkChar), and the character-map pane keys off its
+// cell.isCombiningMark (also isCombiningMarkChar, computed engine-side) — both
+// callers agree on the same \p{M} test today; the parameter is kept so a
+// caller could still special-case it without touching this helper.
+export function prefixCombiningMark(ch: string, isCombiningMark: boolean): string {
+  if (!isCombiningMark) return ch;
+  return DOUBLE_SPAN_MARKS.has(ch) ? '◌' + ch + '◌' : '◌' + ch;
+}
 
 // Render-ready character: prefix combining marks with a dotted circle so they're visible standalone.
 export function displayChar(ch: string): string {
-  return isCombining(ch) ? '◌' + ch : ch;
+  return prefixCombiningMark(ch, isCombining(ch));
 }
 
 const INVISIBLE_CHAR_LABELS: Record<string, string> = {
@@ -179,7 +235,7 @@ export function contextToKeys(context: ContextElement[]): string[] {
   for (const el of context) {
     switch (el.kind) {
       case 'char':
-        keys.push(el.value);
+        keys.push(displayChar(el.value));
         break;
       case 'vkey':
         keys.push(el.name);
@@ -326,37 +382,119 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
 }
 
 // ---------------------------------------------------------------------------
+// storeRefRole — single source of truth for "does this ONE context/output
+// element count as a store reference, and in what role." context any/notany
+// -> 'source'; context index -> 'output'; output index/outs -> 'output';
+// anything else -> null (not a store reference). storeRefsOf (the per-rule
+// roll-up over every store), ruleReferencesStore (the non-allocating
+// presence check for one named store), and ruleStoreRoles (the
+// non-allocating presence+role check for one named store) all iterate this
+// single classifier so the element-kind knowledge never forks between the
+// three call shapes (#952, following on #923's storeRefsOf consolidation).
+// ---------------------------------------------------------------------------
+
+type StoreRefRole = 'source' | 'output';
+
+function storeRefRole(el: ContextElement | OutputElement, inOutput: boolean): { storeName: string; role: StoreRefRole } | null {
+  if (!inOutput) {
+    if (el.kind === 'any' || el.kind === 'notany') return { storeName: el.storeRef, role: 'source' };
+    if (el.kind === 'index') return { storeName: el.storeRef, role: 'output' };
+    return null;
+  }
+  if (el.kind === 'index' || el.kind === 'outs') return { storeName: el.storeRef, role: 'output' };
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // storeRefsOf — single source of truth for "what counts as a store
-// reference in a rule, and its role." context any/notany -> asSource;
-// context index -> asOutput; output index/outs -> asOutput. Returns one
-// entry per DISTINCT store name (first-seen order), OR-ing roles across
-// multiple refs to the same store. Shared by ruleStoreOwners and
-// analyzeStoreUsage so the "store tag" render layer and the store "Used by"
-// panel never drift on which elements count as a store reference.
+// reference in a rule, and its role," rolled up across the whole rule.
+// Returns one entry per DISTINCT store name (first-seen order), OR-ing roles
+// across multiple refs to the same store. Used by ruleStoreOwners, which
+// genuinely needs the full per-store role list (it walks every store the
+// rule touches, not one named store), so the "store tag" render layer and
+// the store "Used by" panel derive from the same storeRefRole classifier.
 // (Positional consumers like describeRuleForStore that need the element
-// index keep their own scan — see the comment on that function.)
+// index keep their own scan — see the comment on that function. Callers
+// that only care about a single named store should use ruleReferencesStore
+// (presence-only) or ruleStoreRoles (presence + role) instead — see their
+// comments; both avoid this function's Map+array allocation over every
+// store in the rule.)
 // ---------------------------------------------------------------------------
 
 function storeRefsOf(rule: IRRule): { storeName: string; asSource: boolean; asOutput: boolean }[] {
   const byName = new Map<string, { storeName: string; asSource: boolean; asOutput: boolean }>();
-  const touch = (name: string, role: 'asSource' | 'asOutput') => {
+  const touch = (name: string, role: StoreRefRole) => {
     let entry = byName.get(name);
     if (!entry) {
       entry = { storeName: name, asSource: false, asOutput: false };
       byName.set(name, entry);
     }
-    entry[role] = true;
+    if (role === 'source') entry.asSource = true;
+    else entry.asOutput = true;
   };
 
   for (const el of rule.context) {
-    if (el.kind === 'any' || el.kind === 'notany') touch(el.storeRef, 'asSource');
-    else if (el.kind === 'index') touch(el.storeRef, 'asOutput');
+    const ref = storeRefRole(el, false);
+    if (ref) touch(ref.storeName, ref.role);
   }
   for (const el of rule.output) {
-    if (el.kind === 'index' || el.kind === 'outs') touch(el.storeRef, 'asOutput');
+    const ref = storeRefRole(el, true);
+    if (ref) touch(ref.storeName, ref.role);
   }
 
   return [...byName.values()];
+}
+
+// ---------------------------------------------------------------------------
+// ruleReferencesStore — non-allocating presence-only check: does `rule`
+// reference `storeName` at all (in either role)? Early-exits on the first
+// match instead of building storeRefsOf's full Map + array roll-up. Shares
+// storeRefRole with storeRefsOf so the element-kind knowledge stays in one
+// place (#952). Use this at call sites that only need a boolean — if you
+// need the asSource/asOutput roles or the full per-store list, use
+// storeRefsOf instead.
+// ---------------------------------------------------------------------------
+
+function ruleReferencesStore(rule: IRRule, storeName: string): boolean {
+  for (const el of rule.context) {
+    const ref = storeRefRole(el, false);
+    if (ref && ref.storeName === storeName) return true;
+  }
+  for (const el of rule.output) {
+    const ref = storeRefRole(el, true);
+    if (ref && ref.storeName === storeName) return true;
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// ruleStoreRoles — non-allocating role lookup for ONE store: does `rule`
+// reference `storeName` as a source, an output, or both? Unlike
+// ruleReferencesStore this can't early-exit on the first match (both roles
+// must be checked), but still avoids storeRefsOf's Map+array roll-up over
+// EVERY store the rule references — it only ever tracks two booleans for
+// the single store the caller asked about. Shares storeRefRole with
+// storeRefsOf/ruleReferencesStore so the element-kind knowledge stays in
+// one place (#952). Used by analyzeStoreUsage's main per-rule usage loop,
+// which — unlike the patternRefs/groupRefs loops — needs the role, not just
+// presence.
+// ---------------------------------------------------------------------------
+
+function ruleStoreRoles(rule: IRRule, storeName: string): { asSource: boolean; asOutput: boolean } {
+  let asSource = false;
+  let asOutput = false;
+  for (const el of rule.context) {
+    const ref = storeRefRole(el, false);
+    if (ref && ref.storeName === storeName) {
+      if (ref.role === 'source') asSource = true;
+      else asOutput = true;
+    }
+  }
+  for (const el of rule.output) {
+    const ref = storeRefRole(el, true);
+    if (ref && ref.storeName === storeName) asOutput = true;
+  }
+  return { asSource, asOutput };
 }
 
 // ---------------------------------------------------------------------------
@@ -516,9 +654,9 @@ export function patternToGlyphs(pattern: Pattern, ir: KeyboardIR, capabilities: 
 //
 // Action is derived once per store via classifyStoreSlotEdit (single
 // authority — never re-derived here):
-//   "nul-fill" — output-store slots; removing the char replaces it with a
-//                silent `nul` filler that preserves index() alignment.
-//   "drop"     — safe to splice out entirely (no positional contract).
+//   "drop"     — safe to splice out entirely (no positional contract), or a
+//                coordinated drop across a resolved pairing set (see
+//                StoreSlotEditMode.coordinatedWith in the engine).
 //   "disabled" — classifyStoreSlotEdit returned "blocked"; disabledReason
 //                carries an author-facing plain-language explanation.
 // ---------------------------------------------------------------------------
@@ -530,7 +668,7 @@ export interface StoreCharChip {
   ch: string;
   /** TRUE 0-based index into IRStore.items (not the char-only display index). */
   itemsIndex: number;
-  action: 'nul-fill' | 'drop' | 'disabled';
+  action: 'drop' | 'disabled';
   /** Author-facing plain-language explanation. Present only when action === 'disabled'. */
   disabledReason?: string;
 }
@@ -544,22 +682,32 @@ export interface StoreCharChip {
  */
 function blockReasonToDisabledReason(reason: StoreSlotBlockReason): string {
   switch (reason) {
-    case 'paired-input':
-      return "This store feeds an any()/index() mechanism — removing characters here would break its pairing; per-character removal for paired stores is planned.";
     case 'notany-widens':
       return "This store is matched negatively (notany) — removing a character would make MORE keys match, not fewer.";
     case 'context-index-aligned':
       return "This store's positions are read directly by a rule's matcher (index() in its context) — removing a character would shift every position after it out of alignment.";
-    case 'dual-use':
-      return "This store is both read from and written to across your rules — removing a character here isn't safe until that dual role is resolved.";
+    case 'unresolved-index-pairing':
+      return "This store (or one it's paired with) feeds a rule's index() output, but the pairing couldn't be resolved to a matching source — removing a character here isn't safe to prove yet.";
+    case 'outs-reference-unanalyzed':
+      return "This store is passed to another group's rules via outs() — removing a character here could break a mechanism hidden behind that hand-off, so it isn't safe to prove yet.";
     case 'system-store':
       return "This is a system store the compiler manages directly — it isn't meant to be edited here.";
   }
 }
 
-/** Extract per-character toggle chips for a store, classified once via classifyStoreSlotEdit. */
-export function storeCharChips(store: IRStore, ir: KeyboardIR): StoreCharChip[] {
-  const editMode = classifyStoreSlotEdit(store, ir);
+/**
+ * Extract per-character toggle chips for a store, classified once via classifyStoreSlotEdit.
+ *
+ * @param analysis Optional precomputed engine `analyzeStores(ir)` result — pass this
+ *                 when classifying many stores against the same `ir` (e.g.
+ *                 `toRailNodes`'s per-store loop, or `recommendedRemovalChars`'s
+ *                 per-candidate-character loop) so each call doesn't re-scan every
+ *                 rule in the IR from scratch.
+ */
+export function storeCharChips(store: IRStore, ir: KeyboardIR, analysis?: StoreAnalysis): StoreCharChip[] {
+  const editMode = analysis !== undefined
+    ? classifyStoreSlotEdit(store, ir, analysis)
+    : classifyStoreSlotEdit(store, ir);
   const chips: StoreCharChip[] = [];
 
   store.items.forEach((item, itemsIndex) => {
@@ -612,7 +760,7 @@ function precedingContextLabel(elements: ContextElement[]): string {
   const parts: string[] = [];
   for (const el of elements) {
     switch (el.kind) {
-      case 'char':       parts.push(`"${el.value}"`); break;
+      case 'char':       parts.push(`"${displayChar(el.value)}"`); break;
       case 'any':        parts.push(`any char from "${el.storeRef}"`); break;
       case 'notany':     parts.push(`any char not in "${el.storeRef}"`); break;
       case 'vkey':       parts.push(`[${el.name}]`); break;
@@ -656,7 +804,7 @@ function describeRuleForStore(rule: IRRule, storeName: string): StoreRuleDetail 
   );
 
   // The raw('+') element marks the keystroke boundary — refs after it are the active keypress
-  const plusIdx = rule.context.findIndex((el) => el.kind === 'raw' && el.text.trim() === '+');
+  const plusIdx = rule.context.findIndex(isPlusSeparator);
   // ctxRefIdx === -1 means store is output-only (not a keystroke trigger)
   const isKeystroke = ctxRefIdx !== -1 && (plusIdx === -1 || ctxRefIdx > plusIdx);
 
@@ -687,10 +835,10 @@ function analyzeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsage {
 
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      const ref = storeRefsOf(rule).find((r) => r.storeName === storeName);
-      if (ref) {
-        if (ref.asSource) asSource = true;
-        if (ref.asOutput) asOutput = true;
+      const { asSource: ruleAsSource, asOutput: ruleAsOutput } = ruleStoreRoles(rule, storeName);
+      if (ruleAsSource || ruleAsOutput) {
+        if (ruleAsSource) asSource = true;
+        if (ruleAsOutput) asOutput = true;
         ruleCount++;
         groupNameSet.add(group.name);
       }
@@ -707,7 +855,7 @@ function analyzeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsage {
     for (const group of ir.groups) {
       for (const rule of group.rules) {
         if (!ownedIds.has(rule.nodeId)) continue;
-        const used = storeRefsOf(rule).some((r) => r.storeName === storeName);
+        const used = ruleReferencesStore(rule, storeName);
         if (used) pRules.push(describeRuleForStore(rule, storeName));
       }
     }
@@ -726,7 +874,7 @@ function analyzeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsage {
     const gRules: StoreRuleDetail[] = [];
     for (const rule of group.rules) {
       if (rule.ownedByPattern !== undefined || ownedNodeIds.has(rule.nodeId)) continue; // skip — already counted in patternRefs
-      const used = storeRefsOf(rule).some((r) => r.storeName === storeName);
+      const used = ruleReferencesStore(rule, storeName);
       if (used) gRules.push(describeRuleForStore(rule, storeName));
     }
     if (gRules.length > 0) groupRefs.push({ groupId: group.nodeId, groupName: group.name, ruleCount: gRules.length, rules: gRules });
@@ -806,6 +954,63 @@ export interface CarveNode {
   pairedStoreRoles?: ('input' | 'output' | 'input+output' | undefined)[] | undefined;
   /** store: short top-of-panel role line ("Output — …" / "Input — …"); undefined when role is undetermined */
   storeRoleLine?: string | undefined;
+  /**
+   * Removal-recommendation confidence, computed by annotateRemovalRecommendations() as a
+   * separate pass over toRailNodes() output (see #525 FOUNDATION slice):
+   *   - 'high'   — safe-to-remove suggestion; every character this node produces is absent
+   *                from the author's confirmed inventory, with no wanted character depending
+   *                on it (see the store dependency guard in annotateRemovalRecommendations).
+   *   - 'medium' — reserved for softer signals (Unicode-block / Phase-C mechanism-not-enabled).
+   *                Not emitted by the slice-1 conservative rule; TODO(#525) once those signals land.
+   *   - 'none'   — no suggestion (default; also the value when Phase B inventory is empty).
+   * Undefined on nodes produced directly by toRailNodes() before annotation runs.
+   */
+  recommendation?: 'high' | 'medium' | 'none' | undefined;
+}
+
+/**
+ * `CarveNode.name` is `pattern.title` verbatim for `kind: 'pattern'` nodes
+ * (see toRailNodes below) — a Tier B content string (spec 046 T028). Render
+ * sites across the Carve editor (Rail, Inspector header, InfoView hover
+ * panel, DepBanner, CarveGallery cascade dialogs) all print `node.name`, so
+ * resolve it here once rather than duplicating the
+ * `node.kind === 'pattern' ? resolveContentString(...) : node.name` branch at
+ * every call site. Group/store/raw names are IR-authoring names, not Pattern
+ * content, and pass through unresolved.
+ */
+export function resolveNodeName(node: CarveNode, i18n?: I18n): string {
+  if (node.kind !== 'pattern') return node.name;
+  return resolveContentString('patterns', node.nodeId, 'title', node.name, i18n);
+}
+
+/**
+ * Same resolution as resolveNodeName, for the `{kind, nodeId, label}` shape
+ * shared by CharLocation (buildCharWeb's cross-reference web popup, below)
+ * and the engine's CharContributors.locations (collectCharContributors) —
+ * both carry pattern.title verbatim in `label` for `kind: 'pattern'` entries.
+ */
+export function resolveLocationLabel(
+  loc: { kind: 'group' | 'pattern' | 'store' | 'raw'; nodeId: string; label: string },
+  i18n?: I18n,
+): string {
+  if (loc.kind !== 'pattern') return loc.label;
+  return resolveContentString('patterns', loc.nodeId, 'title', loc.label, i18n);
+}
+
+/**
+ * `CarveNode.referencedByLabel` mirrors the owning pattern's title verbatim
+ * for a store node (spec 046 T028) — same Tier B content string as
+ * resolveNodeName/resolveLocationLabel above, just carried under a different
+ * field name. Resolves it once rather than duplicating the
+ * `referencedByNodeId !== undefined ? resolveContentString(...) : referencedByLabel`
+ * ternary at each of its two call sites (InfoView.tsx, Inspector.tsx).
+ * Returns undefined when the node has no referencing pattern at all.
+ */
+export function resolveReferencedByLabel(node: CarveNode, i18n?: I18n): string | undefined {
+  if (node.referencedByLabel === undefined) return undefined;
+  return node.referencedByNodeId !== undefined
+    ? resolveContentString('patterns', node.referencedByNodeId, 'title', node.referencedByLabel, i18n)
+    : node.referencedByLabel;
 }
 
 // ---------------------------------------------------------------------------
@@ -939,91 +1144,58 @@ export function vkeyLabel(name: string): string | undefined {
  * Returns a human-readable string or undefined when no trigger is present.
  */
 export function triggerKeyLabel(context: ContextElement[]): string | undefined {
-  const plusIdx = context.findIndex((el) => el.kind === 'raw' && el.text.trim() === '+');
+  const plusIdx = context.findIndex(isPlusSeparator);
   if (plusIdx === -1) return undefined;
   const triggerEl = context[plusIdx + 1];
   if (!triggerEl) return undefined;
   switch (triggerEl.kind) {
     case 'vkey':    return vkeyLabel(triggerEl.name) ?? triggerEl.name;
-    case 'char':    return `"${triggerEl.value}"`;
+    case 'char':    return `"${displayChar(triggerEl.value)}"`;
     case 'deadkey': return `deadkey ${triggerEl.id}`;
     default:        return undefined;
   }
 }
 
 // ---------------------------------------------------------------------------
-// detectStorePairs — find any(storeA)/index(storeB) peer relationships
+// crossPairTrigger — display-only trigger-key lookup for a CONFIRMED
+// describeStorePairing "cross" partner.
+//
+// describeStorePairing (engine) is the single source of truth for WHICH
+// stores are paired — it resolves the pairing graph precisely (an
+// index(target, offset) whose (offset-1)-th non-'+' context element is
+// any(source), unioned through the same offset-alignment the engine's
+// applyStoreSlotRemovals dispatch uses). detectStorePairs used to
+// cross-product every any() against every index() in a rule instead, which
+// over-pairs a rule with 2+ any() and 2+ index() elements (e.g. Cameroon's
+// `word`/`final`, each independently self-paired at its own offset — see
+// the engine's describeStorePairing regression test).
+//
+// This function reimplements ONLY the same offset-resolution rule, locally,
+// to find a trigger key for a partner name describeStorePairing already
+// confirmed — it never introduces a partner describeStorePairing didn't
+// name. If no rule resolves this exact edge (shouldn't happen for a
+// confirmed partner, but display code stays defensive), returns undefined
+// rather than guessing.
 // ---------------------------------------------------------------------------
 
-/** A single entry in the detectStorePairs result: a peer store plus the trigger key that fires the swap. */
-export interface StorePairEntry {
-  pairedName: string;
-  /** Human-readable trigger key label (e.g. "Backspace", "A"); undefined when not determinable. */
-  trigger: string | undefined;
-}
-
-/**
- * For each rule that has both an any(storeA) element in its context AND an
- * index(storeB, …) element in its output, record storeA → storeB and
- * storeB → storeA as paired peers, capturing the trigger key for each pair.
- *
- * Returns a map of storeName → StorePairEntry[] (deduplicated by pairedName,
- * trigger taken from the first matching rule). Sorted by pairedName.
- * Only `any()`/`index()` pairing is in scope (no deadkey elements).
- */
-export function detectStorePairs(ir: KeyboardIR): Map<string, StorePairEntry[]> {
-  // Inner map: storeName → Map<pairedName, trigger>
-  const pairsMap = new Map<string, Map<string, string | undefined>>();
-
-  const addPair = (a: string, b: string, trigger: string | undefined) => {
-    if (a === b) return;
-    if (!pairsMap.has(a)) pairsMap.set(a, new Map());
-    if (!pairsMap.has(b)) pairsMap.set(b, new Map());
-    // Only record trigger on first observation (first matching rule wins)
-    if (!pairsMap.get(a)!.has(b)) pairsMap.get(a)!.set(b, trigger);
-    if (!pairsMap.get(b)!.has(a)) pairsMap.get(b)!.set(a, trigger);
-  };
-
+export function crossPairTrigger(storeName: string, partnerName: string, ir: KeyboardIR): string | undefined {
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      // Collect all any() store names from context
-      const anyStores: string[] = [];
-      for (const el of rule.context) {
-        if (el.kind === 'any' && el.storeRef !== undefined) {
-          anyStores.push(el.storeRef);
-        }
-      }
-      if (anyStores.length === 0) continue;
-
-      // Collect all index() store names from output
-      const indexStores: string[] = [];
+      const effectiveContext = rule.context.filter((el) => !isPlusSeparator(el));
       for (const el of rule.output) {
-        if (el.kind === 'index' && el.storeRef !== undefined) {
-          indexStores.push(el.storeRef);
-        }
-      }
-      if (indexStores.length === 0) continue;
-
-      const trigger = triggerKeyLabel(rule.context);
-
-      // Cross-pair: every any() store is paired with every index() store in this rule
-      for (const a of anyStores) {
-        for (const b of indexStores) {
-          addPair(a, b, trigger);
-        }
+        if (el.kind !== 'index') continue;
+        const target = effectiveContext[el.offset - 1];
+        if (target === undefined || target.kind !== 'any') continue;
+        const a = el.storeRef;
+        const b = target.storeRef;
+        const matchesEdge = (a === storeName && b === partnerName) || (a === partnerName && b === storeName);
+        if (!matchesEdge) continue;
+        const trigger = triggerKeyLabel(rule.context);
+        if (trigger !== undefined) return trigger;
       }
     }
   }
-
-  // Convert to StorePairEntry[] sorted by pairedName
-  const result = new Map<string, StorePairEntry[]>();
-  for (const [name, peers] of pairsMap) {
-    const entries: StorePairEntry[] = [...peers.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([pairedName, trigger]) => ({ pairedName, trigger }));
-    result.set(name, entries);
-  }
-  return result;
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -1101,12 +1273,16 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
     });
   }
 
-  const storePairs = detectStorePairs(ir);
-
   // Build a name→nodeId lookup for resolving paired store names to nodeIds
   const storeNameToNodeId = new Map<string, string>(
     ir.stores.filter((s) => !s.isSystem).map((s) => [s.name, s.nodeId]),
   );
+
+  // Precomputed ONCE per IR and reused for every store below — classifyStoreSlotEdit
+  // and describeStorePairing both scan every rule in the IR, so calling analyzeStores
+  // per-store here (rather than letting each call recompute it) keeps this loop
+  // O(stores + rules) instead of O(stores * rules). (#931 perf)
+  const analysis = analyzeStores(ir);
 
   for (const store of ir.stores) {
     if (store.isSystem) continue;
@@ -1115,20 +1291,30 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
     );
     const usage = analyzeStoreUsage(store.name, ir);
 
-    const pairedEntries = storePairs.get(store.name);
-    const hasPairs = pairedEntries !== undefined && pairedEntries.length > 0;
-    const pairedStoreNames = hasPairs ? pairedEntries.map((e) => e.pairedName) : undefined;
+    // Single source of truth for "is this store paired, and with whom?" —
+    // the engine's describeStorePairing, resolved via the pairing graph.
+    // Only the "cross" kind names OTHER stores; "none"/"self"/"unresolved"
+    // never populate the Linked-pair panel (accuracy over completeness —
+    // see the #931 review: the old detectStorePairs cross-produced every
+    // any() against every index() in a rule and could over-pair, e.g.
+    // Cameroon's word/final, which are each independently self-paired).
+    const pairing = describeStorePairing(store, ir, analysis);
+    const partners = pairing.kind === 'cross' ? pairing.partners : undefined;
+    const hasPairs = partners !== undefined && partners.length > 0;
+    const pairedStoreNames = hasPairs ? partners : undefined;
     // Keep index-aligned with pairedStoreNames/Triggers/Roles: an unresolved
     // peer (e.g. a system store, absent from storeNameToNodeId) stays as an
     // undefined slot rather than being filtered out, which would shift every
     // later pair's id/trigger/role by one. Inspector guards undefined per-slot.
     const pairedStoreIds = hasPairs
-      ? pairedEntries.map((e) => storeNameToNodeId.get(e.pairedName))
+      ? partners.map((name) => storeNameToNodeId.get(name))
       : undefined;
-    const pairedStoreTriggers = hasPairs ? pairedEntries.map((e) => e.trigger) : undefined;
+    const pairedStoreTriggers = hasPairs
+      ? partners.map((name) => crossPairTrigger(store.name, name, ir))
+      : undefined;
     const pairedStoreRoles: ('input' | 'output' | 'input+output' | undefined)[] | undefined = hasPairs
-      ? pairedEntries.map((e) => {
-          const u = analyzeStoreUsage(e.pairedName, ir);
+      ? partners.map((name) => {
+          const u = analyzeStoreUsage(name, ir);
           if (u.asSource && u.asOutput) return 'input+output';
           if (u.asSource) return 'input';
           if (u.asOutput) return 'output';
@@ -1142,7 +1328,7 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
       nodeId: store.nodeId,
       kind: 'store',
       name: store.name,
-      storeChips: storeCharChips(store, ir),
+      storeChips: storeCharChips(store, ir, analysis),
       loadBearing: refPattern !== undefined,
       storeUsage: usage.ruleCount > 0 ? usage : undefined,
       ...(refPattern !== undefined ? { referencedByNodeId: refPattern.id, referencedByLabel: refPattern.title } : {}),
@@ -1165,4 +1351,619 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
   }
 
   return nodes;
+}
+
+// ---------------------------------------------------------------------------
+// annotateRemovalRecommendations — #525 FOUNDATION slice
+//
+// Separate, pure pass over an already-built CarveNode[] (from toRailNodes()).
+// Kept out of toRailNodes() itself so the node-building pass stays free of the
+// confirmed-inventory signal — callers that don't have a confirmed inventory
+// yet (or don't want recommendations) can use toRailNodes() output unannotated.
+//
+// Slice-1 scope is deliberately narrow: the ONLY signal is "does this node
+// produce any character the author confirmed they want?" No Unicode-block
+// signal, no Phase-C mechanism-not-enabled signal, no Track-1 default
+// filtering — see the TODO(#525) markers below for each deferred signal's
+// natural hook point.
+// ---------------------------------------------------------------------------
+
+// Non-literal markers outputToChar()/displayChar() can emit — a placeholder
+// means "production unknown", not "produces an unwanted character", so these
+// must never be treated as produced chars (they'd otherwise leak into the
+// removal-recommendation signal as false "unwanted" output — see #525 P1).
+const PLACEHOLDER_CHARS = new Set(['…', '‹dk›', '🔔', '?']);
+
+/**
+ * Categorical never-remove guard (#525): a character is never recommended
+ * for removal if its Unicode General_Category is a Number (`\p{N}`),
+ * Punctuation (`\p{P}`), or Symbol (`\p{S}`) — regardless of target
+ * language. CLDR's punctuation/number exemplar tiers are language-specific
+ * and often sparse (e.g. Greek `el` doesn't list ASCII `.`/`,`/`0-9`), so
+ * these fall outside `needed` and would otherwise look surplus even though
+ * they're wanted on essentially every keyboard. Shared by both
+ * annotateRemovalRecommendations (node-level) and recommendedRemovalChars
+ * (character-level) so the two signals agree.
+ *
+ * A combining/letter grapheme (base letter + mark) normalizes to category
+ * L/M, not N/P/S, so it does NOT match here — surplus letters/marks are
+ * still eligible for removal recommendations. Only bare number/punctuation/
+ * symbol codepoints are shielded.
+ */
+function isAlwaysKeepCategory(ch: string): boolean {
+  return /^[\p{N}\p{P}\p{S}]$/u.test(ch);
+}
+
+/**
+ * Produced output characters for a single node — the `.ch` of every glyph
+ * (group/pattern) or every store chip (store). Raw fragments produce nothing
+ * displayable, so they always resolve to an empty set (→ 'none').
+ *
+ * Two normalizations vs. the raw `.ch`:
+ * - Strips a leading dotted-circle (U+25CC) that displayChar() prefixes onto
+ *   combining-mark glyphs for standalone visibility, so a combining mark the
+ *   author confirmed (e.g. in confirmedInventory as raw `̀`) still
+ *   matches a fan-out glyph whose `.ch` is `◌̀`.
+ * - Drops placeholder chars (PLACEHOLDER_CHARS) entirely rather than adding
+ *   them to the set — an unresolved index()/outs()/deadkey/beep output is
+ *   "don't know what this produces," not "produces an unwanted character."
+ */
+function producedCharsOf(node: CarveNode, form: CharNormalizationForm = 'NFC'): Set<string> {
+  const chars = new Set<string>();
+  const add = (raw: string) => {
+    const stripped = raw.startsWith('◌') ? raw.slice(1) : raw;
+    const normalized = stripped.normalize(form);
+    // Placeholder-detection uses NFC regardless of `form`: PLACEHOLDER_CHARS
+    // are ASCII/invariant tokens ('…', '‹dk›', '🔔', '?'), identical under
+    // every normalization form, so this check is unaffected by `form`.
+    if (PLACEHOLDER_CHARS.has(stripped.normalize('NFC'))) return;
+    chars.add(normalized);
+  };
+  for (const g of node.glyphs ?? []) add(g.ch);
+  for (const c of node.storeChips ?? []) add(c.ch);
+  return chars;
+}
+
+// ---------------------------------------------------------------------------
+// resolveCoordinatedPartnerItems — SHARED coordinated-partner resolution
+// (#525/#931 follow-up review fix — refactor).
+//
+// Both coordinatedDropHitsNeededChar (boolean short-circuit) and
+// coordinatedCollateralForSlots (display-list builder) independently walked
+// classifyStoreSlotEdit's `coordinatedWith` and looked up each partner
+// store's item at the same `itemsIndex` — this is that walk, written once.
+// Pure and read-only: it never re-derives or changes the engine's
+// coordinated-drop algorithm (classifyStoreSlotEdit/applyStoreSlotRemovals
+// remain the single source of truth for WHICH stores pair and how), it only
+// projects what the engine will do.
+//
+// Takes an ALREADY-CLASSIFIED `mode` rather than (store, ir, analysis) so a
+// caller looping over multiple itemsIndex values for the SAME store can
+// hoist the classifyStoreSlotEdit call once outside that loop (mode never
+// changes across itemsIndex — see the #931-perf fix in
+// annotateRemovalRecommendations below).
+// ---------------------------------------------------------------------------
+
+/** A coordinated partner store's item at a given slot, resolved from a StoreSlotEditMode. */
+interface CoordinatedPartnerItem {
+  partnerStore: IRStore;
+  /** The partner's char item at the same itemsIndex (never a non-char item — those are skipped). */
+  item: Extract<StoreItem, { kind: 'char' }>;
+  /** "<partnerStore.nodeId>#<itemsIndex>" — the locked slot-id contract. */
+  slotId: string;
+}
+
+/**
+ * Resolve every coordinated PARTNER store's item at `itemsIndex`, given an
+ * already-classified `mode` for the store being edited. Returns `[]` when
+ * `mode` is 'blocked' (not this helper's concern — the caller already treats
+ * `mode.mode === 'blocked'` as "not simple" separately), has no coordinated
+ * partners (`coordinatedWith: []` — e.g. a self-paired or unpaired store),
+ * or when a named partner can't be resolved (unknown name, or no char item
+ * at that index — a shorter/non-char partner store slot).
+ */
+function resolveCoordinatedPartnerItems(
+  mode: StoreSlotEditMode,
+  itemsIndex: number,
+  storesByName: ReadonlyMap<string, IRStore>,
+): CoordinatedPartnerItem[] {
+  if (mode.mode === 'blocked' || mode.coordinatedWith.length === 0) return [];
+
+  const results: CoordinatedPartnerItem[] = [];
+  for (const partnerName of mode.coordinatedWith) {
+    const partnerStore = storesByName.get(partnerName);
+    if (partnerStore === undefined) continue;
+    const item = partnerStore.items[itemsIndex];
+    if (item === undefined || item.kind !== 'char') continue;
+    results.push({ partnerStore, item, slotId: `${partnerStore.nodeId}#${itemsIndex}` });
+  }
+  return results;
+}
+
+/**
+ * Coordinated-removal collateral guard ("remove everywhere", #525 v2) —
+ * replaces the old store-LEVEL `storeFeedsConfirmedChar` shield, which
+ * conflated "some rule referencing this store produces a needed char
+ * SOMEWHERE" (store-level, and — via the Cameroon `word` idiom, where a
+ * self-referencing index() output resolves back to the WHOLE store's own
+ * items — trivially true for almost every store) with the actual question
+ * that matters for a specific slot: "would dropping THIS item, via
+ * applyStoreSlotRemovals' coordinated pairing graph, also drop a needed
+ * character from a PAIRED store at the same position?"
+ *
+ * `classifyStoreSlotEdit`'s `coordinatedWith` names the store(s) that a drop
+ * on `store` splices at the SAME `itemsIndex` (see applyStoreSlotRemovals).
+ * A self-paired or unpaired store (`coordinatedWith: []` — e.g. Cameroon's
+ * `word`, self-paired with itself in the SAME rule) has no partner, so it can
+ * never trip this guard: removing one of its own surplus chars never touches
+ * another store's item. A blocked store is not this guard's concern — the
+ * caller already treats `mode.mode === 'blocked'` as "not simple" separately.
+ *
+ * Takes an already-classified `mode` (see resolveCoordinatedPartnerItems)
+ * rather than (store, ir, analysis) — callers looping over itemsIndex for
+ * the same store hoist classifyStoreSlotEdit once outside the loop.
+ */
+function coordinatedDropHitsNeededChar(
+  mode: StoreSlotEditMode,
+  itemsIndex: number,
+  needed: ReadonlySet<string>,
+  bcp47: string | null | undefined,
+  storesByName: ReadonlyMap<string, IRStore>,
+  form: CharNormalizationForm = 'NFC',
+): boolean {
+  const partners = resolveCoordinatedPartnerItems(mode, itemsIndex, storesByName);
+  return partners.some(({ item }) =>
+    isCharCoveredForLocale(item.value, needed, bcp47 ?? '', form),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// coordinatedCollateralForSlots — manual-carve safety helper (#525/#931
+// follow-up, MANUAL-carve gap).
+//
+// collectCharContributors names the store slots a manual chip/cascade click
+// targets DIRECTLY. applyStoreSlotRemovals' coordinated-drop pairing graph
+// (classifyStoreSlotEdit's `coordinatedWith`) then ALSO splices every PAIRED
+// partner store at the SAME itemsIndex — e.g. removing an input char from a
+// deadkey INPUT store silently drops the aligned composed character from the
+// OUTPUT store too. That collateral is otherwise invisible to the confirm
+// dialog. This pass resolves it explicitly for display: for every slot that
+// will actually be dropped (mode 'drop'), it names each coordinated
+// partner's character at the same index, flagging whether it's a needed
+// character (isNeeded) — reusing resolveCoordinatedPartnerItems, the exact
+// same walk coordinatedDropHitsNeededChar above uses for the
+// recommendation-signal guard, never a separate heuristic. Does NOT change
+// or re-derive the engine's coordinated-drop algorithm itself — purely a
+// read-only projection of what applyStoreSlotRemovals will do.
+// ---------------------------------------------------------------------------
+
+/** One character collaterally dropped from a PAIRED store by a coordinated removal. */
+export interface CoordinatedCollateralChar {
+  ch: string;
+  storeName: string;
+  isNeeded: boolean;
+  /**
+   * "<partnerStore.nodeId>#<itemsIndex>" — the locked slot-id contract (same
+   * convention as CharContributors.storeSlotIds / StoreCharChip.chipId).
+   * Lets a caller (e.g. CarveGallery's handleCascadePrimary) fold this
+   * partner slot into cascadeDelete's storeSlotIds argument so a confirmed
+   * "remove everywhere" persists the collateral drop in deletedItemIds —
+   * without this, the Gallery kept showing the collateral char as KEPT even
+   * though export-time applyStoreSlotRemovals had already dropped it.
+   */
+  slotId: string;
+}
+
+/**
+ * Resolve the coordinated-drop collateral for a set of store-slot ids about
+ * to be removed (typically `CharContributors.storeSlotIds` from
+ * collectCharContributors). A partner slot already present in `storeSlotIds`
+ * itself (i.e. already an explicit removal target, not a hidden surprise) is
+ * excluded — this surfaces only the collateral the author did NOT already
+ * ask to remove. Deduped by partner slot id (a partner can only be hit once
+ * per index, but two different requested slots could in principle name the
+ * same partner+index).
+ *
+ * @param storeSlotIds Slot ids ("<storeNodeId>#<itemsIndex>") targeted for removal.
+ * @param ir           The full IR.
+ * @param needed       Confirmed-inventory ∪ CLDR needed-set — the same union the
+ *                      caller already threads into annotateRemovalRecommendations /
+ *                      recommendedRemovalChars.
+ * @param bcp47        Target language, for the Turkic-aware case fold in isCharCoveredForLocale.
+ * @param analysis     Optional precomputed analyzeStores(ir) result (see StoreAnalysis doc) —
+ *                      pass this when calling for many removals against the same ir.
+ * @param form         Normalization form both `needed` and the resolved collateral
+ *                      character are compared under (default "NFC", preserving
+ *                      pre-existing behavior) — see isCharCoveredForLocale's `form` doc.
+ */
+export function coordinatedCollateralForSlots(
+  storeSlotIds: readonly string[],
+  ir: KeyboardIR,
+  needed: ReadonlySet<string>,
+  bcp47?: string | null,
+  analysis: StoreAnalysis = analyzeStores(ir),
+  form: CharNormalizationForm = 'NFC',
+): CoordinatedCollateralChar[] {
+  if (storeSlotIds.length === 0) return [];
+
+  // storesByNodeId resolves the TARGETED slot's own store (keyed by nodeId,
+  // as parseSlotId yields) — not carried by StoreAnalysis, which keys by
+  // name. storesByName (partner-name resolution) IS carried by StoreAnalysis
+  // (analysis.storeByName), so it is reused rather than rebuilt (#931 perf).
+  const storesByNodeId = new Map(ir.stores.map((s) => [s.nodeId, s]));
+  const targetSlotIds = new Set(storeSlotIds);
+  const seenPartnerSlotIds = new Set<string>();
+  const collateral: CoordinatedCollateralChar[] = [];
+
+  for (const slotId of storeSlotIds) {
+    const parsed = parseSlotId(slotId);
+    if (parsed === null) continue;
+    const store = storesByNodeId.get(parsed.storeNodeId);
+    if (store === undefined) continue;
+
+    const mode = classifyStoreSlotEdit(store, ir, analysis);
+    const partners = resolveCoordinatedPartnerItems(mode, parsed.itemsIndex, analysis.storeByName);
+
+    for (const { partnerStore, item, slotId: partnerSlotId } of partners) {
+      if (targetSlotIds.has(partnerSlotId) || seenPartnerSlotIds.has(partnerSlotId)) continue;
+
+      seenPartnerSlotIds.add(partnerSlotId);
+      const ch = item.value.normalize(form);
+      collateral.push({
+        ch,
+        storeName: partnerStore.name,
+        isNeeded: isCharCoveredForLocale(ch, needed, bcp47 ?? '', form),
+        slotId: partnerSlotId,
+      });
+    }
+  }
+
+  return collateral;
+}
+
+/**
+ * Guardrail (#525 items 2/4 — language-driven surplus, confirmed with the
+ * user): recognized patterns, opaque/raw fragments, and deadkey/fan-out
+ * mechanisms are structural, not simple character producers, so neither
+ * signal (inventory-only or language-surplus) may ever recommend removing
+ * them, however "surplus" their output looks in isolation.
+ *
+ * - 'pattern' nodes — owned by a recognized pattern; a rule-level version of
+ *   this exclusion already keeps pattern-owned rules out of 'group' nodes
+ *   (see ownedByPattern / collectOwnedNodeIds in groupToGlyphs), so excluding
+ *   the 'pattern' CardKind here covers "recognized-pattern rules" too.
+ * - 'raw' nodes — opaque RawKmnFragment; never produce glyphs anyway
+ *   (produced.size === 0 already resolves to 'none'), excluded explicitly
+ *   for clarity rather than relying on that side effect.
+ * - 'group' nodes containing a deadkey-context rule, a deadkey-*registration*
+ *   rule (output `dk(...)`, e.g. `+ [K_COLON] > dk(003b)`), or a
+ *   parallel-store fan-out rule (isParallelIndexFanOut — the same predicate
+ *   the S-02 deadkey-body/Bamum-transliteration classifier uses) — a deadkey
+ *   mechanism's characters are locked together structurally; recommending
+ *   removal from the character signal alone could break the composition
+ *   without the author realizing it's part of a deadkey chain. Registration
+ *   rules commonly live in a different group than the deadkey's consuming
+ *   context rules (e.g. `group(main)` registers via output, `group(deadkeys)`
+ *   consumes via context) — checking output as well as context catches that
+ *   split idiom.
+ *
+ * Only plain letter/glyph producers (ordinary 'group' rules with no deadkey
+ * involvement) and store-char producers ('store' nodes) are eligible.
+ *
+ * @param ownedNodeIds Precomputed collectOwnedNodeIds(ir) — hoisted by the
+ *                      caller (annotateRemovalRecommendations) so this
+ *                      O(rules) scan isn't repeated for every group node.
+ */
+function isStructuralExclusion(node: CarveNode, ir: KeyboardIR, ownedNodeIds: Set<string>): boolean {
+  if (node.kind === 'pattern' || node.kind === 'raw') return true;
+  if (node.kind !== 'group') return false;
+
+  const group = ir.groups.find((g) => g.nodeId === node.nodeId);
+  if (!group) return false;
+
+  return group.rules.some((rule) => {
+    if (rule.ownedByPattern !== undefined || ownedNodeIds.has(rule.nodeId)) return false; // owned by a pattern — not this group's concern
+    return (
+      rule.context.some((el) => el.kind === 'deadkey') ||
+      rule.output.some((el) => el.kind === 'deadkey') ||
+      isParallelIndexFanOut(rule)
+    );
+  });
+}
+
+/**
+ * Annotates each node's `recommendation` field. See CarveNode.recommendation
+ * for the meaning of each value; slice-1/2 only ever emit 'high' or 'none'.
+ *
+ * Conservative by design — "when in doubt, return 'none'": a node is 'high'
+ * iff it is not structurally excluded (isStructuralExclusion above), produces
+ * at least one character, and every character it produces is absent from
+ * `needed` AND (for stores) no rule that references it produces a needed
+ * character (the dependency guard above).
+ *
+ * `needed` (#525 items 2/4 — language-driven surplus) is the union of
+ * `neededChars` (a target language's CLDR exemplar set, resolved upstream —
+ * see neededCharsForLanguage) and `confirmedInventory` (the author's Phase B
+ * choices). Passing `neededChars` as null/undefined (CLDR unavailable for
+ * this language, or not yet resolved) falls back to the original
+ * inventory-only behavior — `needed` degrades to `confirmedInventory` alone,
+ * so this is backward-compatible with 3-argument callers. If BOTH sets are
+ * empty, there is no signal at all — every node gets 'none' rather than a
+ * spurious "everything is unwanted" result.
+ *
+ * Membership against `needed` is case-folded via `isCharCoveredForLocale`
+ * (reusing suggestMissing.ts's `isCovered` exception-aware fold, incl. the
+ * Turkic dotted-I exception) rather than exact-match: CLDR exemplars are
+ * lowercase-only, so a keyboard producing an uppercase accented letter (e.g.
+ * French "É") must still count as needed. `bcp47` is required for the Turkic
+ * exception check; when omitted (no target language resolved yet), a plain
+ * non-Turkic fold is used.
+ *
+ * `form` (default "NFC", preserving pre-046-carve behavior) is the
+ * normalization form the marks series' output-form decision resolves to
+ * (see `normalizationFormForOutputForm` — "ready-made" => "NFC",
+ * "base-plus-mark" => "NFD"). BOTH the produced-character set (via
+ * `producedCharsOf`) and `needed` are normalized to this SAME form before
+ * comparison, so the chosen output form actually drives which combo
+ * grapheme (precomposed vs. decomposed) counts as a match — the "apples to
+ * apples" carve-gallery comparison. `needed`'s members are re-normalized
+ * here rather than trusted as already-`form`-normalized, since callers may
+ * pass sets built against the default NFC assumption.
+ */
+export function annotateRemovalRecommendations(
+  nodes: CarveNode[],
+  ir: KeyboardIR,
+  confirmedInventory: ReadonlySet<string>,
+  neededChars?: ReadonlySet<string> | null,
+  bcp47?: string | null,
+  form: CharNormalizationForm = 'NFC',
+): CarveNode[] {
+  const renormalize = (set: ReadonlySet<string>): Set<string> => new Set([...set].map((ch) => ch.normalize(form)));
+  const needed: ReadonlySet<string> = neededChars
+    ? renormalize(new Set([...neededChars, ...confirmedInventory]))
+    : renormalize(confirmedInventory);
+
+  if (needed.size === 0) {
+    return nodes.map((node) => ({ ...node, recommendation: 'none' }));
+  }
+
+  const ownedNodeIds = collectOwnedNodeIds(ir);
+  // '' is a safe "no locale known" default: primarySubtag('') is '' which is
+  // never in TURKIC_LOCALES, so isCharCoveredForLocale falls back to a plain
+  // (non-Turkic) case fold — matching pre-fix exact-match behavior's intent
+  // as closely as possible when the target language hasn't resolved yet.
+  const isNeeded = (ch: string): boolean => isCharCoveredForLocale(ch, needed, bcp47 ?? '', form);
+
+  // Precomputed ONCE per IR (not per store node) — classifyStoreSlotEdit scans
+  // every rule in the IR, mirroring recommendedRemovalChars' perf note below.
+  // storesByName is NOT rebuilt here — analysis.storeByName already carries
+  // an identical name-keyed map (#931 perf).
+  const analysis = analyzeStores(ir);
+  const storesByNodeId = new Map(ir.stores.map((s) => [s.nodeId, s]));
+
+  return nodes.map((node) => {
+    if (isStructuralExclusion(node, ir, ownedNodeIds)) return { ...node, recommendation: 'none' };
+
+    const produced = producedCharsOf(node, form);
+    if (produced.size === 0) return { ...node, recommendation: 'none' };
+
+    for (const ch of produced) {
+      if (isNeeded(ch) || isAlwaysKeepCategory(ch)) return { ...node, recommendation: 'none' };
+    }
+
+    if (node.kind === 'store') {
+      const store = storesByNodeId.get(node.nodeId);
+      if (store !== undefined) {
+        // classifyStoreSlotEdit is index-INDEPENDENT (it classifies the whole
+        // store, not a single slot) — hoisted out of the itemsIndex loop below
+        // so it runs ONCE per store instead of once per item (#931 perf).
+        const mode = classifyStoreSlotEdit(store, ir, analysis);
+        for (let i = 0; i < store.items.length; i++) {
+          if (coordinatedDropHitsNeededChar(mode, i, needed, bcp47, analysis.storeByName, form)) {
+            return { ...node, recommendation: 'none' };
+          }
+        }
+      }
+    }
+
+    // TODO(#525): fold in the Unicode-block signal here (a node whose produced
+    // chars all fall in a block the author's script routing never touches is a
+    // softer 'medium' signal, not 'high') once §9 routing exposes block ranges.
+    // TODO(#525): fold in the Phase-C mechanism-not-enabled signal here (a node
+    // that exists only to support a mechanism the author didn't select in
+    // Phase C survey answers) once that mechanism-selection data is threaded
+    // through to the carve step.
+    return { ...node, recommendation: 'high' };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// recommendedRemovalChars — #525 BANNER slice
+//
+// Character-level removal-recommendation signal, sibling to
+// annotateRemovalRecommendations's node-level 'high'/'none' pass above. The
+// banner's flat checklist operates at CHARACTER granularity, not node
+// granularity — a node can mix simple and structural producers of the SAME
+// character (e.g. a plain group rule AND a deadkey fan-out both happen to
+// produce the same surplus letter), so the node-level signal alone can't
+// drive a per-character checklist safely. This pass re-derives its own
+// producer-simplicity check per character via collectCharContributors,
+// rather than reusing isStructuralExclusion (which is node-scoped).
+// ---------------------------------------------------------------------------
+
+/**
+ * Allowlist predicate (NOT a blocklist): true iff `rule` is a provably-simple,
+ * single-character producer — safe to fold into the character-level removal
+ * banner without risking a structural mechanism.
+ *
+ * A simple rule has EXACTLY:
+ *   - one context element, of kind 'char' or 'vkey' — a bare key press or a
+ *     literal preceding character. Any deadkey/any/notany/context/index/
+ *     baselayout/raw context element fails this (wrong kind, or the extra
+ *     element pushes context.length past 1 — which is also how an if()/
+ *     set()/platform() guard is rejected, since the codec represents those
+ *     as additional context elements).
+ *   - one output element, of kind 'char'. Any deadkey/index()/outs()/beep/
+ *     useGroup/raw output element fails this. A base+combining-mark pair
+ *     that NFC-composes to one visible glyph is still two IR elements and
+ *     is rejected here too, even though collectCharContributors treats it
+ *     as a whole-rule producer (see the ruleNodeIds loop below).
+ *   - NOT owned by a recognized pattern (ownedByPattern === undefined) — a
+ *     pattern-owned rule is part of a structural mechanism the recognizer
+ *     already identified, mirroring isStructuralExclusion's 'pattern'
+ *     exclusion at the node level.
+ *
+ * Default-safe: any shape this predicate doesn't explicitly recognize as
+ * simple returns false.
+ *
+ * Deliberately NOT the same predicate as `isS01` in
+ * `packages/engine/src/recognizer/rules/s01-simple-swap.ts` (the "Simple
+ * swap" pattern recognizer) or the `'removable:simple'` capability from
+ * `classifyRemovalCapabilities` — this is a narrower, character-signal-only
+ * allowlist, so the two differences are intentional, not drift:
+ *   - this predicate accepts a bare `char`-kind context element (one literal
+ *     preceding character), which isS01 does not (isS01 requires a `vkey`
+ *     context); isS01/removable:simple would reject such a rule.
+ *   - this predicate does NOT exclude group "deadkeys" the way isS01 does —
+ *     structural deadkey exclusion for the banner checklist is handled
+ *     separately, upstream, via the per-producer `blocked`/store-mode checks
+ *     in `recommendedRemovalChars` below.
+ * If either isS01 or classifyRemovalCapabilities's simple-shape check
+ * changes, re-check whether this predicate should follow — they are not
+ * mechanically linked.
+ */
+export function isSimpleRemovableRule(rule: IRRule): boolean {
+  if (rule.ownedByPattern !== undefined) return false;
+  if (rule.context.length !== 1) return false;
+  const ctx = rule.context[0];
+  if (ctx === undefined || (ctx.kind !== 'char' && ctx.kind !== 'vkey')) return false;
+  if (rule.output.length !== 1) return false;
+  const out = rule.output[0];
+  if (out === undefined || out.kind !== 'char') return false;
+  return true;
+}
+
+/** A single recommended-removal character for the CarveGallery banner checklist. */
+export interface RecommendedRemovalChar {
+  ch: string;
+  /** Contributor info for removal — pass straight to cascadeDelete(contributors.ruleNodeIds, contributors.storeSlotIds). */
+  contributors: CharContributors;
+}
+
+/**
+ * Character-level removal-recommendation signal for the CarveGallery banner
+ * (#525 BANNER slice). A produced character `ch` is recommended iff ALL hold:
+ *
+ *   1. Surplus — `ch` is absent from `needed` (case-folded via
+ *      isCharCoveredForLocale, same fold annotateRemovalRecommendations
+ *      uses). The caller pre-unions neededChars ∪ confirmedInventory into
+ *      `needed` — this function does no signal-merging of its own. `ch` is
+ *      also never surplus if it falls in the categorical never-remove guard
+ *      (isAlwaysKeepCategory — Unicode Number/Punctuation/Symbol), which
+ *      overrides any language-specific CLDR exemplar-tier gap.
+ *   2. Allowlist rule-shielding — EVERY producer of `ch` (resolved via
+ *      collectCharContributors) is provably simple:
+ *        - any collectCharContributors `blocked` entry (opaque fragment, or
+ *          a multi-char/partial literal run) shields immediately.
+ *        - a character with NO producers found at all (an unrecognized
+ *          shape collectCharContributors can't classify) shields —
+ *          default-safe.
+ *        - each ruleNodeIds entry must resolve to a real rule and pass
+ *          isSimpleRemovableRule.
+ *        - each storeSlotIds entry (`<storeNodeId>#<i>`) must resolve to a
+ *          real store whose classifyStoreSlotEdit mode is 'drop' — never
+ *          'blocked' (notany-widens/context-index-aligned/system-store/
+ *          unresolved-index-pairing/outs-reference-unanalyzed).
+ *   3. Coordinated-removal collateral guard ("remove everywhere", #525 v2) —
+ *      for each contributing store slot `store#i`, resolving
+ *      `classifyStoreSlotEdit`'s `coordinatedWith` partners and checking
+ *      whether any partner store's item AT THE SAME INDEX `i` is itself a
+ *      needed character (`coordinatedDropHitsNeededChar`, shared with the
+ *      node-level pass above). A self-paired or unpaired store
+ *      (`coordinatedWith: []`) has no partner and can never shield on this
+ *      account — this is deliberately narrower than the old store-level
+ *      `storeFeedsConfirmedChar` shield it replaces, which treated "some
+ *      rule referencing this store produces ANY needed char anywhere" as
+ *      grounds to shield EVERY character the store contributes to (the
+ *      Cameroon `word`-store over-coarse-guard bug — `word` self-feeds the
+ *      whole Latin alphabet AND a needed Greek letter, so the old guard
+ *      shielded every Latin letter).
+ *
+ * Returns [] when `needed` is empty — no signal at all yet (mirrors
+ * annotateRemovalRecommendations's "no default is a defect until we're
+ * sure" stance), so the banner never shows before Phase B/CLDR resolves.
+ *
+ * `form` (default "NFC", preserving pre-046-carve behavior) — see
+ * annotateRemovalRecommendations's matching doc. `buildProducedSet` (from
+ * contracts) always returns NFC; rather than touching that shared helper
+ * (used well beyond carve), its output is re-normalized to `form` here at
+ * this comparison seam, alongside `needed`, so both sides of the
+ * surplus-detection match under the SAME form.
+ */
+export function recommendedRemovalChars(args: {
+  ir: KeyboardIR;
+  needed: ReadonlySet<string>;
+  bcp47?: string | null | undefined;
+  form?: CharNormalizationForm;
+}): RecommendedRemovalChar[] {
+  const { ir, needed: rawNeeded, bcp47, form = 'NFC' } = args;
+  if (rawNeeded.size === 0) return [];
+  const needed = new Set([...rawNeeded].map((ch) => ch.normalize(form)));
+
+  const produced = new Set([...buildProducedSet(ir)].map((ch) => ch.normalize(form)));
+  const storesById = new Map(ir.stores.map((s) => [s.nodeId, s]));
+  const rulesById = new Map<string, IRRule>();
+  for (const group of ir.groups) {
+    for (const rule of group.rules) rulesById.set(rule.nodeId, rule);
+  }
+  // Precomputed ONCE per IR, not per candidate character — classifyStoreSlotEdit
+  // scans every rule in the IR, and this loop can call it once per contributing
+  // store of EVERY candidate character, so without this it's O(chars * rules)
+  // rather than O(chars + rules). (#931 perf)
+  const analysis = analyzeStores(ir);
+
+  const results: RecommendedRemovalChar[] = [];
+
+  for (const ch of produced) {
+    if (isCharCoveredForLocale(ch, needed, bcp47 ?? '', form)) continue; // needed — not a candidate
+    if (isAlwaysKeepCategory(ch)) continue; // digit/punctuation/symbol — never a removal candidate
+
+    const contributors = collectCharContributors(ir, ch);
+
+    // Any blocked producer (opaque fragment, multi-char/partial literal run)
+    // shields immediately; so does finding NO producer at all (unrecognized
+    // shape — default-safe).
+    if (contributors.blocked.length > 0) continue;
+    if (contributors.ruleNodeIds.length === 0 && contributors.storeSlotIds.length === 0) continue;
+
+    let allSimple = true;
+    for (const ruleId of contributors.ruleNodeIds) {
+      const rule = rulesById.get(ruleId);
+      if (rule === undefined || !isSimpleRemovableRule(rule)) { allSimple = false; break; }
+    }
+
+    let dependsOnNeeded = false;
+    if (allSimple) {
+      for (const slotId of contributors.storeSlotIds) {
+        const parsed = parseSlotId(slotId);
+        if (parsed === null) { allSimple = false; break; }
+        const store = storesById.get(parsed.storeNodeId);
+        if (store === undefined) { allSimple = false; break; }
+        const mode = classifyStoreSlotEdit(store, ir, analysis);
+        if (mode.mode === 'blocked') { allSimple = false; break; }
+        // Reuses the `mode` just computed above — coordinatedDropHitsNeededChar
+        // takes an already-classified mode rather than re-deriving it (#931 perf).
+        if (coordinatedDropHitsNeededChar(mode, parsed.itemsIndex, needed, bcp47, analysis.storeByName, form)) {
+          dependsOnNeeded = true;
+          break;
+        }
+      }
+    }
+
+    if (!allSimple || dependsOnNeeded) continue;
+
+    results.push({ ch, contributors });
+  }
+
+  return results;
 }

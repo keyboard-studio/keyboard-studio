@@ -401,6 +401,189 @@ describe("emitTouchLayout", () => {
     expect(parentKey?.sk?.length).toBe(2);
     expect(parentKey?.sk?.[0]?.id).toBe("U_005B");
   });
+
+  // ---------------------------------------------------------------------------
+  // Flick + multitap round-trip — regression guard for the parser consolidation
+  //
+  // The old engine parser merged multitap into sk on parse.  After the
+  // canonical-parser consolidation the full cycle must be stable:
+  //   parseTouchLayout → emitTouchLayout → parseTouchLayout again
+  // Both flick directions and multitap entries must survive unchanged.
+  // ---------------------------------------------------------------------------
+
+  it("round-trips flick directions and multitap through parse → emit → parse", () => {
+    const source = JSON.stringify({
+      phone: {
+        layer: [
+          {
+            id: "default",
+            row: [
+              {
+                id: 1,
+                key: [
+                  {
+                    id: "K_A",
+                    text: "a",
+                    // One flick direction (north) — exercises the flick map path
+                    flick: {
+                      n: { id: "K_FN", text: "north" },
+                      e: { id: "K_FE", text: "east" },
+                    },
+                    // Longpress sub-keys — must stay in sk
+                    sk: [{ id: "K_S1", text: "long-a" }],
+                    // Tap-cycle entries — must stay in multitap, NOT merged into sk
+                    multitap: [
+                      { id: "K_T1", text: "tap-1" },
+                      { id: "K_T2", text: "tap-2" },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    // First parse
+    const ir1 = parseTouchLayout(source);
+    const key1 = ir1.platforms[0]!.layers[0]!.rows[0]!.keys[0]!;
+
+    // Sanity-check the first parse
+    expect(key1.flick?.n?.id).toBe("K_FN");
+    expect(key1.flick?.e?.id).toBe("K_FE");
+    expect(key1.sk?.length).toBe(1);
+    expect(key1.multitap?.length).toBe(2);
+
+    // Emit to JSON, then re-parse
+    const emitted = emitTouchLayout(ir1);
+    const ir2 = parseTouchLayout(emitted);
+    const key2 = ir2.platforms[0]!.layers[0]!.rows[0]!.keys[0]!;
+
+    // Flick directions survive the round-trip
+    expect(key2.flick?.n?.id, "flick north id must survive round-trip").toBe("K_FN");
+    expect(key2.flick?.n?.text, "flick north text must survive round-trip").toBe("north");
+    expect(key2.flick?.e?.id, "flick east id must survive round-trip").toBe("K_FE");
+
+    // Unknown directions were never present — confirm no phantom keys
+    expect(Object.keys(key2.flick ?? {})).toEqual(
+      expect.arrayContaining(["n", "e"]),
+    );
+    expect(Object.keys(key2.flick ?? {}).length).toBe(2);
+
+    // sk survives unchanged
+    expect(key2.sk?.length, "sk count must be stable across round-trip").toBe(1);
+    expect(key2.sk?.[0]?.id).toBe("K_S1");
+
+    // multitap survives unchanged and is NOT merged into sk
+    expect(key2.multitap?.length, "multitap count must be stable across round-trip").toBe(2);
+    expect(key2.multitap?.[0]?.id).toBe("K_T1");
+    expect(key2.multitap?.[1]?.id).toBe("K_T2");
+
+    // Guarantee: multitap ids did not leak into sk
+    const skIds2 = (key2.sk ?? []).map((k) => k.id);
+    for (const mt of key2.multitap ?? []) {
+      expect(
+        skIds2,
+        `multitap id "${mt.id}" must not appear in sk after round-trip`,
+      ).not.toContain(mt.id);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// flick — directional gesture map (previously dropped by convertKey)
+// ---------------------------------------------------------------------------
+
+const FLICK_TOUCH = JSON.stringify({
+  tablet: {
+    layer: [
+      {
+        id: "default",
+        row: [
+          {
+            id: 1,
+            key: [
+              {
+                id: "U_0065",
+                text: "e",
+                flick: {
+                  n: { id: "U_0065_n", text: "é", output: "é" },
+                  sw: { id: "U_0065_sw", text: "è", output: "è" },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+});
+
+describe("parseTouchLayout - flick", () => {
+  it("parses flick entries in >= 2 directions into TouchKeyIR.flick with text/output/id intact", () => {
+    const ir = parseTouchLayout(FLICK_TOUCH);
+    const key = ir.platforms[0]?.layers[0]?.rows[0]?.keys[0];
+    expect(key?.flick?.n?.id).toBe("U_0065_n");
+    expect(key?.flick?.n?.text).toBe("é");
+    expect(key?.flick?.n?.output).toBe("é");
+    expect(key?.flick?.sw?.id).toBe("U_0065_sw");
+    expect(key?.flick?.sw?.text).toBe("è");
+    expect(key?.flick?.sw?.output).toBe("è");
+  });
+
+  it("round-trips flick through emit -> reparse", () => {
+    const ir = parseTouchLayout(FLICK_TOUCH);
+    const emitted = emitTouchLayout(ir);
+    const reparsed = JSON.parse(emitted) as Record<
+      string,
+      { layer: Array<{ row: Array<{ key: Array<{ flick?: Record<string, { id: string; text?: string; output?: string }> }> }> }> }
+    >;
+    const wireKey = reparsed["tablet"]?.layer[0]?.row[0]?.key[0];
+    expect(wireKey?.flick?.["n"]?.id).toBe("U_0065_n");
+    expect(wireKey?.flick?.["n"]?.text).toBe("é");
+    expect(wireKey?.flick?.["sw"]?.id).toBe("U_0065_sw");
+    expect(wireKey?.flick?.["sw"]?.text).toBe("è");
+
+    const ir2 = parseTouchLayout(emitted);
+    const key2 = ir2.platforms[0]?.layers[0]?.rows[0]?.keys[0];
+    expect(key2?.flick?.n?.id).toBe("U_0065_n");
+    expect(key2?.flick?.n?.output).toBe("é");
+    expect(key2?.flick?.sw?.id).toBe("U_0065_sw");
+    expect(key2?.flick?.sw?.output).toBe("è");
+  });
+
+  it("drops a flick entry keyed by an unknown/bogus direction, keeping valid ones", () => {
+    const json = JSON.stringify({
+      tablet: {
+        layer: [
+          {
+            id: "default",
+            row: [
+              {
+                id: 1,
+                key: [
+                  {
+                    id: "U_0065",
+                    text: "e",
+                    flick: {
+                      n: { id: "U_0065_n", text: "é", output: "é" },
+                      // bogus direction key — not in the compass-direction vocabulary
+                      xx: { id: "U_0065_xx", text: "?", output: "?" },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const ir = parseTouchLayout(json);
+    const key = ir.platforms[0]?.layers[0]?.rows[0]?.keys[0];
+    expect(key?.flick?.n?.id).toBe("U_0065_n");
+    expect(Object.keys(key?.flick ?? {})).toEqual(["n"]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -492,5 +675,28 @@ describe("touch-key provenance round-trip (spec-014 T028)", () => {
     const parent = ir2.platforms[0]?.layers[0]?.rows[0]?.keys[0];
     expect(parent?.provenance).toBe("physical-suggested");
     expect(parent?.sk?.[0]?.provenance).toBe("base-derived");
+  });
+
+  it("round-trips provenance on multitap sub-keys too", () => {
+    // multitap is kept as its own array (not flattened into sk); provenance
+    // must survive the full cycle there as well.
+    const json = JSON.stringify({
+      tablet: {
+        layer: [{
+          id: "default",
+          row: [{
+            id: 1,
+            key: [{
+              id: "K_1", text: "1", p: "base-derived",
+              multitap: [{ id: "K_1_MT", text: "!", p: "physical-suggested" }],
+            }],
+          }],
+        }],
+      },
+    });
+    const ir2 = parseTouchLayout(emitTouchLayout(parseTouchLayout(json)));
+    const parent = ir2.platforms[0]?.layers[0]?.rows[0]?.keys[0];
+    expect(parent?.provenance).toBe("base-derived");
+    expect(parent?.multitap?.[0]?.provenance).toBe("physical-suggested");
   });
 });

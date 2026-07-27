@@ -2,7 +2,10 @@
 //
 // Two discovery methods are offered:
 //   build-list  — unified "add your whole alphabet": tick CLDR suggestions, type
-//                 the rest of the alphabet, see grid placeholder (DEFAULT)
+//                 the rest of the alphabet, browse+toggle the right-pane
+//                 character map (CharacterMapPane.tsx, rendered by StudioShell's
+//                 SurveyView — see stores/phaseBDraftStore.ts for the shared
+//                 alphabet the two panes both mutate) (DEFAULT)
 //   manual      — step-by-step questions via SurveyRunner
 //
 // On completion, extractInventory() scans the Phase B answers for the question
@@ -10,17 +13,33 @@
 // SurveyPhaseResult.confirmedInventory (additive contract field). The gallery
 // reads this via session.confirmedInventory (mergePhaseResults union).
 
-import { useCallback, useMemo, useState, useRef, useEffect } from "react";
+import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import type { SurveyAnswer, SurveyPhaseResult, LintFinding, PlacementMap } from "@keyboard-studio/contracts";
-import { toUPlusNotation } from "@keyboard-studio/contracts";
+import { composeStack, toUPlusNotation } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { loadModularFlow } from "./loadModularFlow.ts";
 import type { SurveyContext, FlowDef } from "./types.ts";
 import { buildPlacementSeeds } from "./placementSeeds.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { nfcDedup } from "./charNormUtils.ts";
+import { useSurveySessionStore, type DiscoveryMethod } from "../stores/surveySessionStore.ts";
+import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { useGlyphFontStack } from "./useGlyphFontStack.ts";
+import {
+  nfcDedup,
+  harvestChars,
+  casePairOf,
+  lowercaseBaseView,
+  upperCounterpartOf,
+} from "./charNormUtils.ts";
+import { codepointLabel } from "./codepointLabel.ts";
+import { collate, codePointCompare } from "./collation.ts";
+import { glyphCategory, isCombiningMarkChar, caseCounterpart } from "@keyboard-studio/engine";
+import { displayChar, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { suggestMissingChars } from "../lib/services.ts";
 import type { MissingCharSuggestions } from "../lib/services.ts";
+import { RadioGroup, SelectMenu } from "../ui/index.ts";
 import {
   BG_PAGE,
   BORDER,
@@ -28,7 +47,6 @@ import {
   TEXT_DIM,
   TEXT_MAIN,
   FONT,
-  CHIP_GLYPH_ACCENT,
   ERROR_RED,
   phaseContainer,
   phaseHeading,
@@ -42,6 +60,12 @@ import {
   charChip,
   chipGlyph,
   chipCodepoint,
+  chipIndicator,
+  chipIndicatorText,
+  chipIndicatorColor,
+  visuallyHidden,
+  FONT_OPTIONS,
+  phaseBFontStack,
 } from "./surveyStyles.ts";
 
 // Vite ?raw import — typed via the `*.yaml?raw` declaration in src/vite-env.d.ts.
@@ -113,8 +137,6 @@ export function parseSpacedChars(input: string): string[] {
 // PhaseB state — intercept non-manual discovery choices
 // ---------------------------------------------------------------------------
 
-type DiscoveryMethod = "manual" | "build-list" | null;
-
 type LoadState =
   | { status: "idle" }
   | { status: "loading" }
@@ -135,17 +157,42 @@ function makeManualOnlyFlow(flow: FlowDef): FlowDef {
 }
 
 // ---------------------------------------------------------------------------
-// getFirstGrapheme — module-level helper, not exported
+// isLinguisticChar — the "Your alphabet" chip-list filter (spec 047, FR-011)
 // ---------------------------------------------------------------------------
 
-function getFirstGrapheme(s: string): string {
-  if (!s) return "";
-  if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
-    const seg = new Intl.Segmenter();
-    const [first] = seg.segment(s);
-    return first?.segment ?? "";
-  }
-  return [...s][0] ?? "";
+/**
+ * True when a captured grapheme is linguistic content — a letter, a combining
+ * mark (diacritic), or a letter+mark combination — and therefore belongs in the
+ * "Your alphabet" running list. Numbers, punctuation, symbols, separators, and
+ * control characters are excluded here (they remain visible in their own
+ * breakdown sections). A letter+mark combo classifies as `letter` because it
+ * contains a letter code point; a lone mark is caught by isCombiningMarkChar.
+ */
+function isLinguisticChar(c: string): boolean {
+  return isCombiningMarkChar(c) || glyphCategory(c) === "letter";
+}
+
+// ---------------------------------------------------------------------------
+// CpLabel — chip code-point label with the FR-014 multi-code-point affordance
+// ---------------------------------------------------------------------------
+
+/**
+ * Renders a chip's code-point label (spec 047 FR-014): the base code point in
+ * U+XXXX notation, followed — for a multi-code-point grapheme — by a bracketed
+ * "[+<extra marks>]" badge in a contrasting (accent) color that shows the extra
+ * combining mark(s) themselves. The full space-separated stack is exposed on
+ * the chip's hover title/accessible name by the caller.
+ */
+function CpLabel({ grapheme }: { grapheme: string }) {
+  const { base, extras } = codepointLabel(grapheme);
+  return (
+    <span style={chipCodepoint()}>
+      {base}
+      {extras !== "" && (
+        <span style={{ color: ACCENT, fontWeight: 700 }}>{`[+${extras}]`}</span>
+      )}
+    </span>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -153,19 +200,25 @@ function getFirstGrapheme(s: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Presentational component: a text input that adds characters (first grapheme
- * per space-separated token) and a chip grid that shows accumulated chars with
- * remove buttons. State is owned by the parent.
+ * Presentational component: a text input that captures every distinct grapheme
+ * typed or pasted (spec 047 FR-001, via harvestChars) and a chip grid that
+ * shows the accumulated LINGUISTIC characters (letters/marks/combos, FR-011)
+ * with remove buttons. State is owned by the parent.
  */
 interface CharChipEditorProps {
   chars: string[];
   onChange: (next: string[]) => void;
   /** When true, auto-focus the input on mount. */
   autoFocus?: boolean;
+  /** BCP47 tag for locale-correct case-collapse of the letter chips (FR-008). */
+  bcp47?: string | undefined;
 }
 
-function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorProps) {
+function CharChipEditor({ chars, onChange, autoFocus = false, bcp47 }: CharChipEditorProps) {
+  const { t } = useLingui();
+  const glyphFontStack = useGlyphFontStack();
   const [inputVal, setInputVal] = useState("");
+  const [showUppercase, setShowUppercase] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -173,17 +226,53 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
   }, [autoFocus]);
 
   function add(): void {
-    const trimmed = inputVal.trim().normalize("NFC");
-    if (!trimmed) return;
-    const tokens = trimmed.split(/\s+/).filter(Boolean);
-    const newChars = tokens.map(getFirstGrapheme).filter(Boolean);
-    if (newChars.length === 0) return;
-    onChange(nfcDedup(chars, newChars));
+    // Capture EVERY distinct character in the whole input, not just the first
+    // grapheme of each space-separated token (spec 047 FR-001). harvestChars
+    // drops only CR/LF/CRLF/Tab/space (FR-002) and reports retained unusual
+    // invisibles so we can log them for discoverability (FR-003).
+    const { chars: harvested, unusual } = harvestChars(inputVal);
+    if (harvested.length === 0) return;
+    if (unusual.length > 0) {
+      // FR-003: no in-UI alert is required — a console log makes the unusual
+      // separator/format/control characters discoverable to the developer.
+      console.info(
+        "[phase-b] kept unusual invisible character(s): " +
+          unusual.map((u) => codepointLabel(u).title).join(", "),
+      );
+    }
+    // When BOTH cases of a letter exist, show the lowercase: an entered
+    // uppercase that has a single-character lowercase counterpart is folded to
+    // that lowercase for the alphabet/UI (both cases still reach the recorded IR
+    // via the record-both-cases augmentation on Done). An uppercase with NO
+    // lowercase counterpart — and a lowercase with no uppercase (IPA) — is left
+    // exactly as chosen (caseCounterpart returns null, so no fold). Only the
+    // uppercase→lowercase direction ever folds; lowercase is never touched.
+    const folded = harvested.map((c) => {
+      const cc = caseCounterpart(c, bcp47);
+      return cc?.direction === "toLower" ? cc.counterpart : c;
+    });
+    onChange(nfcDedup(chars, folded));
     setInputVal("");
     inputRef.current?.focus();
   }
 
   const addDisabled = inputVal.trim() === "";
+  // "Your alphabet" shows only linguistic content (FR-011); non-letters remain
+  // visible in their breakdown sections below. Ordering: letters and
+  // letter+mark combos by default ICU collation (matching the breakdown
+  // sections); bare combining marks by raw Unicode code-point order (a diacritic
+  // has no meaningful dictionary position), listed after the letters.
+  const linguisticChars = chars.filter(isLinguisticChar);
+  const bareMarks = linguisticChars.filter(isCombiningMarkChar).sort(codePointCompare);
+  const letters = linguisticChars.filter((c) => !isCombiningMarkChar(c));
+  // Case-collapse the letters to their lowercase/caseless unit (FR-008/FR-010):
+  // hide an uppercase only when its lowercase is actually present; a lowercase or
+  // caseless (or uppercase-only) letter is shown as entered.
+  // Single source of truth with the marks step (spec 049, FR-006).
+  const displayLetters = collate(lowercaseBaseView(letters, bcp47));
+  // Count reflects the collapsed lowercase/caseless units + bare marks.
+  const unitCount = displayLetters.length + bareMarks.length;
+  const hasCasedLetter = letters.some((b) => upperCounterpartOf(b, bcp47) !== null);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -200,8 +289,11 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
               add();
             }
           }}
-          placeholder="Type your alphabet with a space between each character (a b c …)"
-          aria-label="Character to add"
+          placeholder={t({
+            id: "survey.phaseB.charChipEditor.placeholder",
+            message: "Type your alphabet with a space between each character (a b c …)",
+          })}
+          aria-label={t({ id: "survey.phaseB.charChipEditor.ariaLabel", message: "Character to add" })}
           style={{
             flex: 1,
             background: BG_PAGE,
@@ -220,7 +312,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
           onClick={add}
           style={{ ...primaryButton(addDisabled), whiteSpace: "nowrap" }}
         >
-          + Add
+          <Trans id="survey.phaseB.charChipEditor.addButton">+ Add</Trans>
         </button>
       </div>
 
@@ -234,40 +326,105 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
             color: TEXT_MAIN,
           }}
         >
-          Your alphabet ({chars.length})
+          <Trans id="survey.phaseB.charChipEditor.count">Your alphabet ({displayLetters.length + bareMarks.length})</Trans>
         </p>
-        {chars.length === 0 ? (
+        {hasCasedLetter && (
+          <label
+            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: TEXT_DIM, cursor: "pointer", margin: "0 0 8px 0" }}
+          >
+            <input
+              type="checkbox"
+              data-testid="your-alphabet-uppercase-toggle"
+              checked={showUppercase}
+              onChange={(e) => setShowUppercase(e.target.checked)}
+            />
+            <Trans id="survey.phaseB.breakdown.showUppercase">Show uppercase letters</Trans>
+          </label>
+        )}
+        {unitCount === 0 ? (
           <p style={mutedParaFlush}>
-            No characters yet — type your whole alphabet above, with a space
-            between each character.
+            <Trans id="survey.phaseB.charChipEditor.empty">
+              No characters yet — type your whole alphabet above, with a space
+              between each character.
+            </Trans>
           </p>
         ) : (
           <div
             role="group"
-            aria-label="Accumulated characters — click to remove"
+            aria-label={t({
+              id: "survey.phaseB.charChipEditor.groupAriaLabel",
+              message: "Accumulated characters — click to remove",
+            })}
             style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}
           >
-            {chars.map((c) => (
-              // This delete chip is always in one visual state, not a toggle.
-              // The charChip/chipGlyph booleans below are FIXED literals chosen
-              // to reproduce the original inline hex (unchecked shell + accent
+            {displayLetters.flatMap((c) => {
+              // Removable chip for the lowercase/caseless (or uppercase-only)
+              // letter. The charChip/chipGlyph booleans are FIXED literals
+              // reproducing the original inline hex (unchecked shell + accent
               // glyph), not real checked state — do not wire them to a value.
-              <button
-                key={c}
-                type="button"
-                onClick={() => onChange(chars.filter((x) => x !== c))}
-                aria-label={`Remove ${c} (${toUPlusNotation(c)})`}
-                style={charChip(false)}
-              >
-                <span style={chipGlyph(true)}>
-                  {c}
-                </span>
-                <span style={chipCodepoint}>
-                  {toUPlusNotation(c)}
-                </span>
-                <span style={{ fontSize: 10, color: ERROR_RED }}>x</span>
-              </button>
-            ))}
+              const { title } = codepointLabel(c);
+              const cells = [
+                <button
+                  key={c}
+                  type="button"
+                  title={title}
+                  onClick={() => {
+                    // Removing a letter removes BOTH cases (the inverse of the
+                    // map, which adds both) — even the uppercase hidden by the
+                    // case-collapse, so it never re-appears as an orphan chip.
+                    const pair = new Set(casePairOf(c, bcp47));
+                    onChange(chars.filter((x) => !pair.has(x)));
+                  }}
+                  aria-label={t({
+                    id: "survey.phaseB.charChipEditor.removeAriaLabel",
+                    message: `Remove ${{ char: c }} (${{ cp: title }})`,
+                  })}
+                  style={charChip(false)}
+                >
+                  <span style={chipGlyph(true, glyphFontStack)}>{displayChar(c)}</span>
+                  <CpLabel grapheme={c} />
+                  <span style={chipIndicator(ERROR_RED)}>x</span>
+                </button>,
+              ];
+              // Derived uppercase (display-only) when the toggle is on — mirrors
+              // the breakdown Letters section; not a removable pick.
+              const upper = showUppercase ? upperCounterpartOf(c, bcp47) : null;
+              if (upper !== null) {
+                const upperTitle = codepointLabel(upper).title;
+                cells.push(
+                  <span
+                    key={upper}
+                    title={upperTitle}
+                    aria-label={`${displayChar(upper)} (${upperTitle})`}
+                    style={{ ...charChip(false), cursor: "default" }}
+                  >
+                    <span style={chipGlyph(true, glyphFontStack)}>{displayChar(upper)}</span>
+                    <CpLabel grapheme={upper} />
+                  </span>,
+                );
+              }
+              return cells;
+            })}
+            {bareMarks.map((c) => {
+              const { title } = codepointLabel(c);
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  title={title}
+                  onClick={() => onChange(chars.filter((x) => x !== c))}
+                  aria-label={t({
+                    id: "survey.phaseB.charChipEditor.removeAriaLabel",
+                    message: `Remove ${{ char: c }} (${{ cp: title }})`,
+                  })}
+                  style={charChip(false)}
+                >
+                  <span style={chipGlyph(true, glyphFontStack)}>{displayChar(c)}</span>
+                  <CpLabel grapheme={c} />
+                  <span style={chipIndicator(ERROR_RED)}>x</span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -286,21 +443,26 @@ interface SuggestionChipProps {
 }
 
 function SuggestionChip({ char, checked, onToggle }: SuggestionChipProps) {
+  const { t } = useLingui();
+  const glyphFontStack = useGlyphFontStack();
   const cp = toUPlusNotation(char);
+  const actionLabel = checked
+    ? t({ id: "survey.phaseB.suggestionChip.removeAction", message: "Remove" })
+    : t({ id: "survey.phaseB.suggestionChip.addAction", message: "Add" });
   return (
     <button
       type="button"
       onClick={() => onToggle(char)}
-      aria-label={`${checked ? "Remove" : "Add"} ${char} (${cp})`}
+      aria-label={`${actionLabel} ${char} (${cp})`}
       aria-pressed={checked}
       style={charChip(checked)}
     >
-      <span style={chipGlyph(checked)}>
-        {char}
+      <span style={chipGlyph(checked, glyphFontStack)}>
+        {displayChar(char)}
       </span>
-      <span style={chipCodepoint}>{cp}</span>
-      <span style={{ fontSize: 10, color: checked ? CHIP_GLYPH_ACCENT : TEXT_DIM }}>
-        {checked ? "[x]" : "+"}
+      <span style={chipCodepoint()}>{cp}</span>
+      <span style={chipIndicator(chipIndicatorColor(checked))}>
+        {chipIndicatorText(checked)}
       </span>
     </button>
   );
@@ -317,6 +479,7 @@ interface SuggestionPanelProps {
 }
 
 function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
+  const { t } = useLingui();
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const bcp47 = context.bcp47_tag;
   const languageName = context.language_name;
@@ -352,13 +515,16 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
     }
   }
 
-  const displayName = languageName ?? bcp47 ?? "this language";
+  const displayName =
+    languageName ?? bcp47 ?? t({ id: "survey.phaseB.suggestionPanel.genericLanguage", message: "this language" });
 
   // Neutral note when no BCP47 or no baseIr yet
   if (!bcp47 || baseIr === null) {
     return (
       <div style={mutedNote}>
-        No verified character list for {displayName}. Add characters below.
+        <Trans id="survey.phaseB.suggestionPanel.noVerifiedList">
+          No verified character list for {displayName}. Add characters below.
+        </Trans>
       </div>
     );
   }
@@ -366,7 +532,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
   if (loadState.status === "idle" || loadState.status === "loading") {
     return (
       <div style={mutedNote}>
-        Checking for a verified character list…
+        <Trans id="survey.phaseB.suggestionPanel.checking">Checking for a verified character list…</Trans>
       </div>
     );
   }
@@ -374,7 +540,9 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
   if (loadState.status === "error") {
     return (
       <div style={mutedNote}>
-        Could not load character suggestions. Add characters below.
+        <Trans id="survey.phaseB.suggestionPanel.loadError">
+          Could not load character suggestions. Add characters below.
+        </Trans>
       </div>
     );
   }
@@ -385,7 +553,9 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
   if (data === null) {
     return (
       <div style={mutedNote}>
-        No verified character list for {displayName}. Add characters below.
+        <Trans id="survey.phaseB.suggestionPanel.noVerifiedList">
+          No verified character list for {displayName}. Add characters below.
+        </Trans>
       </div>
     );
   }
@@ -394,7 +564,9 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
   if (data.main.length === 0 && data.auxiliary.length === 0) {
     return (
       <div style={mutedNote}>
-        Your base keyboard already covers this language's alphabet.
+        <Trans id="survey.phaseB.suggestionPanel.baseAlreadyCovers">
+          Your base keyboard already covers this language's alphabet.
+        </Trans>
       </div>
     );
   }
@@ -403,15 +575,20 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div>
         <p style={{ margin: "0 0 4px 0", fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>
-          Suggested for {data.languageName ?? displayName}
+          <Trans id="survey.phaseB.suggestionPanel.suggestedFor">
+            Suggested for {data.languageName ?? displayName}
+          </Trans>
         </p>
         <p style={{ margin: "0 0 10px 0", fontSize: 11, color: TEXT_DIM }}>
-          from CLDR exemplars — tick to add
+          <Trans id="survey.phaseB.suggestionPanel.fromCldr">from CLDR exemplars — tick to add</Trans>
         </p>
         {data.main.length > 0 ? (
           <div
             role="group"
-            aria-label="Suggested main characters — tick to add"
+            aria-label={t({
+              id: "survey.phaseB.suggestionPanel.mainGroupAriaLabel",
+              message: "Suggested main characters — tick to add",
+            })}
             style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
           >
             {data.main.map((c) => (
@@ -425,7 +602,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
           </div>
         ) : (
           <p style={mutedParaFlush}>
-            No additional main characters needed.
+            <Trans id="survey.phaseB.suggestionPanel.noAdditionalMain">No additional main characters needed.</Trans>
           </p>
         )}
       </div>
@@ -450,12 +627,17 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
             }}
           >
             <span>{auxExpanded ? "▼" : "▶"}</span>
-            Also used in loanwords ({data.auxiliary.length})
+            <Trans id="survey.phaseB.suggestionPanel.auxiliaryToggle">
+              Also used in loanwords ({data.auxiliary.length})
+            </Trans>
           </button>
           {auxExpanded && (
             <div
               role="group"
-              aria-label="Suggested auxiliary characters for loanwords — tick to add"
+              aria-label={t({
+                id: "survey.phaseB.suggestionPanel.auxiliaryGroupAriaLabel",
+                message: "Suggested auxiliary characters for loanwords — tick to add",
+              })}
               style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}
             >
               {data.auxiliary.map((c) => (
@@ -475,29 +657,186 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
 }
 
 // ---------------------------------------------------------------------------
-// GridPlaceholder — coming-soon grid section
+// AlphabetBreakdown — the visible three-store decomposition (spec 046, US5)
+//
+// Renders only once the draft alphabet implies at least one mark or attested
+// combination: picking a whole accented character (one action, one unit of
+// selection) visibly lands its base in Letters and its mark in Marks, teaching
+// the underlying model without an interrupting question (FR-003). Chips here
+// are a VIEW of the derived stores, not remove buttons — removal stays on the
+// pick chips above (removing a pick automatically retracts what it implied).
 // ---------------------------------------------------------------------------
 
-function GridPlaceholder() {
-  return (
-    <div
-      style={{
-        padding: 16,
-        border: `1px solid ${BORDER}`,
-        borderRadius: 6,
-        color: TEXT_DIM,
-      }}
-    >
-      <strong style={{ color: TEXT_MAIN }}>Browse a character grid</strong>
-      <p style={{ margin: "8px 0 0 0", fontSize: 13 }}>
-        Visual character grid — coming soon.
-      </p>
+interface AlphabetBreakdownProps {
+  /** BCP47 tag for locale-correct case derivation in the Letters section (FR-008). */
+  bcp47?: string | undefined;
+}
+
+function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
+  const bases = usePhaseBDraftStore((s) => s.bases);
+  const marks = usePhaseBDraftStore((s) => s.marks);
+  const attestedStacks = usePhaseBDraftStore((s) => s.attestedStacks);
+  const numbers = usePhaseBDraftStore((s) => s.numbers);
+  const punctuation = usePhaseBDraftStore((s) => s.punctuation);
+  const symbols = usePhaseBDraftStore((s) => s.symbols);
+  const separators = usePhaseBDraftStore((s) => s.separators);
+  const controls = usePhaseBDraftStore((s) => s.controls);
+  const lastPick = usePhaseBDraftStore((s) => s.lastPick);
+  const [showUppercase, setShowUppercase] = useState(false);
+
+  // Render once the alphabet has any content to break down. Spec 047 US3 shows
+  // the Letters section (with its lowercase/uppercase toggle) even for a
+  // letters-only alphabet, so bases alone are enough to reveal the panel — the
+  // per-section guards below still hide every empty section (FR-006).
+  if (
+    bases.length === 0 &&
+    marks.length === 0 &&
+    attestedStacks.length === 0 &&
+    numbers.length === 0 &&
+    punctuation.length === 0 &&
+    symbols.length === 0 &&
+    separators.length === 0 &&
+    controls.length === 0
+  ) {
+    return null;
+  }
+
+  const justAddedBases = new Set(lastPick?.addedBases ?? []);
+  const justAddedMarks = new Set(lastPick?.addedMarks ?? []);
+  const justAddedStack =
+    lastPick?.addedStack != null ? composeStack(lastPick.addedStack) : null;
+
+  const chip = (glyph: string, display: string, justAdded: boolean) => {
+    const { title } = codepointLabel(glyph);
+    return (
+      <span
+        key={glyph}
+        title={title}
+        aria-label={`${display} (${title})${justAdded ? " — just added" : ""}`}
+        // Breakdown chips are a read-only VIEW (not remove buttons), so no
+        // pointer cursor — removal stays on the CharChipEditor pick chips above.
+        style={{ ...charChip(false), cursor: "default" }}
+      >
+        <span style={chipGlyph(true)}>{display}</span>
+        <CpLabel grapheme={glyph} />
+        {justAdded && <span style={chipIndicator(ACCENT)}>new</span>}
+      </span>
+    );
+  };
+
+  const section = (
+    testid: string,
+    title: string,
+    note: string,
+    children: ReactNode,
+    extraHeader?: ReactNode,
+  ) => (
+    <div data-testid={testid} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>{title}</p>
+      <p style={{ ...mutedParaFlush, margin: 0, fontSize: 12 }}>{note}</p>
+      {extraHeader}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{children}</div>
     </div>
+  );
+
+  // Letters case-collapse (FR-008/FR-010): show one chip per lowercase/caseless
+  // letter; a present uppercase is hidden behind its lowercase (never the
+  // reverse) and revealed only under the toggle.
+  // Single source of truth with the marks step (spec 049, FR-006).
+  const displayBases = collate(lowercaseBaseView(bases, bcp47));
+
+  const uppercaseToggle = (
+    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: TEXT_DIM, cursor: "pointer" }}>
+      <input
+        type="checkbox"
+        data-testid="letters-uppercase-toggle"
+        checked={showUppercase}
+        onChange={(e) => setShowUppercase(e.target.checked)}
+      />
+      <Trans id="survey.phaseB.breakdown.showUppercase">Show uppercase letters</Trans>
+    </label>
+  );
+
+  return (
+    <section aria-label="How your alphabet breaks down" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <h3 style={sectionHeading}>How your alphabet breaks down</h3>
+      {displayBases.length > 0 &&
+        section(
+          "alphabet-letters",
+          `Letters (${displayBases.length})`,
+          "Letters that stand on their own.",
+          displayBases.flatMap((b) => {
+            const u = showUppercase ? upperCounterpartOf(b, bcp47) : null;
+            const cells = [chip(b, b, justAddedBases.has(b))];
+            if (u !== null) cells.push(chip(u, u, false));
+            return cells;
+          }),
+          uppercaseToggle,
+        )}
+      {marks.length > 0 &&
+        section(
+          "alphabet-marks",
+          `Marks (${marks.length})`,
+          "Accents and other marks that attach to a letter.",
+          // Bare diacritics: raw code-point order, not ICU (spec 047 refinement).
+          [...marks].sort(codePointCompare).map((m) => chip(m, prefixCombiningMark(m, true), justAddedMarks.has(m))),
+        )}
+      {attestedStacks.length > 0 &&
+        section(
+          "alphabet-accented",
+          `Accented letters (${attestedStacks.length})`,
+          "Letter-plus-mark combinations your language uses.",
+          collate(attestedStacks.map(composeStack)).map((composed) =>
+            chip(composed, composed, justAddedStack === composed),
+          ),
+        )}
+      {numbers.length > 0 &&
+        section(
+          "alphabet-numbers",
+          `Numbers (${numbers.length})`,
+          "Digits and other numeric characters.",
+          collate(numbers).map((c) => chip(c, c, false)),
+        )}
+      {punctuation.length > 0 &&
+        section(
+          "alphabet-punctuation",
+          `Punctuation (${punctuation.length})`,
+          "Punctuation marks.",
+          collate(punctuation).map((c) => chip(c, c, false)),
+        )}
+      {symbols.length > 0 &&
+        section(
+          "alphabet-symbols",
+          `Symbols (${symbols.length})`,
+          "Currency, math, and other symbols.",
+          collate(symbols).map((c) => chip(c, c, false)),
+        )}
+      {separators.length > 0 &&
+        section(
+          "alphabet-separators",
+          `Separators (${separators.length})`,
+          "Spaces and other separator characters (kept, not the ordinary space).",
+          collate(separators).map((c) => chip(c, displayChar(c), false)),
+        )}
+      {controls.length > 0 &&
+        section(
+          "alphabet-controls",
+          `Control/other (${controls.length})`,
+          "Invisible control or format characters that were kept.",
+          collate(controls).map((c) => chip(c, displayChar(c), false)),
+        )}
+    </section>
   );
 }
 
 // ---------------------------------------------------------------------------
 // BuildListView — unified "add your whole alphabet" method
+//
+// The alphabet accumulated here is shared with CharacterMapPane (the right-pane
+// character map, rendered independently by StudioShell's SurveyView) via
+// phaseBDraftStore — both panes toggle the SAME chars array. See
+// stores/phaseBDraftStore.ts for the lifecycle contract (reset on substage
+// entry, not on every render).
 // ---------------------------------------------------------------------------
 
 interface BuildListViewProps {
@@ -507,7 +846,11 @@ interface BuildListViewProps {
 }
 
 function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
-  const [chars, setChars] = useState<string[]>([]);
+  const { t } = useLingui();
+  const chars = usePhaseBDraftStore((s) => s.chars);
+  const setAll = usePhaseBDraftStore((s) => s.setAll);
+  const selectedFont = usePhaseBDraftStore((s) => s.selectedFont);
+  const setSelectedFont = usePhaseBDraftStore((s) => s.setSelectedFont);
   const doneDisabled = chars.length === 0;
 
   return (
@@ -527,13 +870,37 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         onClick={onBack}
         style={{ alignSelf: "flex-start", ...secondaryButton }}
       >
-        Back
+        <Trans id="survey.phaseB.buildList.backButton">Back</Trans>
       </button>
 
       {/* Heading */}
       <h2 style={phaseHeadingFlush}>
-        Phase B — Add your whole alphabet
+        <Trans id="survey.phaseB.buildList.heading">Phase B — Add your whole alphabet</Trans>
       </h2>
+
+      {/* Font selection — custom SelectMenu (webview-safe dropdown): native
+          <select> popups don't open in the VS Code Simple Browser, so this is
+          a DOM-rendered menu. Applies to every character glyph on this step,
+          incl. the character map — see phaseBDraftStore.selectedFont. */}
+      <div style={{ maxWidth: 280 }} data-testid="phase-b-font-select">
+        <label id="phase-b-font-select-label"
+               style={{ display: "block", margin: "0 0 8px 0", fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>
+          <Trans id="survey.phaseB.buildList.fontSelectLabel">Font for characters</Trans>
+        </label>
+        <SelectMenu
+          id="phase-b-font-select-control"
+          value={selectedFont}
+          options={FONT_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+          ariaLabelledby="phase-b-font-select-label"
+          renderOptionLabel={(opt) => (
+            <span style={{ fontFamily: phaseBFontStack(opt.value) }}>{opt.label}</span>
+          )}
+          onChange={(v) => {
+            const opt = FONT_OPTIONS.find((o) => o.value === v);
+            if (opt) setSelectedFont(opt.value);
+          }}
+        />
+      </div>
 
       {/* Instructions */}
       <div
@@ -547,10 +914,12 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         }}
       >
         <p style={{ margin: 0 }}>
-          Add <strong>your whole alphabet</strong> on this page — every
-          character your language uses, not just the special ones. Tick the
-          suggested characters below, then type any that are missing{" "}
-          <strong>with a space between each character</strong>, like this:
+          <Trans id="survey.phaseB.buildList.instructions">
+            Add <strong>your whole alphabet</strong> on this page — every
+            character your language uses, not just the special ones. Tick the
+            suggested characters below, then type any that are missing{" "}
+            <strong>with a space between each character</strong>, like this:
+          </Trans>
         </p>
         <p style={{ margin: "8px 0 0 0", fontFamily: "monospace", fontSize: 15 }}>
           a b c d e ɛ ŋ ɔ …
@@ -558,35 +927,44 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
       </div>
 
       {/* Section 1: Suggestions from CLDR */}
-      <section aria-label="Suggested characters from CLDR">
+      <section
+        aria-label={t({
+          id: "survey.phaseB.buildList.cldrSectionAriaLabel",
+          message: "Suggested characters from CLDR",
+        })}
+      >
         <h3 style={sectionHeading}>
-          Suggested characters
+          <Trans id="survey.phaseB.buildList.suggestedCharactersHeading">Suggested characters</Trans>
         </h3>
-        <SuggestionPanel context={context} chars={chars} onChange={setChars} />
+        <SuggestionPanel context={context} chars={chars} onChange={setAll} />
       </section>
 
       {/* Divider */}
       <hr style={divider} />
 
       {/* Section 2: Type-in characters */}
-      <section aria-label="Type your alphabet">
+      <section
+        aria-label={t({ id: "survey.phaseB.buildList.typeSectionAriaLabel", message: "Type your alphabet" })}
+      >
         <h3 style={sectionHeading}>
-          Type your alphabet
+          <Trans id="survey.phaseB.buildList.typeAlphabetHeading">Type your alphabet</Trans>
         </h3>
         <p style={{ ...mutedParaFlush, margin: "0 0 12px 0" }}>
-          Type the rest of your alphabet here, putting a space between each
-          character (for example: a b c ŋ ɛ), then press Enter or + Add.
+          <Trans id="survey.phaseB.buildList.typeAlphabetHelp">
+            Type the rest of your alphabet here, putting a space between each
+            character (for example: a b c ŋ ɛ), then press Enter or + Add.
+          </Trans>
         </p>
-        <CharChipEditor chars={chars} onChange={setChars} autoFocus={false} />
+        <CharChipEditor chars={chars} onChange={setAll} autoFocus={false} bcp47={context.bcp47_tag} />
       </section>
 
-      {/* Divider */}
-      <hr style={divider} />
+      {/* Section 3: visible three-store decomposition (spec 046 US5) + the
+          spec-047 category sections — renders once the alphabet implies marks,
+          accented letters, or any non-letter category. */}
+      <AlphabetBreakdown bcp47={context.bcp47_tag} />
 
-      {/* Section 3: Grid placeholder */}
-      <section aria-label="Character grid (coming soon)">
-        <GridPlaceholder />
-      </section>
+      {/* The character grid has moved to the right pane —
+          see CharacterMapPane.tsx, rendered by StudioShell's SurveyView. */}
 
       {/* Footer: Done */}
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -595,15 +973,30 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
           data-testid="phase-b-done"
           disabled={doneDisabled}
           onClick={() => {
+            // Record both cases (spec 047 FR-009): augment the captured
+            // inventory with each cased letter's locale-correct counterpart via
+            // the engine's caseCounterpart, deduped. A null counterpart
+            // (caseless script, or a multi-character expansion like ß→SS)
+            // contributes nothing (FR-010).
+            const derivedUppercases = chars
+              .map((c) => caseCounterpart(c, context.bcp47_tag)?.counterpart)
+              .filter((u): u is string => u != null);
             onComplete({
               phase: "B",
               answers: [],
-              confirmedInventory: chars,
+              confirmedInventory: nfcDedup(chars, derivedUppercases),
             });
           }}
+          className="ks-focus-ring ks-hit-target"
           style={primaryButton(doneDisabled)}
         >
-          Done ({chars.length} character{chars.length === 1 ? "" : "s"})
+          {t({
+            id: "survey.phaseB.buildList.doneButton",
+            message: plural(chars.length, {
+              one: "Done (# character)",
+              other: "Done (# characters)",
+            }),
+          })}
         </button>
       </div>
     </div>
@@ -639,7 +1032,12 @@ export interface PhaseBProps {
 
 export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId, placementMap }: PhaseBProps) {
   const flow = useMemo(() => loadModularFlow(phaseBModularRaw as string), []);
-  const [discoveryMethod, setDiscoveryMethod] = useState<DiscoveryMethod>(null);
+  // discoveryMethod lives in surveySessionStore (not component state) so
+  // StudioShell's SurveyView can gate the right-pane character map on it —
+  // the map only shows for the build-list path (see steps/manifest.ts's
+  // rightPane:"character-map" on the characters step).
+  const discoveryMethod = useSurveySessionStore((s) => s.discoveryMethod);
+  const setDiscoveryMethod = useSurveySessionStore((s) => s.setDiscoveryMethod);
   // manualFlow is memoized here (before any early returns) to satisfy React's
   // rules of hooks — useMemo must not be called after a conditional return.
   const manualFlow = useMemo(() => makeManualOnlyFlow(flow), [flow]);
@@ -694,7 +1092,7 @@ export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId,
   return (
     <div style={phaseContainer}>
       <h2 style={phaseHeading}>
-        Phase B — Character inventory
+        <Trans id="survey.phaseB.manual.heading">Phase B — Character inventory</Trans>
       </h2>
       <SurveyRunner
         key={manualFlow.flow_id}
@@ -719,15 +1117,29 @@ interface IntroChooserProps {
   onBack?: () => void;
 }
 
-const METHODS: Array<{ value: Exclude<DiscoveryMethod, null>; label: string }> = [
-  { value: "build-list", label: "Add your whole alphabet — type every character your language uses and tick suggested ones" },
-  { value: "manual", label: "Step by step — I will answer the questions below" },
-];
-
 function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
-  const [selected, setSelected] = useState<Exclude<DiscoveryMethod, null>>("build-list");
+  const { t } = useLingui();
+  const [selected, setSelected] = useState<DiscoveryMethod>("build-list");
 
-  const languageName = context["language_name"] ?? context["detected_group"] ?? "your language";
+  const languageName =
+    context["language_name"] ?? context["detected_group"] ?? t({ id: "survey.phaseB.intro.genericLanguage", message: "your language" });
+
+  const methods: Array<{ value: DiscoveryMethod; label: string }> = [
+    {
+      value: "build-list",
+      label: t({
+        id: "survey.phaseB.intro.method.buildList",
+        message: "Add your whole alphabet — type every character your language uses and tick suggested ones",
+      }),
+    },
+    {
+      value: "manual",
+      label: t({
+        id: "survey.phaseB.intro.method.manual",
+        message: "Step by step — I will answer the questions below",
+      }),
+    },
+  ];
 
   return (
     <div
@@ -740,65 +1152,51 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
       }}
     >
       <h2 style={phaseHeadingFlush}>
-        Phase B — Character discovery
+        <Trans id="survey.phaseB.intro.heading">Phase B — Character discovery</Trans>
       </h2>
       <p style={mutedParaFlush}>
-        How would you like to add the alphabet {languageName} uses?
+        <Trans id="survey.phaseB.intro.question">How would you like to add the alphabet {languageName} uses?</Trans>
       </p>
       <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, lineHeight: 1.5 }}>
-        Both methods feed the same final alphabet.
-        The first method starts with verified suggestions and lets you type the rest of your alphabet yourself.
+        <Trans id="survey.phaseB.intro.explanation">
+          Both methods feed the same final alphabet.
+          The first method starts with verified suggestions and lets you type the rest of your alphabet yourself.
+        </Trans>
       </p>
 
-      <div role="radiogroup" aria-label="Discovery method">
-        {METHODS.map(({ value, label }) => {
-          const inputId = `discovery-method-${value}`;
-          return (
-            <label
-              key={value}
-              htmlFor={inputId}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 8,
-                marginBottom: 10,
-                cursor: "pointer",
-                fontSize: 13,
-                color: TEXT_MAIN,
-              }}
-            >
-              <input
-                type="radio"
-                id={inputId}
-                name="discovery_method"
-                value={value}
-                checked={selected === value}
-                onChange={() => setSelected(value)}
-                style={{ marginTop: 2, accentColor: ACCENT }}
-              />
-              <span style={{ lineHeight: 1.5 }}>{label}</span>
-            </label>
-          );
-        })}
-      </div>
+      {/* Issue #536: shared ui/RadioGroup (accent-ring focus, >=44px touch
+          hit area on the wrapping label) instead of a hand-rolled radio list. */}
+      <span id="discovery-method-label" style={visuallyHidden}>
+        <Trans id="survey.phaseB.intro.discoveryMethodLabel">Discovery method</Trans>
+      </span>
+      <RadioGroup
+        name="discovery_method"
+        value={selected}
+        options={methods}
+        accent={ACCENT}
+        onChange={(v) => setSelected(v as DiscoveryMethod)}
+        ariaLabelledby="discovery-method-label"
+      />
 
       <div style={{ display: "flex", gap: 8 }}>
         {onBack !== undefined && (
           <button
             type="button"
             onClick={onBack}
+            className="ks-focus-ring ks-hit-target"
             style={secondaryButton}
           >
-            Back
+            <Trans id="survey.phaseB.intro.backButton">Back</Trans>
           </button>
         )}
         <button
           type="button"
           data-testid="phase-b-intro-next"
           onClick={() => onChoose(selected)}
+          className="ks-focus-ring ks-hit-target"
           style={primaryButton(false)}
         >
-          Continue
+          <Trans id="survey.phaseB.intro.continueButton">Continue</Trans>
         </button>
       </div>
     </div>

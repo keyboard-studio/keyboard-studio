@@ -3,12 +3,22 @@
 // The "Show hint" button toggles an inline popover with plain-language
 // remediation text (hint is not machine-actionable in v1).
 //
-// Severity color map aligns with the five levels in spec.md §10.
+// Severity color map aligns with the five levels in spec.md §10 — except
+// "warning", which is deliberately excluded from the colour treatment. A
+// warning-severity finding reads as a calm advisory (default foreground
+// text, no yellow accent bar/code colour, a leading glyph + "Warning:"
+// label) rather than looking like a bug. fatal/error/hint/info are
+// untouched.
 
 import { useState, useId } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { LintFinding } from "@keyboard-studio/contracts";
 import { dispatchNavigateTo } from "./events";
 import { SEVERITY_COLORS } from "./colors";
+import { TEXT_MAIN } from "../ui/theme.ts";
+
+/** Warning glyph shown before "Warning: <message>" for warning findings. */
+const WARNING_GLYPH = "⚠";
 
 export interface LintChipProps {
   finding: LintFinding;
@@ -21,10 +31,12 @@ function truncate(text: string, max: number): string {
 }
 
 export function LintChip({ finding }: LintChipProps) {
+  const { t } = useLingui();
   const [hintOpen, setHintOpen] = useState(false);
   const hintId = useId();
 
-  const severityColor = SEVERITY_COLORS[finding.severity];
+  const isWarning = finding.severity === "warning";
+  const severityColor = isWarning ? TEXT_MAIN : SEVERITY_COLORS[finding.severity];
   const isUpstream = finding.origin === "upstream";
 
   function handleChipClick() {
@@ -60,7 +72,10 @@ export function LintChip({ finding }: LintChipProps) {
         onKeyDown={isNavigable ? handleChipKeyDown : undefined}
         aria-label={
           isNavigable
-            ? `Go to ${finding.code} at line ${finding.location!.line}`
+            ? t({
+                id: "lint.chip.navigateAriaLabel",
+                message: `Go to ${{ code: finding.code }} at line ${{ line: finding.location!.line }}`,
+              })
             : undefined
         }
         style={{
@@ -100,19 +115,30 @@ export function LintChip({ finding }: LintChipProps) {
           {finding.code}
         </code>
 
-        {/* Message */}
+        {/* Message — warnings get a leading glyph + "Warning:" label (no
+            colour treatment); the truncated message itself stays in its
+            own span either way so its rendered text is exactly the
+            truncated string. */}
         <span
           style={{
             flexGrow: 1,
             fontSize: 12,
-            color: "#e6edf3",
+            color: TEXT_MAIN,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
           }}
           title={finding.message}
         >
-          {truncate(finding.message, 60)}
+          {isWarning && (
+            <>
+              <span aria-hidden="true">{WARNING_GLYPH}</span>{" "}
+              <span>
+                <Trans id="common.warningLabel">Warning:</Trans>
+              </span>{" "}
+            </>
+          )}
+          <span>{truncate(finding.message, 60)}</span>
         </span>
 
         {/* Show hint button — only when hint is present */}
@@ -135,7 +161,11 @@ export function LintChip({ finding }: LintChipProps) {
               lineHeight: 1.4,
             }}
           >
-            {hintOpen ? "Hide hint" : "Show hint"}
+            {hintOpen ? (
+              <Trans id="lint.chip.hideHintButton">Hide hint</Trans>
+            ) : (
+              <Trans id="lint.chip.showHintButton">Show hint</Trans>
+            )}
           </button>
         )}
       </div>

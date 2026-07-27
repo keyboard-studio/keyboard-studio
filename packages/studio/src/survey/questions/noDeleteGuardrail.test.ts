@@ -1,14 +1,16 @@
 // Spec 022 — no-delete library guardrail (FR-004 / FR-005, SC-003).
 //
-// "Demotion is NOT deletion." When the orphaned full non-identity Phase A is
-// demoted to the inert library (rendered as reserve nodes via computeReserveNodes
-// — see buildStepGraph.test.ts / driftGuardrail.test.ts), the no-delete guardrail
-// (migration-plan §4) requires every demoted module to remain:
-//   • REGISTERED   — a key in its sub-registry (phaseARegistry) and in the merged
+// "Demotion is NOT deletion." The orphaned full non-identity Phase A (plus
+// pb_mark_input_order, relocated by spec 046) is physically relocated to the
+// dedicated reserve/ folder and reserveRegistry (rendered as Leftover nodes via
+// buildLeftoverSection — see phaseADemoteReserve.test.ts / driftGuardrail.test.ts).
+// The no-delete guardrail (migration-plan §4) requires every demoted module to
+// remain:
+//   • REGISTERED   — a key in its sub-registry (reserveRegistry) and in the merged
 //                    questionRegistry, with the key matching definition.id;
-//   • ON DISK      — its module file resolves at survey/questions/a/<id>.ts;
+//   • ON DISK      — its module file resolves at survey/questions/reserve/<id>.ts;
 //   • TEST-COVERED — a colocated spec exists in the mirrored tree
-//                    (tests/survey/questions/a/<id>.test.ts);
+//                    (tests/survey/questions/reserve/<id>.test.ts);
 //   • REVIVABLE    — by re-adding its id to a flow YAML / flow-source (no code
 //                    change, no re-registration, no file restore — asserted
 //                    structurally: the registry entry + file + test all persist).
@@ -21,7 +23,8 @@
 // Scope (Amendment 2026-06-29): this covers the full non-identity Phase A only.
 // The `pb_*` step-by-step battery is NOT library content — it stays a live,
 // reachable, non-default branch off the IntroChooser gate — so it is deliberately
-// NOT in the demoted set here.
+// NOT in the demoted set here. (pb_mark_input_order is the one exception, already
+// relocated by spec 046, and is covered separately — see the coverage note below.)
 //
 // Test-only: no contracts bump, no write routing, no flag flip (FR-010/FR-011).
 
@@ -31,7 +34,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 import { questionRegistry } from "./registry.ts";
-import { phaseARegistry } from "./registry.a.ts";
+import { reserveRegistry } from "./registry.reserve.ts";
 import {
   DEMOTED_PHASE_A,
   DEMOTED_PHASE_A_IDENTITY,
@@ -41,15 +44,20 @@ import {
 // The demoted set: the full non-identity Phase A (15 identity + 15 provenance_*),
 // derived ONCE from content/flows/phase_a_identity.modular.yaml (demotedPhaseA.fixture.ts)
 // so this guardrail and the reserve-node assertion share a single source of truth.
-// They are demoted to the inert library (reserve); they MUST remain registered + on
+// They are demoted to the inert reserve; they MUST remain registered + on
 // disk + test-covered. NOTE: the il_* identity-lite head is the CANONICAL identity
 // experience and stays LIVE — it is NOT in the demoted set.
 
-// Resolve the on-disk module dir (./a/) and the mirrored test dir relative to
+// pb_mark_input_order (spec 046) is relocated to reserve/ too, but is NOT part of
+// DEMOTED_PHASE_A (it is not derived from phase_a_identity.modular.yaml) — cover it
+// separately so the reserve folder's full 31-module coverage is genuinely detected.
+const PB_MARK_INPUT_ORDER = "pb_mark_input_order";
+
+// Resolve the on-disk module dir (./reserve/) and the mirrored test dir relative to
 // THIS file (packages/studio/src/survey/questions/noDeleteGuardrail.test.ts).
 const thisDir = path.dirname(fileURLToPath(import.meta.url));
-const moduleDir = path.join(thisDir, "a");
-const testDir = path.resolve(thisDir, "../../../tests/survey/questions/a");
+const moduleDir = path.join(thisDir, "reserve");
+const testDir = path.resolve(thisDir, "../../../tests/survey/questions/reserve");
 
 function modulePath(id: string): string {
   return path.join(moduleDir, `${id}.ts`);
@@ -68,18 +76,32 @@ describe("spec 022 — no-delete library guardrail (demoted Phase A)", () => {
   it("FR-004/FR-005: every demoted id is REGISTERED (sub-registry key + merged registry, key == definition.id)", () => {
     for (const id of DEMOTED_PHASE_A) {
       expect(
-        Object.prototype.hasOwnProperty.call(phaseARegistry, id),
-        `demoted module "${id}" missing from phaseARegistry — silent unregistration`,
+        Object.prototype.hasOwnProperty.call(reserveRegistry, id),
+        `demoted module "${id}" missing from reserveRegistry — silent unregistration`,
       ).toBe(true);
       expect(
         Object.prototype.hasOwnProperty.call(questionRegistry, id),
         `demoted module "${id}" missing from merged questionRegistry`,
       ).toBe(true);
-      expect(phaseARegistry[id]?.definition.id, `registry key "${id}" vs definition.id`).toBe(id);
+      expect(reserveRegistry[id]?.definition.id, `registry key "${id}" vs definition.id`).toBe(id);
     }
   });
 
-  it("FR-004/FR-005: every demoted id RESOLVES TO A MODULE ON DISK (survey/questions/a/<id>.ts)", () => {
+  it("pb_mark_input_order (spec 046) is REGISTERED in reserveRegistry + merged questionRegistry", () => {
+    expect(
+      Object.prototype.hasOwnProperty.call(reserveRegistry, PB_MARK_INPUT_ORDER),
+      "pb_mark_input_order missing from reserveRegistry — silent unregistration",
+    ).toBe(true);
+    expect(
+      Object.prototype.hasOwnProperty.call(questionRegistry, PB_MARK_INPUT_ORDER),
+      "pb_mark_input_order missing from merged questionRegistry",
+    ).toBe(true);
+    expect(reserveRegistry[PB_MARK_INPUT_ORDER]?.definition.id).toBe(PB_MARK_INPUT_ORDER);
+    expect(existsSync(modulePath(PB_MARK_INPUT_ORDER))).toBe(true);
+    expect(existsSync(testPath(PB_MARK_INPUT_ORDER))).toBe(true);
+  });
+
+  it("FR-004/FR-005: every demoted id RESOLVES TO A MODULE ON DISK (survey/questions/reserve/<id>.ts)", () => {
     for (const id of DEMOTED_PHASE_A) {
       expect(
         existsSync(modulePath(id)),
@@ -88,7 +110,7 @@ describe("spec 022 — no-delete library guardrail (demoted Phase A)", () => {
     }
   });
 
-  it("FR-004/FR-005: every demoted id REMAINS TEST-COVERED (mirrored tests/survey/questions/a/<id>.test.ts)", () => {
+  it("FR-004/FR-005: every demoted id REMAINS TEST-COVERED (mirrored tests/survey/questions/reserve/<id>.test.ts)", () => {
     for (const id of DEMOTED_PHASE_A) {
       expect(
         existsSync(testPath(id)),
@@ -140,7 +162,7 @@ function noDeleteViolations(
 
 describe("spec 022 — no-delete guardrail: RED on deletion/unregistration, GREEN on restore", () => {
   // Real sets, computed from the live registry + filesystem.
-  const registered = new Set(DEMOTED_PHASE_A.filter((id) => Object.prototype.hasOwnProperty.call(phaseARegistry, id)));
+  const registered = new Set(DEMOTED_PHASE_A.filter((id) => Object.prototype.hasOwnProperty.call(reserveRegistry, id)));
   const onDisk = new Set(DEMOTED_PHASE_A.filter((id) => existsSync(modulePath(id))));
   const covered = new Set(DEMOTED_PHASE_A.filter((id) => existsSync(testPath(id))));
 
@@ -166,7 +188,7 @@ describe("spec 022 — no-delete guardrail: RED on deletion/unregistration, GREE
   it("SC-003: DELETING a demoted module file turns the guardrail RED (then restore → GREEN)", () => {
     const VICTIM = "primary_script";
     const injected = new Set(onDisk);
-    injected.delete(VICTIM); // simulate deleting survey/questions/a/primary_script.ts
+    injected.delete(VICTIM); // simulate deleting survey/questions/reserve/primary_script.ts
     const v = noDeleteViolations(DEMOTED_PHASE_A, registered, injected, covered);
     expect(v.missingOnDisk).toEqual([VICTIM]);
     // Restore (real set untouched) → GREEN.

@@ -9,6 +9,7 @@
 // can reuse it without copying the markup.
 
 import type { CSSProperties, ReactNode } from "react";
+import { Trans } from "@lingui/react/macro";
 import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
 } from "../../lib/galleryTheme.ts";
@@ -73,7 +74,7 @@ export function GalleryIntroSplash({
             {...(backAriaLabel !== undefined ? { "aria-label": backAriaLabel } : {})}
             style={ghostBtn}
           >
-            &larr; Back
+            <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
           </button>
         )}
 
@@ -158,7 +159,7 @@ export function GalleryIntroSplash({
               fontFamily: FONT,
             }}
           >
-            Get started &rarr;
+            <Trans id="editor.assignLoop.getStartedButton">Get started &rarr;</Trans>
           </button>
         </div>
       </div>

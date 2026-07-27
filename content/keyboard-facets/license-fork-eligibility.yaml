@@ -1,0 +1,33 @@
+# license-fork-eligibility — spec 043 US3 (declared-metadata archetype).
+#
+# Whether the base's license permits forking-and-adapting: permissive / copyleft
+# / proprietary-restricted / unspecified (FR-030). The hard gate on whether a
+# candidate base can be adapted at all. Derived by matching the base's LICENSE
+# file text (collected into the scan source set from the .kps <LicenseFile>)
+# against the pinned data/known-licenses.json header-signature table. No match, or
+# no readable license, yields the honest `unspecified` sentinel — license identity
+# is NEVER inferred from author/copyright/vendor (research Decision 7, SC-004).
+id: license-fork-eligibility
+title: License fork eligibility
+description: >
+  Whether the base's license permits forking-and-adapting — permissive, copyleft,
+  proprietary-restricted, or unspecified — from a known-signature match against
+  the base's LICENSE text. The hard eligibility gate for base selection;
+  `unspecified` is never inferred from author or copyright.
+valueType: enum
+limits:
+  values:
+    - permissive
+    - copyleft
+    - proprietary-restricted
+    - unspecified
+  open: false
+likelihoodSemantics: >
+  a single keyboard-level determination from a known-license header match;
+  `unspecified` marks the absence of a recognizable license, never a guess.
+derivation:
+  archetype: declared-metadata
+  classifierId: license-fork-eligibility-classifier
+  fallbackChain: [declared-metadata, default-fallback]
+feedsSessionFacets: [env.license-fork-eligibility]
+schemaVersion: 1

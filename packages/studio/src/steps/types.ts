@@ -53,6 +53,11 @@ export interface StepBase {
    */
   layout?: "full" | "pane";
   /**
+   * Right-pane content for a "pane"-layout step. Default "preview" (live OSK).
+   * Ignored when layout:"full".
+   */
+  rightPane?: "preview" | "character-map";
+  /**
    * ids into steps/flowSources.ts: survey flows that run inside / hang under
    * this step on the Flow Map. Used by Stage 1 to derive drill-downs without
    * a separate FLOW_SOURCES array (spec 024, ADR-0001).

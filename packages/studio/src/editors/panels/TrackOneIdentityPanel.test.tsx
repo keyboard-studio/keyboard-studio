@@ -12,7 +12,8 @@
 //   9. No base-id warning once keyboardId differs from base id.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { screen, fireEvent, cleanup } from "@testing-library/react";
+import { render } from "../../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";

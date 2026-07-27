@@ -106,7 +106,7 @@ export interface Pattern {
    */
   appliesTo: string[];
   /**
-   * The strategy card (S-01..S-12, spec section 7.3) this pattern implements.
+   * The strategy card (S-01..S-13, spec section 7.3) this pattern implements.
    * The strategy selector uses this to map a decision-tree result to the
    * pattern(s) the gallery should surface.
    * @see spec.md §5, §7.3
@@ -224,8 +224,10 @@ export interface Pattern {
 }
 
 /**
- * Input shape for `makePattern`. Mirrors `Pattern` but all optional fields
- * may be omitted cleanly without fighting `exactOptionalPropertyTypes`.
+ * Input shape consumed by `makePattern`, which normalizes it into a `Pattern`.
+ * Mirrors `Pattern`'s fields, but optional properties may be supplied as
+ * `undefined` or omitted entirely; `makePattern` strips the `undefined`-valued
+ * keys so the resulting `Pattern` satisfies `exactOptionalPropertyTypes`.
  */
 export type PatternInit = {
   id: string;

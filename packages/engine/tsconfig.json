@@ -23,6 +23,6 @@
     { "path": "../contracts" },
     { "path": "../llm" }
   ],
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "src/character-discovery/generated/*.json"],
   "exclude": ["dist", "node_modules", "**/*.test.ts"]
 }

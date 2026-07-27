@@ -51,6 +51,14 @@ export interface SiblingAssetStoreEntry {
   previewStrip: PreviewStripMode;
   /** Whether reconcileSiblingAssetPaths repairs a stale reference to this store. */
   reconcileRepair: boolean;
+  /**
+   * The `source/<baseId><extension>` sibling-file extension `renameFilesInVfs`
+   * (scaffolder) renames on a scaffold identity rename, if this store's file
+   * has a conventional on-disk extension. Omitted for INCLUDECODES (a shared
+   * constants file, not a per-keyboard sibling) and DISPLAYMAP (a PUA-font
+   * sidecar not covered by `renameFilesInVfs`).
+   */
+  extension?: string;
 }
 
 /**
@@ -81,12 +89,12 @@ export interface SiblingAssetStoreEntry {
  *     which is never useful in the live preview, fetched or not.
  */
 export const SIBLING_ASSET_STORES: readonly SiblingAssetStoreEntry[] = [
-  { name: "LAYOUTFILE", fetchRequired: true, scaffoldRename: "always", previewStrip: "dangling", reconcileRepair: true },
-  { name: "VISUALKEYBOARD", fetchRequired: true, scaffoldRename: "always", previewStrip: "dangling", reconcileRepair: true },
-  { name: "BITMAP", fetchRequired: false, scaffoldRename: "bitmap-conditional", previewStrip: "dangling", reconcileRepair: true },
-  { name: "KMW_EMBEDJS", fetchRequired: true, scaffoldRename: "always", previewStrip: "always", reconcileRepair: true },
-  { name: "KMW_EMBEDCSS", fetchRequired: false, scaffoldRename: "always", previewStrip: "never", reconcileRepair: true },
-  { name: "KMW_HELPFILE", fetchRequired: false, scaffoldRename: "always", previewStrip: "always", reconcileRepair: true },
+  { name: "LAYOUTFILE", fetchRequired: true, scaffoldRename: "always", previewStrip: "dangling", reconcileRepair: true, extension: ".keyman-touch-layout" },
+  { name: "VISUALKEYBOARD", fetchRequired: true, scaffoldRename: "always", previewStrip: "dangling", reconcileRepair: true, extension: ".kvks" },
+  { name: "BITMAP", fetchRequired: false, scaffoldRename: "bitmap-conditional", previewStrip: "dangling", reconcileRepair: true, extension: ".ico" },
+  { name: "KMW_EMBEDJS", fetchRequired: true, scaffoldRename: "always", previewStrip: "always", reconcileRepair: true, extension: ".js" },
+  { name: "KMW_EMBEDCSS", fetchRequired: false, scaffoldRename: "always", previewStrip: "never", reconcileRepair: true, extension: ".css" },
+  { name: "KMW_HELPFILE", fetchRequired: false, scaffoldRename: "always", previewStrip: "always", reconcileRepair: true, extension: ".htm" },
   { name: "DISPLAYMAP", fetchRequired: false, scaffoldRename: "never", previewStrip: "dangling", reconcileRepair: true },
   { name: "INCLUDECODES", fetchRequired: true, scaffoldRename: "never", previewStrip: "never", reconcileRepair: false },
 ];
@@ -119,4 +127,15 @@ export function alwaysPreviewStripStores(): Set<string> {
 /** Store names whose stale sibling reference reconcileSiblingAssetPaths will repair. */
 export function reconcileRepairStores(): Set<string> {
   return new Set(SIBLING_ASSET_STORES.filter((s) => s.reconcileRepair).map((s) => s.name));
+}
+
+/**
+ * The sibling-file extensions `renameFilesInVfs` (scaffolder) renames on a
+ * scaffold identity rename. Excludes DISPLAYMAP/INCLUDECODES, which have no
+ * `extension` (see {@link SiblingAssetStoreEntry.extension}). Does NOT
+ * include `.kmn`/`.kps` — those are not asset-store entries and are handled
+ * separately by `renameFilesInVfs`.
+ */
+export function assetFileExtensions(): string[] {
+  return SIBLING_ASSET_STORES.filter((s) => s.extension !== undefined).map((s) => s.extension as string);
 }

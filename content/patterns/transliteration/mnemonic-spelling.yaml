@@ -194,8 +194,9 @@ provenance:
     note: >
       ITRANS Devanagari (Shree Devi Kumar). The canonical S-05 exemplar.
       Maps ASCII sequences to Devanagari: "a" → अ, "aa" → आ, "i" → इ, "ii" → ई, etc.
-      Also handles consonants with diacritics: "R" → ऱ (retroflex), "T" → ट (dental),
-      and nasals: "m" → म, "N" → ण.
+      Also handles vocalic R: "R" → ṛ (U+090B independent vowel letter at syllable
+      onset, U+0943 dependent vowel sign after a consonant), retroflex/dental
+      consonants: "T" → ट, "D" → ड, and nasals: "m" → म, "N" → ण.
 
       Key insight: ITRANS uses doubled vowels for length (aa, ii, uu) and
       capital consonants for retroflex/dental variants (R, T, L, D, N).

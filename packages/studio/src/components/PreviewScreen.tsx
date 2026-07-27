@@ -7,6 +7,7 @@
 // NO Download button. NO SignUpPanel.
 
 import { useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useResizablePanes } from "../hooks/useResizablePanes.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
@@ -21,6 +22,7 @@ import { ResizeHandle } from "./ResizeHandle.tsx";
 import { DIVIDER_WIDTH, LEFT_MIN_PCT, LEFT_MAX_PCT, LEFT_INIT_PCT } from "./previewOutputLayout.ts";
 
 export function PreviewScreen() {
+  const { t } = useLingui();
   // Each screen runs its own independent artifact pipeline — see usePreviewArtifact.ts module comment for why this is deliberate (do not "dedupe" across screens).
   const artifact = usePreviewArtifact();
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
@@ -72,7 +74,7 @@ export function PreviewScreen() {
 
       {/* Right pane: live OSK preview + diagnostics */}
       <section
-        aria-label="Preview pane"
+        aria-label={t({ id: "preview.pane.label", message: "Preview pane" })}
         style={{
           flexBasis: `calc(${rightPct}% - ${DIVIDER_WIDTH / 2}px)`,
           flexGrow: 1,
@@ -96,7 +98,7 @@ export function PreviewScreen() {
           }}
         >
           <h2 style={{ margin: 0, fontSize: "1.1rem", color: "#6ea8fe" }}>
-            Live preview
+            <Trans id="preview.heading">Live preview</Trans>
           </h2>
           <OskModeToggle value={oskMode} onChange={setOskMode} />
         </div>

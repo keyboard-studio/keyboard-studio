@@ -1,0 +1,24 @@
+# Q-TP3 orthography-join (spec 038 US3, trust-policy).
+# The ONLY path a named-orthography label enters the session (FR-009): an
+# author-confirmed opt-in join, never inferred. Session-scoped, record-no-default
+# — a named orthography is a prescription, so with no explicit opt-in nothing is
+# joined.
+
+id: q_tp3_orthography_join
+family: trust-policy
+elicits: >
+  Whether to join this keyboard to a named orthography community, when related
+  keyboards exist in an alternate script for a known family — an explicit opt-in,
+  never inferred.
+firingCondition: "arab-or-alt-script-siblings-for-known-family"
+prefill:
+  facets: [script]
+  sessionFacet: community.multi-orthography
+provenanceLabel: "alternate-script keyboards for related languages in a known family"
+consumers:
+  - "base-suggestion:labeling"
+  - "gallery:grouping"
+noEvidenceDegradation: record-no-default
+scope: session
+renders: true
+status: candidate

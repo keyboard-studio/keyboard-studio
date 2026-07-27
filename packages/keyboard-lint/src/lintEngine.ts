@@ -16,15 +16,27 @@
 
 import type { VirtualFS, LintFinding } from "@keyboard-studio/contracts";
 import type { LintEngineService } from "@keyboard-studio/contracts";
-import { lintWithContext } from "./lintContext.js";
+import { lintWithContext, type LintContext } from "./lintContext.js";
 
 /**
  * Concrete implementation of {@link LintEngineService} for Layer C DISCUS checks.
  * Runs the touch-layout checks (18.1–18.5) via the locked `lint()` contract.
- * For 18.6 (inventory coverage), use `lintWithContext()` directly.
+ * For 18.6 (desktop or touch inventory coverage), use `lintWithContext()` method
+ * below (or the standalone function of the same name).
  */
 export class KeyboardLintEngine implements LintEngineService {
   async lint(fs: VirtualFS, keyboardId: string): Promise<LintFinding[]> {
     return lintWithContext(fs, keyboardId, {});
+  }
+
+  /**
+   * Run 18.1–18.5 plus any context-dependent checks whose inputs are present
+   * in `ctx` (18.6 desktop and/or 18.6 touch — see LintContext). Exposed as an
+   * engine method so callers holding a single engine instance (e.g.
+   * useTouchLint) can route through it without importing the standalone
+   * `lintWithContext` function directly.
+   */
+  async lintWithContext(fs: VirtualFS, keyboardId: string, ctx: LintContext): Promise<LintFinding[]> {
+    return lintWithContext(fs, keyboardId, ctx);
   }
 }

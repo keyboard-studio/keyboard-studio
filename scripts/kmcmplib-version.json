@@ -1,8 +1,0 @@
-{
-  "_comment": "Pinned kmcmplib acquisition config. prod fetches the wasm bundled inside @keymanapp/kmc-kmn from the jsDelivr npm CDN; dev builds the kmcmplib target from a sibling keymanapp/keyman checkout.",
-  "version": "19.0.248-alpha",
-  "sha256": "f08a2abfd508e0240dda091e35798fb747072777b9ec2160a32c7d6ba7f72341",
-  "urlTemplate": "https://cdn.jsdelivr.net/npm/@keymanapp/kmc-kmn@{version}/build/src/import/kmcmplib/wasm-host.wasm",
-  "devBuildCmd": "./build.sh @/developer/src/kmcmplib:wasm --release",
-  "devArtifactPath": "developer/src/kmcmplib/build/wasm/release/src/wasm-host.wasm"
-}

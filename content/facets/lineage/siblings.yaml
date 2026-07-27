@@ -30,6 +30,7 @@ consumers:
   prefills:
     - pb_existing_keyboards
     - pb_legacy_encoding
+    - q_sa1_target_script_spread
   proposes:
     - "track:adapt-vs-new-proposal"
     - "identity:collision-warning"

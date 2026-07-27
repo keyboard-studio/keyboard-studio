@@ -12,7 +12,8 @@
 // directly via useHoverInfoStore.getState() after firing the click.
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, fireEvent, screen } from '@testing-library/react';
+import { cleanup, fireEvent, screen } from '@testing-library/react';
+import { render } from '../../../test/renderWithI18n.tsx';
 import { GlyphCell } from './GlyphCell.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 

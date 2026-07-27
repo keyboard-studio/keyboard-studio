@@ -171,6 +171,42 @@ describe("emit", () => {
     expect(out).toContain("store(myStore)");
   });
 
+  it("emits a user store referenced by rules in more than one group exactly once", () => {
+    // Fragment-free path (ir.raw is empty): the dedup guard on emittedStores
+    // must stop a store referenced from two different groups from being
+    // emitted twice (a duplicate store() declaration is a kmcmplib error).
+    const ir = makeIR();
+    ir.stores.push({
+      nodeId: "store#2",
+      name: "sharedStore",
+      items: [{ kind: "char", value: "a" }],
+      isSystem: false,
+    });
+    const secondGroup: IRGroup = {
+      nodeId: "group#1",
+      name: "second",
+      usingKeys: false,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "rule#5",
+          context: [{ kind: "any", storeRef: "sharedStore" }],
+          output: [{ kind: "char", value: "b" }],
+        },
+      ],
+    };
+    ir.groups[0]?.rules.push({
+      nodeId: "rule#4",
+      context: [{ kind: "any", storeRef: "sharedStore" }],
+      output: [{ kind: "char", value: "c" }],
+    });
+    ir.groups.push(secondGroup);
+
+    const out = emit(ir);
+    const occurrences = out.split("\n").filter((line) => line.includes("store(sharedStore)"));
+    expect(occurrences).toHaveLength(1);
+  });
+
   it("emits RawKmnFragment sourceText verbatim", () => {
     const ir = makeIR();
     ir.raw.push({
@@ -962,5 +998,56 @@ describe("emit — faithful path catch-all dedup prevents double-emission of a n
     // The dedup guard must prevent a second emission.
     const matches = [...out.matchAll(/store\(alreadyEmitted\)/g)];
     expect(matches).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Store-body range re-collapse on emit (spec 042, FR-008)
+// ---------------------------------------------------------------------------
+
+function kmnWithStore(storeLine: string): string {
+  return `store(&VERSION) '10.0'
+store(&NAME) 'Range Test'
+store(&TARGETS) 'any'
+${storeLine}
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > U+0061
+`;
+}
+
+/** Extract the `store(<name>) …` line from emitted output. */
+function storeLine(out: string, name: string): string {
+  const line = out.split("\n").find((l) => l.includes(`store(${name})`));
+  if (line === undefined) throw new Error(`no store(${name}) line in output`);
+  return line;
+}
+
+describe("range re-collapse on emit (spec 042)", () => {
+  it("C11: a BMP svara run re-collapses to `U+0904 .. U+0914`", () => {
+    const { ir } = parse(kmnWithStore("store(svara) U+0904 .. U+0914"), "svara");
+    const out = emit(ir);
+    expect(storeLine(out, "svara")).toContain("U+0904 .. U+0914");
+  });
+
+  it("C11: an SMP run re-collapses with quoted endpoints `'𑚀' .. '𑚉'`", () => {
+    const { ir } = parse(kmnWithStore("store(ConsU) U+11680 .. U+11689"), "smp");
+    const out = emit(ir);
+    const line = storeLine(out, "ConsU");
+    expect(line).toContain(`${String.fromCodePoint(0x11680)}' .. '${String.fromCodePoint(0x11689)}`);
+  });
+
+  it("C11: an ascending run of length < 3 is NOT collapsed", () => {
+    const { ir } = parse(kmnWithStore("store(x) U+0905 U+0906"), "short");
+    const out = emit(ir);
+    expect(storeLine(out, "x")).not.toContain("..");
+  });
+
+  it("an all-printable-ASCII ascending run stays a legible string (dictionary/&word preserved)", () => {
+    const { ir } = parse(kmnWithStore("store(word) 'abc'"), "ascii");
+    const out = emit(ir);
+    const line = storeLine(out, "word");
+    expect(line).toContain("'abc'");
+    expect(line).not.toContain("..");
   });
 });

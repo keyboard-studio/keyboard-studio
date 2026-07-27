@@ -1,0 +1,39 @@
+# platform-coverage — spec 043 US1 (declared-metadata archetype).
+#
+# The modality set — a subset of {desktop, web, touch} — a base ships for,
+# inferred from the BUNDLED FILE TYPES in the .kps <Files> list, NOT from a
+# <Targets> element (absent in this corpus's .kps dialect, verified against
+# bambara.kps — research Decision 4). File-type -> modality (FR-012, verbatim):
+#   .kmx / .kmn          -> desktop
+#   .js                  -> web
+#   .keyman-touch-layout -> touch
+# OS-level labels (windows/macOS/Linux/iOS/Android) are NEVER emitted — file
+# presence cannot distinguish them. `.keyman-touch-layout` is a source sibling
+# (not a <Files> entry in this corpus), so `touch` is added when the <Files>
+# list names one OR the scanner collected the sibling artifact.
+#
+# valueType is `set`: modality membership; a missing/unreadable .kps yields the
+# empty set at the default-fallback tier so the absence is auditable.
+id: platform-coverage
+title: Platform coverage
+description: >
+  Device modalities the base ships for — a subset of {desktop, web, touch} —
+  inferred from bundled file types in the .kps <Files> list (.kmx/.kmn ->
+  desktop, .js -> web, .keyman-touch-layout -> touch), unioned with touch-layout
+  artifact presence. Modality only; never OS-level labels.
+valueType: set
+limits:
+  values:
+    - desktop
+    - web
+    - touch
+  open: false
+likelihoodSemantics: >
+  membership per modality; no per-member likelihood — the record's `notes`
+  carries the bundled file types the modalities were inferred from.
+derivation:
+  archetype: declared-metadata
+  classifierId: platform-coverage-classifier
+  fallbackChain: [declared-metadata, default-fallback]
+feedsSessionFacets: [source.platform-coverage]
+schemaVersion: 1

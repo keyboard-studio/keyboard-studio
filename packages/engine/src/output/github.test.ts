@@ -255,6 +255,45 @@ describe("publishPR", () => {
     expect(treeBody).not.toContain("source/cm_qwerty.kmn.imported");
   });
 
+  // -------------------------------------------------------------------------
+  // Binary source files (fonts, icons) — uploaded as base64 blobs, not dropped
+  // -------------------------------------------------------------------------
+
+  it("uploads binary source files as base64 blobs and references them by SHA", async () => {
+    const BLOB_SHA = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0";
+    const routes = happyPathRoutes();
+    routes.set(`POST ${API}/repos/${FORK_OWNER}/keyboards/git/blobs`, {
+      ok: true,
+      status: 201,
+      body: { sha: BLOB_SHA },
+    });
+
+    const capturedBodies: string[] = [];
+    const base = buildMockFetch(routes);
+    const captureFetch: GitHubFetchFn = async (url, init) => {
+      if (init?.body !== undefined) capturedBodies.push(init.body);
+      return base(url, init);
+    };
+
+    const fontBytes = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
+    const fsWithFont = createVirtualFS([
+      { path: "source/cm_qwerty.kmn", content: "c emitted\n", isBinary: false },
+      { path: "source/AndikaAfr-R.ttf", content: fontBytes, isBinary: true },
+    ]);
+
+    await publishPR(fsWithFont, makeOpts(), captureFetch);
+
+    // A blob was created with base64 encoding of the font bytes.
+    const blobBody = capturedBodies.find((b) => b.includes('"encoding":"base64"')) ?? "";
+    expect(blobBody).toContain(`"content":"${btoa("\xde\xad\xbe\xef")}"`);
+
+    // The tree references the font by SHA (not inlined) and keeps the text file.
+    const treeBody = capturedBodies.find((b) => b.includes("base_tree")) ?? "";
+    expect(treeBody).toContain("source/AndikaAfr-R.ttf");
+    expect(treeBody).toContain(BLOB_SHA);
+    expect(treeBody).toContain("source/cm_qwerty.kmn");
+  });
+
   it("includes the .kmn source file when a .kmn.imported sidecar also exists", async () => {
     const capturedBodies: string[] = [];
     const base = buildMockFetch(happyPathRoutes());

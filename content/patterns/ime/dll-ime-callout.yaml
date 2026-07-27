@@ -16,7 +16,7 @@ description: >
 category: ime
 appliesTo: ["Hans", "Hant", "Jpan", "Kore"]
 priority: 3
-group_visibility: all
+group_visibility: non-roman
 strategyId: "S-12"
 combinesWith: []
 
@@ -91,7 +91,6 @@ kmnFragment: |
   c For any keystroke, call the DLL to get matching characters
   {{kmnRules}}
 
-  nomatch > use(main)
 
 touchLayoutFragment: null
 

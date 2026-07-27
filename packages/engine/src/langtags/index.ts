@@ -39,14 +39,15 @@ export function listLanguages(): readonly LanguageSummary[] {
 }
 
 /**
- * Search languages by code, English name, or autonym (case-insensitive
+ * Search languages by code, English name (including langtags alternate English
+ * names — e.g. "Otuo" resolves Ghotuo), or autonym (case-insensitive
  * substring / prefix matching).
  *
  * Ordering:
  *   1. Exact code match
- *   2. English name prefix match
+ *   2. English name prefix match (primary or any alternate English name)
  *   3. Autonym prefix match
- *   4. Substring match (code, English name, or autonym)
+ *   4. Substring match (code, English name / alternate name, or autonym)
  *
  * Ties within a tier are broken alphabetically by `englishName`.
  *
@@ -75,12 +76,32 @@ export function lookupByName(query: string): readonly LanguageSummary[] {
       continue;
     }
 
-    const engPre = english.startsWith(q);
+    let engPre = english.startsWith(q);
     const autPre = autonym.length > 0 && autonym.startsWith(q);
-    const sub =
+    let sub =
       code.includes(q) ||
       english.includes(q) ||
       (autonym.length > 0 && autonym.includes(q));
+
+    // Alternate English names (langtags aliases) live on LanguageDefaults, not
+    // the summary row. Consult them only when the primary English name hasn't
+    // already put this row in the English-prefix tier — an alias can only
+    // *promote* a row (into engPre, or into the substring tier), never reclassify
+    // one the primary name already qualified. Skipping the per-row index lookup
+    // on the common primary-match path keeps the full-corpus scan cheap.
+    //
+    // The guard is `!engPre` (primary-name), not `!engPre && !autPre`: an alias
+    // *prefix* match joins the English-prefix tier, which outranks autonym-prefix,
+    // so it must still be computed for rows where only the autonym matched. That
+    // ranking is intentional and is pinned by a test.
+    if (!engPre) {
+      const altNames = getLanguageDefaults(lang.code)?.englishNames ?? [];
+      if (altNames.some((n) => n.toLowerCase().startsWith(q))) {
+        engPre = true;
+      } else if (!sub && altNames.some((n) => n.toLowerCase().includes(q))) {
+        sub = true;
+      }
+    }
 
     if (engPre) {
       englishPrefix.push(lang);

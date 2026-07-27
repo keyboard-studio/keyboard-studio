@@ -1,3 +1,20 @@
+# Repo-wide line-ending baseline.
+#
+# Blobs are stored LF; without this, core.autocrlf=true rewrites the working
+# copy to CRLF on checkout, which makes committed generated/snapshot artifacts
+# (e.g. packages/**/generated/**, vitest __snapshots__/**) show perpetually
+# "modified" in `git status` with zero content changes — status noise that
+# masks real edits and risks accidental EOL-flip commits.
+#
+# `eol=lf` forces LF in the working tree for all text files, overriding
+# core.autocrlf on Windows checkouts. Binary files are still auto-detected.
+* text=auto eol=lf
+
+# Explicit LF for machine-generated artifacts, so they never churn regardless
+# of the global setting above.
+**/generated/** text eol=lf
+**/__snapshots__/** text eol=lf
+
 # The Claude Code Workflow tool rejects any script containing CR (U+000D)
 # characters ("script contains control characters that would be hidden in
 # the approval dialog"), so workflow scripts must stay LF even on

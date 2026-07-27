@@ -7,6 +7,7 @@
 // would reset KMW context on every selection — expensive.
 
 import { useEffect, useRef } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { isExcludedScript } from "../lib/excludedScriptFamilies.ts";
 import type { Stage } from "../hooks/useKeyboardArtifact.ts";
@@ -36,6 +37,7 @@ export function OSKFrame({
   onTextChange,
   onKeyTap,
 }: OSKFrameProps) {
+  const { t } = useLingui();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const channel = useOskChannel(iframeRef, onKeyTap);
   // Working-copy identity drives the bcp47 language tag passed to KMW's
@@ -109,7 +111,7 @@ export function OSKFrame({
       <iframe
         ref={iframeRef}
         src="/osk-frame.html"
-        title="On-screen keyboard preview"
+        title={t({ id: "osk.frame.title", message: "On-screen keyboard preview" })}
         // allow-same-origin is load-bearing for the frame's postMessage
         // origin check (osk-frame.js compares event.origin against its own
         // window.location.origin) and for KMW's relative .js fetches in dev.
@@ -142,7 +144,7 @@ export function OSKFrame({
             fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
           }}
         >
-          KMW: {channel.engineError}
+          <Trans id="osk.engineError">KMW: {channel.engineError}</Trans>
         </div>
       )}
     </div>

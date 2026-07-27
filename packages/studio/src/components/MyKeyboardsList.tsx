@@ -32,6 +32,7 @@
 // surfacing.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Trans } from "@lingui/react/macro";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import {
   listDrafts,
@@ -305,7 +306,9 @@ export function MyKeyboardsList() {
 
   return (
     <section aria-label="My keyboards" style={sectionStyle}>
-      <h2 style={headingStyle}>My keyboards</h2>
+      <h2 style={headingStyle}>
+        <Trans id="profile.myKeyboards.label">My keyboards</Trans>
+      </h2>
 
       {loading && (
         <p role="status" aria-live="polite" style={statusLineStyle} data-testid="my-keyboards-loading">

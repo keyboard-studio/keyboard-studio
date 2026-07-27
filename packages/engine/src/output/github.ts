@@ -82,6 +82,21 @@ export function isSourceFile(path: string): boolean {
   return dot === -1 || !COMPILED_EXT.has(path.slice(dot));
 }
 
+/**
+ * Base64-encode a byte array for the GitHub blob API (`encoding: "base64"`).
+ * Chunked so a large font/icon does not overflow the argument stack of
+ * `String.fromCharCode`. Uses the platform `btoa` (present in browsers and
+ * Node ≥ 16).
+ */
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
 function buildHeaders(token: string): Record<string, string> {
   return {
     Accept: "application/vnd.github+json",
@@ -183,8 +198,9 @@ export async function verifyToken(
  * Implements {@link OutputService.publishPR}.
  *
  * Compiled artifacts (`.kmx`, `.kvk`, `.js`) are excluded from the commit
- * per spec §12 / criteria SS1.  Only text source files are committed inline
- * via the GitHub Git Data API (no separate blob creation needed for text).
+ * per spec §12 / criteria SS1.  Text source files are committed inline via the
+ * GitHub Git Data API; binary source files (fonts, icons) are uploaded as
+ * base64 blobs and referenced by SHA so they are not dropped from the PR.
  *
  * @throws {PublishPRError} Discriminated union — callers should `switch` on `err.kind`.
  */
@@ -272,17 +288,44 @@ export async function publishPR(
   const baseTreeSha = parentCommitData.tree.sha;
 
   // ------------------------------------------------------------------
-  // 4. Build tree entries — source files only, text content inline
+  // 4. Build tree entries — source files only. Text content is inlined;
+  //    binary source files (fonts, icons) are uploaded as base64 blobs and
+  //    referenced by SHA so they are not silently dropped from the PR.
   // ------------------------------------------------------------------
-  const treeEntries = fs
-    .entries()
-    .filter((e) => isSourceFile(e.path) && typeof e.content === "string")
+  const sourceEntries = fs.entries().filter((e) => isSourceFile(e.path));
+
+  const textTree = sourceEntries
+    .filter((e) => typeof e.content === "string")
     .map((e) => ({
       path: e.path,
       mode: "100644",
       type: "blob",
       content: e.content as string,
     }));
+
+  const binaryEntries = sourceEntries.filter((e) => typeof e.content !== "string");
+  const binaryTree = await Promise.all(
+    binaryEntries.map(async (e) => {
+      const blobRes = await fetchOrNetworkError("Blob creation failed", () =>
+        ghFetch(`${forkBase}/git/blobs`, token, fetchFn, "POST", {
+          content: bytesToBase64(e.content as Uint8Array),
+          encoding: "base64",
+        })
+      );
+      if (!blobRes.ok) {
+        const ae = authError(blobRes);
+        if (ae !== null) throw ae;
+        throw {
+          kind: "unknown",
+          message: `Blob creation for ${e.path} returned HTTP ${blobRes.status}`,
+        } satisfies PublishPRError;
+      }
+      const blobData = (await blobRes.json()) as { sha: string };
+      return { path: e.path, mode: "100644", type: "blob", sha: blobData.sha };
+    })
+  );
+
+  const treeEntries = [...textTree, ...binaryTree];
 
   // ------------------------------------------------------------------
   // 5. Create the new tree

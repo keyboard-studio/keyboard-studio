@@ -224,8 +224,8 @@ function checkRosterConsistency() {
       .map((f) => path.basename(f, ".md").toLowerCase()),
   );
 
-  // km-lead / km-triage are commands, km-review is a workflow — not subagents.
-  const NON_AGENT = new Set(["km-lead", "km-triage", "km-review"]);
+  // km-lead / km-triage are commands — not subagents.
+  const NON_AGENT = new Set(["km-lead", "km-triage"]);
 
   const checkRef = (name, fullMatch, filePath, lineNum) => {
     if (!NON_AGENT.has(name) && !agentNames.has(name)) {
@@ -249,20 +249,10 @@ function checkRosterConsistency() {
       ),
     );
 
-  // (b) agentType values in the km-review workflow REVIEWERS/prompts.
-  const review = path.join(CLAUDE, "workflows", "km-review.js");
-  const reviewFailures = existsSync(review)
-    ? lines(review).flatMap((line, i) =>
-        [...line.matchAll(/agentType:\s*"(km-[^"]+)"/g)]
-          .map((m) => checkRef(m[1].toLowerCase(), m[1], review, i + 1))
-          .filter(Boolean),
-      )
-    : [];
-
   return {
     id: "6",
     title: "Roster consistency (every referenced km-<role> has an agent file)",
-    failures: [...proseFailures, ...reviewFailures],
+    failures: proseFailures,
   };
 }
 

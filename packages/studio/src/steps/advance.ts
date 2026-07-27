@@ -32,7 +32,9 @@ type ActiveStepId =
   | "project_name"
   | "characters"
   | "carve"
+  | "marks"
   | "mechanisms"
+  | "touch_seed_source"
   | "touch"
   | "help"
   | "done"
@@ -40,6 +42,13 @@ type ActiveStepId =
 
 /** Mirror of survey/index.ts Track (kept local, boundary-clean). */
 type Track = "copy" | "adapt";
+
+/**
+ * Mirror of surveySessionStore.TouchSeedSource (kept local, boundary-clean —
+ * see the module header: advance.ts imports ONLY ./manifest.ts + ./types.ts).
+ * Spec 035 FR-006 / contracts/seed-source-fork.md.
+ */
+type TouchSeedSource = "import-adapt" | "reseed-from-desktop";
 
 // ---------------------------------------------------------------------------
 // AdvanceContext — the session snapshot the advance policy branches on.
@@ -51,6 +60,12 @@ export interface AdvanceContext {
   readonly selectedTrack: Track | null;
   /** Whether the identity step's chosen script is supported in v1. */
   readonly identitySupported: boolean;
+  /**
+   * The recorded touch_seed_source fork choice, or null when none is recorded
+   * yet (spec 035 R12 fork memory). Read by the "mechanisms" case to decide
+   * whether to route into the touch_seed_source chooser or straight to touch.
+   */
+  readonly touchSeedSource: TouchSeedSource | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +103,7 @@ export interface AdvanceOutcome {
 
 export const STEPS_WITH_APPLY_COMPLETION: ReadonlySet<string> = new Set([
   "characters",
+  "marks",
   "carve",
   "mechanisms",
   "touch",
@@ -183,13 +199,31 @@ export function advance(
       return { next: "characters", setCharactersSubStage: "prefill" };
 
     case "characters":
-      return { next: nextSpineStepAfter("characters") }; // carve
+      return { next: nextSpineStepAfter("characters") }; // marks (spec 046)
+
+    case "marks":
+      return { next: nextSpineStepAfter("marks") }; // carve
 
     case "carve":
       return { next: nextSpineStepAfter("carve") }; // mechanisms
 
     case "mechanisms":
-      return { next: nextSpineStepAfter("mechanisms") }; // touch (skips touch_seed_source)
+      // Spec 035 R4/R12: route into the off-spine seed-source fork — but only
+      // when no valid choice is recorded yet. A remembered choice goes
+      // straight to "touch" so back-and-forth over mechanisms doesn't re-ask.
+      // nextSpineStepAfter("mechanisms") would skip the off-spine
+      // touch_seed_source step entirely, so the fork check happens here
+      // explicitly rather than delegating to nextSpineStepAfter. (S-03
+      // sequences now build inline in the Mechanism Gallery's method
+      // chooser — there is no separate "sequences" step to route through
+      // first; this fork check used to live on that step's completion.)
+      return ctx.touchSeedSource === null
+        ? { next: "touch_seed_source" }
+        : { next: "touch" };
+
+    case "touch_seed_source":
+      // joinTarget is "touch"; advance there directly (mirrors project_name).
+      return { next: "touch" };
 
     case "touch":
       return { next: nextSpineStepAfter("touch") }; // help

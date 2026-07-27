@@ -5,6 +5,8 @@
 
 import { useEffect, useState, useDeferredValue, useMemo, useRef, useId } from "react";
 import type { CSSProperties } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { ImportStatus } from "@keyboard-studio/contracts";
 import { getBaseBrowserService } from "../lib/services.ts";
@@ -93,6 +95,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 function ImportBadge({ status }: { status: string }) {
+  const { t } = useLingui();
   const label = STATUS_LABEL[status] ?? status;
   const color = STATUS_COLOR[status] ?? "var(--app-text-muted)";
   return (
@@ -109,7 +112,7 @@ function ImportBadge({ status }: { status: string }) {
         verticalAlign: "middle",
         whiteSpace: "nowrap",
       }}
-      aria-label={`Import status: ${label}`}
+      aria-label={t({ id: "base.importBadge.ariaLabel", message: `Import status: ${label}` })}
     >
       {label}
     </span>
@@ -186,10 +189,12 @@ export function BaseKeyboardPicker({
   value,
   onChange,
   target,
-  label = "Base keyboard",
+  label,
   scopeIds,
   onSearchAll,
 }: BaseKeyboardPickerProps) {
+  const { t } = useLingui();
+  const resolvedLabel = label ?? t({ id: "base.picker.defaultLabel", message: "Base keyboard" });
   const [keyboards, setKeyboards] = useState<BaseKeyboard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -446,7 +451,7 @@ export function BaseKeyboardPicker({
           fontFamily: "var(--app-font)",
         }}
       >
-        {label}
+        {resolvedLabel}
       </label>
 
       {/* Loading state */}
@@ -462,7 +467,7 @@ export function BaseKeyboardPicker({
             borderRadius: 6,
           }}
         >
-          Loading base keyboards...
+          <Trans id="base.picker.loading">Loading base keyboards...</Trans>
         </div>
       )}
 
@@ -472,7 +477,10 @@ export function BaseKeyboardPicker({
           <input
             id={inputId}
             disabled
-            placeholder="failed to load keyboards"
+            placeholder={t({
+              id: "base.picker.error.placeholder",
+              message: "failed to load keyboards",
+            })}
             style={{
               background: "var(--app-bg)",
               color: "var(--app-text-muted)",
@@ -500,7 +508,9 @@ export function BaseKeyboardPicker({
           role="status"
           style={{ fontSize: 12, color: "var(--app-text-muted)", paddingTop: 4 }}
         >
-          No base keyboards found. Check your connection and try again.
+          <Trans id="base.picker.emptyCatalog">
+            No base keyboards found. Check your connection and try again.
+          </Trans>
         </div>
       )}
 
@@ -518,7 +528,10 @@ export function BaseKeyboardPicker({
             aria-label={undefined /* label provided via htmlFor */}
             type="text"
             autoComplete="off"
-            placeholder="Type to search by name, id, script, or language…"
+            placeholder={t({
+              id: "base.picker.search.placeholder",
+              message: "Type to search by name, id, script, or language…",
+            })}
             value={inputText}
             onFocus={() => {
               if (!open) setOpen(true);
@@ -560,7 +573,7 @@ export function BaseKeyboardPicker({
                 fontFamily: "var(--app-font)",
               }}
             >
-              No keyboards match &ldquo;{query}&rdquo;.
+              <Trans id="base.picker.noMatch">No keyboards match &ldquo;{query}&rdquo;.</Trans>
               {scopeIds !== undefined && onSearchAll !== undefined && (
                 <button
                   type="button"
@@ -580,7 +593,9 @@ export function BaseKeyboardPicker({
                     fontFamily: "var(--app-font)",
                   }}
                 >
-                  Search all keyboards instead (or press Enter)
+                  <Trans id="base.picker.searchAll">
+                    Search all keyboards instead (or press Enter)
+                  </Trans>
                 </button>
               )}
             </div>
@@ -591,7 +606,7 @@ export function BaseKeyboardPicker({
             <ul
               id={listboxId}
               role="listbox"
-              aria-label="Base keyboard options"
+              aria-label={t({ id: "base.picker.listboxLabel", message: "Base keyboard options" })}
               style={{
                 ...POPUP_STYLE,
                 padding: 0,
@@ -692,7 +707,9 @@ export function BaseKeyboardPicker({
                     borderTop: "1px solid var(--app-border)",
                   }}
                 >
-                  showing {MAX_VISIBLE} of {ranked.length} — keep typing to narrow
+                  <Trans id="base.picker.truncationFooter">
+                    showing {MAX_VISIBLE} of {ranked.length} — keep typing to narrow
+                  </Trans>
                 </li>
               )}
             </ul>
@@ -713,8 +730,17 @@ export function BaseKeyboardPicker({
           >
             {open
               ? ranked.length === 0
-                ? `No keyboards match "${query}".`
-                : `${ranked.length} keyboard${ranked.length === 1 ? "" : "s"} found.`
+                ? t({
+                    id: "base.picker.liveRegion.noMatch",
+                    message: `No keyboards match "${query}".`,
+                  })
+                : t({
+                    id: "base.picker.liveRegion.resultCount",
+                    message: plural(ranked.length, {
+                      one: "# keyboard found.",
+                      other: "# keyboards found.",
+                    }),
+                  })
               : ""}
           </span>
 
@@ -730,7 +756,7 @@ export function BaseKeyboardPicker({
                 fontFamily: "var(--app-font)",
               }}
             >
-              <span>Import readiness:</span>
+              <span><Trans id="base.picker.importReadiness">Import readiness:</Trans></span>
               <ImportBadge status={selectedStatus} />
             </div>
           )}

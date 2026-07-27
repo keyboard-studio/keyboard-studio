@@ -26,11 +26,13 @@
     "./langtags": {
       "types": "./dist/langtags/index.d.ts",
       "import": "./dist/langtags/index.js"
-    }
+    },
+    "./data/placement-priors.json": "./data/placement-priors.json"
   },
   "files": [
     "dist",
     "src",
+    "data/placement-priors.json",
     "README.md"
   ],
   "scripts": {

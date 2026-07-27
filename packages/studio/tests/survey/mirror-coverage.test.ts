@@ -2,19 +2,24 @@
 //
 // At test time, enumerates every src/survey/questions/<phase>/<id>.ts module
 // (excluding index/registry/barrel files and *.test.ts files) and asserts that
-// a matching tests/survey/questions/<phase>/<id>.test.ts exists.
+// a matching tests/survey/questions/<phase>/<id>.test.ts exists — BUT ONLY for
+// modules that EXPORT A VALIDATE FUNCTION.
 //
 // Handles both flat form (<id>.ts) and folder form (<id>/index.ts, introduced
 // in US5). For folder form the expected mirror is tests/.../<id>.test.ts keyed
 // on the folder name, not "index".
 //
-// A module with no mirror test FAILS this spec. Add the missing test file to
-// tests/survey/questions/<phase>/<id>.test.ts to resolve.
+// A module WITHOUT validate() is covered by orphan-input-lint + buildStepGraph
+// reachability; static-config modules (definition, next, type, etc.) do not need
+// a per-file test. Only modules that export a validate() function must have a
+// mirror test. Add the missing test file to tests/survey/questions/<phase>/<id>.test.ts
+// if a module's validate() lacks coverage.
 
 import { describe, it, expect } from "vitest";
 import { readdirSync, existsSync, statSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 import path from "node:path";
+import { questionRegistry } from "../../src/survey/questions/registry.ts";
 
 // Resolve paths relative to this spec file, which lives at:
 //   packages/studio/tests/survey/mirror-coverage.test.ts
@@ -47,6 +52,14 @@ interface MirrorEntry {
   expectedMirror: string;
 }
 
+// Does the question module export a validate() function? Read it off the typed
+// questionRegistry (QuestionModule.validate) rather than regex-scanning source —
+// the regex missed arrow-function validators (`export const validate = () => …`)
+// and understated the coverage requirement. Keyed by question id.
+function hasValidate(id: string): boolean {
+  return typeof questionRegistry[id]?.validate === "function";
+}
+
 function collectModules(): MirrorEntry[] {
   const entries: MirrorEntry[] = [];
 
@@ -75,6 +88,8 @@ function collectModules(): MirrorEntry[] {
         if (!existsSync(indexFile)) continue;
         const id = child;
         if (isExcluded(id)) continue;
+        // Only require mirror if the module exports validate()
+        if (!hasValidate(id)) continue;
         const expectedMirror = path.join(
           testsQuestionsRoot,
           phase,
@@ -85,6 +100,8 @@ function collectModules(): MirrorEntry[] {
         // Flat form: <id>.ts
         const stem = child.slice(0, -".ts".length);
         if (isExcluded(stem)) continue;
+        // Only require mirror if the module exports validate()
+        if (!hasValidate(stem)) continue;
         const expectedMirror = path.join(
           testsQuestionsRoot,
           phase,

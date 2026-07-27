@@ -1,0 +1,56 @@
+# source.rule-store-compaction — whether the chosen base's .kmn inlines
+# repeated output literals per-rule, hoists them into shared stores
+# referenced via index()/any(), or mixes both. Pure source-shape; the
+# compiled behavior is identical either way.
+
+id: source.rule-store-compaction
+family: source
+title: Source rule/store compaction
+description: >
+  Whether the chosen base's .kmn writes repeated output literals inline in
+  each rule, hoists them into shared stores referenced via index()/any(),
+  or mixes both across its rule groups. A pure source-shape fact — compacting
+  or inlining changes nothing kmcmplib compiles, only how the source reads.
+
+valueType: enum
+values: [inline-rules, consolidated-stores, mixed]
+
+modality: physical
+
+derivations:
+  - kind: computed
+    source: "planned:rule-store-compaction-of-kmn"
+    sourceStatus: planned
+    notes: >
+      Measures whether repeated output literals across the base's rules are
+      written inline per-rule or hoisted into shared stores referenced via
+      index()/any() dispatch.
+
+consumers:
+  prefills: []
+  proposes:
+    - "transform-offer:store-compact"
+
+provenanceLabel: "how your source keyboard already structures its rules and stores"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+transformImpactClass: behavior-preserving
+houseTargetPolicy:
+  inputs: [orth.inventory-delta]
+  rules:
+    - when: "orth.inventory-delta adds more than a handful of new characters"
+      target: consolidated-stores
+    - when: default
+      target: inline-rules
+invertibility: lossless
+implications: >
+  Compacting repeated literals into shared stores, or inlining them back out,
+  changes source layout only; the same rules still dispatch and the same
+  output is still produced.
+exceptionSites: []
+causePredicates: []

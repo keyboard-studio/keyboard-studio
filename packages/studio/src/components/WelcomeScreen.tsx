@@ -10,10 +10,14 @@
 // Deliberately plain: a centered card, a heading, three buttons. No gradients
 // or marketing chrome. Provider buttons mirror SignUpPanel's brand styling.
 
+import { Trans } from "@lingui/react/macro";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { markVisited } from "../lib/firstVisit.ts";
+import { discardActiveDraft } from "../lib/draftPersistence.ts";
+import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import {
   BG_PAGE,
   BG_CARD,
@@ -103,7 +107,7 @@ export function WelcomeScreen() {
             fontFamily: FONT,
           }}
         >
-          Welcome to Keyboard Studio
+          <Trans id="welcome.title">Welcome to Keyboard Studio</Trans>
         </h1>
 
         <p
@@ -115,7 +119,9 @@ export function WelcomeScreen() {
             fontFamily: FONT,
           }}
         >
-          Design and ship a Keyman keyboard, right in your browser.
+          <Trans id="welcome.tagline">
+            Design and ship a Keyman keyboard, right in your browser.
+          </Trans>
         </p>
 
         <div
@@ -134,7 +140,7 @@ export function WelcomeScreen() {
             style={githubButtonStyle}
           >
             <GitHubMark />
-            Sign in with GitHub
+            <Trans id="welcome.signIn.github">Sign in with GitHub</Trans>
           </button>
 
           <button
@@ -145,12 +151,24 @@ export function WelcomeScreen() {
             style={googleButtonStyle}
           >
             <GoogleMark />
-            Sign in with Google
+            <Trans id="welcome.signIn.google">Sign in with Google</Trans>
           </button>
 
           <button
             type="button"
-            onClick={() => leaveWelcome(() => navigateTo("survey"))}
+            onClick={() => {
+              // T024 (spec 034 US3, research D5, G-3): "I'm new" is the
+              // WelcomeScreen's fresh-start entry point. A durable draft may
+              // already have been restored at boot (main.tsx's pre-mount
+              // loadDraft) before the author ever saw this screen — honoring
+              // "I'm new" means clearing that draft (and the active-project
+              // pointer) and resetting both stores, not silently keeping the
+              // restored state around for a later boot to re-surface.
+              discardActiveDraft();
+              useSurveySessionStore.getState().reset();
+              useWorkingCopyStore.getState().reset();
+              leaveWelcome(() => navigateTo("survey"));
+            }}
             style={{
               ...providerButtonBase,
               background: "transparent",
@@ -158,7 +176,7 @@ export function WelcomeScreen() {
               color: TEXT_MAIN,
             }}
           >
-            I&rsquo;m new
+            <Trans id="welcome.imNew">I&rsquo;m new</Trans>
           </button>
         </div>
 

@@ -17,6 +17,7 @@ import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
 import { parseSlotId } from "./slotId.js";
 import { classifyStoreSlotEdit } from "./applyStoreSlotRemovals.js";
 import { readVfsText, resolveOskAssetPaths, xmlUnescape } from "./oskAssetShared.js";
+import { isPlusSeparator } from "../shared/rule-shape.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -132,7 +133,7 @@ export function collectCarvedKeycapTexts(
       // The codec's synthetic keystroke-boundary "+" is not a real context
       // item — index() offsets are 1-based over the remaining items.
       const effectiveContext = (rule.context as { kind: string; text?: string; storeRef?: string }[])
-        .filter((el) => !(el.kind === "raw" && el.text?.trim() === "+"));
+        .filter((el) => !isPlusSeparator(el));
 
       for (const el of outEls) {
         if (el.storeRef === undefined) continue;

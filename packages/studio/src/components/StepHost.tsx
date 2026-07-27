@@ -15,7 +15,8 @@
 //   1. If result is SurveyPhaseResult-shaped: recordPhase(result) +
 //      routeAnswersThroughMutate(result, deps)
 //   2. If step.id in STEPS_WITH_APPLY_COMPLETION: applyStepCompletion(id, result, deps)
-//   3. advance(id, result, { selectedTrack, identitySupported }) → { next, navigate?, setCharactersSubStage? }
+//   3. advance(id, result, { selectedTrack, identitySupported, touchSeedSource }) →
+//      { next, navigate?, setCharactersSubStage? }
 //   4. session.advance(next)
 //   5. if setCharactersSubStage: session.setCharactersSubStage("prefill")
 //   6. if navigate === "output": navigateTo("output")
@@ -30,6 +31,7 @@
 //   remain in SurveyView. StepHost only decides which container a step renders into.
 
 import type { ReactNode, CSSProperties } from "react";
+import { Trans } from "@lingui/react/macro";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -40,6 +42,7 @@ import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
 import type { SurveyContext } from "../steps/types.ts";
+import { ACCENT, ERROR_RED, TEXT_DIM, BORDER } from "../ui/theme.ts";
 
 // ---------------------------------------------------------------------------
 // isSurveyPhaseResult — shape guard for the generic completion path.
@@ -75,7 +78,7 @@ export interface StepHostProps {
 
 const TERMINAL_PANEL_STYLE: CSSProperties = {
   padding: 24,
-  border: "1px solid #30363d",
+  border: `1px solid ${BORDER}`,
   borderRadius: 8,
   display: "flex",
   flexDirection: "column",
@@ -92,15 +95,15 @@ const TERMINAL_HEADING_STYLE: CSSProperties = {
 const TERMINAL_TEXT_STYLE: CSSProperties = {
   margin: 0,
   fontSize: 13,
-  color: "#8b949e",
+  color: TEXT_DIM,
 };
 
 const START_OVER_BTN_STYLE: CSSProperties = {
   padding: "8px 18px",
   background: "transparent",
-  border: "1px solid #30363d",
+  border: `1px solid ${BORDER}`,
   borderRadius: 6,
-  color: "#8b949e",
+  color: TEXT_DIM,
   fontSize: 13,
   cursor: "pointer",
   fontFamily: "inherit",
@@ -116,6 +119,8 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   const identityResult = useSurveySessionStore((s) => s.identityResult);
   const sessionAdvance = useSurveySessionStore((s) => s.advance);
   const sessionPopHistory = useSurveySessionStore((s) => s.popHistory);
+  // Spec 035 R12 re-entry path — see handleBack's "touch" special case below.
+  const sessionBackToTouchSeedSource = useSurveySessionStore((s) => s.backToTouchSeedSource);
   const setCharactersSubStage = useSurveySessionStore((s) => s.setCharactersSubStage);
 
   const recordPhase = useWorkingCopyStore((s) => s.recordPhase);
@@ -127,15 +132,17 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   if (activeStepId === "done") {
     return (
       <div style={TERMINAL_PANEL_STYLE}>
-        <h2 style={{ ...TERMINAL_HEADING_STYLE, color: "#6ea8fe" }}>
-          Survey complete
+        <h2 style={{ ...TERMINAL_HEADING_STYLE, color: ACCENT }}>
+          <Trans id="step.done.heading">Survey complete</Trans>
         </h2>
         <p style={TERMINAL_TEXT_STYLE}>
-          All authoring steps have been completed. Head to Output to download or
-          submit your keyboard.
+          <Trans id="step.done.detail">
+            All authoring steps have been completed. Head to Output to download or
+            submit your keyboard.
+          </Trans>
         </p>
         <button type="button" onClick={onStartOver} style={START_OVER_BTN_STYLE}>
-          Start over
+          <Trans id="step.startOver">Start over</Trans>
         </button>
       </div>
     );
@@ -155,7 +162,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
         <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "flex-start" }}>
           <UnsupportedScriptStub script={identityResult.targetScriptRaw} />
           <button type="button" onClick={onStartOver} style={START_OVER_BTN_STYLE}>
-            Start over
+            <Trans id="step.startOver">Start over</Trans>
           </button>
         </div>
       );
@@ -163,15 +170,17 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     // Fallback: identityResult is null — render a generic fallback panel.
     return (
       <div style={TERMINAL_PANEL_STYLE}>
-        <h2 style={{ ...TERMINAL_HEADING_STYLE, color: "#f85149" }}>
-          Script not supported
+        <h2 style={{ ...TERMINAL_HEADING_STYLE, color: ERROR_RED }}>
+          <Trans id="step.unsupported.fallback.heading">Script not supported</Trans>
         </h2>
         <p style={TERMINAL_TEXT_STYLE}>
-          This script is not yet supported in v1. Please start over and choose a
-          different script, or check back in a future release.
+          <Trans id="step.unsupported.fallback.detail">
+            This script is not yet supported in v1. Please start over and choose a
+            different script, or check back in a future release.
+          </Trans>
         </p>
         <button type="button" onClick={onStartOver} style={START_OVER_BTN_STYLE}>
-          Start over
+          <Trans id="step.startOver">Start over</Trans>
         </button>
       </div>
     );
@@ -188,7 +197,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     return (
       <div
         role="alert"
-        style={{ padding: 24, color: "#f85149", fontFamily: "monospace", fontSize: 13 }}
+        style={{ padding: 24, color: ERROR_RED, fontFamily: "monospace", fontSize: 13 }}
       >
         {`[StepHost] unhandled step id: "${String(activeStepId)}" — wire this manifest step into registerEditorSteps.ts`}
       </div>
@@ -233,6 +242,10 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     const outcome = advance(resolvedStep.id as Parameters<typeof advance>[0], result, {
       selectedTrack: postMutationState.selectedTrack,
       identitySupported: postMutationState.identityResult?.supported ?? true,
+      // Structurally identical to advance.ts's local TouchSeedSource mirror
+      // (both "import-adapt" | "reseed-from-desktop" | null) — no cast needed,
+      // same as selectedTrack above (Track mirror).
+      touchSeedSource: postMutationState.touchSeedSource,
     });
 
     // 4. Session advance to next step.
@@ -250,8 +263,18 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     }
   }
 
-  // onBack maps to the walked-history pop (FR-005, Stage 3/4 behaviour preserved).
+  // onBack maps to the walked-history pop (FR-005, Stage 3/4 behaviour preserved),
+  // with ONE special case (spec 035 R12): the "touch" step's Back-from-first-
+  // character must always resurface the touch_seed_source chooser, not follow
+  // the generic history pop — which would land on "mechanisms" whenever the
+  // fork was skipped this pass (a recorded, non-stale choice routes advance()
+  // straight from mechanisms to touch). See surveySessionStore.backToTouchSeedSource
+  // for how this stays consistent with the chooser's own (generic) Back.
   function handleBack(): void {
+    if (resolvedStep.id === "touch") {
+      sessionBackToTouchSeedSource();
+      return;
+    }
     sessionPopHistory();
   }
 

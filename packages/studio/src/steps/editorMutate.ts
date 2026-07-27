@@ -40,7 +40,7 @@ export const CARVE_WRITES: readonly IRPath[] = [
 /**
  * Partition raw carve item ids into store-slot ids and whole-node item ids.
  * An id parses as a slot id AND its store exists in `baseIr` → a slot id (the
- * nul-filler rewrite path). Anything else → a whole-node deletion.
+ * store-slot drop path). Anything else → a whole-node deletion.
  */
 function partitionItemIds(
   baseIr: KeyboardIR,

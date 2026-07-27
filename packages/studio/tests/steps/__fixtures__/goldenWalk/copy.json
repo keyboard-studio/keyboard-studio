@@ -16,7 +16,9 @@
     "stepId": "choose_base",
     "applyStepCompletion": [],
     "storeMutations": [
+      "setBaseConfirmed",
       "setLocalBase",
+      "setBaseConfirmed",
       "advance"
     ],
     "workingCopyMutations": [],
@@ -57,12 +59,15 @@
   {
     "stepId": "characters/B",
     "applyStepCompletion": [
-      "characters"
+      "characters",
+      "marks"
     ],
     "storeMutations": [
+      "advance",
       "advance"
     ],
     "workingCopyMutations": [
+      "recordPhase",
       "recordPhase"
     ],
     "navigateTo": []
@@ -89,6 +94,15 @@
     "workingCopyMutations": [
       "lockDesktop"
     ],
+    "navigateTo": []
+  },
+  {
+    "stepId": "touch_seed_source",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
     "navigateTo": []
   },
   {

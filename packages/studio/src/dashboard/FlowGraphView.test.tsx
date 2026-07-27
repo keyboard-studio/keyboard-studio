@@ -6,9 +6,14 @@
 // These tests pin that contract via the real layout (no mocking).
 
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { screen, cleanup } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { FlowGraphView } from "./FlowGraphView.tsx";
 import type { FlowGraph, GraphNode, GraphEdge } from "./model.ts";
+
+function renderGraph(graph: FlowGraph) {
+  return render(<FlowGraphView graph={graph} />);
+}
 
 afterEach(cleanup);
 
@@ -63,7 +68,7 @@ function hasCollapsedCap(container: HTMLElement): boolean {
 
 describe("FlowGraphView — full render (no collapse)", () => {
   it("a tall graph renders every node, with no Show more/less toggle and no height cap", () => {
-    const { container } = render(<FlowGraphView graph={chainGraph(8)} />);
+    const { container } = renderGraph(chainGraph(8));
     // No collapse affordance.
     expect(
       screen.queryByRole("button", { name: /show more|show less/i }),
@@ -76,7 +81,7 @@ describe("FlowGraphView — full render (no collapse)", () => {
   });
 
   it("a short graph also renders fully with no toggle", () => {
-    render(<FlowGraphView graph={chainGraph(3)} />);
+    renderGraph(chainGraph(3));
     expect(
       screen.queryByRole("button", { name: /show more|show less/i }),
     ).toBeNull();

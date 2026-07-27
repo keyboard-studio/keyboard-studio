@@ -59,11 +59,13 @@ describe("M5 — all step ids are unique", () => {
 // ---------------------------------------------------------------------------
 // M2 — spine order
 //
-// FR-012: Identity → choose_base → track → Characters → Carve → Mechanisms →
-//         (lock:physical on mechanisms) → touch carve+add → (lock:touch) →
-//         Help → Package
+// FR-012: Identity → choose_base → track → Characters → Marks → Carve →
+//         Mechanisms → (lock:physical on mechanisms) →
+//         touch carve+add → (lock:touch) → Help → Package
 //
 // track is a real spine step (P0 fix). project_name is spine:false (CYOA fork).
+// Sequences (S-03) build inline in the Mechanism Gallery's method chooser —
+// there is no separate "sequences" spine step.
 // ---------------------------------------------------------------------------
 
 const EXPECTED_SPINE_ORDER = [
@@ -71,6 +73,7 @@ const EXPECTED_SPINE_ORDER = [
   "choose_base",
   "track",
   "characters",
+  "marks",
   "carve",
   "mechanisms",
   "touch",
@@ -111,6 +114,12 @@ describe("M2 — spine order matches FR-012", () => {
 
   it("'characters' appears before 'carve' on the spine", () => {
     assertStepOrder(spineSteps(manifest), "characters", "carve");
+  });
+
+  it("'marks' sits between 'characters' and 'carve' on the spine (spec 046 reorder — combined-letter answers precede all key work)", () => {
+    const spine = spineSteps(manifest);
+    assertStepOrder(spine, "characters", "marks");
+    assertStepOrder(spine, "marks", "carve");
   });
 
   it("'help' appears before 'package' on the spine", () => {
@@ -175,7 +184,7 @@ describe("M3 — exactly one lock:physical then one lock:touch", () => {
 describe("M4 — touch_seed_source fork", () => {
   it("a step with id 'touch_seed_source' exists in the manifest", () => {
     const found = manifest.find((s) => s.id === "touch_seed_source");
-    expect(found).toBeDefined();
+    expect(found?.id).toBe("touch_seed_source");
   });
 
   it("touch_seed_source has spine:false", () => {

@@ -2,21 +2,26 @@
 // YAML (?raw) + the engine's exported rule tables, and switch between sections.
 
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { screen, fireEvent, cleanup } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { FlowMapView } from "./DashboardView.tsx";
+
+function renderFlowMap(props: Parameters<typeof FlowMapView>[0] = {}) {
+  return render(<FlowMapView {...props} />);
+}
 
 afterEach(cleanup);
 
 describe("FlowMapView (DashboardView)", () => {
   it("renders the survey-flow section with question ids from the real flows", () => {
-    render(<FlowMapView />);
+    renderFlowMap();
     expect(screen.getByText("Flow Map")).toBeTruthy();
     // The Phase B entry question id should appear as a node card.
     expect(screen.getAllByText("pb_existing_keyboards").length).toBeGreaterThan(0);
   });
 
   it("switches to the strategy tree and shows a decision rule", () => {
-    render(<FlowMapView />);
+    renderFlowMap();
     fireEvent.click(screen.getByText("Strategy tree (§7.2)"));
     // Rule 1 of the §7.2 table → S-12, rendered from the engine rule table.
     expect(screen.getByText("A1=massive AND A2=logographic")).toBeTruthy();
@@ -24,7 +29,7 @@ describe("FlowMapView (DashboardView)", () => {
   });
 
   it("switches to script routing and shows the qwerty-qwertz split", () => {
-    render(<FlowMapView />);
+    renderFlowMap();
     fireEvent.click(screen.getByText("Script routing (§9)"));
     expect(screen.getAllByText("qwerty-qwertz").length).toBeGreaterThan(0);
     expect(screen.getAllByText("non-roman").length).toBeGreaterThan(0);
@@ -38,7 +43,7 @@ describe("FlowMapView (DashboardView)", () => {
 
 describe("FlowMapView — manifest-spine step metadata rendering", () => {
   it("paints writes/inputs/lock metadata on projected manifest-spine node cards", () => {
-    render(<FlowMapView />);
+    renderFlowMap();
 
     // The survey-flow section (default tab) renders the manifest spine.
     // carve writes groups[]/stores[]/raw[] — assert at least one path fragment
@@ -80,7 +85,7 @@ describe("FlowMapView — manifest-spine step metadata rendering", () => {
 
 describe("FlowMapView — Phase G drill-down sections (track / project_name)", () => {
   it("renders a drill-down section under the 'track' manifest step", () => {
-    render(<FlowMapView />);
+    renderFlowMap();
     const bodyText = document.body.textContent ?? "";
     // The drill-down heading for the "track" manifest step must appear.
     expect(bodyText).toMatch(/Drill-downs under\s*track/);
@@ -89,7 +94,7 @@ describe("FlowMapView — Phase G drill-down sections (track / project_name)", (
   });
 
   it("renders a drill-down section under the 'project_name' manifest step", () => {
-    render(<FlowMapView />);
+    renderFlowMap();
     const bodyText = document.body.textContent ?? "";
     // The drill-down heading for the "project_name" manifest step must appear.
     expect(bodyText).toMatch(/Drill-downs under\s*project_name/);

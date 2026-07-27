@@ -52,6 +52,11 @@ const OPTION_ROW_STYLE: React.CSSProperties = {
   cursor: "pointer",
 };
 
+// Issue #536: the label wraps the radio + its text, so it is the natural hit
+// target — bumping it (not the 16px native radio) to >=44px on coarse
+// pointers keeps the compact desktop layout while satisfying touch a11y.
+const OPTION_ROW_CLASSNAME = "ks-hit-target";
+
 const OPTION_LABEL_STYLE: React.CSSProperties = {
   fontSize: 13,
   color: TEXT_MAIN,
@@ -99,7 +104,7 @@ function RadioItem({
   title,
 }: RadioItemProps): React.ReactElement {
   return (
-    <label htmlFor={inputId} style={OPTION_ROW_STYLE}>
+    <label htmlFor={inputId} style={OPTION_ROW_STYLE} className={OPTION_ROW_CLASSNAME}>
       <input
         type="radio"
         id={inputId}
@@ -109,6 +114,7 @@ function RadioItem({
         onChange={() => onChange(optValue)}
         disabled={disabled}
         title={title}
+        className="ks-focus-ring"
         style={{ marginTop: 2, flexShrink: 0, accentColor }}
         aria-required={required}
         // E2E hook: the live "adapt" option of the track_choice question

@@ -236,22 +236,148 @@ function parseUse(tok: string): string | null {
   return m ? (m[1] ?? null) : null;
 }
 
+// ---------------------------------------------------------------------------
+// Store-body range notation (`X .. Y`, spec 042)
+// ---------------------------------------------------------------------------
+
+/**
+ * Decode a single range endpoint token to its codepoint number, or null if it
+ * is not a valid endpoint. An endpoint is either a `U+XXXX` literal (any plane,
+ * via parseCodepoint) or a single-codepoint quoted literal (`'x'` / `"x"`).
+ * A quoted literal whose content is not exactly one codepoint is NOT a valid
+ * endpoint (→ malformed range).
+ */
+function decodeRangeEndpoint(tok: string): number | null {
+  const cp = parseCodepoint(tok);
+  if (cp !== null) return cp.codePointAt(0) ?? null;
+  if (isQuoted(tok)) {
+    const inner = unquote(tok);
+    const chars = [...inner];
+    if (chars.length === 1) return chars[0]?.codePointAt(0) ?? null;
+  }
+  return null;
+}
+
+/**
+ * Split an unquoted token on the range operator `..`. Returns the text before
+ * and after the operator, or null if the token is quoted or contains no `..`.
+ * Used to recognise the no-whitespace / hybrid range spellings that arrive as a
+ * single splitTokens token (`U+0905..U+0910`, `U+0905..`, `..U+0910`).
+ */
+function splitDotDot(tok: string): { before: string; after: string } | null {
+  if (isQuoted(tok)) return null;
+  const idx = tok.indexOf("..");
+  if (idx === -1) return null;
+  return { before: tok.slice(0, idx), after: tok.slice(idx + 2) };
+}
+
+type RangeDetection =
+  | { kind: "range"; from: number; to: number; consumed: number }
+  | { kind: "malformed"; consumed: number };
+
+/**
+ * Classify a codepoint range whose left endpoint is anchored at token index
+ * `i`, given the decoded endpoints and how many tokens the construct spans.
+ *
+ * A `..` is only treated as a *codepoint*-range operator when at least ONE
+ * endpoint decodes as a codepoint (`U+XXXX` or a single-char quoted literal).
+ * When NEITHER decodes the construct is not ours — most importantly the vkey
+ * range `[K_A]..[K_Z]` in `store(&CasedKeys)` — so we return null and let the
+ * legacy per-token path handle the tokens (vkey, raw `..`, vkey) unchanged.
+ * When exactly one endpoint decodes it is an intended-but-broken codepoint
+ * range → malformed (the C9 cases: `U+0905 ..`, `U+0905 .. foo`, `'ab' .. U+0910`).
+ * A mixed vkey/codepoint form (`[K_A] .. U+0060`) therefore also lands here as
+ * malformed rather than falling through — deliberate: it is invalid Keyman (not
+ * in the corpus), so surfacing the whole store opaque with a diagnostic reason
+ * is safer than silently splitting it into a vkey + stray char.
+ */
+function classifyRange(from: number | null, to: number | null, consumed: number): RangeDetection | null {
+  if (from === null && to === null) return null; // not a codepoint range (e.g. vkey range)
+  if (from === null || to === null) return { kind: "malformed", consumed };
+  return { kind: "range", from, to, consumed };
+}
+
+/**
+ * Detect a codepoint range whose LEFT endpoint is at token index `i`. Returns
+ * null when no such range is anchored here (caller handles the token normally),
+ * a `range` result with decoded endpoints, or a `malformed` result when a `..`
+ * operator is present with one decodable and one missing/undecodable endpoint.
+ * Whitespace-independent: handles the spaced (`X .. Y`), no-space (`X..Y`), and
+ * hybrid (`X..`, `..Y`) spellings (FR-002, FR-003). A bare `..` / leading `..Y`
+ * token (left endpoint elsewhere) is NOT anchored here → null, so it is either
+ * consumed by a range anchored at i-1 or falls to legacy handling.
+ */
+function detectRangeAt(toks: string[], i: number): RangeDetection | null {
+  const cur = toks[i];
+  if (cur === undefined) return null;
+  const dd = splitDotDot(cur);
+
+  // (a) the current token itself carries the `..` operator with a left part.
+  if (dd !== null && dd.before !== "") {
+    if (dd.after !== "") {
+      // embedded `X..Y`
+      return classifyRange(decodeRangeEndpoint(dd.before), decodeRangeEndpoint(dd.after), 1);
+    }
+    // trailing `X..`, second endpoint is the next token
+    const next = toks[i + 1];
+    const to = next !== undefined ? decodeRangeEndpoint(next) : null;
+    return classifyRange(decodeRangeEndpoint(dd.before), to, next !== undefined ? 2 : 1);
+  }
+
+  // (b) the NEXT token carries the operator; `cur` is the intended left endpoint.
+  const next = toks[i + 1];
+  if (next === "..") {
+    const toTok = toks[i + 2];
+    const to = toTok !== undefined ? decodeRangeEndpoint(toTok) : null;
+    return classifyRange(decodeRangeEndpoint(cur), to, toTok !== undefined ? 3 : 2);
+  }
+  const nextDd = next !== undefined ? splitDotDot(next) : null;
+  if (nextDd !== null && nextDd.before === "" && nextDd.after !== "") {
+    // next token is `..Y`
+    return classifyRange(decodeRangeEndpoint(cur), decodeRangeEndpoint(nextDd.after), 2);
+  }
+  return null;
+}
+
 /**
  * Parse the value list of a store declaration. Always returns the parsed
  * `items`; `opaqueReason` is non-null when the body carries a construct the
- * typed IR can't represent (named deadkey, SMP literal), in which case the
- * caller wraps the whole store as a RawKmnFragment with that reason.
+ * typed IR can't represent (named deadkey, SMP literal, malformed/descending
+ * range), in which case the caller wraps the whole store as a RawKmnFragment
+ * with that reason.
  */
 function parseStoreItems(rawValue: string): { items: StoreItem[]; opaqueReason: OpaqueReason | null } {
   const toks = splitTokens(rawValue);
   const items: StoreItem[] = [];
-  for (const tok of toks) {
+  for (let i = 0; i < toks.length; ) {
+    const tok = toks[i] ?? "";
+    // Range notation (`X .. Y`) — checked BEFORE the isSmpLiteral early-bail so
+    // an astral range (U+11680 .. U+11689) expands into astral char items
+    // instead of opaquing the whole store (spec 042, FR-005). A non-range
+    // astral singleton still falls to the smp-literal branch below (C10).
+    const range = detectRangeAt(toks, i);
+    if (range !== null) {
+      if (range.kind === "malformed") {
+        return { items, opaqueReason: OPAQUE_REASONS.MALFORMED_RANGE };
+      }
+      if (range.from > range.to) {
+        // descending — never fabricate a wrong-direction interior (FR-006).
+        return { items, opaqueReason: OPAQUE_REASONS.DESCENDING_RANGE };
+      }
+      // from <= to: inclusive ascending expansion (from == to → one item).
+      for (let cp = range.from; cp <= range.to; cp++) {
+        items.push({ kind: "char", value: String.fromCodePoint(cp) });
+      }
+      i += range.consumed;
+      continue;
+    }
     // SMP literal
     if (isSmpLiteral(tok)) return { items, opaqueReason: OPAQUE_REASONS.SMP_LITERAL };
     // U+XXXX codepoint
     const cp = parseCodepoint(tok);
     if (cp !== null) {
       items.push({ kind: "char", value: cp });
+      i++;
       continue;
     }
     // quoted string — expand to individual chars
@@ -260,6 +386,7 @@ function parseStoreItems(rawValue: string): { items: StoreItem[]; opaqueReason: 
       for (const ch of str) {
         items.push({ kind: "char", value: ch });
       }
+      i++;
       continue;
     }
     // dk(name) — named (non-hex) deadkey identifier: opaque. Mirrors the
@@ -271,12 +398,21 @@ function parseStoreItems(rawValue: string): { items: StoreItem[]; opaqueReason: 
     const dkId = parseDk(tok);
     if (dkId !== null) {
       items.push({ kind: "deadkey", id: dkId });
+      i++;
       continue;
     }
-    // vkey bracket
+    // vkey bracket. The typed `StoreItem` "vkey" variant has no modifiers
+    // field (locked contract — see @keyboard-studio/contracts's keyboard-ir.ts),
+    // so a modifier-free bracket (`[K_E]`) parses to `{kind:"vkey"}` as before,
+    // but a modifier-bearing bracket (`[SHIFT RALT K_E]`, as used by the
+    // generalized S-08 "any(store) > index(store, N)" pattern) is preserved
+    // verbatim as `{kind:"raw"}` rather than silently dropping its modifiers —
+    // downstream consumers (modifierCombos.ts's resolveStoreKeyItem) re-parse
+    // the bracket text via parseKeySpec to recover the combo.
     const vk = parseVkeyBracket(tok);
     if (vk !== null) {
-      items.push({ kind: "vkey", name: vk.name });
+      items.push(vk.modifiers.length > 0 ? { kind: "raw", text: tok } : { kind: "vkey", name: vk.name });
+      i++;
       continue;
     }
     // outs(store) — inline expansion of another store's content. The typed
@@ -305,6 +441,7 @@ function parseStoreItems(rawValue: string): { items: StoreItem[]; opaqueReason: 
     }
     // bare identifier (treated as raw if unrecognized)
     items.push({ kind: "raw", text: tok });
+    i++;
   }
   return { items, opaqueReason: null };
 }
@@ -580,18 +717,41 @@ function splitOnArrow(text: string): { lhs: string; rhs: string } | null {
 }
 
 /**
- * Strip a trailing `c <comment>` from the RHS of a rule.
- * Returns { rhs, trailingComment }.
+ * Strip a trailing `c <comment>` (or bare `c`) from a KMN source value.
+ *
+ * kmcmplib's lexer treats a whitespace-delimited `c` token — outside of quotes
+ * and bracket groups — as the start of a line comment. This scan is quote- and
+ * bracket-aware so a `c` inside a quoted output string (e.g. `'a c b'`) or a
+ * key name (`[K_C]`) is not mistaken for a comment start. Used for both rule
+ * RHS values and store values (both can carry a trailing `c` comment).
+ *
+ * Returns { rhs, trailingComment } — `rhs` with the comment removed (trimmed),
+ * and the comment text (undefined when absent; an empty bare-`c` comment is
+ * normalized to undefined).
  */
 function stripTrailingComment(rhs: string): { rhs: string; trailingComment: string | undefined } {
-  // Trailing comment: whitespace + `c` + (whitespace or end of string)
-  // We look from the end to find the last unquoted `c` preceded by whitespace.
-  // Simple approach: tokenize the rhs and see if the last token(s) start a comment.
-  const commentMatch = /\s+c(?:\s+(.*))?$/.exec(rhs);
-  if (commentMatch) {
-    const stripped = rhs.slice(0, commentMatch.index).trim();
-    const commentText = (commentMatch[1] ?? "").trim();
-    return { rhs: stripped, trailingComment: commentText || undefined };
+  let inS = false;
+  let inD = false;
+  let depth = 0;
+  for (let i = 0; i < rhs.length; i++) {
+    const ch = rhs[i];
+    if (ch === "'" && !inD) { inS = !inS; continue; }
+    if (ch === '"' && !inS) { inD = !inD; continue; }
+    if (inS || inD) continue;
+    if (ch === "[") { depth++; continue; }
+    if (ch === "]") { depth--; continue; }
+    // A comment starts at an unquoted, depth-0 `c` bounded by whitespace on the
+    // left and by whitespace (or end-of-string) on the right.
+    if (
+      depth === 0 &&
+      ch === "c" &&
+      /\s/.test(rhs[i - 1] ?? "") &&
+      (i === rhs.length - 1 || /\s/.test(rhs[i + 1] ?? ""))
+    ) {
+      const stripped = rhs.slice(0, i).trim();
+      const commentText = rhs.slice(i + 1).trim();
+      return { rhs: stripped, trailingComment: commentText || undefined };
+    }
   }
   return { rhs, trailingComment: undefined };
 }
@@ -620,6 +780,7 @@ interface ParsedStore {
   name: string;
   isSystem: boolean;
   rawValue: string;
+  trailingComment: string | undefined;
 }
 
 /**
@@ -635,7 +796,11 @@ function parseStoreLine(text: string, line: number): ParsedStore {
   const isSystem = rawName.startsWith("&");
   const upper = rawName.slice(1).toUpperCase();
   const name = isSystem ? (CANONICAL_SYSTEM_STORE[upper] ?? upper) : rawName;
-  return { name, isSystem, rawValue: (m[2] ?? "").trim() };
+  // Strip a trailing `c <comment>`: kmcmplib treats it as a line comment, not
+  // store content, so it must not leak into store items or system-store header
+  // values. Quote/bracket-aware so a `c` inside a quoted value is preserved.
+  const { rhs: rawValue, trailingComment } = stripTrailingComment((m[2] ?? "").trim());
+  return { name, isSystem, rawValue, trailingComment };
 }
 
 // ---------------------------------------------------------------------------
@@ -799,6 +964,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
             sourceLine: tok.line,
           };
           if (tok.targetSelector !== undefined) irStore.targetSelector = tok.targetSelector;
+          if (parsed.trailingComment !== undefined) irStore.trailingComment = parsed.trailingComment;
           stores.push(irStore);
         }
         break;

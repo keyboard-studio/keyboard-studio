@@ -6,6 +6,9 @@
 // Per-phase sub-registries (registry.a.ts, registry.b.ts, registry.f.ts) own
 // the actual import lists — one file per phase keeps merge conflicts off the
 // hot path during parallel migration cycles. This file just merges them.
+// registry.reserve.ts is a further sub-registry: the demoted/relocated question
+// modules physically living under questions/reserve/ (no live flow uses them —
+// see content/flows/README.md's Leftover section).
 //
 // Fan-out rule: a new question lands in questions/<phase>/<id>.ts AND its phase
 // sub-registry. This file does not need editing unless a NEW phase is added.
@@ -15,6 +18,7 @@ import { phaseARegistry } from "./registry.a.ts";
 import { phaseBRegistry } from "./registry.b.ts";
 import { phaseFRegistry } from "./registry.f.ts";
 import { phaseGRegistry } from "./registry.g.ts";
+import { reserveRegistry } from "./registry.reserve.ts";
 
 /**
  * Synchronous registry: { [questionId]: QuestionModule }
@@ -28,6 +32,7 @@ export const questionRegistry: Readonly<Record<string, QuestionModule>> = {
   ...phaseBRegistry,
   ...phaseFRegistry,
   ...phaseGRegistry,
+  ...reserveRegistry,
 } as const;
 
 // ---------------------------------------------------------------------------

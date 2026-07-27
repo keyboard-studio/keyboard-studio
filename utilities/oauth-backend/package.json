@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
+    "@keyboard-studio/contracts": "workspace:*",
     "@octokit/auth-app": "^7.1.1",
     "@vercel/blob": "^2.0.0",
     "@vercel/postgres": "^0.10.0",

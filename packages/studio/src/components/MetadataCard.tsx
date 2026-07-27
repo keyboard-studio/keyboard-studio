@@ -1,5 +1,6 @@
 // MetadataCard — displays selected base keyboard metadata and try-it hints.
 
+import { Trans } from "@lingui/react/macro";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { BG_CARD, CARD_BORDER, FONT_MONO, SUCCESS_ACCENT, TEXT_MAIN } from "../ui/theme.ts";
 
@@ -61,7 +62,7 @@ export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
             marginBottom: 4,
           }}
         >
-          Selected keyboard
+          <Trans id="metadata.selectedKeyboard.heading">Selected keyboard</Trans>
         </div>
         <Row k="id" v={kb.id} />
         <Row k="name" v={kb.displayName} />
@@ -92,7 +93,7 @@ export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
               marginBottom: 8,
             }}
           >
-            Try typing
+            <Trans id="metadata.tryTyping.heading">Try typing</Trans>
           </div>
           <div style={{ fontSize: 13, color: "#9aa7b8", marginBottom: 8 }}>
             {hint.intro}

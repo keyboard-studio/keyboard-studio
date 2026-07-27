@@ -958,5 +958,10 @@ function surveySnapshot(): SurveySessionSnapshot {
     scaffoldSpec: s.scaffoldSpec,
     localBase: s.localBase,
     charactersSubStage: s.charactersSubStage,
+    lastNavigation: s.lastNavigation,
+    marksMigrationNeeded: s.marksMigrationNeeded,
+    baseConfirmed: s.baseConfirmed,
+    touchSeedSource: s.touchSeedSource,
+    discoveryMethod: s.discoveryMethod,
   };
 }

@@ -2,7 +2,7 @@
 
 A lookup table of the Keyman keyboards this project **references** — in [spec.md](../spec.md), the content scan reports, test fixtures, and tooling. Use it to find a keyboard by name, language, author, or where its source lives on disk.
 
-The keyboards themselves are **not** in this repo. They live in a sibling checkout of [keymanapp/keyboards](https://github.com/keymanapp/keyboards) at `../keyboards` (i.e. `<parent>/keyboards`). Every `Path` below is written relative to the keyboard-studio repo root.
+The keyboards themselves are **not** in this repo. They live in a sibling checkout at `../keyboards` (i.e. `<parent>/keyboards`), which tracks the [keyboard-studio/keyboards](https://github.com/keyboard-studio/keyboards) fork — a stable mirror of [keymanapp/keyboards](https://github.com/keymanapp/keyboards) and the project's canonical corpus for deterministic tests and facet-index builds. Point `../keyboards` at that fork's `master` (not upstream), or corpus-calibrated tests will drift. Every `Path` below is written relative to the keyboard-studio repo root.
 
 ## Keep this current
 
@@ -54,8 +54,10 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Gautami IndiTran | `gautami_inditran` | `la` | Gautam Sengupta | `../keyboards/release/gautami/gautami_inditran` |
 | Gautami Thamizh/Tamil | `gautami_thamizh_tamil` | `ta` | Gautam Sengupta | `../keyboards/release/gautami/gautami_thamizh_tamil` |
 | Geba Karen (Myanmar) | `geba_karen_mymr` | `kvq` | Copyright © SIL Global | `../keyboards/release/g/geba_karen_mymr` |
+| Georgian Basic | `basic_kbdgeo` | `ka` | (c) 2009-2019 SIL International | `../keyboards/release/basic/basic_kbdgeo` |
 | GFF Amharic | `gff_amharic` | `am` | The Geʾez Frontier Foundation | `../keyboards/release/gff/gff_amharic` |
 | GFF Geʾez Manuscript | `gff_geez_emufi` | `gez` | The Geʾez Frontier Foundation | `../keyboards/experimental/gff/gff_geez_emufi` |
+| Greek Basic | `basic_kbdhe` | `el` | (c) 2009-2019 SIL International | `../keyboards/release/basic/basic_kbdhe` |
 | Hausa Kano | `hausa_kano` | `ha-Latn` | Hamza Sulayman | `../keyboards/release/h/hausa_kano` |
 | Bengali Phonetic (ITRANS) | `itrans_bengali` | `bn`, `as` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_bengali` |
 | Hindi Devanagari Phonetic (ITRANS) | `itrans_devanagari_hindi` | `hi`, `mr`, `sa`, `bho`, `mai`, `awa`, `bra`, `mag`, `raj`, `kok`, `gom`, `knn-Deva`, `hne`, `bgc`, `sck` … (+2 more) | Shree Devi Kumar | `../keyboards/release/itrans/itrans_devanagari_hindi` |
@@ -72,6 +74,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Nulisa Aksara Jawa | `jawa` | `id-Java`, `jv-Java`, `kaw-Java`, `mad-Java`, `sas-Java`, `su-Java`, `osi`, `tes` | Benny Lin | `../keyboards/release/j/jawa` |
 | Masaram Gondi (ITRANS) | `masaram_gondi` | `gon-Gonm` | Rajesh Kumar Dhuriya | `../keyboards/release/m/masaram_gondi` |
 | Pak Urdu Phonetic | `pak_urdu_phonetic` | `ur` | Nashit Ahmed Barq | `../keyboards/release/p/pak_urdu_phonetic` |
+| Piaroa | `pid_piaroa` | `pid-Latn` | Eddie Antonio Santos | `../keyboards/release/p/pid_piaroa` |
 | Remington GAIL (SIL) | `remington_gail` | `hi` | © SIL Global | `../keyboards/release/r/remington_gail` |
 | Russian Mnemonic R | `russian_mnemonic_r` | `ru` | Tigran Sarukhanyan | `../keyboards/release/r/russian_mnemonic_r` |
 | Umatilla Sahaptin/Ičiškíin | `sahaptin_umatilla` | `uma` | Jonathan A. Geary | `../keyboards/release/s/sahaptin_umatilla` |

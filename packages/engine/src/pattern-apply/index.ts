@@ -14,14 +14,23 @@ export type { ApplyCarveToVfsOpts } from "./applyCarveToVfs.js";
 
 export { carveFilterIr } from "./carveFilterIr.js";
 
-export { applyStoreSlotRemovals, classifyStoreSlotEdit } from "./applyStoreSlotRemovals.js";
+export {
+  applyStoreSlotRemovals,
+  classifyStoreSlotEdit,
+  describeStorePairing,
+  analyzeStores,
+} from "./applyStoreSlotRemovals.js";
 export type {
   StoreSlotRemovalResult,
   StoreSlotEditMode,
   StoreSlotBlockReason,
+  StorePairingDescription,
+  StoreAnalysis,
 } from "./applyStoreSlotRemovals.js";
 
 export { parseSlotId } from "./slotId.js";
+
+export { isPlusSeparator } from "../shared/rule-shape.js";
 
 export { applyKeycapLabelsToVfs } from "./applyKeycapLabelsToVfs.js";
 
@@ -37,6 +46,18 @@ export type { ApplyTouchAssignmentsResult } from "./applyTouchAssignments.js";
 export { applyTouchAssignmentsToRawJson } from "./applyTouchAssignmentsToRawJson.js";
 export type { ApplyTouchAssignmentsToRawJsonResult } from "./applyTouchAssignmentsToRawJson.js";
 
+export { applyDesktopModifications } from "./applyDesktopModifications.js";
+export type {
+  DesktopModifications,
+  ApplyDesktopModificationsResult,
+} from "./applyDesktopModifications.js";
+
+export { applyDesktopModificationsToRawJson } from "./applyDesktopModificationsToRawJson.js";
+export type { ApplyDesktopModificationsToRawJsonResult } from "./applyDesktopModificationsToRawJson.js";
+
+export { propagateDesktopLayersToTouch } from "./propagateDesktopLayersToTouch.js";
+export type { PropagateDesktopLayersToTouchResult } from "./propagateDesktopLayersToTouch.js";
+
 export { collectCharContributors } from "./collectCharContributors.js";
 export type { CharContributors } from "./collectCharContributors.js";
 
@@ -49,4 +70,17 @@ export {
   planShiftAssignment,
 } from "./shiftRules.js";
 export type { ShiftAssignmentPlan } from "./shiftRules.js";
+
+export {
+  MODIFIER_EXCLUSIONS,
+  canonicalizeCombo,
+  comboToKeySpec,
+  parseKeySpec,
+  comboToTouchLayerId,
+  comboToKvksShiftToken,
+  collectModifierTokensInUse,
+  collectLayerCombosInUse,
+  buildComboKeyMap,
+} from "./modifierCombos.js";
+export type { ModifierToken } from "./modifierCombos.js";
 

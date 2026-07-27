@@ -4,9 +4,11 @@
 // spec §8 v1.3.0, Track 1.
 
 import { useState, useMemo } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { slugifyKeyboardId, validateKeyboardId } from "@keyboard-studio/contracts";
 import { Button, TextField, Label } from "../../ui/index.ts";
 import { TEXT_DIM, ERROR_RED } from "../../ui/theme.ts";
+import { handleEnterToAdvance } from "../../survey/enterToAdvance.ts";
 
 export interface ProjectNameStepProps {
   /** Default display name — autonym from identity_lite (il_language_autonym). */
@@ -50,6 +52,7 @@ export function ProjectNameStep({
   onNext,
   onBack,
 }: ProjectNameStepProps) {
+  const { t } = useLingui();
   const [displayName, setDisplayName] = useState(defaultDisplayName);
 
   const derivedId = useMemo(() => slugifyKeyboardId(displayName), [displayName]);
@@ -62,21 +65,29 @@ export function ProjectNameStep({
 
   return (
     <div style={{ color: "#e6edf3", fontFamily: "system-ui, sans-serif" }}>
-      <h2 style={HEADING}>Name your keyboard</h2>
+      <h2 style={HEADING}><Trans id="editor.projectName.heading">Name your keyboard</Trans></h2>
       <p style={SUBTLE}>
-        Give your new keyboard a display name. The keyboard ID will be derived automatically.
+        <Trans id="editor.projectName.intro">
+          Give your new keyboard a display name. The keyboard ID will be derived automatically.
+        </Trans>
       </p>
 
       <div style={{ marginBottom: 20 }}>
         {/* Label base color is #e6edf3; TEXT_DIM — pass through. */}
         <Label htmlFor="project-display-name" style={{ color: TEXT_DIM, fontWeight: "normal" }}>
-          Display name
+          <Trans id="editor.projectName.displayNameLabel">Display name</Trans>
         </Label>
         <TextField
           id="project-display-name"
           data-testid="project-name-input"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
+          onKeyDown={(e) =>
+            // Enter-to-advance (issue #536): single-line field, no Shift+Enter
+            // newline concern — plain Enter submits like clicking Next. Shared
+            // helper; handleNext owns the isValid gate.
+            handleEnterToAdvance(e, { advance: handleNext })
+          }
           autoComplete="off"
           spellCheck={false}
           aria-describedby="project-id-hint"
@@ -88,8 +99,8 @@ export function ProjectNameStep({
           aria-live="polite"
         >
           {isValid
-            ? `Will be saved as: ${derivedId}`
-            : validation.reason ?? "Invalid keyboard ID"}
+            ? t({ id: "editor.projectName.willBeSavedAs", message: `Will be saved as: ${{ id: derivedId }}` })
+            : validation.reason ?? t({ id: "editor.projectName.invalidKeyboardId", message: "Invalid keyboard ID" })}
         </div>
       </div>
 
@@ -101,12 +112,12 @@ export function ProjectNameStep({
           onClick={handleNext}
           aria-disabled={!isValid}
         >
-          Next
+          <Trans id="editor.projectName.nextButton">Next</Trans>
         </Button>
       </div>
 
       <Button variant="back" data-testid="project-name-back" onClick={onBack}>
-        {"←"} Back
+        <Trans id="editor.projectName.backButton">{"←"} Back</Trans>
       </Button>
     </div>
   );

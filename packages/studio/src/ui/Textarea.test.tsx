@@ -5,9 +5,9 @@
 //   2. Passed props (value, onChange, disabled, placeholder, rows) work.
 //   3. The error variant applies ERROR_BORDER (#7a2a2a) as border color.
 //   4. Default border is BORDER (#30363d) when error is not set.
-//   5. resize:vertical is always applied.
+//   5. resize defaults to "none"; the `resize` prop opts into "vertical" (#536).
 //   6. style override passes through (merges over base styles).
-//   7. className override passes through.
+//   7. className override passes through (merged with the shared ks-* classes).
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
@@ -76,8 +76,14 @@ describe("Textarea — error variant", () => {
 });
 
 describe("Textarea — resize", () => {
-  it("always applies resize:vertical", () => {
+  it("defaults to resize:none", () => {
     render(<Textarea />);
+    const el = screen.getByRole("textbox") as HTMLTextAreaElement;
+    expect(el.style.resize).toBe("none");
+  });
+
+  it("applies resize:vertical when resize=\"vertical\" is passed", () => {
+    render(<Textarea resize="vertical" />);
     const el = screen.getByRole("textbox") as HTMLTextAreaElement;
     expect(el.style.resize).toBe("vertical");
   });
@@ -90,9 +96,9 @@ describe("Textarea — style and className override", () => {
     expect(el.style.color).toBe("blue");
   });
 
-  it("forwards className", () => {
+  it("forwards className, merged with the shared ks-* classes", () => {
     render(<Textarea className="ta-class" />);
     const el = screen.getByRole("textbox") as HTMLTextAreaElement;
-    expect(el.className).toBe("ta-class");
+    expect(el.className.split(" ")).toContain("ta-class");
   });
 });

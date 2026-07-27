@@ -118,11 +118,15 @@ describe('collectCharContributors', () => {
     expect(result.locations.some((l) => l.kind === 'store')).toBe(true);
   });
 
-  it('S-02 fan-out: does not nul other slots (only the matching one)', () => {
+  it('S-02 fan-out: does not nul other slots (only the matching ones, output AND input)', () => {
     const ir = makeCameroonIR();
+    // ε is at index 2 of BOTH the output store (dkt003b) and the any()-consumed
+    // input store (dkf003b) — "remove everywhere" (#525 v2) finds both, and
+    // only those two slots (no other index nul'd).
     const resultE = collectCharContributors(ir, 'ε'); // ε at slot 2
-    expect(resultE.storeSlotIds).toHaveLength(1);
-    expect(resultE.storeSlotIds[0]).toBe('sid-dkt#2');
+    expect(resultE.storeSlotIds).toHaveLength(2);
+    expect(resultE.storeSlotIds).toContain('sid-dkt#2');
+    expect(resultE.storeSlotIds).toContain('sid-dkf#2');
   });
 
   it('multi-char producer goes to blocked (not ruleNodeIds)', () => {
@@ -229,11 +233,116 @@ describe('collectCharContributors', () => {
     expect(result.ruleNodeIds).toContain('r-s01');
   });
 
+  // ---------------------------------------------------------------------------
+  // "Remove everywhere" (#525 v2) — any()-consumed INPUT store occurrences
+  // ---------------------------------------------------------------------------
+
+  it('finds a char in an any()-consumed INPUT store (Cameroon dkf-shaped: dk(X) any(dkf) > index(dkt,2))', () => {
+    const ir = makeCameroonIR();
+    // 'a' is at index 0 of the INPUT store dkf003b (sid-dkf), and at index 0
+    // of the OUTPUT store dkt003b (as 'à', not 'a' — so only the input slot matches).
+    const result = collectCharContributors(ir, 'a');
+    expect(result.storeSlotIds).toContain('sid-dkf#0');
+  });
+
+  it('finds a char in an any()-consumed INPUT store that is ALSO the output store name (self-paired idiom)', () => {
+    // `any(word) + [K_SPACE] > index(word, 1)` — self-paired: the same store name
+    // is both the any() source and the index() target. Both the input occurrence
+    // (via any()) and the output occurrence (via index()) must be found.
+    const word = makeStore('sid-word', 'word', [
+      { kind: 'char', value: 'a' }, { kind: 'char', value: 'b' },
+    ]);
+    const rule = makeRule('r-selfpair',
+      [{ kind: 'any', storeRef: 'word' }],
+      [{ kind: 'index', storeRef: 'word', offset: 1 }],
+    );
+    const ir = makeIR({
+      stores: [word],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'a');
+    // Same slot id from both the input-scan and output-scan passes — deduped to one entry.
+    expect(result.storeSlotIds).toEqual(['sid-word#0']);
+  });
+
+  it('does NOT collect a char that only appears in a notany() context store', () => {
+    const store = makeStore('sid-excl', 'exclSet', [
+      { kind: 'char', value: 'a' }, { kind: 'char', value: 'b' },
+    ]);
+    const rule = makeRule('r-notany',
+      [{ kind: 'notany', storeRef: 'exclSet' }],
+      [{ kind: 'char', value: 'z' }],
+    );
+    const ir = makeIR({
+      stores: [store],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'a');
+    expect(result.storeSlotIds).toHaveLength(0);
+    expect(result.ruleNodeIds).toHaveLength(0);
+  });
+
+  it('finds an INPUT-store occurrence even when the same rule\'s output is unrelated (composed-shaped: any(composed) + [K_BKSP] > index(comp-dia,1))', () => {
+    const composed = makeStore('sid-composed', 'composed', [
+      { kind: 'char', value: 'à' }, { kind: 'char', value: 'é' },
+    ]);
+    const compDia = makeStore('sid-compdia', 'comp-dia', [
+      { kind: 'char', value: 'a' }, { kind: 'char', value: 'e' },
+    ]);
+    const rule = makeRule('r-bksp',
+      [
+        { kind: 'any', storeRef: 'composed' },
+        { kind: 'raw', text: '+' },
+        { kind: 'vkey', name: 'K_BKSP', modifiers: [] },
+      ],
+      [{ kind: 'index', storeRef: 'comp-dia', offset: 1 }],
+    );
+    const ir = makeIR({
+      stores: [composed, compDia],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'à');
+    expect(result.storeSlotIds).toContain('sid-composed#0');
+  });
+
   it('returns the targetChar NFC-normalized', () => {
     // Pass NFD é (e + combining acute), get back NFC é
     const nfd = 'é';
     const ir = makeIR();
     const result = collectCharContributors(ir, nfd);
     expect(result.targetChar).toBe('é');
+  });
+
+  // #1357-carve-marks-needed-set G2 guard: a rule whose literal output is a
+  // DECOMPOSED sequence (base char + combining mark(s), two or more IR
+  // elements) that NFC-composes to the queried precomposed targetChar must
+  // still be recognized as a whole-rule single-char producer — verified
+  // empirically already true of the existing NFC-normalize-before-compare
+  // logic (charVals.join('').normalize('NFC') === target); this locks it as a
+  // regression rather than a behavior change.
+  it('whole-rule delete: a decomposed 2-element literal output matches a precomposed target (G2)', () => {
+    const rule = makeRule('r-decomp',
+      [{ kind: 'vkey', name: 'K_E', modifiers: [] }],
+      [{ kind: 'char', value: 'e' }, { kind: 'char', value: '́' }], // e + combining acute
+    );
+    const ir = makeIR({ groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }] });
+    const result = collectCharContributors(ir, 'é'); // precomposed U+00E9
+    expect(result.ruleNodeIds).toEqual(['r-decomp']);
+    expect(result.blocked).toHaveLength(0);
+  });
+
+  it('whole-rule delete: a decomposed 3-element (base + two marks) literal output matches a precomposed target (G2, multi-mark stack)', () => {
+    const rule = makeRule('r-decomp-stack',
+      [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
+      [
+        { kind: 'char', value: 'a' },
+        { kind: 'char', value: '̂' }, // combining circumflex
+        { kind: 'char', value: '̀' }, // combining grave
+      ],
+    );
+    const ir = makeIR({ groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }] });
+    const result = collectCharContributors(ir, 'ầ'); // ầ, precomposed
+    expect(result.ruleNodeIds).toEqual(['r-decomp-stack']);
+    expect(result.blocked).toHaveLength(0);
   });
 });

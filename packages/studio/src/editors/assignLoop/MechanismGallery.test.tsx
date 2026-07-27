@@ -13,16 +13,30 @@
 //   - Coverage status line: "<N> of <M> added".
 //   - Method chooser: "Type a sequence" always present; "Tap a trigger key, then a letter"
 //     always present (S-02 deadkey is always offered, regardless of char type).
-//   - Sequence Apply button disabled until both key inputs are non-empty.
+//   - Default method per character is "swap" (S-01), except a decomposable
+//     accented char defaults to "deadkey" (S-02) — see §3c propose-then-
+//     confirm. Selecting "Type a sequence" (S-03) swaps the RIGHT pane's live
+//     preview for SequenceBuilderPanel; that panel's own Apply records a real
+//     multi_char_sequence MechanismAssignment and hands control back
+//     (method -> "swap"), never counted as "added"/covered (a distinct
+//     "Sequences" dimension — see excludeSequenceMechanisms in the component).
 //   - Added chip row appears; chips invoke remove (filters assignment from store).
 //   - Already-produced section collapsed by default; toggle expands it.
 //   - Guards: null base → no-base prompt; empty inventory → survey prompt.
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
+import { screen, fireEvent, act, cleanup, waitFor, within, renderHook } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { render } from "../../test/renderWithI18n.tsx";
 import { MechanismGallery, PATTERN_SEQUENCE, PATTERN_DEADKEY } from "./MechanismGallery.tsx";
+import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { useWorkingCopyStore, bindManifest } from "../../stores/workingCopyStore.ts";
-import { MECHANISMS_STEP_ID, TOUCH_STEP_ID } from "../../steps/reducer.ts";
+import {
+  MECHANISMS_STEP_ID,
+  TOUCH_STEP_ID,
+  applyStepCompletion,
+  type ReducerDeps,
+} from "../../steps/reducer.ts";
 import type { EditorStep, Step } from "../../steps/types.ts";
 import type { PatternLibraryService, VirtualFS } from "@keyboard-studio/contracts";
 import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
@@ -33,6 +47,9 @@ import type { PatternMatch } from "@keyboard-studio/contracts";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import type { MechanismAssignment, IRGroup, IRRule, IRStore } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
+import { expectCurrentChar } from "../../test/currentCharChip.ts";
+import { changeSelectMenu, selectMenuValue, selectMenuOptionValues } from "../../test/selectMenuTestUtils.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() — variables referenced inside vi.mock() factory closures.
@@ -283,10 +300,10 @@ describe("MechanismGallery — current character display", () => {
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    // The character heading renders "Add a key" label above the char glyph.
+    // The "Add a key" eyebrow still renders above the CharScrollStrip.
     expect(screen.getByText("Add a key")).toBeTruthy();
-    // The char glyph has aria-label "U+00E1 á".
-    expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+    // The CharScrollStrip's selected chip is "á" (aria-pressed + "Go to U+00E1 á").
+    expectCurrentChar("á");
   });
 
   it("renders the coverage status line with initial 0-of-N count", async () => {
@@ -294,7 +311,10 @@ describe("MechanismGallery — current character display", () => {
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    const status = screen.getByRole("status");
+    // Scoped by name: "á" is decomposable-accented, so the deadkey method's
+    // pre-filled base-letter box also renders its own (unrelated) status
+    // reflection — getByRole("status") alone would now match more than one.
+    const status = screen.getByRole("status", { name: "0 of 2 added" });
     expect(status.getAttribute("aria-label")).toBe("0 of 2 added");
   });
 });
@@ -312,17 +332,80 @@ describe("MechanismGallery — sequence method chooser", () => {
     expect(screen.getByText(/Type a sequence/i)).toBeTruthy();
   });
 
-  it("Add key button is disabled when sequence inputs are empty", async () => {
+  it("selecting 'Type a sequence' swaps the right pane's live preview for the sequence builder", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    // "á" decomposes to a + U+0301, so the §3c default method is deadkey
-    // (with the base letter pre-filled). Switch to the sequence method to
-    // assert its empty-input disabled state.
+    // "á" decomposes to a + U+0301, so the §3c default method is deadkey and
+    // the live preview (OSKFrame mock) is showing (visible, not hidden).
+    expect(screen.getByTestId("osk-frame")).toBeTruthy();
+    expect(screen.getByTestId("mechanism-preview-wrapper").style.display).not.toBe("none");
+
+    // Selecting the sequence method is itself the trigger — no separate
+    // Apply needed to open the builder.
     fireEvent.click(screen.getByText(/Type a sequence/i));
-    const addBtn = screen.getByRole("button", { name: /Apply method for á/i });
-    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+
+    // The preview stays MOUNTED (never destroyed/recreated — see the
+    // rightContent doc comment: OSKFrame's iframe must never unmount, since
+    // KMW reinit is expensive/unsafe) — only its wrapper is hidden via CSS.
+    expect(screen.getByTestId("osk-frame")).toBeTruthy();
+    expect(screen.getByTestId("mechanism-preview-wrapper").style.display).toBe("none");
+    expect(screen.getByTestId("sequences-content")).toBeTruthy();
+    expect(screen.getByTestId("sequences-indicator")).toBeTruthy();
+    // The generic "Apply method" button is hidden for this method — the
+    // builder owns its own Apply (sequences-apply).
+    expect(screen.queryByRole("button", { name: /Apply method for á/i })).toBeNull();
+  });
+
+  it("does NOT unmount/recreate the OSKFrame when toggling the sequence method (KMW reinit is expensive/unsafe — see OSKFrame.tsx's own doc comment)", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    const oskFrameBefore = screen.getByTestId("osk-frame");
+
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.click(screen.getByTestId("sequence-builder-cancel"));
+
+    // Same DOM node — proves OSKFrame was never unmounted+remounted across
+    // the round trip (a fresh mount would be a DIFFERENT node reference).
+    expect(screen.getByTestId("osk-frame")).toBe(oskFrameBefore);
+    expect(screen.getByTestId("mechanism-preview-wrapper").style.display).not.toBe("none");
+  });
+
+  it("the builder's own Apply is disabled until Content and Indicator both resolve", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    const applyBtn = screen.getByTestId("sequences-apply");
+    expect((applyBtn as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+
+    expect((applyBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("Cancel returns to the live preview without recording anything", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+
+    fireEvent.click(screen.getByTestId("sequence-builder-cancel"));
+
+    expect(screen.getByTestId("osk-frame")).toBeTruthy();
+    expect(screen.queryByTestId("sequences-content")).toBeNull();
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments).toHaveLength(0);
   });
 
   it("defaults to the deadkey method (pre-enabled) for a decomposable accented char (§3c)", async () => {
@@ -339,34 +422,12 @@ describe("MechanismGallery — sequence method chooser", () => {
     expect((addBtn as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("Add key button is disabled when only first key is filled", async () => {
-    seedInventory(["á"]);
+  it("defaults to the swap method for a plain (non-accented) character", async () => {
+    seedInventory(["z"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    // Select sequence method (it's the default; click to expand inputs).
-    fireEvent.click(screen.getByText(/Type a sequence/i));
-    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
-      target: { value: "a" },
-    });
-    const addBtn = screen.getByRole("button", { name: /Apply method for á/i });
-    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it("Add key button is enabled after both sequence keys are filled", async () => {
-    seedInventory(["á"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    });
-    fireEvent.click(screen.getByText(/Type a sequence/i));
-    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
-      target: { value: "a" },
-    });
-    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
-      target: { value: "'" },
-    });
-    const addBtn = screen.getByRole("button", { name: /Apply method for á/i });
-    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByLabelText(/Physical key for simple swap/i)).toBeTruthy();
   });
 });
 
@@ -418,51 +479,293 @@ describe("MechanismGallery — deadkey method chooser", () => {
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — apply (sequence)", () => {
-  it("clicking Apply method records an individual-scope assignment for the current char", async () => {
+  it("the builder's Apply records a real multi_char_sequence assignment, not a bare flag", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
-    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
-      target: { value: "a" },
-    });
-    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
-      target: { value: "'" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
 
     const assignments = useWorkingCopyStore
       .getState()
       .session.assignments.filter((a) => a.modality === "physical");
     expect(assignments).toHaveLength(1);
-    expect(assignments[0]?.scope).toBe("individual");
-    expect(assignments[0]?.target).toBe("á");
     expect(assignments[0]?.mechanisms[0]?.patternId).toBe(PATTERN_SEQUENCE);
+    expect(assignments[0]?.mechanisms[0]?.strategyId).toBe("S-03");
+    expect(assignments[0]?.mechanisms[0]?.slotValues).toMatchObject({
+      firstLetterOut: "a",
+      secondLetter: "s",
+      collapsedChar: "á",
+    });
   });
 
-  it("sequence slotValues contain firstLetterOut and secondLetter from inputs", async () => {
+  it("Apply returns the right pane to the live preview (mirrors every other method's Apply)", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
-    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
-      target: { value: "a" },
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    expect(screen.queryByTestId("sequences-content")).toBeNull();
+    expect(screen.getByTestId("osk-frame")).toBeTruthy();
+  });
+
+  it("a recorded sequence appears in the 'Sequences' row, not the 'Added' row", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
-      target: { value: "'" },
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("group", { name: /Characters with a recorded sequence/i }),
+      ).toBeTruthy();
     });
+    expect(
+      screen.queryByRole("group", { name: /Added characters — click to remove/i }),
+    ).toBeNull();
+  });
+
+  it("a recorded sequence does not change the coverage count", async () => {
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    await waitFor(() => {
+      const status = screen.getByRole("status");
+      expect(status.getAttribute("aria-label")).toBe("0 of 2 added");
+    });
+  });
+
+  it("a recorded sequence enables Next for the current character", async () => {
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    await waitFor(() => {
+      const nextBtn = screen.getByRole("button", { name: /Next character/i });
+      expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
+    });
+  });
+
+  it("the per-char 'Sequence recorded' badge's remove control strips the recorded assignment", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Sequence recorded/i)).toBeTruthy();
+    });
+    // With only one character in the inventory, the per-char badge's remove
+    // control and the "Sequences" chip row's remove control both render for
+    // "á" simultaneously and share the same aria-label — either one performs
+    // the identical unflagCharForSequence(currentChar) action, so click
+    // whichever resolves first (getAllByRole, not getByRole).
+    const [removeControl] = screen.getAllByRole("button", {
+      name: /Remove recorded sequence for U\+00E1 á/i,
+    });
+    fireEvent.click(removeControl!);
+
+    await waitFor(() => {
+      expect(getPhaseCPhysicalAssignments()).toHaveLength(0);
+    });
+  });
+
+  it("a char with BOTH a real mechanism and a recorded sequence appears in both rows with distinct, addressable remove controls", async () => {
+    // Coexistence is intentional (the gallery is multi-disposition, not
+    // mutually exclusive) — this documents it and guards the P1 fix: the two
+    // rows' remove buttons must not share an aria-label pattern.
+    // A second character ("é") is seeded so the assertions below can advance
+    // currentChar away from "á" — the per-char inline "Sequence recorded"
+    // indicator only renders for currentChar, so this isolates the two
+    // chip-row controls (Added / Sequences) under test from that third control.
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // Apply a real mechanism (swap) for á.
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
-    const assignment = useWorkingCopyStore
-      .getState()
-      .session.assignments.filter((a) => a.modality === "physical")[0];
-    expect(assignment?.mechanisms[0]?.slotValues).toMatchObject({
-      firstLetterOut: "a",
-      secondLetter: "'",
-      collapsedChar: "á",
+    // Record a sequence for á (resetMethodState returns method to "swap"
+    // after the swap apply above, so switch back to the sequence method).
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "s" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    // Read the raw (unmerged) Phase C assignments — session.assignments is a
+    // MERGED view that collapses multiple assignment objects sharing the same
+    // (scope, target) down to one, which would hide the two-separate-objects
+    // shape this gallery and SequenceBuilderPanel actually produce (see
+    // getPhaseCPhysicalAssignments below).
+    await waitFor(() => {
+      expect(getPhaseCPhysicalAssignments()).toHaveLength(2);
     });
+
+    // Advance off "á" so only the two chip rows (not the per-char inline
+    // indicator) are in play for the assertions below.
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
+    await waitFor(() => {
+      expectCurrentChar("é");
+    });
+
+    // Distinct aria-labels — each resolves to exactly one, correctly-scoped
+    // control. getByLabelText throws on zero or multiple matches, so this
+    // itself is the ambiguity assertion.
+    const addedChip = screen.getByLabelText("Remove U+00E1 á");
+    const sequenceChip = screen.getByLabelText("Remove recorded sequence for U+00E1 á");
+    expect(addedChip).toBeTruthy();
+    expect(sequenceChip).toBeTruthy();
+    expect(addedChip).not.toBe(sequenceChip);
+
+    // Both rows are present simultaneously.
+    expect(
+      screen.getByRole("group", { name: /Added characters/i }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("group", { name: /Characters with a recorded sequence/i }),
+    ).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-gallery coexistence (P1 fix) — a REAL multi_char_sequence assignment
+// recorded some other way (directly via the store, mirroring what
+// SequenceBuilderPanel's own Apply produces) must not surface as "Added"/
+// covered here, and this gallery's removal controls must never be able to
+// delete it.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — coexistence with a separately-recorded sequence assignment (P1)", () => {
+  it("a char with a recorded multi_char_sequence assignment does not appear as Added/covered", async () => {
+    seedInventory(["ŋ", "x"]);
+    // Simulate a sequence already recorded for "ŋ" (mirrors
+    // SequenceBuilderPanel's own Apply assignment shape).
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_SEQUENCE,
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // Not counted as covered — the "Added characters" chip row never renders
+    // for a char whose only recorded assignment is sequence-owned.
+    expect(
+      screen.queryByRole("group", { name: /Added characters — click to remove/i }),
+    ).toBeNull();
+
+    // The coverage line excludes it: 0 of 2, not 1 of 2.
+    await waitFor(() => {
+      const status = screen.getByRole("status");
+      expect(status.getAttribute("aria-label")).toBe("0 of 2 added");
+    });
+
+    // The recorded sequence assignment itself is untouched by rendering this
+    // gallery.
+    const assignments = getPhaseCPhysicalAssignments();
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.mechanisms[0]?.patternId).toBe(PATTERN_SEQUENCE);
+  });
+
+  it("a char with BOTH a non-sequence mechanism and a separately-recorded sequence assignment still shows as mechanism-covered, and removing its 'Added' chip leaves the sequence assignment untouched", async () => {
+    seedInventory(["ŋ", "x"]);
+    // Two SEPARATE MechanismAssignment objects for the same target — the
+    // shape a non-sequence method and SequenceBuilderPanel actually produce
+    // today (each always appends its own new assignment object rather than
+    // merging into one shared mechanisms array).
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [{ patternId: "simple_swap", strategyId: "S-01", slotValues: { kmnRules: "+ [K_N] > U+014B" } }],
+        source: "user",
+      },
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_SEQUENCE,
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // Mechanism-covered: the "Added" chip row DOES render for "ŋ" — the
+    // sequence assignment must never hide a genuinely mechanism-covered char.
+    await waitFor(() => {
+      expect(screen.getByRole("group", { name: /Added characters/i })).toBeTruthy();
+    });
+    // Exact label (not a loose regex) — "ŋ" also carries a recorded
+    // sequence, which now surfaces its own "Remove recorded sequence for
+    // U+014B ŋ" control (a separate dimension); a loose /Remove.*ŋ/ regex
+    // would ambiguously match both.
+    const addedChip = screen.getByLabelText("Remove U+014B ŋ");
+    expect(addedChip).toBeTruthy();
+
+    // Removing the "Added" chip strips only the non-sequence mechanism;
+    // the separately-tracked sequence assignment survives.
+    fireEvent.click(addedChip);
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("group", { name: /Added characters — click to remove/i }),
+      ).toBeNull();
+    });
+    const remaining = getPhaseCPhysicalAssignments();
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]?.target).toBe("ŋ");
+    expect(remaining[0]?.mechanisms.every((m) => m.patternId === PATTERN_SEQUENCE)).toBe(true);
   });
 });
 
@@ -495,13 +798,7 @@ describe("MechanismGallery — advance after apply", () => {
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    fireEvent.click(screen.getByText(/Type a sequence/i));
-    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
-      target: { value: "a" },
-    });
-    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
-      target: { value: "'" },
-    });
+    // "á" defaults to the pre-enabled deadkey method (§3c) — apply directly.
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
     // Apply records but stays on á; click Next to advance.
     await waitFor(() => {
@@ -512,7 +809,7 @@ describe("MechanismGallery — advance after apply", () => {
 
     // Now the current char should be "é".
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
   });
 
@@ -520,13 +817,6 @@ describe("MechanismGallery — advance after apply", () => {
     seedInventory(["á", "é"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    });
-    fireEvent.click(screen.getByText(/Type a sequence/i));
-    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
-      target: { value: "a" },
-    });
-    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
-      target: { value: "'" },
     });
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
@@ -559,7 +849,7 @@ describe("MechanismGallery — skip character", () => {
 
     // Current char is now é.
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
   });
 
@@ -569,22 +859,27 @@ describe("MechanismGallery — skip character", () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
 
-    // Coverage starts at 0 of 2.
-    expect(screen.getByRole("status").getAttribute("aria-label")).toBe("0 of 2 added");
+    // Coverage starts at 0 of 2. Scoped by name — see the note in "renders
+    // the coverage status line with initial 0-of-N count" above.
+    expect(
+      screen.getByRole("status", { name: "0 of 2 added" }).getAttribute("aria-label"),
+    ).toBe("0 of 2 added");
 
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
 
     // Skipping recorded nothing, so coverage is unchanged.
-    expect(screen.getByRole("status").getAttribute("aria-label")).toBe("0 of 2 added");
+    expect(
+      screen.getByRole("status", { name: "0 of 2 added" }).getAttribute("aria-label"),
+    ).toBe("0 of 2 added");
 
     // Navigating back to the skipped-over "á": it is NOT treated as resolved —
     // Next stays disabled until it is actually applied.
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+      expectCurrentChar("á");
     });
     const nextBtn = screen.getByRole("button", { name: /Next character/i });
     expect((nextBtn as HTMLButtonElement).disabled).toBe(true);
@@ -778,7 +1073,7 @@ describe("MechanismGallery — positional Back/Next navigation", () => {
     });
 
     // --- Implement "á" (idx 0), then Next → "é" (idx 1). ---
-    expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+    expectCurrentChar("á");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
     await waitFor(() => {
       const nextBtn = screen.getByRole("button", { name: /Next character/i });
@@ -786,7 +1081,7 @@ describe("MechanismGallery — positional Back/Next navigation", () => {
       fireEvent.click(nextBtn);
     });
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
 
     // --- Implement "é" (idx 1), then Next → "í" (idx 2, the LAST character). ---
@@ -797,7 +1092,7 @@ describe("MechanismGallery — positional Back/Next navigation", () => {
       fireEvent.click(nextBtn);
     });
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00ED í$/)).toBeTruthy();
+      expectCurrentChar("í");
     });
 
     // The last character's forward button already reads "Done" (not yet
@@ -808,7 +1103,7 @@ describe("MechanismGallery — positional Back/Next navigation", () => {
     // --- Back from "í" (idx 2) lands on "é" (idx 1) — covered, not skipped. ---
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
     expect(onBack).not.toHaveBeenCalled();
 
@@ -821,17 +1116,17 @@ describe("MechanismGallery — positional Back/Next navigation", () => {
     expect((nextFromE as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(nextFromE);
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00ED í$/)).toBeTruthy();
+      expectCurrentChar("í");
     });
 
     // --- Back twice more: "í" → "é" → "á" (idx 0), both covered, neither skipped. ---
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+      expectCurrentChar("á");
     });
     expect(onBack).not.toHaveBeenCalled();
 
@@ -841,8 +1136,29 @@ describe("MechanismGallery — positional Back/Next navigation", () => {
   });
 });
 
-describe("MechanismGallery — previous-character navigation", () => {
-  it("clicking '« Previous character' from an interior character moves to the immediately preceding character, ungated by intermediate implementation status", async () => {
+// The old "« Previous character" button (data-testid "mechanisms-prev-char")
+// only ever stepped back exactly one position; it was replaced by
+// CharScrollStrip (data-testid "char-scroll-strip"), which offers ONE chip
+// per lettersToAdd character (data-testid "char-scroll-chip-<HEX>", where
+// <HEX> is every codepoint of the grapheme, 4+-digit uppercase hex,
+// hyphen-joined — see CharScrollStrip.tsx's file header) and lets the author
+// jump to ANY of them, forward or backward, via handleSelectChar. These
+// tests exercise that replacement contract directly rather than deleting the
+// navigation coverage.
+describe("MechanismGallery — character-scroll-strip navigation", () => {
+  it("renders the char-scroll-strip with one chip per lettersToAdd character", async () => {
+    seedInventory(["á", "é", "í"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    expect(screen.getByTestId("char-scroll-strip")).toBeTruthy();
+    expect(screen.getByTestId("char-scroll-chip-00E1")).toBeTruthy();
+    expect(screen.getByTestId("char-scroll-chip-00E9")).toBeTruthy();
+    expect(screen.getByTestId("char-scroll-chip-00ED")).toBeTruthy();
+  });
+
+  it("clicking an earlier character's chip moves back to it, ungated by intermediate implementation status", async () => {
     const onBack = vi.fn();
     seedInventory(["á", "é", "í"]);
     await act(async () => {
@@ -852,7 +1168,7 @@ describe("MechanismGallery — previous-character navigation", () => {
     });
 
     // Advance to "é" (idx 1) via Apply + Next — "í" stays untouched.
-    expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+    expectCurrentChar("á");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
     await waitFor(() => {
       const nextBtn = screen.getByRole("button", { name: /Next character/i });
@@ -860,78 +1176,214 @@ describe("MechanismGallery — previous-character navigation", () => {
       fireEvent.click(nextBtn);
     });
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
 
-    const prevBtn = screen.getByTestId("mechanisms-prev-char");
-    expect(prevBtn.getAttribute("aria-label")).toBe("Previous character");
-    expect((prevBtn as HTMLButtonElement).disabled).toBe(false);
-
-    fireEvent.click(prevBtn);
+    // Click the chip for "á" (the earlier, already-implemented character)
+    // while sitting on "é" — must jump straight back to it.
+    fireEvent.click(screen.getByTestId("char-scroll-chip-00E1"));
 
     // Landed back on "á" (idx 0) — the phase was NOT exited.
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+      expectCurrentChar("á");
     });
     expect(onBack).not.toHaveBeenCalled();
   });
 
-  it("renders the previous-character button DISABLED on the first character", async () => {
-    seedInventory(["á", "é", "í"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    });
-    // Starting on "á" (idx 0) — nowhere further back to step.
-    const prevBtn = screen.getByTestId("mechanisms-prev-char");
-    expect(prevBtn).toBeTruthy();
-    expect((prevBtn as HTMLButtonElement).disabled).toBe(true);
-
-    // Clicking a disabled button is a no-op — still on "á", onBack untouched.
-    fireEvent.click(prevBtn);
-    expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
-  });
-
-  it("the previous-character button is enabled on later (non-first) characters", async () => {
+  it("clicking a later character's chip moves forward to it too — the old prev-only button could never do this", async () => {
     seedInventory(["á", "é", "í"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
 
-    // Advance to "é" (idx 1) via Skip (records nothing).
-    fireEvent.click(
-      screen.getByRole("button", { name: /Skip this character/i }),
-    );
-    await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
-    });
-    expect((screen.getByTestId("mechanisms-prev-char") as HTMLButtonElement).disabled).toBe(false);
+    // Starting on "á" (idx 0) — jump straight to "í" (idx 2, the last
+    // character), skipping over "é" entirely without visiting it.
+    expectCurrentChar("á");
+    fireEvent.click(screen.getByTestId("char-scroll-chip-00ED"));
 
-    // Advance to "í" (idx 2, the last character) — still enabled there too.
-    fireEvent.click(
-      screen.getByRole("button", { name: /Skip this character/i }),
-    );
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00ED í$/)).toBeTruthy();
+      expectCurrentChar("í");
     });
-    expect((screen.getByTestId("mechanisms-prev-char") as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("does NOT render the previous-character button when the desktop layout is locked", async () => {
+  it("the char-scroll-strip stays rendered — and its chips stay clickable — when the desktop layout is locked", async () => {
     seedInventory(["á", "é", "í"]);
     await act(async () => {
       render(
         <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />,
       );
     });
-    expect(screen.getByTestId("mechanisms-prev-char")).toBeTruthy();
+    expect(screen.getByTestId("char-scroll-strip")).toBeTruthy();
 
     act(() => {
       useWorkingCopyStore.getState().lockDesktop();
     });
 
-    expect(screen.queryByTestId("mechanisms-prev-char")).toBeNull();
-    // The locked-forward-escape button takes over the primary slot instead.
+    // Unlike the removed prev-char button (which disappeared entirely once
+    // locked), the scroll strip is navigation, not editing — it must survive
+    // the lock, and the locked-forward-escape button takes over the primary
+    // forward slot alongside it (not in place of it).
+    expect(screen.getByTestId("char-scroll-strip")).toBeTruthy();
     expect(screen.getByTestId("mechanisms-continue")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("char-scroll-chip-00ED"));
+    await waitFor(() => {
+      expectCurrentChar("í");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// usePositionalCharNav.handleSelectChar — not-found no-op (the branch the
+// UI-level chip-click tests above can never reach, since CharScrollStrip
+// only ever offers chips drawn from the SAME `list` handleSelectChar checks
+// against). Exercised directly against the hook rather than through
+// MechanismGallery/TouchGallery — there is no dedicated
+// usePositionalCharNav.test.ts(x) file, so this lands beside the gallery
+// suite that most directly depends on handleSelectChar's contract (the
+// character-scroll-strip navigation tests immediately above).
+// ---------------------------------------------------------------------------
+
+describe("usePositionalCharNav — handleSelectChar not-found no-op", () => {
+  it("leaves currentChar/currentIdx genuinely unchanged when called with a character not in `list`", () => {
+    const list = ["á", "é", "í"] as const;
+    let currentChar: string | null = "é";
+    const setCurrentChar = vi.fn((c: string | null) => {
+      currentChar = c;
+    });
+
+    const { result } = renderHook(() =>
+      usePositionalCharNav({
+        list,
+        currentChar,
+        setCurrentChar,
+      }),
+    );
+
+    // Sitting on "é" (idx 1) before the no-op call.
+    expect(result.current.currentIdx).toBe(1);
+
+    act(() => {
+      result.current.handleSelectChar("z"); // not present in `list`
+    });
+
+    // The guard (`if (!list.includes(char)) return;`) must fire BEFORE
+    // setCurrentChar is invoked — asserting the setter was never called
+    // (rather than merely re-checking currentIdx, which could stay 1 by
+    // coincidence if setCurrentChar were called with the same value) is what
+    // makes this fail if the not-found guard is ever removed or the
+    // `!list.includes` check is inverted.
+    expect(setCurrentChar).not.toHaveBeenCalled();
+    // The external state this test's setter closure would have mutated is
+    // still exactly what it started as — the selection genuinely did not move.
+    expect(currentChar).toBe("é");
+    expect(result.current.currentIdx).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Producer-count badge (CharScrollStrip Part 2) — integration coverage.
+//
+// CharScrollStrip.test.tsx already unit-tests the badge in isolation (a
+// hand-built `assignments` prop). This closes the gap that isolation leaves:
+// it proves the badge MechanismGallery actually renders is wired to THIS
+// gallery's real store-backed `session.assignments` (via the same
+// `sessionAssignments` prop the "apply (deadkey)" describe block above
+// asserts against) and the "physical" modality — not a stray/constant array.
+// A swapped `assignments` array or wrong `modality` at the
+// MechanismGallery -> CharScrollStrip call site would slip past
+// CharScrollStrip.test.tsx alone but must fail here.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — character-scroll-strip producer badge (integration)", () => {
+  it("the current char's badge starts RED at 0, then GREEN at 1 after a real Apply records the assignment", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    const badgeBefore = within(strip).getByTestId("char-scroll-badge-00E1");
+    expect(badgeBefore.textContent).toBe("0");
+    expect(badgeBefore.style.color).toBe("rgb(248, 81, 73)"); // #f85149 — badge-bad color
+
+    // "á" defaults to the pre-enabled deadkey method (§3c) — apply directly,
+    // the same real Apply flow the "apply (deadkey)" describe block above
+    // drives, so this test exercises the actual store write
+    // (session.assignments), not a hand-built MechanismAssignment.
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+
+    await waitFor(() => {
+      const badgeAfter = within(screen.getByTestId("char-scroll-strip")).getByTestId(
+        "char-scroll-badge-00E1",
+      );
+      expect(badgeAfter.textContent).toBe("1");
+      expect(badgeAfter.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// UsesSequencesCard (Part 3) — integration coverage.
+//
+// UsesSequencesCard.tsx (packages/studio/src/editors/assignLoop/parts/) has
+// its own render-level unit test exercising pure props in isolation. This
+// closes the gap that leaves: it proves the card MechanismGallery actually
+// renders is wired to THIS gallery's real store-backed `sessionAssignments`
+// (recorded via the same `recordAssignments` store call the P1 coexistence
+// suite above uses to simulate a Sequence-Gallery-recorded assignment) — not
+// a hand-built prop or a constant. A swapped/empty assignments source at the
+// MechanismGallery -> UsesSequencesCard call site would slip past a
+// UsesSequencesCard-only unit test but must fail here.
+//
+// PRODUCES vs USES: the seeded assignment's own `target` ("ŋ", what the
+// sequence PRODUCES) is deliberately a DIFFERENT character from currentChar
+// ("n", the char under test) — "n" only appears as the sequence's
+// `firstLetterOut` (an INPUT slot), never as the char it produces. This is
+// exactly the produces-vs-uses distinction the card exists to surface.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — UsesSequencesCard (integration)", () => {
+  it("renders the card with a row for a real recorded sequence that USES the current character as an input slot (not its produced char)", async () => {
+    seedInventory(["n"]);
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_SEQUENCE,
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    expectCurrentChar("n");
+    const card = await screen.findByTestId("uses-sequences-card");
+    const row = within(card).getByTestId("uses-sequences-row-0");
+    // The row names the sequence's own input pair and its produced char —
+    // proving this is the REAL recorded sequence surfaced from real store
+    // state, not a placeholder or a hardcoded row.
+    expect(row.textContent).toContain("n");
+    expect(row.textContent).toContain("g");
+    expect(row.textContent).toContain("ŋ");
+  });
+
+  it("control: renders no uses-sequences-card for a character with no recorded using-sequence anywhere in the assignments", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expectCurrentChar("x");
+    expect(screen.queryByTestId("uses-sequences-card")).toBeNull();
   });
 });
 
@@ -1078,9 +1530,9 @@ describe("MechanismGallery — Back after skipping the only character", () => {
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     expect(onComplete).toHaveBeenCalledOnce();
 
-    // The heading for "á" is still present — positional nav never nulled
+    // "á" is still the selected chip — positional nav never nulled
     // currentChar out from under the completed character.
-    expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+    expectCurrentChar("á");
 
     // Back is still positional: idx 0 has no prior position, so it calls
     // onBack — not gated by the character having just been skipped.
@@ -1133,14 +1585,15 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
       expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
     });
 
-    // Navigate back to "é" without resolving à's suggestion. Anchored regex:
-    // "é" is covered (accepted above), so an "Added" chip ("Remove U+00E9 é")
-    // also carries "U+00E9" in its aria-label — match only the
-    // character-heading span's exact label.
+    // Navigate back to "é" without resolving à's suggestion. Scoped via
+    // expectCurrentChar to the CharScrollStrip's selected chip: "é" is
+    // covered (accepted above), so an "Added" chip ("Remove U+00E9 é") also
+    // carries "U+00E9" in its own aria-label — an unscoped query would be
+    // ambiguous.
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     expect(onBack).not.toHaveBeenCalled();
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
 
     // The already-accepted suggestion for "é" must NOT re-render its card.
@@ -1168,13 +1621,13 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // Skip it — no accept/deny, no assignment recorded.
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E0 à$/)).toBeTruthy();
+      expectCurrentChar("à");
     });
 
     // Navigate back to "é" without ever resolving its suggestion.
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+      expectCurrentChar("é");
     });
 
     // Unlike the accept/deny case above, the suggestion row for "é" MUST
@@ -1320,28 +1773,12 @@ describe("MechanismGallery — per-method delete badge", () => {
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
-    // --- Apply second method: sequence ---
-    // Expand the sequence card.
-    fireEvent.click(screen.getByText(/Type a sequence/i));
-
-    // Fill in the two sequence inputs.
-    const seqInputs = screen.queryAllByRole("textbox");
-    const firstInput = seqInputs.find(
-      (el) => el.getAttribute("aria-label")?.toLowerCase().includes("first"),
-    );
-    const secondInput = seqInputs.find(
-      (el) => el.getAttribute("aria-label")?.toLowerCase().includes("second"),
-    );
-    expect(firstInput).toBeDefined();
-    expect(secondInput).toBeDefined();
-    await act(async () => {
-      fireEvent.change(firstInput!, { target: { value: "e" } });
-      fireEvent.change(secondInput!, { target: { value: "a" } });
-    });
-
+    // --- Apply second method: swap (S-01) ---
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
-    // Two per-method badges should now be visible (deadkey + sequence).
+    // Two per-method badges should now be visible (deadkey + swap).
     await waitFor(() => {
       const methodBadges = screen.queryAllByRole("button", {
         name: /^Remove method/i,
@@ -1360,31 +1797,21 @@ describe("MechanismGallery — per-method delete badge", () => {
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
-    // Apply sequence method.
-    fireEvent.click(screen.getByText(/Type a sequence/i));
-    const seqInputs = screen.queryAllByRole("textbox");
-    const firstInput = seqInputs.find(
-      (el) => el.getAttribute("aria-label")?.toLowerCase().includes("first"),
-    );
-    const secondInput = seqInputs.find(
-      (el) => el.getAttribute("aria-label")?.toLowerCase().includes("second"),
-    );
-    await act(async () => {
-      fireEvent.change(firstInput!, { target: { value: "e" } });
-      fireEvent.change(secondInput!, { target: { value: "a" } });
-    });
+    // Apply swap method.
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
     // Wait for both badges.
     let deadkeyBadge: HTMLElement | null = null;
-    let seqBadge: HTMLElement | null = null;
+    let swapBadge: HTMLElement | null = null;
     await waitFor(() => {
       const badges = screen.queryAllByRole("button", { name: /^Remove method/i });
       expect(badges.length).toBe(2);
       deadkeyBadge = badges.find((b) => b.getAttribute("aria-label")?.includes("Deadkey")) ?? null;
-      seqBadge = badges.find((b) => b.getAttribute("aria-label")?.includes("Sequence")) ?? null;
+      swapBadge = badges.find((b) => b.getAttribute("aria-label")?.includes("Key:")) ?? null;
       expect(deadkeyBadge).not.toBeNull();
-      expect(seqBadge).not.toBeNull();
+      expect(swapBadge).not.toBeNull();
     });
 
     // Click the deadkey badge to remove only that method.
@@ -1392,7 +1819,7 @@ describe("MechanismGallery — per-method delete badge", () => {
       fireEvent.click(deadkeyBadge!);
     });
 
-    // Sequence badge must still be visible; deadkey badge must be gone.
+    // Swap badge must still be visible; deadkey badge must be gone.
     await waitFor(() => {
       const remaining = screen.queryAllByRole("button", { name: /^Remove method/i });
       expect(remaining.length).toBe(1);
@@ -1463,9 +1890,12 @@ describe("MechanismGallery — intro splash", () => {
       await new Promise((r) => setTimeout(r, 0));
     });
 
-    // Gallery now visible; intro gone.
+    // Gallery now visible; intro gone. "á" is decomposable-accented, so more
+    // than one status region can legitimately be present (the coverage line
+    // plus the deadkey method's pre-filled base-letter reflection) — assert
+    // at least one rather than exactly one.
     expect(screen.queryByText(/Welcome to the Mechanism Gallery/i)).toBeNull();
-    expect(screen.queryByRole("status")).not.toBeNull();
+    expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
   });
 
   it("does NOT show the intro on a return visit (intro already marked seen)", async () => {
@@ -1477,7 +1907,7 @@ describe("MechanismGallery — intro splash", () => {
     });
 
     expect(screen.queryByText(/Welcome to the Mechanism Gallery/i)).toBeNull();
-    expect(screen.queryByRole("status")).not.toBeNull();
+    expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
   });
 });
 
@@ -1536,9 +1966,7 @@ describe("MechanismGallery — shift-layer targeting (S-01)", () => {
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
-    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
-      target: { value: "K_Q" },
-    });
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
     fireEvent.click(screen.getByRole("radio", { name: "Shift" }));
     fireEvent.click(screen.getByRole("button", { name: /Apply method for Θ/i }));
 
@@ -1571,9 +1999,7 @@ describe("MechanismGallery — shift-layer targeting (S-01)", () => {
 
     // Clicking a disabled toggle must not change the layer — applying still
     // produces a base-layer rule.
-    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
-      target: { value: "K_Q" },
-    });
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
     fireEvent.click(shiftToggle);
     fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
 
@@ -1591,17 +2017,15 @@ describe("MechanismGallery — shift-layer targeting (S-01)", () => {
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
-  it("emits a [RALT K_X] rule by default (unshifted plane)", async () => {
+  it("emits a [ALT K_X] rule by default (unshifted plane, generic alt until chirality is in use)", async () => {
     instantiateWorkingCopy();
     seedInventory(["ε"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
 
-    fireEvent.click(screen.getByText(/RAlt \+ key/i));
-    fireEvent.change(screen.getByLabelText(/Base key for RAlt layer/i), {
-      target: { value: "K_E" },
-    });
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    await changeSelectMenu(screen.getByLabelText(/Base key for layer-switch combo/i), "K_E");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for ε/i }));
 
     const assignments = useWorkingCopyStore
@@ -1611,27 +2035,28 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     expect(assignments[0]?.target).toBe("ε");
     expect(assignments[0]?.mechanisms[0]?.patternId).toBe("modifier_as_layer_switch");
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
-      "[RALT K_E]",
+      "[ALT K_E]",
     );
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrOutputList"]).toBe(
       "ε",
     );
   });
 
-  it("emits a [SHIFT RALT K_X] rule when the Shift+RAlt layer is selected", async () => {
-    // The user is adding Ε (capital epsilon) via the shifted RAlt plane of
-    // K_E — Shift+RAlt+E should produce Ε, not the unshifted RAlt character.
+  it("emits a [SHIFT ALT K_X] rule when a second SHIFT layer is added", async () => {
+    // The user is adding Ε (capital epsilon) via the shifted Alt plane of
+    // K_E — Shift+Alt+E should produce Ε, not the unshifted Alt character.
+    // Base slot defaults to generic ALT (no chiral alt in use); a second
+    // dropdown is added and set to SHIFT.
     instantiateWorkingCopy();
     seedInventory(["Ε"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
 
-    fireEvent.click(screen.getByText(/RAlt \+ key/i));
-    fireEvent.change(screen.getByLabelText(/Base key for RAlt layer/i), {
-      target: { value: "K_E" },
-    });
-    fireEvent.click(screen.getByRole("radio", { name: "Shift+RAlt" }));
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    await changeSelectMenu(screen.getByLabelText(/Base key for layer-switch combo/i), "K_E");
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Layer 2 for layer-switch combo/i), "SHIFT");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for Ε/i }));
 
     const assignments = useWorkingCopyStore
@@ -1641,27 +2066,443 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     expect(assignments[0]?.target).toBe("Ε");
     expect(assignments[0]?.mechanisms[0]?.patternId).toBe("modifier_as_layer_switch");
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
-      "[SHIFT RALT K_E]",
+      "[SHIFT ALT K_E]",
     );
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrOutputList"]).toBe(
       "Ε",
     );
   });
 
+  it("unifies an author's Ctrl + (chiral) Alt pick to the generic [CTRL ALT K_E] (#defect: AltGr not working)", async () => {
+    // The author picks slot 1 = Ctrl, slot 2 = an alt-family token — the
+    // exact "Ctrl+Alt" selection reported as not working. A mixed
+    // generic-ctrl + chiral-alt rule is kmcmplib-invalid
+    // (KM_WARNING_KMCMP_4202659) and can never be delivered by a real
+    // keypress either. The picker must emit the all-generic, functional
+    // [CTRL ALT K_X] rule instead.
+    // LALT must already be "in use" for the pool to offer it under the new
+    // gating rule (computeModifierPool).
+    instantiateWithModifiersInUse("K_W", ["LALT"]);
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    await changeSelectMenu(screen.getByLabelText(/Base key for layer-switch combo/i), "K_E");
+    await changeSelectMenu(screen.getByLabelText(/Layer 1 for layer-switch combo/i), "CTRL");
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Layer 2 for layer-switch combo/i), "LALT");
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for ε/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe("[CTRL ALT K_E]");
+  });
+
+  it("unifies a Ctrl + RAlt + Caps pick to the generic [CTRL ALT CAPS K_E] (chirality unification — mixed generic+chiral is kmcmplib-invalid)", async () => {
+    // Slot 1 must default to RALT for this scenario to actually exercise
+    // chirality unification — under the new gating rule (computeModifierPool)
+    // generic ALT is the default until a chiral alt token is already in use,
+    // so seed RALT as already in use to get the RALT default here.
+    instantiateWithModifiersInUse("K_W", ["RALT"]);
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    await changeSelectMenu(screen.getByLabelText(/Base key for layer-switch combo/i), "K_E");
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Layer 2 for layer-switch combo/i), "CTRL");
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Layer 3 for layer-switch combo/i), "CAPS");
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for ε/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
+      "[CTRL ALT CAPS K_E]",
+    );
+  });
+
   it("is not gated by mnemonic layout (unlike the S-01 Shift toggle)", async () => {
-    // [SHIFT RALT K_X] selects the shifted RAlt plane — orthogonal to
-    // &MNEMONICLAYOUT, which only changes base-character resolution (real
-    // mnemonic keyboards like sil_euro_latin ship RALT SHIFT rules) — so the
-    // Shift+RAlt radio must remain enabled regardless of &MNEMONICLAYOUT.
+    // Adding SHIFT to the layer combo is orthogonal to &MNEMONICLAYOUT, which
+    // only gates the S-01 Shift radio (shiftLayerAllowed) — the layer-combo
+    // SHIFT option must stay selectable regardless.
     instantiateWorkingCopy({ mnemonic: true });
     seedInventory(["ε"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
 
-    fireEvent.click(screen.getByText(/RAlt \+ key/i));
-    const shiftRaltToggle = screen.getByRole("radio", { name: "Shift+RAlt" }) as HTMLButtonElement;
-    expect(shiftRaltToggle.disabled).toBe(false);
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLButtonElement;
+    expect(secondLayerSelect.disabled).toBe(false);
+    await changeSelectMenu(secondLayerSelect, "SHIFT");
+    expect(selectMenuValue(secondLayerSelect)).toBe("SHIFT");
+  });
+
+  it("excludes LALT from the next dropdown once RALT is chosen in an earlier slot", async () => {
+    // LALT must already be "in use" for the pool to offer it at all under the
+    // new gating rule (computeModifierPool) — seed it so this test still
+    // exercises the exclusion (not just the gating) behavior.
+    instantiateWithModifiersInUse("K_W", ["LALT"]);
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    // Slot 1 defaults to RALT; adding a second slot must not offer LALT
+    // (or RALT again) — MODIFIER_EXCLUSIONS is self-inclusive + chiral.
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLElement;
+    const optionValues = await selectMenuOptionValues(secondLayerSelect);
+    expect(optionValues).not.toContain("LALT");
+    expect(optionValues).not.toContain("RALT");
+  });
+
+  it("excludes CAPS from the next dropdown once CAPS is chosen in an earlier slot, and never offers NCAPS at all", async () => {
+    // NCAPS is not a distinct selectable S-08 layer (computeModifierPool
+    // never includes it) — a rule with no caps token already matches
+    // caps-off, so it must not appear in ANY slot's options, regardless of
+    // what an earlier slot holds.
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    const firstLayerSelect = screen.getByLabelText(
+      /Layer 1 for layer-switch combo/i,
+    ) as HTMLElement;
+    const firstOptionValues = await selectMenuOptionValues(firstLayerSelect);
+    expect(firstOptionValues).not.toContain("NCAPS");
+
+    await changeSelectMenu(firstLayerSelect, "CAPS");
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLElement;
+    const optionValues = await selectMenuOptionValues(secondLayerSelect);
+    expect(optionValues).not.toContain("CAPS");
+    expect(optionValues).not.toContain("NCAPS");
+  });
+
+  it("caps the layer combo at 4 dropdowns", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Layer 2 for layer-switch combo/i), "CTRL");
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Layer 3 for layer-switch combo/i), "SHIFT");
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Layer 4 for layer-switch combo/i), "CAPS");
+
+    expect(screen.queryByLabelText(/Layer 5 for layer-switch combo/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Add another layer/i })).toBeNull();
+  });
+
+  it("handleRemoveRaltSlot: removing a middle layer slot shifts later slots down and keeps their values", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    // Slot 1 defaults to generic ALT (no chiral alt in use). Add slot 2
+    // (CTRL) and slot 3 (SHIFT).
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Layer 2 for layer-switch combo/i), "CTRL");
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Layer 3 for layer-switch combo/i), "SHIFT");
+
+    // Remove the middle slot (CTRL, index 1).
+    fireEvent.click(screen.getByRole("button", { name: /Remove layer 2/i }));
+
+    // Slot 3 is gone; slot 2 now holds what was slot 3's value (SHIFT) —
+    // values are re-indexed by the removal, not reset to blank.
+    expect(screen.queryByLabelText(/Layer 3 for layer-switch combo/i)).toBeNull();
+    const layer2 = screen.getByLabelText(/Layer 2 for layer-switch combo/i) as HTMLElement;
+    expect(selectMenuValue(layer2)).toBe("SHIFT");
+
+    // Applying still produces a valid, canonically-ordered combo from the
+    // remaining (ALT, SHIFT) slots — the removed CTRL is gone entirely.
+    await changeSelectMenu(screen.getByLabelText(/Base key for layer-switch combo/i), "K_E");
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for ε/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
+      "[SHIFT ALT K_E]",
+    );
+  });
+
+  it("hides the Add-layer button until every rendered dropdown has a selection", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    // Default state (slot 1 pre-filled with generic ALT) already shows the
+    // button.
+    expect(screen.getByRole("button", { name: /Add another layer/i })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    // Slot 2 starts unselected — the Add button must hide until it is filled.
+    expect(screen.queryByRole("button", { name: /Add another layer/i })).toBeNull();
+
+    await changeSelectMenu(screen.getByLabelText(/Layer 2 for layer-switch combo/i), "SHIFT");
+    expect(screen.getByRole("button", { name: /Add another layer/i })).toBeTruthy();
+  });
+
+  it('shows "(in use)" on a modifier token already used elsewhere in the working IR', async () => {
+    // A `main` group with a rule under [RALT K_W] puts RALT "in use".
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "r-ralt-w",
+          context: [{ kind: "vkey", name: "K_W", modifiers: ["RALT"] }],
+          output: [{ kind: "char", value: "w" }],
+        },
+      ],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    const ir = makeTestIR([group], []);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: seedVfs, ir });
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    const firstLayerSelect = screen.getByLabelText(
+      /Layer 1 for layer-switch combo/i,
+    ) as HTMLElement;
+    fireEvent.click(firstLayerSelect);
+    await waitFor(() => expect(firstLayerSelect.getAttribute("aria-expanded")).toBe("true"));
+    const raltOption = firstLayerSelect.parentElement?.querySelector('li[data-value="RALT"]');
+    expect(raltOption?.textContent).toBe("RALT (in use)");
+  });
+
+  it("shows a desktop-only note when the combo includes CAPS", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    const firstLayerSelect = screen.getByLabelText(
+      /Layer 1 for layer-switch combo/i,
+    ) as HTMLElement;
+    await changeSelectMenu(firstLayerSelect, "CAPS");
+
+    expect(screen.getByText(/desktop only/i)).toBeTruthy();
+  });
+
+  it("drops a now-invalid later pick when an earlier dropdown changes", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    // Slot 1 starts at ALT (default); add slot 2 and pick CAPS (valid — CAPS
+    // isn't excluded by ALT). Slot 1's own options are never constrained by
+    // a LATER slot (options only cascade downward), so slot 1 can freely
+    // switch to CAPS too — which then excludes slot 2's CAPS pick and must
+    // drop it back to unselected.
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLElement;
+    await changeSelectMenu(secondLayerSelect, "CAPS");
+    expect(selectMenuValue(secondLayerSelect)).toBe("CAPS");
+
+    const firstLayerSelect = screen.getByLabelText(
+      /Layer 1 for layer-switch combo/i,
+    ) as HTMLElement;
+    await changeSelectMenu(firstLayerSelect, "CAPS");
+
+    expect(selectMenuValue(secondLayerSelect)).toBe("");
+  });
+
+  it("falls back to the default modifier pool (no crash) when workingIr is null but a base keyboard is selected", async () => {
+    // No instantiateWorkingCopy() call — store.ir and store.baseIr both stay
+    // null, so MechanismGallery's workingIr resolves to null even though
+    // selectedBaseKeyboard is set. collectModifierTokensInUse must not be
+    // called on a null IR; the pool must fall back to the documented
+    // defaults (SHIFT/CTRL/ALT/CAPS — no RALT/LALT/LCTRL/RCTRL since nothing
+    // is "in use" and neither family has surfaced its chiral options yet,
+    // NCAPS is never offered) rather than crashing.
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    const firstLayerSelect = screen.getByLabelText(
+      /Layer 1 for layer-switch combo/i,
+    ) as HTMLElement;
+
+    // Pre-filled with the default alt-family token (generic ALT).
+    expect(selectMenuValue(firstLayerSelect)).toBe("ALT");
+
+    const optionValues = (await selectMenuOptionValues(firstLayerSelect))
+      .filter((v) => v !== "");
+    expect(new Set(optionValues)).toEqual(
+      new Set(["SHIFT", "CTRL", "ALT", "CAPS"]),
+    );
+
+    // Applying still works end to end against the fallback pool.
+    await changeSelectMenu(screen.getByLabelText(/Base key for layer-switch combo/i), "K_E");
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for ε/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe("[ALT K_E]");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeModifierPool — pool-gating scenarios (product rule: default to
+// GENERIC ONLY for a family until the keyboard already uses a chiral L/R
+// token for that family — at which point BOTH chiral options are offered
+// and the generic is dropped. No always-on exception for AltGr (RALT);
+// applies symmetrically to Alt and Ctrl.)
+// ---------------------------------------------------------------------------
+
+/** Build a `main` group with a single rule under the given vkey/modifiers. */
+function groupWithModifiers(vkey: string, modifiers: string[]): IRGroup {
+  return {
+    nodeId: "g-main",
+    name: "main",
+    usingKeys: true,
+    readonly: false,
+    rules: [
+      {
+        nodeId: `r-${vkey}-${modifiers.join("-")}`,
+        context: [{ kind: "vkey", name: vkey, modifiers }],
+        output: [{ kind: "char", value: "x" }],
+      },
+    ],
+  };
+}
+
+function instantiateWithModifiersInUse(vkey: string, modifiers: string[]): void {
+  const seedVfs = createVirtualFS([
+    { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+  ]);
+  const ir = makeTestIR([groupWithModifiers(vkey, modifiers)], []);
+  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: seedVfs, ir });
+}
+
+async function firstLayerOptionValues(): Promise<Set<string>> {
+  fireEvent.click(screen.getByText(/Layer \+ key/i));
+  const firstLayerSelect = screen.getByLabelText(
+    /Layer 1 for layer-switch combo/i,
+  ) as HTMLElement;
+  return new Set(
+    (await selectMenuOptionValues(firstLayerSelect)).filter((v) => v !== ""),
+  );
+}
+
+describe("MechanismGallery — computeModifierPool gating", () => {
+  it("(i) no alt/ctrl in use: alt pool is [ALT] only (no RALT/LALT), ctrl pool is [CTRL] only (no LCTRL/RCTRL)", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const options = await firstLayerOptionValues();
+    expect(options).toEqual(new Set(["SHIFT", "CTRL", "ALT", "CAPS"]));
+  });
+
+  it("(ii) RALT in use: alt pool becomes both chiral options [RALT,LALT] — generic ALT drops (CHANGE: RALT-in-use now also surfaces LALT)", async () => {
+    instantiateWithModifiersInUse("K_W", ["RALT"]);
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const options = await firstLayerOptionValues();
+    expect(options).toEqual(new Set(["SHIFT", "CTRL", "RALT", "LALT", "CAPS"]));
+  });
+
+  it("(iii) LALT in use: alt pool becomes both chiral options [RALT,LALT] — generic ALT drops", async () => {
+    instantiateWithModifiersInUse("K_W", ["LALT"]);
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const options = await firstLayerOptionValues();
+    expect(options).toEqual(new Set(["SHIFT", "CTRL", "RALT", "LALT", "CAPS"]));
+  });
+
+  it("(iv) RCTRL in use: ctrl pool becomes both chiral options [LCTRL,RCTRL] — generic CTRL drops", async () => {
+    instantiateWithModifiersInUse("K_W", ["RCTRL"]);
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const options = await firstLayerOptionValues();
+    expect(options).toEqual(
+      new Set(["SHIFT", "LCTRL", "RCTRL", "ALT", "CAPS"]),
+    );
+  });
+
+  it("(v) LCTRL in use: ctrl pool becomes both chiral options [LCTRL,RCTRL] — generic CTRL drops", async () => {
+    instantiateWithModifiersInUse("K_W", ["LCTRL"]);
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const options = await firstLayerOptionValues();
+    expect(options).toEqual(
+      new Set(["SHIFT", "LCTRL", "RCTRL", "ALT", "CAPS"]),
+    );
+  });
+
+  it("(vi) generic ALT already in use (no chiral alt): alt pool stays generic-only [ALT] — a bare generic token in use does not trigger chiral options", async () => {
+    instantiateWithModifiersInUse("K_W", ["ALT"]);
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const options = await firstLayerOptionValues();
+    expect(options).toEqual(new Set(["SHIFT", "CTRL", "ALT", "CAPS"]));
   });
 });
 
@@ -1671,16 +2512,17 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
 
 describe("MechanismGallery — covered-chip badge text for RAlt/Shift+RAlt (methodLabel)", () => {
   it('shows "RAlt: K_E" on the badge for an unshifted RAlt assignment', async () => {
-    instantiateWorkingCopy();
+    // RALT must already be "in use" for the pool (and therefore the slot-1
+    // default) to lead with RALT rather than generic ALT — see
+    // computeModifierPool's new generic-until-chiral-then-both gating rule.
+    instantiateWithModifiersInUse("K_W", ["RALT"]);
     seedInventory(["ε"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
 
-    fireEvent.click(screen.getByText(/RAlt \+ key/i));
-    fireEvent.change(screen.getByLabelText(/Base key for RAlt layer/i), {
-      target: { value: "K_E" },
-    });
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    await changeSelectMenu(screen.getByLabelText(/Base key for layer-switch combo/i), "K_E");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for ε/i }));
 
     await waitFor(() => {
@@ -1691,17 +2533,18 @@ describe("MechanismGallery — covered-chip badge text for RAlt/Shift+RAlt (meth
   });
 
   it('shows "Shift+RAlt: K_E" on the badge for a shifted RAlt assignment', async () => {
-    instantiateWorkingCopy();
+    // Seed RALT in use so slot 1 defaults to RALT rather than generic ALT
+    // (computeModifierPool).
+    instantiateWithModifiersInUse("K_W", ["RALT"]);
     seedInventory(["Ε"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
 
-    fireEvent.click(screen.getByText(/RAlt \+ key/i));
-    fireEvent.change(screen.getByLabelText(/Base key for RAlt layer/i), {
-      target: { value: "K_E" },
-    });
-    fireEvent.click(screen.getByRole("radio", { name: "Shift+RAlt" }));
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    await changeSelectMenu(screen.getByLabelText(/Base key for layer-switch combo/i), "K_E");
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Layer 2 for layer-switch combo/i), "SHIFT");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for Ε/i }));
 
     await waitFor(() => {
@@ -1720,7 +2563,10 @@ describe("MechanismGallery — covered-chip badge text for RAlt/Shift+RAlt (meth
 
 describe("MechanismGallery — OSK key-tap selects the RAlt base key", () => {
   it("tapping the OSK sets the base key and Apply emits [SHIFT RALT <tappedKey>] when Shift+RAlt is selected", async () => {
-    instantiateWorkingCopy();
+    // Seed a chiral alt token as already in use (on a different key) so the
+    // slot-1 default leads with RALT rather than generic ALT
+    // (computeModifierPool's generic-until-chiral-then-both gating rule).
+    instantiateWithModifiersInUse("K_W", ["RALT"]);
     seedInventory(["Ε"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -1729,8 +2575,9 @@ describe("MechanismGallery — OSK key-tap selects the RAlt base key", () => {
       await new Promise((r) => setTimeout(r, 0));
     });
 
-    fireEvent.click(screen.getByText(/RAlt \+ key/i));
-    fireEvent.click(screen.getByRole("radio", { name: "Shift+RAlt" }));
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Layer 2 for layer-switch combo/i), "SHIFT");
 
     // Tap the OSK mock (always taps "K_E") to pick the base key instead of
     // using the dropdown.
@@ -1761,9 +2608,7 @@ describe("MechanismGallery — case-pair companion proposal", () => {
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
-    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
-      target: { value: "K_Q" },
-    });
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
 
     expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
@@ -1795,9 +2640,7 @@ describe("MechanismGallery — case-pair companion proposal", () => {
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
-    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
-      target: { value: "K_Q" },
-    });
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
 
     fireEvent.click(
@@ -1820,9 +2663,7 @@ describe("MechanismGallery — case-pair companion proposal", () => {
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
-    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
-      target: { value: "K_Q" },
-    });
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for ا/i }));
 
     expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
@@ -1836,9 +2677,7 @@ describe("MechanismGallery — case-pair companion proposal", () => {
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
-    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
-      target: { value: "K_Q" },
-    });
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
 
     expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
@@ -1858,9 +2697,7 @@ describe("MechanismGallery — CAPS-aware base-layer swap (P0)", () => {
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
-    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
-      target: { value: "K_Q" },
-    });
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
 
     // Decline the companion so only the base swap is recorded.
@@ -1885,9 +2722,7 @@ describe("MechanismGallery — CAPS-aware base-layer swap (P0)", () => {
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
-    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
-      target: { value: "K_Q" },
-    });
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
 
     fireEvent.click(
@@ -1945,18 +2780,15 @@ describe("MechanismGallery — companion proposal identity tracking (P1/P2 regre
     // 1. Apply the base swap on the CAPS-handling key K_Q — raises the
     //    companion banner and records the NCAPS/CAPS base pair.
     fireEvent.click(screen.getByText(/Assign to a key/i));
-    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
-      target: { value: "K_Q" },
-    });
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
     expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
 
     // 2. Apply a SECOND, unrelated mechanism for the same char (θ) while the
-    //    banner is still up — an RAlt assignment on a different key.
-    fireEvent.click(screen.getByText(/RAlt \+ key/i));
-    fireEvent.change(screen.getByLabelText(/Base key for RAlt layer/i), {
-      target: { value: "K_W" },
-    });
+    //    banner is still up — a layer-combo (default generic Alt, no chiral
+    //    alt in use) assignment on a different key.
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    await changeSelectMenu(screen.getByLabelText(/Base key for layer-switch combo/i), "K_W");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
 
     // Banner must still be up — applying an unrelated mechanism does not
@@ -1982,7 +2814,7 @@ describe("MechanismGallery — companion proposal identity tracking (P1/P2 regre
     expect(raltAssignment).toBeDefined();
     expect(raltAssignment?.target).toBe("θ");
     expect(raltAssignment?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
-      "[RALT K_W]",
+      "[ALT K_W]",
     );
 
     const quadAssignment = assignments.find(
@@ -2015,9 +2847,7 @@ describe("MechanismGallery — companion proposal identity tracking (P1/P2 regre
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
-    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
-      target: { value: "K_Q" },
-    });
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
     expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
 
@@ -2042,9 +2872,7 @@ describe("MechanismGallery — companion proposal identity tracking (P1/P2 regre
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
-    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
-      target: { value: "K_Q" },
-    });
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
     expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
 
@@ -2086,9 +2914,7 @@ describe("MechanismGallery — companion proposal bcp47 plumbing", () => {
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
-    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
-      target: { value: "K_Q" },
-    });
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for i/i }));
 
     expect(screen.getByText(/has an uppercase form, İ/i)).toBeTruthy();
@@ -2115,13 +2941,767 @@ describe("MechanismGallery — companion proposal bcp47 plumbing", () => {
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
-    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
-      target: { value: "K_Q" },
-    });
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
     expect(() => {
       fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
     }).not.toThrow();
 
     expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T008 (spec 034 MVP authoring walk, FR-006 / AS-5) — full-inventory
+// assignment coverage + desktop auto-lock on completion.
+//
+// Drives the gallery through every character in a small declared inventory
+// (S-02/S-03/S-01/S-08 are all available per character; the decomposable
+// accented fixture chars here default to S-02 deadkey per §3c), asserting:
+//   (a) every declared character ends up with at least one recorded
+//       MechanismAssignment(scope: "individual") — the "every alphabet
+//       character gets assigned to at least one key/mechanism" functional
+//       path, and
+//   (b) reaching the phase's completion (the final Done click) fires the
+//       real applyStepCompletion(MECHANISMS_STEP_ID) reducer path (R1),
+//       landing desktopLocked === true on the real store.
+//
+// NOTE: the explicit-gate UX affordance (a visible lock button) is
+// deliberately deferred — this suite asserts only the functional auto-lock
+// side effect via the reducer, never a lock-button UI element.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — full-inventory coverage + desktop auto-lock (T008)", () => {
+  it("assigns every declared character to a mechanism (S-02 default) and locks the desktop on completion", async () => {
+    const DECLARED_CHARS = ["á", "é", "í"];
+    seedInventory(DECLARED_CHARS);
+
+    let completionFired = false;
+    const onComplete = () => {
+      completionFired = true;
+      // Mirror the production wiring (SurveyView -> applyStepCompletion): the
+      // gallery's onComplete triggers the reducer's R1 lock gate. lockDesktop
+      // is bound to the REAL store action so this exercises the actual
+      // desktopLocked flip, not a mock.
+      const deps: ReducerDeps = {
+        lockDesktop: useWorkingCopyStore.getState().lockDesktop,
+        clearStale: vi.fn(),
+        setTouchLayoutJson: vi.fn(),
+        instantiateFromBase: vi.fn(),
+        instantiateFromExisting: vi.fn(),
+        buildTouchLayoutJson: vi.fn().mockReturnValue({ json: "{}", warnings: [] }),
+        resolveBaseTouchJson: vi.fn().mockReturnValue(undefined),
+        instantiateFromBaseIfConfirmed: vi.fn().mockReturnValue(true),
+      };
+      applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps);
+    };
+
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />,
+      );
+    });
+
+    // Every non-last character: Apply (the deadkey method is pre-selected by
+    // default for a decomposable accented char, §3c default-fill — Apply is
+    // enabled immediately without further input) then Next.
+    for (const ch of DECLARED_CHARS.slice(0, -1)) {
+      const applyBtn = screen.getByRole("button", {
+        name: new RegExp(`Apply method for ${ch}`, "i"),
+      });
+      expect((applyBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(applyBtn);
+      await waitFor(() => {
+        const nextBtn = screen.getByRole("button", { name: /Next character/i });
+        expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
+        fireEvent.click(nextBtn);
+      });
+    }
+
+    // The last character's forward button reads "Done" — Apply, then Done
+    // fires onComplete (which runs the real R1 lock reducer above).
+    const lastChar = DECLARED_CHARS[DECLARED_CHARS.length - 1]!;
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: new RegExp(`Apply method for ${lastChar}`, "i"),
+      }),
+    );
+    await waitFor(() => {
+      const doneBtn = screen.getByRole("button", { name: "Done" });
+      expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(doneBtn);
+    });
+
+    expect(completionFired).toBe(true);
+
+    // FR-006/AS-5 coverage: every declared character has at least one
+    // recorded individual-scope MechanismAssignment — the gallery does not
+    // silently leave a declared character unassigned.
+    const assignments = getPhaseCPhysicalAssignments();
+    for (const ch of DECLARED_CHARS) {
+      expect(
+        assignments.some((a) => a.scope === "individual" && a.target === ch),
+        `expected an individual-scope MechanismAssignment for declared character "${ch}"`,
+      ).toBe(true);
+    }
+
+    // AS-5 auto-lock: reaching completion locks the desktop layout. This is
+    // the FUNCTIONAL auto-lock only — no lock-button UI is asserted here (it
+    // is deliberately deferred).
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(true);
+  });
+
+  it("does NOT lock the desktop if completion is never reached (fewer than all declared characters assigned)", async () => {
+    const DECLARED_CHARS = ["á", "é"];
+    seedInventory(DECLARED_CHARS);
+    const onComplete = vi.fn();
+
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />,
+      );
+    });
+
+    // Apply only the first character; do not advance to / complete the last.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Apply method for á/i }),
+    );
+
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// "Enter my own character..." custom key option + U+ notation in character
+// boxes — feature coverage for the key-picker dropdowns (S-01 swap, S-08
+// ralt, S-02 deadkey trigger) and the deadkeyBaseLetter character box.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — custom key option (S-01 swap)", () => {
+  it("selecting 'Enter my own character...' reveals a custom text input", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), CUSTOM_KEY_OPTION_VALUE);
+    expect(
+      screen.getByLabelText(/Custom character for simple swap key/i),
+    ).toBeTruthy();
+  });
+
+  it("a custom literal character resolves to a vkey and Apply records the mapped key", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), CUSTOM_KEY_OPTION_VALUE);
+    fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
+      target: { value: "z" },
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for ẑ/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(addBtn);
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      "+ [K_Z] > U+1E91",
+    );
+  });
+
+  it("custom U+ notation resolves through to the mapped key and shows the resolved character", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), CUSTOM_KEY_OPTION_VALUE);
+    fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
+      target: { value: "U+007A" },
+    });
+    // Feedback line shows the raw notation, the resolved char, and the vkey.
+    expect(screen.getByText("U+007A → z → K_Z")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for ẑ/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      "+ [K_Z] > U+1E91",
+    );
+  });
+
+  it("an unmappable custom character shows an error and blocks Apply", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), CUSTOM_KEY_OPTION_VALUE);
+    fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
+      target: { value: "é" },
+    });
+    expect(
+      screen.getByText(/Cannot map 'é' to a physical key — pick a key from the list instead\./i),
+    ).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for ẑ/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("invalid U+ notation blocks Apply", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), CUSTOM_KEY_OPTION_VALUE);
+    fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
+      target: { value: "U+ZZZZ" },
+    });
+    expect(screen.getByText(/Not a valid Unicode value/i)).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for ẑ/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("tapping a key in the OSK preview while custom mode is active exits custom mode and clears the stale custom text", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      // Flush the patterns-loading microtasks so GalleryPreviewWithPatterns
+      // (and the mocked OSKFrame's tap button) mounts.
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), CUSTOM_KEY_OPTION_VALUE);
+    expect(
+      screen.getByLabelText(/Custom character for simple swap key/i),
+    ).toBeTruthy();
+
+    // Type some (possibly-invalid) custom text before the tap — this is the
+    // stale state that must NOT survive a tap-to-select.
+    fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
+      target: { value: "zz" },
+    });
+
+    // The OSKFrame mock's "tap-K_E" button simulates an OSK key tap.
+    fireEvent.click(screen.getByRole("button", { name: "tap-K_E" }));
+
+    // Custom mode is exited — the select now shows K_E and the custom input
+    // is gone.
+    expect(
+      screen.queryByLabelText(/Custom character for simple swap key/i),
+    ).toBeNull();
+    expect(
+      selectMenuValue(screen.getByLabelText(/Physical key for simple swap/i)),
+    ).toBe("K_E");
+
+    // Re-opening "Enter my own character..." starts clean — the paired
+    // custom-char state was cleared by the tap, not left stale from before.
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), CUSTOM_KEY_OPTION_VALUE);
+    expect(
+      (screen.getByLabelText(/Custom character for simple swap key/i) as HTMLInputElement).value,
+    ).toBe("");
+  });
+});
+
+describe("MechanismGallery — custom key option (S-02 deadkey trigger)", () => {
+  it("a custom trigger character maps to its vkey, and deadkeyName/accentChar never fall back to 'dead0'", async () => {
+    // "a" is not one of the 4 built-in DEADKEY_OPTIONS trigger keys, so this
+    // exercises the custom-trigger path exclusively — deadkeyNameFor(triggerKey)
+    // would otherwise return the "dead0" fallback for an unrecognised key id.
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    await changeSelectMenu(screen.getByLabelText(/Trigger key for deadkey/i), CUSTOM_KEY_OPTION_VALUE);
+    fireEvent.change(screen.getByLabelText(/Custom trigger character for deadkey/i), {
+      target: { value: "a" },
+    });
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "a" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for ā/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    const slotValues = assignments[0]?.mechanisms[0]?.slotValues;
+    expect(slotValues?.["triggerKey"]).toBe("K_A");
+    expect(slotValues?.["deadkeyName"]).toBe("0061");
+    expect(slotValues?.["accentChar"]).toBe("a");
+    expect(slotValues?.["deadkeyName"]).not.toBe("dead0");
+  });
+});
+
+describe("MechanismGallery — custom key option (S-08 ralt)", () => {
+  it("a custom base character resolves to its vkey and Apply records the resolved key, never the '__custom__' sentinel", async () => {
+    // RALT must already be a chosen family option in the modifier pool for
+    // "Layer 1 for layer-switch combo" to offer it as a <select> value — see
+    // computeModifierPool. Seed a distinct vkey (K_Q) so it never collides
+    // with the K_W the custom character below resolves to.
+    instantiateWithModifiersInUse("K_Q", ["RALT"]);
+    seedInventory(["ŵ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    await changeSelectMenu(screen.getByLabelText(/Base key for layer-switch combo/i), CUSTOM_KEY_OPTION_VALUE);
+    fireEvent.change(
+      screen.getByLabelText(/Custom character for layer-switch combo base key/i),
+      { target: { value: "w" } },
+    );
+    await changeSelectMenu(screen.getByLabelText(/Layer 1 for layer-switch combo/i), "RALT");
+
+    const addBtn = screen.getByRole("button", { name: /Apply method for ŵ/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(addBtn);
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.patternId).toBe("modifier_as_layer_switch");
+    const altgrKeyList = assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"];
+    // Non-vacuity: the resolved vkey for custom char "w" must appear (proving
+    // the assertion actually depends on resolution, not just that Apply
+    // fired), and the raw "__custom__" sentinel must never leak through —
+    // that leak is exactly the bug this regression test guards against.
+    expect(altgrKeyList).toBe("[RALT K_W]");
+    expect(altgrKeyList).not.toContain(CUSTOM_KEY_OPTION_VALUE);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Delimiter guard (P0) — ASCII straight quotes can't be resolved output
+// characters in deadkeyBaseLetter or the deadkey-trigger custom character
+// (both substitute into an unescaped KMN string literal or JSON block). The
+// SWAP/RALT custom-character key pickers are unaffected — they resolve only
+// to a K_ vkey id. (The sequence method's own Content/Indicator boxes carry
+// the SAME delimiter guard — see SequenceBuilderPanel.tsx's
+// SEQ_CONTENT_RESOLVE_OPTIONS/buildSeqIndicatorResolveOptions — but live in
+// the right pane now, not this gallery's own MethodChooser; see "apply
+// (sequence)" above for their coverage.)
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — delimiter guard (straight quotes)", () => {
+  it("blocks Apply when the deadkey base-letter box resolves to a straight apostrophe", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "'" },
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for ā/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("blocks Apply and shows the steer-to-U+02BC message when the deadkey CUSTOM TRIGGER character resolves to a straight quote", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    await changeSelectMenu(screen.getByLabelText(/Trigger key for deadkey/i), CUSTOM_KEY_OPTION_VALUE);
+    fireEvent.change(screen.getByLabelText(/Custom trigger character for deadkey/i), {
+      target: { value: '"' },
+    });
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "a" },
+    });
+    expect(
+      screen.getByText(/Straight quotes \(' or "\) can't be typed here\. For a glottal stop or saltillo, use U\+02BC or U\+2019\./i),
+    ).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for ā/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("a straight apostrophe in the SWAP custom-character picker still maps to K_QUOTE and is NOT blocked", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), CUSTOM_KEY_OPTION_VALUE);
+    fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
+      target: { value: "'" },
+    });
+    // Bidirectional reflection (Fix 2): a literal custom key char now also
+    // shows its U+ value, ahead of the resolved vkey.
+    expect(screen.getByText("' → U+0027 → K_QUOTE")).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for ẑ/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(addBtn);
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      "+ [K_QUOTE] > U+1E91",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NFC normalization (P1) — a decomposed paste collapses to its precomposed
+// form before it lands in slotValues, matching the deadkey patterns' NFC
+// convention.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Single-grapheme guard (P1) -- deadkeyBaseLetter accepts exactly one
+// grapheme cluster. (The sequence builder's own Content/Indicator boxes have
+// their own resolve-options coverage in SequenceBuilderPanel's own module —
+// this section is scoped to the deadkey base-letter box only.)
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — single-grapheme guard on character boxes", () => {
+  it("rejects a two-character literal paste in the deadkey base-letter box with the 'coming later' reason", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "ab" },
+    });
+    expect(
+      screen.getByText(
+        "Enter one base character. (Covering several base letters with one dead key is coming later.)",
+      ),
+    ).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for ā/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("accepts a base+combining sequence with a precomposed NFC form (n + U+0303 -> ñ) in the deadkey base-letter box", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    // "n" + U+0303 COMBINING TILDE precomposes under NFC to the single code
+    // point U+00F1 (ñ) — one grapheme either way.
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "ñ" },
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for ā/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Multi-token compose (deadkeyBaseLetter) -- space-separated tokens are each
+// independently resolved, then concatenated + NFC-normalized. This section is
+// scoped to the deadkey base-letter box only; the sequence builder's own
+// Content box has its own resolve-options coverage in
+// SequenceBuilderPanel.tsx.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — multi-token compose (deadkey base-letter box)", () => {
+  it("accepts a U+-composed single grapheme in the deadkey base-letter box", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "U+006E U+0303" }, // composes to one grapheme: "n with tilde"
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for ā/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("rejects a two-token compose that does NOT collapse to one grapheme in the deadkey base-letter box", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "a b" }, // two independent tokens, two graphemes
+    });
+    expect(
+      screen.getByText(
+        "Enter one base character. (Covering several base letters with one dead key is coming later.)",
+      ),
+    ).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for ā/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lone-combining-mark caution (P1) — warns but does not block.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — lone combining mark caution on the deadkey base-letter box", () => {
+  it("shows a caution (does not block Apply) when the base letter is a bare combining mark", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "́" }, // bare COMBINING ACUTE ACCENT
+    });
+    expect(
+      screen.getByText(
+        /That looks like a combining mark on its own — the base letter is usually a plain letter\./i,
+      ),
+    ).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for ā/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("does not show the caution for a plain base letter", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "a" },
+    });
+    expect(
+      screen.queryByText(/That looks like a combining mark on its own/i),
+    ).toBeNull();
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// Sentinel leak in preview text (P1 QC finding) — the raw "__custom__"
+// sentinel must never be interpolated into "Press X, then Y" when the
+// deadkey trigger picker is in custom mode but not yet resolved.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — no sentinel leak in the deadkey preview line", () => {
+  it("shows a neutral placeholder instead of the raw '__custom__' sentinel when custom trigger mode is unresolved", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    await changeSelectMenu(screen.getByLabelText(/Trigger key for deadkey/i), CUSTOM_KEY_OPTION_VALUE);
+    // No custom character typed yet — customChar is empty, so
+    // resolveKeyPickerSelection resolves to customError, not customOk.
+    expect(screen.queryByText(/__custom__/)).toBeNull();
+    expect(screen.getByText(/Press \[trigger key\], then/i)).toBeTruthy();
+  });
+
+  it("shows a neutral placeholder when the custom trigger character is unmappable (customError)", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    await changeSelectMenu(screen.getByLabelText(/Trigger key for deadkey/i), CUSTOM_KEY_OPTION_VALUE);
+    fireEvent.change(screen.getByLabelText(/Custom trigger character for deadkey/i), {
+      target: { value: "é" },
+    });
+    expect(screen.queryByText(/__custom__/)).toBeNull();
+    expect(screen.getByText(/Press \[trigger key\], then/i)).toBeTruthy();
+  });
+
+  it("shows the resolved character (not the sentinel or placeholder) once the custom trigger resolves", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    await changeSelectMenu(screen.getByLabelText(/Trigger key for deadkey/i), CUSTOM_KEY_OPTION_VALUE);
+    fireEvent.change(screen.getByLabelText(/Custom trigger character for deadkey/i), {
+      target: { value: "a" },
+    });
+    expect(screen.queryByText(/__custom__/)).toBeNull();
+    expect(screen.queryByText(/\[trigger key\]/)).toBeNull();
+    expect(screen.getByText(/Press a, then/i)).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Accessible feedback — live-region roles on custom-input validation
+// feedback (P1 QC finding). Screen-reader users must hear an error/success
+// hint when it appears while focus stays in the input.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — accessible live-region roles on validation feedback", () => {
+  it("marks the lone-combining-mark caution as a polite status region (deadkey base-letter box)", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "́" }, // bare COMBINING ACUTE ACCENT
+    });
+    const caution = screen.getByText(
+      /That looks like a combining mark on its own — the base letter is usually a plain letter\./i,
+    );
+    expect(caution.getAttribute("role")).toBe("status");
+    expect(caution.getAttribute("aria-live")).toBe("polite");
+  });
+
+  it("marks the KeyPickerField custom-resolution reflection as a polite status region (SWAP custom key)", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), CUSTOM_KEY_OPTION_VALUE);
+    fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
+      target: { value: "z" },
+    });
+    // Bidirectional reflection (Fix 2): a literal custom key char now also
+    // shows its U+ value, ahead of the resolved vkey.
+    const hint = screen.getByText("z → U+007A → K_Z");
+    expect(hint.getAttribute("role")).toBe("status");
+    expect(hint.getAttribute("aria-live")).toBe("polite");
+  });
+
+  it("marks the KeyPickerField custom-resolution error as an alert region (SWAP custom key)", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), CUSTOM_KEY_OPTION_VALUE);
+    fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
+      target: { value: "é" },
+    });
+    const error = screen.getByText(
+      /Cannot map 'é' to a physical key — pick a key from the list instead\./i,
+    );
+    expect(error.getAttribute("role")).toBe("alert");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// No in-box placeholders (Fix 1) — placeholder text was distracting inside
+// the character boxes and the KeyPickerField custom-character inputs.
+// Guidance now lives OUTSIDE the box: one caption near the method chooser
+// (character boxes) and one line inside KeyPickerField shown only while its
+// custom-input mode is active.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — no in-box placeholders (Fix 1)", () => {
+  it("the deadkey base-letter box carries no placeholder attribute", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    expect(screen.getByLabelText(/Base letter for deadkey/i).getAttribute("placeholder")).toBeNull();
+  });
+
+  it("the SWAP custom key input carries no placeholder attribute", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), CUSTOM_KEY_OPTION_VALUE);
+    const input = screen.getByLabelText(/Custom character for simple swap key/i);
+    expect(input.getAttribute("placeholder")).toBeNull();
+  });
+
+  it("the RALT custom key input carries no placeholder attribute", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    await changeSelectMenu(screen.getByLabelText(/Base key for layer-switch combo/i), CUSTOM_KEY_OPTION_VALUE);
+    const input = screen.getByLabelText(/Custom character for layer-switch combo base key/i);
+    expect(input.getAttribute("placeholder")).toBeNull();
+  });
+
+  it("the deadkey trigger custom input carries no placeholder attribute", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    await changeSelectMenu(screen.getByLabelText(/Trigger key for deadkey/i), CUSTOM_KEY_OPTION_VALUE);
+    const input = screen.getByLabelText(/Custom trigger character for deadkey/i);
+    expect(input.getAttribute("placeholder")).toBeNull();
+  });
+
+  it("shows a single character-box help caption near the method chooser, not repeated per box", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(
+      screen.getAllByText(
+        "Type a character, or a Unicode value like U+00E9. Combine composed parts with spaces, e.g. U+006E U+0303.",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("shows the unrelated KeyPickerField custom-input help line only once custom mode is active (SWAP key)", async () => {
+    // Fix 1's method-chooser caption (CHAR_BOX_HELP_TEXT) and KeyPickerField's
+    // own custom-input help line (CUSTOM_INPUT_HELP_TEXT) are two DIFFERENT
+    // constants with different copy since the sequence/deadkey character
+    // boxes were relaxed to multi-token/multi-character — only the
+    // KeyPickerField line (unaffected: the key-picker custom-char path stays
+    // single-character) should appear once custom mode activates.
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    expect(
+      screen.queryByText("Type a character directly, or a Unicode value like U+00E9."),
+    ).toBeNull();
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), CUSTOM_KEY_OPTION_VALUE);
+    expect(
+      screen.getAllByText("Type a character directly, or a Unicode value like U+00E9."),
+    ).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Real-interaction regression (bug report: "I can't click my cursor into any
+// of the fields and type") — uses @testing-library/user-event, which
+// simulates a genuine click-to-focus + per-character keydown/input/keyup
+// sequence (unlike fireEvent.change, which sets a value directly and would
+// pass even if the input never accepted real focus/keystrokes). Proves the
+// Content/Indicator boxes actually accept focus and typed input end to end,
+// through the full gallery (method-card click -> builder mount -> type).
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — sequence builder accepts real click+type (user-event)", () => {
+  it("clicking into Content and Indicator and typing updates their values and the combine-preview", async () => {
+    seedInventory(["á"]);
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+
+    const contentInput = screen.getByTestId("sequences-content") as HTMLInputElement;
+    const indicatorInput = screen.getByTestId("sequences-indicator") as HTMLInputElement;
+
+    await user.click(contentInput);
+    await user.type(contentInput, "a");
+    expect(contentInput.value).toBe("a");
+    expect(document.activeElement).toBe(contentInput);
+
+    await user.click(indicatorInput);
+    await user.type(indicatorInput, "s");
+    expect(indicatorInput.value).toBe("s");
+    expect(document.activeElement).toBe(indicatorInput);
+
+    // Combine-preview reflects both typed values.
+    expect(screen.getByText(/a \+ s/)).toBeTruthy();
+
+    const applyBtn = screen.getByTestId("sequences-apply") as HTMLButtonElement;
+    expect(applyBtn.disabled).toBe(false);
   });
 });

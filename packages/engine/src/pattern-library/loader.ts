@@ -1,10 +1,17 @@
 import { parse } from "yaml";
 import { PatternSchema } from "./patternSchema.js";
-import type { RawPattern } from "./patternSchema.js";
 import { runAllChecks } from "../validator/index.js";
-import { makePattern } from "@keyboard-studio/contracts";
-import type { Pattern, PatternCategory, StrategyId, DemoObject } from "@keyboard-studio/contracts";
+import { toPattern } from "@keyboard-studio/contracts";
+import type { Pattern } from "@keyboard-studio/contracts";
 import type { PatternFilter, LoadReport } from "./types.js";
+
+// Re-exported so `@keyboard-studio/engine`'s main entry (and the
+// `pattern-library/index.js` barrel) keep resolving `toPattern` unchanged.
+// The single implementation now lives in `@keyboard-studio/contracts`
+// (schemas.ts, next to RawPatternSchema) so the node loader here and the
+// studio's browser loader (`studio/src/lib/browserPatternLibrary.ts`) share
+// one RawPattern -> Pattern mapping instead of maintaining copies.
+export { toPattern };
 
 /** In-memory cache populated by the last successful {@link loadPatterns} call. */
 let _cache: Pattern[] = [];
@@ -215,68 +222,3 @@ async function collectYamlFiles(
     });
 }
 
-// Convenience alias for the provenance item type used in PatternInit.
-type ProvenanceItem = { keyboard: string; rule?: string; notes?: string };
-
-/**
- * Map a validated {@link RawPattern} to the contracts {@link Pattern} shape
- * by delegating to {@link makePattern}, which handles all optional-field
- * spreading internally (satisfying `exactOptionalPropertyTypes`).
- *
- * Each optional field is hoisted into a typed local before being passed so
- * that `exactOptionalPropertyTypes` sees a narrowed non-undefined value
- * rather than `T | undefined`.
- *
- * Exported (not just used internally) so the studio's browser pattern
- * library — which loads the same YAML via `import.meta.glob` instead of
- * `node:fs` — can share this mapping instead of re-implementing it. This
- * function has no `node:fs`/`node:path` dependency, so re-exporting it from
- * the engine's main entry does not pull Node-only code into the browser
- * bundle (unlike {@link loadPatterns}, whose fs/path use is behind a dynamic
- * `import()` and never invoked from the browser).
- */
-export function toPattern(data: RawPattern): Pattern {
-  // Required fields — always present after schema validation.
-  const base = {
-    id: String(data.id),
-    title: String(data.title),
-    description: String(data.description),
-    category: data.category as PatternCategory,
-    appliesTo: data.appliesTo,
-    questions: data.questions as Parameters<typeof makePattern>[0]["questions"],
-    kmnFragment: data.kmnFragment,
-    tests: data.tests as Parameters<typeof makePattern>[0]["tests"],
-    validatedForFamilies: data.validatedForFamilies,
-    sourceKeyboards: data.sourceKeyboards,
-    reviewedBy: String(data.reviewedBy),
-    reviewDate: String(data.reviewDate),
-  };
-
-  // Optional fields — each narrowed to its non-undefined type so the spread
-  // satisfies exactOptionalPropertyTypes on PatternInit.
-  const strategyId = data.strategyId as StrategyId | undefined;
-  const combinesWith = data.combinesWith as StrategyId[] | undefined;
-  const provenance = data.provenance as ProvenanceItem[] | undefined;
-  const demo = data.demo as string | DemoObject | null | undefined;
-
-  return makePattern({
-    ...base,
-    ...(strategyId !== undefined ? { strategyId } : {}),
-    ...(combinesWith !== undefined ? { combinesWith } : {}),
-    // null (authored "no fragment") and undefined both coerce to omitted —
-    // Pattern types these as `?: string`, so only a real string is forwarded.
-    ...(typeof data.touchLayoutFragment === "string"
-      ? { touchLayoutFragment: data.touchLayoutFragment }
-      : {}),
-    ...(typeof data.reorderRules === "string" ? { reorderRules: data.reorderRules } : {}),
-    ...(data.frequencyInCorpus !== undefined
-      ? { frequencyInCorpus: data.frequencyInCorpus }
-      : {}),
-    ...(provenance !== undefined ? { provenance } : {}),
-    ...(demo !== undefined ? { demo } : {}),
-    ...(data.group_visibility !== undefined
-      ? { group_visibility: data.group_visibility }
-      : {}),
-    ...(data.priority !== undefined ? { priority: data.priority } : {}),
-  });
-}

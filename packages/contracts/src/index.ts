@@ -8,6 +8,7 @@ export * from "./axes";
 export * from "./axisFill";
 export * from "./baseKeyboard";
 export * from "./compileResult";
+export * from "./confirmedAlphabet";
 export * from "./criteria";
 export * from "./keyboard-ir";
 export * from "./keyboardId";
@@ -53,6 +54,8 @@ export * from "./validator";
 // ---------------------------------------------------------------------------
 export * from "./ir/producedSet";
 export * from "./keyboardIRRoundTrip";
+export * from "./touch-coverage";
+export * from "./parseTouchLayout";
 
 // ---------------------------------------------------------------------------
 // IRPath — typed key-path over KeyboardIR (P2 contract, FR-012).
@@ -65,6 +68,7 @@ export * from "./ir-path";
 // Utilities — shared pure helpers consumed across packages.
 // ---------------------------------------------------------------------------
 export * from "./utils/charUtils";
+export * from "./utils/bcp47";
 
 // ---------------------------------------------------------------------------
 // Loader / data — modules that load checked-in data files (criteria.json) and

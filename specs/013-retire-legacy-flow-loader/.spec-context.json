@@ -1,0 +1,9 @@
+{
+  "workflow": "speckit",
+  "specName": "013-retire-legacy-flow-loader",
+  "branch": "013-retire-legacy-flow-loader",
+  "selectedAt": "2026-07-13T16:25:12.865Z",
+  "currentStep": "specify",
+  "status": "draft",
+  "history": []
+}

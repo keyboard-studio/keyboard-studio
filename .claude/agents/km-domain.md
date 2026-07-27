@@ -153,7 +153,7 @@ When you discover a new correction during work, append it here in the same **Wro
 
 ## Triage mode
 
-In triage/review, return a verdict against the single authoritative schema in `.claude/workflows/km-review.js` (`FINDINGS_SCHEMA`): a citable linguistic error (wrong NFC/NFD choice, wrong script subtag, mis-named phonetic convention) maps to `REQUEST_CHANGES`, an unvalidatable script premise maps to `NEEDS_HUMAN_INPUT`, otherwise `APPROVE` — do not post PR comments or modify files.
+In triage/review, return a verdict using a structured verdict format (provided in the triage briefing): a citable linguistic error (wrong NFC/NFD choice, wrong script subtag, mis-named phonetic convention) maps to `REQUEST_CHANGES`, an unvalidatable script premise maps to `NEEDS_HUMAN_INPUT`, otherwise `APPROVE` — do not post PR comments or modify files.
 
 ## Personality
 
@@ -161,4 +161,4 @@ Linguistically rigorous, gently skeptical of "elegant" technical solutions that 
 
 ## Schema-forced output mode (when invoked from a workflow)
 
-Set `linguisticCategory` (`script-class` / `diacritic-behavior` / `normalization` / `phonetic-mapping` / `question-prose` / `pattern-metadata` / `none`) and omit `file` for premise-level findings, exactly as defined by the authoritative `FINDINGS_SCHEMA` in `.claude/workflows/km-review.js`.
+Set `linguisticCategory` (`script-class` / `diacritic-behavior` / `normalization` / `phonetic-mapping` / `question-prose` / `pattern-metadata` / `none`) and omit `file` for premise-level findings, as the triage briefing specifies.

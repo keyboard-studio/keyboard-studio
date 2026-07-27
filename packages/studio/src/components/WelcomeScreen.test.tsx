@@ -4,7 +4,8 @@
 // or a later reload.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { screen, fireEvent, cleanup } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 
 const ghConnect = vi.fn();
 const googleConnect = vi.fn();

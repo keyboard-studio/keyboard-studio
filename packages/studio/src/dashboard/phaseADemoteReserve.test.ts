@@ -1,80 +1,83 @@
-// Spec 022 — reserve-node + reachability assertions for the demoted Phase A
-// (FR-001 / FR-003 / SC-001 and FR-009; additive — does NOT repurpose the
-// spec-015 buildStepGraph.test.ts or the spec-016 driftGuardrail.test.ts).
+// Spec 022 — demoted-Phase-A placement assertions (FR-001 / FR-003 / SC-001 and
+// FR-009; additive — does NOT repurpose the spec-015 buildStepGraph.test.ts or the
+// spec-016 driftGuardrail.test.ts).
 //
 // The orphaned full non-identity Phase A (15 identity + 15 provenance_*) is
-// demoted to the inert library. computeReserveNodes renders a registry module as a
-// `library-not-in-flow` reserve node whenever it is in the registry but NOT in a
-// flow's live ordering (reserveIds = registryKeys − liveIds). The identity-lite
-// flow (the CANONICAL identity experience) lists only the 5 il_* modules, so its
-// drill-down already emits every Phase A module as a reserve node via the SAME
-// computeReserveNodes mechanism the migration plan reserves for library content
-// (§2.2(a)). This locks that:
-//   • every demoted Phase A id renders as kind:"library-not-in-flow",
-//     region:"not-yet-ordered", isTerminal:true (FR-003);
-//   • it is absent from the identity-lite flow's LIVE ordering (FR-001 / SC-001);
-//   • it is registered (no-delete) so it is reserve, NOT orphan (FR-009).
+// physically relocated to the dedicated reserve/ folder and reserveRegistry.
+// Originally (spec 022) this rendered as reserve clog INSIDE the identity-lite
+// drill-down, because identity_lite shared the full phaseARegistry. That has
+// since been moved: identity_lite's phaseARegistry now holds ONLY the il_*
+// modules (steps/flowSources.ts), so its drill-down carries NO reserve nodes,
+// and the demoted battery surfaces in the Flow Map's dedicated Leftover section
+// (buildLeftoverSection, sourced from reserveRegistry) — kept for reference /
+// future reuse, never run by the live survey and never clogging a live flow.
 //
-// Resolved (Stage 1, spec 024 / ADR-0001): the FULL demotion is now realized.
-// FLOW_SOURCES has been retired from renderedNodeSet.ts; phase_a_identity carries
-// status:"proposed" in steps/flowSources.ts, which excludes it from all live
-// drill-downs. There is no separate FLOW_SOURCES list to drift. The reserve
-// RENDERING asserted below remains correct — identity-lite's drill-down still
-// emits all Phase A modules as library-not-in-flow reserve nodes.
+// This locks:
+//   • every demoted Phase A id renders as a Leftover node — kind:"library-not-in-flow",
+//     region:"leftover", isTerminal:true (FR-003);
+//   • it is ABSENT from the identity-lite drill-down as wired in production —
+//     neither live nor reserve (FR-001 / SC-001);
+//   • it is registered (no-delete) so it is leftover/reserve, NOT orphan (FR-009).
 //
 // Test-only: no contracts bump, no write routing, no flag flip (FR-010/FR-011).
 
 import { describe, it, expect } from "vitest";
 
-import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
 import phaseAModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
 import { buildModularFlowGraph } from "./buildStepGraph.ts";
+import { buildLeftoverSection } from "./renderedNodeSet.ts";
 import { loadModularFlow } from "../survey/loadModularFlow.ts";
-import { phaseARegistry } from "../survey/questions/registry.a.ts";
+import { flowSources } from "../steps/flowSources.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 // The demoted-Phase-A id list is derived ONCE from phase_a_identity.modular.yaml
 // (shared with noDeleteGuardrail.test.ts) — single source of truth.
 import { DEMOTED_PHASE_A } from "../survey/questions/demotedPhaseA.fixture.ts";
 
-describe("spec 022 — demoted Phase A renders as reserve nodes (FR-001/FR-003/SC-001)", () => {
-  const graph = buildModularFlowGraph(
-    identityLiteModularRaw,
-    "Identity-lite (Phase A head)",
-    phaseARegistry,
+describe("spec 022 — demoted Phase A is Leftover, not clog (FR-001/FR-003/SC-001)", () => {
+  // The identity-lite drill-down as wired in PRODUCTION (its real flowSources
+  // registry — now the il_*-only phaseARegistry).
+  const identityLite = flowSources["identity_lite"]!;
+  const identityGraph = buildModularFlowGraph(
+    identityLite.raw,
+    identityLite.title,
+    identityLite.registry,
   );
 
-  const reserveById = new Map(
-    graph.nodes
-      .filter((n) => n.kind === "library-not-in-flow")
-      .map((n) => [n.id, n]),
-  );
+  // The dedicated Leftover section: registered questions used by no live flow.
+  const leftoverById = new Map(buildLeftoverSection().map((n) => [n.id, n]));
 
-  it("FR-003: every demoted Phase A id renders as a library-not-in-flow reserve node", () => {
+  it("FR-003: every demoted Phase A id renders as a Leftover node (region:'leftover')", () => {
     for (const id of DEMOTED_PHASE_A) {
-      const node = reserveById.get(id);
-      expect(node, `demoted Phase A id "${id}" not rendered as a reserve node`).toBeDefined();
+      const node = leftoverById.get(id);
+      expect(node, `demoted Phase A id "${id}" not rendered as a Leftover node`).toBeDefined();
       expect(node!.kind).toBe("library-not-in-flow");
-      expect(node!.region).toBe("not-yet-ordered");
+      expect(node!.region).toBe("leftover");
       expect(node!.isTerminal).toBe(true);
     }
   });
 
-  it("FR-001/SC-001: demoted Phase A ids are ABSENT from the identity-lite live ordering", () => {
-    const liveIds = new Set(
-      graph.nodes.filter((n) => n.kind === "live").map((n) => n.id),
-    );
+  it("FR-001/SC-001: demoted Phase A ids are ABSENT from the production identity-lite drill-down", () => {
+    const drillDownIds = new Set(identityGraph.nodes.map((n) => n.id));
     for (const id of DEMOTED_PHASE_A) {
-      expect(liveIds.has(id), `demoted id "${id}" must NOT be a live node`).toBe(false);
+      expect(
+        drillDownIds.has(id),
+        `demoted id "${id}" must not appear (live OR reserve) in the identity-lite drill-down`,
+      ).toBe(false);
     }
   });
 
-  it("FR-009: demoted Phase A ids are RESERVE, not orphan — registered but off the live ordering", () => {
+  it("the live identity-lite drill-down carries NO reserve clog at all", () => {
+    const reserveNodes = identityGraph.nodes.filter((n) => n.kind === "library-not-in-flow");
+    expect(reserveNodes).toEqual([]);
+  });
+
+  it("FR-009: demoted Phase A ids are LEFTOVER, not orphan — registered but off every live flow", () => {
     for (const id of DEMOTED_PHASE_A) {
       // registered (no-delete) ...
       expect(Object.prototype.hasOwnProperty.call(questionRegistry, id)).toBe(true);
-      // ... and rendered by the SEPARATE reserve mechanism (so the 016 bijection,
-      // which is over the reachable set, excludes it — reserve, not orphan).
-      expect(reserveById.has(id)).toBe(true);
+      // ... and rendered by the SEPARATE Leftover mechanism (so the 016 bijection,
+      // which is over the reachable set, excludes it — leftover, not orphan).
+      expect(leftoverById.has(id)).toBe(true);
     }
   });
 

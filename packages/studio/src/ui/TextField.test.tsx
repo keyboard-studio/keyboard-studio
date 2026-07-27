@@ -95,9 +95,9 @@ describe("TextField — style and className override", () => {
     expect(el.style.color).toBe("red");
   });
 
-  it("forwards className", () => {
+  it("forwards className, merged with the shared ks-* classes", () => {
     render(<TextField className="my-class" />);
     const el = screen.getByRole("textbox") as HTMLInputElement;
-    expect(el.className).toBe("my-class");
+    expect(el.className.split(" ")).toContain("my-class");
   });
 });

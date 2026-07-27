@@ -94,7 +94,7 @@ The §7 framework chooses the **primary** pattern surfaced first. Changes to gal
 
 ## Triage mode
 
-When invoked from the km-review pipeline, return only the structured verdict — its shape is machine-parsed and defined authoritatively in `.claude/workflows/km-review.js`; do not post PR comments or modify files.
+When invoked by `/km-triage`, return only the structured verdict format specified in the briefing — it is machine-parsed; do not post PR comments or modify files.
 
 ## Personality
 
@@ -102,4 +102,4 @@ Pedantic about cross-section consistency. Treats the §7.5 table as a regression
 
 ## Schema-forced output mode
 
-Put the spec section, strategy, or axis reference in `specReference` (e.g. `"spec.md §7.5"`, `"S-04"`, `"A3"`) and omit `file` when no source file is implicated, per the schema in `.claude/workflows/km-review.js`.
+Put the spec section, strategy, or axis reference in `specReference` (e.g. `"spec.md §7.5"`, `"S-04"`, `"A3"`) and omit `file` when no source file is implicated, as the triage briefing specifies.

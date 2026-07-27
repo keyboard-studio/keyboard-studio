@@ -34,6 +34,7 @@ import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
 import { TrackOneIdentityPanel } from "../panels/TrackOneIdentityPanel.tsx";
 import { BaseResolution } from "../panels/BaseResolution.tsx";
 import type { SuggestTarget } from "../../lib/suggestBase.ts";
+import { useBasePreviewStatusStore } from "../../stores/basePreviewStatusStore.ts";
 import {
   IdentityLite,
   extractIdentityLite,
@@ -133,24 +134,34 @@ export function TrackOneIdentityPanelAdapter(_props: EditorStepProps) {
 }
 
 // ---------------------------------------------------------------------------
-// BaseResolutionAdapter (updated for Stage 5)
+// BaseResolutionAdapter (preview-before-commit)
 //
-// Writes setLocalBase to surveySessionStore BEFORE calling onComplete so the
-// golden-walk mutation ordering is: setLocalBase → onComplete → (host) advance.
+// BaseResolution now separates PREVIEW (every search-result / suggestion-card
+// click) from COMMIT (the single "Choose this keyboard" button). Preview
+// writes setLocalBase (which drives the live compile pipeline in StudioShell)
+// and clears baseConfirmed WITHOUT calling onComplete — the wizard does not
+// advance and the working copy is not instantiated. Commit sets
+// baseConfirmed=true (which arms StudioShell's single-instantiation effect,
+// see StudioShell.tsx) BEFORE calling onComplete, preserving the R7
+// "writes before advance" ordering.
 // ---------------------------------------------------------------------------
 
 /**
  * Adapter for BaseResolution. Reads the suggest target from the
  * surveySessionStore's identityResult (written by IdentityLiteAdapter's
- * setIdentityResult before this step is reached) and passes the resolved
- * BaseKeyboard as the step result.
+ * setIdentityResult before this step is reached).
  *
- * T-Stage5: calls setLocalBase (surveySessionStore) before onComplete to
- * reproduce the pre-Stage-5 handleBaseResolved mutation ordering.
+ * previewStatus is read from basePreviewStatusStore (published by
+ * StudioShell's SurveyView) so this adapter never imports useKeyboardArtifact
+ * or the compile pipeline directly.
  */
 export function BaseResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
   const identityResult = useSurveySessionStore((s) => s.identityResult);
+  const localBase = useSurveySessionStore((s) => s.localBase);
   const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
+  const setBaseConfirmed = useSurveySessionStore((s) => s.setBaseConfirmed);
+
+  const previewStatus = useBasePreviewStatusStore((s) => s.status);
 
   // `||` not `??`: prefill.script can be "" (no script selected for an
   // unrecognized language), which must also fall back.
@@ -162,10 +173,20 @@ export function BaseResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
   return (
     <BaseResolution
       target={target}
-      onResolved={(base) => {
-        // R7: setLocalBase fires before onComplete → host → advance.
+      previewedBase={localBase}
+      previewStatus={previewStatus}
+      onPreview={(base) => {
+        // A fresh preview re-arms the commit gate — any prior confirmation
+        // no longer applies to a DIFFERENT (or cleared) base.
+        setBaseConfirmed(false);
         setLocalBase(base);
-        onComplete({ base });
+      }}
+      onConfirm={() => {
+        if (localBase) {
+          // R7: setBaseConfirmed fires before onComplete → host → advance.
+          setBaseConfirmed(true);
+          onComplete({ base: localBase });
+        }
       }}
       {...(onBack ? { onBack } : {})}
     />

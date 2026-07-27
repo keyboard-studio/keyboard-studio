@@ -32,6 +32,7 @@ derivations:
 consumers:
   prefills:
     - pa_primary_target
+    - q_ip2_keep_device_targets
   proposes:
     - "mechanism-gallery:per-modality-ordering"
     - "scaffolder:touch-layer-inclusion"

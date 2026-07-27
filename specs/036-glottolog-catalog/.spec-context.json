@@ -1,0 +1,18 @@
+{
+  "workflow": "speckit",
+  "specName": "036-glottolog-catalog",
+  "branch": "036-glottolog-catalog",
+  "selectedAt": "2026-07-15T04:57:38.738Z",
+  "currentStep": "specify",
+  "status": "archived",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-15T04:57:48.744Z"
+    }
+  ],
+  "telemetryInstanceId": "eb1d3a20-beef-4586-b90e-ca2d78c2447d"
+}

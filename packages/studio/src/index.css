@@ -43,7 +43,40 @@
   --sil-orange-dark:   var(--amber-text);
   --sil-green:         #509E2F;
   --sil-green-dark:    #38751C;
+
+  /* Shared control conventions (issue #536) */
+  --control-h:         34px;
+  --app-accent-ring:   rgba(90, 167, 240, 0.45);
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--ui); }
+
+/* Shared control conventions (issue #536) ---------------------------------
+ * .ks-control      — single-line inputs/selects are sized to --control-h.
+ * .ks-focus-ring   — consistent keyboard-focus indicator across every
+ *                     interactive control (inputs, selects, buttons,
+ *                     comboboxes); uses --app-accent-ring so a host-page
+ *                     theme change propagates automatically.
+ * .ks-hit-target   — bumps the effective hit area to >=44px on coarse
+ *                     (touch) pointers only, leaving the compact desktop
+ *                     visual (--control-h / native padding) untouched for
+ *                     mouse/trackpad users.
+ * These are additive utility classes — they never replace a component's own
+ * inline styles, only supplement them (focus/touch cannot be expressed via
+ * an inline `style` object). */
+.ks-control {
+  height: var(--control-h);
+}
+
+.ks-focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--app-accent-ring);
+  border-color: var(--app-accent);
+}
+
+@media (pointer: coarse) {
+  .ks-hit-target {
+    min-height: 44px;
+  }
+}

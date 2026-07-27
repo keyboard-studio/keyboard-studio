@@ -14,8 +14,10 @@
 //   - download filename
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
+import { screen, fireEvent, act, cleanup } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore";
+import { TOUCH_STEP_ID } from "../steps/reducer";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { Stage } from "../hooks/useKeyboardArtifact";
@@ -119,6 +121,22 @@ import { OutputScreen } from "./OutputScreen.tsx";
 // Minimal valid ZIP file signature (empty ZIP, 22 bytes)
 const EMPTY_ZIP_BYTES = new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
+/** Render helper — OutputScreen uses Lingui Trans/t macros (useLingui()),
+ * which require an I18nProvider ancestor. All OutputScreen render call-sites
+ * in this file go through this helper so there is exactly one place the
+ * provider is wired up. */
+function renderOutputScreen() {
+  return render(<OutputScreen />);
+}
+
+/** Render helper — PreviewScreen (and its DiagnosticsPanel / OSKFrame /
+ * PickerPane children) also uses Lingui Trans/t macros, which require an
+ * I18nProvider ancestor. All PreviewScreen render call-sites in this file go
+ * through this helper so there is exactly one place the provider is wired up. */
+function renderPreviewScreen() {
+  return render(<PreviewScreen />);
+}
+
 function seedInstantiatedWorkingCopy() {
   const vfs = createVirtualFS([
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
@@ -157,25 +175,25 @@ afterEach(() => {
 
 describe("PreviewScreen — route-split AC", () => {
   it("renders the OSK frame (osk-frame testid)", () => {
-    render(<PreviewScreen />);
+    renderPreviewScreen();
     expect(screen.getByTestId("osk-frame")).toBeTruthy();
   });
 
   it("renders DiagnosticsPanel (no-diagnostics message) after base is picked", () => {
-    render(<PreviewScreen />);
+    renderPreviewScreen();
     fireEvent.click(screen.getByTestId("base-picker"));
     // DiagnosticsPanel renders "No compiler diagnostics." when empty.
     expect(screen.getByText(/no compiler diagnostics/i)).toBeTruthy();
   });
 
   it("does NOT render a Download .zip button", () => {
-    render(<PreviewScreen />);
+    renderPreviewScreen();
     fireEvent.click(screen.getByTestId("base-picker"));
     expect(screen.queryByRole("button", { name: /download/i })).toBeNull();
   });
 
   it("does NOT render SignUpPanel", () => {
-    render(<PreviewScreen />);
+    renderPreviewScreen();
     fireEvent.click(screen.getByTestId("base-picker"));
     expect(screen.queryByTestId("signup-panel")).toBeNull();
   });
@@ -190,21 +208,119 @@ describe("OutputScreen — route-split AC", () => {
       keyboardId: "basic_kbdus",
       version: "1.0",
     };
-    render(<OutputScreen />);
+    renderOutputScreen();
     fireEvent.click(screen.getByTestId("base-picker"));
     expect(screen.getByRole("button", { name: /download/i })).toBeTruthy();
   });
 
   it("renders SignUpPanel after base is picked", () => {
-    render(<OutputScreen />);
+    renderOutputScreen();
     fireEvent.click(screen.getByTestId("base-picker"));
     expect(screen.getByTestId("signup-panel")).toBeTruthy();
   });
 
   it("does NOT render an interactive OSK (no osk-frame testid)", () => {
-    render(<OutputScreen />);
+    renderOutputScreen();
     fireEvent.click(screen.getByTestId("base-picker"));
     expect(screen.queryByTestId("osk-frame")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — output-time touch-layout staleness gate.
+//
+// A mechanics edit after the Touch step was completed re-opens touch
+// staleness (staleSteps.has(TOUCH_STEP_ID)); MechanismGallery.handleUnlock
+// only marks "touch" stale when touchLayoutJson !== null, so this predicate
+// already implies the emitted source/<id>.keyman-touch-layout side-car would
+// be stale. Neither output surface may ship it: both the zip download and the
+// managed-PR submit must refuse-with-explanation while this predicate holds.
+// ---------------------------------------------------------------------------
+
+describe("OutputScreen — output-time touch-layout staleness gate", () => {
+  function renderWithReadyOutput() {
+    seedInstantiatedWorkingCopy();
+    mockSerializeResult.current = {
+      bytes: EMPTY_ZIP_BYTES,
+      warnings: [],
+      keyboardId: "basic_kbdus",
+      version: "1.0",
+    };
+    renderOutputScreen();
+    fireEvent.click(screen.getByTestId("base-picker"));
+  }
+
+  it("disables the download button when staleSteps contains the touch step id", () => {
+    renderWithReadyOutput();
+    act(() => {
+      useWorkingCopyStore.setState({ staleSteps: new Set([TOUCH_STEP_ID]) });
+    });
+
+    const btn = screen.getByTestId("emit-download") as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+
+  it("download button aria-label explains the touch-staleness block", () => {
+    renderWithReadyOutput();
+    act(() => {
+      useWorkingCopyStore.setState({ staleSteps: new Set([TOUCH_STEP_ID]) });
+    });
+
+    expect(
+      screen.getByRole("button", { name: /download unavailable.*touch layout is out of date/i }),
+    ).toBeTruthy();
+  });
+
+  it("renders a role=alert banner explaining the block when touch is stale", () => {
+    renderWithReadyOutput();
+    act(() => {
+      useWorkingCopyStore.setState({ staleSteps: new Set([TOUCH_STEP_ID]) });
+    });
+
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toMatch(/touch step/i);
+    expect(alert.textContent).toMatch(/out of date/i);
+  });
+
+  it("disables the managed-PR submit button when staleSteps contains the touch step id", () => {
+    renderWithReadyOutput();
+    act(() => {
+      useWorkingCopyStore.setState({ staleSteps: new Set([TOUCH_STEP_ID]) });
+    });
+
+    const submitBtn = screen.getByRole("button", {
+      name: /submit unavailable.*touch layout is out of date/i,
+    }) as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(true);
+  });
+
+  it("control: both buttons are enabled when staleSteps does NOT contain the touch step id", () => {
+    renderWithReadyOutput();
+    // Confirm the default (no staleness seeded) leaves both surfaces usable.
+    expect(useWorkingCopyStore.getState().staleSteps.has(TOUCH_STEP_ID)).toBe(false);
+
+    const downloadBtn = screen.getByTestId("emit-download") as HTMLButtonElement;
+    expect(downloadBtn.disabled).toBe(false);
+
+    // The submit button is still gated on its own form validity — fill it in
+    // so this control assertion isolates the staleness gate specifically.
+    const nameInput = screen.getByRole("textbox", { name: /your name/i });
+    fireEvent.change(nameInput, { target: { value: "Jane" } });
+    fireEvent.blur(nameInput);
+    const emailInput = screen.getByRole("textbox", { name: /email address/i });
+    fireEvent.change(emailInput, { target: { value: "jane@example.com" } });
+    fireEvent.blur(emailInput);
+    fireEvent.click(screen.getByRole("checkbox"));
+
+    const submitBtn = screen.getByRole("button", {
+      name: /submit keyboard to community repository/i,
+    }) as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(false);
+  });
+
+  it("does NOT render the staleness banner when touch is not stale", () => {
+    renderWithReadyOutput();
+    expect(screen.queryByText(/touch step/i)).toBeNull();
   });
 });
 
@@ -222,7 +338,7 @@ describe("OutputScreen — projection warnings", () => {
       version: "1.0",
     };
 
-    render(<OutputScreen />);
+    renderOutputScreen();
 
     // Click the base picker to set the base keyboard (renders the Download button).
     fireEvent.click(screen.getByTestId("base-picker"));
@@ -249,7 +365,7 @@ describe("OutputScreen — projection warnings", () => {
       version: "1.0",
     };
 
-    render(<OutputScreen />);
+    renderOutputScreen();
     fireEvent.click(screen.getByTestId("base-picker"));
 
     await act(async () => {
@@ -272,7 +388,7 @@ describe("OutputScreen — projection warnings", () => {
       version: "1.0",
     };
 
-    render(<OutputScreen />);
+    renderOutputScreen();
     fireEvent.click(screen.getByTestId("base-picker"));
 
     await act(async () => {
@@ -294,7 +410,7 @@ describe("OutputScreen — projection warnings", () => {
       version: "1.0",
     };
 
-    render(<OutputScreen />);
+    renderOutputScreen();
     fireEvent.click(screen.getByTestId("base-picker"));
 
     await act(async () => {
@@ -330,7 +446,7 @@ describe("OutputScreen — projection warnings", () => {
 // in instantiateFromBase keeps identity = null → showIdentityWarn = true.
 function renderOutputWithBasePicked() {
   seedInstantiatedWorkingCopy();
-  render(<OutputScreen />);
+  renderOutputScreen();
   fireEvent.click(screen.getByTestId("base-picker"));
 }
 
@@ -416,7 +532,7 @@ describe("OutputScreen — download filename", () => {
       }) as typeof document.createElement);
 
     try {
-      render(<OutputScreen />);
+      renderOutputScreen();
       fireEvent.click(screen.getByTestId("base-picker"));
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: /download/i }));

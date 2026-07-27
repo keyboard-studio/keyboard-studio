@@ -54,6 +54,20 @@ function dedup(arr: string[]): string[] {
   return [...new Set(arr)];
 }
 
+/**
+ * Extract the four-letter ISO 15924 script subtag from a single BCP47 tag
+ * (e.g. "Deva" from "hi-Deva"), title-cased, or `null` when the tag carries
+ * no such subtag. Shared by {@link parseKps} (which defaults the result to
+ * "Latn" for display purposes) and the facet-index build orchestrator
+ * (utilities/facet-index/build-index.ts), which needs the null-preserving
+ * form to distinguish "no declared script" from "declared Latin".
+ */
+export function extractScriptSubtag(tag: string): string | null {
+  const seg = tag.split("-").find((p) => /^[A-Za-z]{4}$/.test(p));
+  if (seg === undefined) return null;
+  return seg.charAt(0).toUpperCase() + seg.slice(1).toLowerCase();
+}
+
 const VALID_TARGETS = new Set<string>([
   "windows",
   "macosx",
@@ -116,11 +130,9 @@ export function parseKps(xml: string): KpsMetadata {
     if (langId === undefined) continue;
     languages.push(langId);
     if (!scriptFound) {
-      const scriptPart = langId.split("-").find((p) => /^[A-Za-z]{4}$/.test(p));
-      if (scriptPart !== undefined) {
-        script =
-          scriptPart.charAt(0).toUpperCase() +
-          scriptPart.slice(1).toLowerCase();
+      const scriptPart = extractScriptSubtag(langId);
+      if (scriptPart !== null) {
+        script = scriptPart;
         scriptFound = true;
       }
     }
@@ -135,28 +147,49 @@ export function parseKps(xml: string): KpsMetadata {
   };
 }
 
+/** One `<Files><File>` entry: its `<Name>` and its (lowercased) `<FileType>`. */
+export interface KpsFileEntry {
+  /** The `<Name>` value, backslashes intact as they appear in the XML. */
+  name: string;
+  /** The `<FileType>` value lowercased (e.g. ".ttf"), or "" when the block has none. */
+  fileType: string;
+}
+
 /**
- * Walk the <File> blocks in the .kps XML and collect font and stylesheet
- * paths into typed buckets.  A <File> block is included when its
- * <FileType> child is ".ttf", ".otf", or ".css".
+ * Walk every `<File>` block in the .kps XML and yield its `<Name>` + `<FileType>`.
+ * The single `<File>`-block walker shared by {@link extractFileBlocks} (which
+ * filters by font/stylesheet type) and the facet-index reader (which needs the
+ * full name list regardless of type). Blocks with no `<Name>` are skipped; a
+ * block with no `<FileType>` yields `fileType: ""`.
+ */
+export function parseKpsFiles(xml: string): KpsFileEntry[] {
+  const fileBlockRe = /<File\s*>([\s\S]*?)<\/File>/gi;
+  const entries: KpsFileEntry[] = [];
+  let blockMatch: RegExpExecArray | null;
+  while ((blockMatch = fileBlockRe.exec(xml)) !== null) {
+    const block = blockMatch[1] ?? "";
+    const nameMatch = /<Name\s*>([^<]*)<\/Name>/i.exec(block);
+    if (nameMatch === null) continue;
+    const name = (nameMatch[1] ?? "").trim();
+    if (name.length === 0) continue;
+    const typeMatch = /<FileType\s*>([^<]*)<\/FileType>/i.exec(block);
+    const fileType = (typeMatch?.[1] ?? "").trim().toLowerCase();
+    entries.push({ name, fileType });
+  }
+  return entries;
+}
+
+/**
+ * Collect font and stylesheet paths into typed buckets.  A `<File>` block is
+ * included when its `<FileType>` child is ".ttf", ".otf", or ".css".
  */
 function extractFileBlocks(xml: string): {
   fileFonts: string[];
   stylesheetPaths: string[];
 } {
-  const fileBlockRe = /<File\s*>([\s\S]*?)<\/File>/gi;
   const fileFonts: string[] = [];
   const stylesheetPaths: string[] = [];
-  let blockMatch: RegExpExecArray | null;
-  while ((blockMatch = fileBlockRe.exec(xml)) !== null) {
-    const block = blockMatch[1] ?? "";
-    const typeMatch = /<FileType\s*>([^<]*)<\/FileType>/i.exec(block);
-    if (typeMatch === null) continue;
-    const fileType = (typeMatch[1] ?? "").trim().toLowerCase();
-    const nameMatch = /<Name\s*>([^<]*)<\/Name>/i.exec(block);
-    if (nameMatch === null) continue;
-    const name = (nameMatch[1] ?? "").trim();
-    if (name.length === 0) continue;
+  for (const { name, fileType } of parseKpsFiles(xml)) {
     if (fileType === ".ttf" || fileType === ".otf") {
       fileFonts.push(name);
     } else if (fileType === ".css") {

@@ -28,6 +28,7 @@ import { phaseARegistry } from "../survey/questions/registry.a.ts";
 import { phaseBRegistry } from "../survey/questions/registry.b.ts";
 import { phaseFRegistry } from "../survey/questions/registry.f.ts";
 import { phaseTrackRegistry, phaseProjectRegistry } from "../survey/questions/registry.g.ts";
+import { reserveRegistry } from "../survey/questions/registry.reserve.ts";
 
 import type { QuestionModule } from "../survey/types.ts";
 
@@ -69,8 +70,11 @@ export interface FlowSource {
  *
  * phase_a_identity is intentionally status:"proposed" and referenced by NO
  * manifest step — this realises the spec-022 demotion through the new mechanism.
- * Its modules remain registered in phaseARegistry (no-delete guardrail) and are
- * visible as reserve/library nodes in the identity_lite drill-down.
+ * Its modules are physically relocated to questions/reserve/ and registered in
+ * reserveRegistry (no-delete guardrail) and are visible as the ordered
+ * proposed-flow graph in the Flow Map's Library section and as flat entries in
+ * its Leftover section — never as reserve clog inside the live identity_lite
+ * drill-down (which keys off the il_*-only phaseARegistry).
  */
 export const flowSources: Readonly<Record<string, FlowSource>> = {
   // --- Live flows (referenced by manifest step flowRefs) ---
@@ -79,9 +83,13 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
     id: "identity_lite",
     raw: identityLiteModularRaw,
     title: "Identity-lite (Phase A head)",
-    // NOTE: shares phaseARegistry with phase_a_identity below — do NOT clone it.
-    // Both flows draw modules from the same registry; the identity_lite flow lists
-    // only the il_* subset while phase_a_identity covers the full battery.
+    // phaseARegistry now holds ONLY the il_* modules (the demoted battery was
+    // physically relocated to questions/reserve/), so computeReserveNodes
+    // yields nothing here: the demoted Phase A battery is not surfaced as
+    // reserve clog under the live identity flow. Those demoted modules are
+    // registered in reserveRegistry (no-delete guardrail) and surface in the
+    // Flow Map's dedicated Leftover section instead (kept for reference /
+    // future reuse, never run by the live survey).
     registry: phaseARegistry,
     status: "live",
   },
@@ -121,15 +129,16 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
   // --- Proposed flows (NOT referenced by any manifest step) ---
 
   // Spec 022 demotion: the full non-identity Phase A battery is excluded from
-  // live drill-downs. Its modules remain in phaseARegistry (no-delete guardrail)
-  // and appear as reserve/library nodes in the identity_lite drill-down graph.
-  // Stage 2 will build a full ordered graph for proposed entries; Stage 1
-  // exposes it only as a flat Library list.
+  // live drill-downs. Its modules are physically relocated to questions/reserve/
+  // and registered in reserveRegistry (no-delete guardrail), appearing as the
+  // ordered proposed-flow graph in the Library section plus flat entries in the
+  // Leftover section — kept for reference / future reuse, never run by the live
+  // survey and never clogging the live identity_lite drill-down.
   phase_a_identity: {
     id: "phase_a_identity",
     raw: phaseAIdentityModularRaw,
     title: "Phase A — full identity (reserve/library)",
-    registry: phaseARegistry,
+    registry: reserveRegistry,
     status: "proposed",
   },
 } as const;

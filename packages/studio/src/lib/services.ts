@@ -13,7 +13,7 @@ import type {
   VirtualFS,
   KeyboardIR,
 } from "@keyboard-studio/contracts";
-import type { MissingCharSuggestions, CldrFullLoader } from "@keyboard-studio/engine";
+import type { MissingCharSuggestions, CldrFullLoader, CharacterMapGroup } from "@keyboard-studio/engine";
 import { mockBaseBrowser, mockOutputService, mockPatternLibrary, mockScaffolder } from "@keyboard-studio/contracts/mocks";
 import { getBackendUrl } from "./githubOAuth.ts";
 import { localBaseBrowser, LOCAL_PROXY_BASE } from "./localBaseBrowser.ts";
@@ -190,3 +190,71 @@ export async function suggestMissingChars(
 
 // Re-export the type so callers can use it without a direct engine import.
 export type { MissingCharSuggestions };
+
+// characterMapGroups — Phase B right-pane character map data source
+// (CharacterMapPane.tsx). When USE_REAL is false returns [] (deterministic,
+// no network) so tests render the pane's empty state without real CLDR
+// traffic. When real, lazy-imports buildCharacterMap from the engine; caches
+// the function after first import so subsequent calls skip the dynamic
+// import entirely (mirrors suggestMissingChars above).
+//
+// `baseScripts` forwards to buildCharacterMap's opts.baseScripts — additional
+// ISO 15924 scripts (e.g. the base keyboard's own script) to enumerate
+// alongside the resolved target script, so groups from both appear.
+//
+// NOTE: buildCharacterMap is a parallel-track engine deliverable (character
+// discovery, spec §8 Phase B) — the import below is written against its
+// locked signature and resolves once the engine export lands.
+let characterMapEngineCache:
+  | ((
+      baseIr: KeyboardIR | null,
+      bcp47?: string,
+      languageName?: string,
+      opts?: { baseScripts?: readonly string[] },
+    ) => Promise<CharacterMapGroup[]>)
+  | null = null;
+export async function characterMapGroups(
+  baseIr: KeyboardIR | null,
+  bcp47?: string,
+  languageName?: string,
+  baseScripts?: readonly string[],
+): Promise<CharacterMapGroup[]> {
+  if (!USE_REAL) return [];
+  if (characterMapEngineCache === null) {
+    const { buildCharacterMap } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
+    characterMapEngineCache = buildCharacterMap;
+  }
+  return characterMapEngineCache(baseIr, bcp47, languageName, {
+    ...(baseScripts !== undefined ? { baseScripts } : {}),
+  });
+}
+
+// Re-export the type so callers (CharacterMapPane.tsx) can use it without a
+// direct engine import.
+export type { CharacterMapGroup };
+
+// neededCharsForLanguage — the full CLDR needed-char set for a target BCP47
+// language (issue #525 items 2/4, language-driven surplus). Mirrors
+// suggestMissingChars's lazy-import + cache pattern above. When USE_REAL is
+// false returns null (deterministic, no network — matches suggestMissingChars's
+// test-mode contract). When real, lazy-imports neededCharsForLanguage +
+// createFetchCldrFullLoader from the engine and caches both together.
+type NeededCharsEngineCache = {
+  fn: (opts: { bcp47: string; loader: CldrFullLoader }) => Promise<Set<string> | null>;
+  loader: CldrFullLoader;
+};
+let neededCharsEngineCache: NeededCharsEngineCache | null = null;
+export async function neededCharsForLanguage(bcp47: string): Promise<Set<string> | null> {
+  if (!USE_REAL) return null;
+  if (neededCharsEngineCache !== null) {
+    return neededCharsEngineCache.fn({ bcp47, loader: neededCharsEngineCache.loader });
+  }
+  const { neededCharsForLanguage: engineNeededCharsForLanguage, createFetchCldrFullLoader } = await import(
+    /* @vite-ignore */ "@keyboard-studio/engine"
+  );
+  neededCharsEngineCache = {
+    fn: engineNeededCharsForLanguage,
+    loader: createFetchCldrFullLoader(),
+  };
+  return neededCharsEngineCache.fn({ bcp47, loader: neededCharsEngineCache.loader });
+}

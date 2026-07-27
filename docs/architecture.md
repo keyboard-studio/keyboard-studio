@@ -52,6 +52,22 @@ one persistent working copy.
   by every step, serialized only at output.
   → [docs/workflow-model.md](workflow-model.md) · spec
   [§8](../spec.md#8-data-flow) → [`specs/008-data-flow/`](../specs/008-data-flow/spec.md)
+- **Generic step host (v1.3 studio).** The studio renders every survey/editor
+  step through one generic host — no per-step `switch` in the shell. A typed
+  step **manifest** (`{ id, component, layout, inputs, writes, flowRefs }`)
+  declares each step; `StepHost` resolves `manifest.find(activeStepId)`, renders
+  the declared `component` in the chrome its `layout` selects, and runs a single
+  centralized completion path (`applyStepCompletion → advance → session.advance`).
+  Adding, reordering, or re-laying-out a step is a manifest edit, not a shell
+  edit. The three bespoke survey wrappers converged onto a single `FlowStepHost`
+  + `makeFlowStepComponent` factory (spec 029 Stage 6, landed) — the factory is
+  the extension mechanism for new flows; existing flows keep their
+  `panelAdapters.tsx` adapters to preserve the golden-walk mock seam.
+  → [docs/workflow-model.md §7](workflow-model.md#7-survey-wrapper-architecture-spec-029-stage-6--flowstephost-convergence) ·
+  [`specs/028-qu-generic-step-host/`](../specs/028-qu-generic-step-host/spec.md) ·
+  [`specs/029-qu-flowstephost-convergence/`](../specs/029-qu-flowstephost-convergence/spec.md) ·
+  code [`packages/studio/src/components/StepHost.tsx`](../packages/studio/src/components/StepHost.tsx),
+  [`survey/FlowStepHost.tsx`](../packages/studio/src/survey/FlowStepHost.tsx)
 
 ## The meta-flow (end to end)
 
@@ -79,7 +95,9 @@ pick keyboard ──▶ instantiate working copy (Track 1 copy/adapt | Track 2 i
 Authoritative detail: [`specs/008-data-flow/`](../specs/008-data-flow/spec.md)
 (the 15-step pipeline, survey phases, gallery instantiation) and
 [`specs/007-strategy-selection/`](../specs/007-strategy-selection/spec.md) (the
-A1–A7 axes + decision tree that drive the gallery defaults).
+A1–A7 axes + decision tree that drive the gallery defaults). How the four
+analytic lenses (facets, §7.1 axes, DISCUS, §11 criteria) compose across this
+pipeline as one keep-or-change flow: [docs/lens-model.md](lens-model.md).
 
 ## Validator layering
 
@@ -118,7 +136,7 @@ not a number maintained by hand here.)
 | Pattern schema (contract) | [specs/005](../specs/005-pattern-schema/spec.md) | `packages/contracts/src/pattern.ts` (+ zod `schemas.ts`) |
 | Pattern library | spec §5 / [specs/005](../specs/005-pattern-schema/spec.md) | `packages/engine/src/pattern-library/`, `pattern-apply/` |
 | Validator (A/B/A′/C) | spec §10 | `packages/engine/src/validator/`, `packages/keyboard-lint/` |
-| Compiler (kmcmplib) | spec §4 | `packages/engine/src/compiler/`, `packages/compiler/` |
+| Compiler (kmcmplib) | spec §4 | `packages/engine/src/compiler/` (wasm ships in the `@keymanapp/kmc-kmn` npm dependency) |
 | Simulator | spec §4 | `packages/engine/src/simulator/` |
 | Output / scaffolder | spec §11 / §12 | `packages/engine/src/{output,scaffolder}/` |
 | Studio SPA | spec §4 | `packages/studio/` |

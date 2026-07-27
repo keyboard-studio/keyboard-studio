@@ -126,7 +126,7 @@ These crew docs are guarded by a machine lint suite at `utilities/crew-lint/inde
 3. No phantom package paths (`packages/{scaffolder,validator}`) anywhere under `.claude/**` — they actually live at `packages/engine/src/{scaffolder,validator}`.
 4. No hardcoded line-number self cross-refs in `km-triage.md` (soft `~<num>` line refs, `see line <num>`, `lines <num>-<num>`).
 5. The two `km-qc` rubrics (agent + command) agree on the subtractive scheme (start 100; -10 P0 / -3 P1 / -1 P2) and the verdict thresholds (PASS >= 80 / PASS WITH NOTES 60-79 / FAIL < 60 or any P0).
-6. Every specialist / `subagent_type` referenced in `km-lead.md`, `km-triage.md`, and the `km-review.js` REVIEWERS has a matching `.claude/agents/km-<name>.md` file.
+6. Every specialist / `subagent_type` referenced in `km-lead.md` and `km-triage.md` has a matching `.claude/agents/km-<name>.md` file.
 7. The escalation sentinel is spelled `.escalations/.labels-created-v2` everywhere across `.claude/**` and `utilities/km-triage-app/**` (never the stale `.labels-created`).
 
 Every failure names the offending file and line. When editing these docs, run `pnpm crew-lint` before committing.

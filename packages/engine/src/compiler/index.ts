@@ -3,9 +3,14 @@
 //
 // kmc-kmn is callback-IO based (no direct Node fs/path use); we bridge
 // its callbacks to our VirtualFS so the compile pipeline runs entirely
-// in the browser. The wasm-host.js + wasm-host.wasm vendored under
-// /wasm/kmcmplib/ are used by kmc-kmn's internal loader (via its own
-// '../import/kmcmplib/wasm-host.js' static import).
+// in the browser. The compiler wasm ships inside the @keymanapp/kmc-kmn
+// npm dependency (version-pinned in packages/engine/package.json) — its
+// Emscripten glue (wasm-host.js) loads wasm-host.wasm as a sibling via
+// `new URL(..., import.meta.url)`. Vite's `optimizeDeps.exclude` for
+// kmc-kmn (packages/studio/vite.config.ts) keeps that resolution intact
+// by skipping pre-bundling. The npm dependency + lockfile are the single
+// source of truth for the compiler version; there is no separate fetch
+// or vendoring step.
 
 import type {
   CompilerService,

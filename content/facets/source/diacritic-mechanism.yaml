@@ -1,0 +1,56 @@
+# source.diacritic-mechanism — the mechanism the chosen base's .kmn uses to
+# apply diacritics (axis A4): stacking combining marks, a replacing/cycling
+# deadkey compose, both, or none. Read from the base before adaptation, so the
+# §7.2 selector can match a candidate base's diacritic mechanism to the target
+# orthography's needs. Measurement ships in spec 043's keyboard-facet-index;
+# session consumption is planned. Construction facet mirrored under the source
+# family, matching spec 041's construction facets.
+
+id: source.diacritic-mechanism
+family: source
+title: Source diacritic mechanism
+description: >
+  How the chosen base applies diacritics on desktop, classified from rule shape:
+  stacking-combining (combining-mark output), replacing-cycling (a deadkey compose
+  rule), multi-family (both), or none. Read from the base ahead of any strategy
+  re-selection, so the selector can rank bases by diacritic-mechanism fit (A4).
+
+valueType: enum
+values: [stacking-combining, replacing-cycling, multi-family, none]
+
+modality: physical
+
+derivations:
+  - kind: computed
+    source: "planned:diacritic-mechanism-of-kmn"
+    sourceStatus: planned
+    notes: >
+      Reduces each diacritic-input rule to a mechanism: combining-mark output ->
+      stacking-combining; a dk(NNNN) compose rule -> replacing-cycling; the
+      plurality wins, with multi-family when both are attested. Produced by the
+      keyboard-facet-index diacritic-mechanism classifier (spec 043); session
+      consumption of the index is planned.
+
+consumers:
+  prefills: []
+  proposes:
+    - "strategy:diacritic-mechanism-match"
+
+relatedAxes: [A4]
+provenanceLabel: "how your source keyboard already applies diacritics on desktop"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+transformImpactClass: ux-changing
+houseTargetPolicy: null
+invertibility: one-way
+implications: >
+  Changing the diacritic mechanism changes the physical sequence the typist
+  performs to produce an accented letter (deadkey-then-base vs base+combining);
+  it is a visible typing-method change, not a source-only rewrite.
+exceptionSites: []
+causePredicates: []

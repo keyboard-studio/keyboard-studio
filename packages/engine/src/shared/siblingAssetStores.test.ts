@@ -3,7 +3,8 @@
 // The expected sets below are exactly today's four pre-consolidation literals
 // (parseKmnHeaderStores.SYSTEM_STORES, scaffold-ir.PATH_STORES + BITMAP,
 // stripDanglingAssetStores.{DANGLING_STORES,ALWAYS_STRIP_STORES},
-// reconcileSiblingAssetPaths.SIBLING_PATH_STORES).
+// reconcileSiblingAssetPaths.SIBLING_PATH_STORES), plus the fifth,
+// scaffolder's renameFilesInVfs asset-extension list.
 
 import { describe, it, expect } from "vitest";
 import {
@@ -13,6 +14,7 @@ import {
   danglingPreviewStripStores,
   alwaysPreviewStripStores,
   reconcileRepairStores,
+  assetFileExtensions,
 } from "./siblingAssetStores.js";
 
 describe("siblingAssetStores — frozen derived subsets", () => {
@@ -69,5 +71,17 @@ describe("siblingAssetStores — frozen derived subsets", () => {
     expect(danglingPreviewStripStores().has("INCLUDECODES")).toBe(false);
     expect(alwaysPreviewStripStores().has("INCLUDECODES")).toBe(false);
     expect(reconcileRepairStores().has("INCLUDECODES")).toBe(false);
+  });
+
+  it("assetFileExtensions matches scaffolder renameFilesInVfs' original hand-typed asset-extension list", () => {
+    expect(assetFileExtensions().sort()).toEqual(
+      [".kvks", ".keyman-touch-layout", ".ico", ".css", ".htm", ".js"].sort(),
+    );
+  });
+
+  it("assetFileExtensions excludes DISPLAYMAP/INCLUDECODES, which have no conventional sibling extension", () => {
+    const extensions = assetFileExtensions();
+    expect(extensions).toHaveLength(6);
+    expect(extensions).not.toContain(undefined);
   });
 });
