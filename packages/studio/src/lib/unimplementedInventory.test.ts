@@ -9,6 +9,7 @@ import {
   unimplementedDesktopChars,
   unimplementedTouchChars,
   inventoryCoverageGate,
+  formatUncoveredCharsList,
 } from "./unimplementedInventory.ts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 
@@ -194,5 +195,34 @@ describe("inventoryCoverageGate", () => {
     expect(gate.blockedOnDesktop).toBe(false);
     expect(gate.blockedOnTouch).toBe(true);
     expect(gate.blocked).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatUncoveredCharsList — the display formatter PhaseFGate and
+// OutputScreen both call so a long uncovered list degrades (truncates) the
+// same way in both blocked banners rather than each call site inlining its
+// own `.join(", ")` with no cap.
+// ---------------------------------------------------------------------------
+
+describe("formatUncoveredCharsList", () => {
+  it("returns an empty string for an empty list", () => {
+    expect(formatUncoveredCharsList([])).toBe("");
+  });
+
+  it("joins every character with no suffix when at or under the limit", () => {
+    const chars = ["á", "é", "í"];
+    expect(formatUncoveredCharsList(chars, 12)).toBe("á, é, í");
+  });
+
+  it("truncates past the limit and appends a '+N more' suffix", () => {
+    const chars = ["a", "b", "c", "d", "e"];
+    expect(formatUncoveredCharsList(chars, 3)).toBe("a, b, c, +2 more");
+  });
+
+  it("uses the default limit (12) when none is supplied", () => {
+    const chars = Array.from({ length: 34 }, (_, i) => `c${i}`);
+    const result = formatUncoveredCharsList(chars);
+    expect(result).toBe(`${chars.slice(0, 12).join(", ")}, +22 more`);
   });
 });

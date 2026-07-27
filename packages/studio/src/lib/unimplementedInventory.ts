@@ -95,6 +95,31 @@ export interface InventoryCoverageGate {
  * gate (via usePreviewArtifact) all call this one function so the three
  * never drift from each other.
  */
+/**
+ * Default cap on how many uncovered characters `formatUncoveredCharsList`
+ * lists inline before folding the remainder into a "+N more" suffix. Long
+ * inventories (30+ characters is common for e.g. an abugida) would otherwise
+ * blow up the Phase F / Output blocked banners into an unreadable wall of
+ * glyphs.
+ */
+export const DEFAULT_UNCOVERED_LIST_LIMIT = 12;
+
+/**
+ * Renders an uncovered-character array as a display string, truncating with
+ * a "+N more" suffix past `limit` — the single formatting rule PhaseFGate and
+ * OutputScreen both use so a long inventory degrades the same way in both
+ * places rather than each call site inventing its own cutoff.
+ */
+export function formatUncoveredCharsList(
+  chars: readonly string[],
+  limit: number = DEFAULT_UNCOVERED_LIST_LIMIT,
+): string {
+  if (chars.length <= limit) return chars.join(", ");
+  const shown = chars.slice(0, limit).join(", ");
+  const remaining = chars.length - limit;
+  return `${shown}, +${remaining} more`;
+}
+
 export function inventoryCoverageGate(inputs: InventoryCoverageInputs): InventoryCoverageGate {
   const unimplementedDesktop = unimplementedDesktopChars(
     inputs.desktopAssignments,

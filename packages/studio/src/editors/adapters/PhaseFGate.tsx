@@ -12,7 +12,12 @@
 // out Phase F and hit an inert Done button, this wraps the normal Phase F
 // content in a blocking ConfirmDialog (single action, no secondaryLabel) that
 // explains WHY (which characters, which modality) and routes them back to the
-// relevant gallery via the session store's `advance` primitive.
+// relevant gallery via the session store's `backToUnfinishedGallery` action — a
+// BACK primitive (pops the "help" entry the touch-forward gate pushed), never
+// the forward-push `advance` (see backToUnfinishedGallery's docstring for the P0
+// history-corruption regression that fix replaced: routing back via `advance`
+// left a stale "help" history entry that a LATER ordinary Back traversal
+// would resurface, making Back from the gallery route back to Phase F).
 //
 // Coverage truth is the SAME shared helper (lib/unimplementedInventory.ts)
 // both galleries use — do not fork the definition here.
@@ -23,7 +28,7 @@ import { plural } from "@lingui/core/macro";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
-import { inventoryCoverageGate } from "../../lib/unimplementedInventory.ts";
+import { inventoryCoverageGate, formatUncoveredCharsList } from "../../lib/unimplementedInventory.ts";
 import { ConfirmDialog } from "../assignLoop/parts/ConfirmDialog.tsx";
 import { PhaseFStepFactoryComponent } from "./flowStepOptions.tsx";
 import type { EditorStepProps } from "../../steps/types.ts";
@@ -34,7 +39,7 @@ export function PhaseFGate(props: EditorStepProps): React.ReactElement {
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
   const confirmedInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
-  const sessionAdvance = useSurveySessionStore((s) => s.advance);
+  const sessionBackToUnfinishedGallery = useSurveySessionStore((s) => s.backToUnfinishedGallery);
   const { lettersToAdd } = useInventoryDiff();
 
   const desktopAssignments = useMemo(
@@ -75,15 +80,19 @@ export function PhaseFGate(props: EditorStepProps): React.ReactElement {
   });
   const touchGalleryLabel = t({ id: "editor.assignLoop.touchGalleryHeading", message: "Touch Gallery" });
   const uncoveredCharsList = [
-    ...(blockedOnDesktop ? [`${unimplementedDesktop.join(", ")} (desktop)`] : []),
-    ...(blockedOnTouch ? [`${unimplementedTouch.join(", ")} (touch)`] : []),
+    ...(blockedOnDesktop ? [`${formatUncoveredCharsList(unimplementedDesktop)} (desktop)`] : []),
+    ...(blockedOnTouch ? [`${formatUncoveredCharsList(unimplementedTouch)} (touch)`] : []),
   ].join("; ");
   const targetGalleryLabel = blockedOnDesktop ? desktopGalleryLabel : touchGalleryLabel;
 
   // Routes back to whichever gallery still has work — desktop first (it
   // gates touch's own completion too, so fixing it first is always correct).
+  // A BACK action (backToUnfinishedGallery), not `advance` — see the module
+  // comment and that action's docstring for why: `advance` would push a
+  // stale "help" entry onto history that a later ordinary Back traversal
+  // would resurface.
   const handleGoBack = () => {
-    sessionAdvance(blockedOnDesktop ? "mechanisms" : "touch");
+    sessionBackToUnfinishedGallery(blockedOnDesktop ? "mechanisms" : "touch");
   };
 
   return (

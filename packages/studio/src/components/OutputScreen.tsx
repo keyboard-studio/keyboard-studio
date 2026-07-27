@@ -26,6 +26,7 @@
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
+import { formatUncoveredCharsList } from "../lib/unimplementedInventory.ts";
 import { useResizablePanes } from "../hooks/useResizablePanes.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
@@ -92,7 +93,7 @@ export function OutputScreen() {
   // ---------------------------------------------------------------------------
   const { unimplementedDesktop, unimplementedTouch, blockedOnDesktop, blockedOnTouch, blocked: coverageBlocked } =
     coverageGate;
-  const sessionAdvance = useSurveySessionStore((s) => s.advance);
+  const sessionBackToUnfinishedGallery = useSurveySessionStore((s) => s.backToUnfinishedGallery);
   const coverageTotalCount =
     unimplementedDesktop.length + (blockedOnTouch ? unimplementedTouch.length : 0);
   const coverageCountLabel = t({
@@ -105,15 +106,19 @@ export function OutputScreen() {
   });
   const touchGalleryLabel = t({ id: "editor.assignLoop.touchGalleryHeading", message: "Touch Gallery" });
   const coverageUncoveredCharsList = [
-    ...(blockedOnDesktop ? [`${unimplementedDesktop.join(", ")} (desktop)`] : []),
-    ...(blockedOnTouch ? [`${unimplementedTouch.join(", ")} (touch)`] : []),
+    ...(blockedOnDesktop ? [`${formatUncoveredCharsList(unimplementedDesktop)} (desktop)`] : []),
+    ...(blockedOnTouch ? [`${formatUncoveredCharsList(unimplementedTouch)} (touch)`] : []),
   ].join("; ");
   const coverageTargetGalleryLabel = blockedOnDesktop ? mechanismGalleryLabel : touchGalleryLabel;
   const handleGoToGallery = () => {
     // Route back into the survey wizard at whichever gallery still has
     // work — desktop first (it gates touch's own completion too, so fixing
-    // it first is always correct — same ordering as PhaseFGate).
-    sessionAdvance(blockedOnDesktop ? "mechanisms" : "touch");
+    // it first is always correct — same ordering as PhaseFGate). This is a
+    // BACK action (backToUnfinishedGallery), not the forward-push `advance`
+    // — see that store action's docstring for the P0 regression a
+    // forward-push here would reproduce (a stale history entry a later
+    // ordinary Back traversal would resurface as Phase F).
+    sessionBackToUnfinishedGallery(blockedOnDesktop ? "mechanisms" : "touch");
     navigateTo("survey");
   };
 

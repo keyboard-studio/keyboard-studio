@@ -143,6 +143,85 @@ describe("surveySessionStore", () => {
     expect(getStore().history).toEqual([]);
   });
 
+  // backToUnfinishedGallery — the Phase F hard-gate's "go back and finish" action
+  // (PhaseFGate.tsx). P0 regression guard: a prior implementation routed
+  // this through the forward-push `advance()` primitive, which left a stale
+  // "help" entry on top of `history` — a LATER ordinary Back traversal
+  // (popHistory / backToTouchSeedSource) would then pop that stale entry and
+  // silently land back on "help" ("Back" appearing to route to Phase F).
+  describe("backToUnfinishedGallery", () => {
+    it("pops exactly the one entry 'help' pushed (leaves history exactly as it was before entering help) and sets activeStepId to the target", () => {
+      const store = getStore();
+      // Walk to "touch", then simulate touch's forward completion into "help"
+      // (advance.ts's "touch" case always targets "help").
+      store.advance("mechanisms");
+      store.advance("touch_seed_source");
+      store.advance("touch");
+      const historyBeforeHelp = [...getStore().history]; // ["identity", "mechanisms", "touch_seed_source"]
+      store.advance("help");
+      expect(getStore().activeStepId).toBe("help");
+
+      store.backToUnfinishedGallery("touch");
+
+      expect(getStore().activeStepId).toBe("touch");
+      // History is back to EXACTLY what it was before "help" was entered —
+      // no stale entry left over from the round trip.
+      expect([...getStore().history]).toEqual(historyBeforeHelp);
+    });
+
+    it("can route PAST the immediate predecessor to 'mechanisms' (desktop-first priority) while still only consuming the one 'help' entry", () => {
+      const store = getStore();
+      store.advance("mechanisms");
+      store.advance("touch_seed_source");
+      store.advance("touch");
+      store.advance("help");
+      const historyOnHelp = [...getStore().history]; // [..., "mechanisms", "touch_seed_source", "touch"]
+
+      store.backToUnfinishedGallery("mechanisms");
+
+      expect(getStore().activeStepId).toBe("mechanisms");
+      // Exactly one entry ("touch", the top) consumed — not two, not zero.
+      expect([...getStore().history]).toEqual(historyOnHelp.slice(0, -1));
+    });
+
+    it("the regression itself: a subsequent ordinary Back from the target gallery must NOT resurface 'help'", () => {
+      const store = getStore();
+      store.advance("mechanisms");
+      store.advance("touch_seed_source");
+      store.advance("touch");
+      store.advance("help");
+
+      // "Go back and finish" — the fixed action.
+      store.backToUnfinishedGallery("touch");
+      expect(getStore().activeStepId).toBe("touch");
+
+      // The touch step's own "Back from the first character" special case
+      // (StepHost's handleBack). Since "touch_seed_source" IS the top of
+      // history here (fork was not skipped), this pops it — proving the
+      // fixed backToUnfinishedGallery left a clean, poppable stack rather than a
+      // stale "help" entry that this would otherwise have surfaced.
+      store.backToTouchSeedSource();
+      expect(getStore().activeStepId).toBe("touch_seed_source");
+      expect(getStore().activeStepId).not.toBe("help");
+
+      // And the chooser's own ordinary Back reaches "mechanisms" next — the
+      // pre-existing invariant `backToTouchSeedSource`'s docstring promises —
+      // proving the stack is fully intact, not just superficially not-"help".
+      store.popHistory();
+      expect(getStore().activeStepId).toBe("mechanisms");
+    });
+
+    it("is a no-op on history (still honors the target) when history is already empty", () => {
+      // Fresh store: activeStepId = "identity", history = [].
+      expect(getStore().history).toEqual([]);
+
+      getStore().backToUnfinishedGallery("touch");
+
+      expect(getStore().activeStepId).toBe("touch");
+      expect(getStore().history).toEqual([]);
+    });
+  });
+
   // baseConfirmed — the choose_base preview-before-commit gate
   describe("baseConfirmed", () => {
     it("defaults to false on a fresh store", () => {

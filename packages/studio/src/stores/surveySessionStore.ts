@@ -251,6 +251,40 @@ export interface SurveySessionState {
    */
   backToTouchSeedSource: () => void;
 
+  /**
+   * "Go finish the unfinished gallery" action — shared by PhaseFGate.tsx's
+   * hard-gate ConfirmDialog ("Go back and finish", offered when
+   * `inventoryCoverageGate` is still blocked on "help") and OutputScreen.tsx's
+   * coverage-blocked banner ("Go finish them now", reachable from #output
+   * directly, bypassing "help" entirely). Both need to route the author to
+   * whichever gallery still has gaps — desktop ("mechanisms") first if it is
+   * incomplete, else "touch" — and BOTH are conceptually a BACK action, not a
+   * forward one, even though the target may not be the immediate predecessor
+   * in `history` (desktop-first priority can route past "touch" straight to
+   * "mechanisms" — see each caller's blockedOnDesktop-first ordering).
+   *
+   * Regression this guards (P0): the previous PhaseFGate implementation
+   * called the forward-push `advance()` primitive to perform this "route
+   * back to the relevant gallery" jump. `advance()` PUSHES the current
+   * activeStepId (typically "help") onto history before switching —
+   * appropriate for a genuine forward step, but wrong here, since this
+   * action is conceptually a Back. That extra push left a stale "help" entry
+   * sitting on top of the walked stack; the NEXT ordinary Back traversal
+   * from the target gallery (a plain `popHistory()`, or
+   * `backToTouchSeedSource()`'s own history-consuming branch) would then pop
+   * that stale entry and silently land the author back on the blocked
+   * "help" step — "Back" appearing to route to Phase F instead of the
+   * previous step, indefinitely, since the gate stays blocked.
+   *
+   * The fix: behave exactly like `popHistory` (pop the one entry that was
+   * pushed to reach the current screen) but set `activeStepId` to the
+   * caller-supplied `target` rather than trusting whatever was popped. This
+   * keeps `history` exactly as balanced as it was before, so it never
+   * resurfaces later. No-op-safe when history is empty (mirrors
+   * `popHistory`'s empty-history guard) — still honors the caller's target.
+   */
+  backToUnfinishedGallery: (target: "mechanisms" | "touch") => void;
+
   /** Reset every slot to initial (start-over). Includes clearing history. */
   reset: () => void;
 
@@ -310,7 +344,7 @@ export interface SurveySessionState {
 
 type SurveySessionData = Omit<
   SurveySessionState,
-  | "advance" | "popHistory" | "backToTouchSeedSource" | "reset"
+  | "advance" | "popHistory" | "backToTouchSeedSource" | "backToUnfinishedGallery" | "reset"
   | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
   | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
   | "setTouchSeedSource" | "setBaseConfirmed" | "setDiscoveryMethod"
@@ -388,6 +422,23 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
       // "mechanisms" (or whatever is actually on top) stays there for the
       // chooser's own Back.
       return { activeStepId: "touch_seed_source", lastNavigation: "pop" as const };
+    }),
+
+  // See the interface docstring above for the P0 regression this fixes:
+  // behaves like popHistory (consumes the one entry "help" pushed — always
+  // "touch") but sets activeStepId to the caller's target rather than
+  // whatever was actually on top, so a gate that needs to route past "touch"
+  // to "mechanisms" doesn't leave a stale entry for a later Back to resurface.
+  backToUnfinishedGallery: (target) =>
+    set((s) => {
+      if (s.history.length === 0) {
+        return { activeStepId: target, lastNavigation: "pop" as const };
+      }
+      return {
+        activeStepId: target,
+        history: s.history.slice(0, -1),
+        lastNavigation: "pop" as const,
+      };
     }),
 
   reset: () =>
