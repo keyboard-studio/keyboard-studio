@@ -90,8 +90,6 @@ const mockRefs = vi.hoisted(() => ({
   phaseBBack: { current: null as null | (() => void) },
   mechDone: { current: null as null | (() => void) },
   mechBack: { current: null as null | (() => void) },
-  seqDone: { current: null as null | (() => void) },
-  seqBack: { current: null as null | (() => void) },
   phaseFDone: { current: null as null | ((...args: unknown[]) => void) },
   phaseFBack: { current: null as null | (() => void) },
   touchEComplete: { current: null as null | ((a: unknown[]) => void) },
@@ -370,27 +368,6 @@ vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () => ({
         {onBack !== undefined && (
           <button type="button" data-testid="mechanisms-back" onClick={onBack}>
             mechanisms-back
-          </button>
-        )}
-      </div>
-    );
-  },
-}));
-
-vi.mock("../../src/editors/sequences/SequenceGallery.tsx", () => ({
-  SequenceGallery: ({ onComplete, onBack }: { onComplete?: () => void; onBack?: () => void }) => {
-    mockRefs.seqDone.current = onComplete ?? null;
-    mockRefs.seqBack.current = onBack ?? null;
-    return (
-      <div data-testid="stage-sequences">
-        {onComplete !== undefined && (
-          <button type="button" data-testid="sequences-complete" onClick={onComplete}>
-            sequences-complete
-          </button>
-        )}
-        {onBack !== undefined && (
-          <button type="button" data-testid="sequences-back" onClick={onBack}>
-            sequences-back
           </button>
         )}
       </div>
@@ -720,11 +697,15 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
 /**
  * Drive the full copy-track walk.
  * identity -> choose_base -> track(copy) -> project_name ->
- * characters(prefill->B) -> carve -> mechanisms -> sequences ->
+ * characters(prefill->B) -> carve -> mechanisms ->
  * touch_seed_source -> touch -> help -> done
  *
- * touch_seed_source (spec 035 R4/R12) is inserted between sequences and touch
- * on a FRESH walk because touchSeedSource starts null — advance("sequences")
+ * S-03 sequences build inline in the Mechanism Gallery's method chooser (the
+ * right-hand preview pane swaps for a one-character sequence builder while
+ * that method is selected) — there is no separate "sequences" step.
+ *
+ * touch_seed_source (spec 035 R4/R12) is inserted between mechanisms and touch
+ * on a FRESH walk because touchSeedSource starts null — advance("mechanisms")
  * routes into the fork instead of straight to "touch". The fork step renders
  * the mocked TouchSeedSourcePanel stub (T014, registerEditorSteps.ts) — driven
  * via its own "seed-source-complete" testid — before the real "touch" step
@@ -740,7 +721,6 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "characters/B", testId: "phaseB-complete" },
     { stepId: "carve", testId: "carve-complete" },
     { stepId: "mechanisms", testId: "mechanisms-complete" },
-    { stepId: "sequences", testId: "sequences-complete" },
     { stepId: "touch_seed_source", testId: "seed-source-complete", async: true },
     { stepId: "touch", testId: "e-complete", async: true },
     { stepId: "help", testId: "phaseF-complete", async: true },
@@ -750,10 +730,11 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
 /**
  * Drive the full adapt-track walk.
  * identity -> choose_base -> track(adapt) ->
- * characters(prefill->B) -> carve -> mechanisms -> sequences ->
+ * characters(prefill->B) -> carve -> mechanisms ->
  * touch_seed_source -> touch -> help -> done
  * project_name MUST NOT appear. See driveCopyTrack's docstring for why
- * touch_seed_source appears (spec 035 R4/R12 fork memory).
+ * touch_seed_source appears (spec 035 R4/R12 fork memory) and why there is no
+ * separate "sequences" step.
  */
 async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
   await driveSteps(recorder, [
@@ -764,7 +745,6 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     { stepId: "characters/B", testId: "phaseB-complete" },
     { stepId: "carve", testId: "carve-complete" },
     { stepId: "mechanisms", testId: "mechanisms-complete" },
-    { stepId: "sequences", testId: "sequences-complete" },
     { stepId: "touch_seed_source", testId: "seed-source-complete", async: true },
     { stepId: "touch", testId: "e-complete", async: true },
     { stepId: "help", testId: "phaseF-complete", async: true },

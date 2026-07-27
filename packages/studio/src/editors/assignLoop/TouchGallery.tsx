@@ -85,14 +85,18 @@ import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
+import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
+import { RemovableChipRow } from "./parts/RemovableChipRow.tsx";
 import { SelectMenu } from "../../ui/SelectMenu.tsx";
 import { KEY_OPTIONS, VALID_HOST_KEYS } from "../../lib/keyOptions.ts";
 import { resolveKeyPickerSelection, resolvedVkeyOf } from "../../lib/charInput.ts";
 import {
-  BG_PAGE, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
-  galleryPageStyle as pageStyle,
+  BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
   galleryGhostBtn as ghostBtn,
   gallerySelectMenuStyle,
+  galleryHeaderBtnStyle as headerBtnStyle,
+  galleryConfigStyle as configStyle,
+  galleryCardStyle as cardStyle,
 } from "../../lib/galleryTheme.ts";
 
 const selectStyle: CSSProperties = gallerySelectMenuStyle(160);
@@ -147,34 +151,11 @@ function touchMechanismLabel(target: string, m: MechanismRef, i18n?: I18n): stri
 }
 
 
-// Static styles shared across TouchMethodChooser renders — none depend on
-// props or state, so they are hoisted to module scope rather than recreated
-// per render.
-const headerBtnStyle: CSSProperties = {
-  width: "100%",
-  padding: "10px 14px",
-  background: "transparent",
-  border: "none",
-  color: TEXT_MAIN,
-  fontSize: 13,
-  fontFamily: FONT,
-  cursor: "pointer",
-  textAlign: "left",
-  display: "flex",
-  flexDirection: "column",
-  gap: 4,
-};
-
-const configStyle: CSSProperties = {
-  padding: "0 14px 12px",
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-};
-
-// pageStyle and ghostBtn are imported (aliased) from ../../lib/galleryTheme.ts
-// — shared byte-for-byte with MechanismGallery.tsx/SequenceGallery.tsx rather
-// than redefined here.
+// ghostBtn, headerBtnStyle, configStyle, and cardStyle are imported
+// (aliased) from ../../lib/galleryTheme.ts — shared byte-for-byte with
+// MechanismGallery.tsx rather than redefined here. The page-level wrapper
+// style (pageStyle) is no longer imported directly here — it's used via
+// GalleryEmptyState.tsx (the no-inventory guard) rather than inline.
 
 // ---------------------------------------------------------------------------
 // Touch method type
@@ -270,13 +251,7 @@ function TouchMethodChooser({
   // macro collapses it to a POSITIONAL {0}/{1}, which is what broke the fr
   // catalog (see the module-level fix note near MechanismGallery's twin).
   const currentCharDisplay = displayChar(currentChar);
-  const cardStyle = (active: boolean): CSSProperties => ({
-    borderRadius: 8,
-    border: `1px solid ${active ? ACCENT : BORDER}`,
-    background: active ? "#0d2840" : BG_PAGE,
-    overflow: "hidden",
-    transition: "border-color 120ms ease, background 120ms ease",
-  });
+  // cardStyle is imported from ../../lib/galleryTheme.ts.
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -500,6 +475,66 @@ function TouchMethodChooser({
 }
 
 // TouchPreviewPane is now GalleryPreviewPane (shared component) — see GalleryPreviewPane.tsx.
+
+// ---------------------------------------------------------------------------
+// SuggestionActions — Accept/Deny button pair shared by the three suggestion-
+// card variants (longpress/replace/already) rendered in TouchGallery's
+// leftContent below. The three variants differ only in message text, the
+// accept handler, and the aria-labels — style is byte-identical across all
+// three, so it is hoisted to module scope here rather than repeated per card.
+// ---------------------------------------------------------------------------
+
+const suggestionAcceptBtnStyle: CSSProperties = {
+  padding: "5px 14px",
+  background: "#238636",
+  border: "none",
+  borderRadius: 5,
+  color: "#e6edf3",
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: "pointer",
+  fontFamily: FONT,
+};
+
+const suggestionDenyBtnStyle: CSSProperties = {
+  padding: "5px 14px",
+  background: "transparent",
+  border: `1px solid ${BORDER}`,
+  borderRadius: 5,
+  color: TEXT_DIM,
+  fontSize: 12,
+  cursor: "pointer",
+  fontFamily: FONT,
+};
+
+/** Message text style shared by all three suggestion-card variants. */
+const suggestionMessageStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 12,
+  color: "#56d364",
+  fontFamily: FONT,
+  fontWeight: 600,
+};
+
+interface SuggestionActionsProps {
+  onAccept: () => void;
+  onDeny: () => void;
+  acceptAriaLabel: string;
+  denyAriaLabel: string;
+}
+
+function SuggestionActions({ onAccept, onDeny, acceptAriaLabel, denyAriaLabel }: SuggestionActionsProps) {
+  return (
+    <div style={{ display: "flex", gap: 8 }}>
+      <button type="button" onClick={onAccept} aria-label={acceptAriaLabel} style={suggestionAcceptBtnStyle}>
+        <Trans id="editor.assignLoop.suggestion.acceptButton">Accept</Trans>
+      </button>
+      <button type="button" onClick={onDeny} aria-label={denyAriaLabel} style={suggestionDenyBtnStyle}>
+        <Trans id="editor.assignLoop.suggestion.denyButton">Deny</Trans>
+      </button>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // TouchGallery — main component
@@ -1265,32 +1300,17 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
   if (inventory.length === 0) {
     return (
-      <div style={{ ...pageStyle, padding: "24px 32px" }}>
-        <div style={{ maxWidth: 560, margin: "0 auto" }}>
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label={t({ id: "editor.assignLoop.touch.backToMechanismsAriaLabel", message: "Back to mechanisms" })}
-            style={ghostBtn}
-          >
-            <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
-          </button>
-          <div
-            style={{
-              margin: "60px auto",
-              textAlign: "center",
-              color: TEXT_DIM,
-            }}
-          >
-            <p style={{ fontSize: 15 }}>
-              <Trans id="editor.assignLoop.touch.noInventory">
-                No characters in inventory yet. Complete the Survey (Phase B) to
-                confirm which characters your keyboard must produce.
-              </Trans>
-            </p>
-          </div>
-        </div>
-      </div>
+      <GalleryEmptyState
+        wrapperMaxWidth={560}
+        onBack={onBack}
+        backAriaLabel={t({ id: "editor.assignLoop.touch.backToMechanismsAriaLabel", message: "Back to mechanisms" })}
+        message={
+          <Trans id="editor.assignLoop.touch.noInventory">
+            No characters in inventory yet. Complete the Survey (Phase B) to
+            confirm which characters your keyboard must produce.
+          </Trans>
+        }
+      />
     );
   }
 
@@ -1501,15 +1521,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             >
               {suggestion.kind === "longpress" && (
                 <>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 12,
-                      color: "#56d364",
-                      fontFamily: FONT,
-                      fontWeight: 600,
-                    }}
-                  >
+                  <p style={suggestionMessageStyle}>
                     <Trans id="editor.assignLoop.touch.suggestion.longpressText">
                       Suggested: long-press{" "}
                       {suggestion.hostKey
@@ -1518,59 +1530,20 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                       to reach {currentCharDisplay}
                     </Trans>
                   </p>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={handleUseSuggestion}
-                      aria-label={t({
-                        id: "editor.assignLoop.touch.suggestion.useLongpressAriaLabel",
-                        message: `Use suggested long-press method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
-                      })}
-                      style={{
-                        padding: "5px 14px",
-                        background: "#238636",
-                        border: "none",
-                        borderRadius: 5,
-                        color: "#e6edf3",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        fontFamily: FONT,
-                      }}
-                    >
-                      <Trans id="editor.assignLoop.suggestion.acceptButton">Accept</Trans>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSuggestionChange}
-                      aria-label={t({ id: "editor.assignLoop.touch.chooseDifferentMethodAriaLabel", message: "Choose a different touch method" })}
-                      style={{
-                        padding: "5px 14px",
-                        background: "transparent",
-                        border: `1px solid ${BORDER}`,
-                        borderRadius: 5,
-                        color: TEXT_DIM,
-                        fontSize: 12,
-                        cursor: "pointer",
-                        fontFamily: FONT,
-                      }}
-                    >
-                      <Trans id="editor.assignLoop.suggestion.denyButton">Deny</Trans>
-                    </button>
-                  </div>
+                  <SuggestionActions
+                    onAccept={handleUseSuggestion}
+                    onDeny={handleSuggestionChange}
+                    acceptAriaLabel={t({
+                      id: "editor.assignLoop.touch.suggestion.useLongpressAriaLabel",
+                      message: `Use suggested long-press method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+                    })}
+                    denyAriaLabel={t({ id: "editor.assignLoop.touch.chooseDifferentMethodAriaLabel", message: "Choose a different touch method" })}
+                  />
                 </>
               )}
               {suggestion.kind === "replace" && (
                 <>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 12,
-                      color: "#56d364",
-                      fontFamily: FONT,
-                      fontWeight: 600,
-                    }}
-                  >
+                  <p style={suggestionMessageStyle}>
                     <Trans id="editor.assignLoop.touch.suggestion.replaceText">
                       Suggested: replace{" "}
                       {suggestion.hostKey
@@ -1579,103 +1552,33 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                       with {currentCharDisplay}
                     </Trans>
                   </p>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={handleUseSuggestion}
-                      aria-label={t({
-                        id: "editor.assignLoop.touch.suggestion.useReplaceAriaLabel",
-                        message: `Use suggested replace method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
-                      })}
-                      style={{
-                        padding: "5px 14px",
-                        background: "#238636",
-                        border: "none",
-                        borderRadius: 5,
-                        color: "#e6edf3",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        fontFamily: FONT,
-                      }}
-                    >
-                      <Trans id="editor.assignLoop.suggestion.acceptButton">Accept</Trans>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSuggestionChange}
-                      aria-label={t({ id: "editor.assignLoop.touch.chooseDifferentMethodAriaLabel", message: "Choose a different touch method" })}
-                      style={{
-                        padding: "5px 14px",
-                        background: "transparent",
-                        border: `1px solid ${BORDER}`,
-                        borderRadius: 5,
-                        color: TEXT_DIM,
-                        fontSize: 12,
-                        cursor: "pointer",
-                        fontFamily: FONT,
-                      }}
-                    >
-                      <Trans id="editor.assignLoop.suggestion.denyButton">Deny</Trans>
-                    </button>
-                  </div>
+                  <SuggestionActions
+                    onAccept={handleUseSuggestion}
+                    onDeny={handleSuggestionChange}
+                    acceptAriaLabel={t({
+                      id: "editor.assignLoop.touch.suggestion.useReplaceAriaLabel",
+                      message: `Use suggested replace method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+                    })}
+                    denyAriaLabel={t({ id: "editor.assignLoop.touch.chooseDifferentMethodAriaLabel", message: "Choose a different touch method" })}
+                  />
                 </>
               )}
               {suggestion.kind === "already" && (
                 <>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 12,
-                      color: "#56d364",
-                      fontFamily: FONT,
-                      fontWeight: 600,
-                    }}
-                  >
+                  <p style={suggestionMessageStyle}>
                     <Trans id="editor.assignLoop.touch.suggestion.alreadyText">
                       {currentCharDisplay} is already on the touch keyboard. Keep it as is?
                     </Trans>
                   </p>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={handleSuggestionAccept}
-                      aria-label={t({
-                        id: "editor.assignLoop.touch.suggestion.keepAlreadyAriaLabel",
-                        message: `Keep ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }} as already in touch layout`,
-                      })}
-                      style={{
-                        padding: "5px 14px",
-                        background: "#238636",
-                        border: "none",
-                        borderRadius: 5,
-                        color: "#e6edf3",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        fontFamily: FONT,
-                      }}
-                    >
-                      <Trans id="editor.assignLoop.suggestion.acceptButton">Accept</Trans>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSuggestionChange}
-                      aria-label={t({ id: "editor.assignLoop.touch.makeChangesAriaLabel", message: "Make changes to touch method" })}
-                      style={{
-                        padding: "5px 14px",
-                        background: "transparent",
-                        border: `1px solid ${BORDER}`,
-                        borderRadius: 5,
-                        color: TEXT_DIM,
-                        fontSize: 12,
-                        cursor: "pointer",
-                        fontFamily: FONT,
-                      }}
-                    >
-                      <Trans id="editor.assignLoop.suggestion.denyButton">Deny</Trans>
-                    </button>
-                  </div>
+                  <SuggestionActions
+                    onAccept={handleSuggestionAccept}
+                    onDeny={handleSuggestionChange}
+                    acceptAriaLabel={t({
+                      id: "editor.assignLoop.touch.suggestion.keepAlreadyAriaLabel",
+                      message: `Keep ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }} as already in touch layout`,
+                    })}
+                    denyAriaLabel={t({ id: "editor.assignLoop.touch.makeChangesAriaLabel", message: "Make changes to touch method" })}
+                  />
                 </>
               )}
             </div>
@@ -1704,9 +1607,9 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               still worth surfacing here: an author configuring touch access
               may need to know this character is already "in play" as a
               sequence's content/indicator/output on the desktop layout.
-              Read-only — mirrors SequenceGallery's own "Recorded sequences"
-              card style; editing a sequence stays owned by the Sequence
-              Gallery. Shared with MechanismGallery's own bottom list — see
+              Read-only — mirrors the inline SequenceBuilderPanel's "Recorded
+              sequences" card style; editing a sequence stays owned by the
+              sequence builder. Shared with MechanismGallery's own bottom list — see
               UsesSequencesCard.tsx. */}
           <UsesSequencesCard
             currentChar={currentChar}
@@ -1768,69 +1671,35 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
       {/* Configured chip row */}
       {charTouch.size > 0 && (
-        <div>
-          <p
-            style={{
-              margin: "0 0 6px",
-              fontSize: 11,
-              color: TEXT_DIM,
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-            }}
-          >
-            <Trans id="editor.assignLoop.touch.configuredHeading">Configured</Trans>
-          </p>
-          <div
-            role="group"
-            aria-label={t({ id: "editor.assignLoop.touch.configuredGroupAriaLabel", message: "Configured characters — click to remove" })}
-            style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
-          >
-            {[...charTouch.entries()].flatMap(([c, assignment]) =>
-              assignment.mechanisms.map((m, i) => (
-                <button
-                  key={`${c}-${i}`}
-                  type="button"
-                  onClick={() => handleRemoveMechanism(c, i)}
-                  aria-label={t({
-                    id: "editor.assignLoop.touch.removeMechanismAriaLabel",
-                    message: `Remove ${{ notation: toUPlusNotation(c) }} ${{ label: touchMechanismLabel(c, m, i18n) }}`,
-                  })}
-                  title={t({
-                    id: "editor.assignLoop.removeCharacterTitle",
-                    message: `${{ notation: toUPlusNotation(c) }} — click to remove`,
-                  })}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    padding: "4px 10px",
-                    background: "#0d2218",
-                    border: "1px solid #238636",
-                    borderRadius: 16,
-                    color: "#56d364",
-                    fontSize: 12,
-                    fontFamily: "monospace",
-                    cursor: "pointer",
-                    lineHeight: 1.3,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {/* Visible chip label only — routes the target through
-                      displayChar() so a standalone combining mark shows the
-                      dotted circle; the aria-label above keeps the raw
-                      target (via touchMechanismLabel(c, ...)) untouched. */}
-                  {touchMechanismLabel(displayChar(c), m, i18n)}
-                  <span
-                    aria-hidden="true"
-                    style={{ fontSize: 11, color: "#56d364", opacity: 0.7 }}
-                  >
-                    &times;
-                  </span>
-                </button>
-              )),
-            )}
-          </div>
-        </div>
+        <RemovableChipRow
+          heading={<Trans id="editor.assignLoop.touch.configuredHeading">Configured</Trans>}
+          groupAriaLabel={t({ id: "editor.assignLoop.touch.configuredGroupAriaLabel", message: "Configured characters — click to remove" })}
+          chipBackground="#0d2218"
+          chipBorder="#238636"
+          chipColor="#56d364"
+          chipPadding="4px 10px"
+          chipFontSize={12}
+          chipWhiteSpaceNowrap
+          items={[...charTouch.entries()].flatMap(([c, assignment]) =>
+            assignment.mechanisms.map((m, i) => ({
+              key: `${c}-${i}`,
+              // Visible chip label only — routes the target through
+              // displayChar() so a standalone combining mark shows the
+              // dotted circle; the aria-label below keeps the raw target
+              // (via touchMechanismLabel(c, ...)) untouched.
+              label: touchMechanismLabel(displayChar(c), m, i18n),
+              onClick: () => handleRemoveMechanism(c, i),
+              ariaLabel: t({
+                id: "editor.assignLoop.touch.removeMechanismAriaLabel",
+                message: `Remove ${{ notation: toUPlusNotation(c) }} ${{ label: touchMechanismLabel(c, m, i18n) }}`,
+              }),
+              title: t({
+                id: "editor.assignLoop.removeCharacterTitle",
+                message: `${{ notation: toUPlusNotation(c) }} — click to remove`,
+              }),
+            })),
+          )}
+        />
       )}
 
       {/* Lint summary — Layer C touch checks (18.1–18.5) */}

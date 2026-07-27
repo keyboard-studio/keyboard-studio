@@ -19,7 +19,7 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `added-char-count` | 919 | 0 | 8 | 0 |
 | `caps-handling` | 920 | 0 | 7 | 0 |
 | `casing` | 919 | 0 | 8 | 0 |
-| `combining-mark-repertoire` | 845 | 0 | 82 | 0 |
+| `combining-mark-repertoire` | 903 | 0 | 24 | 0 |
 | `declared-bcp47-tags` | 0 | 927 | 0 | 0 |
 | `desktop-combo-mechanism` | 915 | 0 | 12 | 0 |
 | `diacritic-mechanism` | 917 | 0 | 10 | 0 |
@@ -38,7 +38,7 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `reordering-rules` | 920 | 0 | 7 | 0 |
 | `rule-store-compaction` | 915 | 0 | 12 | 0 |
 | `script` | 914 | 6 | 5 | 2 |
-| `script-family` | 845 | 0 | 82 | 0 |
+| `script-family` | 903 | 0 | 24 | 0 |
 | `spare-key-budget` | 577 | 0 | 350 | 0 |
 | `strategy-fingerprint` | 917 | 0 | 10 | 0 |
 | `target-mix` | 0 | 919 | 8 | 0 |

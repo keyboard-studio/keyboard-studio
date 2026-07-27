@@ -23,7 +23,7 @@ import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode } fro
 import { Trans, useLingui } from "@lingui/react/macro";
 import { msg, plural } from "@lingui/core/macro";
 import type { SurveyAnswer, SurveyPhaseResult, LintFinding, PlacementMap } from "@keyboard-studio/contracts";
-import { toUPlusNotation } from "@keyboard-studio/contracts";
+import { composeStack, toUPlusNotation } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { loadModularFlow } from "./loadModularFlow.ts";
 import type { SurveyContext, FlowDef } from "./types.ts";
@@ -37,6 +37,7 @@ import {
   harvestChars,
   casePairOf,
   lowercaseBaseView,
+  upperCounterpartOf,
 } from "./charNormUtils.ts";
 import { codepointLabel } from "./codepointLabel.ts";
 import { collate, codePointCompare } from "./collation.ts";
@@ -290,15 +291,11 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
   // Case-collapse the letters to their lowercase/caseless unit (FR-008/FR-010):
   // hide an uppercase only when its lowercase is actually present; a lowercase or
   // caseless (or uppercase-only) letter is shown as entered.
-  const upperOf = (b: string): string | null => {
-    const cc = caseCounterpart(b, bcp47);
-    return cc?.direction === "toUpper" ? cc.counterpart : null;
-  };
   // Single source of truth with the marks step (spec 049, FR-006).
   const displayLetters = collate(lowercaseBaseView(letters, bcp47));
   // Count reflects the collapsed lowercase/caseless units + bare marks.
   const unitCount = displayLetters.length + bareMarks.length;
-  const hasCasedLetter = letters.some((b) => upperOf(b) !== null);
+  const hasCasedLetter = letters.some((b) => upperCounterpartOf(b, bcp47) !== null);
   // Distinct proposal attributions currently represented in the draft — the
   // legend names them rather than leaving the dashed outline to speak for itself.
   const proposedAttributions = [
@@ -463,7 +460,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
               ];
               // Derived uppercase (display-only) when the toggle is on — mirrors
               // the breakdown Letters section; not a removable pick.
-              const upper = showUppercase ? upperOf(c) : null;
+              const upper = showUppercase ? upperCounterpartOf(c, bcp47) : null;
               if (upper !== null) {
                 const upperTitle = codepointLabel(upper).title;
                 cells.push(
@@ -776,12 +773,10 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
     return null;
   }
 
-  const composedStack = (stack: { base: string; marks: string[] }): string =>
-    (stack.base + stack.marks.join("")).normalize("NFC");
   const justAddedBases = new Set(lastPick?.addedBases ?? []);
   const justAddedMarks = new Set(lastPick?.addedMarks ?? []);
   const justAddedStack =
-    lastPick?.addedStack != null ? composedStack(lastPick.addedStack) : null;
+    lastPick?.addedStack != null ? composeStack(lastPick.addedStack) : null;
 
   const chip = (glyph: string, display: string, justAdded: boolean) => {
     const { title } = codepointLabel(glyph);
@@ -819,10 +814,6 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
   // Letters case-collapse (FR-008/FR-010): show one chip per lowercase/caseless
   // letter; a present uppercase is hidden behind its lowercase (never the
   // reverse) and revealed only under the toggle.
-  const upperOf = (b: string): string | null => {
-    const cc = caseCounterpart(b, bcp47);
-    return cc?.direction === "toUpper" ? cc.counterpart : null;
-  };
   // Single source of truth with the marks step (spec 049, FR-006).
   const displayBases = collate(lowercaseBaseView(bases, bcp47));
 
@@ -847,7 +838,7 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
           `Letters (${displayBases.length})`,
           "Letters that stand on their own.",
           displayBases.flatMap((b) => {
-            const u = showUppercase ? upperOf(b) : null;
+            const u = showUppercase ? upperCounterpartOf(b, bcp47) : null;
             const cells = [chip(b, b, justAddedBases.has(b))];
             if (u !== null) cells.push(chip(u, u, false));
             return cells;
@@ -867,7 +858,7 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
           "alphabet-accented",
           `Accented letters (${attestedStacks.length})`,
           "Letter-plus-mark combinations your language uses.",
-          collate(attestedStacks.map(composedStack)).map((composed) =>
+          collate(attestedStacks.map(composeStack)).map((composed) =>
             chip(composed, composed, justAddedStack === composed),
           ),
         )}

@@ -34,6 +34,7 @@ import {
   confirmedAlphabetKey,
   makeConfirmedAlphabet,
   makeEmptyPlacementWorklist,
+  stackKey,
 } from "@keyboard-studio/contracts";
 import {
   groupMarkClasses,
@@ -57,7 +58,7 @@ import { AttachmentStation } from "./AttachmentStation.tsx";
 import { MentalModelStation } from "./MentalModelStation.tsx";
 import { InputOrderStation, type MarkInputOrder } from "./InputOrderStation.tsx";
 import { OutputFormStation } from "./OutputFormStation.tsx";
-import { StackingStation, stackKey } from "./StackingStation.tsx";
+import { StackingStation } from "./StackingStation.tsx";
 import {
   ACCENT,
   TEXT_MAIN,

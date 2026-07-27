@@ -16,6 +16,7 @@
 // Thresholds ship as named constants, calibrated later (spec assumption).
 
 import type { ConfirmedAlphabet, KeyboardIR } from "@keyboard-studio/contracts";
+import { isCombiningMarkChar } from "../character-discovery/characterMap.js";
 import type { MarkClass } from "./mark-classes.js";
 import { attestedBasesOf } from "./mark-classes.js";
 import type { AttachmentProposal } from "./attachment-proposals.js";
@@ -56,7 +57,7 @@ export function detectBaseMarkMechanism(ir: KeyboardIR): BaseMarkMechanism | nul
     for (const rule of group.rules) {
       for (const el of rule.output) {
         if (el.kind !== "char") continue;
-        if (/^\p{M}$/u.test(el.value)) return "combining-keystroke";
+        if (isCombiningMarkChar(el.value)) return "combining-keystroke";
         if (el.value.normalize("NFD").length > el.value.length) sawPrecomposed = true;
       }
     }

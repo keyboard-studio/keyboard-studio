@@ -27,7 +27,6 @@ import { CarveAdapter } from "../editors/adapters/carveAdapter.tsx";
 import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
 import { TouchSeedSourcePanel } from "../editors/touchSeedSource/TouchSeedSourcePanel.tsx";
-import { SequencesAdapter } from "../editors/adapters/sequencesAdapter.tsx";
 import {
   BaseResolutionAdapter,
   IdentityLiteAdapter,
@@ -137,6 +136,10 @@ export const carveStep: EditorStep = step({
  * Self-read: assigns onto groups[]/stores[] without upstream producer.
  * inputs stays [] to avoid C2 data cycle (FR-002).
  * ADD_GALLERY_WRITES: groups[] / stores[] (editorMutate.ts).
+ * S-03 sequences build inline in MechanismGallery's method chooser (the
+ * right-hand preview pane swaps for a one-character sequence builder while
+ * that method is selected) — there is no separate "sequences" step; this is
+ * the only spine step directly before the off-spine touch_seed_source fork.
  */
 export const mechanismsStep: EditorStep = step({
   id: "mechanisms",
@@ -144,32 +147,6 @@ export const mechanismsStep: EditorStep = step({
   layout: "full",
   component: AddPhysicalAdapter,
   surface: "physical",
-  writes: [...ADD_GALLERY_WRITES],
-});
-
-/**
- * Sequences step: the Sequence Gallery (S-03 multi-key sequences),
- * positioned after Mechanisms and before the touch fork. Cycles the
- * characters flagged for sequences (sequenceFlaggedChars, set by the
- * Mechanism Gallery's S-03 FLAG card) and records a real
- * `multi_char_sequence` MechanismAssignment per character on Apply — routed
- * through the same recordAssignments -> applyAssignmentsToVfs pipeline
- * mechanismsStep uses, so it writes groups[]/stores[] exactly like
- * mechanismsStep does. Carries no lock (only "physical" and "touch" locks
- * exist, M3).
- * inputs stays [] (step() default): sequenceFlaggedChars is studio UI state,
- * not an IRPath, so this step has no upstream IR dependency and carries no
- * completeness-graph edges — but writes[] must still be declared, since it
- * DOES mutate groups[]/stores[] (self-read/self-write, same shape as
- * mechanismsStep above; not to be confused with R13 (steps/repropagate.ts),
- * which governs ir.touchLayout, a different artifact entirely).
- * ADD_GALLERY_WRITES: groups[] / stores[] (editorMutate.ts).
- */
-export const sequencesStep: EditorStep = step({
-  id: "sequences",
-  title: "Sequences",
-  layout: "full",
-  component: SequencesAdapter,
   writes: [...ADD_GALLERY_WRITES],
 });
 
@@ -250,7 +227,6 @@ export const registeredEditorSteps: readonly EditorStep[] = [
   projectNameStep,
   carveStep,
   mechanismsStep,
-  sequencesStep,
   touchSeedSourceStep,
   touchStep,
   helpStep,

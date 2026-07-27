@@ -44,7 +44,7 @@
 
 import { create } from "zustand";
 import type { AttestedStack, ConfirmedAlphabet, DeclaredRole } from "@keyboard-studio/contracts";
-import { makeConfirmedAlphabet } from "@keyboard-studio/contracts";
+import { makeConfirmedAlphabet, stackKey } from "@keyboard-studio/contracts";
 import type { SourcedInventory } from "@keyboard-studio/engine";
 import { decomposeGrapheme, isCombiningMarkChar, isPrivateUseCodePoint, glyphCategory } from "@keyboard-studio/engine";
 import { casePairOf, nfcDedup } from "../survey/charNormUtils.ts";
@@ -268,7 +268,7 @@ function deriveStores(picks: DraftPick[]): DerivedStores {
     }
   };
   const pushStack = (s: AttestedStack): void => {
-    const key = `${s.base} ${s.marks.join(" ")}`;
+    const key = stackKey(s);
     if (!stackSeen.has(key)) {
       stackSeen.add(key);
       attestedStacks.push(s);
@@ -349,9 +349,8 @@ function contribution(
 ): LastPickContribution {
   const beforeBases = new Set(before.bases);
   const beforeMarks = new Set(before.marks);
-  const beforeStacks = new Set(before.attestedStacks.map((s) => `${s.base} ${s.marks.join(" ")}`));
-  const addedStack =
-    after.attestedStacks.find((s) => !beforeStacks.has(`${s.base} ${s.marks.join(" ")}`)) ?? null;
+  const beforeStacks = new Set(before.attestedStacks.map((s) => stackKey(s)));
+  const addedStack = after.attestedStacks.find((s) => !beforeStacks.has(stackKey(s))) ?? null;
   return {
     grapheme: grapheme.normalize("NFC"),
     addedBases: after.bases.filter((b) => !beforeBases.has(b)),

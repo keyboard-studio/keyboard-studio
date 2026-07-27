@@ -22,9 +22,13 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 
 export function confirmRebaseIfEdited(): boolean {
   const s = useWorkingCopyStore.getState();
-  // sequenceFlaggedChars: flagging a char (Mechanism Gallery S-03) is a real
-  // edit even though it records no MechanismAssignment — included here so
-  // rebasing away from it is confirmed, not silently discarded.
+  // sequenceFlaggedChars: historically, flagging a char (Mechanism Gallery
+  // S-03) was a real edit even though it recorded no MechanismAssignment.
+  // flagCharForSequence is no longer called from any UI path (see
+  // workingCopyStore), so this list is always empty in practice — the
+  // membership check below is a harmless no-op, kept rather than removed
+  // since the underlying sequenceFlaggedChars/flagCharForSequence state is
+  // itself dead code deliberately deferred, not yet stripped.
   // deletedItemIds is a known separate gap, not addressed here.
   const hasEdits =
     s.isInstantiated() &&
