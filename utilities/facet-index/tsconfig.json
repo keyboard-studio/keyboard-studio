@@ -1,4 +1,5 @@
 {
+  "extends": "../tsconfig.contracts-paths.json",
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",
@@ -6,9 +7,6 @@
     "allowImportingTsExtensions": true,
     "strict": true,
     "noEmit": true,
-    "types": ["node"],
-    "paths": {
-      "@keyboard-studio/contracts": ["../../packages/contracts/src/index.ts"]
-    }
+    "types": ["node"]
   }
 }

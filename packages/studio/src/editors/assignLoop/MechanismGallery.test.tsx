@@ -24,7 +24,7 @@
 //   - Already-produced section collapsed by default; toggle expands it.
 //   - Guards: null base → no-base prompt; empty inventory → survey prompt.
 
-import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
+import { describe, it, expect, afterEach, vi, beforeEach, beforeAll } from "vitest";
 import { screen, fireEvent, act, cleanup, waitFor, within, renderHook } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { render } from "../../test/renderWithI18n.tsx";
@@ -50,6 +50,7 @@ import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 import { expectCurrentChar } from "../../test/currentCharChip.ts";
 import { changeSelectMenu, selectMenuValue, selectMenuOptionValues } from "../../test/selectMenuTestUtils.ts";
+import { installDialogShim } from "../../test/dialogShim.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() — variables referenced inside vi.mock() factory closures.
@@ -239,6 +240,12 @@ function instantiateWorkingCopy(opts: { mnemonic?: boolean; caps?: boolean } = {
   const ir = makeTestIR([group], opts.mnemonic === true ? [mnemonicStore()] : []);
   useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: seedVfs, ir });
 }
+
+// jsdom does not implement HTMLDialogElement.showModal()/close() — shared
+// shim (test/dialogShim.ts); see that module for rationale. Needed here
+// because the leave-warning modal (ConfirmDialog) now mounts whenever the
+// whole-inventory unimplemented-characters check finds a gap.
+beforeAll(installDialogShim);
 
 afterEach(() => {
   cleanup();
@@ -932,10 +939,13 @@ describe("MechanismGallery — Done state (positional: last char's forward butto
     expect(onComplete).toHaveBeenCalledOnce();
   });
 
-  it("skipping the only (last) character completes the phase via onComplete", async () => {
-    // Skip on the last position is itself the phase completion — positional
-    // Skip advances by one position, or finishes if there is no next
-    // position, exactly like Next/Done.
+  it("skipping the only (last) character opens the leave-warning modal, then completes via \"Come back later\"", async () => {
+    // Skip on the last position is itself the phase completion attempt —
+    // positional Skip advances by one position, or finishes if there is no
+    // next position, exactly like Next/Done. "á" was skipped (never applied),
+    // so it is unimplemented — the whole-inventory leave-warning modal opens
+    // instead of completing immediately; "Come back later" defers and
+    // completes anyway.
     const onComplete = vi.fn();
     seedInventory(["á"]);
     await act(async () => {
@@ -947,7 +957,118 @@ describe("MechanismGallery — Done state (positional: last char's forward butto
       );
     });
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(onComplete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Come back later/i }));
     expect(onComplete).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Leave-warning modal — open/closed state + the "Go back and finish" (stay)
+// path, and the Back-button-does-not-trigger-it guard. The "Come back later"
+// (defer) path is covered above; this suite closes the gap on the modal's
+// OTHER outcomes and on the dialog's actual open/closed state (queried via
+// the native <dialog> element's `open` attribute, not just button presence —
+// ConfirmDialog always renders both buttons regardless of `open`, so a bare
+// button-exists query cannot distinguish "modal is showing" from "modal is
+// mounted but closed").
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — leave-warning modal open/closed state", () => {
+  it("does NOT open the dialog when Done completes with every character implemented", async () => {
+    const onComplete = vi.fn();
+    seedInventory(["á"]);
+    const { container } = await act(async () =>
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />,
+      ),
+    );
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+    await waitFor(() => {
+      const doneBtn = screen.getByRole("button", { name: "Done" });
+      expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(doneBtn);
+    });
+    // Completed directly — the dialog never opened.
+    expect(onComplete).toHaveBeenCalledOnce();
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+  });
+
+  it("opens the dialog (native <dialog open> attribute) when forward-completing with an unimplemented character", async () => {
+    seedInventory(["á"]);
+    const { container } = await act(async () =>
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(container.querySelector("dialog")?.hasAttribute("open")).toBe(true);
+  });
+
+  it('"Go back and finish" (primary) closes the dialog and does NOT complete — the author stays in the gallery able to finish "á"', async () => {
+    const onComplete = vi.fn();
+    seedInventory(["á"]);
+    const { container } = await act(async () =>
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(container.querySelector("dialog")?.hasAttribute("open")).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: /Go back and finish/i }));
+
+    // No advance — onComplete never fires, and the dialog is closed again.
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+    // Still on "á", with the Apply control still available to actually finish it.
+    expectCurrentChar("á");
+    expect(screen.getByRole("button", { name: /Apply method for á/i })).toBeTruthy();
+  });
+
+  it("Escape (the native <dialog> cancel event) does NOT proceed — it stays in the gallery, same as \"Go back and finish\" (P1(a))", async () => {
+    const onComplete = vi.fn();
+    seedInventory(["á"]);
+    const { container } = await act(async () =>
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    const dialog = container.querySelector("dialog")!;
+    expect(dialog.hasAttribute("open")).toBe(true);
+
+    fireEvent(dialog, new Event("cancel", { cancelable: true }));
+
+    // Escape must map to the STAY action, not the "Come back later" defer —
+    // onComplete must never fire from a dismissal.
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(dialog.hasAttribute("open")).not.toBe(true);
+    expectCurrentChar("á");
+  });
+
+  it("the ← back button never opens the leave-warning modal, even while characters remain unimplemented", async () => {
+    const onBack = vi.fn();
+    seedInventory(["á", "é"]);
+    const { container } = await act(async () =>
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} onComplete={vi.fn()} />,
+      ),
+    );
+    // Advance to "é" (idx 1) without implementing "á" — Skip is pure forward nav.
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    await waitFor(() => {
+      expectCurrentChar("é");
+    });
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+
+    // Navigate backward through both (still-unimplemented) characters via
+    // the Back control — this is a DIFFERENT control from the forward
+    // Done/Skip-on-last path that triggers the modal, and must never open it.
+    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    await waitFor(() => {
+      expectCurrentChar("á");
+    });
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    expect(onBack).toHaveBeenCalledOnce();
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
   });
 });
 
@@ -1525,9 +1646,13 @@ describe("MechanismGallery — Back after skipping the only character", () => {
       );
     });
 
-    // Skipping the only character is itself the phase completion (idx 0 is
-    // also the last position) — it does not move currentChar anywhere.
+    // Skipping the only character is itself the phase completion attempt
+    // (idx 0 is also the last position) — it does not move currentChar
+    // anywhere. "á" was skipped (never applied), so the leave-warning modal
+    // opens instead of completing immediately; defer via "Come back later".
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(onComplete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Come back later/i }));
     expect(onComplete).toHaveBeenCalledOnce();
 
     // "á" is still the selected chip — positional nav never nulled

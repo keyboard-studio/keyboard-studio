@@ -5,7 +5,11 @@
   "description": "Monorepo root for keyboard-studio. See spec.md.",
   "packageManager": "pnpm@9.12.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.19.0"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.0.0",
+    "@vercel/postgres": "^0.10.0"
   },
   "scripts": {
     "fetch-langtags": "node scripts/fetch-langtags.mjs",
@@ -14,7 +18,10 @@
     "codegen-glottolog": "node scripts/codegen-glottolog.mjs",
     "compile-recognizer-rules": "node scripts/compile-recognizer-rules.mjs",
     "codegen-charnames": "node scripts/codegen-charnames.mjs",
-    "prebuild": "pnpm run fetch-langtags && pnpm run codegen-langtags && pnpm run fetch-glottolog && pnpm run codegen-glottolog && pnpm run compile-recognizer-rules && pnpm run codegen-charnames",
+    "fetch-sldr": "node scripts/fetch-sldr.mjs",
+    "codegen-exemplars": "node --experimental-strip-types scripts/codegen-exemplars.mjs",
+    "check-exemplar-staleness": "node scripts/check-exemplar-staleness.mjs",
+    "prebuild": "pnpm run fetch-langtags && pnpm run codegen-langtags && pnpm run fetch-glottolog && pnpm run codegen-glottolog && pnpm run compile-recognizer-rules && pnpm run codegen-charnames && pnpm run fetch-sldr && pnpm run codegen-exemplars",
     "build": "pnpm -r build",
     "dev": "pnpm --filter @keyboard-studio/engine build && pnpm --parallel --stream --filter @keyboard-studio/engine --filter @keyboard-studio/studio run dev",
     "test": "pnpm -r test",

@@ -10,6 +10,7 @@
 //   #output             — OutputScreen: "ship it" — Download .zip +
 //                         SignUpPanel (no interactive OSK)
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import { ResizeHandle } from "./components/ResizeHandle.tsx";
@@ -23,9 +24,10 @@ import {
   deriveProjectKeyFromWorkingCopy,
   discardActiveDraft,
   installDraftAutosave,
-  replaceActiveDraftIfDifferentProject,
+  startCloudSync,
   wasDraftRestoredThisBoot,
 } from "./lib/draftPersistence.ts";
+import { useGitHubAuth } from "./hooks/useGitHubAuth.ts";
 import { type RouteId } from "./lib/navigate.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
@@ -44,7 +46,7 @@ import { PreviewScreen } from "./components/PreviewScreen.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
-import { Trans } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { LocaleSwitcher } from "./components/LocaleSwitcher.tsx";
@@ -57,6 +59,7 @@ import { StepHost } from "./components/StepHost.tsx";
 import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
 import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
+import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
 
 // Bind the manifest into the store's staleness actions.
 // Called once at module load; avoids a circular static import in the store
@@ -141,9 +144,19 @@ const NAV_ITEMS: NavItem[] = [
 
 interface NavBarProps {
   active: RouteId;
+  /**
+   * P0 fix UX signal (not the authoritative enforcement — that lives in
+   * OutputScreen/usePreviewArtifact's canDownload gate, which is reachable
+   * regardless of how #output was navigated to). Dims the Output tab and
+   * marks it aria-disabled with an explanatory title so the block is obvious
+   * BEFORE the click, not just after landing on a disabled download button.
+   */
+  outputBlocked?: boolean;
+  /** Tooltip / aria explanation shown while outputBlocked is true. */
+  outputBlockedTitle?: string;
 }
 
-function NavBar({ active }: NavBarProps) {
+function NavBar({ active, outputBlocked = false, outputBlockedTitle }: NavBarProps) {
   return (
     <nav
       aria-label="Studio navigation"
@@ -163,17 +176,21 @@ function NavBar({ active }: NavBarProps) {
       <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
         {NAV_ITEMS.map(({ id, label }) => {
           const isActive = id === active;
+          const isBlocked = id === "output" && outputBlocked;
           return (
             <a
               key={id}
               href={`#${id}`}
               aria-current={isActive ? "page" : undefined}
+              aria-disabled={isBlocked ? "true" : undefined}
+              title={isBlocked ? outputBlockedTitle : undefined}
               style={{
                 padding: "4px 12px",
                 fontSize: 14,
                 fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
                 textDecoration: "none",
-                color: isActive ? "#6ea8fe" : "#e6edf3",
+                color: isBlocked ? "#6e7681" : isActive ? "#6ea8fe" : "#e6edf3",
+                opacity: isBlocked ? 0.6 : 1,
                 borderBottom: isActive ? "2px solid #6ea8fe" : "2px solid transparent",
                 lineHeight: "40px",
                 whiteSpace: "nowrap",
@@ -272,6 +289,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const localBase = useSurveySessionStore((s) => s.localBase);
   const surveyContext = useSurveySessionStore((s) => s.surveyContext);
 
+  // Self-contained useGitHubAuth() call (same idiom as MyKeyboardsList /
+  // ManagedPRSubmitPanel) so SurveyView can start/stop the signed-in cloud
+  // draft backup (startCloudSync, below) without threading auth state down
+  // through props. Only the access-token PRIMITIVE is read — see the
+  // cloud-sync effect's dependency array.
+  const { token: githubToken } = useGitHubAuth();
+  const cloudSyncAccessToken = githubToken?.accessToken ?? null;
+
   // Store actions needed by SurveyView (not delegated to StepHost).
   const sessionReset = useSurveySessionStore((s) => s.reset);
   const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
@@ -319,7 +344,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     if (!wasDraftRestoredThisBoot()) {
       useSurveySessionStore.getState().reset();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally empty: runs exactly once on mount
+    // Intentionally empty deps: runs exactly once on mount.
   }, []);
 
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
@@ -381,8 +406,31 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       autosaveTeardownRef.current?.();
       autosaveTeardownRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- teardown-on-unmount only; the ref itself is stable
+    // Teardown-on-unmount only; the ref itself is stable.
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // US3a: signed-in cloud-draft backup. Runs ALONGSIDE (never instead of) the
+  // local autosave above — see draftPersistence.ts's startCloudSync docstring
+  // for what it pushes and why this is not a second D3-scoped debounce cycle.
+  // Starts as soon as an access token is present (sign-in can happen before
+  // OR after a working copy is instantiated — startCloudSync's own flush
+  // no-ops while there is no active project yet) and tears down on sign-out
+  // or unmount. `cloudSyncAccessToken` is the effect's ONLY dependency, so
+  // this does not restart the subscription on every render; React calls the
+  // returned cleanup (tearing down the old subscription) before re-running
+  // the effect on a token change, so there is exactly one live subscription
+  // at a time. A project switch (e.g. start-over) does NOT need its own
+  // teardown/restart here — startCloudSync re-resolves the active project on
+  // every flush, so it simply follows whichever project is active next.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (cloudSyncAccessToken === null) {
+      return undefined;
+    }
+    const teardown = startCloudSync(() => cloudSyncAccessToken);
+    return teardown;
+  }, [cloudSyncAccessToken]);
 
   // ---------------------------------------------------------------------------
   // ReducerDeps — injected into applyStepCompletion (steps/reducer.ts).
@@ -443,7 +491,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       setMarksMigrationNeeded: (needed) =>
         useSurveySessionStore.getState().setMarksMigrationNeeded(needed),
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
     [lockDesktop, clearStale, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting, setTouchSeedSource],
   );
@@ -477,17 +524,22 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       if (instantiatedRef.current) return;
       instantiatedRef.current = true;
 
-      // T025 (spec 034 US3, VR-5 / FR-009 / AS-4): a durable draft from a
-      // DIFFERENT project may already be active (e.g. the author abandoned an
-      // earlier in-progress keyboard without "start over" and picked a new
-      // base). This is the instantiation entry point, so it is where a genuine
-      // project switch first becomes visible — replace the prior project's
-      // draft now, BEFORE this instantiation's own autosave (below) starts
-      // writing under the new key. MVP policy: clean replace, never silent
-      // merge (a confirm-before-overwrite UX is the non-MVP alternative the
-      // contract also permits, deferred).
-      replaceActiveDraftIfDifferentProject(base.id);
-
+      // Spec 034's VR-5 used to call `replaceActiveDraftIfDifferentProject`
+      // here: picking a new base DELETED the previously active project's
+      // draft, because the studio could hold only one draft at a time and a
+      // project switch was therefore indistinguishable from abandonment.
+      //
+      // "My keyboards" (spec 047 US3a) is precisely the feature that makes
+      // several drafts co-exist, so that implicit delete is now the direct
+      // negation of SC-001 — it would let an author start keyboard B and find
+      // keyboard A silently gone from their list. The clear-on-switch is
+      // removed, not merely relaxed: there is no longer any sense in which a
+      // project switch implies discarding the project being switched away
+      // from. Abandonment stays explicit, via `discardActiveDraft` on the
+      // start-over paths (WelcomeScreen's "start over" and this shell's own
+      // reset below) — the author's own instruction, not an inference from
+      // navigation. See specs/047-my-keyboards/spec.md ("Superseded: spec
+      // 034 VR-5").
       // Reads via getState() escape hatch (not a selector) to avoid a stale closure — the callback is memoised with empty deps.
       const track = useSurveySessionStore.getState().selectedTrack;
       applyStepCompletion(
@@ -510,7 +562,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         autosaveTeardownRef.current = installDraftAutosave(projectKey);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     // Same escape hatch as the pre-preview-before-commit onInstantiate: all
     // reads are via getState()/reducerDepsRef.current (stable refs), not
     // React state, so an empty dep array is intentional here too.
@@ -553,7 +604,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         setSurveyPatternMap(map);
       })
       .catch((err: unknown) => {
-        console.error("[SurveyView] pattern load for preview failed:", err);
+        devLog.error("[SurveyView] pattern load for preview failed:", err);
       });
   }, [sessionAssignments]);
 
@@ -861,6 +912,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
 export function StudioShell() {
   const route = useRoute();
+  const { t } = useLingui();
 
   const selectedBaseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
 
@@ -907,6 +959,16 @@ export function StudioShell() {
     [desktopLocked, touchLayoutJson, staleSteps, validatorFindings],
   );
 
+  // ---------------------------------------------------------------------------
+  // Output nav-link UX signal (P0 fix) — NOT the authoritative enforcement
+  // (that is OutputScreen's canDownload gate via usePreviewArtifact, which
+  // still applies regardless of how #output was reached). This is purely so
+  // the block is visible on the tab itself before the click. Same shared hook
+  // (hooks/useInventoryCoverageGate.ts) as StepHost/PhaseFGate/OutputScreen —
+  // do not re-derive the desktop-always/touch-only-if-authored booleans here.
+  // ---------------------------------------------------------------------------
+  const outputNavBlocked = useInventoryCoverageGate().blocked;
+
   let content: ReactNode;
   switch (route) {
     case "welcome":
@@ -941,7 +1003,14 @@ export function StudioShell() {
           background: "var(--bg)",
         }}
       >
-        <NavBar active={route} />
+        <NavBar
+          active={route}
+          outputBlocked={outputNavBlocked}
+          outputBlockedTitle={t({
+            id: "studio.nav.outputBlocked.title",
+            message: "Finish every inventory character before you can access Output",
+          })}
+        />
         <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
           {content}
         </div>

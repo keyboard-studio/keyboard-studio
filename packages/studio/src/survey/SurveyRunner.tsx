@@ -11,6 +11,7 @@
 //     ctx.field != 'x', "or" (space-separated "or" tokens), "and" tokens.
 //     Full boolean DSL is out of scope — these cover the actual YAML content.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useState, useId, useMemo, useRef, useEffect } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { FlowDef, FlowQuestion, FlowOption, FlowGotoRule, SurveyContext, AnswerStackEntry } from "./types.ts";
@@ -203,12 +204,12 @@ export function advanceThrough(
   while (nextId !== null) {
     const next = index.get(nextId);
     if (next === undefined) {
-      console.error("SurveyRunner: unresolved goto target", nextId);
+      devLog.error("SurveyRunner: unresolved goto target", nextId);
       return null;
     }
     if (next.engine_resolved !== true) return nextId;
     if (visited.has(nextId)) {
-      console.error("SurveyRunner: cycle detected in engine_resolved chain", nextId);
+      devLog.error("SurveyRunner: cycle detected in engine_resolved chain", nextId);
       return null;
     }
     visited.add(nextId);

@@ -22,6 +22,10 @@
     "./criteria": {
       "types": "./dist/criteriaData.d.ts",
       "import": "./dist/criteriaData.js"
+    },
+    "./dev-log": {
+      "types": "./dist/utils/devLog.d.ts",
+      "import": "./dist/utils/devLog.js"
     }
   },
   "files": [

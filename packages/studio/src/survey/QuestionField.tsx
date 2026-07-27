@@ -2,6 +2,7 @@
 // Each renderer receives the current value (string | string[] | undefined)
 // and calls onChange when the user modifies it.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useState, useEffect, useRef } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { FlowQuestion, SurveyContext } from "./types.ts";
@@ -332,7 +333,7 @@ function LangtagsComboboxField({
       .catch((err: unknown) => {
         // Degrade to a plain free-text field on import failure (FR-009).
         if (!isMountedRef.current) return;
-        console.warn(
+        devLog.warn(
           "[LangtagsComboboxField] langtags load failed; degrading to free-text input",
           err,
         );

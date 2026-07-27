@@ -43,9 +43,13 @@ function walkSpine(
 // Context helpers
 // ---------------------------------------------------------------------------
 
-const copyCtx = { selectedTrack: "copy" as const, identitySupported: true, touchSeedSource: null };
-const adaptCtx = { selectedTrack: "adapt" as const, identitySupported: true, touchSeedSource: null };
-const unsupported = { selectedTrack: null, identitySupported: false, touchSeedSource: null };
+// allCharactersImplemented: true — these contexts model the "everything is
+// finished" success path for the full-walk assertions below; the Phase F
+// hard-gate's own false-branch behavior is covered separately (see "advance:
+// help — hard gate" below).
+const copyCtx = { selectedTrack: "copy" as const, identitySupported: true, touchSeedSource: null, allCharactersImplemented: true };
+const adaptCtx = { selectedTrack: "adapt" as const, identitySupported: true, touchSeedSource: null, allCharactersImplemented: true };
+const unsupported = { selectedTrack: null, identitySupported: false, touchSeedSource: null, allCharactersImplemented: true };
 
 // ---------------------------------------------------------------------------
 // manifestIndexOf
@@ -338,6 +342,26 @@ describe("advance: help", () => {
   it("help carries navigate:'output'", () => {
     const { navigate } = advance("help", undefined, copyCtx);
     expect(navigate).toBe("output");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// advance — help: the Phase F hard gate (no "come back later" escape)
+// ---------------------------------------------------------------------------
+
+describe("advance: help — hard gate (allCharactersImplemented)", () => {
+  it("stays on 'help' (no navigate) when allCharactersImplemented is false", () => {
+    const blockedCtx = { ...copyCtx, allCharactersImplemented: false };
+    const outcome = advance("help", undefined, blockedCtx);
+    expect(outcome.next).toBe("help");
+    expect(outcome.navigate).toBeUndefined();
+  });
+
+  it("advances to done + navigate:'output' once allCharactersImplemented flips true", () => {
+    const readyCtx = { ...copyCtx, allCharactersImplemented: true };
+    const outcome = advance("help", undefined, readyCtx);
+    expect(outcome.next).toBe("done");
+    expect(outcome.navigate).toBe("output");
   });
 });
 

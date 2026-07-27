@@ -1,5 +1,6 @@
 // see spec.md §8 step 1 — BaseBrowserService implementation (GitHub API client)
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import {
   makeBaseKeyboard,
   type BaseBrowserService,
@@ -54,7 +55,7 @@ async function collectReleaseTreeItems(
   if (!tree.truncated) {
     return { items: tree.tree, sha: tree.sha };
   }
-  console.warn(
+  devLog.warn(
     "[base-browser] keymanapp/keyboards exceeded GitHub's recursive-tree limit " +
       "(100k entries / 7 MB); falling back to an incremental per-subfolder listing" +
       (clientOpts.token === undefined
@@ -92,7 +93,7 @@ async function collectReleaseItemsIncrementally(
       try {
         sub = await fetchTree(OWNER, REPO, group.sha, clientOpts, true);
       } catch (err) {
-        console.warn(
+        devLog.warn(
           "[base-browser] failed to list release/" +
             group.path +
             "/; skipping (its keyboards will be missing from the gallery): " +

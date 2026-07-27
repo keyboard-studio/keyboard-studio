@@ -1,3 +1,4 @@
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useState, useEffect } from "react";
 import type { PlacementMap } from "@keyboard-studio/contracts";
 
@@ -22,7 +23,7 @@ export function usePlacementPriors(): PlacementMap | null {
         setPlacementMap(corpusPriorsToPlacementMap(priors));
       } catch (err) {
         if (!cancelled) {
-          console.warn("Placement priors unavailable:", err);
+          devLog.warn("Placement priors unavailable:", err);
         }
       }
     })();

@@ -25,6 +25,7 @@
 - **D1 — Partial slot-fill:** Block on required slots; allow optional empty only if substituted fragment passes Layer A validation.
 - **D2 — CasedKeys for non-Roman:** Default omit; survey-prompt shown for case-distinct script subtags: Armn, Geor, Adlm, Osge, Wara, Cher.
 - **D3 — Lint vs. compile:** One debounce cycle (300 ms), two concurrent microtasks; TS error suppresses WASM call; WASM diagnostic supersedes conflicting TS diagnostic.
+  - *Scope clarification (2026-07-27, spec 047):* D3 constrains the **validation** cycle — any timer that turns working-copy edits into diagnostics. Persistence and network-sync timers are outside it: they race no other timer, produce no diagnostics, and cannot reorder a TS/WASM verdict. `AUTOSAVE_DEBOUNCE_MS` (500 ms) and `CLOUD_SYNC_DEBOUNCE_MS` (20 s) in `draftPersistence.ts` are therefore not D3 violations. Test: *does the timer emit diagnostics?* If yes, it must fold into the single 300 ms cycle; if no, D3 is silent on it. This clarifies the original decision's scope; it does not reopen or amend the decision itself.
 - **D4 — Quality bands:** Four bands: scaffolder-bake / Layer-C-enforce / yellow-survey / red-checklist.
 - **D5 — CJK/Ethiopic:** Confirmed out of v1; routing renders "not yet supported" stub.
 - **D6 — Desktop-first authoring scope:** v1 is desktop-first only; touch layout produced in Phase E from desktop OSK; mobile-primary authors notified at Phase A before survey investment; touch-first authoring is a v1.1 candidate.

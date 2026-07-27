@@ -15,16 +15,31 @@ import { seedReturningVisitor } from "./helpers/surveyFlow";
 // Scope everything to the NavBar landmark (aria-label="Studio navigation",
 // StudioShell.tsx) — the survey's own language-identify question also has
 // "language" in its accessible name/text, so an unscoped locator is ambiguous.
-// The LocaleSwitcher's field label (<Trans>) is a bare text node sharing its
-// wrapping <label> with the <select> itself, so within the nav a substring
-// getByText is unambiguous (option text is each language's autonym —
-// "English"/"Français" — which never contains "Language"/"Langue").
+// The LocaleSwitcher's field label (<Trans>) is a bare text node next to the
+// control, so within the nav a substring getByText is unambiguous (option text
+// is each language's autonym — "English"/"Français" — which never contains
+// "Language"/"Langue").
 function navBar(page: import("playwright/test").Page) {
   return page.getByRole("navigation", { name: "Studio navigation" });
 }
 
-function localeSwitcher(page: import("playwright/test").Page) {
-  return navBar(page).getByRole("combobox");
+/**
+ * Pick a UI locale.
+ *
+ * The switcher is a ui/SelectMenu (trigger `<button aria-haspopup="listbox">`
+ * plus a DOM-rendered `<ul role="listbox">`), not a native `<select>` — native
+ * popups don't open in the VS Code webview. So: open it, then click the option
+ * by its `data-value` test hook. Same pattern as the survey's target-script and
+ * host-key pickers in helpers/surveyFlow.ts; `selectOption()` cannot drive it.
+ */
+async function chooseLocale(
+  page: import("playwright/test").Page,
+  locale: "en" | "fr",
+): Promise<void> {
+  const trigger = navBar(page).locator("#nav-language-select");
+  await trigger.waitFor({ timeout: 10_000 });
+  await trigger.click();
+  await trigger.locator("xpath=..").locator(`li[data-value="${locale}"]`).click();
 }
 
 test.describe("Locale switcher — persistence + no first-paint English flash", () => {
@@ -35,7 +50,7 @@ test.describe("Locale switcher — persistence + no first-paint English flash", 
     // English by default — the field label reads "Language".
     await expect(navBar(page).getByText("Language")).toBeVisible();
 
-    await localeSwitcher(page).selectOption("fr");
+    await chooseLocale(page, "fr");
 
     // Same assertion LocaleSwitcher.test.tsx makes at the unit level
     // ("Language" -> "Langue"), here proving the real browser round-trip
@@ -50,7 +65,7 @@ test.describe("Locale switcher — persistence + no first-paint English flash", 
 
     // Switch back to English so this test leaves no locale side effect for
     // any spec that happens to reuse the browser context/storage state.
-    await localeSwitcher(page).selectOption("en");
+    await chooseLocale(page, "en");
     await expect(navBar(page).getByText("Language")).toBeVisible();
   });
 });
