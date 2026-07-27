@@ -82,6 +82,14 @@ jobs:
       - name: Test (all packages)
         run: pnpm -r test
 
+      # The i18n-content-extract and content-i18n-lint tools live under
+      # utilities/* (outside pnpm-workspace.yaml), so `pnpm -r test` never
+      # reaches their vitest suites. Run them explicitly — these are the
+      # regression guards for the Tier B content-i18n extractor + drift gate
+      # (spec 046 T024/T031, spec 050 T010/T013), so they must run in CI.
+      - name: Test (i18n utilities — outside the pnpm workspace)
+        run: pnpm run test:i18n-utilities
+
       # Non-blocking: warns in CI log and opens GitHub Issues for any spec
       # sections whose content changed since the last acknowledgement.
       # Never fails the build — drift is a backlog item, not a blocker.

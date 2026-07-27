@@ -120,14 +120,22 @@ Crowdin dry-run). Summary:
   source strings on every merge to `main`; `crowdin-download-translations.yml`
   runs on a schedule and opens a translations PR through the km-triage merge
   gate when Crowdin has new/updated approved strings.
-- **Tier B (content strings) — deferred, commented scaffolding only.** Crowdin's
+- **Tier B (content strings) — shipped (spec 046 US2, T027–T031); extended to a
+  fourth catalog by [spec 050](../specs/050-flow-question-i18n/spec.md).** Crowdin's
   generic JSON/YAML parser translates every string value, so pointing it at the
   raw content records would hand control fields (`id`, `answerType`, `default`,
-  `firingCondition`, BCP47 tags, `criteria.json` ids …) to translators. The
-  intended design is a build step that extracts translatable prose into flat
-  `{id: text}` sidecar catalogs (Tier A shape); `criteria.json` is further gated
-  by its zod schema + the 148-count test. Both are US2 (T024–T031) decisions,
-  gated on the joint engine+content session (T026).
+  `firingCondition`, BCP47 tags, `criteria.json` ids …) to translators. Instead
+  `utilities/i18n-content-extract` extracts only render-verified prose into flat
+  `{id: text}` sidecar catalogs (Tier A shape) under `content/i18n/en/*.json`.
+  There are now **four** such catalogs — `patterns`, `adaptationQuestions`,
+  `criteria`, and `flowQuestions` (the modular flow-engine's survey-question
+  prompt/help text, added by spec 050). Freshness is gated by the extractor
+  CLI's `--check` (wired into `pnpm lint`) and target-locale key-set parity by
+  `utilities/content-i18n-lint`; `criteria.json` is further gated by its zod
+  schema + the criteria-count test. Seam decisions live in
+  [specs/046-i18n-localization/research.md](../specs/046-i18n-localization/research.md)
+  (D8) and spec 050's research.md (D7 — why `flowQuestions` freshness is
+  delegated to the extractor CLI rather than mirrored in the plain-JS lint tool).
 
 **Verify manually:** `crowdin upload sources --dry-run -b main` (the CLI has no
 offline config validation — every command authenticates against the live

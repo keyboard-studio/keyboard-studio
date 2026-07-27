@@ -47,6 +47,7 @@ export function run(options: RunOptions): RunResult {
     ["patterns.json", catalogs.patterns],
     ["adaptationQuestions.json", catalogs.adaptationQuestions],
     ["criteria.json", catalogs.criteria],
+    ["flowQuestions.json", catalogs.flowQuestions],
   ];
 
   const changed: string[] = [];

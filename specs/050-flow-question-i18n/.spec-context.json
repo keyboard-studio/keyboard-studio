@@ -1,0 +1,38 @@
+{
+  "workflow": "speckit",
+  "specName": "Flow-Question Content i18n (Tier B coverage for the modular flow engine)",
+  "branch": "050-flow-question-i18n",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-27T14:35:50.918Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-27T14:42:17.760Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-27T14:43:31.700Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-27T14:43:37.303Z"
+    }
+  ],
+  "telemetryInstanceId": "f1a5712a-9e25-4b8e-a597-758870fb9016"
+}
