@@ -1,0 +1,9 @@
+{
+  "_comment": "Pinned SIL SLDR acquisition config. fetch-sldr.mjs downloads the single source tarball at the pinned commit, SHA-256-verifies it (fails loudly on placeholder, mismatch, HTML error page, or zero-length body), and extracts the sldr/ locale tree into the gitignored packages/engine/data/sldr/.",
+  "repo": "silnrsi/sldr",
+  "commit": "922a7879250864e23039f56dc929c84ed4aa3ebc",
+  "urlTemplate": "https://codeload.github.com/silnrsi/sldr/tar.gz/{commit}",
+  "sha256": "583bd26ce95b6f57fd16ca6fb4c87cf0b53b890a8a12e8d09fdbfe9dd66eb9c7",
+  "license": "MIT",
+  "notice": "Copyright (c) 2014-2023 SIL International (http://www.sil.org)"
+}

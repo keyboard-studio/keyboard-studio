@@ -89,6 +89,27 @@ try {
     .filter((d) => d.isDirectory())
     .map((d) => d.name);
 
+  // A fresh extraction that produced NOTHING is a broken toolchain, not a
+  // catalog with zero locales. Without this guard the empty temp dir flows into
+  // the orphan check below and reports every committed locale as "not a
+  // configured locale" — a misdiagnosis that sent one fix pass looking at
+  // lingui.config.ts when the CLI had never run.
+  //
+  // The failure mode that produced it: @lingui/cli v6 gates its CLI entry on
+  // `import.meta.main`, which is undefined before Node 22.19 — so on an older
+  // Node every `lingui` subcommand exits 0 having done nothing, printing
+  // nothing. Hence the explicit Node hint, which is the cause in practice.
+  if (freshLocales.length === 0) {
+    throw new Error(
+      "i18n-catalog-lint: the fresh extraction produced no locales at all — " +
+        "the Lingui CLI ran but wrote nothing.\n" +
+        `  Node in use: ${process.version} (@lingui/cli requires >= 22.19.0; ` +
+        "below that its CLI entry silently no-ops).\n" +
+        "  Check `pnpm --filter @keyboard-studio/studio messages:extract` prints " +
+        "a catalog-statistics table. If it prints nothing, upgrade Node.",
+    );
+  }
+
   for (const locale of freshLocales) {
     const fresh = readCatalog(path.join(tmpRoot, locale, CATALOG_FILE));
     const committed = readCatalog(

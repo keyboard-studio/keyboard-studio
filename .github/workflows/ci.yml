@@ -37,12 +37,30 @@ jobs:
 
       # Offline codegen the build depends on. Most prebuild steps fetch over
       # the network (langtags/glottolog) and commit their derived index, so CI
-      # skips them; but codegen-charnames derives from the committed,
-      # SHA-pinned lib/ucd/UnicodeData.txt into a gitignored JSON that
+      # skips them. Two exceptions run here, for different reasons: this one
+      # because it is hermetic and the build needs it, and fetch-sldr below
+      # because a test needs its raw input even though the derived index is
+      # committed — see that step's own comment.
+      #
+      # codegen-charnames derives from the committed, SHA-pinned
+      # lib/ucd/UnicodeData.txt into a gitignored JSON that
       # engine/src/character-discovery/charNames.ts imports at build time.
       # Regenerate it here — hermetic, no network — so `pnpm -r build` resolves.
       - name: Codegen (charnames — offline, build input)
         run: pnpm run codegen-charnames
+
+      # The exemplar index (exemplars.generated.json) IS committed, so neither
+      # the build nor the app needs the raw SLDR tree. But the spec 044
+      # determinism test regenerates the index from source and asserts it
+      # reproduces the committed artifact byte for byte — that regeneration
+      # reads packages/engine/data/sldr/sldr/, which is gitignored. Without
+      # this step the test fails on every run with "not found — run
+      # `pnpm run fetch-sldr` first", and the guarantee that a pin bump can't
+      # silently change the index goes unenforced. Commit + tarball SHA-256 are
+      # pinned in scripts/sldr-version.json and the script fails loudly on a
+      # mismatch, so the fetch is reproducible despite touching the network.
+      - name: Fetch SLDR (pinned — determinism-test input)
+        run: pnpm run fetch-sldr
 
       # Build before typecheck — engine/studio depend on contracts'
       # dist/*.d.ts at type-resolution time. Without this, downstream

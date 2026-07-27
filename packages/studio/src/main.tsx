@@ -12,6 +12,7 @@ import { rehydrateWorkingCopyFromSession } from "./lib/persistWorkingCopy.ts";
 import { installE2eHook } from "./lib/e2eHook.ts";
 import { loadDraft, resolveActiveProjectKey } from "./lib/draftPersistence.ts";
 import { localeReady } from "./lib/i18n.ts";
+import { warmExemplarSource } from "./lib/services.ts";
 
 function requireRoot(): HTMLElement {
   const rootEl = document.getElementById("root");
@@ -33,6 +34,16 @@ async function mountApp(): Promise<void> {
   // Flag-gated E2E test hook (window.__ksE2E__) — no-op unless VITE_E2E=1 or
   // ?e2e=1. See lib/e2eHook.ts.
   installE2eHook();
+
+  // Warm the pinned CLDR+SLDR exemplar index off the startup critical path
+  // (spec 044 T038). Deliberately NOT awaited: the chunk is ~1.3 MB and only
+  // the Characters step needs it, so awaiting here would charge every visitor
+  // — including the ones who never reach Phase B — for it before first paint.
+  // Fire-and-forget is safe because every consumer awaits the same idempotent
+  // warm-up internally; a call that lands before this settles is correct, just
+  // no faster. A rejection (offline, chunk 404) is swallowed for the same
+  // reason — sourcing re-attempts the import and surfaces its own failure.
+  void warmExemplarSource().catch(() => {});
 
   // Durable draft restore (spec 034 US3) — MUST run BEFORE the OAuth-redirect
   // sessionStorage rehydrate immediately below, so the durable localStorage

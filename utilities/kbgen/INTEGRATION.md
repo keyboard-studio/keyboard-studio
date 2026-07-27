@@ -62,3 +62,46 @@ KM-crew ratification cycle 2026-06-15 (km-validator, km-keyman, km-strategy, km-
 **D-INT-4 — Ownership boundary (item 4):** CONTENT team owns `data/supplement.json` (44 hand-curated codepoint entries with name/visual/ipa judgment calls — same kind as `criteria.json`) and the §7.6 weighting inputs (standards-body bonus list, fork-copy collapse policy, anti-pattern blocklist). ENGINE team owns `analyze.js`, `place.js`, `emitPlacementMap`, the extraction pipeline, and the `PlacementMap` type itself. The `PlacementMap` TYPE has no content sign-off dependency — content sign-off applies only when weighting-policy inputs are defined or revised. (Verified: km-domain.)
 
 **Scope guard for #133:** #133 implements ONLY the §7.6 `PlacementMap` (seeder output). It does NOT include the §7.7 assignment-map (`SurveyPhaseResult.assignments?`, full form deferred to joint session #5b) nor the §7.5.1 `StrategyDivergence` type (corpus-eval tooling, separate issue). These are distinct pipeline-phase artifacts and must not be merged into the same PR.
+
+---
+
+## Retirement note: the duplicate `parseUnicodeSet` (2026-07-27)
+
+`utilities/kbgen/sources/cldr.ts` carries its own copy of `parseUnicodeSet`
+(and of `loadExemplars`/`exemplarString`). Spec 044 fixed two verified defects
+in the engine's copy at `packages/engine/src/character-discovery/cldr.ts`;
+**kbgen's copy still has both** and is deliberately left unchanged here — kbgen
+is a prototype outside `packages/*`, and touching it was out of that feature's
+scope.
+
+What the kbgen copy still gets wrong:
+
+| Input | kbgen today | Engine (fixed) |
+|---|---|---|
+| `[a \u200C b]` | `a`, `u`, `2`, `0`, `C`, `b` | `a`, U+200C, `b` |
+| `[\x{1E9E}]` | `x`, `{`, `1`… | `ẞ` |
+| `[[a-z]-[aeiou]]` | `[`, `]`, `a`…`z` | throws `UnsupportedUnicodeSetError` |
+| any NFD input | passed through as NFD | NFC-normalized |
+
+147 of CLDR 48.2.0's 3064 exemplar sets use `\uXXXX` (every Arabic-script
+locale's `auxiliary` and `numbers` tiers among them), so this is not a
+theoretical divergence.
+
+**Retirement path** — when kbgen is ported to TypeScript against
+`packages/contracts` (items 1–2 above, issues #132/#133):
+
+1. Delete `parseUnicodeSet`, `ParsedExemplars`, `LoadedExemplars`,
+   `exemplarString`, and `loadExemplars` from `sources/cldr.ts`.
+2. Import the canonical parser from
+   `@keyboard-studio/engine/character-discovery/cldr` instead, and the sourcing
+   path from `exemplarSource.ts` — one exemplar path repo-wide is FR-015 of
+   spec 044, and a second copy in `packages/*` would violate it.
+3. kbgen's per-locale `data/cldr/*.json` snapshots become redundant: the pinned
+   offline index (`exemplars.generated.json`) already covers both CLDR and
+   SLDR, deterministically and version-pinned.
+4. The uppercase augmentation kbgen does inline (`loadExemplars`) is **not** part
+   of the sourcing path by design — `SourcedInventory` stays a faithful record
+   of what the source attested, and case counterparts are derived by the caller.
+
+Until then, treat kbgen's exemplar output as prototype-grade and do not feed it
+into anything under `packages/*`.

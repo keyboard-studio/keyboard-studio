@@ -13,6 +13,9 @@
 //     and records instantiationMode = "new-from-base".
 //   - `instantiateFromExisting()` is the Track-2 entry point; it preserves the
 //     loaded keyboard's identity and sets instantiationMode = "adapt-existing".
+//   - Both instantiate entry points also clear the per-working-copy Phase B
+//     proposal decisions (resetPhaseBDraftDecisions, spec 044 FR-016a), which
+//     deliberately survive phaseBDraftStore's own per-visit reset().
 //   - `setIdentity()` overlays a post-instantiation identity patch.
 //   - No host-disk writes. VirtualFS lives as a React-state reference.
 //   - Worker boundary upheld: WASM is not imported here.
@@ -30,6 +33,7 @@ import {
   type TouchAssignment,
 } from "@keyboard-studio/contracts";
 import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
+import { resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
 import type { Step } from "../steps/types.ts";
 import { isSequenceAssignmentForChar } from "../editors/assignLoop/patternIds.ts";
 
@@ -960,6 +964,14 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
     // Track 1: new keyboard from base — identity RESET, edit layers cleared.
     _reopenedRoots = new Set(); // reset staleness roots for the new session
+    // Phase B proposal decisions are per-working-copy (spec 044 FR-016a), not
+    // per-session: they survive phaseBDraftStore.reset() (which runs on every
+    // entry to the build-list screen) and are cleared HERE instead. Without
+    // this, declining the exemplar offer — or removing a proposed character —
+    // on one keyboard would silently carry into the next one started in the
+    // same browser session. Placed after the shouldNoop guard so a redundant
+    // re-fire of the same instantiate never discards a live decision.
+    resetPhaseBDraftDecisions();
     set({
       instantiationMode: "new-from-base",
       baseKeyboard: base,
@@ -1008,6 +1020,10 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     }
 
     _reopenedRoots = new Set(); // reset staleness roots for the new session
+    // Per-working-copy Phase B proposal decisions — see the identical call in
+    // instantiateFromBase above for why this cannot live in
+    // phaseBDraftStore.reset().
+    resetPhaseBDraftDecisions();
     // Track 2: adapt existing keyboard — identity PRESERVED from loaded keyboard.
     set({
       instantiationMode: "adapt-existing",

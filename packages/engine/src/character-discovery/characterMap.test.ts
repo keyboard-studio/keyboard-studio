@@ -731,3 +731,98 @@ describe("buildCharacterMap", () => {
     expect(mark?.block).not.toBe("Combining Diacritical Marks");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Spec 044 US2 — the language's own punctuation and numerals reach the map,
+// categorized distinctly from the whole-script enumeration tiers.
+//
+// These use the DEFAULT (offline, index-backed) path — no `loader` — which is
+// the authoring path since spec 044. Before that feature the punctuation and
+// numbers exemplar tiers were read under key names CLDR has never emitted
+// (research R0), so only `main` and `auxiliary` could ever populate.
+// ---------------------------------------------------------------------------
+
+describe("exemplar tiers from the offline index (spec 044 US2)", () => {
+  it("a locale with all four tiers produces four populated exemplar tiers, not two", async () => {
+    // ewo (Ewondo) defines main, auxiliary, punctuation and numbers in CLDR.
+    const groups = await buildCharacterMap(makeIR(), "ewo");
+    const populated = (tier: string): number =>
+      groups.filter((g) => g.tier === tier).reduce((n, g) => n + g.cells.length, 0);
+
+    expect(populated("main")).toBeGreaterThan(0);
+    expect(populated("auxiliary")).toBeGreaterThan(0);
+    expect(populated("exemplar-punctuation")).toBeGreaterThan(0);
+    expect(populated("exemplar-numbers")).toBeGreaterThan(0);
+  });
+
+  it("categorizes the exemplar tiers distinctly from the whole-script enumeration tiers", async () => {
+    const groups = await buildCharacterMap(makeIR(), "ewo");
+    const tiers = new Set(groups.map((g) => g.tier));
+    // The four exemplar tiers and the three enumeration tiers coexist; the
+    // language's own "( )" must not be buried in the ~350-char Common
+    // punctuation enumeration.
+    expect(tiers.has("exemplar-punctuation")).toBe(true);
+    expect(tiers.has("punctuation")).toBe(true);
+    expect(tiers.has("exemplar-numbers")).toBe(true);
+    expect(tiers.has("digits")).toBe(true);
+  });
+
+  it("keeps each character in exactly one tier (global dedupe still holds)", async () => {
+    const groups = await buildCharacterMap(makeIR(), "ewo");
+    const seen = new Map<string, string>();
+    for (const g of groups) {
+      for (const c of g.cells) {
+        expect(seen.has(c.char), `${c.char} appears in ${seen.get(c.char)} and ${g.tier}`).toBe(
+          false,
+        );
+        seen.set(c.char, g.tier);
+      }
+    }
+  });
+
+  it("surfaces a locale's own digits in exemplar-numbers, ahead of the digits enumeration", async () => {
+    // Persian's numbers tier is the Eastern Arabic-Indic set ۰۱۲…
+    const groups = await buildCharacterMap(makeIR(), "fa-IR");
+    const exemplarNumbers = groups
+      .filter((g) => g.tier === "exemplar-numbers")
+      .flatMap((g) => g.cells.map((c) => c.char));
+    expect(exemplarNumbers).toContain("۵");
+  });
+
+  it("produces the letter tiers only for a locale that defines no punctuation or numbers set", async () => {
+    // ebk (Eastern Bontok) is SLDR-only: main + punctuation, no numbers set.
+    // The absent tier must yield NO group at all — not an empty placeholder.
+    const groups = await buildCharacterMap(makeIR(), "ebk");
+    const exemplarTiers = new Set(
+      groups
+        .filter((g) =>
+          ["main", "auxiliary", "exemplar-punctuation", "exemplar-numbers"].includes(g.tier),
+        )
+        .map((g) => g.tier),
+    );
+    expect(exemplarTiers.has("main")).toBe(true);
+    expect(exemplarTiers.has("exemplar-numbers")).toBe(false);
+    // And nothing anywhere is an empty group.
+    expect(groups.filter((g) => g.cells.length === 0)).toEqual([]);
+  });
+
+  it("emits no exemplar groups at all for a tag neither source covers", async () => {
+    const groups = await buildCharacterMap(makeIR(), "zxx-Latn");
+    const exemplarGroups = groups.filter((g) =>
+      ["main", "auxiliary", "exemplar-punctuation", "exemplar-numbers"].includes(g.tier),
+    );
+    expect(exemplarGroups).toEqual([]);
+    // The whole-script enumeration still populates, so the pane is not empty.
+    expect(groups.filter((g) => g.tier === "block").length).toBeGreaterThan(0);
+  });
+
+  it("seeds an SLDR-only language from its real alphabet, not the whole Latin block", async () => {
+    const groups = await buildCharacterMap(makeIR(), "ebk");
+    const main = groups
+      .filter((g) => g.tier === "main")
+      .flatMap((g) => g.cells.map((c) => c.char));
+    expect(main).toContain("ó");
+    // A whole-script fallback would be hundreds of characters wide.
+    expect(main.length).toBeLessThan(80);
+  });
+});
