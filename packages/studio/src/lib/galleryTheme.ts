@@ -17,15 +17,16 @@ export {
 // These are composed CSSProperties objects, NOT primitive tokens (the "do not
 // add token values" note above is about the hex/font values re-exported from
 // ui/theme.ts). They were byte-identical consts hand-copied across
-// MechanismGallery.tsx, SequenceGallery.tsx, and TouchGallery.tsx; consolidated
-// here so the galleries can no longer drift apart. A gallery whose page needs
-// its own variant (e.g. SequenceGallery's flex-column page layout) spreads one
-// of these as a base and layers its own overrides locally rather than
-// redefining the whole object.
+// MechanismGallery.tsx and TouchGallery.tsx (and formerly the retired
+// SequenceGallery.tsx — its sequence-builder UI now lives inline in
+// MechanismGallery.tsx's SequenceBuilderPanel.tsx); consolidated here so the
+// galleries can no longer drift apart. A gallery whose page needs its own
+// variant spreads one of these as a base and layers its own overrides
+// locally rather than redefining the whole object.
 // ---------------------------------------------------------------------------
 
 import type { CSSProperties } from "react";
-import { BG_PAGE, BORDER, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION } from "../ui/theme.ts";
+import { BG_PAGE, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION } from "../ui/theme.ts";
 
 /** Base page-level style shared by the mechanism/sequence/touch galleries' guard/content branches. */
 export const galleryPageStyle: CSSProperties = {
@@ -67,7 +68,7 @@ export const galleryForwardBtnStyle: CSSProperties = {
 
 /**
  * Monospace character-entry box shared by MechanismGallery's deadkey
- * trigger/base-letter boxes and SequenceGallery's Content/Indicator boxes.
+ * trigger/base-letter boxes and SequenceBuilderPanel's Content/Indicator boxes.
  */
 export const galleryInputStyle: CSSProperties = {
   width: 52,
@@ -91,3 +92,46 @@ export const galleryInputStyle: CSSProperties = {
  * fourth SelectMenu migration doesn't hand-copy a fourth near-identical const.
  */
 export const gallerySelectMenuStyle = (width: number): CSSProperties => ({ width, fontSize: 12 });
+
+/**
+ * Transparent, full-width method-card header button — shared by
+ * MethodChooser (MechanismGallery.tsx) and TouchMethodChooser
+ * (TouchGallery.tsx); byte-identical across both prior to consolidation.
+ */
+export const galleryHeaderBtnStyle: CSSProperties = {
+  width: "100%",
+  padding: "10px 14px",
+  background: "transparent",
+  border: "none",
+  color: TEXT_MAIN,
+  fontSize: 13,
+  fontFamily: FONT,
+  cursor: "pointer",
+  textAlign: "left",
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+};
+
+/**
+ * Inline config-panel wrapper shown below an expanded method-card header —
+ * shared by MethodChooser and TouchMethodChooser.
+ */
+export const galleryConfigStyle: CSSProperties = {
+  padding: "0 14px 12px",
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+};
+
+/**
+ * Method-card container style — active card gets an accent border and dark
+ * highlight background; shared by MethodChooser and TouchMethodChooser.
+ */
+export const galleryCardStyle = (active: boolean): CSSProperties => ({
+  borderRadius: 8,
+  border: `1px solid ${active ? ACCENT : BORDER}`,
+  background: active ? "#0d2840" : BG_PAGE,
+  overflow: "hidden",
+  transition: "border-color 120ms ease, background 120ms ease",
+});

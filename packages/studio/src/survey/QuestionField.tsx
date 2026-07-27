@@ -2,6 +2,7 @@
 // Each renderer receives the current value (string | string[] | undefined)
 // and calls onChange when the user modifies it.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useState, useEffect, useRef } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { FlowQuestion } from "./types.ts";
@@ -321,7 +322,7 @@ function LangtagsComboboxField({
       .catch((err: unknown) => {
         // Degrade to a plain free-text field on import failure (FR-009).
         if (!isMountedRef.current) return;
-        console.warn(
+        devLog.warn(
           "[LangtagsComboboxField] langtags load failed; degrading to free-text input",
           err,
         );
@@ -627,9 +628,10 @@ function StyledCombobox({
 function SelectField({ question, value, onChange }: FieldProps) {
   const { t } = useLingui();
   const strVal = stringValue(value);
-  // Leading placeholder option — matches ui/Dropdown's own hardcoded "— Select
-  // one —" entry (always first, selectable to reset to unanswered), now
-  // actually localized (Dropdown's was a plain string, never wrapped in t()).
+  // Leading placeholder option — matches the hardcoded "— Select one —" entry
+  // of the now-removed ui/Dropdown (always first, selectable to reset to
+  // unanswered), now actually localized (Dropdown's was a plain string, never
+  // wrapped in t()).
   const selectOptions: SelectMenuOption[] = [
     { value: "", label: t({ id: "survey.selectField.placeholder", message: "— Select one —" }) },
     ...(question.options ?? []).map((opt) => ({ value: opt.value, label: opt.label })),

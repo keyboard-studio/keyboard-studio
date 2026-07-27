@@ -6,6 +6,7 @@
 // finished keyboard (the row's help text states that consequence).
 
 import type { ConfirmedAlphabet } from "@keyboard-studio/contracts";
+import { stackKey } from "@keyboard-studio/contracts";
 import { caseCounterpart } from "../character-discovery/casePair.js";
 import type { MarkClass } from "./mark-classes.js";
 import { attestedBasesOf } from "./mark-classes.js";
@@ -80,7 +81,7 @@ export function deriveCaseCounterparts(
   for (const stack of alphabet.attestedStacks) {
     const pair = caseCounterpart(stack.base, bcp47);
     if (pair !== null && bases.has(pair.counterpart)) {
-      result.set(`${stack.base} ${stack.marks.join(" ")}`, pair.counterpart);
+      result.set(stackKey(stack), pair.counterpart);
     }
   }
   return result;

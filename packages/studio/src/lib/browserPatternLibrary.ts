@@ -20,6 +20,7 @@
 // via the dedicated "./pattern-schema" export added to the engine's package.json.
 // This closes the drift window: the schema is now a single source of truth.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { parse } from "yaml";
 import { toPattern } from "@keyboard-studio/contracts";
 import { rankPatterns } from "@keyboard-studio/engine";
@@ -52,14 +53,14 @@ function loadAll(): Pattern[] {
   const patterns: Pattern[] = [];
   for (const [path, raw] of Object.entries(YAML_MODULES)) {
     if (typeof raw !== "string") {
-      console.warn(`[browserPatternLibrary] skipping ${path}: not a string`);
+      devLog.warn(`[browserPatternLibrary] skipping ${path}: not a string`);
       continue;
     }
     let parsed: unknown;
     try {
       parsed = parse(raw);
     } catch (e) {
-      console.warn(`[browserPatternLibrary] YAML parse error in ${path}: ${String(e)}`);
+      devLog.warn(`[browserPatternLibrary] YAML parse error in ${path}: ${String(e)}`);
       continue;
     }
     const result = PatternSchema.safeParse(parsed);
@@ -67,7 +68,7 @@ function loadAll(): Pattern[] {
       const reason = result.error.issues
         .map((i) => `${i.path.join(".")}: ${i.message}`)
         .join("; ");
-      console.warn(`[browserPatternLibrary] schema error in ${path}: ${reason}`);
+      devLog.warn(`[browserPatternLibrary] schema error in ${path}: ${reason}`);
       continue;
     }
     patterns.push(toPattern(result.data));

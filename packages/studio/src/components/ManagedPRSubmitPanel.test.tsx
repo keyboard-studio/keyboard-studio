@@ -11,7 +11,7 @@
 // The real services (getManagedPROutputService, projectWorkingCopyForOutput)
 // are mocked so the tests never touch the engine, WASM, or the backend.
 
-import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { ManagedPRSubmitPanel, type ManagedPRSubmitPanelProps } from "./ManagedPRSubmitPanel.tsx";
@@ -33,11 +33,44 @@ vi.mock("../lib/services.ts", () => ({
   getManagedPRProxyEndpoint: vi.fn(() => "https://example.com/submit/managed-pr"),
 }));
 
+// useGitHubAuth mocked at the module boundary — same idiom as
+// ProfileScreen.test.tsx / AccountControl.test.tsx.
+vi.mock("../hooks/useGitHubAuth.ts", () => ({ useGitHubAuth: vi.fn() }));
+
+// recordProjectSubmission mocked so the "My keyboards" submission-transition
+// call can be asserted without exercising the real localStorage/index/server
+// side effects (covered separately by draftPersistence.test.ts).
+vi.mock("../lib/draftPersistence.ts", () => ({ recordProjectSubmission: vi.fn(async () => {}) }));
+
 import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
 import { getManagedPROutputService } from "../lib/services.ts";
+import { useGitHubAuth, type UseGitHubAuthResult } from "../hooks/useGitHubAuth.ts";
+import { recordProjectSubmission } from "../lib/draftPersistence.ts";
 
 const mockedProject = projectWorkingCopyForOutput as Mock;
 const mockedGetService = getManagedPROutputService as Mock;
+const mockedUseGitHubAuth = vi.mocked(useGitHubAuth);
+const mockedRecordProjectSubmission = vi.mocked(recordProjectSubmission);
+
+/** Default: signed out (token null) — matches the pre-existing test posture. */
+function mockGitHubAuth(overrides: Partial<UseGitHubAuthResult> = {}): void {
+  mockedUseGitHubAuth.mockReturnValue({
+    status: "idle",
+    token: null,
+    verify: null,
+    login: null,
+    canSubmit: false,
+    missingScopes: [],
+    error: null,
+    connect: vi.fn(async () => {}),
+    disconnect: vi.fn(),
+    ...overrides,
+  });
+}
+
+beforeEach(() => {
+  mockGitHubAuth();
+});
 
 // Minimal VirtualFS-shaped object — the panel passes it through to publishManagedPR.
 const MOCK_VFS = { entries: () => [] };
@@ -269,6 +302,41 @@ describe("ManagedPRSubmitPanel — success state", () => {
     ).toBeTruthy();
     const link = screen.getByRole("link", { name: /view your keyboard submission/i }) as HTMLAnchorElement;
     expect(link.href).toBe("https://github.com/keymanapp/keyboards/pull/9999");
+  });
+
+  it("transitions the active 'My keyboards' project via recordProjectSubmission with the PR URL and access token", async () => {
+    mockGitHubAuth({ token: { accessToken: "gho_test", tokenType: "bearer", scope: "", client: "github_app" } });
+    mockedProject.mockResolvedValueOnce(makeProjectResult());
+    const svc = makeService();
+    mockedGetService.mockResolvedValueOnce(svc);
+
+    renderPanel({ canSubmit: true });
+    fillValidForm();
+    fireEvent.click(screen.getByRole("button", { name: /submit keyboard to community repository/i }));
+
+    await waitFor(() => {
+      expect(mockedRecordProjectSubmission).toHaveBeenCalledWith(
+        "https://github.com/keymanapp/keyboards/pull/9999",
+        "gho_test",
+      );
+    });
+  });
+
+  it("passes null to recordProjectSubmission when signed out", async () => {
+    mockedProject.mockResolvedValueOnce(makeProjectResult());
+    const svc = makeService();
+    mockedGetService.mockResolvedValueOnce(svc);
+
+    renderPanel({ canSubmit: true });
+    fillValidForm();
+    fireEvent.click(screen.getByRole("button", { name: /submit keyboard to community repository/i }));
+
+    await waitFor(() => {
+      expect(mockedRecordProjectSubmission).toHaveBeenCalledWith(
+        "https://github.com/keymanapp/keyboards/pull/9999",
+        null,
+      );
+    });
   });
 });
 

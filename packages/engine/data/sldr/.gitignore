@@ -1,4 +1,5 @@
-# Raw SLDR dataset — build input, ~70 MB / ~2700 XML files, reproducibly fetched
-# against a pinned version + checksum (spec 044).
-# SOURCES.json and LICENSE are committed; the raw data tree is not.
+# Raw SLDR locale tree — build input, ~13 MB compressed, reproducibly fetched by
+# scripts/fetch-sldr.mjs at the commit pinned in scripts/sldr-version.json.
+# Run `pnpm run fetch-sldr` to download.
+# SOURCES.json and LICENSE are committed; the extracted tree is not.
 sldr/

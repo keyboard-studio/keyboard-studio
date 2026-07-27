@@ -3,7 +3,7 @@
 // Coverage:
 //   T028 — manifest-driven SurveyView: forward and back transitions driven by the
 //           manifest step order (identity → choose_base → track → [project_name] →
-//           characters → marks → carve → mechanisms → sequences → touch →
+//           characters → marks → carve → mechanisms → touch →
 //           help → done). No SurveyStage union. The marks step (spec 046) is
 //           NOT mocked — the marks-free test alphabet makes its S0 gate
 //           auto-complete without rendering, so walks hop it invisibly.
@@ -40,8 +40,6 @@ const {
   mockPhaseBBackRef,
   mockMechDoneRef,
   mockMechBackRef,
-  mockSeqDoneRef,
-  mockSeqBackRef,
   mockPhaseFDoneRef,
   mockPhaseFBackRef,
   mockTouchECompleteRef,
@@ -59,10 +57,6 @@ const {
   const mockPhaseBBackRef = { current: null as null | (() => void) };
   const mockMechDoneRef = { current: null as null | (() => void) };
   const mockMechBackRef = { current: null as null | (() => void) };
-  // Sequences gallery mock (S-03 sequences are authored in a dedicated
-  // step after mechanisms, between mechanisms and the touch fork).
-  const mockSeqDoneRef = { current: null as null | (() => void) };
-  const mockSeqBackRef = { current: null as null | (() => void) };
   const mockPhaseFDoneRef = { current: null as null | ((...args: unknown[]) => void) };
   const mockPhaseFBackRef = { current: null as null | (() => void) };
   // TouchGallery mock: ref holds the onComplete callback so tests can fire it
@@ -82,8 +76,6 @@ const {
     mockPhaseBBackRef,
     mockMechDoneRef,
     mockMechBackRef,
-    mockSeqDoneRef,
-    mockSeqBackRef,
     mockPhaseFDoneRef,
     mockPhaseFBackRef,
     mockTouchECompleteRef,
@@ -102,8 +94,6 @@ const _mockPhaseBDoneRef = mockPhaseBDoneRef;
 const _mockPhaseBBackRef = mockPhaseBBackRef;
 const _mockMechDoneRef = mockMechDoneRef;
 const _mockMechBackRef = mockMechBackRef;
-const _mockSeqDoneRef = mockSeqDoneRef;
-const _mockSeqBackRef = mockSeqBackRef;
 const _mockPhaseFDoneRef = mockPhaseFDoneRef;
 const _mockPhaseFBackRef = mockPhaseFBackRef;
 const _mockTouchECompleteRef = mockTouchECompleteRef;
@@ -377,27 +367,6 @@ vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => ({
   },
 }));
 
-vi.mock("./editors/sequences/SequenceGallery.tsx", () => ({
-  SequenceGallery: ({ onComplete, onBack }: { onComplete?: () => void; onBack?: () => void }) => {
-    _mockSeqDoneRef.current = onComplete ?? null;
-    _mockSeqBackRef.current = onBack ?? null;
-    return (
-      <div data-testid="stage-sequences">
-        {onComplete !== undefined && (
-          <button type="button" data-testid="sequences-complete" onClick={onComplete}>
-            sequences-complete
-          </button>
-        )}
-        {onBack !== undefined && (
-          <button type="button" data-testid="sequences-back" onClick={onBack}>
-            sequences-back
-          </button>
-        )}
-      </div>
-    );
-  },
-}));
-
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => ({
   TouchGallery: ({ onComplete, onBack }: { onComplete: (a: unknown[]) => void; onBack: () => void }) => {
     _mockTouchECompleteRef.current = onComplete;
@@ -583,6 +552,7 @@ import { SurveyView, StudioShell } from "./StudioShell.tsx";
 import { navigateTo } from "./lib/navigate.ts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS } from "@keyboard-studio/contracts";
+import { saveDraft, loadDraft, deriveProjectKeyFromWorkingCopy } from "./lib/draftPersistence.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -642,16 +612,10 @@ function advanceToMechanisms() {
   fireEvent.click(screen.getByTestId("carve-complete"));
 }
 
-/** Drive from "identity" to "sequences". */
-function advanceToSequences() {
-  advanceToMechanisms();
-  fireEvent.click(screen.getByTestId("mechanisms-complete"));
-}
-
 /** Drive from "identity" to "touch_seed_source" (the seed-source fork chooser). */
 function advanceToTouchSeedSource() {
-  advanceToSequences();
-  fireEvent.click(screen.getByTestId("sequences-complete"));
+  advanceToMechanisms();
+  fireEvent.click(screen.getByTestId("mechanisms-complete"));
 }
 
 /** Drive from "identity" to "F". */
@@ -736,11 +700,16 @@ describe("SurveyView — carve → mechanisms transition", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Forward transition 4: mechanisms → sequences
+// Forward transition 4: mechanisms → touch_seed_source fork → touch → F
+//
+// Sequences (S-03) are now built inline in the Mechanism Gallery's method
+// chooser (the right-hand preview pane swaps for the builder when "sequence"
+// is selected) — there is no separate "sequences" step between mechanisms
+// and the touch_seed_source fork.
 // ---------------------------------------------------------------------------
 
-describe("SurveyView — mechanisms → sequences transition", () => {
-  it("renders the sequences stage after MechanismGallery onComplete is called", async () => {
+describe("SurveyView — mechanisms → F transition", () => {
+  it("renders the touch_seed_source fork after MechanismGallery onComplete is called", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -748,31 +717,10 @@ describe("SurveyView — mechanisms → sequences transition", () => {
     advanceToMechanisms();
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
-    // mechanisms → sequences
+    // mechanisms → touch_seed_source fork (spec 035 R4/R12)
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
-
-    expect(screen.getByTestId("stage-sequences")).toBeTruthy();
-    expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Forward transition 5: sequences → touch_seed_source fork → touch → F
-// ---------------------------------------------------------------------------
-
-describe("SurveyView — sequences → F transition", () => {
-  it("renders the F stage after the sequences gallery onComplete is called", async () => {
-    await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
-    });
-
-    advanceToSequences();
-    expect(screen.getByTestId("stage-sequences")).toBeTruthy();
-
-    // sequences → touch_seed_source fork (spec 035 R4/R12)
-    fireEvent.click(screen.getByTestId("sequences-complete"));
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
-    expect(screen.queryByTestId("stage-sequences")).toBeNull();
+    expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
 
     // Confirming the fork (no choice recorded yet on a fresh walk) lands on
     // the real "touch" step (mocked TouchGallery stub, stage-E).
@@ -968,11 +916,11 @@ describe("SurveyView — PhaseF done navigates to #output", () => {
 
 // ---------------------------------------------------------------------------
 // Back from Phase E (touch) returns to the touch_seed_source chooser
-// (spec 035 R12 re-entry path) — NOT directly to sequences or mechanisms.
+// (spec 035 R12 re-entry path) — NOT directly to mechanisms.
 // ---------------------------------------------------------------------------
 
 describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R12)", () => {
-  it("onBack passed to TouchGallery sets stage to touch_seed_source, not sequences/mechanisms", async () => {
+  it("onBack passed to TouchGallery sets stage to touch_seed_source, not mechanisms", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -986,14 +934,13 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
     // Click the back button in the Phase E mock.
     fireEvent.click(screen.getByTestId("e-back"));
 
-    // Should resurface the seed-source chooser (R12), NOT sequences/mechanisms directly.
+    // Should resurface the seed-source chooser (R12), NOT mechanisms directly.
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
     expect(screen.queryByTestId("stage-E")).toBeNull();
-    expect(screen.queryByTestId("stage-sequences")).toBeNull();
     expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
   });
 
-  it("the chooser's own Back reaches sequences (not mechanisms directly — sequences is genuinely visited first)", async () => {
+  it("the chooser's own Back reaches mechanisms (the step genuinely visited immediately before touch_seed_source)", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -1005,11 +952,11 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
 
     // The chooser's own Back (not TouchGallery's) pops the walked-history —
-    // which reaches "sequences" (the step genuinely visited immediately
-    // before touch_seed_source), not "mechanisms".
+    // which reaches "mechanisms" (the step genuinely visited immediately
+    // before touch_seed_source now that sequences build inline there).
     fireEvent.click(screen.getByTestId("seed-source-back"));
 
-    expect(screen.getByTestId("stage-sequences")).toBeTruthy();
+    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
     expect(screen.queryByTestId("stage-seed-source")).toBeNull();
   });
 
@@ -1023,7 +970,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
     fireEvent.click(screen.getByTestId("seed-source-complete"));
     expect(screen.getByTestId("stage-E")).toBeTruthy();
 
-    // Go back — lands on the seed-source chooser (R12), not sequences/mechanisms.
+    // Go back — lands on the seed-source chooser (R12), not mechanisms.
     fireEvent.click(screen.getByTestId("e-back"));
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
 
@@ -1031,26 +978,6 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
     fireEvent.click(screen.getByTestId("seed-source-complete"));
     expect(screen.getByTestId("stage-E")).toBeTruthy();
     expect(screen.queryByTestId("stage-seed-source")).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Back-navigation: sequences → mechanisms (the sequences step's own onBack)
-// ---------------------------------------------------------------------------
-
-describe("SurveyView — sequences → mechanisms back-navigation", () => {
-  it("returns to mechanisms stage when the sequences gallery onBack is called", async () => {
-    await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
-    });
-
-    advanceToSequences();
-    expect(screen.getByTestId("stage-sequences")).toBeTruthy();
-
-    fireEvent.click(screen.getByTestId("sequences-back"));
-
-    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
-    expect(screen.queryByTestId("stage-sequences")).toBeNull();
   });
 });
 
@@ -1194,10 +1121,9 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     };
     _mockTouchEAssignmentsRef.current = [longpressAssignment];
 
-    // Navigate through sequences and the fork, then fire the TouchGallery complete button.
+    // Navigate through the fork, then fire the TouchGallery complete button.
     advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
-    fireEvent.click(screen.getByTestId("sequences-complete"));
     // The touch_seed_source chooser is shown next (spec 035 R4/R12, no choice
     // recorded on a fresh walk) — NOT the real "touch" step, so
     // applyStepCompletion("touch") has not fired yet.
@@ -1231,7 +1157,6 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
 
     advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
-    fireEvent.click(screen.getByTestId("sequences-complete"));
 
     // Confirming touch_seed_source (spec 035 R4/R12 fork; no choice recorded
     // on a fresh walk) lands on the real "touch" step; completing it fires
@@ -1267,7 +1192,6 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
 
     advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
-    fireEvent.click(screen.getByTestId("sequences-complete"));
 
     // Confirming touch_seed_source (spec 035 R4/R12 fork; no choice recorded
     // on a fresh walk) lands on the real "touch" step; completing it fires
@@ -1302,7 +1226,6 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
 
     advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
-    fireEvent.click(screen.getByTestId("sequences-complete"));
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
 
     // Pick "Reseed from desktop" instead of the default import-adapt button.
@@ -1341,7 +1264,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → choose_base → track → characters → marks → carve → mechanisms → sequences → touch → help → package (M2, spec 046)", () => {
+  it("manifest spine order is: identity → choose_base → track → characters → marks → carve → mechanisms → touch → help → package (M2, spec 046)", () => {
     // track is now a real manifest step (P0 fix); project_name is spine:false.
     const spineIds = manifest
       .filter((s) => s.spine !== false)
@@ -1354,7 +1277,6 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
       "marks",
       "carve",
       "mechanisms",
-      "sequences",
       "touch",
       "help",
       "package",
@@ -1392,7 +1314,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
 });
 
 describe("T029 — runtime step order matches manifest spine order", () => {
-  it("survey advances: identity → choose_base → track (manifest step) → project_name (copy, spine:false) → characters (prefill) → B → marks (S0 auto-skip) → carve → mechanisms → sequences → touch → help", async () => {
+  it("survey advances: identity → choose_base → track (manifest step) → project_name (copy, spine:false) → characters (prefill) → B → marks (S0 auto-skip) → carve → mechanisms → touch → help", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -1435,12 +1357,8 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("carve-complete"));
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
-    // → sequences
-    fireEvent.click(screen.getByTestId("mechanisms-complete"));
-    expect(screen.getByTestId("stage-sequences")).toBeTruthy();
-
     // → touch_seed_source fork (stage-seed-source; spec 035 R4/R12, no choice recorded yet)
-    fireEvent.click(screen.getByTestId("sequences-complete"));
+    fireEvent.click(screen.getByTestId("mechanisms-complete"));
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
 
     // touch_seed_source → touch (joinTarget hop; mocked TouchGallery stub, stage-E)
@@ -1498,5 +1416,132 @@ describe("T029 — runtime step order matches manifest spine order", () => {
 
     // lockDesktop effect: desktopLocked becomes true.
     expect(useWorkingCopyStore.getState().desktopLocked).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: rehydrating a corrupted persisted draft must not runaway-render
+// (freeze report filed against commit b7c9a2c, "sanitize persisted step
+// history so Back never resurfaces the Phase F gate").
+//
+// Placed LAST in this file deliberately: draftPersistence.wasDraftRestoredThisBoot()
+// is a module-level flag that flips false -> true on the first successful
+// loadDraft() and never resets (see draftPersistence.ts / draftPersistence.test.ts's
+// own ordering note) — a successful loadDraft() here would otherwise make every
+// SurveyView mount in a LATER test skip its own mount-time reset(), which is
+// exactly the kind of ordering hazard draftPersistence.test.ts already
+// documents. No test after this one depends on a fresh reset.
+// ---------------------------------------------------------------------------
+
+describe("rehydrate of a corrupted persisted draft does not runaway-render (freeze regression)", () => {
+  it("loadDraft() + mounting SurveyView on a stale-help-in-history record notifies a bounded number of times and leaves history reference-stable", async () => {
+    // Build a legitimately-walked position via real instantiate + advance(),
+    // then corrupt `history` exactly the way an OLDER, pre-P0-fix build would
+    // have persisted it: a stale "help" entry left behind while activeStepId
+    // is anywhere other than "done" (see surveySessionStore.ts's
+    // sanitizeHistory doc comment for the corruption class this repairs).
+    const fakeIr = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+      vfs: createVirtualFS([]),
+      ir: fakeIr,
+    });
+    useSurveySessionStore.getState().advance("choose_base");
+    useSurveySessionStore.getState().advance("track");
+    useSurveySessionStore.getState().advance("characters");
+    useSurveySessionStore.getState().advance("marks");
+    useSurveySessionStore.getState().advance("carve");
+    useSurveySessionStore.setState({
+      activeStepId: "mechanisms",
+      history: [...useSurveySessionStore.getState().history, "help"],
+    });
+
+    const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    expect(projectKey).not.toBeNull();
+    saveDraft(projectKey!);
+
+    // Cold reset — simulate a fresh page boot with nothing live to inherit from.
+    useWorkingCopyStore.getState().reset();
+    useSurveySessionStore.getState().reset();
+
+    // Count every notification the survey-session store fires from the start
+    // of rehydrate onward. A runaway render/setState loop shows up here as an
+    // unbounded (or very large) count within this synchronous test; a correct,
+    // idempotent rehydrate + mount fires only a handful of times.
+    let notifyCount = 0;
+    const unsubscribe = useSurveySessionStore.subscribe(() => {
+      notifyCount += 1;
+    });
+
+    expect(loadDraft(projectKey!)).toBe(true);
+    // Sanitized immediately at rehydrate — "help" never resurfaces live.
+    expect(useSurveySessionStore.getState().history).not.toContain("help");
+    expect(useSurveySessionStore.getState().activeStepId).toBe("mechanisms");
+
+    const historyAfterLoad = useSurveySessionStore.getState().history;
+
+    // Mount the real component tree on top of the rehydrated state, exactly
+    // as main.tsx -> StudioShell would on a real boot. If rehydrate (or any
+    // effect it triggers) forms a render -> setState -> render cycle, this
+    // either hangs (test times out) or notifyCount grows unboundedly.
+    await act(async () => {
+      render(<SurveyView baseKeyboard={basicKbdus} />);
+    });
+
+    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+
+    // Idempotence / reference-stability invariant: having already been
+    // sanitized once, the live history must not have been reallocated again
+    // by mount, and total store churn must stay small and bounded.
+    expect(useSurveySessionStore.getState().history).toBe(historyAfterLoad);
+    expect(notifyCount).toBeLessThan(10);
+
+    unsubscribe();
+  });
+
+  it("resuming directly AT the real (unmocked) PhaseFGate after rehydrate does not runaway-render", async () => {
+    // Second real-code-path scenario: unlike the "mechanisms" case above
+    // (where PhaseFGate never mounts), this resumes with activeStepId ===
+    // "help" itself, so the actual PhaseFGate wrapper (ConfirmDialog +
+    // backToUnfinishedGallery wiring) is on-screen and exercised, not just
+    // the mocked step body inside it.
+    const fakeIr = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+      vfs: createVirtualFS([]),
+      ir: fakeIr,
+    });
+    useSurveySessionStore.getState().advance("choose_base");
+    useSurveySessionStore.getState().advance("track");
+    useSurveySessionStore.getState().advance("characters");
+    useSurveySessionStore.getState().advance("marks");
+    useSurveySessionStore.getState().advance("carve");
+    useSurveySessionStore.getState().advance("mechanisms");
+    useSurveySessionStore.setState({ activeStepId: "help" });
+
+    const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    expect(projectKey).not.toBeNull();
+    saveDraft(projectKey!);
+
+    useWorkingCopyStore.getState().reset();
+    useSurveySessionStore.getState().reset();
+
+    let notifyCount = 0;
+    const unsubscribe = useSurveySessionStore.subscribe(() => {
+      notifyCount += 1;
+    });
+
+    expect(loadDraft(projectKey!)).toBe(true);
+    expect(useSurveySessionStore.getState().activeStepId).toBe("help");
+
+    await act(async () => {
+      render(<SurveyView baseKeyboard={basicKbdus} />);
+    });
+
+    // PhaseFGate's wrapped step body renders (empty confirmedInventory means
+    // the coverage gate is unblocked, so the ConfirmDialog stays closed and
+    // "stage-F" is what's visible).
+    expect(screen.getByTestId("stage-F")).toBeTruthy();
+    expect(notifyCount).toBeLessThan(10);
+
+    unsubscribe();
   });
 });

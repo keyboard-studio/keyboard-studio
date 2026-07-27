@@ -8,6 +8,7 @@
 // store generation, and the blocking rules — so they can never disagree.
 
 import type { AttestedStack, ConfirmedAlphabet } from "@keyboard-studio/contracts";
+import { composeStack, stackKey } from "@keyboard-studio/contracts";
 
 export interface PosturePair {
   stack: AttestedStack;
@@ -30,10 +31,10 @@ export function nfcPostureOfInventory(alphabet: ConfirmedAlphabet): PosturePair[
   const seen = new Set<string>();
   const pairs: PosturePair[] = [];
   for (const stack of alphabet.attestedStacks) {
-    const key = `${stack.base} ${stack.marks.join(" ")}`;
+    const key = stackKey(stack);
     if (seen.has(key)) continue;
     seen.add(key);
-    const nfc = (stack.base + stack.marks.join("")).normalize("NFC");
+    const nfc = composeStack(stack);
     const hasReadyMadeForm = [...nfc].length === 1;
     pairs.push({
       stack: { base: stack.base, marks: [...stack.marks] },

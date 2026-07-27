@@ -43,7 +43,8 @@
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { isNoncharacterCodePoint, scriptSubtagOf } from "@keyboard-studio/contracts";
 import type { CldrFullLoader } from "./cldr.js";
-import { createFetchCldrFullLoader, loadExemplarsFromFull } from "./cldr.js";
+import { loadExemplarsFromFull } from "./cldr.js";
+import { loadExemplarSource, sourceExemplars } from "./exemplarSource.js";
 import { isBidiControlCodePoint } from "./CharacterDiscoveryServiceImpl.js";
 import { getLanguageDefaults } from "../langtags/index.js";
 import { loadCharNames } from "./charNames.js";
@@ -53,7 +54,30 @@ import { producedGlyphs } from "../inventory/producedGlyphs.js";
 // Public types
 // ---------------------------------------------------------------------------
 
-export type CharacterMapTier = "main" | "auxiliary" | "block" | "digits" | "punctuation";
+/**
+ * The tiers a character-map group can belong to, in dedupe/display priority.
+ *
+ * The first four are the LANGUAGE's own exemplar tiers, sourced from the
+ * offline CLDR+SLDR index. `exemplar-punctuation` and `exemplar-numbers` are
+ * deliberately distinct from the `punctuation`/`digits` tiers below them: the
+ * latter are whole-script *enumerations* (every \p{P}/\p{S} or \p{Nd}/\p{No}
+ * codepoint of a script), while the former are the specific marks and digits
+ * the language's exemplar data actually attests — French "« »", Persian
+ * "۰۱۲…". Collapsing the two would bury a dozen attested characters inside a
+ * few hundred enumerated ones.
+ *
+ * Before spec 044 only `main` and `auxiliary` could ever populate: the other
+ * two exemplar tiers were read under CLDR key names that have never existed
+ * (research R0), so they silently resolved to null on every locale.
+ */
+export type CharacterMapTier =
+  | "main"
+  | "auxiliary"
+  | "exemplar-punctuation"
+  | "exemplar-numbers"
+  | "block"
+  | "digits"
+  | "punctuation";
 
 export interface CharacterMapCell {
   /** NFC grapheme the user can add to their alphabet. */
@@ -418,6 +442,8 @@ function dedupeScripts(scripts: readonly string[]): string[] {
 const TIER_FALLBACK_LABEL: Record<Exclude<CharacterMapTier, "block">, string> = {
   main: "Other",
   auxiliary: "Other",
+  "exemplar-punctuation": "Punctuation",
+  "exemplar-numbers": "Digits",
   digits: "Digits",
   punctuation: "Punctuation",
 };
@@ -866,9 +892,11 @@ function taggedByCodepointAscending(a: ScriptTaggedChar, b: ScriptTaggedChar): n
  *                    target language. Included in the enumeration set (and
  *                    the group-ordering priority) right after the target
  *                    script and before CURATED_SCRIPTS.
- * @param opts.loader CldrFullLoader; defaults to the network-backed
- *                    createFetchCldrFullLoader() instance. Test-injection
- *                    hook only.
+ * @param opts.loader Optional CldrFullLoader. Omit for the offline sourcing
+ *                    path (the authoring path — the committed CLDR+SLDR index,
+ *                    no network); pass one for live CLDR refresh or test
+ *                    injection. Preserved unchanged as the existing tests'
+ *                    injection seam.
  */
 export async function buildCharacterMap(
   baseIr: KeyboardIR | null,
@@ -877,7 +905,6 @@ export async function buildCharacterMap(
   opts?: { baseScripts?: readonly string[]; loader?: CldrFullLoader },
 ): Promise<CharacterMapGroup[]> {
   void languageName;
-  const loader = opts?.loader ?? createFetchCldrFullLoader();
   // The Unicode name table is an OPTIONAL search enhancement (search-by-name).
   // It must never break the whole character map: if the lazily-loaded table
   // fails to load (bundler/asset issue, missing prebuild artifact, etc.),
@@ -914,13 +941,34 @@ export async function buildCharacterMap(
   // related script groups.
   const scriptGroupOrder = [...enumerationScripts, "Common"];
 
+  // The language's own exemplar tiers, from the single sourcing path: the
+  // offline CLDR+SLDR index by default, or an injected live loader when the
+  // caller supplies one (tests, opt-in refresh).
   let mainRaw: string[] = [];
   let auxRaw: string[] = [];
+  let exemplarPunctRaw: string[] = [];
+  let exemplarNumRaw: string[] = [];
   if (effectiveBcp47 !== undefined) {
-    const exemplars = await loadExemplarsFromFull(effectiveBcp47, loader);
-    if (exemplars !== null) {
-      mainRaw = [...exemplars.used].filter((ch) => !isGuardrailExcluded(ch));
-      auxRaw = exemplars.auxiliary.filter((ch) => !isGuardrailExcluded(ch));
+    const keep = (chars: Iterable<string>): string[] =>
+      [...chars].filter((ch) => !isGuardrailExcluded(ch));
+    if (opts?.loader !== undefined) {
+      const exemplars = await loadExemplarsFromFull(effectiveBcp47, opts.loader);
+      if (exemplars !== null) {
+        mainRaw = keep(exemplars.used);
+        auxRaw = keep(exemplars.auxiliary);
+      }
+    } else {
+      // Idempotent; the index chunk is shared process-wide.
+      await loadExemplarSource();
+      const inv = sourceExemplars(effectiveBcp47);
+      if (inv !== null) {
+        const byTier = (tier: string): string[] =>
+          keep(inv.characters.filter((c) => c.tier === tier).map((c) => c.char));
+        mainRaw = byTier("main");
+        auxRaw = byTier("auxiliary");
+        exemplarPunctRaw = byTier("punctuation");
+        exemplarNumRaw = byTier("numbers");
+      }
     }
   }
   const blockRaw = blockTierCandidates(enumerationScripts);
@@ -929,6 +977,8 @@ export async function buildCharacterMap(
 
   mainRaw.sort(byCodepointAscending);
   auxRaw.sort(byCodepointAscending);
+  exemplarPunctRaw.sort(byCodepointAscending);
+  exemplarNumRaw.sort(byCodepointAscending);
   blockRaw.sort(taggedByCodepointAscending);
   digitsRaw.sort(taggedByCodepointAscending);
   punctuationRaw.sort(taggedByCodepointAscending);
@@ -937,12 +987,16 @@ export async function buildCharacterMap(
   // char is tagged with the resolved target script (falling back to "Common"
   // in the unlikely case CLDR still yielded exemplars but no script resolved).
   const mainAuxScript = targetScript ?? "Common";
-  const mainTagged: ScriptTaggedChar[] = mainRaw.map((char) => ({ char, script: mainAuxScript }));
-  const auxTagged: ScriptTaggedChar[] = auxRaw.map((char) => ({ char, script: mainAuxScript }));
+  const tagExemplars = (chars: readonly string[]): ScriptTaggedChar[] =>
+    chars.map((char) => ({ char, script: mainAuxScript }));
+  const mainTagged = tagExemplars(mainRaw);
+  const auxTagged = tagExemplars(auxRaw);
+  const exemplarPunctTagged = tagExemplars(exemplarPunctRaw);
+  const exemplarNumTagged = tagExemplars(exemplarNumRaw);
 
-  // Global dedupe: first tier to introduce a char wins
-  // (main > auxiliary > block > digits > punctuation). The winning
-  // occurrence's script tag is the one that survives.
+  // Global dedupe: first tier to introduce a char wins (main > auxiliary >
+  // exemplar-punctuation > exemplar-numbers > block > digits > punctuation).
+  // The winning occurrence's script tag is the one that survives.
   const seen = new Set<string>();
   const dedupe = (chars: readonly ScriptTaggedChar[]): ScriptTaggedChar[] => {
     const out: ScriptTaggedChar[] = [];
@@ -956,6 +1010,8 @@ export async function buildCharacterMap(
 
   const mainChars = dedupe(mainTagged);
   const auxChars = dedupe(auxTagged);
+  const exemplarPunctChars = dedupe(exemplarPunctTagged);
+  const exemplarNumChars = dedupe(exemplarNumTagged);
   const blockChars = dedupe(blockRaw);
   const digitsChars = dedupe(digitsRaw);
   const punctuationChars = dedupe(punctuationRaw);
@@ -963,6 +1019,14 @@ export async function buildCharacterMap(
   return [
     ...groupTierByScript(mainChars, "main", scriptGroupOrder, names, produced),
     ...groupTierByScript(auxChars, "auxiliary", scriptGroupOrder, names, produced),
+    ...groupTierByScript(
+      exemplarPunctChars,
+      "exemplar-punctuation",
+      scriptGroupOrder,
+      names,
+      produced,
+    ),
+    ...groupTierByScript(exemplarNumChars, "exemplar-numbers", scriptGroupOrder, names, produced),
     ...groupTierByScript(blockChars, "block", scriptGroupOrder, names, produced),
     ...groupTierByScript(digitsChars, "digits", scriptGroupOrder, names, produced),
     ...groupTierByScript(punctuationChars, "punctuation", scriptGroupOrder, names, produced),

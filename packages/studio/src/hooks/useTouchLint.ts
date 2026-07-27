@@ -1,3 +1,4 @@
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useState, useEffect, useMemo } from "react";
 import { KeyboardLintEngine } from "@keymanapp/keyboard-lint";
 import type { LintFinding, VirtualFS, TouchLayoutIR } from "@keyboard-studio/contracts";
@@ -56,7 +57,7 @@ export function useTouchLint(
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        console.error("[useTouchLint]", err);
+        devLog.error("[useTouchLint]", err);
         setTouchFindings([LINT_ERROR_FINDING]);
         setTouchLintRunning(false);
       });

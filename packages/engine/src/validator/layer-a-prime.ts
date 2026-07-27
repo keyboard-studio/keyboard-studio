@@ -13,6 +13,7 @@
  * packages/engine/src/validator/index.ts.
  */
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { LintFinding, KeyboardIR, IRRule } from "@keyboard-studio/contracts";
 import type { ParseResult } from "../codec/parse.js";
 import { tokenize } from "../codec/tokenize.js";
@@ -239,7 +240,7 @@ export function checkRoundTrip(ir: KeyboardIR): LintFinding[] {
   const { corpus, corpusSpec, inputCount } = generateCorpus(ir);
 
   // Log corpus size matching the console.info pattern used in compiler/index.ts.
-  console.info(
+  devLog.info(
     `[layer-a-prime] I2 corpus: ${inputCount} sequences` +
       ` (${corpusSpec.vkeyCount} vkeys × ${corpusSpec.modifierSets.length} modifier sets,` +
       ` deadkeyDepth=${corpusSpec.deadkeyDepth})`,

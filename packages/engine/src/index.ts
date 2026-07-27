@@ -129,8 +129,28 @@ export { applyIdentityStubMutation } from "./stub-mutator/index.js";
 export { createCharacterDiscoveryService } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
 export type { LLMCompleter } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
 export type { CldrLoader, CldrFullLoader, ExemplarResult } from "./character-discovery/cldr.js";
+// The live-CLDR fetch path. NOT the authoring path since spec 044 — authoring
+// reads the committed offline CLDR+SLDR index via sourceExemplars below. These
+// stay exported unchanged as the opt-in live-refresh route and the injection
+// seam every existing test uses.
 export { createFetchCldrLoader, createFetchCldrFullLoader } from "./character-discovery/cldr.js";
-// Phase B high-confidence missing-character suggestions (CLDR-grounded, no LLM).
+// The single exemplar-sourcing path (spec 044 FR-015): offline, deterministic,
+// version-pinned, covering both CLDR and SLDR with per-character attribution.
+export {
+  loadExemplarSource,
+  sourceExemplars,
+  exemplarLocaleCandidates,
+  isGatedTag,
+  charactersInTier,
+} from "./character-discovery/exemplarSource.js";
+export type {
+  ExemplarTier,
+  ExemplarSource,
+  ExemplarConfidence,
+  SourcedCharacter,
+  SourcedInventory,
+} from "./character-discovery/exemplarTypes.js";
+// Phase B high-confidence missing-character suggestions, now CLDR+SLDR-grounded.
 export { suggestMissingCharacters, neededCharsForLanguage, isCharCoveredForLocale } from "./character-discovery/suggestMissing.js";
 export type { MissingCharSuggestions, CharNormalizationForm } from "./character-discovery/suggestMissing.js";
 // Case-pair proposal helper for the shift-layer studio feature (bidirectional;
@@ -229,3 +249,18 @@ export type {
 // Inventory diff (spec §8): static extraction of a keyboard's produced glyph set.
 export { producedGlyphs, collectFromOutput } from "./inventory/producedGlyphs.js";
 export type { ProducedGlyphsOptions } from "./inventory/producedGlyphs.js";
+
+// Inventory diff (spec §8): needed-vs-produced coverage delta.
+//
+// Intentionally unwired for now — a pure, tested primitive published ahead of
+// its caller, not leftover rebase debris. It is the coverage-diff half of the
+// Phase B worklist derivation sketched in docs/design-notes/survey-flow-rework.md;
+// the caller lands with that rework. Landed here deliberately (see the "My
+// keyboards" PR discussion) rather than split out, so the primitive and the
+// design note that motivates it stay together in history.
+//
+// If you are about to flag this as dead code: it is reachable and tested via
+// computeInventoryDelta.test.ts, and the lack of a production caller is the
+// documented state above, not an oversight.
+export { computeInventoryDelta } from "./inventory/computeInventoryDelta.js";
+export type { InventoryDelta } from "./inventory/computeInventoryDelta.js";

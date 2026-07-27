@@ -201,6 +201,25 @@ export function nonAlphabetConfirmedInventory(
 }
 
 /**
+ * Deterministic key for one attested stack, keyed by its ordered shape
+ * (base then each mark, space-separated) — used by consumers that need to
+ * look up or dedupe a stack by identity without composing it (e.g. a
+ * confirmation map keyed per-stack, or a before/after diff of stacks).
+ */
+export function stackKey(stack: AttestedStack): string {
+  return `${stack.base} ${stack.marks.join(" ")}`;
+}
+
+/**
+ * Compose a stack's base + marks into its single displayable grapheme,
+ * NFC-normalised — used everywhere a stack needs to render or compare as
+ * one visible unit rather than its constituent codepoints.
+ */
+export function composeStack(stack: AttestedStack): string {
+  return (stack.base + stack.marks.join("")).normalize("NFC");
+}
+
+/**
  * Canonical, deterministic content key for a confirmed alphabet — used by
  * consumers (e.g. the studio's MarksSeriesStep) that need to detect a
  * genuine content change without depending on object identity or property
