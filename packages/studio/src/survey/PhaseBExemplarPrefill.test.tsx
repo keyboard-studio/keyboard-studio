@@ -30,10 +30,14 @@ const { getSourcedExemplars } = vi.hoisted(() => {
   };
 });
 
-vi.mock("../lib/services.ts", () => ({
+// `charactersInTier` is a pure re-export of the engine's own function, not a
+// service call — the offer detail renders through it. It comes from the engine
+// rather than a hand-copy so this mock cannot drift from the real tier filter.
+vi.mock("../lib/services.ts", async () => ({
   USE_REAL: false,
   suggestMissingChars: async () => null,
   sourcedExemplars: async (_bcp47: string) => getSourcedExemplars.get(),
+  charactersInTier: (await import("@keyboard-studio/engine")).charactersInTier,
 }));
 
 // ---------------------------------------------------------------------------
