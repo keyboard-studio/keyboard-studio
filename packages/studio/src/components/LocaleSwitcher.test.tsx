@@ -45,15 +45,18 @@ describe("LocaleSwitcher", () => {
 
     // Persisted synchronously…
     expect(loadSavedLocale()).toBe("fr");
-    // …and the (async) catalog load flips the active locale.
-    await waitFor(() => expect(i18n.locale).toBe("fr"));
+    // …and the (async) catalog load flips the active locale. The default 1s
+    // waitFor window is not enough under a loaded worker — the fr catalog is a
+    // dynamic import, so this races the rest of the suite for CPU rather than
+    // waiting on anything this component does.
+    await waitFor(() => expect(i18n.locale).toBe("fr"), { timeout: 10_000 });
   });
 
   it("renders the field label translated once French is active", async () => {
     renderSwitcher();
     fireEvent.click(screen.getByRole("button"));
     fireEvent.click(screen.getByRole("option", { name: "Français" }));
-    await waitFor(() => expect(i18n.locale).toBe("fr"));
+    await waitFor(() => expect(i18n.locale).toBe("fr"), { timeout: 10_000 });
     // "Language" -> "Langue" from the fr catalog.
     expect(screen.getByText("Langue")).toBeTruthy();
   });

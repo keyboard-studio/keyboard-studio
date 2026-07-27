@@ -81,6 +81,13 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-27T06:04:01.000Z"
+    },
+    {
+      "step": "implement",
+      "substep": "run-tests",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-27T07:13:12.000Z"
     }
   ],
   "telemetryInstanceId": "430d586b-5457-44ee-a1fb-e76460d0983a",
@@ -248,7 +255,9 @@
         "T049"
       ],
       "tests": [
-        "packages/studio/src/stores/phaseBDraftStore.test.ts"
+        "packages/studio/src/stores/phaseBDraftStore.test.ts",
+        "packages/studio/src/survey/PhaseBExemplarPrefill.test.tsx",
+        "packages/studio/e2e/exemplar-prefill.spec.ts"
       ]
     },
     "FR-016a": {
@@ -257,17 +266,27 @@
         "T049"
       ],
       "tests": [
-        "packages/studio/src/stores/phaseBDraftStore.test.ts"
+        "packages/studio/src/stores/phaseBDraftStore.test.ts",
+        "packages/studio/src/survey/PhaseBExemplarPrefill.test.tsx",
+        "packages/studio/e2e/exemplar-prefill.spec.ts"
       ]
     },
     "FR-016b": {
       "tasks": [
         "T051"
+      ],
+      "tests": [
+        "packages/studio/src/survey/PhaseBExemplarPrefill.test.tsx",
+        "packages/studio/e2e/exemplar-prefill.spec.ts"
       ]
     },
     "FR-016c": {
       "tasks": [
         "T050"
+      ],
+      "tests": [
+        "packages/studio/src/survey/PhaseBExemplarPrefill.test.tsx",
+        "packages/studio/e2e/exemplar-prefill.spec.ts"
       ]
     },
     "FR-017": {
@@ -278,7 +297,8 @@
         "T053"
       ],
       "tests": [
-        "packages/studio/src/stores/phaseBDraftStore.test.ts"
+        "packages/studio/src/stores/phaseBDraftStore.test.ts",
+        "packages/studio/src/survey/PhaseBExemplarPrefill.test.tsx"
       ]
     }
   },
@@ -325,6 +345,16 @@
       "what": "SC-003 coverage measurement",
       "command": "node -e (count distinct primary subtags in index vs baseline fixture)",
       "result": "313 languages before, 1810 now (+1497, 5.8x); 1628 of 2381 locale entries are SLDR-only, covering 1518 distinct languages CLDR lacks"
+    },
+    {
+      "what": "Phase B prefill E2E walks (SC-008/009/010)",
+      "command": "cd packages/studio && npx playwright test exemplar-prefill.spec.ts",
+      "result": "2 passed (28.1s) — accept walk reaches a recorded alphabet in two actions with 0 characters typed; decline walk records only what was typed and does not re-assert on re-entry. Drives the real offline index, no stubbing"
+    },
+    {
+      "what": "full gate after the prefill UI landed",
+      "command": "pnpm typecheck && pnpm -r test && eslint",
+      "result": "pass — typecheck clean, 6976 tests green (studio 4188/306 files, engine 2077), 0 eslint errors"
     }
   ]
 }

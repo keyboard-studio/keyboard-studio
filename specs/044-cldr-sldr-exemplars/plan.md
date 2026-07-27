@@ -189,15 +189,15 @@ Sequencing that `/speckit-tasks` should preserve:
 
 ## Follow-ups (explicitly not in this plan)
 
-- **Opt-in live refresh** of exemplar data (keeps #1366's loader as an author-initiated
+- **Opt-in live refresh** of exemplar data (tracked: keyboard-studio/keyboard-studio#1367) (keeps #1366's loader as an author-initiated
   action) — R3; needs its own provenance UI and risks FR-015's single-path rule.
-- **kbgen `parseUnicodeSet` retirement** — R9; blocked on kbgen conforming to
+- **kbgen `parseUnicodeSet` retirement** (tracked: keyboard-studio/keyboard-studio#1368) — R9; blocked on kbgen conforming to
   `packages/contracts` per [INTEGRATION.md](../../utilities/kbgen/INTEGRATION.md).
-- **CLDR/SLDR union as an author action** ("also show SLDR's extras" for the 313
+- **CLDR/SLDR union as an author action** (tracked: keyboard-studio/keyboard-studio#1369) ("also show SLDR's extras" for the 313
   overlapping tags) — representable once per-character attribution exists (R5).
 - **Text-sample prefill** (paste/upload a paragraph → propose its characters) — split out
   as [specs/050-text-sample-prefill/](../050-text-sample-prefill/spec.md). It reuses this
   feature's FR-016/FR-016a/FR-017 propose-then-confirm contract and unions with exemplar
   proposals; 044 must therefore not assume exemplars are the only proposal source.
-- **`index` tier** (collation headers) — out of scope per spec Assumption; revisit only
+- **`index` tier** (collation headers, tracked: keyboard-studio/keyboard-studio#1370) — out of scope per spec Assumption; revisit only
   if a keyboard-authoring need appears.

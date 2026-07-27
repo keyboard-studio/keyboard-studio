@@ -1,6 +1,12 @@
 // Phase B survey wrapper — Character inventory discovery (spec §8 step 4).
 //
-// Two discovery methods are offered:
+// Discovery methods offered at the IntroChooser:
+//   exemplars   — start from the alphabet the pinned CLDR+SLDR index already
+//                 has for this language (spec 044). Offered FIRST and
+//                 pre-selected whenever a sourced inventory exists, absent
+//                 entirely when it does not. Accepting seeds the draft and
+//                 lands on the same build-list page, prefilled; it is not a
+//                 separate persisted DiscoveryMethod.
 //   build-list  — unified "add your whole alphabet": tick CLDR suggestions, type
 //                 the rest of the alphabet, browse+toggle the right-pane
 //                 character map (CharacterMapPane.tsx, rendered by StudioShell's
@@ -37,7 +43,12 @@ import { collate, codePointCompare } from "./collation.ts";
 import { glyphCategory, isCombiningMarkChar, caseCounterpart } from "@keyboard-studio/engine";
 import { displayChar, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { suggestMissingChars } from "../lib/services.ts";
-import type { MissingCharSuggestions } from "../lib/services.ts";
+import type {
+  MissingCharSuggestions,
+  ExemplarSource,
+  SourcedInventory,
+} from "../lib/services.ts";
+import { useSourcedExemplars, tierChars } from "./useSourcedExemplars.ts";
 import { RadioGroup, SelectMenu } from "../ui/index.ts";
 import {
   BG_PAGE,
@@ -211,11 +222,23 @@ interface CharChipEditorProps {
   autoFocus?: boolean;
   /** BCP47 tag for locale-correct case-collapse of the letter chips (FR-008). */
   bcp47?: string | undefined;
+  /**
+   * Remove specific characters, rather than replacing the whole list.
+   *
+   * Clicking a chip is a per-character REJECTION (spec 044 FR-017) — the store
+   * has to see it as such so a removed proposal is never re-proposed. Routing
+   * it through `onChange` with a filtered array would look like a wholesale
+   * replace, which deliberately does not record rejections. Falls back to the
+   * filter-and-replace behaviour when not supplied.
+   */
+  onRemove?: ((chars: string[]) => void) | undefined;
 }
 
-function CharChipEditor({ chars, onChange, autoFocus = false, bcp47 }: CharChipEditorProps) {
+function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }: CharChipEditorProps) {
   const { t } = useLingui();
   const glyphFontStack = useGlyphFontStack();
+  const provenance = usePhaseBDraftStore((s) => s.provenance);
+  const proposalConfidence = usePhaseBDraftStore((s) => s.proposalConfidence);
   const [inputVal, setInputVal] = useState("");
   const [showUppercase, setShowUppercase] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -276,6 +299,15 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47 }: CharChipE
   // Count reflects the collapsed lowercase/caseless units + bare marks.
   const unitCount = displayLetters.length + bareMarks.length;
   const hasCasedLetter = letters.some((b) => upperOf(b) !== null);
+  // Distinct proposal attributions currently represented in the draft — the
+  // legend names them rather than leaving the dashed outline to speak for itself.
+  const proposedAttributions = [
+    ...new Set(
+      Object.values(provenance)
+        .filter((o) => o !== "author")
+        .map((o) => attributionText(o, proposalConfidence[o], t)),
+    ),
+  ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -331,6 +363,19 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47 }: CharChipE
         >
           <Trans id="survey.phaseB.charChipEditor.count">Your alphabet ({displayLetters.length + bareMarks.length})</Trans>
         </p>
+        {/* Legend — the dashed outline needs saying out loud once, so the
+            distinction is not carried by colour/border alone (spec 044 P5). */}
+        {proposedAttributions.length > 0 && (
+          <p
+            data-testid="proposed-chip-legend"
+            style={{ margin: "0 0 8px 0", fontSize: 12, color: TEXT_DIM }}
+          >
+            <Trans id="survey.phaseB.charChipEditor.proposedLegend">
+              Dashed characters were proposed for you ({{ sources: proposedAttributions.join("; ") }}).
+              Remove any that are wrong.
+            </Trans>
+          </p>
+        )}
         {hasCasedLetter && (
           <label
             style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: TEXT_DIM, cursor: "pointer", margin: "0 0 8px 0" }}
@@ -366,23 +411,50 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47 }: CharChipE
               // reproducing the original inline hex (unchecked shell + accent
               // glyph), not real checked state — do not wire them to a value.
               const { title } = codepointLabel(c);
+              // Proposed-vs-authored (spec 044 FR-017 / obligation P5): a
+              // proposed character is visually distinct and says where it came
+              // from, so "confirm this alphabet" is a real decision rather than
+              // a rubber stamp over an undifferentiated list.
+              const origin = provenance[c];
+              const isProposed = origin !== undefined && origin !== "author";
+              const attribution = isProposed
+                ? attributionText(origin, proposalConfidence[origin], t)
+                : null;
               const cells = [
                 <button
                   key={c}
                   type="button"
-                  title={title}
+                  title={attribution === null ? title : `${title} — ${attribution}`}
+                  data-testid={isProposed ? "proposed-char-chip" : "authored-char-chip"}
+                  data-provenance={origin ?? "author"}
                   onClick={() => {
                     // Removing a letter removes BOTH cases (the inverse of the
                     // map, which adds both) — even the uppercase hidden by the
                     // case-collapse, so it never re-appears as an orphan chip.
-                    const pair = new Set(casePairOf(c, bcp47));
-                    onChange(chars.filter((x) => !pair.has(x)));
+                    const pair = casePairOf(c, bcp47);
+                    if (onRemove !== undefined) {
+                      onRemove(pair);
+                    } else {
+                      const drop = new Set(pair);
+                      onChange(chars.filter((x) => !drop.has(x)));
+                    }
                   }}
-                  aria-label={t({
-                    id: "survey.phaseB.charChipEditor.removeAriaLabel",
-                    message: `Remove ${{ char: c }} (${{ cp: title }})`,
-                  })}
-                  style={charChip(false)}
+                  aria-label={
+                    attribution === null
+                      ? t({
+                          id: "survey.phaseB.charChipEditor.removeAriaLabel",
+                          message: `Remove ${{ char: c }} (${{ cp: title }})`,
+                        })
+                      : t({
+                          id: "survey.phaseB.charChipEditor.removeProposedAriaLabel",
+                          message: `Remove ${{ char: c }} (${{ cp: title }}), proposed ${{ attribution }}`,
+                        })
+                  }
+                  style={
+                    isProposed
+                      ? { ...charChip(false), borderStyle: "dashed", borderColor: ACCENT }
+                      : charChip(false)
+                  }
                 >
                   <span style={chipGlyph(true, glyphFontStack)}>{displayChar(c)}</span>
                   <CpLabel grapheme={c} />
@@ -860,7 +932,20 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   const setAll = usePhaseBDraftStore((s) => s.setAll);
   const selectedFont = usePhaseBDraftStore((s) => s.selectedFont);
   const setSelectedFont = usePhaseBDraftStore((s) => s.setSelectedFont);
+  const provenance = usePhaseBDraftStore((s) => s.provenance);
+  const removeChar = usePhaseBDraftStore((s) => s.remove);
   const doneDisabled = chars.length === 0;
+
+  // Chip removal goes through the store's per-character remove(), not setAll,
+  // so removing a PROPOSED character is recorded as a rejection and never
+  // re-proposed (spec 044 FR-017). Removing an authored one records nothing.
+  const removeChars = (toRemove: string[]): void => {
+    for (const ch of toRemove) removeChar(ch);
+  };
+
+  // "Proposed" means a machine origin, not merely "the draft is non-empty" —
+  // an author who typed their whole alphabet by hand has nothing to confirm.
+  const hasProposedChars = Object.values(provenance).some((p) => p !== "author");
 
   return (
     <div
@@ -882,9 +967,16 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         <Trans id="survey.phaseB.buildList.backButton">Back</Trans>
       </button>
 
-      {/* Heading */}
-      <h2 style={phaseHeadingFlush}>
-        <Trans id="survey.phaseB.buildList.heading">Phase B — Add your whole alphabet</Trans>
+      {/* Heading — swaps once something has been PROPOSED into the draft
+          (spec 044 FR-016c): the author's job changes from producing an
+          alphabet to checking one. The confirm action itself is unchanged, and
+          a filled draft is NOT a completed step — Done still has to be pressed. */}
+      <h2 style={phaseHeadingFlush} data-testid="phase-b-heading">
+        {hasProposedChars ? (
+          <Trans id="survey.phaseB.buildList.headingConfirm">Phase B — Confirm your alphabet</Trans>
+        ) : (
+          <Trans id="survey.phaseB.buildList.heading">Phase B — Add your whole alphabet</Trans>
+        )}
       </h2>
 
       {/* Font selection — custom SelectMenu (webview-safe dropdown): native
@@ -964,8 +1056,21 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
             character (for example: a b c ŋ ɛ), then press Enter or + Add.
           </Trans>
         </p>
-        <CharChipEditor chars={chars} onChange={setAll} autoFocus={false} bcp47={context.bcp47_tag} />
+        <CharChipEditor
+          chars={chars}
+          onChange={setAll}
+          onRemove={removeChars}
+          autoFocus={false}
+          bcp47={context.bcp47_tag}
+        />
       </section>
+
+      {/* Section 2b: the other two ways to fill the alphabet. All three
+          affordances stay present regardless of the page-1 choice (spec 044
+          FR-016b / obligation P1b) — declining the offer must not remove a
+          route back to it, and choosing it must not remove the manual routes. */}
+      <ExemplarApplyAffordance context={context} />
+      <TextSamplePlaceholder />
 
       {/* Section 3: visible three-store decomposition (spec 046 US5) + the
           spec-047 category sections — renders once the alphabet implies marks,
@@ -1009,6 +1114,95 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         </button>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ExemplarApplyAffordance — the collapsed "exemplars available" route back
+//
+// Declining the offer on page 1 is a first-class choice, not a dead end: the
+// proposed alphabet stays one click away here, collapsed so it does not nag
+// (spec 044 FR-016b). Renders nothing when there is no inventory to apply, and
+// nothing once the proposal has already been applied.
+// ---------------------------------------------------------------------------
+
+function ExemplarApplyAffordance({ context }: { context: SurveyContext }) {
+  const { t } = useLingui();
+  const { inventory } = useSourcedExemplars(context.bcp47_tag);
+  const provenance = usePhaseBDraftStore((s) => s.provenance);
+  const seedFromProposal = usePhaseBDraftStore((s) => s.seedFromProposal);
+  const [expanded, setExpanded] = useState(false);
+
+  const alreadyApplied = Object.values(provenance).some(
+    (p) => p === "cldr" || p === "sldr",
+  );
+  if (inventory === null || alreadyApplied) return null;
+
+  return (
+    <section
+      data-testid="exemplar-apply-affordance"
+      aria-label={t({
+        id: "survey.phaseB.buildList.exemplarApplyAriaLabel",
+        message: "Apply the exemplar alphabet",
+      })}
+    >
+      <button
+        type="button"
+        data-testid="exemplar-apply-toggle"
+        onClick={() => setExpanded((v) => !v)}
+        className="ks-focus-ring ks-hit-target"
+        style={{ ...secondaryButton, fontSize: 13 }}
+        aria-expanded={expanded}
+      >
+        <Trans id="survey.phaseB.buildList.exemplarApplyToggle">
+          Exemplars available for this language — show
+        </Trans>
+      </button>
+      {expanded && (
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+          <ExemplarOfferDetail inventory={inventory} />
+          <div>
+            <button
+              type="button"
+              data-testid="exemplar-apply-confirm"
+              onClick={() => seedFromProposal(inventory, context.bcp47_tag)}
+              className="ks-focus-ring ks-hit-target"
+              style={primaryButton(false)}
+            >
+              <Trans id="survey.phaseB.buildList.exemplarApplyButton">
+                Add these to my alphabet
+              </Trans>
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TextSamplePlaceholder — the third fill affordance's surface
+//
+// The paste/upload route is owned by spec 050 and is deliberately NOT built
+// here; 044 only guarantees the affordance is present on page 2 alongside the
+// other two (FR-016b), so the set of routes does not depend on the page-1
+// choice.
+// ---------------------------------------------------------------------------
+
+function TextSamplePlaceholder() {
+  return (
+    <section data-testid="text-sample-placeholder">
+      <h3 style={sectionHeading}>
+        <Trans id="survey.phaseB.buildList.textSampleHeading">Paste or upload a text sample</Trans>
+      </h3>
+      <p style={mutedParaFlush}>
+        <Trans id="survey.phaseB.buildList.textSampleComingSoon">
+          Coming soon — you will be able to paste a paragraph of your language
+          and have its characters proposed for you, alongside anything already
+          in your alphabet.
+        </Trans>
+      </p>
+    </section>
   );
 }
 
@@ -1077,6 +1271,12 @@ export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId,
   }
 
   if (discoveryMethod === "build-list") {
+    // Both the "use the exemplar set" and the plain "add your whole alphabet"
+    // choices land here — page 2 is the same screen either way, prefilled or
+    // empty (spec 044 obligations P1/P1a). Which one the author picked is
+    // recorded durably in the draft store's provenance and
+    // exemplarMethodDeclined, not in discoveryMethod, so the persisted survey
+    // traversal and StudioShell's right-pane gating are untouched.
     return (
       <BuildListView
         context={context}
@@ -1126,14 +1326,55 @@ interface IntroChooserProps {
   onBack?: () => void;
 }
 
+/**
+ * The chooser's own option vocabulary. `"exemplars"` is NOT a
+ * `DiscoveryMethod`: accepting the exemplar set lands on the same page 2 as
+ * `"build-list"`, just prefilled, so it resolves to `"build-list"` on Continue.
+ * Keeping it local means the persisted traversal, draft persistence and
+ * StudioShell's right-pane gating all stay unchanged.
+ */
+type IntroChoice = DiscoveryMethod | "exemplars";
+
 function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
   const { t } = useLingui();
-  const [selected, setSelected] = useState<DiscoveryMethod>("build-list");
+  const { inventory, loading } = useSourcedExemplars(context.bcp47_tag);
+  const seedFromProposal = usePhaseBDraftStore((s) => s.seedFromProposal);
+  const declineExemplarMethod = usePhaseBDraftStore((s) => s.declineExemplarMethod);
+  const declinedBefore = usePhaseBDraftStore((s) => s.exemplarMethodDeclined);
+
+  // Defaults-first (spec §3c): when a sourced inventory exists it is the
+  // pre-selected option — unless the author already declined it for this
+  // working copy, in which case the decision is not re-asserted (FR-016a).
+  const offerExemplars = inventory !== null;
+  const [selected, setSelected] = useState<IntroChoice>("build-list");
+  // The offer resolves asynchronously, so the pre-selection is applied once the
+  // lookup settles rather than at first render. Only ever moves the selection
+  // off the initial default — never overrides a choice the author has made.
+  const [autoSelected, setAutoSelected] = useState(false);
+  useEffect(() => {
+    if (loading || autoSelected) return;
+    setAutoSelected(true);
+    if (offerExemplars && !declinedBefore) setSelected("exemplars");
+  }, [loading, autoSelected, offerExemplars, declinedBefore]);
 
   const languageName =
     context["language_name"] ?? context["detected_group"] ?? t({ id: "survey.phaseB.intro.genericLanguage", message: "your language" });
 
-  const methods: Array<{ value: DiscoveryMethod; label: string }> = [
+  const methods: Array<{ value: IntroChoice; label: string; detail?: ReactNode }> = [
+    // Absent ENTIRELY when there is no inventory — not disabled, not empty
+    // (obligation P2). The list then reverts to today's two options.
+    ...(offerExemplars
+      ? [
+          {
+            value: "exemplars" as IntroChoice,
+            label: t({
+              id: "survey.phaseB.intro.method.exemplars",
+              message: "Start from the alphabet we already have for this language — you can change anything",
+            }),
+            detail: <ExemplarOfferDetail inventory={inventory} />,
+          },
+        ]
+      : []),
     {
       value: "build-list",
       label: t({
@@ -1149,6 +1390,20 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
       }),
     },
   ];
+
+  function handleContinue(): void {
+    if (selected === "exemplars" && inventory !== null) {
+      // Exactly once, here — never on the prefill -> B transition (P1a).
+      // seedFromProposal is idempotent, so a Back-and-Continue is safe.
+      seedFromProposal(inventory, context.bcp47_tag);
+      onChoose("build-list");
+      return;
+    }
+    // Any other choice, when an offer was actually available, is a decline —
+    // remembered so it is never re-asserted as the default (FR-016a).
+    if (offerExemplars) declineExemplarMethod();
+    onChoose(selected as DiscoveryMethod);
+  }
 
   return (
     <div
@@ -1183,7 +1438,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
         value={selected}
         options={methods}
         accent={ACCENT}
-        onChange={(v) => setSelected(v as DiscoveryMethod)}
+        onChange={(v) => setSelected(v as IntroChoice)}
         ariaLabelledby="discovery-method-label"
       />
 
@@ -1201,7 +1456,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
         <button
           type="button"
           data-testid="phase-b-intro-next"
-          onClick={() => onChoose(selected)}
+          onClick={handleContinue}
           className="ks-focus-ring ks-hit-target"
           style={primaryButton(false)}
         >
@@ -1210,4 +1465,121 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// ExemplarOfferDetail — the offer's evidence, rendered INLINE on the option
+//
+// The author is being asked to accept a proposed alphabet, so what is being
+// proposed has to be visible at the point of the decision, not one click away
+// (obligation P2). Shows the source, its confidence, how many characters, and
+// a preview of the actual main set.
+// ---------------------------------------------------------------------------
+
+/** How many main-tier characters to show before eliding. */
+const EXEMPLAR_PREVIEW_LIMIT = 24;
+
+function ExemplarOfferDetail({ inventory }: { inventory: SourcedInventory }) {
+  const glyphFontStack = useGlyphFontStack();
+  const main = tierChars(inventory, "main");
+  const preview = main.slice(0, EXEMPLAR_PREVIEW_LIMIT);
+  const elided = main.length - preview.length;
+
+  return (
+    <div
+      data-testid="exemplar-offer-detail"
+      style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}
+    >
+      <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM }}>
+        <ExemplarAttribution
+          source={inventory.source}
+          confidence={inventory.confidence}
+        />{" "}
+        <Trans id="survey.phaseB.intro.exemplars.count">
+          {{ n: main.length }} characters
+        </Trans>
+      </p>
+      <p
+        data-testid="exemplar-offer-preview"
+        style={{
+          margin: 0,
+          fontSize: 16,
+          lineHeight: 1.6,
+          wordBreak: "break-word",
+          fontFamily: glyphFontStack,
+        }}
+      >
+        {preview.join(" ")}
+        {elided > 0 && (
+          <span style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+            {" "}
+            <Trans id="survey.phaseB.intro.exemplars.more">+{{ elided }} more</Trans>
+          </span>
+        )}
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ExemplarAttribution — where a proposed character came from, and how sure
+//
+// Confidence drives WORDING ONLY and never filters (FR-017): most SLDR
+// coverage is drafted or machine-generated, and hiding it would discard the
+// languages this whole feature exists to reach. What it must do is tell the
+// author when to look twice.
+// ---------------------------------------------------------------------------
+
+/** LDML draft statuses that are not human-confirmed — worth flagging. */
+const UNCONFIRMED_CONFIDENCES = new Set([
+  "generated",
+  "suspect",
+  "unconfirmed",
+  "provisional",
+  "tentative",
+]);
+
+/**
+ * The same attribution as a plain string, for a `title` / `aria-label` where a
+ * component cannot go. Kept beside `ExemplarAttribution` so the two wordings
+ * cannot drift.
+ */
+function attributionText(
+  source: string,
+  confidence: string | undefined,
+  t: ReturnType<typeof useLingui>["t"],
+): string {
+  if (source === "cldr") {
+    return t({ id: "survey.phaseB.exemplars.fromCldr", message: "from CLDR" });
+  }
+  if (source === "text") {
+    return t({ id: "survey.phaseB.exemplars.fromText", message: "from your text sample" });
+  }
+  if (confidence !== undefined && UNCONFIRMED_CONFIDENCES.has(confidence)) {
+    return t({
+      id: "survey.phaseB.exemplars.fromSldrUnconfirmed",
+      message: "from SLDR (machine-generated — please check)",
+    });
+  }
+  return t({ id: "survey.phaseB.exemplars.fromSldr", message: "from SLDR" });
+}
+
+function ExemplarAttribution({
+  source,
+  confidence,
+}: {
+  source: ExemplarSource;
+  confidence: string;
+}) {
+  if (source === "cldr") {
+    return <Trans id="survey.phaseB.exemplars.fromCldr">from CLDR</Trans>;
+  }
+  if (UNCONFIRMED_CONFIDENCES.has(confidence)) {
+    return (
+      <Trans id="survey.phaseB.exemplars.fromSldrUnconfirmed">
+        from SLDR (machine-generated — please check)
+      </Trans>
+    );
+  }
+  return <Trans id="survey.phaseB.exemplars.fromSldr">from SLDR</Trans>;
 }

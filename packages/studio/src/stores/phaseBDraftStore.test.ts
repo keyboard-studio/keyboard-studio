@@ -216,6 +216,7 @@ describe("phaseBDraftStore — snapshotPhaseBDraft/applyPhaseBDraftSnapshot roun
       // know to the author, and the sticky proposal decisions start clear.
       provenance: { a: "author", b: "author", "ɛ": "author" },
       rejected: [],
+      proposalConfidence: {},
       exemplarMethodDeclined: false,
       selectedFont: "charis-sil",
     });

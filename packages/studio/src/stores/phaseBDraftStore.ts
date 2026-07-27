@@ -114,6 +114,16 @@ export interface PhaseBDraftState {
   rejected: string[];
 
   /**
+   * The confidence each proposal source was seeded at, keyed by source
+   * (spec 044 FR-017). Recorded per SOURCE rather than per character because
+   * `SourcedInventory` resolves one confidence for the whole winning side —
+   * every character it yields shares it. Drives the chip wording
+   * ("from CLDR" vs "from SLDR (machine-generated — please check)");
+   * confidence never filters anything.
+   */
+  proposalConfidence: Record<string, string>;
+
+  /**
    * True once the author has declined the exemplar discovery method for this
    * working copy (spec 044 FR-016a). Sticky across Phase B re-entry: the offer
    * is never re-asserted as the default, though the apply affordance stays
@@ -368,6 +378,7 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
   lastPick: null,
   provenance: {},
   rejected: [],
+  proposalConfidence: {},
   exemplarMethodDeclined: false,
   selectedFont: DEFAULT_PHASE_B_FONT,
 
@@ -439,6 +450,7 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
       [],
       mainChars.flatMap((ch) => casePairOf(ch, bcp47)),
     );
+    set({ proposalConfidence: { ...get().proposalConfidence, [inv.source]: inv.confidence } });
     for (const ch of proposed) {
       addWithProvenance(set, get, ch, inv.source);
     }
@@ -461,6 +473,7 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
       controls: [],
       lastPick: null,
       provenance: {},
+      proposalConfidence: {},
       // `rejected` and `exemplarMethodDeclined` deliberately SURVIVE a reset:
       // both record a decision the author made about proposals, and reset() runs
       // on every entry to the build-list screen. Clearing them would re-propose
@@ -554,6 +567,8 @@ export interface PhaseBDraftSnapshot {
   provenance?: Record<string, DraftProvenance>;
   /** Proposals the author removed. Absent in pre-044 snapshots. */
   rejected?: string[];
+  /** Per-source confidence of the proposals seeded. Absent in pre-044 snapshots. */
+  proposalConfidence?: Record<string, string>;
   /** Whether the exemplar method was declined. Absent in pre-044 snapshots. */
   exemplarMethodDeclined?: boolean;
   selectedFont: PhaseBFontValue;
@@ -567,6 +582,7 @@ export function snapshotPhaseBDraft(): PhaseBDraftSnapshot {
     declaredRoles: s.declaredRoles,
     provenance: s.provenance,
     rejected: s.rejected,
+    proposalConfidence: s.proposalConfidence,
     exemplarMethodDeclined: s.exemplarMethodDeclined,
     selectedFont: s.selectedFont,
   };
@@ -588,6 +604,7 @@ export function applyPhaseBDraftSnapshot(snapshot: PhaseBDraftSnapshot): void {
     declaredRoles: snapshot.declaredRoles ?? {},
     provenance: snapshot.provenance ?? {},
     rejected: snapshot.rejected ?? [],
+    proposalConfidence: snapshot.proposalConfidence ?? {},
     exemplarMethodDeclined: snapshot.exemplarMethodDeclined ?? false,
   });
   usePhaseBDraftStore.getState().setAll(snapshot.chars);
