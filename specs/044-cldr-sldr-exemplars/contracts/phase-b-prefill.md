@@ -6,8 +6,9 @@
 >
 > The behaviour below is now specified: **FR-016** and **FR-017** (plus **SC-008**) are in
 > [spec.md](../spec.md), and the Assumption *"No new UI surface required"* has been amended
-> to *"No new screen required"*. One gate remains — the **Content sign-off** on which tiers
-> arrive pre-ticked (see the Content decision note under Seeding).
+> to *"No new screen required"*. The **Content sign-off** on which tiers arrive pre-ticked
+> was **cleared by the maintainer on 2026-07-27** — see the Seeding note below. No gate
+> remains.
 
 ## Why this is a gap, not an existing behaviour
 
@@ -71,9 +72,12 @@ exemplar one **first and pre-selected**:
 > them dismantle a proposal they never wanted is worse than asking one question. §3c wants
 > a proposed default, not an imposed one.
 
-> **Content decision required** (Article VI): the offer's wording and what step 2's accept
-> covers (Engine default: `main` only) are Content calls, not Engine's. Confirm before
-> implementation.
+> **Content decision — CLEARED** (Article VI, maintainer, 2026-07-27): the offer's wording
+> and what step 2's accept covers are Content calls, not Engine's. The Engine defaults were
+> signed off as-is: `main` tier only, with `auxiliary`/`punctuation`/`numbers` reaching the
+> author through their own 047 breakdown sections, and the copy as shipped. Revising the
+> wording later stays a catalog edit — every user-visible string is behind an i18n id — and
+> the accept scope is one line in `seedFromProposal`.
 
 ### Page 2 — the alphabet page (`BuildListView`)
 
@@ -128,7 +132,7 @@ to check rather than trust.
 | P3 | A proposed character removed, then Phase B re-entered, stays removed | FR-017 sticky removal |
 | P4 | Author-added character survives a re-seed and is attributed `"author"` | FR-017 |
 | P5 | Proposed chips are distinguishable and expose source + confidence | FR-004/FR-017, SC-007 |
-| P6 | `auxiliary`/`punctuation`/`numbers` appear in their 047 sections unticked | US2 + Content decision |
+| P6 | `auxiliary`/`punctuation`/`numbers` appear in their 047 sections unticked | US2 + Content decision (cleared 2026-07-27) |
 | P7 | Every 047 store invariant still holds after seeding (`chars` complete, one category each) | 047 regression |
 | P8 | E2E walk: fresh visitor → Phase B → Continue (default option) → Done. Two actions, alphabet recorded, 0 characters typed | SC-001, SC-008, SC-010 |
 | P9 | E2E walk: fresh visitor → Phase B → option 2 → types their own alphabet → Done records only what they typed | SC-009 |
