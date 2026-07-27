@@ -79,6 +79,21 @@ async function exemplarRadio(): Promise<HTMLInputElement | null> {
   return document.querySelector<HTMLInputElement>("#discovery_method-exemplars");
 }
 
+/**
+ * Accept the exemplar offer and press Continue.
+ *
+ * The "exemplars" option is pre-selected ASYNCHRONOUSLY once the inventory
+ * lookup settles (IntroChooser's auto-select effect). Clicking Continue before
+ * that effect has run reads the initial "build-list" default — a decline — so
+ * every accept-path test must wait for the radio to be checked first, or it
+ * races the effect (flaky only under load, e.g. the full CI suite).
+ */
+async function acceptExemplarsAndContinue(): Promise<void> {
+  const radio = await exemplarRadio();
+  await waitFor(() => expect(radio!.checked).toBe(true));
+  fireEvent.click(screen.getByTestId("phase-b-intro-next"));
+}
+
 beforeEach(() => {
   getSourcedExemplars.set(null);
   useSurveySessionStore.getState().setDiscoveryMethod(null);
@@ -189,8 +204,7 @@ describe("Continue branching (obligations P1/P1a, FR-016)", () => {
   it("accepting seeds the draft exactly once and lands on a prefilled page 2", async () => {
     getSourcedExemplars.set(inventory(["a", "ŋ"]));
     renderPhaseB();
-    await exemplarRadio();
-    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
+    await acceptExemplarsAndContinue();
 
     await waitFor(() => {
       expect(screen.getByTestId("phase-b-done")).toBeTruthy();
@@ -254,8 +268,7 @@ describe("heading swap (obligation P1c, FR-016c)", () => {
   it("says 'Confirm your alphabet' once something has been proposed into it", async () => {
     getSourcedExemplars.set(inventory(["a", "ŋ"]));
     renderPhaseB();
-    await exemplarRadio();
-    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
+    await acceptExemplarsAndContinue();
     await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
     expect(screen.getByRole("heading", { level: 2 }).textContent).toContain(
       "Confirm your alphabet",
@@ -279,8 +292,7 @@ describe("heading swap (obligation P1c, FR-016c)", () => {
   it("a filled draft is still not a completed step — Done must be pressed", async () => {
     getSourcedExemplars.set(inventory(["a", "ŋ"]));
     const { onComplete } = renderPhaseB();
-    await exemplarRadio();
-    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
+    await acceptExemplarsAndContinue();
     await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
     expect(onComplete).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("phase-b-done"));
@@ -295,12 +307,14 @@ describe("heading swap (obligation P1c, FR-016c)", () => {
 describe("page-2 fill affordances (obligation P1b, FR-016b)", () => {
   async function reachPage2(accept: boolean): Promise<void> {
     renderPhaseB();
-    await exemplarRadio();
-    if (!accept) {
+    if (accept) {
+      await acceptExemplarsAndContinue();
+    } else {
+      await exemplarRadio();
       const buildList = document.querySelector("#discovery_method-build-list");
       if (buildList !== null) fireEvent.click(buildList as HTMLInputElement);
+      fireEvent.click(screen.getByTestId("phase-b-intro-next"));
     }
-    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
     await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
   }
 
@@ -351,8 +365,7 @@ describe("proposed-vs-authored affordance (obligation P5, FR-017)", () => {
   async function acceptAndReachPage2(inv: SourcedInventory): Promise<void> {
     getSourcedExemplars.set(inv);
     renderPhaseB();
-    await exemplarRadio();
-    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
+    await acceptExemplarsAndContinue();
     await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
   }
 
