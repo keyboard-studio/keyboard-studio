@@ -148,17 +148,14 @@ vi.mock("./editors/panels/BaseResolution.tsx", () => ({
   },
 }));
 
-// Carve/mechanisms/sequences/touch stubs — never reached by the gating tests
-// below (they stop at "characters"), but StudioShell.tsx imports these
-// modules statically, so they must resolve to something lightweight.
+// Carve/mechanisms/touch stubs — never reached by the gating tests below
+// (they stop at "characters"), but StudioShell.tsx imports these modules
+// statically, so they must resolve to something lightweight.
 vi.mock("./editors/carve/CarveGallery.tsx", () => ({
   CarveGallery: () => <div data-testid="stage-carve" />,
 }));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => ({
   MechanismGallery: () => <div data-testid="stage-mechanisms" />,
-}));
-vi.mock("./editors/sequences/SequenceGallery.tsx", () => ({
-  SequenceGallery: () => <div data-testid="stage-sequences" />,
 }));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => ({
   TouchGallery: () => <div data-testid="stage-E" />,

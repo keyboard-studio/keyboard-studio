@@ -31,7 +31,7 @@ import {
 } from "@keyboard-studio/contracts";
 import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
 import type { Step } from "../steps/types.ts";
-import { PATTERN_SEQUENCE } from "../editors/assignLoop/patternIds.ts";
+import { isSequenceAssignmentForChar } from "../editors/assignLoop/patternIds.ts";
 
 // ---------------------------------------------------------------------------
 // Manifest binding — avoids a static import of steps/manifest.ts which would
@@ -202,11 +202,13 @@ export interface WorkingCopyState {
   /** Desktop layout lock — prevents further physical edits until unlocked. */
   desktopLocked: boolean;
   /**
-   * De-duplicated, insertion-ordered list of characters the author has
-   * flagged (via the S-03 "Type a sequence" card) to be typed via a
-   * sequence, DEFERRED to the Sequence Gallery. Tracked here — never
-   * folded into a MechanismAssignment — so no sequence .kmn is emitted
-   * until the Sequence Gallery actually defines the key sequence.
+   * De-duplicated, insertion-ordered list of characters flagged (via
+   * flagCharForSequence) for later sequence definition. Dates from the
+   * retired standalone Sequence Gallery step; MechanismGallery's inline
+   * sequence builder (SequenceBuilderPanel) records real
+   * multi_char_sequence assignments directly instead of flagging, so no
+   * current UI call site populates this list — see flagCharForSequence's
+   * own doc comment.
    */
   sequenceFlaggedChars: string[];
   /**
@@ -879,7 +881,13 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       galleryIntrosSeen: { ...s.galleryIntrosSeen, [gallery]: true },
     })),
 
-  // Idempotent add — tracked for the Sequence Gallery only, never emitted.
+  // Idempotent add — tracked for the (now-retired) standalone Sequence
+  // Gallery only, never emitted. MechanismGallery's inline sequence builder
+  // (SequenceBuilderPanel) records real assignments directly and no longer
+  // calls this action — sequenceFlaggedChars/flagCharForSequence are unused
+  // by any current UI call site and are candidates for a later simplify pass.
+  // Left in place (and still store-tested) rather than removed in this
+  // change, per the "don't touch what isn't asked" rule.
   flagCharForSequence: (char) =>
     set((s) =>
       s.sequenceFlaggedChars.includes(char)
@@ -887,16 +895,18 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         : { sequenceFlaggedChars: [...s.sequenceFlaggedChars, char] },
     ),
 
-  // Tracked for the Sequence Gallery only, never emitted. ALSO strips any
-  // recorded individual-scope multi_char_sequence (PATTERN_SEQUENCE)
-  // assignment for `char` from Phase C — unflagging removes the char from
-  // sequenceFlaggedChars, which is the ONLY thing that makes a recorded
-  // sequence assignment reachable/editable from the UI (SequenceGallery keys
-  // everything off sequenceFlaggedChars membership). Leaving the assignment
-  // behind would keep emitting it into the .kmn while making it impossible
-  // to review or remove — done here, in the one store action, so every call
-  // site (both MechanismGallery chip-remove buttons) is covered without
-  // duplicating the filter at each call site.
+  // ALSO strips any recorded individual-scope multi_char_sequence
+  // (PATTERN_SEQUENCE) assignment for `char` from Phase C — this stripping
+  // half of the action is still actively used by MechanismGallery's
+  // "Sequence recorded"/"Sequences" remove controls (which now key
+  // reachability off a recorded PATTERN_SEQUENCE assignment via
+  // hasSequenceForChar, not off sequenceFlaggedChars membership — see
+  // SequenceBuilderPanel.tsx). The sequenceFlaggedChars-membership half below
+  // is a no-op in that flow (the char generally isn't in the list at all
+  // since flagCharForSequence is no longer called) but is harmless and kept
+  // for the retired-gallery call shape. Done here, in the one store action,
+  // so every call site (both MechanismGallery chip-remove buttons) is
+  // covered without duplicating the filter at each call site.
   unflagCharForSequence: (char) => {
     // Delegate the Phase C merge to recordAssignments — the single place that
     // already knows how to splice a new assignments array back into
@@ -907,12 +917,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     const phaseC = get().phaseResults.find((p) => p.phase === "C");
     if (phaseC !== undefined) {
       const strippedAssignments = (phaseC.assignments ?? []).filter(
-        (a) =>
-          !(
-            a.scope === "individual" &&
-            a.target === char &&
-            a.mechanisms.some((m) => m.patternId === PATTERN_SEQUENCE)
-          ),
+        (a) => !isSequenceAssignmentForChar(a, char),
       );
       get().recordAssignments(strippedAssignments);
     }
