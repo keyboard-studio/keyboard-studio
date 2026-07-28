@@ -802,3 +802,158 @@ describe("isTouchSubKeyDuplicate", () => {
     expect(isTouchSubKeyDuplicate({}, char)).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Layer targeting — the optional `layer` slot value (faithful-edit path)
+//
+// Absent `layer` === "default"; every case above exercises the absent form, so
+// this block covers the explicit form, a non-default target, and the misses.
+// ---------------------------------------------------------------------------
+
+function longpressOnLayer(hostKey: string, char: string, layer: string): TouchAssignment {
+  return {
+    scope: "individual",
+    target: char,
+    modality: "touch",
+    mechanisms: [
+      { patternId: "longpress_alternates", slotValues: { hostKey, char, layer } },
+    ],
+    source: "user",
+  };
+}
+
+/** Phone-only raw layout whose shift layer carries the same key ids as default
+ *  (what scaffoldTouchLayout emits), plus an extra default-only key. */
+function makePhoneWithShiftJson(): string {
+  return JSON.stringify({
+    phone: {
+      layer: [
+        {
+          id: "default",
+          row: [{ id: 1, key: [{ id: "K_A", text: "a" }, { id: "K_S", text: "s" }] }],
+        },
+        { id: "shift", row: [{ id: 1, key: [{ id: "K_A", text: "A" }] }] },
+      ],
+    },
+  });
+}
+
+/** Pull a key object out of a named phone layer of a result JSON string. */
+function phoneKeyOnLayer(
+  json: string,
+  layerId: string,
+  keyId: string,
+): Record<string, unknown> | undefined {
+  const parsed = JSON.parse(json) as {
+    phone: { layer: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }> };
+  };
+  const layer = parsed.phone.layer.find((l) => l.id === layerId);
+  return layer?.row.flatMap((r) => r.key).find((k) => k["id"] === keyId);
+}
+
+describe("applyTouchAssignmentsToRawJson — layer targeting", () => {
+  it('layer: "default" produces exactly the same JSON as an absent layer', () => {
+    const raw = makePhoneWithShiftJson();
+
+    const withAbsent = applyTouchAssignmentsToRawJson(raw, [longpress("K_A", "á")]);
+    const withExplicit = applyTouchAssignmentsToRawJson(raw, [
+      longpressOnLayer("K_A", "á", "default"),
+    ]);
+
+    expect(withExplicit.warnings).toEqual(withAbsent.warnings);
+    expect(withExplicit.json).toBe(withAbsent.json);
+  });
+
+  it('layer: "shift" splices onto the shift-layer key and leaves the default key alone', () => {
+    const { json, warnings } = applyTouchAssignmentsToRawJson(makePhoneWithShiftJson(), [
+      longpressOnLayer("K_A", "Á", "shift"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+
+    const shiftKeyA = phoneKeyOnLayer(json, "shift", "K_A")!;
+    expect(shiftKeyA["sk"]).toEqual([{ id: "U_00C1", text: "Á" }]);
+
+    const defaultKeyA = phoneKeyOnLayer(json, "default", "K_A")!;
+    expect(defaultKeyA["sk"]).toBeUndefined();
+  });
+
+  it("an unknown layer warns naming that layer, skips, and never falls back to default", () => {
+    const { json, warnings } = applyTouchAssignmentsToRawJson(makePhoneWithShiftJson(), [
+      longpressOnLayer("K_A", "Á", "caps"),
+    ]);
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('host key "K_A" not found in any platform\'s "caps" layer');
+    expect(phoneKeyOnLayer(json, "default", "K_A")!["sk"]).toBeUndefined();
+    expect(phoneKeyOnLayer(json, "shift", "K_A")!["sk"]).toBeUndefined();
+  });
+
+  it("a host key present on another layer but absent from the target layer warns and skips", () => {
+    // K_S exists on default only; targeting shift must not silently use default.
+    const { json, warnings } = applyTouchAssignmentsToRawJson(makePhoneWithShiftJson(), [
+      longpressOnLayer("K_S", "Ś", "shift"),
+    ]);
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('host key "K_S" not found in any platform\'s "shift" layer');
+    expect(phoneKeyOnLayer(json, "default", "K_S")!["sk"]).toBeUndefined();
+  });
+
+  it("preserves unknown fields and key order when splicing onto a non-default layer", () => {
+    const raw = JSON.stringify({
+      _comment: "hand-authored",
+      phone: {
+        displayUnderlying: false,
+        font: "Andika Afr",
+        layer: [
+          { id: "default", row: [{ id: 1, key: [{ id: "K_A", text: "a" }] }] },
+          {
+            id: "shift",
+            row: [
+              {
+                id: 1,
+                key: [
+                  { id: "K_A", text: "A", width: "150", futureField: 7 },
+                  { id: "K_B", text: "B" },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const { json, warnings } = applyTouchAssignmentsToRawJson(raw, [
+      longpressOnLayer("K_A", "Á", "shift"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    expect(Object.keys(parsed)).toEqual(["_comment", "phone"]);
+    expect(parsed["_comment"]).toBe("hand-authored");
+
+    const shiftKeyA = phoneKeyOnLayer(json, "shift", "K_A")!;
+    // Unknown/verbatim fields survive, and the spliced sk[] is appended last.
+    expect(Object.keys(shiftKeyA)).toEqual(["id", "text", "width", "futureField", "sk"]);
+    expect(shiftKeyA["futureField"]).toBe(7);
+    expect(shiftKeyA["width"]).toBe("150");
+
+    // Key order within the row is unchanged.
+    const shiftLayer = (
+      (parsed["phone"] as { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string }> }> }> })
+        .layer
+    ).find((l) => l.id === "shift")!;
+    expect(shiftLayer.row[0]!.key.map((k) => k.id)).toEqual(["K_A", "K_B"]);
+  });
+
+  it('defaultHint "dot" promotion still fires for a platform that gained an sk[] on a non-default layer', () => {
+    const { json } = applyTouchAssignmentsToRawJson(makePhoneWithShiftJson(), [
+      longpressOnLayer("K_A", "Á", "shift"),
+    ]);
+
+    const parsed = JSON.parse(json) as { phone: { defaultHint?: string } };
+    expect(parsed.phone.defaultHint).toBe("dot");
+  });
+});

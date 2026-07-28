@@ -44,9 +44,81 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-28T03:10:57.145Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:14:49.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:14:49.982Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:14:50.244Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:14:50.486Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:19:39.878Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:19:40.142Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:19:40.393Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:19:40.645Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:19:40.884Z"
     }
   ],
-  "currentTask": "T004",
+  "currentTask": "T013",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -74,6 +146,69 @@
       "did": "Recorded the six shipped editor.assignLoop.companion.* ids and their exact English messages for verbatim reuse",
       "files": [
         "packages/studio/src/locales/en/messages.json (read-only)"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Generalized layer resolution to per-mechanism 'slotValues.layer ?? default' resolved against phonePlatform.layers by id, replacing the hardcoded default lookup",
+      "files": [
+        "packages/engine/src/pattern-apply/applyTouchAssignments.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Added the missing-target-layer path - warns and skips that mechanism only, never throws, never falls back to default",
+      "files": [
+        "packages/engine/src/pattern-apply/applyTouchAssignments.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Host-key-missing warning now names the resolved layer ('not found in phone layer \"<id>\"')",
+      "files": [
+        "packages/engine/src/pattern-apply/applyTouchAssignments.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Converted the single-defaultLayerIndex rebuild to a lazy per-touched-layer rebuild; untouched layers/platforms returned by reference and no input mutated",
+      "files": [
+        "packages/engine/src/pattern-apply/applyTouchAssignments.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Re-keyed the raw-JSON lookup from platformName->keyId to platformName->layerId->keyId across every layer present, resolving slotValues.layer ?? default per mechanism",
+      "files": [
+        "packages/engine/src/pattern-apply/applyTouchAssignmentsToRawJson.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Raw-JSON warning now names the target layer; an unknown layer matches no platform so it warns+skips without throwing or defaulting; defaultHint dot promotion and splice-in-place fidelity unchanged",
+      "files": [
+        "packages/engine/src/pattern-apply/applyTouchAssignmentsToRawJson.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Added 6 IR-path layer cases: default==absent, shift placement, two layers on one char, unknown layer warn+skip, host key absent from target layer, structural sharing",
+      "files": [
+        "packages/engine/src/pattern-apply/applyTouchAssignments.test.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Added 6 raw-JSON layer cases: default==absent, shift splice, unknown layer, host key on another layer, unknown-field/key-order preservation, defaultHint promotion",
+      "files": [
+        "packages/engine/src/pattern-apply/applyTouchAssignmentsToRawJson.test.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Regression floor verified: both applier test diffs are pure appends (137/0 and 155/0, zero deleted lines); 36->42 and 41->47 cases; full engine suite 2110 passed",
+      "files": [
+        "(verification only)"
       ]
     }
   }
