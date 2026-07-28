@@ -1548,13 +1548,23 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // different object entirely.
     const targetLayer = casePairTouchLayer(editingLayer);
     if (targetLayer !== null && resolvedHostKey !== null) {
+      const hk = resolvedHostKey;
       proposeCompanion({
         mechanism: "touch",
         originalChar: currentChar,
-        hostKey: resolvedHostKey,
+        hostKey: hk,
         targetLayer,
         // Object identity, not target/index (FR-008).
         baseRef: ref,
+        // "Counterpart already placed" (spec §Edge Cases): the capital is
+        // already on this host key's parallel layer, so there is nothing to
+        // propose. Asked with the counterpart the hook derived — this gallery
+        // never cases a letter itself (FR-002).
+        alreadyProduced: (counterpart) =>
+          (charTouch.get(counterpart)?.mechanisms ?? []).some((m) => {
+            const slots = normalizeTouchSlots(m.slotValues);
+            return slots["hostKey"] === hk && slots["layer"] === targetLayer;
+          }),
       });
     }
     // spec-014 FR-014/R4: a manual edit to the host touch key PROMOTES it to
@@ -1575,8 +1585,21 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     setHostKey("");
     setHostKeyCustomChar("");
     setFlickDirection("");
+    // `charTouch` is listed because the case-pair "already placed" predicate
+    // above closes over it — a stale map would re-propose a pairing the author
+    // has already made.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentChar, canApply, method, hostKey, resolvedHostKey, flickDirection]);
+  }, [
+    currentChar,
+    canApply,
+    method,
+    hostKey,
+    resolvedHostKey,
+    flickDirection,
+    charTouch,
+    editingLayer,
+    proposeCompanion,
+  ]);
 
   // "Skip this character" is pure forward navigation — it records nothing,
   // so it is identical to handleNext (advance one position, or complete from

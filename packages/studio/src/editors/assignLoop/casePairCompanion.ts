@@ -122,8 +122,22 @@ export type CasePairProposal = CasePairProposalCommon & {
 
 /** What a caller passes to `propose` — the proposal minus everything the hook
  *  derives from `caseCounterpart`. */
-export type CasePairProposalInput = CasePairProposalCommon &
-  (PhysicalProposalParts | ComboProposalParts | TouchProposalParts);
+export type CasePairProposalInput = CasePairProposalCommon & {
+  /**
+   * Optional caller predicate for the "counterpart already placed" edge case
+   * (spec §Edge Cases): given the derived counterpart, is it ALREADY produced
+   * on the parallel slot? `true` raises nothing — a redundant proposal is
+   * noise.
+   *
+   * It is a callback rather than a boolean because the counterpart is not
+   * known until `caseCounterpart` has run, and `propose` is deliberately its
+   * only caller (FR-002). Answering the question this way lets the gallery
+   * inspect its own state without acquiring a second casing path.
+   *
+   * Never stored on the resulting proposal — it is an input-time gate only.
+   */
+  alreadyProduced?: (counterpart: string) => boolean;
+} & (PhysicalProposalParts | ComboProposalParts | TouchProposalParts);
 
 export interface UseCasePairCompanion {
   /** The pending proposal, or null. At most one at a time. */
@@ -174,16 +188,21 @@ export function useCasePairCompanion(): UseCasePairCompanion {
       const pair = caseCounterpart(input.originalChar, bcp47);
       if (pair === null || pair.direction !== "toUpper") return false;
 
-      if (input.mechanism === "combo") {
+      // "Counterpart already placed" (spec §Edge Cases) — asked only now that
+      // the counterpart exists, and stripped from what gets stored.
+      const { alreadyProduced, ...parts } = input;
+      if (alreadyProduced?.(pair.counterpart) === true) return false;
+
+      if (parts.mechanism === "combo") {
         // The INPUT side must case-shift too: a parallel combo whose base
         // letter has no confident capital is not a combo we can propose.
-        const parallelCombo = caseShiftCombo(input.combo, bcp47);
+        const parallelCombo = caseShiftCombo(parts.combo, bcp47);
         if (parallelCombo === null) return false;
-        setProposal({ ...input, counterpart: pair.counterpart, parallelCombo });
+        setProposal({ ...parts, counterpart: pair.counterpart, parallelCombo });
         return true;
       }
 
-      setProposal({ ...input, counterpart: pair.counterpart });
+      setProposal({ ...parts, counterpart: pair.counterpart });
       return true;
     },
     [bcp47],

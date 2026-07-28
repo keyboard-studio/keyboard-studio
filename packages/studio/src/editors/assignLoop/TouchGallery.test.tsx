@@ -2223,6 +2223,47 @@ describe("TouchGallery — shift-layer case-pair proposal (spec 051 US3)", () =>
     expect(touchMechanismsFor("中")).toHaveLength(1);
   });
 
+  it("raises no redundant proposal once the capital is already on that host key's shift layer", async () => {
+    seedStore({ withInventory: ["θ"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // First apply: propose, then confirm — Θ now sits on K_A's shift layer.
+    await applyLongpressOn("K_A");
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map Θ to the shift layer of/i }),
+      );
+    });
+    expect(touchMechanismsFor("Θ")).toHaveLength(1);
+
+    // Re-applying the same placement must not re-offer a pairing that exists
+    // (spec §Edge Cases, "counterpart already placed").
+    await applyLongpressOn("K_A");
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+    expect(touchMechanismsFor("Θ")).toHaveLength(1);
+  });
+
+  it("still proposes when the capital exists on a DIFFERENT host key's shift layer", async () => {
+    seedStore({ withInventory: ["θ"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await applyLongpressOn("K_A");
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map Θ to the shift layer of/i }),
+      );
+    });
+
+    // A placement on another host key is a different parallel slot, so the
+    // suppression must not over-reach.
+    await applyLongpressOn("K_B");
+    expect(screen.queryByText(/has an uppercase form, Θ/i)).toBeTruthy();
+  });
+
   it("does not consult or write suggestionResolved — that set governs the placement card, not this proposal", async () => {
     seedStore({ withInventory: ["θ"] });
     await act(async () => {

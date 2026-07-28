@@ -177,13 +177,13 @@ not `default`; a caseless letter raises nothing.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T042 Extract i18n catalogs: `pnpm --filter @keyboard-studio/studio messages:extract`, then confirm `packages/studio/src/locales/en/messages.json` gained only the additive `editor.assignLoop.companion.prompt.combo` / `.prompt.touch` ids and that every reused `editor.assignLoop.companion.*` id keeps its exact T004-recorded English message
-- [ ] T043 Verify `packages/studio/src/locales/fr/messages.json` key-set parity after extraction so `i18n-catalog-lint` passes (no orphaned or missing ids)
-- [ ] T044 [P] Audit the "single casing source" invariant: grep the diff for `toUpperCase(` / `toLocaleUpperCase(` and confirm the only surviving occurrence on the touch path is the vkey-name construction in `TouchGallery.tsx` (~L1194). Zero new casing calls on the proposal path ([data-model.md](data-model.md) §Invariants 1)
-- [ ] T045 [P] Confirm the deliberately-unchanged files have an empty diff: `packages/engine/src/character-discovery/casePair.ts`, `packages/engine/src/pattern-apply/shiftRules.ts`, `packages/contracts/**`, `content/patterns/**`
-- [ ] T046 Run the repo gates from [quickstart.md](quickstart.md) §6: `pnpm typecheck`, `pnpm -r test`, `pnpm lint`
+- [x] T042 Extract i18n catalogs: `pnpm --filter @keyboard-studio/studio messages:extract`, then confirm `packages/studio/src/locales/en/messages.json` gained only the additive `editor.assignLoop.companion.prompt.combo` / `.prompt.touch` ids and that every reused `editor.assignLoop.companion.*` id keeps its exact T004-recorded English message
+- [x] T043 Verify `packages/studio/src/locales/fr/messages.json` key-set parity after extraction so `i18n-catalog-lint` passes (no orphaned or missing ids)
+- [x] T044 [P] Audit the "single casing source" invariant: grep the diff for `toUpperCase(` / `toLocaleUpperCase(` and confirm the only surviving occurrence on the touch path is the vkey-name construction in `TouchGallery.tsx` (~L1194). Zero new casing calls on the proposal path ([data-model.md](data-model.md) §Invariants 1)
+- [x] T045 [P] Confirm the deliberately-unchanged files have an empty diff: `packages/engine/src/character-discovery/casePair.ts`, `packages/engine/src/pattern-apply/shiftRules.ts`, `packages/contracts/**`, `content/patterns/**`
+- [x] T046 Run the repo gates from [quickstart.md](quickstart.md) §6: `pnpm typecheck`, `pnpm -r test`, `pnpm lint`
 - [ ] T047 Walk [quickstart.md](quickstart.md) §5 manually under `pnpm dev` — steps 2 (physical confirm/dismiss), 3 (dead key: trigger unchanged, base letter capitalized), 4 (`á` on `default`, `Á` on `shift` in the generated `.keyman-touch-layout`), 5 (the inverse case: `Á` placed directly lands on `shift`), 6 (caseless: no banner)
-- [ ] T048 [P] Update [docs/keyboard-index.md](../../docs/keyboard-index.md) **only if** the manual walkthrough or any new test fixture references a keyboard not already in the phonebook (mandatory when it does; otherwise a no-op)
+- [x] T048 [P] Update [docs/keyboard-index.md](../../docs/keyboard-index.md) **only if** the manual walkthrough or any new test fixture references a keyboard not already in the phonebook (mandatory when it does; otherwise a no-op)
 
 ---
 
