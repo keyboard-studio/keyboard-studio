@@ -1050,4 +1050,24 @@ describe("range re-collapse on emit (spec 042)", () => {
     expect(line).toContain("'abc'");
     expect(line).not.toContain("..");
   });
+
+  // A store that contains a `dk()` deadkey item must NOT get range re-collapse:
+  // kmcmplib rejects a store holding both a `X .. Y` range and a `dk()` item in
+  // the same declaration with KM_WARNING_KMCMP_5251093 "Invalid 'deadkey' or 'dk'
+  // statement" (no .kmx produced). This is exactly the shape of the deadkey
+  // lookup store `store(dkf0021)` in sil_cameroon_azerty — a run of consecutive
+  // combining marks followed by a trailing deadkey — and re-collapsing it broke a
+  // Track-1 copy of that keyboard at the preview compile.
+  it("does NOT re-collapse an ascending run in a store that also holds a dk() item", () => {
+    const { ir } = parse(
+      kmnWithStore("store(dkf) U+0300 U+0301 U+0302 U+0303 dk(003d)"),
+      "deadkey-store",
+    );
+    const out = emit(ir);
+    const line = storeLine(out, "dkf");
+    expect(line).not.toContain("..");
+    expect(line).toContain("U+0300");
+    expect(line).toContain("U+0303");
+    expect(line).toContain("dk(003d)");
+  });
 });
