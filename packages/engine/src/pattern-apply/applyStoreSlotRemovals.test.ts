@@ -30,6 +30,8 @@ import {
   applyStoreSlotRemovals,
   classifyStoreSlotEdit,
   describeStorePairing,
+  analyzeStores,
+  storeRoleOf,
 } from "./applyStoreSlotRemovals.js";
 import { collectCharContributors } from "./collectCharContributors.js";
 import { parseSlotId } from "./slotId.js";
@@ -1482,5 +1484,72 @@ describe("applyStoreSlotRemovals — Cameroon-shaped integration (trimmed fixtur
     const dktLine = emitted.split("\n").find((l) => l.includes("store(dkt003b)"));
     expect(dktLine).toBeDefined();
     expect((dktLine!.match(/nul/g) ?? []).length).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 12. Store ROLE — asIndexOutputTarget / storeRoleOf (spec 051 T009)
+//
+// Additive coverage for the fourth usage flag. The collateral guard turns on
+// "is this partner store an OUTPUT target?" — a fact nothing in the analysis
+// could answer before, because pairSets membership is symmetric.
+// ---------------------------------------------------------------------------
+
+describe("analyzeStores — store role (spec 051)", () => {
+  /** Cameroon's grave-accent pair: dkf0060 any()-consumed, dkt0060 index()-targeted. */
+  function makeGraveAccentIr(): KeyboardIR {
+    const dkf = makeInputStore("store#dkf0060", "dkf0060", ["a", "i", "u"]);
+    const dkt = makeOutputStore("store#dkt0060", "dkt0060", [
+      { kind: "char", value: "à" },
+      { kind: "char", value: "ɨ" },
+      { kind: "char", value: "ù" },
+    ]);
+    const group = makeParallelStoreGroup("group#main", "rule#0", 0x0060, "dkf0060", "dkt0060");
+    return makeTestIR([group], [dkt, dkf]);
+  }
+
+  it("marks the any()-consumed input store as NOT an output target (dkf0060 -> input)", () => {
+    const analysis = analyzeStores(makeGraveAccentIr());
+    expect(analysis.usageByName.get("dkf0060")?.asAnySource).toBe(true);
+    expect(analysis.usageByName.get("dkf0060")?.asIndexOutputTarget).toBe(false);
+    expect(storeRoleOf(analysis, "dkf0060")).toBe("input");
+  });
+
+  it("marks the index()-targeted output store as an output target (dkt0060 -> output)", () => {
+    const analysis = analyzeStores(makeGraveAccentIr());
+    expect(analysis.usageByName.get("dkt0060")?.asAnySource).toBe(false);
+    expect(analysis.usageByName.get("dkt0060")?.asIndexOutputTarget).toBe(true);
+    expect(storeRoleOf(analysis, "dkt0060")).toBe("output");
+  });
+
+  it("classifies a self-paired store as BOTH, and it still has an empty coordinatedWith", () => {
+    const ir = makeSelfPairedIr();
+    const analysis = analyzeStores(ir);
+    expect(storeRoleOf(analysis, "word")).toBe("both");
+    // Unchanged from today: a self-paired store never reaches the guard, because
+    // there is no other store to coordinate with (spec 051 invariant D5).
+    const store = ir.stores.find((s) => s.name === "word")!;
+    expect(classifyStoreSlotEdit(store, ir)).toEqual({ mode: "drop", coordinatedWith: [] });
+  });
+
+  it("reports a store no rule references as unused", () => {
+    const orphan = makeInputStore("store#orphan", "orphanX", ["q"]);
+    const ir = makeTestIR([makeParallelStoreGroup("group#main", "rule#0", 0x0060, "dkfX", "dktX")], [
+      makeInputStore("store#dkf", "dkfX", ["a"]),
+      makeOutputStore("store#dkt", "dktX", [{ kind: "char", value: "à" }]),
+      orphan,
+    ]);
+    expect(storeRoleOf(analyzeStores(ir), "orphanX")).toBe("unused");
+  });
+
+  it("marks an outs()-referenced store as an output target", () => {
+    const src = makeOutputStore("store#src", "srcX", [{ kind: "char", value: "x" }]);
+    const rule: IRRule = {
+      nodeId: "rule#outs",
+      context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
+      output: [{ kind: "outs", storeRef: "srcX" }],
+    };
+    const ir = makeTestIR([{ nodeId: "group#main", name: "main", usingKeys: true, rules: [rule], readonly: false }], [src]);
+    expect(storeRoleOf(analyzeStores(ir), "srcX")).toBe("output");
   });
 });

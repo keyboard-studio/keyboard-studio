@@ -309,7 +309,8 @@ the uppercase is now trimmed too.
   `applyStoreSlotRemovals` coordinated-drop algorithm are unchanged; this feature changes only the
   **proposal/guard** layer that decides *which* slots to propose, not *how* a confirmed drop is applied.
 - **NFR-004** Team boundary (spec §12): the produced-vs-input distinction and the "no other producer"
-  test are engine-side facts about the IR; the studio consumes them. No studio→engine import.
+  test are engine-side facts about the IR; the studio consumes them and owns carve policy/presentation
+  on top. The engine must never import the studio.
 
 ## Key Entities *(the data this reasons over)*
 

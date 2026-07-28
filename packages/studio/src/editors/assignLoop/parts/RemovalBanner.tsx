@@ -54,6 +54,7 @@ export function RemovalBanner({ recommended, languageLabel, onRemoveSelected }: 
   };
 
   const selected = recommended.filter((r) => !uncheckedChs.has(r.ch));
+  const hasPairedRow = recommended.some((r) => r.caseGroup !== undefined);
 
   return (
     <div
@@ -111,9 +112,22 @@ export function RemovalBanner({ recommended, languageLabel, onRemoveSelected }: 
               display: 'flex', flexWrap: 'wrap', gap: 8,
             }}
           >
-            {recommended.map(({ ch }) => {
-              const codepoint = charCodepointLabel(ch);
+            {recommended.map(({ ch, caseGroup }) => {
               const isChecked = !uncheckedChs.has(ch);
+              // A paired row shows BOTH case-group members — accepting it trims both as one
+              // action (handleRemoveSelectedRecommended), so the checklist must not imply a
+              // single character is at stake. FR-014: still one checkbox for the whole pair;
+              // no per-case checkbox inside the row (that would rebuild the two-row
+              // reconciliation this requirement removes).
+              const pairChars = caseGroup ?? [ch];
+              const glyphLabel = pairChars.map(displayChar).join(' / ');
+              const codepointLabel = pairChars.map(charCodepointLabel).join(' / ');
+              const ariaLabel = caseGroup
+                ? t({
+                    id: "editor.assignLoop.removalBanner.removeCheckboxAriaLabelPair",
+                    message: `Remove ${{ codepointLabel }} (both cases)`,
+                  })
+                : t({ id: "editor.assignLoop.removalBanner.removeCheckboxAriaLabel", message: `Remove ${{ codepoint: codepointLabel }}` });
               return (
                 <li key={ch}>
                   <label
@@ -127,20 +141,28 @@ export function RemovalBanner({ recommended, languageLabel, onRemoveSelected }: 
                       type="checkbox"
                       checked={isChecked}
                       onChange={() => toggle(ch)}
-                      aria-label={t({ id: "editor.assignLoop.removalBanner.removeCheckboxAriaLabel", message: `Remove ${{ codepoint }}` })}
+                      aria-label={ariaLabel}
                       style={{ cursor: 'pointer' }}
                     />
                     <span style={{ font: "400 16px/1 'Lora', serif", color: 'var(--app-text)' }}>
-                      {displayChar(ch)}
+                      {glyphLabel}
                     </span>
                     <span style={{ font: '600 10px/1 var(--app-font-mono)', color: 'var(--app-text-subtle)', letterSpacing: '.03em' }}>
-                      {codepoint}
+                      {codepointLabel}
                     </span>
                   </label>
                 </li>
               );
             })}
           </ul>
+          {hasPairedRow && (
+            <p style={{ margin: 0, font: '400 11.5px var(--app-font)', color: 'var(--app-text-subtle)' }}>
+              <Trans id="editor.assignLoop.removalBanner.pairEscapeHatchHint">
+                A paired row removes both cases together — to keep just one, uncheck it here and remove the single
+                character you want from its card instead.
+              </Trans>
+            </p>
+          )}
           <div>
             <button
               type="button"

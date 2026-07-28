@@ -204,6 +204,51 @@ interface StoreUsageFlags {
   asNotAny: boolean;
   /** Store is referenced by an index() context element in some rule (matcher reads it). */
   asContextIndex: boolean;
+  /** Store is an index()/outs() output target in some rule (spec 051 T004). */
+  asIndexOutputTarget: boolean;
+}
+
+/**
+ * Store role derived from usage flags (spec 051 T004).
+ * - "input": any()-consumed or notany()-excluded (context-side only)
+ * - "output": index()/outs() target (output-side only)
+ * - "both": used in both context and output
+ * - "unused": not referenced at all (neither context nor output)
+ */
+export type StoreRole = "input" | "output" | "both" | "unused";
+
+/**
+ * Derive a store's {@link StoreRole} from the usage flags gathered by
+ * {@link analyzeStores} (spec 051 T004).
+ *
+ * The collateral guard only needs "is this an output target?" and reads
+ * `asIndexOutputTarget` directly; this is the full four-way view for callers
+ * (and tests) that want to name a store's role rather than test one flag.
+ *
+ * CAVEAT — this is NOT the studio's display-role vocabulary, and the two
+ * DISAGREE on one case. `storeRefRole` in
+ * `packages/studio/src/lib/irToCarveNodes.ts` (the Inspector's "Linked pair"
+ * panel) classifies a CONTEXT `index()` element as "output", because it aligns
+ * with an output store. This function counts it context-side, because the
+ * question here is edit safety — "does some rule READ this store to decide what
+ * to match?" — and a matcher read makes a slot unsafe to drop for a different
+ * reason than an emission does. Do not treat the two as interchangeable, and do
+ * not wire this into a UI surface without reconciling that case first.
+ *
+ * @param analysis The whole-IR analysis from {@link analyzeStores}.
+ * @param name     The store name to classify.
+ */
+export function storeRoleOf(analysis: StoreAnalysis, name: string): StoreRole {
+  const usage = analysis.usageByName.get(name);
+  if (usage === undefined) return "unused";
+  // Context-side: consumed by any(), excluded by notany(), or read by a
+  // context index(). All three mean "the store's chars are things you type".
+  const isInput = usage.asAnySource || usage.asNotAny || usage.asContextIndex;
+  const isOutput = usage.asIndexOutputTarget;
+  if (isInput && isOutput) return "both";
+  if (isOutput) return "output";
+  if (isInput) return "input";
+  return "unused";
 }
 
 /**
@@ -239,7 +284,7 @@ export function analyzeStores(ir: KeyboardIR): StoreAnalysis {
   const ensureUsage = (name: string): StoreUsageFlags => {
     let usage = usageByName.get(name);
     if (usage === undefined) {
-      usage = { asAnySource: false, asNotAny: false, asContextIndex: false };
+      usage = { asAnySource: false, asNotAny: false, asContextIndex: false, asIndexOutputTarget: false };
       usageByName.set(name, usage);
     }
     return usage;
@@ -292,9 +337,13 @@ export function analyzeStores(ir: KeyboardIR): StoreAnalysis {
           // KNOWN LIMITATION note above. Recorded regardless of whether this
           // particular outs() looks positional; any outs() reference is enough.
           outsReferencedNames.add(el.storeRef);
+          // Spec 051 T004: mark as output target
+          ensureUsage(el.storeRef).asIndexOutputTarget = true;
           continue;
         }
         if (el.kind !== "index") continue;
+        // Spec 051 T004: mark as output target
+        ensureUsage(el.storeRef).asIndexOutputTarget = true;
         ensureNode(el.storeRef);
         const target = effectiveContext[el.offset - 1];
         if (target !== undefined && target.kind === "any") {

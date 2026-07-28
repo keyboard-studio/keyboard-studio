@@ -2325,6 +2325,33 @@ describe('recommendedRemovalChars', () => {
     expect(result.map((r) => r.ch)).toContain('b');
   });
 
+  it('does not recommend an input-only character appearing only in an any()-consumed store (invariant D2b, spec 051 FR-002)', () => {
+    // Characterization test — pins the existing correct behavior before touching
+    // the collateral guard. The produced set (and thus the recommendation signal)
+    // walks rule OUTPUTS + output-store slots only. An any()-consumed input store
+    // is a trigger, not a producer — its characters are not produced and therefore
+    // never proposed for trimming. This test mirrors T002's contracts-side
+    // characterization of buildProducedSet.
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'store#inputOnly', name: 'inputOnly', items: [{ kind: 'char', value: 'x' }], isSystem: false } as IRStore,
+      ],
+      groups: [
+        makeGroup([
+          makeCharOnlyRule(), // produces 'y' (surplus)
+          // Rule whose context any()-consumes inputOnly (x is an input trigger only)
+          { nodeId: 'rule-with-any', context: [{ kind: 'any', storeRef: 'inputOnly' }], output: [{ kind: 'char', value: 'a' }] },
+        ]),
+      ],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    // y and a are produced and surplus → should be in result if not shielded
+    // x from the any()-consumed store is NOT produced → NOT recommended
+    expect(result.map((r) => r.ch)).not.toContain('x');
+  });
+
   it('does not recommend a character that IS in `needed`', () => {
     const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
 
@@ -2508,7 +2535,11 @@ describe('coordinatedCollateralForSlots', () => {
 
     const collateral = coordinatedCollateralForSlots(['store#dkf#0'], ir, new Set(['α']));
 
-    expect(collateral).toEqual([{ ch: 'α', storeName: 'dkt', isNeeded: true, slotId: 'store#dkt#0' }]);
+    // role/isLost added by spec 051 T013 — `dkt` is the index() OUTPUT store and
+    // α has no other producer, so this drop really would lose it.
+    expect(collateral).toEqual([
+      { ch: 'α', storeName: 'dkt', isNeeded: true, slotId: 'store#dkt#0', role: 'output', isLost: true },
+    ]);
   });
 
   it('isNeeded is false when the partner char is not in `needed`', () => {
@@ -2516,7 +2547,9 @@ describe('coordinatedCollateralForSlots', () => {
 
     const collateral = coordinatedCollateralForSlots(['store#dkf#0'], ir, new Set(['α']));
 
-    expect(collateral).toEqual([{ ch: 'γ', storeName: 'dkt', isNeeded: false, slotId: 'store#dkt#0' }]);
+    expect(collateral).toEqual([
+      { ch: 'γ', storeName: 'dkt', isNeeded: false, slotId: 'store#dkt#0', role: 'output', isLost: false },
+    ]);
   });
 
   it('returns [] when the targeted slot has no coordinated partner (unpaired store)', () => {
@@ -2589,7 +2622,9 @@ describe('coordinatedCollateralForSlots', () => {
 
     expect(collateral).toHaveLength(1);
     expect(collateral[0]?.slotId).toBe('store#dkt#0');
-    expect(collateral).toEqual([{ ch: 'α', storeName: 'dkt', isNeeded: true, slotId: 'store#dkt#0' }]);
+    expect(collateral).toEqual([
+      { ch: 'α', storeName: 'dkt', isNeeded: true, slotId: 'store#dkt#0', role: 'output', isLost: true },
+    ]);
   });
 
   // Blocked-store guard: the TARGETED slot's own store classifies as
@@ -2727,5 +2762,404 @@ describe('resolveNodeName / resolveLocationLabel', () => {
     expect(resolveLocationLabel({ kind: 'store', nodeId: 's1', label: 'Vowels' }, i18nFor('fr'))).toBe(
       'Vowels',
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The collateral guard is a CONJUNCTION, not "any needed partner" (spec 051)
+//
+// contracts/collateral-guard.md G1/G2/G9. Cameroon QWERTY's grave-accent pair:
+// trimming the surplus `ɨ` resolves partner slot `dkf0060#1`, which holds the
+// needed `i`. `dkf0060` is any()-CONSUMED — an input store — so `i` is not
+// produced there and the shield must lift. `i` stays typeable through its own
+// `+ [K_I] > 'i'` rule (FR-004).
+// ---------------------------------------------------------------------------
+
+/**
+ * Cameroon-shaped grave-accent fixture.
+ *
+ * @param outputChars the OUTPUT store's items (what the deadkey emits)
+ * @param inputChars  the INPUT store's items (what you type after the deadkey)
+ * @param baseChars   characters that also get their own `+ [K_x] > 'c'` rule
+ */
+function makeGraveAccentIR(
+  outputChars: string[],
+  inputChars: string[],
+  baseChars: string[],
+): KeyboardIR {
+  const baseRules: IRRule[] = baseChars.map((ch, i) => ({
+    nodeId: `rule#base-${i}`,
+    context: [{ kind: 'vkey', name: `K_${ch.toUpperCase()}`, modifiers: [] }],
+    output: [{ kind: 'char', value: ch }],
+  }));
+  return makeIR({
+    stores: [
+      { nodeId: 'store#dkf', name: 'dkf0060', items: inputChars.map((v) => ({ kind: 'char', value: v })), isSystem: false } as IRStore,
+      { nodeId: 'store#dkt', name: 'dkt0060', items: outputChars.map((v) => ({ kind: 'char', value: v })), isSystem: false } as IRStore,
+    ],
+    groups: [{
+      nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      rules: [
+        ...baseRules,
+        {
+          nodeId: 'rule#fanout',
+          context: [{ kind: 'deadkey', id: 0x0060 }, { kind: 'any', storeRef: 'dkf0060' }],
+          output: [{ kind: 'index', storeRef: 'dkt0060', offset: 2 }],
+        },
+      ],
+    }],
+  });
+}
+
+describe('collateral guard — input partner never shields (spec 051 US1)', () => {
+  it('G1: proposes the surplus ɨ even though its coordinated partner slot holds the needed i', () => {
+    // dkt0060 = [à, ɨ, ù]; dkf0060 = [a, i, u]. Orthography needs a/i/u/à/ù but NOT ɨ.
+    const ir = makeGraveAccentIR(['à', 'ɨ', 'ù'], ['a', 'i', 'u'], ['a', 'i', 'u']);
+    const needed = new Set(['a', 'i', 'u', 'à', 'ù']);
+
+    const result = recommendedRemovalChars({ ir, needed });
+
+    expect(result.map((r) => r.ch)).toContain('ɨ');
+    // The needed characters are never candidates.
+    expect(result.map((r) => r.ch)).not.toContain('i');
+    expect(result.map((r) => r.ch)).not.toContain('à');
+  });
+
+  it('G1: the ɨ proposal resolves to the OUTPUT store slot, tagged with the producing role', () => {
+    const ir = makeGraveAccentIR(['à', 'ɨ', 'ù'], ['a', 'i', 'u'], ['a', 'i', 'u']);
+    const needed = new Set(['a', 'i', 'u', 'à', 'ù']);
+
+    const proposal = recommendedRemovalChars({ ir, needed }).find((r) => r.ch === 'ɨ');
+
+    expect(proposal).toBeDefined();
+    expect(proposal!.contributors.storeSlotIds).toEqual(['store#dkt#1']);
+    expect(proposal!.contributors.storeSlots).toEqual([{ slotId: 'store#dkt#1', role: 'output' }]);
+  });
+
+  it('G2: the coordinated collateral for the ɨ trim names dkf0060#1 (the i slot), as an INPUT partner', () => {
+    const ir = makeGraveAccentIR(['à', 'ɨ', 'ù'], ['a', 'i', 'u'], ['a', 'i', 'u']);
+    const needed = new Set(['a', 'i', 'u', 'à', 'ù']);
+
+    const collateral = coordinatedCollateralForSlots(['store#dkt#1'], ir, needed);
+
+    expect(collateral).toHaveLength(1);
+    expect(collateral[0]!.ch).toBe('i');
+    expect(collateral[0]!.storeName).toBe('dkf0060');
+    expect(collateral[0]!.slotId).toBe('store#dkf#1');
+    // `i` IS needed, but the partner is an INPUT store, so nothing is lost:
+    // the `i → ɨ` mapping stops firing; `i` itself is still typeable.
+    expect(collateral[0]!.isNeeded).toBe(true);
+    expect(collateral[0]!.role).toBe('input');
+    expect(collateral[0]!.isLost).toBe(false);
+  });
+
+  it("G2: the base `+ [K_I] > 'i'` rule is NOT a contributor to the ɨ trim (FR-004)", () => {
+    const ir = makeGraveAccentIR(['à', 'ɨ', 'ù'], ['a', 'i', 'u'], ['a', 'i', 'u']);
+    const needed = new Set(['a', 'i', 'u', 'à', 'ù']);
+
+    const proposal = recommendedRemovalChars({ ir, needed }).find((r) => r.ch === 'ɨ')!;
+
+    // Only the output-store slot is touched — no rule delete, so `+ [K_I] > 'i'`
+    // survives the splice and `i` stays produced.
+    expect(proposal.contributors.ruleNodeIds).toEqual([]);
+  });
+
+  it('G9: the banner and the tile signal agree — both lift together (NFR-001)', () => {
+    // Every char in the OUTPUT store is surplus, so the node-level signal is
+    // decided by the coordinated guard alone; the INPUT store holds needed chars.
+    const ir = makeGraveAccentIR(['ɨ', 'ɔ'], ['i', 'o'], ['i', 'o']);
+    const needed = new Set(['i', 'o']);
+
+    const banner = recommendedRemovalChars({ ir, needed }).map((r) => r.ch);
+    const tiles = annotateRemovalRecommendations(toRailNodes(ir), ir, needed);
+    const outputStoreTile = tiles.find((n) => n.kind === 'store' && n.name === 'dkt0060');
+
+    expect(banner).toEqual(expect.arrayContaining(['ɨ', 'ɔ']));
+    expect(outputStoreTile?.recommendation).toBe('high');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The guard is NARROWED, not removed (spec 051 US2)
+//
+// contracts/collateral-guard.md's truth table, rows 2-5, plus the shields that
+// must be unchanged. The whole point of FR-003 is that a trim which really
+// would leave a needed character unproducible STILL warns.
+// ---------------------------------------------------------------------------
+
+/**
+ * Chained cross-pair: S2 is an index() OUTPUT target in rule 1 and an any()
+ * INPUT source in rule 2, so its pair set reaches an OUTPUT store (S3).
+ * Trimming S2's char therefore has an OUTPUT partner — the only shape in which
+ * a coordinated drop can genuinely lose a produced character.
+ *
+ *   rule#1: dk(1) any(S1) > index(S2, 2)
+ *   rule#2: dk(2) any(S2) > index(S3, 2)
+ */
+function makeChainedPairIR(extraRules: IRRule[] = []): KeyboardIR {
+  return makeIR({
+    stores: [
+      { nodeId: 'store#s1', name: 'S1', items: [{ kind: 'char', value: 'a' }], isSystem: false } as IRStore,
+      { nodeId: 'store#s2', name: 'S2', items: [{ kind: 'char', value: 'X' }], isSystem: false } as IRStore,
+      { nodeId: 'store#s3', name: 'S3', items: [{ kind: 'char', value: 'Y' }], isSystem: false } as IRStore,
+    ],
+    groups: [{
+      nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      rules: [
+        { nodeId: 'rule#1', context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'S1' }], output: [{ kind: 'index', storeRef: 'S2', offset: 2 }] },
+        { nodeId: 'rule#2', context: [{ kind: 'deadkey', id: 2 }, { kind: 'any', storeRef: 'S2' }], output: [{ kind: 'index', storeRef: 'S3', offset: 2 }] },
+        ...extraRules,
+      ],
+    }],
+  });
+}
+
+/** `+ [K_Y] > 'Y'` — a second, independent producer of the needed Y. */
+const secondYProducer: IRRule = {
+  nodeId: 'rule#y',
+  context: [{ kind: 'vkey', name: 'K_Y', modifiers: [] }],
+  output: [{ kind: 'char', value: 'Y' }],
+};
+
+describe('collateral guard — truth table (spec 051 US2)', () => {
+  it('G3 (row 5): SHIELDS when the needed partner is an OUTPUT store and has no other producer', () => {
+    const ir = makeChainedPairIR();
+    const result = recommendedRemovalChars({ ir, needed: new Set(['Y']) });
+
+    // Trimming X would splice S3 at the same index and take the needed Y with
+    // it — Y has no other producer, so it would become untypeable.
+    expect(result.map((r) => r.ch)).not.toContain('X');
+  });
+
+  it('G4 (row 4): does NOT shield when the same needed character has a second producer', () => {
+    const ir = makeChainedPairIR([secondYProducer]);
+    const result = recommendedRemovalChars({ ir, needed: new Set(['Y']) });
+
+    expect(result.map((r) => r.ch)).toContain('X');
+  });
+
+  it('G3/G4: the collateral entry reports isLost exactly as the guard decides', () => {
+    const shielded = coordinatedCollateralForSlots(['store#s2#0'], makeChainedPairIR(), new Set(['Y']));
+    const outputPartner = shielded.find((c) => c.storeName === 'S3');
+    expect(outputPartner?.role).toBe('output');
+    expect(outputPartner?.isLost).toBe(true);
+
+    const withSecondProducer = coordinatedCollateralForSlots(
+      ['store#s2#0'],
+      makeChainedPairIR([secondYProducer]),
+      new Set(['Y']),
+    );
+    const stillNeeded = withSecondProducer.find((c) => c.storeName === 'S3');
+    expect(stillNeeded?.isNeeded).toBe(true); // still needed…
+    expect(stillNeeded?.isLost).toBe(false); // …but no longer lost
+  });
+
+  it('row 3: does NOT shield when the needed partner is an any()-consumed INPUT store', () => {
+    const ir = makeGraveAccentIR(['à', 'ɨ', 'ù'], ['a', 'i', 'u'], ['a', 'i', 'u']);
+    const result = recommendedRemovalChars({ ir, needed: new Set(['a', 'i', 'u', 'à', 'ù']) });
+    expect(result.map((r) => r.ch)).toContain('ɨ');
+  });
+
+  it('G5 (row 2): a self-paired store has no partner and is unchanged by the narrowing', () => {
+    // Cameroon's `word` idiom — any(word) and index(word) in the SAME rule, so
+    // coordinatedWith is [] and the guard can never fire (invariant D5).
+    const ir = makeIR({
+      stores: [{ nodeId: 'store#word', name: 'word', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'ɛ' }], isSystem: false } as IRStore],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule#self', context: [{ kind: 'any', storeRef: 'word' }], output: [{ kind: 'index', storeRef: 'word', offset: 1 }] }],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['a']) });
+
+    expect(result.map((r) => r.ch)).toContain('ɛ');
+    expect(coordinatedCollateralForSlots(['store#word#1'], ir, new Set(['a']))).toEqual([]);
+  });
+
+  it('G6 (FR-009): returns [] when the needed set is empty — no signal before the orthography resolves', () => {
+    expect(recommendedRemovalChars({ ir: makeChainedPairIR(), needed: new Set() })).toEqual([]);
+  });
+
+  it('G7: digits, punctuation and symbols stay shielded by isAlwaysKeepCategory', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule#digit', context: [{ kind: 'vkey', name: 'K_1', modifiers: [] }], output: [{ kind: 'char', value: '1' }] },
+          { nodeId: 'rule#punct', context: [{ kind: 'vkey', name: 'K_COMMA', modifiers: [] }], output: [{ kind: 'char', value: ',' }] },
+          { nodeId: 'rule#symbol', context: [{ kind: 'vkey', name: 'K_4', modifiers: [] }], output: [{ kind: 'char', value: '$' }] },
+          { nodeId: 'rule#letter', context: [{ kind: 'vkey', name: 'K_Z', modifiers: [] }], output: [{ kind: 'char', value: 'ʒ' }] },
+        ],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) }).map((r) => r.ch);
+
+    expect(result).toContain('ʒ'); // a surplus letter is still proposed
+    expect(result).not.toContain('1');
+    expect(result).not.toContain(',');
+    expect(result).not.toContain('$');
+  });
+
+  it('G8: an opaque-fragment producer is still shielded by the blocked check, BEFORE the producer test', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule#z', context: [{ kind: 'vkey', name: 'K_Z', modifiers: [] }], output: [{ kind: 'char', value: 'ʒ' }] }],
+      }],
+      raw: [{
+        nodeId: 'raw#1',
+        reason: 'if-guard',
+        sourceText: "if(&layer = 'x') + [K_Z] > 'ʒ'",
+      }] as unknown as KeyboardIR['raw'],
+    });
+
+    // 'ʒ' is surplus and has a simple rule producer, but an opaque fragment also
+    // emits it — the codec cannot confirm what that fragment does, so shield.
+    expect(recommendedRemovalChars({ ir, needed: new Set(['q']) }).map((r) => r.ch)).not.toContain('ʒ');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// recommendedRemovalChars — paired proposal-row granularity (spec 051 T026,
+// FR-014, contracts/case-pairing.md "Proposal-row granularity"). Fixture pair
+// is 'ǝ' U+01DD LATIN SMALL LETTER TURNED E <-> 'Ǝ' U+018E LATIN CAPITAL
+// LETTER REVERSED E — the same grounded fold carveCasePairs.test.ts uses.
+// Deliberately NOT 'ə' U+0259 (which uppercases to 'Ə' U+018F, a DIFFERENT
+// pair) — see carveCasePairs.ts's module doc for why the spec's own
+// Latin-a/Greek-alpha example likewise doesn't hold and isn't reused here.
+// ---------------------------------------------------------------------------
+
+describe('recommendedRemovalChars — paired proposal rows (spec 051 FR-014)', () => {
+  it('folds two independently-surplus case-group members into ONE row, not two', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule-lower', context: [{ kind: 'vkey', name: 'K_1', modifiers: [] }], output: [{ kind: 'char', value: 'ǝ' }] },
+          { nodeId: 'rule-upper', context: [{ kind: 'vkey', name: 'K_2', modifiers: [] }], output: [{ kind: 'char', value: 'Ǝ' }] },
+        ],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.ch).toBe('ǝ'); // lowercase member survives
+    expect(result[0]?.caseGroup).toEqual(['Ǝ', 'ǝ']); // sorted by code point: U+018E before U+01DD
+  });
+
+  it('leaves caseGroup undefined when the character has no counterpart in the produced set', () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y', no case counterpart produced
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result.map((r) => r.ch)).toEqual(['y']);
+    expect(result[0]?.caseGroup).toBeUndefined();
+  });
+
+  it('does not fold in a NEEDED case-group partner — only the surplus member surfaces, unpaired', () => {
+    // Turkic fixture (mirrors carveCasePairs.test.ts P7): under bcp47 "tr", plain
+    // lowercase 'i' pairs 1:1 with dotted 'İ', separately from dotless 'ı' <-> 'I'.
+    // isCharCoveredForLocale's own case-fold is Turkic-suppressed too, so 'İ' being
+    // in `needed` does NOT also cover 'i' by fold — 'i' is independently surplus,
+    // while 'İ' is excluded from candidacy outright (it's the literal needed char).
+    // 'İ' therefore never enters `results`, so the fold below must not pull it in.
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule-lower', context: [{ kind: 'vkey', name: 'K_1', modifiers: [] }], output: [{ kind: 'char', value: 'i' }] },
+          { nodeId: 'rule-upper', context: [{ kind: 'vkey', name: 'K_2', modifiers: [] }], output: [{ kind: 'char', value: 'İ' }] },
+        ],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['İ']), bcp47: 'tr' });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.ch).toBe('i');
+    expect(result[0]?.caseGroup).toBeUndefined();
+  });
+
+  it('leaves an ordinary, non-paired surplus character unchanged (existing behaviour)', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule-z', context: [{ kind: 'vkey', name: 'K_Z', modifiers: [] }], output: [{ kind: 'char', value: 'ʒ' }] }],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result.map((r) => r.ch)).toContain('ʒ');
+    expect(result.find((r) => r.ch === 'ʒ')?.caseGroup).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR-013 at proposal time — a shared uppercase is never offered for trimming
+// while one of its produced lowercase referents survives (spec 051, issue #1357).
+//
+// This is the many-to-one caveat the issue is actually about. The first fold
+// written for FR-014 collapsed any two rows sharing an uppercase, which got
+// { s, ſ, S } wrong: with `ſ` in the orthography, it proposed trimming `s` and
+// `S` together and left `ſ` with no uppercase. The retire rule now runs through
+// `caseTrimSet`, the one implementation of it.
+// ---------------------------------------------------------------------------
+
+/** Rules producing exactly `chars`, one key each — every char is independently trimmable. */
+function makeCharsIR(chars: string[]): KeyboardIR {
+  return makeIR({
+    groups: [{
+      nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      rules: chars.map((c, i) => ({
+        nodeId: `rule#${i}`,
+        context: [{ kind: 'vkey' as const, name: `K_${i}`, modifiers: [] }],
+        output: [{ kind: 'char' as const, value: c }],
+      })),
+    }],
+  });
+}
+
+describe('recommendedRemovalChars — shared uppercase retires last (spec 051 FR-013)', () => {
+  it('does NOT propose the shared uppercase while a produced lowercase referent is needed', () => {
+    // produced { s, ſ, S }; the orthography needs ſ (U+017F) but not s or S.
+    // Trimming S would leave ſ without its uppercase, so S must not be offered
+    // at all — neither folded into s's row nor as a row of its own.
+    const result = recommendedRemovalChars({
+      ir: makeCharsIR(['s', 'ſ', 'S']),
+      needed: new Set(['ſ']),
+    });
+
+    expect(result.map((r) => r.ch)).toEqual(['s']);
+    expect(result[0]!.caseGroup).toBeUndefined(); // single row, not a pair
+    expect(result.map((r) => r.ch)).not.toContain('S');
+  });
+
+  it('DOES retire the shared uppercase once every referent is being trimmed', () => {
+    // Same produced set, but nothing in it is needed — the whole group goes, as
+    // ONE row (FR-014), with the lowest-code-point lowercase surviving as the row.
+    const result = recommendedRemovalChars({
+      ir: makeCharsIR(['s', 'ſ', 'S']),
+      needed: new Set(['q']),
+    });
+
+    expect(result.map((r) => r.ch)).toEqual(['s']);
+    // S U+0053 < s U+0073 < ſ U+017F
+    expect(result[0]!.caseGroup).toEqual(['S', 's', 'ſ']);
+  });
+
+  it('never folds two distinct lowercases that merely share an uppercase', () => {
+    // produced { s, ſ } with no S at all: `s` and `ſ` are not counterparts of
+    // each other, so they stay two independent rows.
+    const result = recommendedRemovalChars({
+      ir: makeCharsIR(['s', 'ſ']),
+      needed: new Set(['q']),
+    });
+
+    expect(result.map((r) => r.ch).sort()).toEqual(['s', 'ſ']);
+    expect(result.every((r) => r.caseGroup === undefined)).toBe(true);
   });
 });
