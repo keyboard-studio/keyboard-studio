@@ -340,9 +340,57 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-28T04:06:47.141Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:38:48.191Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:38:48.536Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:38:48.844Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:38:49.127Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:38:49.404Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:38:49.703Z"
     }
   ],
-  "currentTask": "T041",
+  "currentTask": "T048",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -633,6 +681,191 @@
       "files": [
         "(verification only)"
       ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "lingui extract on node 24.11: en gained exactly the two additive ids (.prompt.combo, .prompt.touch) and nothing else; all six reused companion ids keep their exact T004-recorded messages",
+      "files": [
+        "packages/studio/src/locales/en/messages.json"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "fr key-set parity verified: 945 keys both sides, zero orphans and zero missing; i18n-catalog-lint reports catalogs in sync",
+      "files": [
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T044": {
+      "status": "DONE",
+      "did": "Single-casing-source audit: the feature diff adds ZERO toUpperCase/toLocaleUpperCase calls (the only two matches are prose in comments); the surviving TouchGallery call builds the K_ vkey name, not a letter",
+      "files": [
+        "(audit only)"
+      ]
+    },
+    "T045": {
+      "status": "DONE",
+      "did": "Deliberately-unchanged audit: casePair.ts, shiftRules.ts, packages/contracts/** and content/patterns/** all show 0 changed files against main",
+      "files": [
+        "(audit only)"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "Repo gates green: pnpm typecheck clean across all packages, pnpm -r test 6858 passed / 2 skipped, pnpm lint all checkers GREEN",
+      "files": [
+        "(verification only)"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "Phonebook no-op: the only keyboard referenced is basicKbdus (and the pre-existing sil_cameroon_qwerty fixture), both already indexed in docs/keyboard-index.md",
+      "files": [
+        "(audit only)"
+      ]
     }
-  }
+  },
+  "verified": [
+    {
+      "what": "SC-005 regression gate - the shipping physical-key companion is behaviour-preserved by the extraction",
+      "command": "pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/MechanismGallery.test.tsx",
+      "result": "PASS - all 145 pre-existing cases pass with a zero-deletion diff (pure append); no existing companion case was edited",
+      "warnings": []
+    },
+    {
+      "what": "Absent-layer regression floor for both touch appliers",
+      "command": "pnpm --filter @keyboard-studio/engine test src/pattern-apply/",
+      "result": "PASS - 441/441; the two applier test diffs are 137/0 and 155/0 (zero deleted lines), so no existing fixture was edited to make the change pass",
+      "warnings": []
+    },
+    {
+      "what": "Repo gates",
+      "command": "pnpm typecheck; pnpm -r test; pnpm lint",
+      "result": "PASS - typecheck clean, 6858 tests passed / 2 skipped, every lint checker GREEN including i18n-catalog-lint",
+      "warnings": [
+        "jsdom HTMLCanvasElement.getContext not-implemented noise from the pre-existing fontSupport tests - unrelated and non-failing"
+      ]
+    },
+    {
+      "what": "Single-casing-source invariant (FR-002)",
+      "command": "git diff main...HEAD -- packages/ | grep + | grep -E toUpperCase|toLocaleUpperCase",
+      "result": "PASS - zero new casing calls on the proposal path; the only two matches are prose inside comments, and the surviving TouchGallery call builds the K_ vkey NAME, not a letter",
+      "warnings": []
+    },
+    {
+      "what": "i18n additive-only catalog change",
+      "command": "pnpm --filter @keyboard-studio/studio messages:extract; git diff packages/studio/src/locales",
+      "result": "PASS - en/fr each gained exactly 2 keys (.prompt.combo, .prompt.touch); all six reused editor.assignLoop.companion.* ids keep their exact pre-change English messages, so no translation is orphaned",
+      "warnings": [
+        "required switching node 22.16.0 -> 24.11.0; below the repo 22.19 floor lingui exits 0 having written nothing"
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "mechanismRefEquals normalizes an absent layer to default before comparing slot key sets",
+      "why": "Not in the task list, but required: a ref stored in a draft before the layer slot existed carries {hostKey,char} while a freshly built one carries {hostKey,char,layer:default}, so raw key-set comparison called them distinct and duplicated the chip on every revisit. Two shipping dedupe/revisit tests caught it. This extends the absent-layer===default compatibility guarantee from the appliers to the studio dedup, keeping {K_A,a-acute,default} and {K_A,A-acute,shift} correctly distinct.",
+      "rejected": "Editing the two failing dedupe tests, which would have shipped a real backward-compatibility defect for every stored touch draft"
+    },
+    {
+      "decision": "The proposal carries a hook-derived parallelCombo alongside the source combo",
+      "why": "The data model gives the combo variant only the source combo, but the confirm handler needs the case-shifted base/content letter. Deriving it at confirm time would have made a second caseCounterpart caller and broken FR-002s structural guarantee. Deriving it inside propose keeps the hook the sole casing source.",
+      "rejected": "Re-deriving the uppercase base letter in the gallery confirm handler"
+    },
+    {
+      "decision": "S-03 proposals ride the existing onApplied callback rather than a second banner in SequenceBuilderPanel",
+      "why": "FR-011 requires one affordance across all three mechanisms; MechanismGallery owns the single hook and banner. The panel returns a SequenceApplied payload (absent on a dedup no-op) and the gallery raises the proposal.",
+      "rejected": "Giving SequenceBuilderPanel its own useCasePairCompanion instance and banner"
+    },
+    {
+      "decision": "The parallel sequence ref lands in the counterparts own sequence bucket",
+      "why": "collapsedChar is the counterpart, and a bucket is keyed by the assignment target, so partitionSequenceAssignment is called with the counterpart. This matches how the physical non-CAPS path appends an assignment targeting the counterpart, and inherits the existing (firstLetterOut, secondLetter) dedup.",
+      "rejected": "Appending the parallel ref to the source characters bucket, which would have made collapsedChar disagree with the assignment target"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "T047 (the manual quickstart §5 walkthrough under pnpm dev) was NOT performed - it needs a human at a browser. Every one of its six steps has automated coverage (physical confirm/dismiss, dead key with trigger unchanged and base capitalized, a-acute on default vs A-acute on shift, the inverse case, caseless raising nothing), and the engine applier tests prove layer:shift reaches the shift layer in both the IR and raw-JSON emit paths - but the end-to-end UI walk itself is unverified.",
+      "step": "implement"
+    },
+    {
+      "note": "The studio vitest suite is intermittently flaky under parallel pnpm -r load, unrelated to this feature: one run failed useValidator.test.ts (a 300ms-debounce running===false assertion) and another failed 2 unidentified tests. Three subsequent full runs passed 4350/4350 and the final pnpm -r test was fully green. The same flakiness class is visible on a clean main checkout.",
+      "step": "implement"
+    },
+    {
+      "note": "The machine default node was 22.16.0, below the repos >=22.19.0 engines floor. Switched to 24.11.0 via nvm and corepack-activated pnpm 9.12.0. This is a persistent change to the users global node selection; without it lingui messages:extract silently no-ops and i18n-catalog-lint misreports catalogs.",
+      "step": "implement"
+    }
+  ],
+  "coverage": {
+    "FR-001": {
+      "tests": [
+        "casePairCompanion.test.ts",
+        "MechanismGallery.test.tsx::case-pair companion proposal",
+        "TouchGallery.test.tsx::shift-layer case-pair proposal"
+      ]
+    },
+    "FR-002": {
+      "tests": [
+        "casePairCompanion.test.ts::suppression (FR-002)"
+      ]
+    },
+    "FR-003": {
+      "tests": [
+        "MechanismGallery.test.tsx::case-pair companion proposal"
+      ]
+    },
+    "FR-004": {
+      "tests": [
+        "MechanismGallery.test.tsx::S-02 parallel-combo proposal",
+        "MechanismGallery.test.tsx::S-03 parallel-combo proposal",
+        "SequenceBuilderPanel.test.tsx::onApplied case-pair seam"
+      ]
+    },
+    "FR-005": {
+      "tests": [
+        "TouchGallery.test.tsx::shift-layer case-pair proposal",
+        "applyTouchAssignments.test.ts::layer targeting"
+      ]
+    },
+    "FR-006": {
+      "tests": [
+        "TouchGallery.test.tsx::buildTouchMechanismRef - case-derived layer"
+      ]
+    },
+    "FR-007": {
+      "tests": [
+        "MechanismGallery.test.tsx::records nothing additional when the companion prompt is declined",
+        "TouchGallery.test.tsx::dismissing records nothing"
+      ]
+    },
+    "FR-008": {
+      "tests": [
+        "MechanismGallery.test.tsx::companion proposal identity tracking (P1/P2 regression)",
+        "MechanismGallery.test.tsx::confirming applies to the RAISING swap"
+      ]
+    },
+    "FR-009": {
+      "tests": [
+        "casePairCompanion.test.ts::locale (FR-009)",
+        "MechanismGallery.test.tsx::companion proposal bcp47 plumbing"
+      ]
+    },
+    "FR-010": {
+      "tests": [
+        "MechanismGallery.test.tsx::does not show the companion prompt when the keyboard is mnemonic"
+      ]
+    },
+    "FR-011": {
+      "tests": [
+        "MechanismGallery.test.tsx::shared case-pair affordance (spec 051)"
+      ]
+    }
+  },
+  "step_summaries": {
+    "implement": {
+      "summary": "One shared useCasePairCompanion hook + CasePairProposalBanner now serve all three placement mechanisms, and touch placements can finally name their layer - the engine appliers target slotValues.layer (absent === default) and touch refs derive it from the placed letter case."
+    }
+  },
+  "last_action": "47/48 tasks done - gates green (typecheck, 6858 tests, lint); T047 manual browser walkthrough left for a human"
 }
