@@ -25,7 +25,13 @@
  *   - scans a {@link KeyboardIR} for the modifier tokens / combos already in
  *     use, generalizing scaffoldTouchLayout.ts's `classifyModifiers` (which
  *     stays untouched — it buckets into the fixed 3-layer touch template and
- *     has its own callers).
+ *     has its own callers),
+ *   - computes the reachability constraint a combo-builder UI needs
+ *     (`addableTouchLayerTokens`/`optionsForTouchLayerSlot`) to only let an
+ *     author assemble a combo already present in a reported set (e.g.
+ *     TouchGallery's layer builder, constrained against
+ *     `collectLayerCombosInUse`'s own report of what the desktop keyboard
+ *     already uses).
  *
  * `canonicalizeCombo` applies one normalizing step AFTER the exclusion
  * check, so a combo that reaches it is already guaranteed
@@ -654,6 +660,62 @@ export function collectLayerCombosInUse(ir: KeyboardIR): ModifierToken[][] {
   }
 
   return combos;
+}
+
+// ---------------------------------------------------------------------------
+// Combo-reachability constraint — shared by any picker that must only let an
+// author assemble a combo already present in a reported set (e.g. the touch
+// gallery's layer builder constraining against `collectLayerCombosInUse`'s
+// report, mirroring MechanismGallery's S-08 "Layer + key" card's own
+// raltTokens/optionsForRaltSlot, whose pool there is the free/constructible
+// `computeModifierPool` rather than a fixed reported set).
+// ---------------------------------------------------------------------------
+
+/**
+ * Tokens that can legally extend `selectedSoFar` toward AT LEAST ONE combo in
+ * `validCombos` (e.g. as returned by {@link collectLayerCombosInUse}). A
+ * token `t` is offered when some combo in `validCombos` is a superset of
+ * `selectedSoFar ∪ {t}`: picking `t` next still leaves at least one valid
+ * combo reachable. Extending toward a combo that does NOT already contain
+ * everything picked so far would be a dead end, so those combos are skipped.
+ * Already-chosen tokens and their {@link MODIFIER_EXCLUSIONS} conflicts are
+ * excluded too.
+ */
+export function addableTouchLayerTokens(
+  selectedSoFar: ReadonlySet<ModifierToken>,
+  validCombos: readonly (readonly ModifierToken[])[],
+): ModifierToken[] {
+  const excluded = new Set<ModifierToken>();
+  for (const t of selectedSoFar) {
+    for (const e of MODIFIER_EXCLUSIONS[t]) excluded.add(e);
+  }
+  const addable = new Set<ModifierToken>();
+  for (const combo of validCombos) {
+    if (![...selectedSoFar].every((t) => combo.includes(t))) continue;
+    for (const t of combo) {
+      if (selectedSoFar.has(t) || excluded.has(t)) continue;
+      addable.add(t);
+    }
+  }
+  return [...addable];
+}
+
+/**
+ * Per-slot option pool for slot `index` of a combo builder — the tokens
+ * addable given only the EARLIER slots' chosen values. One-directional:
+ * earlier slots constrain later ones, never the reverse.
+ */
+export function optionsForTouchLayerSlot(
+  validCombos: readonly (readonly ModifierToken[])[],
+  tokens: readonly (ModifierToken | "")[],
+  index: number,
+): ModifierToken[] {
+  const selectedSoFar = new Set<ModifierToken>();
+  for (let i = 0; i < index; i++) {
+    const t = tokens[i];
+    if (t !== undefined && t !== "") selectedSoFar.add(t);
+  }
+  return addableTouchLayerTokens(selectedSoFar, validCombos);
 }
 
 /**
