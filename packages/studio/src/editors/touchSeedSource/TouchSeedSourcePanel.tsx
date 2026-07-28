@@ -44,6 +44,7 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { emitTouchLayout } from "@keyboard-studio/engine";
 import type { EditorStepProps } from "../../steps/types.ts";
@@ -53,6 +54,7 @@ import { useSurveySessionStore, type TouchSeedSource } from "../../stores/survey
 import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";
 import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
 import { deriveSeedLayout } from "../../lib/buildTouchLayoutJson.ts";
+import { formatUncoveredCharsList } from "../../lib/unimplementedInventory.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec, VfsTransform } from "../../hooks/useKeyboardArtifact.ts";
 import { OSKFrame } from "../../components/OSKFrame.tsx";
@@ -296,6 +298,22 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
     }
   }, [baseIr, selected, rawJson, mods]);
 
+  // Named string locals computed BEFORE the JSX below — the message body
+  // must not embed a conditional (ternary) expression as a direct <Trans>
+  // child (see MechanismGallery/TouchGallery's matching convention notes).
+  // Empty/unused when unplacedChars is empty — the note below doesn't render
+  // in that case, so the wasted computation is harmless.
+  const unplacedChars = currentSeedPreview?.unplacedChars ?? [];
+  const unplacedCountLabel = t({
+    id: "editor.touchSeed.reseedUnplacedNote.count",
+    message: plural(unplacedChars.length, { one: "# character", other: "# characters" }),
+  });
+  const unplacedVerb = t({
+    id: "editor.touchSeed.reseedUnplacedNote.verb",
+    message: plural(unplacedChars.length, { one: "was", other: "were" }),
+  });
+  const unplacedCharsList = formatUncoveredCharsList(unplacedChars);
+
   const scaffoldSpec = useMemo<ScaffoldSpec | null>(
     () =>
       identity?.keyboardId != null
@@ -534,9 +552,9 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
                     data-testid="seed-source-reseed-extras-note"
                     style={{ margin: "10px 0 0 0", fontSize: 12, color: "#d29922", fontFamily: FONT }}
                   >
-                    <Trans id="editor.touchSeed.reseedExtrasNote">
-                      [WARN] These characters had no matching key and were relocated to the
-                      space bar&apos;s longpress &ldquo;extras&rdquo; menu: {currentSeedPreview.unplacedChars.join(", ")}
+                    <Trans id="editor.touchSeed.reseedUnplacedNote">
+                      [WARN] {unplacedCountLabel} from the desktop layout could not be
+                      placed and {unplacedVerb} omitted: {unplacedCharsList}
                     </Trans>
                   </p>
                 )}

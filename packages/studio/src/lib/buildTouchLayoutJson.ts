@@ -69,10 +69,12 @@ export interface BuildTouchLayoutJsonResult {
   warnings: string[];
   /**
    * Characters the seed derivation (Case A only — `scaffoldTouchLayout`)
-   * could not place on a real compact-layout key or a known adjacent slot,
-   * so it spilled them onto the space bar's "extras" longpress menu instead
-   * of dropping them. Empty on Case B (raw-JSON splice never runs the
-   * scaffolder) or when nothing was spilled. Advisory only.
+   * produces that are reachable NOWHERE in the derived layout — not on their
+   * own key, the altgr/numeric layer, or any key's sk[] longpress menu (see
+   * `scaffoldTouchLayoutWithDiagnostics`'s `unplacedChars`, a TRUE
+   * reachability check, not a log of internal placement decisions). Empty on
+   * Case B (raw-JSON splice never runs the scaffolder) or when every
+   * produced character is reachable somewhere. Advisory only.
    */
   unplacedChars: string[];
 }

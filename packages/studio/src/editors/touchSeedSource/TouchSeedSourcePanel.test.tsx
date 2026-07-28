@@ -21,7 +21,7 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
-import type { TouchAssignment, IRGroup, IRRule, VirtualFS } from "@keyboard-studio/contracts";
+import type { TouchAssignment, IRGroup, IRRule, KeyboardIR, Pattern, VirtualFS } from "@keyboard-studio/contracts";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { deriveSeedLayout } from "../../lib/buildTouchLayoutJson.ts";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
@@ -157,7 +157,9 @@ function seedBase(touchLayoutJson?: string, groups: IRGroup[] = []) {
  * A single-rule IRGroup producing `overflowChar` on `K_oE2` — a vkey with no
  * compact-layout slot AND no known physical neighbor (see
  * OVERFLOW_NEAREST_SLOT in scaffoldTouchLayout.ts), so scaffoldTouchLayout
- * spills it onto the space bar's "extras" sk[] rather than dropping it.
+ * spills it onto the space bar's "extras" sk[] rather than dropping it. That
+ * makes it reachable, NOT a genuine data-loss case (see
+ * makeUnreachableSymbolIR below for the fixture that is).
  */
 function makeOverflowGroup(overflowChar: string): IRGroup {
   const rule: IRRule = {
@@ -166,6 +168,73 @@ function makeOverflowGroup(overflowChar: string): IRGroup {
     output: [{ kind: "char", value: overflowChar }],
   };
   return { nodeId: "group:overflow", name: "main", usingKeys: true, rules: [rule], readonly: false };
+}
+
+/** Seed baseVfs/baseIr from a fully-built KeyboardIR (bypassing makeTestIR),
+ *  for fixtures that need stores/recognizedPatterns alongside groups. */
+function seedBaseWithIr(ir: KeyboardIR, touchLayoutJson?: string) {
+  const files = [{ path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false }];
+  if (touchLayoutJson !== undefined) {
+    files.push({
+      path: "source/basic_kbdus.keyman-touch-layout",
+      content: touchLayoutJson,
+      isBinary: false,
+    });
+  }
+  const vfs = createVirtualFS(files);
+  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+}
+
+/**
+ * A KeyboardIR with a genuinely-unreachable rejected deadkey-successor
+ * candidate: `symbol` is unrelated to the base letter it was rejected from,
+ * never assigned to any vkey elsewhere, and not a numeric-layer literal — so
+ * it ends up nowhere in the derived layout. Mirrors the fixture in
+ * buildTouchLayoutJson.test.ts / scaffoldTouchLayout.test.ts.
+ */
+function makeUnreachableSymbolIR(symbol: string): KeyboardIR {
+  const baseVkey = "K_E";
+  const baseChar = "e";
+  const bodyRule: IRRule = {
+    nodeId: "rule:body",
+    context: [
+      { kind: "deadkey", id: 1 } as never,
+      { kind: "any", storeRef: "s_base" },
+    ],
+    output: [{ kind: "index", storeRef: "s_out", offset: 2 }],
+  };
+  const baseLetterRule: IRRule = {
+    nodeId: "rule:base",
+    context: [{ kind: "vkey", name: baseVkey, modifiers: [] }],
+    output: [{ kind: "char", value: baseChar }],
+  };
+  const pattern: Pattern = {
+    id: "test_s02_unreachable",
+    title: "Rejected candidate with no home anywhere in the layout",
+    description: "Locks the TRUE data-loss diagnostic at the panel level",
+    category: "desktop",
+    appliesTo: [],
+    strategyId: "S-02",
+    origin: "recognized",
+    ownedNodes: [{ nodeId: "rule:body", kind: "rule" }],
+    questions: [],
+    kmnFragment: "+ [K_TILDE] > dk(z)\ndk(z) + any(s_base) > index(s_out, 2)",
+    tests: [],
+    validatedForFamilies: [],
+    sourceKeyboards: [],
+    reviewedBy: "test",
+    reviewDate: "2026-07-28",
+  };
+  return {
+    ...makeTestIR(
+      [{ nodeId: "group:main", name: "main", usingKeys: true, rules: [baseLetterRule, bodyRule], readonly: false }],
+      [
+        { nodeId: "store:base", name: "s_base", items: [{ kind: "char", value: baseChar }], isSystem: false },
+        { nodeId: "store:out", name: "s_out", items: [{ kind: "char", value: symbol }], isSystem: false },
+      ],
+    ),
+    recognizedPatterns: [pattern],
+  };
 }
 
 afterEach(() => {
@@ -426,21 +495,22 @@ describe("TouchSeedSourcePanel — real OSK preview (R4b)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// P1 fix: unplaced/spilled overflow characters surfaced in the live preview
-// (structured data from scaffoldTouchLayoutWithDiagnostics -> deriveSeedLayout
-// -> reseedResult.unplacedChars), never gating.
+// unplacedChars is a TRUE reachability diagnostic surfaced in the live
+// preview (structured data from scaffoldTouchLayoutWithDiagnostics ->
+// deriveSeedLayout -> reseedResult.unplacedChars), never gating. A character
+// merely spilled onto the space bar's "extras" sk[] is reachable there and
+// must NOT show the advisory — only a character reachable nowhere in the
+// derived layout does.
 // ---------------------------------------------------------------------------
 
 describe("TouchSeedSourcePanel — reseed extras advisory", () => {
-  it("shows the reseed-extras advisory note listing a character spilled onto the space bar's extras sk[]", () => {
+  it("does not show the advisory note for a character spilled onto the space bar's extras sk[] — it is reachable there", () => {
     const overflowChar = "ʔ"; // LATIN LETTER GLOTTAL STOP — no compact slot, no known neighbor
     seedBase(undefined, [makeOverflowGroup(overflowChar)]); // no base layout -> default is Reseed
     render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
 
     expect(screen.getByTestId("seed-source-reseed").getAttribute("aria-pressed")).toBe("true");
-    const note = screen.getByTestId("seed-source-reseed-extras-note");
-    expect(note).toBeTruthy();
-    expect(note.textContent).toContain(overflowChar);
+    expect(screen.queryByTestId("seed-source-reseed-extras-note")).toBeNull();
   });
 
   it("does not show the reseed-extras advisory note when nothing was spilled", () => {
@@ -450,9 +520,24 @@ describe("TouchSeedSourcePanel — reseed extras advisory", () => {
     expect(screen.queryByTestId("seed-source-reseed-extras-note")).toBeNull();
   });
 
+  it("shows the advisory note listing a rejected deadkey-successor candidate that is genuinely unreachable elsewhere", () => {
+    const symbol = "§";
+    seedBaseWithIr(makeUnreachableSymbolIR(symbol)); // no base layout -> default is Reseed
+    render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
+
+    expect(screen.getByTestId("seed-source-reseed").getAttribute("aria-pressed")).toBe("true");
+    const note = screen.getByTestId("seed-source-reseed-extras-note");
+    expect(note).toBeTruthy();
+    expect(note.textContent).toContain(symbol);
+    // Honest wording — no longer claims "relocated to the space bar" for a
+    // character that in fact ended up nowhere in the layout.
+    expect(note.textContent).toContain("could not be placed");
+    expect(note.textContent).toContain("omitted");
+  });
+
   it("never gates either choice — both cards stay clickable when the advisory is showing", () => {
-    const overflowChar = "ʔ";
-    seedBase(undefined, [makeOverflowGroup(overflowChar)]);
+    const symbol = "§";
+    seedBaseWithIr(makeUnreachableSymbolIR(symbol));
     render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
 
     expect(screen.getByTestId("seed-source-reseed-extras-note")).toBeTruthy();

@@ -1272,7 +1272,7 @@ describe("scaffoldTouchLayout", () => {
       expect(spaceKey?.sk?.some((s) => s.text === punct) ?? false).toBe(false);
     });
 
-    it("a mark with no resolvable base (no IR composed form, absent from the static fallback table) still lands on the space bar's extras, tagged distinctly in unplacedChars", () => {
+    it("a mark with no resolvable base (no IR composed form, absent from the static fallback table) lands on the space bar's extras — reachable there, so NOT reported in unplacedChars (reachability-based diagnostic)", () => {
       const mark = "̥"; // COMBINING RING BELOW — absent from MARK_FALLBACK_VKEY
       const rule = makeCharRule("K_oMark3", [], mark);
       const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
@@ -1284,10 +1284,11 @@ describe("scaffoldTouchLayout", () => {
       const funcRow = defaultLayer.rows[3]!;
       const spaceKey = funcRow.keys.find((k) => k.id === "K_SPACE");
 
+      // Still placed on the space bar's extras (never dropped).
       expect(spaceKey?.sk?.some((s) => s.text === mark)).toBe(true);
-      expect(
-        unplacedChars.some((u) => u.includes(mark) && u.includes("no resolvable base letter")),
-      ).toBe(true);
+      // But reachable there, so the TRUE data-loss diagnostic does not flag
+      // it — only a character reachable NOWHERE in the layout is unplaced.
+      expect(unplacedChars).not.toContain(mark);
     });
   });
 
@@ -1517,7 +1518,7 @@ describe("scaffoldTouchLayout", () => {
       expect(oneKey?.sk?.some((s) => s.text === "!")).toBe(true);
     });
 
-    it("[QC P1] a rejected deadkey-successor candidate is surfaced in unplacedChars (tagged 'rejected from <vkey> longpress'), not silently dropped", () => {
+    it("a rejected deadkey-successor candidate that IS reachable elsewhere (a digit — the numeric layer always renders 0-9) is filtered from the letter's sk[] but NOT reported in unplacedChars", () => {
       const baseVkey = "K_E";
       const baseChar = "ə";
       const bodyRuleNodeId = freshId("rule");
@@ -1574,10 +1575,73 @@ describe("scaffoldTouchLayout", () => {
         .layers.find((l) => l.id === "default")!;
       const keKey = defaultLayer.rows.flatMap((r) => r.keys).find((k) => k.id === baseVkey)!;
 
+      // Internal filtering still holds: "3" never leaks onto K_E's own sk[].
       expect(keKey.sk?.some((s) => s.text === "3") ?? false).toBe(false);
-      expect(
-        unplacedChars.some((u) => u.includes("3") && u.includes(`rejected from ${baseVkey} longpress`)),
-      ).toBe(true);
+      // But "3" is trivially reachable via the compact layout's always-present
+      // numeric-layer literal key, so it is NOT a true data-loss case.
+      expect(unplacedChars.some((u) => u.includes("3"))).toBe(false);
+    });
+
+    it("a rejected deadkey-successor candidate that is genuinely unreachable elsewhere (a symbol unrelated to the base letter, never assigned to any vkey) IS reported in unplacedChars", () => {
+      const baseVkey = "K_E";
+      const baseChar = "e";
+      const symbol = "§"; // SECTION SIGN — unrelated to 'e'; not a digit, not on the numeric layer's literal/nearest-slot tables, never produced elsewhere in this IR
+      const bodyRuleNodeId = freshId("rule");
+      const baseLetterRule = makeCharRule(baseVkey, [], baseChar);
+      const bodyRule: IRRule = {
+        nodeId: bodyRuleNodeId,
+        context: [
+          { kind: "deadkey", id: 1 } as never,
+          { kind: "any", storeRef: "s_unreachable_base" },
+        ],
+        output: [{ kind: "index", storeRef: "s_unreachable_out", offset: 2 }],
+      };
+
+      const pattern: Pattern = {
+        id: "test_s02_genuinely_unreachable",
+        title: "Rejected candidate with no home anywhere in the layout",
+        description: "Locks the TRUE data-loss diagnostic: a rejected candidate not reachable via any other key/layer is still reported",
+        category: "desktop",
+        appliesTo: [],
+        strategyId: "S-02",
+        origin: "recognized",
+        ownedNodes: [{ nodeId: bodyRuleNodeId, kind: "rule" }],
+        questions: [],
+        kmnFragment: "+ [K_TILDE] > dk(z)\ndk(z) + any(s_unreachable_base) > index(s_unreachable_out, 2)",
+        tests: [],
+        validatedForFamilies: [],
+        sourceKeyboards: [],
+        reviewedBy: "test",
+        reviewDate: "2026-07-28",
+      };
+
+      const ir = makeMinimalIR({
+        groups: [makeGroup([baseLetterRule, bodyRule])],
+        stores: [
+          {
+            nodeId: freshId("store"),
+            name: "s_unreachable_base",
+            items: [{ kind: "char", value: baseChar }],
+            isSystem: false,
+          },
+          {
+            nodeId: freshId("store"),
+            name: "s_unreachable_out",
+            items: [{ kind: "char", value: symbol }],
+            isSystem: false,
+          },
+        ],
+        recognizedPatterns: [pattern],
+      });
+
+      const { layout, unplacedChars } = scaffoldTouchLayoutWithDiagnostics(ir);
+      const defaultLayer = layout.platforms
+        .find((p) => p.id === "phone")!
+        .layers.find((l) => l.id === "default")!;
+      const keKey = defaultLayer.rows.flatMap((r) => r.keys).find((k) => k.id === baseVkey)!;
+
+      expect(keKey.sk?.some((s) => s.text === symbol) ?? false).toBe(false);
+      expect(unplacedChars).toContain(symbol);
     });
 
     it("[QC P2] a non-ASCII (Unicode) decimal digit is rejected from a letter's sk[], not just ASCII 0-9", () => {
@@ -1659,14 +1723,20 @@ describe("scaffoldTouchLayout", () => {
       expect(unplacedChars).toEqual([]);
     });
 
-    it("unplacedChars contains a character spilled onto the space bar's extras sk[] (no known physical neighbor)", () => {
+    it("unplacedChars stays empty for a character spilled onto the space bar's extras sk[] — it IS reachable there, just not on its 'natural' key", () => {
       const overflowChar = "ʔ"; // LATIN LETTER GLOTTAL STOP — same fixture as the defect 2 regression above
       const rule = makeCharRule("K_oE2", [], overflowChar);
       const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
 
-      const { unplacedChars } = scaffoldTouchLayoutWithDiagnostics(ir);
+      const { layout, unplacedChars } = scaffoldTouchLayoutWithDiagnostics(ir);
+      const defaultLayer = layout.platforms
+        .find((p) => p.id === "phone")!
+        .layers.find((l) => l.id === "default")!;
+      const funcRow = defaultLayer.rows[3]!;
+      const spaceKey = funcRow.keys.find((k) => k.id === "K_SPACE");
 
-      expect(unplacedChars).toContain(overflowChar);
+      expect(spaceKey?.sk?.some((s) => s.text === overflowChar)).toBe(true);
+      expect(unplacedChars).not.toContain(overflowChar);
     });
 
     it("unplacedChars is empty for a character routed to a nearest-neighbor slot (not the extras grouping)", () => {
@@ -1679,7 +1749,7 @@ describe("scaffoldTouchLayout", () => {
       expect(unplacedChars).toEqual([]);
     });
 
-    it("unplacedChars is populated when a phone platform is synthesized onto an existing non-phone touchLayout", () => {
+    it("unplacedChars stays empty when a phone platform is synthesized onto an existing non-phone touchLayout and the overflow character lands on ITS space bar's extras (reachable)", () => {
       const overflowChar = "ʔ";
       const rule = makeCharRule("K_oE2", [], overflowChar);
       const existingTouchLayout: TouchLayoutIR = {
@@ -1693,9 +1763,14 @@ describe("scaffoldTouchLayout", () => {
       };
       const ir = makeMinimalIR({ groups: [makeGroup([rule])], touchLayout: existingTouchLayout });
 
-      const { unplacedChars } = scaffoldTouchLayoutWithDiagnostics(ir);
+      const { layout, unplacedChars } = scaffoldTouchLayoutWithDiagnostics(ir);
+      const phonePlatform = layout.platforms.find((p) => p.id === "phone")!;
+      const defaultLayer = phonePlatform.layers.find((l) => l.id === "default")!;
+      const funcRow = defaultLayer.rows[3]!;
+      const spaceKey = funcRow.keys.find((k) => k.id === "K_SPACE");
 
-      expect(unplacedChars).toContain(overflowChar);
+      expect(spaceKey?.sk?.some((s) => s.text === overflowChar)).toBe(true);
+      expect(unplacedChars).not.toContain(overflowChar);
     });
   });
 

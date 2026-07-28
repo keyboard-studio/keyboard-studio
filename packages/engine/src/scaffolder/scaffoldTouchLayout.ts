@@ -415,19 +415,23 @@ function isValidSuccessorChar(baseChar: string | undefined, ch: string): boolean
  * a last resort, for patterns lacking ownedNodes or whose owned rules don't
  * match either shape above.
  *
- * [QC P1 fix] A candidate {@link isValidSuccessorChar} rejects is no longer
- * dropped with zero diagnostics — it is recorded in the returned `rejected`
- * list, tagged with the vkey it was rejected from (e.g.
- * `"3 (rejected from K_E longpress)"`), so a caller can surface it the same
- * way unresolved overflow characters already are (see
- * {@link scaffoldTouchLayoutWithDiagnostics}).
+ * A candidate {@link isValidSuccessorChar} rejects is internal hygiene, not
+ * a data-loss signal by itself — the rejected character is very often
+ * reachable elsewhere in the emitted layout (its own key, the altgr layer,
+ * the numeric layer), which is exactly what it means for a deadkey candidate
+ * to be "unrelated to this vkey's base letter". Rejection is recorded in the
+ * returned `rejected` list (raw char + the vkey it was rejected from) purely
+ * so {@link scaffoldTouchLayoutWithDiagnostics} can feed it into the
+ * desktop-produced-characters set for the TRUE reachability check — a
+ * rejected candidate that turns out to be reachable nowhere else in the
+ * final layout is still reported there, just never as a per-rejection event.
  */
 function buildDeadkeySuccessors(
   ir: KeyboardIR,
   charToVkey: ReadonlyMap<string, string>,
-): { successors: DeadkeySuccessors; rejected: string[] } {
+): { successors: DeadkeySuccessors; rejected: Array<{ ch: string; vkey: string }> } {
   const result: DeadkeySuccessors = new Map();
-  const rejected: string[] = [];
+  const rejected: Array<{ ch: string; vkey: string }> = [];
   const vkeyToBaseChar = buildVkeyToBaseCharMap(charToVkey);
 
   // BUG 3 fix: both call sites below (the accurate owned-rule path and the
@@ -437,8 +441,7 @@ function buildDeadkeySuccessors(
   // one of the two paths.
   const addSuccessor = (vkey: string, ch: string): void => {
     if (!isValidSuccessorChar(vkeyToBaseChar.get(vkey), ch)) {
-      const tag = `${ch} (rejected from ${vkey} longpress)`;
-      if (!rejected.includes(tag)) rejected.push(tag);
+      if (!rejected.some((r) => r.ch === ch && r.vkey === vkey)) rejected.push({ ch, vkey });
       return;
     }
     if (!result.has(vkey)) result.set(vkey, []);
@@ -1215,19 +1218,22 @@ function attachNumericOverflowExtra(
  *   - anything else, or a mark/digit/punctuation/symbol char neither table
  *     above can resolve -> the space bar's "extras" grouping, same as before.
  *
- * Logs a warning (no emoji, per convention) naming any character that still
- * landed in the extras grouping — an unresolved mark is tagged distinctly
- * (e.g. "<mark> (no resolvable base letter)") so the gap is visible rather
- * than only inferred from the layout — AND returns that same list as
- * structured data (`unplacedChars`) so a caller with no console (e.g. the
- * studio's live preview) can surface it too — see
- * {@link scaffoldTouchLayoutWithDiagnostics}.
+ * Logs a console-only warning (no emoji, per convention) naming any character
+ * that still landed in the extras grouping — an unresolved mark is tagged
+ * distinctly (e.g. "<mark> (no resolvable base letter)") so the gap is
+ * visible rather than only inferred from the layout. This is placement
+ * bookkeeping, not the caller-facing data-loss diagnostic: everything routed
+ * here DOES land somewhere in the emitted layout (the space bar's longpress),
+ * so it is reachable and therefore not part of
+ * {@link scaffoldTouchLayoutWithDiagnostics}'s `unplacedChars` (which is
+ * computed separately from TRUE post-build reachability, not from this
+ * function's placement bookkeeping).
  */
 function buildCompactPhoneLayers(
   keyMap: KeyMap,
   deadkeySuccessors: DeadkeySuccessors,
   minter: NodeIdMinter,
-): { layers: TouchLayoutIR["platforms"][number]["layers"]; unplacedChars: string[] } {
+): { layers: TouchLayoutIR["platforms"][number]["layers"] } {
   const { bySlot: overflowBySlot, unplaced } = collectOverflowEntries(keyMap, COVERED_VKEYS);
   const charToVkey = buildCharToVkeyMap(keyMap);
 
@@ -1283,20 +1289,19 @@ function buildCompactPhoneLayers(
     if (!attached) stillUnplaced.push(ch);
   }
 
-  const unplacedChars = stillUnplaced.map((ch) =>
-    unresolvedMarks.has(ch) ? `${ch} (no resolvable base letter)` : ch,
-  );
-
   if (stillUnplaced.length > 0) {
+    const tagged = stillUnplaced.map((ch) =>
+      unresolvedMarks.has(ch) ? `${ch} (no resolvable base letter)` : ch,
+    );
     attachOverflowExtras(layers, minter, stillUnplaced);
     console.warn(
       `[scaffoldTouchLayout] ${stillUnplaced.length} character(s) produced by the desktop rules ` +
         "have no compact-layout key and no known adjacent slot; placed on the space bar's " +
-        `longpress ("extras") menu instead of being dropped: ${unplacedChars.join(", ")}`,
+        `longpress ("extras") menu instead of being dropped: ${tagged.join(", ")}`,
     );
   }
 
-  return { layers, unplacedChars };
+  return { layers };
 }
 
 /**
@@ -1417,21 +1422,113 @@ export function buildMinimalPhoneTouchLayout(): TouchLayoutIR {
   };
 }
 
+/**
+ * Walk a touch key (and its sk[] longpress sub-keys, flick{} directional
+ * sub-keys, and multitap[] sub-keys, recursively) collecting every non-empty
+ * `text` / `output` value it carries. Used by {@link collectReachableChars}
+ * to build the "reachable anywhere in the emitted layout" set a produced
+ * character is checked against — the true data-loss test, replacing the old
+ * rejection-event/overflow-spill bookkeeping (which over-reported: a
+ * character reachable via the altgr layer, the numeric layer, or its own key
+ * is not lost just because it was also rejected from — or routed off of —
+ * some OTHER key's longpress menu).
+ */
+function collectKeyText(key: TouchKeyIR, into: Set<string>): void {
+  if (key.text) into.add(key.text);
+  if (key.output) into.add(key.output);
+  for (const sub of key.sk ?? []) collectKeyText(sub, into);
+  for (const sub of Object.values(key.flick ?? {})) collectKeyText(sub, into);
+  for (const sub of key.multitap ?? []) collectKeyText(sub, into);
+}
+
+/**
+ * The set of every character (or multi-char literal, e.g. "FCFA") reachable
+ * anywhere in the given platform layers — every key's text/output, plus
+ * every sk[]/flick{}/multitap[] sub-key's text/output, across every layer
+ * (default, shift, numeric, altgr, and any other layer present). Computed
+ * AFTER all placement (deadkey sk[] attachment, overflow routing, space-bar
+ * extras spill) has already happened, so it reflects the layout the author
+ * actually sees/gets, not the intermediate placement bookkeeping.
+ */
+function collectReachableChars(
+  layers: TouchLayoutIR["platforms"][number]["layers"],
+): Set<string> {
+  const reachable = new Set<string>();
+  for (const layer of layers) {
+    for (const row of layer.rows) {
+      for (const key of row.keys) collectKeyText(key, reachable);
+    }
+  }
+  return reachable;
+}
+
+/**
+ * The set of every character the desktop rules actually produce — the input
+ * inventory the derivation is trying to place. Union of every keyMap value
+ * (every vkey's default/shift/altgr output, whatever the compact skeleton
+ * does or doesn't have a slot for) and every deadkey-successor candidate
+ * {@link buildDeadkeySuccessors} considered, whether it was accepted onto a
+ * sk[] longpress menu or rejected as unrelated to its vkey's own base letter
+ * — a rejected candidate is still something the desktop's rules produce; the
+ * question this set exists to answer is only whether it ends up reachable
+ * SOMEWHERE, not whether that one placement attempt succeeded.
+ */
+function collectDesktopProducedChars(
+  keyMap: KeyMap,
+  rejectedSuccessors: ReadonlyArray<{ ch: string; vkey: string }>,
+): Set<string> {
+  const produced = new Set<string>();
+  for (const layerMap of keyMap.values()) {
+    for (const ch of layerMap.values()) produced.add(ch);
+  }
+  for (const { ch } of rejectedSuccessors) produced.add(ch);
+  return produced;
+}
+
+/**
+ * The TRUE data-loss diagnostic (spec's "no silent drops" principle,
+ * scoped correctly this time): every desktop-produced character that is NOT
+ * reachable anywhere in the final phone-platform layers. A rejected deadkey
+ * candidate or a spilled overflow character that landed on a DIFFERENT key
+ * (the altgr layer, the numeric layer, the space bar's extras, its own vkey)
+ * is reachable and therefore not reported here — only a character that ends
+ * up nowhere at all is. Order is the (deterministic) Set insertion order —
+ * keyMap first, then rejected candidates — so results are stable across
+ * calls for the same IR.
+ */
+function computeUnplacedChars(
+  keyMap: KeyMap,
+  rejectedSuccessors: ReadonlyArray<{ ch: string; vkey: string }>,
+  phoneLayers: TouchLayoutIR["platforms"][number]["layers"],
+): string[] {
+  const produced = collectDesktopProducedChars(keyMap, rejectedSuccessors);
+  const reachable = collectReachableChars(phoneLayers);
+  const unplaced: string[] = [];
+  for (const ch of produced) {
+    if (!reachable.has(ch)) unplaced.push(ch);
+  }
+  return unplaced;
+}
+
 /** The result of {@link scaffoldTouchLayoutWithDiagnostics}. */
 export interface ScaffoldTouchLayoutResult {
   /** The derived TouchLayoutIR — identical to {@link scaffoldTouchLayout}'s return. */
   layout: TouchLayoutIR;
   /**
-   * Characters produced by the desktop rules that had no compact-layout key
-   * and no known adjacent slot, so they were spilled onto the space bar's
-   * "extras" longpress menu instead of being dropped (see
-   * {@link collectOverflowEntries} / {@link attachOverflowExtras}), PLUS
-   * [QC P1 fix] any deadkey-successor candidate {@link isValidSuccessorChar}
-   * rejected (tagged `"<ch> (rejected from <vkey> longpress)"` — see
-   * {@link buildDeadkeySuccessors}). Empty when nothing was spilled or
-   * rejected. Advisory only — never gates anything; a caller with a UI (e.g.
-   * the studio's live seed preview) can surface this list to the author
-   * instead of relying on the `console.warn` this function also emits.
+   * Characters the desktop rules produce that are reachable NOWHERE in the
+   * final phone-platform layout — not on their own key, not on the altgr or
+   * numeric layer, not on any key's sk[]/flick{}/multitap[] longpress menu
+   * (see {@link computeUnplacedChars}). Empty when every desktop-produced
+   * character is reachable somewhere. Advisory only — never gates anything;
+   * a caller with a UI (e.g. the studio's live seed preview) can surface this
+   * list to the author.
+   *
+   * This is a TRUE reachability check, not a log of internal placement
+   * decisions — a deadkey-successor candidate rejected from one key's
+   * longpress menu, or an overflow character routed off its "natural" key,
+   * is NOT reported here as long as it is reachable somewhere else in the
+   * layout (see {@link buildDeadkeySuccessors} / {@link collectOverflowEntries}
+   * for those internal, non-user-facing decisions).
    */
   unplacedChars: string[];
 }
@@ -1456,13 +1553,17 @@ export function scaffoldTouchLayoutWithDiagnostics(ir: KeyboardIR): ScaffoldTouc
     charToVkey,
   );
 
-  // [QC P1 fix] a rejected deadkey-successor candidate is never silently
-  // dropped — aggregate a single warning (no spam per-candidate) naming every
-  // one, mirroring the overflow-extras warning below.
+  // A rejected deadkey-successor candidate is internal hygiene bookkeeping,
+  // not a user-facing signal by itself — most rejected candidates ARE
+  // reachable elsewhere (their own key, the altgr layer). A single aggregated
+  // console.debug records that the filtering ran, without claiming any of
+  // these characters are lost — the actual data-loss check is the
+  // post-build reachability computation below (computeUnplacedChars).
   if (rejectedSuccessors.length > 0) {
-    console.warn(
-      `[scaffoldTouchLayout] ${rejectedSuccessors.length} deadkey-successor candidate(s) were ` +
-        `rejected as unrelated to their vkey's own base letter: ${rejectedSuccessors.join(", ")}`,
+    console.debug(
+      `[scaffoldTouchLayout] ${rejectedSuccessors.length} deadkey-successor candidate(s) filtered ` +
+        "as unrelated to their vkey's own base letter (internal hygiene; see unplacedChars for any " +
+        "that turn out to be genuinely unreachable elsewhere in the layout)",
     );
   }
 
@@ -1471,7 +1572,7 @@ export function scaffoldTouchLayoutWithDiagnostics(ir: KeyboardIR): ScaffoldTouc
   //         the compact 3-layer phone template.
   // ------------------------------------------------------------------
   if (ir.touchLayout === undefined) {
-    const { layers: phoneLayers, unplacedChars } = buildCompactPhoneLayers(
+    const { layers: phoneLayers } = buildCompactPhoneLayers(
       keyMap,
       deadkeySuccessors,
       minter,
@@ -1487,7 +1588,7 @@ export function scaffoldTouchLayoutWithDiagnostics(ir: KeyboardIR): ScaffoldTouc
         ],
         nodeIds: [],
       },
-      unplacedChars: [...rejectedSuccessors, ...unplacedChars],
+      unplacedChars: computeUnplacedChars(keyMap, rejectedSuccessors, phoneLayers),
     };
   }
 
@@ -1499,7 +1600,6 @@ export function scaffoldTouchLayoutWithDiagnostics(ir: KeyboardIR): ScaffoldTouc
   );
 
   let platforms: TouchLayoutIR["platforms"];
-  let unplacedChars: string[] = [...rejectedSuccessors];
 
   if (existingPhoneIdx >= 0) {
     // Augment the existing phone platform with deadkey sk[] entries.
@@ -1514,7 +1614,6 @@ export function scaffoldTouchLayoutWithDiagnostics(ir: KeyboardIR): ScaffoldTouc
       deadkeySuccessors,
       minter,
     );
-    unplacedChars = [...unplacedChars, ...built.unplacedChars];
     platforms = [
       ...ir.touchLayout.platforms,
       {
@@ -1524,6 +1623,8 @@ export function scaffoldTouchLayoutWithDiagnostics(ir: KeyboardIR): ScaffoldTouc
     ];
   }
 
+  const phonePlatform = platforms.find((p) => p.id === "phone")!;
+
   return {
     layout: {
       platforms,
@@ -1532,7 +1633,7 @@ export function scaffoldTouchLayoutWithDiagnostics(ir: KeyboardIR): ScaffoldTouc
       // transient Phase E output, not committed to the IR).
       nodeIds: [...ir.touchLayout.nodeIds],
     },
-    unplacedChars,
+    unplacedChars: computeUnplacedChars(keyMap, rejectedSuccessors, phonePlatform.layers),
   };
 }
 

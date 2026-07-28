@@ -24,7 +24,7 @@
 
 import { describe, it, expect } from "vitest";
 import { buildTouchLayoutJson, deriveSeedLayout, type BuildTouchLayoutJsonOpts } from "./buildTouchLayoutJson";
-import type { KeyboardIR, TouchAssignment, TouchLayoutIR, IRGroup, IRRule } from "@keyboard-studio/contracts";
+import type { KeyboardIR, TouchAssignment, TouchLayoutIR, IRGroup, IRRule, Pattern } from "@keyboard-studio/contracts";
 import { touchCoverage } from "@keyboard-studio/engine";
 
 // ---------------------------------------------------------------------------
@@ -547,15 +547,19 @@ describe("buildTouchLayoutJson — Case A reseed replay (mods.placements land on
 });
 
 // ---------------------------------------------------------------------------
-// P1 fix: unplaced/spilled overflow characters surfaced as structured data
-// (`result.unplacedChars`), not console-only. Case A only — Case B never runs
-// the scaffolder (raw-JSON splice), so it always reports unplacedChars: [].
+// unplacedChars is a TRUE reachability diagnostic (not a log of internal
+// placement events): a character spilled onto the space bar's "extras" sk[]
+// IS reachable there, so it does NOT appear in unplacedChars — only a
+// character reachable NOWHERE in the derived layout does. Case A only — Case
+// B never runs the scaffolder (raw-JSON splice), so it always reports
+// unplacedChars: [].
 // ---------------------------------------------------------------------------
 
 describe("buildTouchLayoutJson / deriveSeedLayout — unplacedChars", () => {
   /** IR with a rule producing `overflowChar` on a vkey with no compact-layout
    *  slot and no known physical neighbor (see OVERFLOW_NEAREST_SLOT in
-   *  scaffoldTouchLayout.ts), forcing the "extras" spill path. */
+   *  scaffoldTouchLayout.ts) — the "extras" spill path. The character ends up
+   *  reachable (on the space bar's sk[]), so this is NOT a data-loss fixture. */
   function makeOverflowIR(overflowChar: string): KeyboardIR {
     const rule: IRRule = {
       nodeId: "rule:overflow",
@@ -572,14 +576,72 @@ describe("buildTouchLayoutJson / deriveSeedLayout — unplacedChars", () => {
     return makeMinimalIR({ groups: [group] });
   }
 
-  it("Case A (reseed): unplacedChars contains a character spilled onto the space bar's extras sk[]", () => {
+  /**
+   * IR with a genuinely-unreachable rejected deadkey-successor candidate: a
+   * symbol unrelated to the base letter it was rejected from, never assigned
+   * to any vkey elsewhere, and not a digit/numeric-layer literal — so it ends
+   * up nowhere in the derived layout. Mirrors the engine-level fixture in
+   * scaffoldTouchLayout.test.ts ("genuinely unreachable elsewhere").
+   */
+  function makeUnreachableSymbolIR(symbol: string): KeyboardIR {
+    const baseVkey = "K_E";
+    const baseChar = "e";
+    const bodyRule: IRRule = {
+      nodeId: "rule:body",
+      context: [
+        { kind: "deadkey", id: 1 } as never,
+        { kind: "any", storeRef: "s_base" },
+      ],
+      output: [{ kind: "index", storeRef: "s_out", offset: 2 }],
+    };
+    const baseLetterRule: IRRule = {
+      nodeId: "rule:base",
+      context: [{ kind: "vkey", name: baseVkey, modifiers: [] }],
+      output: [{ kind: "char", value: baseChar }],
+    };
+    const pattern: Pattern = {
+      id: "test_s02_unreachable",
+      title: "Rejected candidate with no home anywhere in the layout",
+      description: "Locks the TRUE data-loss diagnostic at the buildTouchLayoutJson router level",
+      category: "desktop",
+      appliesTo: [],
+      strategyId: "S-02",
+      origin: "recognized",
+      ownedNodes: [{ nodeId: "rule:body", kind: "rule" }],
+      questions: [],
+      kmnFragment: "+ [K_TILDE] > dk(z)\ndk(z) + any(s_base) > index(s_out, 2)",
+      tests: [],
+      validatedForFamilies: [],
+      sourceKeyboards: [],
+      reviewedBy: "test",
+      reviewDate: "2026-07-28",
+    };
+    return makeMinimalIR({
+      groups: [
+        {
+          nodeId: "group:main",
+          name: "main",
+          usingKeys: true,
+          rules: [baseLetterRule, bodyRule],
+          readonly: false,
+        },
+      ],
+      stores: [
+        { nodeId: "store:base", name: "s_base", items: [{ kind: "char", value: baseChar }], isSystem: false },
+        { nodeId: "store:out", name: "s_out", items: [{ kind: "char", value: symbol }], isSystem: false },
+      ],
+      recognizedPatterns: [pattern],
+    });
+  }
+
+  it("Case A (reseed): unplacedChars does NOT contain a character spilled onto the space bar's extras sk[] — it is reachable there", () => {
     const overflowChar = "ʔ";
     const result = buildTouchLayoutJson(
       makeOverflowIR(overflowChar),
       [],
       opts({ seedSource: "reseed-from-desktop" }),
     );
-    expect(result.unplacedChars).toContain(overflowChar);
+    expect(result.unplacedChars).not.toContain(overflowChar);
   });
 
   it("Case A: unplacedChars is empty when nothing was spilled", () => {
@@ -587,22 +649,32 @@ describe("buildTouchLayoutJson / deriveSeedLayout — unplacedChars", () => {
     expect(result.unplacedChars).toEqual([]);
   });
 
+  it("Case A (reseed): unplacedChars DOES contain a rejected deadkey-successor candidate that is genuinely unreachable elsewhere", () => {
+    const symbol = "§";
+    const result = buildTouchLayoutJson(
+      makeUnreachableSymbolIR(symbol),
+      [],
+      opts({ seedSource: "reseed-from-desktop" }),
+    );
+    expect(result.unplacedChars).toContain(symbol);
+  });
+
   it("Case B (raw path): unplacedChars is always empty — the scaffolder never runs", () => {
     const result = buildTouchLayoutJson(
-      makeOverflowIR("ʔ"),
+      makeUnreachableSymbolIR("§"),
       [],
       opts({ baseTouchJson: TABLET_ONLY_JSON }),
     );
     expect(result.unplacedChars).toEqual([]);
   });
 
-  it("deriveSeedLayout (Case A): unplacedChars contains the spilled character", () => {
-    const overflowChar = "ʔ";
-    const result = deriveSeedLayout(makeOverflowIR(overflowChar), {
+  it("deriveSeedLayout (Case A): unplacedChars contains a genuinely-unreachable character, not a spilled-but-reachable one", () => {
+    const symbol = "§";
+    const result = deriveSeedLayout(makeUnreachableSymbolIR(symbol), {
       mods: NO_MODS,
       seedSource: "reseed-from-desktop",
     });
-    expect(result.unplacedChars).toContain(overflowChar);
+    expect(result.unplacedChars).toContain(symbol);
   });
 });
 
