@@ -248,6 +248,17 @@ function emitStoreItems(items: StoreItem[]): string {
   const parts: string[] = [];
   let buf = "";
 
+  // Range re-collapse (spec 042, FR-008) is suppressed for any store that also
+  // contains a `dk()` deadkey item. kmcmplib cannot parse a store that holds
+  // both a `X .. Y` range AND a `dk()` item in the same declaration — it emits
+  // KM_WARNING_KMCMP_5251093 "Invalid 'deadkey' or 'dk' statement" and produces
+  // no .kmx. This bites the deadkey lookup stores that pair a run of consecutive
+  // combining marks with a trailing deadkey (e.g. `store(dkf0021)` in
+  // sil_cameroon_azerty: `U+0300 U+0301 U+0302 U+0303 ... dk(003d)`), so a Track-1
+  // copy of that keyboard failed to compile. Range re-collapse is a pure
+  // legibility nicety, so dropping it for these stores costs nothing semantically.
+  const hasDeadkey = items.some((it) => it.kind === "deadkey");
+
   const flushBuf = (): void => {
     if (buf === "") return;
     const hasSingle = buf.includes("'");
@@ -271,7 +282,7 @@ function emitStoreItems(items: StoreItem[]): string {
     // `first .. last` (spec 042, FR-008). All-printable-ASCII runs are left for
     // the string path (a quoted word reads better than a codepoint range).
     const runLen = ascendingRunLength(items, i);
-    if (runLen >= 3 && !isAllPrintableAscii(items, i, runLen)) {
+    if (runLen >= 3 && !isAllPrintableAscii(items, i, runLen) && !hasDeadkey) {
       flushBuf();
       const first = items[i];
       const last = items[i + runLen - 1];

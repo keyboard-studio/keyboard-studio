@@ -79,6 +79,21 @@ async function exemplarRadio(): Promise<HTMLInputElement | null> {
   return document.querySelector<HTMLInputElement>("#discovery_method-exemplars");
 }
 
+/**
+ * Accept the exemplar offer and press Continue.
+ *
+ * The "exemplars" option is pre-selected ASYNCHRONOUSLY once the inventory
+ * lookup settles (IntroChooser's auto-select effect). Clicking Continue before
+ * that effect has run reads the initial "build-list" default — a decline — so
+ * every accept-path test must wait for the radio to be checked first, or it
+ * races the effect (flaky only under load, e.g. the full CI suite).
+ */
+async function acceptExemplarsAndContinue(): Promise<void> {
+  const radio = await exemplarRadio();
+  await waitFor(() => expect(radio!.checked).toBe(true));
+  fireEvent.click(screen.getByTestId("phase-b-intro-next"));
+}
+
 beforeEach(() => {
   getSourcedExemplars.set(null);
   useSurveySessionStore.getState().setDiscoveryMethod(null);
@@ -130,13 +145,40 @@ describe("discovery-method offer (obligation P2, FR-016)", () => {
     expect(screen.getByTestId("exemplar-offer-preview").textContent).toContain("ŋ");
   });
 
-  it("elides a long preview rather than dumping the whole alphabet", async () => {
-    const many = Array.from({ length: 40 }, (_, i) => String.fromCodePoint(0x61 + (i % 26)));
-    getSourcedExemplars.set(inventory([...new Set(many)]));
+  it("shows the whole alphabet as cards — the list is never truncated", async () => {
+    const many = [...new Set(Array.from({ length: 40 }, (_, i) => String.fromCodePoint(0x61 + (i % 26))))];
+    getSourcedExemplars.set(inventory(many));
     renderPhaseB();
     await exemplarRadio();
     const preview = await screen.findByTestId("exemplar-offer-preview");
-    expect(preview.textContent).toContain("more");
+    // No "+N more" elision — every character is present, one card each.
+    expect(preview.textContent).not.toContain("more");
+    for (const c of many) {
+      expect(preview.querySelector(`[aria-label^="${c} "]`)).not.toBeNull();
+    }
+  });
+
+  it("orders letters by ICU collation and trails bare diacritics by code point", async () => {
+    // Out-of-order input with two bare combining marks (U+0301 acute after
+    // U+0300 grave) interspersed among unsorted letters.
+    getSourcedExemplars.set(inventory(["ɛ", "́", "a", "b", "̀"]));
+    renderPhaseB();
+    await exemplarRadio();
+    const preview = await screen.findByTestId("exemplar-offer-preview");
+    const order = [...preview.querySelectorAll("[aria-label]")].map(
+      (el) => el.getAttribute("aria-label")?.charAt(0),
+    );
+    // Letters (ICU) first: a, b, ɛ — then bare marks by code point: ◌̀, ◌́.
+    expect(order).toEqual(["a", "b", "ɛ", "◌", "◌"]);
+  });
+
+  it("renders a floating diacritic with the dotted circle (U+25CC)", async () => {
+    // U+0301 COMBINING ACUTE ACCENT — a bare mark must be visible standalone.
+    getSourcedExemplars.set(inventory(["a", "́"]));
+    renderPhaseB();
+    await exemplarRadio();
+    const preview = await screen.findByTestId("exemplar-offer-preview");
+    expect(preview.textContent).toContain("◌́");
   });
 
   it("does not pre-select the offer once it has been declined (FR-016a)", async () => {
@@ -162,8 +204,7 @@ describe("Continue branching (obligations P1/P1a, FR-016)", () => {
   it("accepting seeds the draft exactly once and lands on a prefilled page 2", async () => {
     getSourcedExemplars.set(inventory(["a", "ŋ"]));
     renderPhaseB();
-    await exemplarRadio();
-    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
+    await acceptExemplarsAndContinue();
 
     await waitFor(() => {
       expect(screen.getByTestId("phase-b-done")).toBeTruthy();
@@ -227,8 +268,7 @@ describe("heading swap (obligation P1c, FR-016c)", () => {
   it("says 'Confirm your alphabet' once something has been proposed into it", async () => {
     getSourcedExemplars.set(inventory(["a", "ŋ"]));
     renderPhaseB();
-    await exemplarRadio();
-    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
+    await acceptExemplarsAndContinue();
     await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
     expect(screen.getByRole("heading", { level: 2 }).textContent).toContain(
       "Confirm your alphabet",
@@ -252,8 +292,7 @@ describe("heading swap (obligation P1c, FR-016c)", () => {
   it("a filled draft is still not a completed step — Done must be pressed", async () => {
     getSourcedExemplars.set(inventory(["a", "ŋ"]));
     const { onComplete } = renderPhaseB();
-    await exemplarRadio();
-    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
+    await acceptExemplarsAndContinue();
     await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
     expect(onComplete).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("phase-b-done"));
@@ -268,12 +307,14 @@ describe("heading swap (obligation P1c, FR-016c)", () => {
 describe("page-2 fill affordances (obligation P1b, FR-016b)", () => {
   async function reachPage2(accept: boolean): Promise<void> {
     renderPhaseB();
-    await exemplarRadio();
-    if (!accept) {
+    if (accept) {
+      await acceptExemplarsAndContinue();
+    } else {
+      await exemplarRadio();
       const buildList = document.querySelector("#discovery_method-build-list");
       if (buildList !== null) fireEvent.click(buildList as HTMLInputElement);
+      fireEvent.click(screen.getByTestId("phase-b-intro-next"));
     }
-    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
     await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
   }
 
@@ -324,8 +365,7 @@ describe("proposed-vs-authored affordance (obligation P5, FR-017)", () => {
   async function acceptAndReachPage2(inv: SourcedInventory): Promise<void> {
     getSourcedExemplars.set(inv);
     renderPhaseB();
-    await exemplarRadio();
-    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
+    await acceptExemplarsAndContinue();
     await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
   }
 

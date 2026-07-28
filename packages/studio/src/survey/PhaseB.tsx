@@ -37,6 +37,7 @@ import {
   nfcDedup,
   harvestChars,
   casePairOf,
+  isFoldedUppercase,
   lowercaseBaseView,
   upperCounterpartOf,
 } from "./charNormUtils.ts";
@@ -644,6 +645,52 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
     );
   }
 
+  // What's actually left to OFFER. Two folds, in order — both are about not
+  // asking the author to tick something that is already settled:
+  //
+  //  1. Case fold. `suggestMissingChars` reports each cased letter twice (the
+  //     CLDR consumer path synthesizes uppercase into `specials`), so a
+  //     lowercase-only exemplar list arrives as "à Á á È é …". Offering both
+  //     is noise: the uppercase is never a separate decision, because Done
+  //     folds each cased letter's counterpart into `confirmedInventory` via
+  //     `derivedUppercases` (spec 047 FR-009). Note this differs from the
+  //     character map, which pairs the cases EAGERLY on click — here ticking a
+  //     chip adds the one character, and the uppercase joins at submit.
+  //     `isFoldedUppercase` is the fold rule shared with the map's display-side
+  //     case-collapse.
+  //  2. Already-in-the-alphabet fold. `suggestMissingChars` filters against the
+  //     BASE KEYBOARD's produced set, which knows nothing about the draft — so
+  //     after the exemplar prefill seeds the alphabet (IntroChooser's
+  //     "exemplars" route), every seeded character came back as a suggestion,
+  //     pre-ticked, and the panel became a wall of things already done. A
+  //     character present in either case counts as present.
+  //
+  // Consequence: a ticked chip LEAVES this panel and reappears below in "Your
+  // alphabet", where removal lives (and correctly retracts both cases). The
+  // panel is therefore add-only in practice; `handleToggle`'s remove branch
+  // survives only for the props contract.
+  const offerable = (candidates: string[]): string[] =>
+    candidates
+      .map((c) => c.normalize("NFC"))
+      .filter((c) => !isFoldedUppercase(c, bcp47))
+      .filter((c) => !casePairOf(c, bcp47).some((p) => chars.includes(p)));
+
+  const mainOffered = offerable(data.main);
+  const auxOffered = offerable(data.auxiliary);
+
+  // Everything CLDR/SLDR knows about is already in the draft — distinct from
+  // the "base covers it" note above: the author put these there (or accepted
+  // the prefill), so say that rather than crediting the base keyboard.
+  if (mainOffered.length === 0 && auxOffered.length === 0) {
+    return (
+      <div style={mutedNote}>
+        <Trans id="survey.phaseB.suggestionPanel.allSuggestionsAdded">
+          Every suggested character is already in your alphabet below.
+        </Trans>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div>
@@ -655,7 +702,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
         <p style={{ margin: "0 0 10px 0", fontSize: 11, color: TEXT_DIM }}>
           <Trans id="survey.phaseB.suggestionPanel.fromCldr">from CLDR exemplars — tick to add</Trans>
         </p>
-        {data.main.length > 0 ? (
+        {mainOffered.length > 0 ? (
           <div
             role="group"
             aria-label={t({
@@ -664,13 +711,8 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
             })}
             style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
           >
-            {data.main.map((c) => (
-              <SuggestionChip
-                key={c}
-                char={c}
-                checked={chars.includes(c.normalize("NFC"))}
-                onToggle={handleToggle}
-              />
+            {mainOffered.map((c) => (
+              <SuggestionChip key={c} char={c} checked={false} onToggle={handleToggle} />
             ))}
           </div>
         ) : (
@@ -680,7 +722,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
         )}
       </div>
 
-      {data.auxiliary.length > 0 && (
+      {auxOffered.length > 0 && (
         <div>
           <button
             type="button"
@@ -701,7 +743,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
           >
             <span>{auxExpanded ? "▼" : "▶"}</span>
             <Trans id="survey.phaseB.suggestionPanel.auxiliaryToggle">
-              Also used in loanwords ({data.auxiliary.length})
+              Also used in loanwords ({auxOffered.length})
             </Trans>
           </button>
           {auxExpanded && (
@@ -713,13 +755,8 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
               })}
               style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}
             >
-              {data.auxiliary.map((c) => (
-                <SuggestionChip
-                  key={c}
-                  char={c}
-                  checked={chars.includes(c.normalize("NFC"))}
-                  onToggle={handleToggle}
-                />
+              {auxOffered.map((c) => (
+                <SuggestionChip key={c} char={c} checked={false} onToggle={handleToggle} />
               ))}
             </div>
           )}
@@ -925,6 +962,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   const selectedFont = usePhaseBDraftStore((s) => s.selectedFont);
   const setSelectedFont = usePhaseBDraftStore((s) => s.setSelectedFont);
   const provenance = usePhaseBDraftStore((s) => s.provenance);
+  const exemplarDigraphs = usePhaseBDraftStore((s) => s.exemplarDigraphs);
   const removeChar = usePhaseBDraftStore((s) => s.remove);
   const doneDisabled = chars.length === 0;
 
@@ -1091,6 +1129,10 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
               phase: "B",
               answers: [],
               confirmedInventory: nfcDedup(chars, derivedUppercases),
+              // Alongside the inventory, never inside it: the cluster's own
+              // letters are already in `chars`, so a keyboard needs no extra
+              // key for "dz" — this is the record that d+z also form a unit.
+              ...(exemplarDigraphs.length > 0 ? { attestedDigraphs: exemplarDigraphs } : {}),
             });
           }}
           className="ks-focus-ring ks-hit-target"
@@ -1465,17 +1507,26 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
 // The author is being asked to accept a proposed alphabet, so what is being
 // proposed has to be visible at the point of the decision, not one click away
 // (obligation P2). Shows the source, its confidence, how many characters, and
-// a preview of the actual main set.
+// the actual main set.
+//
+// The character list is shown IN FULL and is never truncated — the author
+// cannot confirm an alphabet they cannot see. Each character is a read-only
+// card matching the chips on the build-list page (glyph + code-point label);
+// a floating diacritic renders with the dotted circle (U+25CC) via displayChar
+// so a bare combining mark is visible standalone, the same treatment as the
+// breakdown and character-map pages.
 // ---------------------------------------------------------------------------
-
-/** How many main-tier characters to show before eliding. */
-const EXEMPLAR_PREVIEW_LIMIT = 24;
 
 function ExemplarOfferDetail({ inventory }: { inventory: SourcedInventory }) {
   const glyphFontStack = useGlyphFontStack();
   const main = charactersInTier(inventory, "main");
-  const preview = main.slice(0, EXEMPLAR_PREVIEW_LIMIT);
-  const elided = main.length - preview.length;
+  // ICU collation, matching the "Your alphabet" list and the breakdown
+  // sections: letters (and letter+mark combos) by default ICU order; bare
+  // combining marks have no meaningful dictionary position, so they sort by
+  // raw code point and trail the letters (spec 047 refinement).
+  const bareMarks = main.filter(isCombiningMarkChar).sort(codePointCompare);
+  const letters = collate(main.filter((c) => !isCombiningMarkChar(c)));
+  const ordered = [...letters, ...bareMarks];
 
   return (
     <div
@@ -1491,24 +1542,27 @@ function ExemplarOfferDetail({ inventory }: { inventory: SourcedInventory }) {
           {{ n: main.length }} characters
         </Trans>
       </p>
-      <p
+      <div
         data-testid="exemplar-offer-preview"
-        style={{
-          margin: 0,
-          fontSize: 16,
-          lineHeight: 1.6,
-          wordBreak: "break-word",
-          fontFamily: glyphFontStack,
-        }}
+        style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
       >
-        {preview.join(" ")}
-        {elided > 0 && (
-          <span style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-            {" "}
-            <Trans id="survey.phaseB.intro.exemplars.more">+{{ elided }} more</Trans>
-          </span>
-        )}
-      </p>
+        {ordered.map((c) => {
+          const { title } = codepointLabel(c);
+          return (
+            <span
+              key={c}
+              title={title}
+              aria-label={`${displayChar(c)} (${title})`}
+              // Read-only VIEW card (not a toggle/remove button) — no pointer
+              // cursor, matching AlphabetBreakdown's chips.
+              style={{ ...charChip(false), cursor: "default" }}
+            >
+              <span style={chipGlyph(true, glyphFontStack)}>{displayChar(c)}</span>
+              <CpLabel grapheme={c} />
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }

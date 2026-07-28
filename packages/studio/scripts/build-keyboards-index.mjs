@@ -6,7 +6,10 @@
 //   1. If KEYBOARDS_REPO is set and points to an existing directory, scan it.
 //      (Dev / local builds with the sibling keymanapp/keyboards clone.)
 //   2. Otherwise, shallow-clone (or refresh) KEYBOARDS_REPO_URL into
-//      <repoRoot>/.cache/keyboards and scan that. (Vercel build.)
+//      <repoRoot>/node_modules/.cache/keyboards and scan that. (Vercel build.)
+//      That path lives under node_modules/.cache, which Vercel's build cache
+//      persists between deployments, so a warm build does an incremental
+//      `git fetch` instead of a full fresh clone. TRIAL: measuring the saving.
 //
 // Pairs with vercel.json's rewrite /local-kbd-proxy/* -> raw.githubusercontent
 // so the live source files for each keyboard come from GitHub raw, not from
@@ -24,7 +27,14 @@ import {
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const STUDIO_DIR = path.resolve(SCRIPT_DIR, "..");
 const REPO_ROOT = path.resolve(STUDIO_DIR, "..", "..");
-const DEFAULT_CACHE = path.join(REPO_ROOT, ".cache", "keyboards");
+// Stash under node_modules/.cache so Vercel's build cache carries the clone
+// across deployments (warm build => incremental fetch, cold build => clone).
+const DEFAULT_CACHE = path.join(
+  REPO_ROOT,
+  "node_modules",
+  ".cache",
+  "keyboards",
+);
 
 const REPO_URL =
   process.env["KEYBOARDS_REPO_URL"] ??
@@ -86,6 +96,12 @@ function ensureClone(target) {
       log(`refresh failed (${String(e)}); re-cloning`);
       fs.rmSync(target, { recursive: true, force: true });
     }
+  } else if (fs.existsSync(target)) {
+    // Dir exists but isn't a valid git repo — e.g. a partial/corrupted cache
+    // restored from Vercel. Wipe it so `git clone` can't wedge on a non-empty
+    // destination.
+    log(`cache dir at ${target} is not a git repo; wiping before clone`);
+    fs.rmSync(target, { recursive: true, force: true });
   }
   fs.mkdirSync(path.dirname(target), { recursive: true });
   log(`cloning ${REPO_URL} (branch=${REPO_BRANCH}, depth=1) -> ${target}`);

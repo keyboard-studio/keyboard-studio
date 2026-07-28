@@ -4,9 +4,9 @@
 // BaseKeyboardPicker, OskModeToggle, and friends) with Lingui's useLingui()/
 // <Trans>, which throw "useLingui hook was used without I18nProvider" unless
 // an <I18nProvider> ancestor is present at render time (see
-// ../../../docs/i18n-spike.md). In the app this is StudioShell's job, but a
-// test that renders a sub-component in isolation (not via <StudioShell>)
-// needs its own provider.
+// ../../../docs/i18n-spike.md). In the app this is AppRoot's job (see
+// ../AppRoot.tsx), but a test that renders a component in isolation (not via
+// the app root) needs its own provider.
 //
 // Rather than duplicate "i18n.load/activate + wrap in <I18nProvider>" at
 // every render() call site (the pattern PreviewShell.test.tsx pioneered
