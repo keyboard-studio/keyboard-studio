@@ -2057,6 +2057,19 @@ export function MechanismGallery({
           baseLetter: base.value,
         },
         baseAssignment: assignment,
+        // "Counterpart already placed" (spec §Edge Cases): the parallel combo
+        // is redundant if the counterpart already has a PATTERN_DEADKEY
+        // mechanism on this same trigger key.
+        alreadyProduced: (counterpart) =>
+          sessionAssignments.some(
+            (a) =>
+              a.target === counterpart &&
+              a.mechanisms.some(
+                (m) =>
+                  m.patternId === PATTERN_DEADKEY &&
+                  m.slotValues?.["triggerKey"] === resolvedTriggerVkey,
+              ),
+          ),
       });
     } else if (method === "swap") {
       const resolvedSwapVkey = resolvedVkeyOf(
@@ -2130,6 +2143,29 @@ export function MechanismGallery({
           // mechanisms per character, so confirm must locate exactly the
           // assignment this proposal was raised for (FR-008).
           baseAssignment: assignment,
+          // "Counterpart already placed" (spec §Edge Cases). `simple_swap`
+          // records its rule text as already-emitted .kmn lines in
+          // `slotValues.kmnRules` (buildBaseRuleLines / buildShiftRuleLines /
+          // buildCasePairRuleLines all interpolate the vkey literally), so we
+          // don't have exactly one line shape to string-match against — a
+          // combined CAPS quad, a bare shift line, and a CAPS/NCAPS shift pair
+          // all look different. Matching `target === counterpart` (this IS an
+          // assignment for the capital) together with the vkey appearing
+          // (word-boundary) anywhere in that assignment's `kmnRules` is
+          // reliable regardless of which of the three emitters produced it,
+          // without re-deriving or comparing exact rule text.
+          alreadyProduced: (counterpart) =>
+            sessionAssignments.some(
+              (a) =>
+                a.target === counterpart &&
+                a.mechanisms.some((m) => {
+                  const rules = m.slotValues?.["kmnRules"];
+                  return (
+                    typeof rules === "string" &&
+                    new RegExp(`\\b${resolvedSwapVkey}\\b`).test(rules)
+                  );
+                }),
+            ),
         });
       }
     } else {
@@ -2224,9 +2260,25 @@ export function MechanismGallery({
           indicator: applied.indicator,
         },
         baseAssignment: applied.assignment,
+        // "Counterpart already placed" (spec §Edge Cases). The confirm path's
+        // own (firstLetterOut, secondLetter) dedup already makes a re-confirm
+        // a no-op — this predicate suppresses the BANNER in that same case, so
+        // the author isn't prompted to confirm something that would do
+        // nothing. Matches the S-02 predicate's style: it checks the
+        // UNCHANGED physical component (there, `triggerKey`; here,
+        // `secondLetter`, the indicator key, which the combo shift never
+        // touches — see DeadkeyCombo/SequenceCombo in casePairCompanion.ts)
+        // rather than re-deriving the case-shifted `firstLetterOut`, which
+        // would need a second `caseCounterpart` call outside the hook
+        // (`caseCounterpart` is deliberately kept to exactly one caller,
+        // FR-002 — see the comment above `useCasePairCompanion()`).
+        alreadyProduced: (counterpart) =>
+          partitionSequenceAssignment(sessionAssignments, counterpart).mechs.some(
+            (m) => m.slotValues?.["secondLetter"] === applied.indicator,
+          ),
       });
     },
-    [resetMethodState, currentChar, proposeCompanion],
+    [resetMethodState, currentChar, proposeCompanion, sessionAssignments],
   );
 
   /**

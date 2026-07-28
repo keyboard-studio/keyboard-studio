@@ -3995,6 +3995,44 @@ describe("MechanismGallery — S-02 parallel-combo proposal (spec 051 US2)", () 
 
     expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
   });
+
+  it("stale-guard: confirming a parallel-combo proposal whose raising deadkey assignment vanished via an unaudited mutation path records nothing", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // "á" defaults to the pre-enabled deadkey method (§3c) — apply directly.
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+    expect(screen.getByText(/has an uppercase form, Á/i)).toBeTruthy();
+
+    // Simulate a hypothetical future mutation path that removes the raising
+    // deadkey assignment WITHOUT going through the gallery's own removal
+    // handlers (which proactively dismiss the banner) — direct store
+    // mutation bypassing the component's handlers entirely, the same
+    // technique the physical stale-guard test above uses. The component's
+    // pendingCompanion state is untouched by this, so the banner remains
+    // visible in the DOM, exercising confirmComboCompanion's confirm-time
+    // staleness re-check (`sessionAssignments.includes(proposal.baseAssignment)`)
+    // rather than any removal-time dismissal.
+    await act(async () => {
+      useWorkingCopyStore.getState().recordAssignments([]);
+    });
+    expect(screen.getByText(/has an uppercase form, Á/i)).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Map Á to the shift layer of/i }),
+    );
+
+    // Nothing was recorded for the counterpart — the stale proposal was
+    // dismissed, not applied.
+    expect(
+      getPhaseCPhysicalAssignments().find((a) => a.target === "Á"),
+    ).toBeUndefined();
+    expect(getPhaseCPhysicalAssignments()).toHaveLength(0);
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -4096,5 +4134,136 @@ describe("MechanismGallery — S-03 parallel-combo proposal (spec 051 US2)", () 
       (a) => a.target === "Á",
     );
     expect(companion?.mechanisms).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 051 P1 fix — "counterpart already placed" (spec §Edge Cases), wired to
+// the physical (S-01) and combo (S-02/S-03) mechanisms. The touch mechanism
+// already had this wired (TouchGallery.tsx); these lock the other two.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — 'counterpart already placed' suppression (spec 051 P1 fix)", () => {
+  it("physical (S-01): no companion prompt when the counterpart is already on the shift layer of the same key", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["θ"]);
+    // Θ already recorded on the shift layer of K_Q — the exact slot a
+    // base-layer θ swap on K_Q would otherwise propose.
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "Θ",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: "simple_swap",
+            strategyId: "S-01",
+            slotValues: { kmnRules: "+ [SHIFT K_Q] > U+0398" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+
+    // No proposal — the parallel slot already produces the counterpart.
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+
+    const assignments = getPhaseCPhysicalAssignments();
+    // Only the pre-seeded Θ assignment plus the new θ swap — nothing added
+    // for a redundant companion.
+    expect(assignments).toHaveLength(2);
+    expect(assignments.filter((a) => a.target === "Θ")).toHaveLength(1);
+  });
+
+  it("combo S-02: no parallel-combo prompt when the counterpart already has a PATTERN_DEADKEY mechanism on the same trigger key", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    // Á already has a deadkey mechanism on the default trigger key (K_COLON,
+    // MechanismGallery's initial triggerKey state) — the parallel combo this
+    // apply would otherwise propose.
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "Á",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_DEADKEY,
+            strategyId: "S-02",
+            slotValues: {
+              triggerKey: "K_COLON",
+              deadkeyName: "dead0",
+              baseLetters: "A",
+              accentedForms: "Á",
+              accentChar: ";",
+            },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // "á" defaults to the pre-enabled deadkey method (§3c) on K_COLON.
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+
+    const assignments = getPhaseCPhysicalAssignments();
+    expect(assignments.filter((a) => a.target === "Á")).toHaveLength(1);
+  });
+
+  it("combo S-03: no parallel-combo prompt when the counterpart already has a PATTERN_SEQUENCE mechanism on the same indicator key", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    // Á already has a sequence mechanism keyed on the same indicator ("s")
+    // the new á sequence below will use.
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "Á",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_SEQUENCE,
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "A", secondLetter: "s", collapsedChar: "Á" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByTestId("sequences-content"), {
+      target: { value: "a" },
+    });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), {
+      target: { value: "s" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("sequences-apply"));
+    });
+
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+
+    const assignments = getPhaseCPhysicalAssignments();
+    expect(assignments.filter((a) => a.target === "Á")).toHaveLength(1);
+    expect(assignments.find((a) => a.target === "á")).toBeDefined();
   });
 });

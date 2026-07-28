@@ -804,3 +804,114 @@ describe("applyAssignments — multi_char_sequence (S-03) real production patter
     expect(reemitted).toContain("U+006E + U+0079 > U+0272");
   });
 });
+
+// ---------------------------------------------------------------------------
+// deadkey_single_tap (S-02) merge-by-triggerKey — real production pattern,
+// loaded from content/patterns/desktop-input/deadkey-single-tap.yaml. Spec 051
+// introduces a NEW caller of this old merge path: the S-02 case-pair
+// companion produces a second deadkey_single_tap ref sharing the source's
+// triggerKey (and deadkeyName) but targeting a DIFFERENT character (the
+// uppercase counterpart). If the merge in applyAssignments (grouping
+// deadkeyRefs by triggerKey before store/emit) ever stopped firing, both refs
+// would independently emit their own store(dk_acute_bases)/store(dk_acute_output)
+// pair and their own "+ [K_QUOTE] > dk(acute)" trigger line — duplicate store
+// identifiers and a duplicate context-match line, a Layer-A Check #10 class
+// conflict / compile error. Regression coverage for a gap a review pass found:
+// the merge was previously exercised only via hand-authored double-tap
+// mechanisms sharing one target character, never via two DIFFERENT target
+// characters sharing one triggerKey (the shape S-02's companion introduces).
+// ---------------------------------------------------------------------------
+
+describe("applyAssignments — deadkey_single_tap (S-02) merge by triggerKey across different targets", () => {
+  beforeAll(async () => {
+    await loadPatterns(REAL_CONTENT_DIR);
+  });
+
+  const BASE_KMN_DEADKEY =
+    "store(&VERSION) '10.0'\n" +
+    "store(&NAME) 'Test'\n" +
+    "store(&TARGETS) 'any'\n" +
+    "begin Unicode > use(main)\n" +
+    "\n" +
+    "group(main) using keys\n";
+
+  function makeDeadkeyAssignment(
+    target: string,
+    slotValues: {
+      triggerKey: string;
+      deadkeyName: string;
+      baseLetters: string;
+      accentedForms: string;
+      accentChar: string;
+    },
+  ): MechanismAssignment {
+    return {
+      scope: "individual",
+      target,
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "deadkey_single_tap",
+          strategyId: "S-02",
+          slotValues,
+        },
+      ],
+      source: "user",
+    };
+  }
+
+  it("resolves the real deadkey_single_tap pattern with the deadkeyName-parameterized store fragment", () => {
+    const pattern = getById("deadkey_single_tap");
+    expect(pattern).toBeDefined();
+    expect(pattern?.kmnFragment).toContain(
+      "store(dk_{{deadkeyName}}_bases)",
+    );
+    expect(pattern?.kmnFragment).toContain(
+      "dk({{deadkeyName}}) + [{{triggerKey}}] > '{{accentChar}}'",
+    );
+  });
+
+  it("collapses a source ref (á) and a same-triggerKey companion ref (Á) into exactly one store pair and one dk trigger line, with both base letters and both accented forms present", () => {
+    const pattern = getById("deadkey_single_tap")!;
+    const sourceRef = makeDeadkeyAssignment("á", {
+      triggerKey: "K_QUOTE",
+      deadkeyName: "acute",
+      baseLetters: "a",
+      accentedForms: "á",
+      accentChar: "́",
+    });
+    const companionRef = makeDeadkeyAssignment("Á", {
+      triggerKey: "K_QUOTE",
+      deadkeyName: "acute",
+      baseLetters: "A",
+      accentedForms: "Á",
+      accentChar: "́",
+    });
+
+    const { kmn, warnings } = applyAssignments(
+      [sourceRef, companionRef],
+      (id) => (id === pattern.id ? pattern : undefined),
+      BASE_KMN_DEADKEY,
+    );
+
+    expect(warnings).toEqual([]);
+
+    // Exactly one store(dk_acute_bases) / store(dk_acute_output) pair —
+    // never one per ref.
+    expect(kmn.match(/store\(dk_acute_bases\)/g) ?? []).toHaveLength(1);
+    expect(kmn.match(/store\(dk_acute_output\)/g) ?? []).toHaveLength(1);
+
+    // Both base letters and both accented forms landed in the single merged
+    // pair, in ref order (source then companion).
+    expect(kmn).toContain("store(dk_acute_bases)  'aA'");
+    expect(kmn).toContain("store(dk_acute_output) 'áÁ'");
+
+    // Exactly one dk(acute) index rule and one dk(acute) trigger line — a
+    // second copy of either is the duplicate-store/duplicate-context-match
+    // regression this test pins.
+    expect(
+      kmn.match(/dk\(acute\) \+ any\(dk_acute_bases\) > index\(dk_acute_output, 2\)/g) ?? [],
+    ).toHaveLength(1);
+    expect(kmn.match(/\+ \[K_QUOTE\] > dk\(acute\)/g) ?? []).toHaveLength(1);
+  });
+});

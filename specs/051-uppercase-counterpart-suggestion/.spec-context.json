@@ -759,6 +759,26 @@
       "warnings": [
         "required switching node 22.16.0 -> 24.11.0; below the repo 22.19 floor lingui exits 0 having written nothing"
       ]
+    },
+    {
+      "what": "km-lead review cycle 1 - six specialists (verification, qc, synthesis, frontend, keyman, domain)",
+      "command": "Agent x6 parallel",
+      "result": "No P0. Verdicts: verification APPROVE, keyman APPROVE, qc PASS WITH NOTES 88/100, synthesis/frontend/domain APPROVE WITH NOTES",
+      "warnings": [
+        "km-frontend corrected my briefing: handleApply already lists charTouch/editingLayer/proposeCompanion in its deps, so the suspected stale-closure bug does not exist"
+      ]
+    },
+    {
+      "what": "Georgian unicameral-script finding, verified by execution rather than UCD inference",
+      "command": "npx tsx probe against caseCounterpart",
+      "result": "CONFIRMED - Georgian Mkhedruli U+10D0 returns Mtavruli U+1C90; Cherokee maps both directions. Titlecase U+01C5 returns null, so km-domain overstated that P2 - no proposal is raised for titlecase at all",
+      "warnings": []
+    },
+    {
+      "what": "Post-review gates after cycle-2 fixes",
+      "command": "pnpm typecheck; pnpm -r test; pnpm lint",
+      "result": "PASS - typecheck clean, 6870 passed / 2 skipped (up from 6858), lint exit 0 with zero NEW warnings (assignLoop dir has the same 3 pre-existing warnings before and after)",
+      "warnings": []
     }
   ],
   "decisions": [
@@ -781,6 +801,16 @@
       "decision": "The parallel sequence ref lands in the counterparts own sequence bucket",
       "why": "collapsedChar is the counterpart, and a bucket is keyed by the assignment target, so partitionSequenceAssignment is called with the counterpart. This matches how the physical non-CAPS path appends an assignment targeting the counterpart, and inherits the existing (firstLetterOut, secondLetter) dedup.",
       "rejected": "Appending the parallel ref to the source characters bucket, which would have made collapsedChar disagree with the assignment target"
+    },
+    {
+      "decision": "Hoisted the absent-layer-means-default rule into packages/engine/src/pattern-apply/touchLayer.ts",
+      "why": "The invariant was encoded three times (both appliers plus TouchGallery normalizeTouchSlots) and now gates case-pair ref equality, so independent drift would silently break dedup. Engine is the right home since studio already depends on it.",
+      "rejected": "Leaving three copies, or moving it to contracts (wrong dependency direction)"
+    },
+    {
+      "decision": "Georgian/Cherokee unicameral-script gap documented as an accepted v1 limitation rather than code-fixed",
+      "why": "Spec 051 explicitly places any change to the caseCounterpart primitive out of scope, and propose-then-confirm means nothing is auto-inserted. Recorded in spec Edge Cases, Assumptions, Out of scope, and the casePair.ts docstring so it is a known gap rather than a surprise.",
+      "rejected": "Adding a script-aware suppression list, which would have meant changing the frozen primitive"
     }
   ],
   "concerns": [
@@ -794,6 +824,14 @@
     },
     {
       "note": "The machine default node was 22.16.0, below the repos >=22.19.0 engines floor. Switched to 24.11.0 via nvm and corepack-activated pnpm 9.12.0. This is a persistent change to the users global node selection; without it lingui messages:extract silently no-ops and i18n-catalog-lint misreports catalogs.",
+      "step": "implement"
+    },
+    {
+      "note": "km-qc P2 (not addressed): MechanismGallery.tsx is ~3500 lines and keeps accreting per-mechanism confirm branches rather than a dispatch table. A km-simplify pass is warranted eventually; deliberately out of scope for this feature.",
+      "step": "implement"
+    },
+    {
+      "note": "The physical alreadyProduced predicate builds a RegExp from the resolved vkey and matches it anywhere in kmnRules. Vkeys are constrained to K_[A-Z0-9_]+ so there is no metacharacter hazard today, but it over-suppresses in one edge case: if the counterpart is already assigned to the SAME key on a different layer (e.g. base rather than shift), the shift proposal is suppressed even though the parallel slot is empty. P2, benign under propose-then-confirm.",
       "step": "implement"
     }
   ],

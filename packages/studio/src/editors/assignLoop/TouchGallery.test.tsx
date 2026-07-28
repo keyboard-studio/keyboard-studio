@@ -2286,4 +2286,47 @@ describe("TouchGallery — shift-layer case-pair proposal (spec 051 US3)", () =>
     expect(after).not.toContain("Θ");
     expect(after.filter((c) => !before.includes(c))).not.toContain("Θ");
   });
+
+  it("stale-guard: confirming a proposal whose raising mechanism ref vanished via chip removal records nothing", async () => {
+    seedStore({ withInventory: ["θ"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await applyLongpressOn("K_A");
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+
+    // Remove the just-applied mechanism for "θ" via its configured chip —
+    // the in-UI equivalent of the raising ref vanishing out from under the
+    // banner. handleRemoveMechanism does not proactively dismiss the
+    // companion (unlike the physical/combo removal paths), so the banner
+    // stays visible and confirming it below exercises handleCasePairConfirm's
+    // confirm-time staleness re-check
+    // (`existing.mechanisms.includes(baseRef)`) rather than a removal-time
+    // dismissal.
+    const configuredGroup = screen.getByRole("group", {
+      name: /configured characters/i,
+    });
+    const chips = configuredGroup.querySelectorAll("button");
+    expect(chips.length).toBe(1);
+    await act(async () => {
+      fireEvent.click(chips[0]!);
+    });
+    expect(touchMechanismsFor("θ")).toHaveLength(0);
+
+    // Banner is still up — the component's pending-proposal state is
+    // untouched by the direct chip removal.
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map Θ to the shift layer of/i }),
+      );
+    });
+
+    // Nothing was recorded for the counterpart — the stale proposal was
+    // dismissed, not applied.
+    expect(touchMechanismsFor("Θ")).toHaveLength(0);
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
 });

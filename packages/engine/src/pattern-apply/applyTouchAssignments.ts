@@ -24,6 +24,7 @@ import type { TouchAssignment } from "@keyboard-studio/contracts";
 import { NodeIdMinter } from "../shared/node-ids.js";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
+import { resolveTouchLayerId } from "./touchLayer.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -52,10 +53,6 @@ interface LayerWorkState {
    *  rewrites a key's id does not disturb later lookups by the old id. */
   keyIndex: Map<string, { rowIdx: number; keyIdx: number }>;
 }
-
-/** The layer a mechanism targets when it does not name one. Absent `layer`
- *  must stay byte-identical to the pre-`layer` behaviour. */
-const DEFAULT_TOUCH_LAYER = "default";
 
 /**
  * Apply a list of touch {@link TouchAssignment}s to a {@link TouchLayoutIR},
@@ -144,7 +141,7 @@ export function applyTouchAssignments(
     char: string,
   ): { state: LayerWorkState; key: TouchKeyIR; hostKey: string } | undefined {
     const hostKey = slotValues?.["hostKey"] ?? "";
-    const layerId = slotValues?.["layer"] ?? DEFAULT_TOUCH_LAYER;
+    const layerId = resolveTouchLayerId(slotValues);
 
     const state = resolveLayerState(layerId);
     if (!state) {

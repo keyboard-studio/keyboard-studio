@@ -49,13 +49,10 @@ import type { TouchAssignment } from "@keyboard-studio/contracts";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
 import type { RawKey, RawPlatform } from "./touch-layout-wire-format.js";
+import { resolveTouchLayerId } from "./touchLayer.js";
 
 /** The top-level raw .keyman-touch-layout JSON object. */
 type RawTouchLayout = Record<string, unknown>;
-
-/** The layer a mechanism targets when it does not name one. Absent `layer`
- *  must stay byte-identical to the pre-`layer` behaviour. */
-const DEFAULT_TOUCH_LAYER = "default";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -136,7 +133,7 @@ export function applyTouchAssignmentsToRawJson(
       ) {
         const hostKey = slotValues?.["hostKey"] ?? "";
         const char = slotValues?.["char"] ?? "";
-        const layerId = slotValues?.["layer"] ?? DEFAULT_TOUCH_LAYER;
+        const layerId = resolveTouchLayerId(slotValues);
 
         // Find which platforms have this host key in the TARGET layer. A
         // platform that lacks the layer entirely simply does not match — an

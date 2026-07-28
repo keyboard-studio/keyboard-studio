@@ -20,6 +20,23 @@
  * `isCovered`'s Turkic suppression into this function would incorrectly
  * refuse to propose "İ" for "i" under a "tr" tag, which is exactly the
  * proposal this function exists to make.
+ *
+ * Known limitation: Unicode-bicameral but orthographically-unicameral scripts
+ * ---------------------------------------------------------------------------
+ * The guards below are Unicode general-category tests (`\p{Ll}`/`\p{Lu}`),
+ * not orthographic-convention tests. For most scripts that coincides with
+ * "is this actually a Shift-key pairing an author would want" — but not
+ * always. Georgian Mkhedruli is the sharp case: Unicode 11.0 gave Mkhedruli a
+ * formal Mtavruli uppercase (ა U+10D0 -> Ⴀ U+1C90, ბ U+10D1 -> Ბ U+1C91), so
+ * this function happily returns a counterpart for it, but standard Georgian
+ * orthography does not case-alternate — Mtavruli is a headers/inscriptions
+ * register, not the everyday companion of Mkhedruli. Cherokee (ꭰ U+AB70 <->
+ * Ꭰ U+13A0) is nominally bicameral the same way. There is deliberately no
+ * suppression list here for this class (see the "no suppression list"
+ * paragraph above) — callers that want to hide this noise for a given script
+ * must do so themselves; consuming code (spec 051) accepts it as a known v1
+ * gap mitigated by propose-then-confirm rather than building a script-aware
+ * list into this primitive.
  */
 
 /**

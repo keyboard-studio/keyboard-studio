@@ -78,7 +78,11 @@ import {
   formatUncoveredTouchMessage,
 } from "@keyboard-studio/contracts";
 import type { DesktopModifications } from "@keyboard-studio/engine";
-import { parseTouchLayout, touchCoverage } from "@keyboard-studio/engine";
+import {
+  parseTouchLayout,
+  touchCoverage,
+  resolveTouchLayerId,
+} from "@keyboard-studio/engine";
 import {
   buildTouchLayoutJson,
   deriveSeedLayout,
@@ -257,7 +261,9 @@ function normalizeTouchSlots(
   // targeting; `touch_inherited` has no slotValues at all and must not gain
   // a phantom one.
   if (base["hostKey"] === undefined) return base;
-  return base["layer"] === undefined ? { ...base, layer: "default" } : base;
+  return base["layer"] === undefined
+    ? { ...base, layer: resolveTouchLayerId(base) }
+    : base;
 }
 
 export function buildTouchMechanismRef(
