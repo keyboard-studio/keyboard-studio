@@ -208,6 +208,40 @@ R4 to permit compilation or an OSK iframe in the panel too* — rejected: out of
 change; the team-lead-approved widening is scoped to the pure derivation call only, and the
 compile/OSK prohibitions are unaffected.
 
+**Further amended by R4b below (2026-07-28) — the compile/OSK-iframe prohibition this
+section reaffirmed is superseded.**
+
+---
+
+## R4b — Amendment: live OSK preview replaces the pure-derivation preview (2026-07-28)
+
+**Amends**: R4a's (and R4's) remaining "no compilation, no OSK iframe in this panel"
+restriction. This is a recorded amendment, not a silent reinterpretation — R4a's literal text
+holds those two prohibitions "unchanged, for this panel," and this decision lifts both.
+Directed by the user in a km-lead cycle, after live review of the R4a preview.
+
+**Decision**: The seed-source chooser panel
+([TouchSeedSourcePanel.tsx](../../packages/studio/src/editors/touchSeedSource/TouchSeedSourcePanel.tsx))
+now renders the selected seed option's touch layout via the studio's **live OSK preview** —
+the same `OSKFrame` + `useKeyboardArtifact` compile recipe
+[TouchGallery](../../packages/studio/src/editors/assignLoop/TouchGallery.tsx) already uses —
+locked to **mobile/touch mode**. This supersedes R4/R4a's "no compilation, no OSK iframe in
+this panel" restriction: the panel now compiles the candidate layout and mounts an OSK
+iframe to show it.
+
+**Rationale**: The R4a lightweight, non-OSK preview (a custom keycap renderer driven by the
+pure `deriveSeedLayout`) was reviewed by the user and rejected as not usable. The real OSK
+gives an accurate, familiar rendering the author already trusts from the rest of the studio.
+The OSK compile runs in a scratch VFS scoped to the preview and does not mutate the
+persistent working copy, so driving it from a pre-commit chooser screen carries no working-
+copy-spine risk. This was a direct user decision made in a km-lead cycle.
+
+**Alternatives considered**: (a) *Keep the R4a custom keycap preview* — rejected by the user
+as not usable. (b) *Drive the app's persistent right-hand preview pane instead of an inline
+OSK* — not chosen: the inline OSK reuses `TouchGallery`'s self-contained compile recipe
+without coupling the chooser to the persistent pane's working-copy state, which the
+persistent-pane route would have required.
+
 ---
 
 ## R5 — Coverage guard so simplification never orphans a character (FR-008)

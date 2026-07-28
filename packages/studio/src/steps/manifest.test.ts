@@ -282,16 +282,20 @@ describe("Off-spine step inventory", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Layout declarations (spec 024 Stage 0)
+// Layout declarations (spec 024 Stage 0; touch_seed_source joined this set in
+// the spec 035 R4b follow-up P0 fix — the panel's inline live OSK preview
+// needs the two-pane shell's persistent right-pane OSKFrame suppressed, or
+// two live OSKs co-mount).
 //
-// Exactly {carve, mechanisms, touch} must declare layout:"full".
-// All other steps must have layout:"pane" or omit the field (implicit "pane").
+// Exactly {carve, mechanisms, touch, touch_seed_source} must declare
+// layout:"full". All other steps must have layout:"pane" or omit the field
+// (implicit "pane").
 // ---------------------------------------------------------------------------
 
-const FULL_LAYOUT_IDS = ["carve", "mechanisms", "touch"] as const;
+const FULL_LAYOUT_IDS = ["carve", "mechanisms", "touch", "touch_seed_source"] as const;
 
 describe("layout declarations (spec 024 Stage 0)", () => {
-  it("exactly three steps declare layout:'full'", () => {
+  it("exactly four steps declare layout:'full'", () => {
     const fullSteps = manifest.filter((s) => s.layout === "full");
     const fullIds = fullSteps.map((s) => s.id).sort();
     expect(fullIds).toEqual([...FULL_LAYOUT_IDS].sort());
@@ -310,6 +314,11 @@ describe("layout declarations (spec 024 Stage 0)", () => {
   it("touch declares layout:'full'", () => {
     const touch = manifest.find((s) => s.id === "touch");
     expect(touch?.layout).toBe("full");
+  });
+
+  it("touch_seed_source declares layout:'full' (P0 fix: suppresses the outer persistent OSK pane so the panel's own inline OSK is the only preview)", () => {
+    const seedSource = manifest.find((s) => s.id === "touch_seed_source");
+    expect(seedSource?.layout).toBe("full");
   });
 
   it("all other steps have layout:'pane' or omit layout (implicit pane)", () => {

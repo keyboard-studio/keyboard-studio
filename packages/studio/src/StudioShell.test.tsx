@@ -736,6 +736,56 @@ describe("SurveyView — mechanisms → F transition", () => {
 });
 
 // ---------------------------------------------------------------------------
+// P0 regression guard: touch_seed_source must NOT co-mount the outer
+// persistent right-pane OSKFrame (spec 035 R4b follow-up).
+//
+// TouchSeedSourcePanel now renders its own inline live OSK preview. Before
+// this fix, touch_seed_source was an ordinary "pane" step, so SurveyView's
+// two-pane shell ALSO mounted its own persistent right-pane <OSKFrame> at
+// the same time — two live OSKs on screen, with the outer one showing the
+// working copy's DESKTOP preview instead of the selected touch seed. Giving
+// touch_seed_source layout:"full" makes SurveyView early-return the step's
+// own full-screen container (same mechanism as carve/mechanisms/touch),
+// which never reaches the two-pane shell that mounts the outer OSKFrame.
+//
+// This test mocks TouchSeedSourcePanel (as the rest of this file does) so it
+// renders no "osk-frame" testid of its own — meaning if the outer, persistent
+// OSKFrame (mocked at the top of this file to always render
+// data-testid="osk-frame") is EVER absent while on this step, the fix holds;
+// if it reappears, this test fails and the regression is caught. Paired with
+// TouchSeedSourcePanel.test.tsx's own "mounts the real OSK forced into
+// touch/mobile mode" test — which proves the panel renders exactly one real
+// OSK — the two tests together prove exactly one OSK is ever on screen for
+// this step (the specific "both sides mocked in isolation" gap QC flagged).
+// ---------------------------------------------------------------------------
+
+describe("SurveyView — touch_seed_source suppresses the outer OSK pane (P0 fix)", () => {
+  it("does not mount the outer persistent OSKFrame while touch_seed_source is active", async () => {
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    advanceToTouchSeedSource();
+    expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
+
+    // The outer, persistent right-pane OSKFrame is mocked to unconditionally
+    // render data-testid="osk-frame" wherever it is mounted. TouchSeedSourcePanel
+    // is mocked above and renders no such testid itself, so ANY "osk-frame"
+    // node here can only have come from SurveyView's own two-pane shell — the
+    // exact redundant mount this fix removes.
+    expect(screen.queryByTestId("osk-frame")).toBeNull();
+
+    // Sanity check the mock actually renders "osk-frame" elsewhere (i.e. this
+    // isn't a false negative from the mock never firing) — confirm it DOES
+    // show up on a genuine two-pane ("pane" layout) step, e.g. "characters".
+    fireEvent.click(screen.getByTestId("seed-source-complete"));
+    fireEvent.click(screen.getByTestId("e-complete")); // touch -> F (pane layout)
+    expect(screen.getByTestId("stage-F")).toBeTruthy();
+    expect(screen.getByTestId("osk-frame")).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Back-navigation 5: B → prefill  (issue #508: was carve → prefill)
 // ---------------------------------------------------------------------------
 

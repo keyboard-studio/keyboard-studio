@@ -1,4 +1,5 @@
-// Unit tests for TouchSeedSourcePanel (spec 035 T014, contracts/seed-source-fork.md).
+// Unit tests for TouchSeedSourcePanel (spec 035 T014, contracts/seed-source-fork.md;
+// spec 035 R4b amendment — real OSK live preview).
 //
 // Coverage:
 //   - default selection with/without a usable base touch layout (R4)
@@ -8,6 +9,9 @@
 //   - confirm calls setTouchSeedSource then onComplete
 //   - the draft-discard warning (R12) is shown ONLY on re-entry with a
 //     DIFFERENT selection than the recorded choice, while a touch draft exists
+//   - the live preview is now the REAL OSK (mocked here the same way
+//     TouchGallery.test.tsx mocks it — no iframe/KMW in jsdom), forced into
+//     mobile/touch mode, swapping its injected VFS content per selected card
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, fireEvent, cleanup } from "@testing-library/react";
@@ -17,9 +21,10 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
-import type { TouchAssignment, IRGroup, IRRule } from "@keyboard-studio/contracts";
+import type { TouchAssignment, IRGroup, IRRule, VirtualFS } from "@keyboard-studio/contracts";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { deriveSeedLayout } from "../../lib/buildTouchLayoutJson.ts";
+import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 
 // ---------------------------------------------------------------------------
 // deriveSeedLayout mock — wraps the REAL implementation by default (every
@@ -35,6 +40,59 @@ vi.mock("../../lib/buildTouchLayoutJson.ts", async (importOriginal) => {
     deriveSeedLayout: vi.fn(original.deriveSeedLayout),
   };
 });
+
+// ---------------------------------------------------------------------------
+// Mock useKeyboardArtifact — capture the (baseKeyboard, scaffoldSpec,
+// vfsTransform) triple passed in, same pattern as TouchGallery.test.tsx. No
+// real fetch/compile/WASM runs in jsdom.
+// ---------------------------------------------------------------------------
+
+type CapturedVfsTransform = (vfs: VirtualFS, kbId: string) => { warnings: string[] };
+
+const { capturedArtifactCallRef } = vi.hoisted(() => ({
+  capturedArtifactCallRef: {
+    current: null as null | {
+      baseKeyboard: unknown;
+      scaffoldSpec: unknown;
+      vfsTransform: CapturedVfsTransform | null | undefined;
+    },
+  },
+}));
+
+vi.mock("../../hooks/useKeyboardArtifact.ts", () => ({
+  useKeyboardArtifact: (
+    baseKeyboard: unknown,
+    scaffoldSpec: unknown,
+    vfsTransform: CapturedVfsTransform | null | undefined,
+  ) => {
+    capturedArtifactCallRef.current = { baseKeyboard, scaffoldSpec, vfsTransform };
+    return { stage: { kind: "idle" } as Stage, retry: vi.fn(), recompile: vi.fn() };
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Mock OSKFrame — no iframe / KMW environment; surface the props this panel
+// is contractually required to lock (oskMode="touch", no mode toggle).
+// ---------------------------------------------------------------------------
+
+vi.mock("../../components/OSKFrame.tsx", () => ({
+  OSKFrame: ({ oskMode, stage }: { oskMode: string; stage: Stage }) => (
+    <div data-testid="osk-frame" data-osk-mode={oskMode} data-stage={stage.kind}>
+      osk-frame-mock
+    </div>
+  ),
+}));
+
+/** Invoke the most recently captured vfsTransform with a fresh VFS. */
+function runCapturedVfsTransform(kbId: string): VirtualFS {
+  const call = capturedArtifactCallRef.current;
+  if (!call || !call.vfsTransform) {
+    throw new Error("vfsTransform was not captured — useKeyboardArtifact mock not called");
+  }
+  const vfs = createVirtualFS([]);
+  call.vfsTransform(vfs, kbId);
+  return vfs;
+}
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -114,6 +172,8 @@ afterEach(() => {
   cleanup();
   useWorkingCopyStore.getState().reset();
   useSurveySessionStore.getState().reset();
+  vi.clearAllMocks();
+  capturedArtifactCallRef.current = null;
 });
 
 // ---------------------------------------------------------------------------
@@ -294,6 +354,74 @@ describe("TouchSeedSourcePanel — live preview (R4a)", () => {
     expect(screen.getByTestId("seed-source-reseed").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId("seed-source-reseed-preview")).toBeTruthy();
     expect(screen.getByTestId("seed-source-reseed-preview-error")).toBeTruthy();
+    // No baseIr -> no artifact to build -> the OSK is never mounted.
+    expect(screen.queryByTestId("osk-frame")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Real OSK live preview (spec 035 R4b amendment — supersedes the homemade
+// TouchLayoutPreview keycap grid). The OSK itself is mocked (no iframe/KMW in
+// jsdom, same pattern as TouchGallery.test.tsx); these tests assert the
+// wiring: forced mobile/touch mode, no mode toggle, and the injected VFS
+// content swapping per the currently-selected card.
+// ---------------------------------------------------------------------------
+
+describe("TouchSeedSourcePanel — real OSK preview (R4b)", () => {
+  it("mounts the real OSK forced into touch/mobile mode, with no desktop/mobile toggle on this screen", () => {
+    seedBase(PHONE_ONLY_JSON);
+    render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
+
+    const osk = screen.getByTestId("osk-frame");
+    expect(osk.getAttribute("data-osk-mode")).toBe("touch");
+    // This screen never renders the Desktop OSK / Mobile KB toggle.
+    expect(screen.queryByTestId("osk-mode-toggle")).toBeNull();
+    expect(screen.queryByText("Desktop OSK")).toBeNull();
+  });
+
+  it("feeds useKeyboardArtifact the working copy's baseKeyboard", () => {
+    seedBase(PHONE_ONLY_JSON);
+    render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
+
+    expect(capturedArtifactCallRef.current?.baseKeyboard).toBe(
+      useWorkingCopyStore.getState().baseKeyboard,
+    );
+  });
+
+  it("injects a DIFFERENT derived .keyman-touch-layout per selected card — Import & adapt carries the base's shipped key, Reseed derives fresh", () => {
+    seedBase(PHONE_ONLY_JSON); // ships a "q"/"w" phone layout -> default Import & adapt
+    render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
+
+    const importAdaptVfs = runCapturedVfsTransform("basic_kbdus");
+    const importAdaptJson = importAdaptVfs.get("source/basic_kbdus.keyman-touch-layout")?.content;
+    expect(typeof importAdaptJson).toBe("string");
+    // Case B (raw-JSON splice) preserves the base's shipped key text verbatim.
+    expect(importAdaptJson).toContain('"q"');
+
+    fireEvent.click(screen.getByTestId("seed-source-reseed"));
+
+    const reseedVfs = runCapturedVfsTransform("basic_kbdus");
+    const reseedJson = reseedVfs.get("source/basic_kbdus.keyman-touch-layout")?.content;
+    expect(typeof reseedJson).toBe("string");
+    // Case A (fresh scaffold from the empty-rule test IR) does not carry the
+    // base's own shipped "q" key forward — the two derivations differ.
+    expect(reseedJson).not.toBe(importAdaptJson);
+  });
+
+  it("does not inject a .keyman-touch-layout entry when the seed derivation failed (graceful, no partial/stale artifact)", () => {
+    seedBase(); // no baseIr issue here, but force the catch branch below
+    vi.mocked(deriveSeedLayout).mockImplementationOnce(() => {
+      throw new Error("simulated genuine derivation failure");
+    });
+    const errorSpy = vi.spyOn(devLog, "error").mockImplementation(() => undefined);
+
+    render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
+
+    expect(screen.queryByTestId("osk-frame")).toBeNull();
+    const vfs = runCapturedVfsTransform("basic_kbdus");
+    expect(vfs.get("source/basic_kbdus.keyman-touch-layout")).toBeUndefined();
+
+    errorSpy.mockRestore();
   });
 });
 
