@@ -741,7 +741,7 @@
     },
     "specs/051-uppercase-counterpart-suggestion": {
       "title": "Feature Specification: Suggest the uppercase counterpart when a lowercase cased letter is placed",
-      "hash": "sha256:eb3f01b2411b72b3",
+      "hash": "sha256:f09f4bced33a0614",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
