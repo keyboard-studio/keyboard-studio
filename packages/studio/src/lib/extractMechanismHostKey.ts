@@ -5,7 +5,7 @@
 // (packages/studio/src/lib/deriveDesktopModifications.ts) each independently
 // inspected a Phase C MechanismRef to recover the physical host key a desktop
 // mechanism targets, via the same four pattern/strategy shapes:
-//   - simple_swap / S-01              — `kmnRules`'s `+ [K_X]` vkey.
+//   - simple_swap / S-01              — `kmnRules`'s `+ [ … K_X]` vkey (via parseKeySpec).
 //   - deadkey_single_tap / S-02       — first `baseLetters` letter -> K_<UPPER>.
 //   - modifier_as_layer_switch / S-08 — `altgrKeyList`'s vkey (via parseKeySpec).
 //   - multi_char_sequence / S-03      — first `firstLetterOut` letter -> K_<UPPER>.
@@ -44,10 +44,15 @@ export function extractMechanismHostKey(m: MechanismRef): MechanismHostKeyResult
   const sid = m.strategyId ?? "";
   const sv = m.slotValues ?? {};
 
-  // simple_swap / S-01 — host key is the KMN rule's target vkey.
+  // simple_swap / S-01 — host key is the KMN rule's target vkey: the last
+  // token inside the leading `+ [ … ]` keystroke. Parse via parseKeySpec (the
+  // same helper the S-08 branch uses) so a modifier-combo host key such as
+  // `+ [SHIFT K_X]` yields K_X rather than an empty match — a bare
+  // `/\[([A-Z0-9_]+)\]/` class can't span the space and silently dropped the
+  // shift-layer case-pair companion from the touch replay.
   if (pid === "simple_swap" || sid === "S-01") {
-    const match = /\+\s*\[([A-Z0-9_]+)\]/.exec(sv["kmnRules"] ?? "");
-    return { kind: "replace", hostKey: match?.[1] ?? "" };
+    const parsed = parseKeySpec(sv["kmnRules"] ?? "");
+    return { kind: "replace", hostKey: parsed?.vkey ?? "" };
   }
 
   // deadkey_single_tap / S-02 — host key derived from the first base letter.
