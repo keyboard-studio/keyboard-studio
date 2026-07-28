@@ -219,3 +219,59 @@ describe("useCasePairCompanion — lifecycle", () => {
     expect(result.current.proposal?.originalChar).toBe("θ");
   });
 });
+
+describe("useCasePairCompanion — Georgian suppression", () => {
+  // Unicode gives Mkhedruli a formal Mtavruli uppercase mapping, but that
+  // mapping is a stylistic all-caps register, not a Shift companion in
+  // ordinary Georgian orthography — Unicode case properties say nothing
+  // about orthographic convention. The corpus's one Georgian keyboard,
+  // basic_kbdgeo (../keyboards), maps every [SHIFT K_x] to the IDENTICAL
+  // codepoint as its base rule, and the facet classifier independently
+  // labels it casing: "caseless", caps-handling: notApplicable. These cases
+  // pin the suppression to Georgian specifically — Cherokee is
+  // Unicode-bicameral in the same technical sense and must keep proposing,
+  // so a future widening of the suppression fails loudly here.
+  beforeEach(() => {
+    useWorkingCopyStore.getState().setIdentity(null);
+  });
+
+  it("raises nothing for Georgian Mkhedruli ა (U+10D0) — physical", () => {
+    const { raised, proposal } = proposePhysical("ა");
+    expect(raised).toBe(false);
+    expect(proposal).toBeNull();
+  });
+
+  it("raises nothing for Georgian Mkhedruli ა (U+10D0) — touch, proving the suppression lives in propose()", () => {
+    const { result } = renderHook(() => useCasePairCompanion());
+    let raised = true;
+    act(() => {
+      raised = result.current.propose({
+        mechanism: "touch",
+        originalChar: "ა",
+        hostKey: "K_A",
+        targetLayer: "shift",
+        baseRef: { patternId: "simple_swap", slotValues: { kmnRules: "" } },
+      });
+    });
+    expect(raised).toBe(false);
+    expect(result.current.proposal).toBeNull();
+  });
+
+  it("raises nothing for Georgian Mtavruli Ა (U+1C90) placed directly", () => {
+    const { raised, proposal } = proposePhysical("Ა");
+    expect(raised).toBe(false);
+    expect(proposal).toBeNull();
+  });
+
+  it("control: Cherokee ꭰ (U+AB70) still raises a proposal (U+13A0) — Georgian-only scope", () => {
+    const { raised, proposal } = proposePhysical("ꭰ");
+    expect(raised).toBe(true);
+    expect(proposal?.counterpart).toBe("Ꭰ");
+  });
+
+  it("control: Greek θ still raises Θ — unaffected by the Georgian suppression", () => {
+    const { raised, proposal } = proposePhysical("θ");
+    expect(raised).toBe(true);
+    expect(proposal?.counterpart).toBe("Θ");
+  });
+});

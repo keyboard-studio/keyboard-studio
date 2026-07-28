@@ -779,6 +779,9 @@
       "command": "pnpm typecheck; pnpm -r test; pnpm lint",
       "result": "PASS - typecheck clean, 6870 passed / 2 skipped (up from 6858), lint exit 0 with zero NEW warnings (assignLoop dir has the same 3 pre-existing warnings before and after)",
       "warnings": []
+    },
+    {
+      "what": "{\"what\":\"Georgian suppression decision - corpus and script-detection evidence\",\"command\":\"npx tsx probe against caseCounterpart + \\p{Script=Georgian}; km-author read of ../keyboards/release/basic/basic_kbdgeo/source/basic_kbdgeo.kmn\",\"result\":\"CONFIRMED - all four Georgian ranges match one regex and nothing else does; basic_kbdgeo shift rules output identical codepoints to base. Also corrected km-domains unverified table: it predicted Warang Citi and Old Hungarian return null, but both actually return a counterpart\",\"warnings\":[\"km-domain and km-doc both ran without a Bash tool, so their factual claims were re-verified by me before being acted on\"]}"
     }
   ],
   "decisions": [
@@ -811,6 +814,9 @@
       "decision": "Georgian/Cherokee unicameral-script gap documented as an accepted v1 limitation rather than code-fixed",
       "why": "Spec 051 explicitly places any change to the caseCounterpart primitive out of scope, and propose-then-confirm means nothing is auto-inserted. Recorded in spec Edge Cases, Assumptions, Out of scope, and the casePair.ts docstring so it is a known gap rather than a surprise.",
       "rejected": "Adding a script-aware suppression list, which would have meant changing the frozen primitive"
+    },
+    {
+      "decision": "{\"decision\":\"Suppress the case-pair proposal for Georgian only, in the studio hook\",\"why\":\"Three independent lines of evidence agreed: km-domain ruled Mtavruli a stylistic all-caps register rather than a Shift companion; km-author verified in-file that the corpus keyboard basic_kbdgeo maps every [SHIFT K_x] to the IDENTICAL codepoint as its base rule, so Shift is not a case layer there at all; and this projects own facet classifier already labels that keyboard casing:caseless / caps-handling:notApplicable. I verified by probe that a single native /\\p{Script=Georgian}/u covers all four Georgian scripts (Mkhedruli, Nuskhuri, Asomtavruli, Mtavruli), so this needs no table, no dependency, and no change to the frozen caseCounterpart primitive.\",\"rejected\":\"Accepting the noise (documented-only); a locale/BCP47 gate (a working copy may carry no tag, and it would wrongly suppress borrowed-Latin proposals on a Georgian keyboard); and widening the suppression to Cherokee, which has only absence-of-evidence behind it\"}"
     }
   ],
   "concerns": [
@@ -832,6 +838,10 @@
     },
     {
       "note": "The physical alreadyProduced predicate builds a RegExp from the resolved vkey and matches it anywhere in kmnRules. Vkeys are constrained to K_[A-Z0-9_]+ so there is no metacharacter hazard today, but it over-suppresses in one edge case: if the counterpart is already assigned to the SAME key on a different layer (e.g. base rather than shift), the shift proposal is suppressed even though the parallel slot is empty. P2, benign under propose-then-confirm.",
+      "step": "implement"
+    },
+    {
+      "note": "Cherokee (U+AB70 lowercase block <-> U+13A0) is Unicode-bicameral in the same technical sense as Georgian and still proposes. The only evidence against it is that no shipped corpus keyboard uses the lowercase block - absence of evidence, not evidence of absence. Deliberately left proposing; revisit if a Cherokee author reports the prompt as noise.",
       "step": "implement"
     }
   ],

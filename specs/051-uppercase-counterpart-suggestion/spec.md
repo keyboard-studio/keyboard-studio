@@ -139,18 +139,23 @@ edited.
   returns `null` and no case-pair suggestion fires for it at all — same as any other caseless input. Its only
   observable effect is that FR-006's `\p{Lu}` layer test does not classify it as uppercase, so a direct titlecase
   placement lands on the touch default layer; this is benign, not a defect, and needs no suppression.
-- **Orthographically-unicameral, Unicode-bicameral scripts (known accepted gap).** `caseCounterpart` suppresses only
-  what its Unicode-property guards can see (§ "No confident counterpart" above); it has no notion of which Unicode
-  case mappings are actually used as a shift-key pairing in ordinary orthography versus a stylistic alternate. The
-  sharp case is **Georgian Mkhedruli/Mtavruli**: `caseCounterpart` maps Mkhedruli ა U+10D0 -> Mtavruli Ⴀ U+1C90 and
+- **Orthographically-unicameral, Unicode-bicameral scripts.** `caseCounterpart` itself suppresses only what its
+  Unicode-property guards can see (§ "No confident counterpart" above); it has no notion of which Unicode case
+  mappings are actually used as a shift-key pairing in ordinary orthography versus a stylistic alternate. The sharp
+  case is **Georgian Mkhedruli/Mtavruli**: `caseCounterpart` maps Mkhedruli ა U+10D0 -> Mtavruli Ⴀ U+1C90 and
   ბ U+10D1 -> Ბ U+1C91 (Unicode 11.0 gave Mkhedruli a formal uppercase), but standard Georgian orthography does not
-  case-alternate — Mtavruli is a headers/inscriptions register, not the Shift companion of everyday Mkhedruli.
-  Cherokee (e.g. ꭰ U+AB70 <-> Ꭰ U+13A0) is nominally bicameral in Unicode the same way, though its everyday-use
-  convention is less settled than Georgian's. **v1 decision:** the suggestion still fires for these scripts — the
-  primitive is deliberately unchanged (see Out of scope), so a Georgian keyboard author is offered a Mtavruli capital
-  on Shift for every Mkhedruli letter placed. Propose-then-confirm (FR-001/FR-007) is the mitigation: nothing is
-  auto-inserted, and the author dismisses the noise. A script-aware suppression list is deferred, not implemented
-  here — see Out of scope.
+  case-alternate — Mtavruli is a headers/inscriptions register, not the Shift companion of everyday Mkhedruli. The
+  corpus confirms it: the one Georgian keyboard, `basic_kbdgeo`, maps every `[SHIFT K_x]` to the identical codepoint
+  as its base rule, and the facet classifier independently labels it `casing: "caseless"`,
+  `caps-handling: notApplicable`. **v1 decision:** the primitive stays unchanged (it is a pure Unicode fact, per Out
+  of scope below), but the studio's `casePairCompanion.ts` — the one caller that turns a counterpart into an authored
+  proposal — suppresses the suggestion specifically for Georgian, via a named `isOrthographicallyUnicameral`
+  predicate keyed on `\p{Script=Georgian}` (covering Mkhedruli, Mtavruli, Asomtavruli, and Nuskhuri uniformly). No
+  Mtavruli capital is ever proposed for a Mkhedruli placement. Cherokee (e.g. ꭰ U+AB70 <-> Ꭰ U+13A0) is nominally
+  bicameral in Unicode the same way, but its everyday-use convention is less settled and there is no comparable
+  corpus keyboard demonstrating a caseless Shift layer, so it is **not** suppressed and remains a known accepted v1
+  gap — see Out of scope. Propose-then-confirm (FR-001/FR-007) is the mitigation for that remaining gap: nothing is
+  auto-inserted, and the author dismisses the noise.
 - **Multiple mechanisms per character.** A character may carry several assignments; confirming a suggestion must apply
   to exactly the placement that raised it (the physical-key path already captures the raising assignment by object
   identity in `pendingCompanion.baseAssignment` — the parallel-combo and touch paths must be equally precise).
@@ -217,8 +222,10 @@ edited.
 - `caseCounterpart` (engine) is the sole cased-pair mechanism; its existing guards (single code point, `\p{Ll}`/`\p{Lu}`
   only, one-to-one, locale-aware) define exactly when a suggestion can fire. No looser fallback is added. Those guards
   are Unicode-general-category tests, not orthographic-convention tests — they say nothing about whether a script's
-  Unicode case mapping is actually used as a Shift-key pairing in ordinary use (see the Georgian Mkhedruli/Mtavruli
-  edge case above), so "can fire" and "should read as a useful pairing to this author" are not the same claim.
+  Unicode case mapping is actually used as a Shift-key pairing in ordinary use, so "can fire" and "should read as a
+  useful pairing to this author" are not the same claim. The Georgian case (see Edge Cases above) is where that gap is
+  wide enough to warrant an explicit, corpus-evidenced suppression in the studio's proposal hook rather than being
+  left to propose-then-confirm alone.
 - The three galleries already expose a shared Accept/Deny propose-then-confirm affordance and per-character
   resolved-suggestion tracking; this feature routes the new suggestions through those, rather than inventing a new UI.
 - The working-copy identity's BCP47 tag is the locale source for casing, matching the physical-key companion's current
@@ -234,10 +241,13 @@ edited.
 - Locale-specific casing beyond the existing BCP47-tag mechanism — genuinely ambiguous or context-sensitive casing is a
   follow-up per the issue's open question, not v1.
 - Any change to the `caseCounterpart` primitive itself, or to the marks-series `deriveCaseCounterparts`
-  (that path stays as-is; this feature is about placement-time suggestions, not mark attachments).
-- A script-aware suppression list for scripts that are bicameral in Unicode but not in ordinary orthography (e.g.
-  Georgian Mkhedruli/Mtavruli, see Edge Cases) — accepted as v1 noise, mitigated by propose-then-confirm, deferred to
-  a follow-up rather than built here.
+  (that path stays as-is; this feature is about placement-time suggestions, not mark attachments; the primitive
+  remains a pure Unicode fact and carries no script-aware suppression list, per its own docstring).
+- A general script-aware suppression list for every script that is bicameral in Unicode but not in ordinary
+  orthography. Georgian is suppressed (see Edge Cases above), on direct corpus evidence
+  (`basic_kbdgeo`'s caseless Shift layer). Cherokee and any other script in this class are **not** suppressed and
+  remain accepted v1 noise, mitigated by propose-then-confirm; widening the suppression list is a follow-up, done
+  only on comparable corpus evidence, not a hunch.
 - CJK/Ethiopic and other caseless scripts (no case pairs to propose) and any out-of-scope items from spec §16.
 - Bulk "add all capitals" actions — each proposal remains an independent per-placement confirm.
 

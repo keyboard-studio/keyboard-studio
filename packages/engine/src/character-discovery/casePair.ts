@@ -33,10 +33,15 @@
  * register, not the everyday companion of Mkhedruli. Cherokee (ꭰ U+AB70 <->
  * Ꭰ U+13A0) is nominally bicameral the same way. There is deliberately no
  * suppression list here for this class (see the "no suppression list"
- * paragraph above) — callers that want to hide this noise for a given script
- * must do so themselves; consuming code (spec 051) accepts it as a known v1
- * gap mitigated by propose-then-confirm rather than building a script-aware
- * list into this primitive.
+ * paragraph above) — this primitive stays a pure Unicode fact, and the
+ * orthographic-convention judgment call is made by the one caller that turns
+ * a counterpart into an authored proposal: the studio's `propose()` in
+ * `packages/studio/src/editors/assignLoop/casePairCompanion.ts` suppresses
+ * Georgian specifically (corpus evidence: `basic_kbdgeo` maps every
+ * `[SHIFT K_x]` to the identical codepoint as its base rule, and the facet
+ * classifier independently labels it caseless). Cherokee and any other
+ * Unicode-bicameral-but-arguably-unicameral script are NOT suppressed there
+ * and remain a known, accepted v1 gap mitigated by propose-then-confirm.
  */
 
 /**

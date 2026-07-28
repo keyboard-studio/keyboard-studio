@@ -188,6 +188,19 @@ export function useCasePairCompanion(): UseCasePairCompanion {
       const pair = caseCounterpart(input.originalChar, bcp47);
       if (pair === null || pair.direction !== "toUpper") return false;
 
+      // Georgian: Unicode gives Mkhedruli a formal Mtavruli uppercase mapping,
+      // but that mapping is a stylistic all-caps register, not a Shift
+      // companion in ordinary Georgian orthography — Unicode case properties
+      // say nothing about orthographic convention. The corpus backs this up:
+      // basic_kbdgeo (../keyboards) maps every [SHIFT K_x] to the IDENTICAL
+      // codepoint as its base rule, and this project's own facet classifier
+      // independently labels it casing: "caseless", caps-handling:
+      // notApplicable. Suppressed here rather than in `caseCounterpart` so the
+      // engine's case-pair derivation stays a pure Unicode fact and the
+      // orthographic-convention judgment call lives with the one caller that
+      // turns it into an authored proposal.
+      if (isOrthographicallyUnicameral(input.originalChar)) return false;
+
       // "Counterpart already placed" (spec §Edge Cases) — asked only now that
       // the counterpart exists, and stripped from what gets stored.
       const { alreadyProduced, ...parts } = input;
@@ -217,6 +230,20 @@ export function useCasePairCompanion(): UseCasePairCompanion {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Scripts where Unicode's Lu/Ll case-pair machinery reports a formal
+ * uppercase mapping that does NOT correspond to a Shift-layer relationship in
+ * ordinary orthographic practice. Currently Georgian only — see the comment
+ * at the `propose` call site for the corpus evidence. Add a script here only
+ * on the same kind of evidence (a real keyboard whose Shift layer doesn't
+ * case-shift it, ideally corroborated by the facet classifier), never on a
+ * hunch; Cherokee is Unicode-bicameral in the same technical sense and is
+ * deliberately NOT listed — it keeps proposing.
+ */
+function isOrthographicallyUnicameral(char: string): boolean {
+  return /\p{Script=Georgian}/u.test(char);
+}
 
 /**
  * Case-shift a combo's input side through `caseCounterpart`, leaving the
