@@ -21,6 +21,13 @@
 import type { KeyboardIR, TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/contracts";
 
 /**
+ * A touch layer id, matching `comboToTouchLayerId`'s vocabulary. The named
+ * members document the ids this codebase reasons about; the `string` arm keeps
+ * a keyboard's own layer ids (e.g. `"rightalt-shift"`) assignable.
+ */
+export type TouchLayerId = "default" | "shift" | "caps" | (string & {});
+
+/**
  * Return a structural clone of `layout` with the key whose id is `keyId`
  * promoted to `hand-set`. If the key is already `hand-set` the result is
  * value-equal (idempotent). If no key matches `keyId`, the layout is returned

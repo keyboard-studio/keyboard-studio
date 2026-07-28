@@ -3830,3 +3830,76 @@ describe("MechanismGallery — sequence builder accepts real click+type (user-ev
     expect(applyBtn.disabled).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Spec 051 — the case-pair proposal now comes from the SHARED hook + banner
+// (useCasePairCompanion / CasePairProposalBanner). The existing companion
+// cases above are the behaviour-preservation gate (SC-005); these two pin the
+// contract's identity surface that the extraction makes load-bearing.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — shared case-pair affordance (spec 051)", () => {
+  it("renders the proposal through the shared banner's role/aria-label contract (FR-011)", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["θ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+
+    const banner = screen.getByRole("note", {
+      name: /Case-pair companion proposal/i,
+    });
+    expect(banner).toBeTruthy();
+    // Exactly two controls, Confirm and Dismiss — no third button, no
+    // "apply to all" (bulk actions are out of scope).
+    expect(within(banner).getAllByRole("button")).toHaveLength(2);
+  });
+
+  it("confirming applies to the RAISING swap when the same character carries two swap assignments (FR-008)", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["θ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // 1. First swap on K_Q — raises a proposal for K_Q.
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+    expect(
+      screen.getByRole("button", { name: /Map Θ to the shift layer of K_Q/i }),
+    ).toBeTruthy();
+
+    // 2. Second swap for the SAME character on K_W — at most one proposal is
+    //    pending, so this replaces the first.
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_W");
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+
+    // 3. Confirm — must pair with K_W (the raising placement), not K_Q. An
+    //    index/target scan would grab the first θ assignment and emit K_Q.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Map Θ to the shift layer of K_W/i }),
+    );
+
+    const assignments = getPhaseCPhysicalAssignments();
+    const companion = assignments.find((a) => a.target === "Θ");
+    expect(companion?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      "+ [SHIFT K_W] > U+0398",
+    );
+    // Both base swaps survive untouched (non-CAPS key → append, not replace).
+    expect(assignments.filter((a) => a.target === "θ")).toHaveLength(2);
+  });
+
+  // "Stale base removed before confirm records nothing" is already pinned by
+  // the two shipping cases above — "removing the base swap while the banner is
+  // up dismisses the companion proposal" (the gallery's own removal paths
+  // dismiss proactively) and "stale-guard: confirming a companion whose base
+  // assignment vanished via an unaudited mutation path records nothing" (the
+  // confirm-time backstop). Both still pass unedited after the extraction, so
+  // they are not restated here.
+});

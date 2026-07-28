@@ -116,9 +116,89 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-28T03:19:40.884Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:27.807Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:28.092Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:28.400Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:28.768Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:29.044Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:29.307Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:29.553Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:29.785Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:30.024Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:30.255Z"
     }
   ],
-  "currentTask": "T013",
+  "currentTask": "T023",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -207,6 +287,77 @@
     "T013": {
       "status": "DONE",
       "did": "Regression floor verified: both applier test diffs are pure appends (137/0 and 155/0, zero deleted lines); 36->42 and 41->47 cases; full engine suite 2110 passed",
+      "files": [
+        "(verification only)"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Created casePairCompanion.test.ts: 14 cases pinning suppression (caseless, self-mapping, multi-char expansion, uppercase input), tr locale, empty/malformed bcp47, and the one-pending-proposal lifecycle",
+      "files": [
+        "packages/studio/src/editors/assignLoop/casePairCompanion.test.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Defined the CasePairProposal discriminated union (physical|combo|touch), CasePairProposalInput (union minus counterpart), and the DeadkeyCombo/SequenceCombo shapes; added TouchLayerId to touchBehavior.ts as its canonical home",
+      "files": [
+        "packages/studio/src/editors/assignLoop/casePairCompanion.ts",
+        "packages/studio/src/editors/assignLoop/touchBehavior.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Implemented useCasePairCompanion: propose is the sole caseCounterpart caller, reads identity bcp47 itself (empty-string normalized to undefined), returns false on null/toLower, keeps at most one pending proposal",
+      "files": [
+        "packages/studio/src/editors/assignLoop/casePairCompanion.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Created CasePairProposalBanner.tsx with the inline banner lifted verbatim (markup, styling, all six shipped companion i18n ids); no third button",
+      "files": [
+        "packages/studio/src/editors/assignLoop/CasePairProposalBanner.tsx"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Removed local pendingCompanion state and the 80-line inline banner from MechanismGallery; adopted the hook + shared banner and cleared the proposal from the existing current-character reset effect",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Physical proposal now raised via proposeCompanion from the swap branch, preserving the base-layer and shiftLayerAllowed gates and carrying vkey/capsHandling/baseAssignment by identity; dropped the gallery's now-unused caseCounterpart import and identityBcp47 selector",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Moved the physical confirm verbatim onto the banner onConfirm, CAPS-quad replace vs non-CAPS append branches unchanged (Layer-A Check #10)",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Stale-base guard kept on the confirm path plus both proactive-dismissal sites, now narrowed through pendingCompanionBase (touch proposals carry a ref, not an assignment)",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Added 2 new MechanismGallery cases: shared banner role/aria-label + exactly-two-controls (FR-011), and confirm targeting the raising swap when one char carries two swaps (FR-008). The contract's stale-base case already exists in the shipping suite - noted rather than duplicated",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.test.tsx"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "SC-005 gate PASS: 145 pre-existing MechanismGallery cases pass with a zero-deletion diff (pure append), 147+14=161 total green",
       "files": [
         "(verification only)"
       ]

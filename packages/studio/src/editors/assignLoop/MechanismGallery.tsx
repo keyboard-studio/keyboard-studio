@@ -70,7 +70,6 @@ import { displayChar } from "../../lib/irToCarveNodes.ts";
 import type { AxisFill, DiscoveryAxisVector } from "@keyboard-studio/contracts";
 import {
   defaultFillAxes,
-  caseCounterpart,
   isMnemonicLayout,
   planShiftAssignment,
   buildShiftRuleLines,
@@ -105,6 +104,8 @@ import {
   type ResolveCharInputOptions,
   type KeyPickerResolveOptions,
 } from "../../lib/charInput.ts";
+import { useCasePairCompanion } from "./casePairCompanion.ts";
+import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
@@ -1648,13 +1649,23 @@ export function MechanismGallery({
   // was raised for; a target/index scan would silently grab whichever
   // assignment for that char happens to match, which is the P1 defect this
   // guards against.
-  const [pendingCompanion, setPendingCompanion] = useState<{
-    originalChar: string;
-    counterpart: string;
-    vkey: string;
-    capsHandling: boolean;
-    baseAssignment: MechanismAssignment;
-  } | null>(null);
+  // The state and the banner both live in the shared case-pair module now, so
+  // all three placement mechanisms raise the SAME proposal through the SAME
+  // affordance (FR-011) and `caseCounterpart` keeps exactly one caller
+  // (FR-002). Physical behaviour is unchanged.
+  const {
+    proposal: pendingCompanion,
+    propose: proposeCompanion,
+    dismiss: dismissCompanion,
+    clear: clearCompanion,
+  } = useCasePairCompanion();
+
+  /** The base assignment a proposal was raised for, when it has one (physical
+   *  and combo do; touch tracks a mechanism ref instead). */
+  const pendingCompanionBase: MechanismAssignment | null =
+    pendingCompanion !== null && pendingCompanion.mechanism !== "touch"
+      ? pendingCompanion.baseAssignment
+      : null;
 
   // Working IR used to plan shift-layer assignments — prefer the carve
   // working IR (ir), falling back to baseIr before the carve step has run.
@@ -1662,7 +1673,9 @@ export function MechanismGallery({
   // inventory-only render in tests); shift targeting is disabled in that case
   // since planShiftAssignment has nothing to evaluate against.
   const workingIr = useWorkingCopyStore((s) => s.ir ?? s.baseIr);
-  const identityBcp47 = useWorkingCopyStore((s) => s.identity?.bcp47);
+  // The casing locale is read by useCasePairCompanion itself — the gallery no
+  // longer plumbs a bcp47 tag, which is what keeps `caseCounterpart` down to
+  // exactly one caller.
 
   // Shift-layer targeting is disallowed for mnemonic keyboards (planShiftAssignment /
   // isMnemonicLayout in @keyboard-studio/engine) — in mnemonic mode K_X already
@@ -1785,7 +1798,7 @@ export function MechanismGallery({
   // Reset method inputs (not suggestionResolved — that persists per char)
   // whenever currentChar changes.
   useEffect(() => {
-    setPendingCompanion(null);
+    clearCompanion();
     resetMethodState();
     if (currentChar !== null && isDecomposableAccented(currentChar)) {
       // §3c defaults-first: for a decomposable accented letter the natural method
@@ -1794,7 +1807,7 @@ export function MechanismGallery({
       setDeadkeyBaseLetter([...currentChar.normalize("NFD")][0] ?? "");
       setMethod("deadkey");
     }
-  }, [currentChar, resetMethodState]);
+  }, [currentChar, resetMethodState, clearCompanion]);
 
   // ---------------------------------------------------------------------------
   // Suggestion row handlers
@@ -2080,25 +2093,20 @@ export function MechanismGallery({
       // an uppercase char to base proposes nothing; only the base->uppercase
       // (toUpper) direction is offered a companion. Scope cut, not a defect:
       // the reverse direction is left for a future pass.
-      if (effectiveLayer === "base" && shiftLayerAllowed) {
-        const bcp47 =
-          identityBcp47 !== undefined && identityBcp47 !== ""
-            ? identityBcp47
-            : undefined;
-        const counterpart = caseCounterpart(currentChar, bcp47);
-        if (
-          counterpart !== null &&
-          counterpart.direction === "toUpper" &&
-          workingIr !== null
-        ) {
-          setPendingCompanion({
-            originalChar: currentChar,
-            counterpart: counterpart.counterpart,
-            vkey: resolvedSwapVkey,
-            capsHandling,
-            baseAssignment: assignment,
-          });
-        }
+      // The mnemonic gate and the base-layer gate are enforced HERE, at propose
+      // time — the shared hook owns only the casing decision (it reads the
+      // identity bcp47 itself, so no locale is plumbed through).
+      if (effectiveLayer === "base" && shiftLayerAllowed && workingIr !== null) {
+        proposeCompanion({
+          mechanism: "physical",
+          originalChar: currentChar,
+          vkey: resolvedSwapVkey,
+          capsHandling,
+          // Object identity, not target/index: the gallery allows several
+          // mechanisms per character, so confirm must locate exactly the
+          // assignment this proposal was raised for (FR-008).
+          baseAssignment: assignment,
+        });
       }
     } else {
       // method === "ralt"
@@ -2163,7 +2171,7 @@ export function MechanismGallery({
     raltTokens,
     shiftLayerAllowed,
     workingIr,
-    identityBcp47,
+    proposeCompanion,
     recordAssignments,
     sessionAssignments,
     resetMethodState,
@@ -2176,6 +2184,9 @@ export function MechanismGallery({
 
   const handleCompanionConfirm = useCallback(() => {
     if (pendingCompanion === null) return;
+    // Only the physical mechanism is wired here; the other two galleries own
+    // their own confirm paths.
+    if (pendingCompanion.mechanism !== "physical") return;
 
     // Stale-proposal guard: locate the exact assignment object this proposal
     // was raised for, by reference — not by re-matching target/scope, which
@@ -2187,7 +2198,7 @@ export function MechanismGallery({
       pendingCompanion.baseAssignment,
     );
     if (baseAssignmentIdx === -1) {
-      setPendingCompanion(null);
+      clearCompanion();
       return;
     }
 
@@ -2250,12 +2261,8 @@ export function MechanismGallery({
       recordAssignments([...sessionAssignments, companionAssignment]);
     }
 
-    setPendingCompanion(null);
-  }, [pendingCompanion, sessionAssignments, recordAssignments]);
-
-  const handleCompanionDecline = useCallback(() => {
-    setPendingCompanion(null);
-  }, []);
+    clearCompanion();
+  }, [pendingCompanion, sessionAssignments, recordAssignments, clearCompanion]);
 
   // How many NON-sequence methods have already been applied to the current
   // character (mechanismAssignments already excludes the sequence-owned
@@ -2314,13 +2321,18 @@ export function MechanismGallery({
       // spec v1.3.1 §3c). The staleness re-check in handleCompanionConfirm
       // is a backstop for paths this dismissal doesn't cover.
       if (
-        pendingCompanion !== null &&
-        !next.includes(pendingCompanion.baseAssignment)
+        pendingCompanionBase !== null &&
+        !next.includes(pendingCompanionBase)
       ) {
-        setPendingCompanion(null);
+        clearCompanion();
       }
     },
-    [sessionAssignments, recordAssignments, pendingCompanion],
+    [
+      sessionAssignments,
+      recordAssignments,
+      pendingCompanionBase,
+      clearCompanion,
+    ],
   );
 
   const handleRemoveMechanism = useCallback(
@@ -2352,13 +2364,18 @@ export function MechanismGallery({
       recordAssignments(next);
       // See handleRemoveCovered above — same proactive-dismissal rationale.
       if (
-        pendingCompanion !== null &&
-        !next.includes(pendingCompanion.baseAssignment)
+        pendingCompanionBase !== null &&
+        !next.includes(pendingCompanionBase)
       ) {
-        setPendingCompanion(null);
+        clearCompanion();
       }
     },
-    [sessionAssignments, recordAssignments, pendingCompanion],
+    [
+      sessionAssignments,
+      recordAssignments,
+      pendingCompanionBase,
+      clearCompanion,
+    ],
   );
 
   // Edit-after-Done: unlocks the desktop layout so a completed Mechanism
@@ -2968,85 +2985,11 @@ export function MechanismGallery({
                   S-01 apply when the applied character has a known
                   uppercase counterpart. */}
             {pendingCompanion !== null && (
-              <div
-                role="note"
-                aria-label={t({
-                  id: "editor.assignLoop.companion.ariaLabel",
-                  message: "Case-pair companion proposal",
-                })}
-                style={{
-                  background: "#0d2218",
-                  border: "1px solid #238636",
-                  borderRadius: 8,
-                  padding: "10px 14px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 12,
-                    color: "#56d364",
-                    fontFamily: FONT,
-                  }}
-                >
-                  <Trans id="editor.assignLoop.companion.prompt">
-                    {pendingCompanion.originalChar} has an uppercase form,{" "}
-                    {pendingCompanion.counterpart}. Map{" "}
-                    {pendingCompanion.counterpart} to the shift layer of the
-                    same key as well?
-                  </Trans>
-                </p>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={handleCompanionConfirm}
-                    aria-label={t({
-                      id: "editor.assignLoop.companion.confirmAriaLabel",
-                      message: `Map ${pendingCompanion.counterpart} to the shift layer of ${pendingCompanion.vkey}`,
-                    })}
-                    style={{
-                      padding: "5px 14px",
-                      background: "#238636",
-                      border: "none",
-                      borderRadius: 5,
-                      color: "#e6edf3",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      fontFamily: FONT,
-                    }}
-                  >
-                    <Trans id="editor.assignLoop.companion.confirmButton">
-                      Map it
-                    </Trans>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCompanionDecline}
-                    aria-label={t({
-                      id: "editor.assignLoop.companion.declineAriaLabel",
-                      message: `Do not map ${pendingCompanion.counterpart} to the shift layer`,
-                    })}
-                    style={{
-                      padding: "5px 14px",
-                      background: "transparent",
-                      border: `1px solid ${BORDER}`,
-                      borderRadius: 5,
-                      color: TEXT_DIM,
-                      fontSize: 12,
-                      cursor: "pointer",
-                      fontFamily: FONT,
-                    }}
-                  >
-                    <Trans id="editor.assignLoop.companion.declineButton">
-                      No thanks
-                    </Trans>
-                  </button>
-                </div>
-              </div>
+              <CasePairProposalBanner
+                proposal={pendingCompanion}
+                onConfirm={handleCompanionConfirm}
+                onDismiss={dismissCompanion}
+              />
             )}
 
             {/* Apply + Next + Skip actions */}
