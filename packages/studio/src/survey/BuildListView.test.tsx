@@ -581,17 +581,17 @@ describe("BuildListView — end-to-end onComplete", () => {
 // ---------------------------------------------------------------------------
 
 describe("BuildListView — whole-alphabet instructions", () => {
-  it("shows the instruction callout with the space-separated example", async () => {
+  it("shows the instruction callout with the example", async () => {
     await renderBuildListView({});
-    // Callout: whole-alphabet wording + explicit spacing instruction.
+    // Callout: whole-alphabet wording.
     expect(
       screen.getByText(/every\s+character your language uses, not just the special ones/i),
     ).toBeTruthy();
     // The spaced example line.
     expect(screen.getByText("a b c d e ɛ ŋ ɔ …")).toBeTruthy();
-    // Type-in section repeats the spacing instruction.
+    // Type-in section repeats the example.
     expect(
-      screen.getByText(/putting a space between each\s+character/i),
+      screen.getByText(/Type the rest of your alphabet here/i),
     ).toBeTruthy();
   });
 });
