@@ -16,6 +16,14 @@
 //   1. Carve deletions  — applyCarveToVfs (re-emits filtered IR into .kmn)
 //   1.5 Carve keycaps   — applyCarveKeycapRemovalsToVfs (blanks carved chars off
 //                         .kvks / .keyman-touch-layout keycaps in place)
+//   1.6 Touch method deletions — applyTouchKeycapRemovalsToVfs (blanks/drops
+//                         individually deleted pre-existing touch methods —
+//                         main key / longpress / multitap / flick — off
+//                         .keyman-touch-layout, addressed by
+//                         workingCopyStore.deletedTouchKeyIds; runs AFTER the
+//                         carve keycap cascade so an address already
+//                         neutralized by that step resolves to nothing here,
+//                         never a double-blank)
 //   2. Assignments      — applyAssignmentsToVfs (injects mechanism patterns)
 //   2.5 Layer propagation — propagateDesktopLayersToTouch (surfaces S-08
 //                         generalized modifier-combo layers onto the
@@ -45,6 +53,7 @@ import {
   applyAssignmentsToVfs,
   applyIdentityStubMutation,
   applyKeycapLabelsToVfs,
+  applyTouchKeycapRemovalsToVfs,
   parseKmn,
   emitKmn,
   resetIdentity,
@@ -110,6 +119,13 @@ export interface ProjectWorkingCopyVfsInput {
   deletedNodeIds: ReadonlySet<string>;
   /** Individual rule nodeIds removed via glyph-level carving (GlyphCell clicks). */
   deletedItemIds?: ReadonlySet<string>;
+  /**
+   * Individually-deleted pre-existing touch methods (main key / longpress /
+   * multitap / flick), addressed by the `touchKeyAddress.ts` scheme. Applied
+   * at step 1.6, after the carve keycap cascade. Omit or pass an empty set
+   * when there are no touch-method deletions.
+   */
+  deletedTouchKeyIds?: ReadonlySet<string>;
   assignments: ReadonlyArray<MechanismAssignment>;
   /** Synchronous resolver. Pass `() => undefined` when no pattern library is available. */
   getPattern: (id: string) => Pattern | undefined;
@@ -180,6 +196,7 @@ export function projectWorkingCopyVfs(
     baseIr,
     deletedNodeIds,
     deletedItemIds = new Set<string>(),
+    deletedTouchKeyIds = new Set<string>(),
     assignments,
     getPattern,
     identity,
@@ -295,6 +312,28 @@ export function projectWorkingCopyVfs(
       const msg = err instanceof Error ? err.message : String(err);
       warnings.push(
         `[project-working-copy] carve keycap projection skipped: ${msg}`,
+      );
+    }
+  }
+
+  // Step 1.6: Touch method deletion projection — blank/drop individually
+  // deleted pre-existing touch methods (main key / longpress / multitap /
+  // flick) off `.keyman-touch-layout`, addressed by
+  // workingCopyStore.deletedTouchKeyIds. Runs AFTER step 1.5 so an address
+  // the carve keycap cascade already neutralized resolves to nothing here
+  // (idempotent — never a double-blank or an error).
+  if (deletedTouchKeyIds.size > 0) {
+    try {
+      const touchKeycapRemovalResult = applyTouchKeycapRemovalsToVfs(
+        vfs,
+        keyboardId,
+        deletedTouchKeyIds,
+      );
+      warnings.push(...touchKeycapRemovalResult.warnings);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      warnings.push(
+        `[project-working-copy] touch method deletion projection skipped: ${msg}`,
       );
     }
   }

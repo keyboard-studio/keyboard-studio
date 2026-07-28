@@ -59,6 +59,7 @@ import type {
   MechanismRef,
   PlacementMap,
   PlacementWorklist,
+  RemovalCapability,
 } from "@keyboard-studio/contracts";
 import {
   toUPlusNotation,
@@ -67,7 +68,8 @@ import {
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
 import { getPatternLibraryService } from "../../lib/services.ts";
-import { displayChar } from "../../lib/irToCarveNodes.ts";
+import { displayChar, modifierLabel, vkeyLabel } from "../../lib/irToCarveNodes.ts";
+import { capabilityHint } from "./parts/InfoView.tsx";
 import type { AxisFill, DiscoveryAxisVector } from "@keyboard-studio/contracts";
 import {
   defaultFillAxes,
@@ -80,7 +82,10 @@ import {
   canonicalizeCombo,
   comboToKeySpec,
   collectModifierTokensInUse,
+  collectCharContributors,
+  parseSlotId,
   type ModifierToken,
+  type CharContributors,
 } from "@keyboard-studio/engine";
 import {
   useKeyboardArtifact,
@@ -118,7 +123,7 @@ import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
-import { RemovableChipRow } from "./parts/RemovableChipRow.tsx";
+import { RemovableChipRow, HoverDangerChip } from "./parts/RemovableChipRow.tsx";
 import { ConfirmDialog } from "./parts/ConfirmDialog.tsx";
 import {
   unimplementedDesktopChars,
@@ -1388,6 +1393,25 @@ export function MechanismGallery({
   );
   const setAxisFills = useWorkingCopyStore((s) => s.setAxisFills);
 
+  // -- "Existing methods" (base keyboard producers for currentChar) --------
+  // baseIr is the source of truth projectWorkingCopyVfs itself projects
+  // from (never mutated by carve/output projection) — the same source
+  // useInventoryDiff() reads for the lettersToAdd/alreadyProduced diff below.
+  // removalCapabilities/deletedItemIds/isItemDeleted/cascadeDelete are the
+  // EXISTING carve overlay (workingCopyStore.ts) — no new store state is
+  // introduced here; a deletion recorded from this gallery is undone by the
+  // same Undo the carve gallery uses, and is projected at output by the
+  // existing carve-deletion projection step.
+  const baseIr = useWorkingCopyStore((s) => s.baseIr);
+  const removalCapabilities = useWorkingCopyStore((s) => s.removalCapabilities);
+  // deletedItemIds is selected (even though only isItemDeleted is called
+  // below) purely so this component re-renders when the overlay changes —
+  // isItemDeleted itself is a stable store-action reference and calling it
+  // does not, on its own, subscribe this component to deletedItemIds.
+  const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const isItemDeleted = useWorkingCopyStore((s) => s.isItemDeleted);
+  const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
+
   // One-time intro splash — read the seen flag on mount; mark it on "Get started".
   const mechIntroSeen = useWorkingCopyStore(
     (s) => s.galleryIntrosSeen.mechanism,
@@ -1396,7 +1420,20 @@ export function MechanismGallery({
     (s) => s.markGalleryIntroSeen,
   );
 
-  const { lettersToAdd: inventoryLettersToAdd } = useInventoryDiff();
+  const { lettersToAdd: inventoryLettersToAdd, alreadyProduced } =
+    useInventoryDiff();
+
+  // Display-only set for CharScrollStrip's badge (criterion 18.6 SHOW-ALL):
+  // characters the base keyboard already produces render the green
+  // produces->=1 badge via CharScrollStrip's `inheritedChars` (same contract
+  // TouchGallery's `detectedChars` already uses) even though they carry no
+  // MechanismAssignment of their own. lettersToAdd itself (the coverage/gate
+  // denominator, criterion 18.6) is NEVER widened — see the locked constraint
+  // on lettersToAdd above.
+  const alreadyProducedSet = useMemo(
+    () => new Set(alreadyProduced),
+    [alreadyProduced],
+  );
 
   // Spec 046 worklist filter (FR-020): a composed unit whose marks are ALL
   // productive mark keys is reachable via base key + mark key — it needs no
@@ -1764,7 +1801,6 @@ export function MechanismGallery({
     hasAnotherCharAfterCurrent,
     handleNext,
     handleBack,
-    handleSelectChar,
     suggestionResolved,
     markSuggestionResolved,
   } = usePositionalCharNav({
@@ -1774,6 +1810,24 @@ export function MechanismGallery({
     onComplete: handleForwardComplete,
     onBack,
   });
+
+  // Select-by-value for the CharScrollStrip's SHOW-ALL display list
+  // (criterion 18.6): `handleSelectChar` above is gated on `lettersToAdd`
+  // (usePositionalCharNav's own `list`), so clicking an already-produced
+  // chip through it would be a no-op — deliberately, since Back/Next/Skip
+  // must never step onto a char outside lettersToAdd's walk order. This
+  // sibling handler is the one CharScrollStrip actually calls: it jumps to
+  // ANY character in the full `inventory` (in or out of lettersToAdd) purely
+  // for inspection, without touching the positional walk state. A no-op
+  // when `char` isn't in `inventory` at all (defense-in-depth — every chip
+  // CharScrollStrip renders is itself drawn from `inventory`).
+  const handleSelectDisplayChar = useCallback(
+    (char: string) => {
+      if (!inventory.includes(char)) return;
+      setCurrentChar(char);
+    },
+    [inventory, setCurrentChar],
+  );
 
   // Whether the suggestion row must stay hidden for the current character —
   // true once explicitly resolved (Accept/Deny), or once the character is
@@ -2570,6 +2624,143 @@ export function MechanismGallery({
     ],
   );
 
+  // -- "Existing methods" — base keyboard's own producers for currentChar --
+  //
+  // Runs collectCharContributors against baseIr (never the carve working
+  // IR — baseIr is the same source-of-truth projectWorkingCopyVfs itself
+  // projects from) to find every place in the BASE keyboard that already
+  // produces currentChar, then flattens it to one row per method:
+  //   - a ruleNodeId is a whole-rule delete candidate — deletable unless
+  //     removalCapabilities marks it not-removable (context-sensitive /
+  //     opaque / unknown), in which case it's shown muted with a reason.
+  //   - a storeSlot is an output/input-store slot drop — always deletable
+  //     (store slots are not separately capability-gated; see
+  //     classifyRemovalCapabilities' keying contract).
+  //   - a `blocked` entry (opaque fragment, or a multi-char literal output
+  //     that can't be split) is always muted, never silently dropped.
+  // A method already removed THIS session (its id already in
+  // deletedItemIds, via the existing carve overlay) is filtered out
+  // entirely — collectCharContributors always reads baseIr, which never
+  // reflects the overlay itself.
+  interface ExistingMethodRow {
+    id: string;
+    label: string;
+    deletable: boolean;
+    kind: "rule" | "slot" | "blocked";
+    reason?: string;
+  }
+
+  const existingMethodContributors = useMemo<CharContributors | null>(
+    () =>
+      baseIr !== null && currentChar !== null
+        ? collectCharContributors(baseIr, currentChar)
+        : null,
+    [baseIr, currentChar],
+  );
+
+  const existingMethods = useMemo<ExistingMethodRow[]>(() => {
+    if (existingMethodContributors === null || baseIr === null) return [];
+
+    // Human label for a rule nodeId — "Shift+A" style, built directly from
+    // the rule's own vkey context (modifierLabel/vkeyLabel, both already
+    // used by the full carve gallery's node naming). Deliberately NOT the
+    // heavier toRailNodes()/resolveNodeName() machinery CarveGallery uses —
+    // this section only needs a short label per chip, not a full CarveNode.
+    const labelForRuleNodeId = (nodeId: string): string => {
+      for (const group of baseIr.groups) {
+        const rule = group.rules.find((r) => r.nodeId === nodeId);
+        if (rule === undefined) continue;
+        const vkeyEl = rule.context.find((el) => el.kind === "vkey");
+        const keyName =
+          vkeyEl !== undefined && vkeyEl.kind === "vkey"
+            ? (vkeyLabel(vkeyEl.name) ?? vkeyEl.name)
+            : undefined;
+        const prefix = modifierLabel(rule);
+        if (keyName === undefined) return prefix || nodeId;
+        return prefix ? `${prefix}+${keyName}` : keyName;
+      }
+      return nodeId;
+    };
+
+    const rows: ExistingMethodRow[] = [];
+
+    for (const nodeId of existingMethodContributors.ruleNodeIds) {
+      if (isItemDeleted(nodeId)) continue;
+      const capability: RemovalCapability | undefined =
+        removalCapabilities.get(nodeId);
+      const notRemovable = (capability ?? "").startsWith("not-removable:");
+      rows.push({
+        id: nodeId,
+        label: labelForRuleNodeId(nodeId),
+        deletable: !notRemovable,
+        kind: "rule",
+        ...(notRemovable
+          ? {
+              reason: capabilityHint(
+                capability ?? "not-removable:unknown",
+                i18n,
+              ),
+            }
+          : {}),
+      });
+    }
+
+    for (const slot of existingMethodContributors.storeSlots) {
+      if (isItemDeleted(slot.slotId)) continue;
+      const parsed = parseSlotId(slot.slotId);
+      const loc =
+        parsed !== null
+          ? existingMethodContributors.locations.find(
+              (l) => l.kind === "store" && l.nodeId === parsed.storeNodeId,
+            )
+          : undefined;
+      rows.push({
+        id: slot.slotId,
+        label: loc?.label ?? slot.slotId,
+        deletable: true,
+        kind: "slot",
+      });
+    }
+
+    existingMethodContributors.blocked.forEach((b, i) => {
+      rows.push({
+        id: `blocked:${i}:${b.label}`,
+        label: b.label,
+        deletable: false,
+        kind: "blocked",
+        reason: b.reason,
+      });
+    });
+
+    return rows;
+    // deletedItemIds is an intentional dep even though only isItemDeleted is
+    // called in the body — see the store-selector comment above.
+  }, [
+    existingMethodContributors,
+    baseIr,
+    removalCapabilities,
+    isItemDeleted,
+    deletedItemIds,
+    i18n,
+  ]);
+
+  const handleRemoveExistingMethod = useCallback(
+    (row: ExistingMethodRow) => {
+      if (!row.deletable) return;
+      // Routes through the SAME cascadeDelete the full carve gallery uses
+      // (CarveGallery.tsx) — a rule nodeId and a store slot id both go
+      // through the item channel there too, so a removal made here is
+      // reversible via the identical Undo stack and is reflected at output
+      // by the existing carve-deletion projection step. No new store state.
+      if (row.kind === "rule") {
+        cascadeDelete([row.id], []);
+      } else if (row.kind === "slot") {
+        cascadeDelete([], [row.id]);
+      }
+    },
+    [cascadeDelete],
+  );
+
   // Edit-after-Done: unlocks the desktop layout so a completed Mechanism
   // Gallery can be revisited and corrected. When a touch layout has already
   // been built from the (now-stale) physical layout, mark the TOUCH step
@@ -2760,7 +2951,16 @@ export function MechanismGallery({
             disabled: false,
             style: forwardBtnStyle,
           }
-        : currentChar !== null
+        : // The per-char Next/Done control is scoped to lettersToAdd's walk
+          // order (Back/Next/Skip/canGoNext all key off it — see the
+          // lettersToAdd-gating comment above). currentChar can now also be
+          // an already-produced character selected via the SHOW-ALL
+          // CharScrollStrip (handleSelectDisplayChar) — HIDE this button
+          // entirely rather than render it disabled in that case: it isn't
+          // a "global Next" separate from this one, so a disabled render
+          // would look like the walk is stuck rather than simply "you're
+          // inspecting a character outside this step's coverage".
+          currentChar !== null && lettersToAdd.includes(currentChar)
           ? {
               label: hasAnotherCharAfterCurrent
                 ? t({
@@ -2974,19 +3174,28 @@ export function MechanismGallery({
           </div>
         )}
 
-        {/* Character scroll strip — horizontal, all of lettersToAdd; click
-              any chip to jump straight to that character (replaces the old
-              "Previous character" button, which only ever stepped back one
-              position). Each chip's badge is the produces-count for that
-              character in THIS gallery's modality (physical) — see
-              charMechanisms.ts. */}
-        {lettersToAdd.length > 0 && (
+        {/* Character scroll strip — horizontal, SHOW-ALL of the confirmed
+              inventory (criterion 18.6), not just lettersToAdd: an author
+              should be able to see and inspect every character, including
+              ones the base keyboard already produces, not only the ones
+              still needing a method. `inheritedChars` feeds alreadyProduced
+              into CharScrollStrip's badge so those chips still show the
+              green produces->=1 badge (mirrors TouchGallery's
+              detectedChars). Selecting a chip goes through
+              handleSelectDisplayChar (not handleSelectChar, which is gated
+              on lettersToAdd) so an already-produced chip is still
+              selectable — see handleSelectDisplayChar's own doc comment and
+              the forwardButton guard below for what changes once such a
+              character is selected. lettersToAdd itself (coverage counter,
+              coverage gate, canGoNext) is never widened. */}
+        {inventory.length > 0 && (
           <CharScrollStrip
-            chars={lettersToAdd}
+            chars={inventory}
             currentChar={currentChar}
-            onSelectChar={handleSelectChar}
+            onSelectChar={handleSelectDisplayChar}
             assignments={sessionAssignments}
             modality="physical"
+            inheritedChars={alreadyProducedSet}
           />
         )}
 
@@ -3230,12 +3439,11 @@ export function MechanismGallery({
                             .map((m) => methodLabel(m, i18n))
                             .join(", ");
                     return (
-                      <button
+                      <HoverDangerChip
                         key={i}
-                        type="button"
                         onClick={() => handleRemoveMechanism(a)}
                         disabled={locked}
-                        aria-label={t({
+                        ariaLabel={t({
                           id: "editor.assignLoop.removeMethodAriaLabel",
                           message: `Remove method ${label} for ${currentChar}`,
                         })}
@@ -3243,7 +3451,7 @@ export function MechanismGallery({
                           id: "editor.assignLoop.clickToRemove",
                           message: "click to remove",
                         })}
-                        style={{
+                        baseStyle={{
                           display: "inline-flex",
                           alignItems: "center",
                           gap: 4,
@@ -3261,15 +3469,111 @@ export function MechanismGallery({
                         {label}
                         <span
                           aria-hidden="true"
-                          style={{ fontSize: 10, opacity: 0.7 }}
+                          style={{ fontSize: 10, color: "inherit", opacity: 0.7 }}
                         >
                           {" ×"}
                         </span>
-                      </button>
+                      </HoverDangerChip>
                     );
                   })}
               </div>
             )}
+
+            {/* Existing methods — the BASE keyboard's own producers for
+                  currentChar (desktop "delete each pre-existing method").
+                  Deletable rows share the exact "click deletes / turns red
+                  on hover" chip both the "Added" row and the full carve
+                  gallery use; not-removable / opaque producers render as a
+                  muted, non-interactive chip naming why, never silently
+                  hidden. See existingMethods/handleRemoveExistingMethod
+                  above for how rows are built and removed. */}
+            {currentChar !== null && existingMethods.length > 0 && (
+              <div>
+                <p
+                  style={{
+                    margin: "0 0 6px",
+                    fontSize: 11,
+                    color: TEXT_DIM,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  <Trans id="editor.assignLoop.existingMethodsHeading">
+                    Existing methods
+                  </Trans>
+                </p>
+                <div
+                  role="group"
+                  aria-label={t({
+                    id: "editor.assignLoop.existingMethodsGroupAriaLabel",
+                    message: "Existing methods from the base keyboard",
+                  })}
+                  style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
+                >
+                  {existingMethods.map((row) =>
+                    row.deletable ? (
+                      <HoverDangerChip
+                        key={row.id}
+                        onClick={() => handleRemoveExistingMethod(row)}
+                        disabled={locked}
+                        ariaLabel={t({
+                          id: "editor.assignLoop.removeExistingMethodAriaLabel",
+                          message: `Remove existing method ${row.label} for ${currentChar}`,
+                        })}
+                        title={t({
+                          id: "editor.assignLoop.clickToRemove",
+                          message: "click to remove",
+                        })}
+                        baseStyle={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          padding: "3px 8px",
+                          background: "#0d2218",
+                          border: "1px solid #238636",
+                          borderRadius: 12,
+                          color: "#56d364",
+                          fontSize: 11,
+                          fontFamily:
+                            "ui-monospace, 'Cascadia Code', Consolas, monospace",
+                          cursor: locked ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {row.label}
+                        <span
+                          aria-hidden="true"
+                          style={{ fontSize: 10, color: "inherit", opacity: 0.7 }}
+                        >
+                          {" ×"}
+                        </span>
+                      </HoverDangerChip>
+                    ) : (
+                      <span
+                        key={row.id}
+                        {...(row.reason !== undefined
+                          ? { title: row.reason }
+                          : {})}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          padding: "3px 8px",
+                          background: "#161b22",
+                          border: `1px solid ${BORDER}`,
+                          borderRadius: 12,
+                          color: TEXT_DIM,
+                          fontSize: 11,
+                          fontFamily:
+                            "ui-monospace, 'Cascadia Code', Consolas, monospace",
+                        }}
+                      >
+                        {row.label}
+                      </span>
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
+
             {currentChar !== null &&
               hasSequenceForChar(sessionAssignments, currentChar) && (
                 <div
@@ -3418,6 +3722,7 @@ export function MechanismGallery({
             chipBackground="#0d2218"
             chipBorder="#238636"
             chipColor="#56d364"
+            hoverDanger
             items={[...coveredChars].map((c) => ({
               key: c,
               label: displayChar(c),
@@ -3449,6 +3754,7 @@ export function MechanismGallery({
             chipBackground="#1c2a3a"
             chipBorder="#58a6ff"
             chipColor="#58a6ff"
+            hoverDanger={false}
             items={sequenceRecordedChars.map((c) => ({
               key: c,
               label: displayChar(c),

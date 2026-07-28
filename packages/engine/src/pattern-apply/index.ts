@@ -89,3 +89,18 @@ export {
 } from "./modifierCombos.js";
 export type { ModifierToken } from "./modifierCombos.js";
 
+export { touchKeyAddress, touchSubKeyAddress, touchFlickAddress } from "./touchKeyAddress.js";
+
+export { enumerateTouchMethodsForChar } from "./enumerateTouchMethodsForChar.js";
+export type { TouchMethodDescriptor } from "./enumerateTouchMethodsForChar.js";
+
+export {
+  applyTouchKeycapRemovalsToLayout,
+  applyTouchKeycapRemovalsToRawJson,
+  applyTouchKeycapRemovalsToVfs,
+} from "./applyTouchKeycapRemovalsToVfs.js";
+export type {
+  ApplyTouchKeycapRemovalsResult,
+  ApplyTouchKeycapRemovalsToRawJsonResult,
+} from "./applyTouchKeycapRemovalsToVfs.js";
+

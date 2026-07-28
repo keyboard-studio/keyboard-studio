@@ -12,6 +12,8 @@ import {
   snapshotWorkingCopyToSession,
   rehydrateWorkingCopyFromSession,
   snapshotWorkingCopyData,
+  prepareWorkingCopySnapshot,
+  type WorkingCopySnapshot,
 } from "./persistWorkingCopy.ts";
 
 // ---------------------------------------------------------------------------
@@ -441,6 +443,101 @@ describe("persistWorkingCopy", () => {
   // OBJECT REFERENCE: reused while the same working copy is active, recomputed
   // when a new instantiation replaces the reference.
   // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // deletedTouchKeyIds — Set<string> -> string[] round-trip (mirrors
+  // deletedNodeIds/deletedItemIds's own serialization convention).
+  // -------------------------------------------------------------------------
+
+  describe("deletedTouchKeyIds round-trip", () => {
+    it("round-trips through sessionStorage snapshot/rehydrate", () => {
+      const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      const vfs = createVirtualFS([
+        { path: "source/test.kmn", content: "c test\n", isBinary: false },
+      ]);
+
+      useWorkingCopyStore.setState({
+        instantiationMode: "new-from-base",
+        baseKeyboard: { id: "test_keyboard", displayName: "Test", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+        baseVfs: vfs,
+        baseIr: ir,
+        ir,
+        identity: null,
+        deletedNodeIds: new Set(),
+        deletedItemIds: new Set(),
+        deletedTouchKeyIds: new Set(["phone:default:U_0061", "phone:default:U_0062:sk:U_00E1"]),
+        undoStack: [
+          { k: "t", id: "phone:default:U_0061" },
+          { k: "t", id: "phone:default:U_0062:sk:U_00E1" },
+        ],
+        phaseResults: [],
+        irAxes: {},
+        desktopLocked: false,
+        touchLayoutJson: null,
+        touchDraft: null,
+        galleryIntrosSeen: { mechanism: false, touch: false },
+      });
+
+      snapshotWorkingCopyToSession();
+      useWorkingCopyStore.getState().reset();
+
+      const result = rehydrateWorkingCopyFromSession();
+      expect(result).toBe(true);
+
+      const s = useWorkingCopyStore.getState();
+      expect(s.deletedTouchKeyIds).toBeInstanceOf(Set);
+      expect([...s.deletedTouchKeyIds].sort()).toEqual([
+        "phone:default:U_0061",
+        "phone:default:U_0062:sk:U_00E1",
+      ]);
+      expect(s.undoStack).toEqual([
+        { k: "t", id: "phone:default:U_0061" },
+        { k: "t", id: "phone:default:U_0062:sk:U_00E1" },
+      ]);
+    });
+
+    it("snapshotWorkingCopyData serializes the Set as a plain string[]", () => {
+      useWorkingCopyStore.getState().instantiateFromBase(
+        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+        { vfs: createVirtualFS(), ir: makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR },
+      );
+      useWorkingCopyStore.getState().deleteTouchKey("phone:default:U_0063");
+
+      const snapshot = snapshotWorkingCopyData();
+      expect(Array.isArray(snapshot.deletedTouchKeyIds)).toBe(true);
+      expect(snapshot.deletedTouchKeyIds).toEqual(["phone:default:U_0063"]);
+    });
+
+    it("prepareWorkingCopySnapshot tolerates a pre-existing snapshot missing the field", () => {
+      const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      const legacySnapshot = {
+        instantiationMode: "new-from-base",
+        baseKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
+        baseVfsEntries: [],
+        baseIr: ir,
+        identity: null,
+        ir,
+        deletedNodeIds: [],
+        deletedItemIds: [],
+        // deletedTouchKeyIds intentionally OMITTED — pre-feature snapshot shape.
+        undoStack: [],
+        phaseResults: [],
+        irAxes: {},
+        desktopLocked: false,
+        sequenceFlaggedChars: [],
+        touchLayoutJson: null,
+        touchDraft: null,
+        galleryIntrosSeen: { mechanism: false, touch: false },
+        staleSteps: [],
+        validatorFindings: [],
+        axisFills: [],
+      } as unknown as WorkingCopySnapshot;
+
+      const patch = prepareWorkingCopySnapshot(legacySnapshot);
+      expect(patch.deletedTouchKeyIds).toBeInstanceOf(Set);
+      expect(patch.deletedTouchKeyIds?.size).toBe(0);
+    });
+  });
+
   describe("base-VFS serialization cache (efficiency)", () => {
     const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
     const base = { id: "cache_kbd", displayName: "Cache Test", languages: ["en"] } as import("@keyboard-studio/contracts").BaseKeyboard;

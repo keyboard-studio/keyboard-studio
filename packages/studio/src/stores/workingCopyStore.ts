@@ -81,12 +81,18 @@ export function bindManifest(m: readonly Step[]): void {
  *
  * 'n'     — whole node deleted (single).
  * 'i'     — single item removed (single).
+ * 't'     — single pre-existing touch method deleted (single), addressed by
+ *           the `touchKeyAddress.ts` scheme (main key / longpress / multitap
+ *           / flick) — mirrors 'i' but on the separate `deletedTouchKeyIds`
+ *           overlay so a touch-method deletion and a carve item deletion
+ *           can never collide on the same id space.
  * 'batch' — grouped cascade-delete (multiple nodes + items in one undo step).
  *            A single undoDelete() call reverses the entire cascade atomically.
  */
 export type UndoEntry =
   | { k: 'n'; id: string }
   | { k: 'i'; id: string }
+  | { k: 't'; id: string }
   | { k: 'batch'; nodeIds: string[]; itemIds: string[] };
 
 // ---------------------------------------------------------------------------
@@ -189,8 +195,20 @@ export interface WorkingCopyState {
    * has removed. Format: `"<nodeId>#<index>"` or `"<nodeId>#r<ruleIndex>"`.
    */
   deletedItemIds: Set<string>;
+  /**
+   * Set of individually-deleted pre-existing touch methods (main key /
+   * longpress / multitap / flick provided by the base keyboard's
+   * `.keyman-touch-layout`), addressed by the `touchKeyAddress.ts` scheme
+   * (`"<platform>:<layerId>:<keyId>"`, optionally suffixed
+   * `:sk:<subId>` / `:multitap:<subId>` / `:flick:<direction>`). A separate
+   * overlay from `deletedItemIds` (a different id space — desktop carve item
+   * ids never collide with touch addresses) so the two deletion kinds can be
+   * undone independently. Consumed by `projectWorkingCopyVfs`'s touch-method
+   * deletion step (`applyTouchKeycapRemovalsToVfs`).
+   */
+  deletedTouchKeyIds: Set<string>;
   /** Ordered list of undo entries (latest last). Each entry is either a whole-node
-   * deletion or a single-item removal. */
+   * deletion, a single-item removal, or a single touch-method deletion. */
   undoStack: UndoEntry[];
 
   // -- Survey results (surveyResultsStore slots) --------------------------------
@@ -348,9 +366,24 @@ export interface WorkingCopyState {
   restoreItem: (itemId: string) => void;
   /** Returns true if the given itemId is in the item deletion set. */
   isItemDeleted: (itemId: string) => boolean;
-  /** Clear all deletions (nodes + items) and the undo stack without touching the IR. */
+  /**
+   * Mark a pre-existing touch method (main key / longpress / multitap /
+   * flick) as deleted, addressed by the `touchKeyAddress.ts` scheme. Pushes a
+   * `'t'` undo entry so a single `undoDelete()` reverses it.
+   */
+  deleteTouchKey: (touchKeyId: string) => void;
+  /** Restore a single deleted touch-method address. */
+  restoreTouchKey: (touchKeyId: string) => void;
+  /** Returns true if the given touch-method address is in the deletion set. */
+  isTouchKeyDeleted: (touchKeyId: string) => boolean;
+  /**
+   * Clear all deletions (nodes + items + touch-method deletions) and the
+   * undo stack, without touching the IR. Also clears `deletedTouchKeyIds` so
+   * no 't' deletion is left applied with its only undo path (the entry this
+   * just wiped from `undoStack`) gone — see the implementation comment.
+   */
   keepAll: () => void;
-  /** Clear all deletions (nodes + items) and the undo stack. Alias for keepAll with clearer name. */
+  /** Clear all deletions (nodes + items + touch-method deletions) and the undo stack. Alias for keepAll with clearer name. */
   restoreAll: () => void;
   /**
    * Atomically delete a set of whole-rule nodes AND a set of output-store slot items
@@ -654,7 +687,8 @@ export type WorkingCopyData = Omit<
   WorkingCopyState,
   // actions are excluded from the data snapshot
   | "setIR" | "setWorkingIR" | "commitFacetTransform" | "clearIR" | "deleteNode" | "undoDelete" | "restoreNode"
-  | "isDeleted" | "deleteItem" | "restoreItem" | "isItemDeleted" | "keepAll" | "restoreAll"
+  | "isDeleted" | "deleteItem" | "restoreItem" | "isItemDeleted"
+  | "deleteTouchKey" | "restoreTouchKey" | "isTouchKeyDeleted" | "keepAll" | "restoreAll"
   | "cascadeDelete"
   | "cascadeRestore"
   | "recordPhase" | "recordAssignments"
@@ -680,6 +714,7 @@ const INITIAL_STATE: WorkingCopyData = {
   removalCapabilities: new Map(),
   deletedNodeIds: new Set(),
   deletedItemIds: new Set(),
+  deletedTouchKeyIds: new Set(),
   undoStack: [],
   // survey slots
   ...INITIAL_SURVEY,
@@ -748,6 +783,10 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         const next = new Set(s.deletedItemIds);
         next.delete(last.id);
         return { deletedItemIds: next, undoStack: s.undoStack.slice(0, -1) };
+      } else if (last.k === 't') {
+        const next = new Set(s.deletedTouchKeyIds);
+        next.delete(last.id);
+        return { deletedTouchKeyIds: next, undoStack: s.undoStack.slice(0, -1) };
       } else {
         // Batch entry: reverse all node AND item deletions in this cascade atomically.
         const nextNodes = new Set(s.deletedNodeIds);
@@ -792,8 +831,47 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   isItemDeleted: (itemId) => get().deletedItemIds.has(itemId),
 
+  deleteTouchKey: (touchKeyId) =>
+    set((s) => ({
+      deletedTouchKeyIds: new Set([...s.deletedTouchKeyIds, touchKeyId]),
+      undoStack: [...s.undoStack, { k: 't', id: touchKeyId }],
+    })),
+
+  restoreTouchKey: (touchKeyId) =>
+    set((s) => {
+      const next = new Set(s.deletedTouchKeyIds);
+      next.delete(touchKeyId);
+      return {
+        deletedTouchKeyIds: next,
+        undoStack: s.undoStack.filter((e) => !(e.k === 't' && e.id === touchKeyId)),
+      };
+    }),
+
+  isTouchKeyDeleted: (touchKeyId) => get().deletedTouchKeyIds.has(touchKeyId),
+
+  // keepAll/restoreAll semantics: `restoreAll` is literally the same discard-
+  // everything operation as `keepAll` (see the aliasing below and the
+  // interface doc comments) — CarveGallery's "Skip carving" / gate-screen
+  // buttons call `keepAll()` to mean "discard any pending review, keep every
+  // rule as-is", and StatusBar's "Restore all" calls `restoreAll()` to mean
+  // "undo every deletion made so far". Both land on the same post-condition:
+  // NO deletion of any kind remains applied. Per the carve/touch symmetry
+  // this fix restores, `keepAll` must therefore clear `deletedTouchKeyIds`
+  // exactly like it clears `deletedNodeIds`/`deletedItemIds` — leaving any
+  // subset of the three Sets applied while wiping `undoStack` would orphan
+  // whichever 'n'/'i'/'t' undo entries pointed at the still-applied Set,
+  // making that deletion permanently un-undoable while it stays live. The
+  // invariant restored: after keepAll/restoreAll, undoStack is empty AND all
+  // three deletion Sets (deletedNodeIds, deletedItemIds, deletedTouchKeyIds)
+  // are empty too — no applied deletion can outlive the undo history that
+  // was its only path back.
   keepAll: () =>
-    set({ deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),
+    set({
+      deletedNodeIds: new Set(),
+      deletedItemIds: new Set(),
+      deletedTouchKeyIds: new Set(),
+      undoStack: [],
+    }),
 
   restoreAll: () => get().keepAll(),
 
@@ -938,6 +1016,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // Re-initialize mutable objects so mutations do not bleed across resets.
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
+      deletedTouchKeyIds: new Set(),
       removalCapabilities: new Map(),
       galleryIntrosSeen: { mechanism: false, touch: false },
       staleSteps: new Set<string>(),
@@ -984,6 +1063,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       removalCapabilities: removalCapabilities ?? new Map(),
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
+      deletedTouchKeyIds: new Set(),
       undoStack: [],
       // Clear survey results only on a genuine base switch; otherwise carry
       // forward any phaseResults/irAxes recorded while this instantiate was
@@ -1045,6 +1125,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       removalCapabilities: removalCapabilities ?? new Map(),
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
+      deletedTouchKeyIds: new Set(),
       undoStack: [],
       // Edit layers start clean only on a genuine base switch; otherwise carry
       // forward any phaseResults/irAxes recorded while this instantiate was
