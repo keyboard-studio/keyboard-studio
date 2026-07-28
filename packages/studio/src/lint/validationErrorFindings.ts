@@ -14,12 +14,3 @@ export const VALIDATOR_ERROR_FINDING: LintFinding = {
   message: "Validator check threw an unexpected error — findings may be incomplete.",
   hint: "Reload the studio to retry; if it persists, file a bug.",
 };
-
-/** Injected by useTouchLint when the Layer C hygiene engine (engine.lint) rejects. */
-export const LINT_ERROR_FINDING: LintFinding = {
-  code: "KM_WARN_LINT_ERROR",
-  severity: "warning",
-  layer: "C",
-  message: "Hygiene lint engine threw an unexpected error — Layer C findings may be incomplete.",
-  hint: "Reload the studio to retry; if it persists, file a bug.",
-};

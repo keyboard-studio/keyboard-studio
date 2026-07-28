@@ -1,6 +1,12 @@
 // Phase B survey wrapper — Character inventory discovery (spec §8 step 4).
 //
-// Two discovery methods are offered:
+// Discovery methods offered at the IntroChooser:
+//   exemplars   — start from the alphabet the pinned CLDR+SLDR index already
+//                 has for this language (spec 044). Offered FIRST and
+//                 pre-selected whenever a sourced inventory exists, absent
+//                 entirely when it does not. Accepting seeds the draft and
+//                 lands on the same build-list page, prefilled; it is not a
+//                 separate persisted DiscoveryMethod.
 //   build-list  — unified "add your whole alphabet": tick CLDR suggestions, type
 //                 the rest of the alphabet, browse+toggle the right-pane
 //                 character map (CharacterMapPane.tsx, rendered by StudioShell's
@@ -13,9 +19,10 @@
 // SurveyPhaseResult.confirmedInventory (additive contract field). The gallery
 // reads this via session.confirmedInventory (mergePhaseResults union).
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { plural } from "@lingui/core/macro";
+import { msg, plural } from "@lingui/core/macro";
 import type { SurveyAnswer, SurveyPhaseResult, LintFinding, PlacementMap } from "@keyboard-studio/contracts";
 import { composeStack, toUPlusNotation } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
@@ -30,6 +37,7 @@ import {
   nfcDedup,
   harvestChars,
   casePairOf,
+  isFoldedUppercase,
   lowercaseBaseView,
   upperCounterpartOf,
 } from "./charNormUtils.ts";
@@ -37,8 +45,13 @@ import { codepointLabel } from "./codepointLabel.ts";
 import { collate, codePointCompare } from "./collation.ts";
 import { glyphCategory, isCombiningMarkChar, caseCounterpart } from "@keyboard-studio/engine";
 import { displayChar, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
-import { suggestMissingChars } from "../lib/services.ts";
-import type { MissingCharSuggestions } from "../lib/services.ts";
+import { suggestMissingChars, charactersInTier } from "../lib/services.ts";
+import type {
+  MissingCharSuggestions,
+  ExemplarSource,
+  SourcedInventory,
+} from "../lib/services.ts";
+import { useSourcedExemplars } from "./useSourcedExemplars.ts";
 import { RadioGroup, SelectMenu } from "../ui/index.ts";
 import {
   BG_PAGE,
@@ -212,11 +225,23 @@ interface CharChipEditorProps {
   autoFocus?: boolean;
   /** BCP47 tag for locale-correct case-collapse of the letter chips (FR-008). */
   bcp47?: string | undefined;
+  /**
+   * Remove specific characters, rather than replacing the whole list.
+   *
+   * Clicking a chip is a per-character REJECTION (spec 044 FR-017) — the store
+   * has to see it as such so a removed proposal is never re-proposed. Routing
+   * it through `onChange` with a filtered array would look like a wholesale
+   * replace, which deliberately does not record rejections. Falls back to the
+   * filter-and-replace behaviour when not supplied.
+   */
+  onRemove?: ((chars: string[]) => void) | undefined;
 }
 
-function CharChipEditor({ chars, onChange, autoFocus = false, bcp47 }: CharChipEditorProps) {
+function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }: CharChipEditorProps) {
   const { t } = useLingui();
   const glyphFontStack = useGlyphFontStack();
+  const provenance = usePhaseBDraftStore((s) => s.provenance);
+  const proposalConfidence = usePhaseBDraftStore((s) => s.proposalConfidence);
   const [inputVal, setInputVal] = useState("");
   const [showUppercase, setShowUppercase] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -235,7 +260,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47 }: CharChipE
     if (unusual.length > 0) {
       // FR-003: no in-UI alert is required — a console log makes the unusual
       // separator/format/control characters discoverable to the developer.
-      console.info(
+      devLog.info(
         "[phase-b] kept unusual invisible character(s): " +
           unusual.map((u) => codepointLabel(u).title).join(", "),
       );
@@ -273,6 +298,15 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47 }: CharChipE
   // Count reflects the collapsed lowercase/caseless units + bare marks.
   const unitCount = displayLetters.length + bareMarks.length;
   const hasCasedLetter = letters.some((b) => upperCounterpartOf(b, bcp47) !== null);
+  // Distinct proposal attributions currently represented in the draft — the
+  // legend names them rather than leaving the dashed outline to speak for itself.
+  const proposedAttributions = [
+    ...new Set(
+      Object.values(provenance)
+        .filter((o) => o !== "author")
+        .map((o) => attributionText(o, proposalConfidence[o], t)),
+    ),
+  ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -328,6 +362,19 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47 }: CharChipE
         >
           <Trans id="survey.phaseB.charChipEditor.count">Your alphabet ({displayLetters.length + bareMarks.length})</Trans>
         </p>
+        {/* Legend — the dashed outline needs saying out loud once, so the
+            distinction is not carried by colour/border alone (spec 044 P5). */}
+        {proposedAttributions.length > 0 && (
+          <p
+            data-testid="proposed-chip-legend"
+            style={{ margin: "0 0 8px 0", fontSize: 12, color: TEXT_DIM }}
+          >
+            <Trans id="survey.phaseB.charChipEditor.proposedLegend">
+              Dashed characters were proposed for you ({{ sources: proposedAttributions.join("; ") }}).
+              Remove any that are wrong.
+            </Trans>
+          </p>
+        )}
         {hasCasedLetter && (
           <label
             style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: TEXT_DIM, cursor: "pointer", margin: "0 0 8px 0" }}
@@ -363,23 +410,50 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47 }: CharChipE
               // reproducing the original inline hex (unchecked shell + accent
               // glyph), not real checked state — do not wire them to a value.
               const { title } = codepointLabel(c);
+              // Proposed-vs-authored (spec 044 FR-017 / obligation P5): a
+              // proposed character is visually distinct and says where it came
+              // from, so "confirm this alphabet" is a real decision rather than
+              // a rubber stamp over an undifferentiated list.
+              const origin = provenance[c];
+              const isProposed = origin !== undefined && origin !== "author";
+              const attribution = isProposed
+                ? attributionText(origin, proposalConfidence[origin], t)
+                : null;
               const cells = [
                 <button
                   key={c}
                   type="button"
-                  title={title}
+                  title={attribution === null ? title : `${title} — ${attribution}`}
+                  data-testid={isProposed ? "proposed-char-chip" : "authored-char-chip"}
+                  data-provenance={origin ?? "author"}
                   onClick={() => {
                     // Removing a letter removes BOTH cases (the inverse of the
                     // map, which adds both) — even the uppercase hidden by the
                     // case-collapse, so it never re-appears as an orphan chip.
-                    const pair = new Set(casePairOf(c, bcp47));
-                    onChange(chars.filter((x) => !pair.has(x)));
+                    const pair = casePairOf(c, bcp47);
+                    if (onRemove !== undefined) {
+                      onRemove(pair);
+                    } else {
+                      const drop = new Set(pair);
+                      onChange(chars.filter((x) => !drop.has(x)));
+                    }
                   }}
-                  aria-label={t({
-                    id: "survey.phaseB.charChipEditor.removeAriaLabel",
-                    message: `Remove ${{ char: c }} (${{ cp: title }})`,
-                  })}
-                  style={charChip(false)}
+                  aria-label={
+                    attribution === null
+                      ? t({
+                          id: "survey.phaseB.charChipEditor.removeAriaLabel",
+                          message: `Remove ${{ char: c }} (${{ cp: title }})`,
+                        })
+                      : t({
+                          id: "survey.phaseB.charChipEditor.removeProposedAriaLabel",
+                          message: `Remove ${{ char: c }} (${{ cp: title }}), proposed ${{ attribution }}`,
+                        })
+                  }
+                  style={
+                    isProposed
+                      ? { ...charChip(false), borderStyle: "dashed", borderColor: ACCENT }
+                      : charChip(false)
+                  }
                 >
                   <span style={chipGlyph(true, glyphFontStack)}>{displayChar(c)}</span>
                   <CpLabel grapheme={c} />
@@ -571,6 +645,52 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
     );
   }
 
+  // What's actually left to OFFER. Two folds, in order — both are about not
+  // asking the author to tick something that is already settled:
+  //
+  //  1. Case fold. `suggestMissingChars` reports each cased letter twice (the
+  //     CLDR consumer path synthesizes uppercase into `specials`), so a
+  //     lowercase-only exemplar list arrives as "à Á á È é …". Offering both
+  //     is noise: the uppercase is never a separate decision, because Done
+  //     folds each cased letter's counterpart into `confirmedInventory` via
+  //     `derivedUppercases` (spec 047 FR-009). Note this differs from the
+  //     character map, which pairs the cases EAGERLY on click — here ticking a
+  //     chip adds the one character, and the uppercase joins at submit.
+  //     `isFoldedUppercase` is the fold rule shared with the map's display-side
+  //     case-collapse.
+  //  2. Already-in-the-alphabet fold. `suggestMissingChars` filters against the
+  //     BASE KEYBOARD's produced set, which knows nothing about the draft — so
+  //     after the exemplar prefill seeds the alphabet (IntroChooser's
+  //     "exemplars" route), every seeded character came back as a suggestion,
+  //     pre-ticked, and the panel became a wall of things already done. A
+  //     character present in either case counts as present.
+  //
+  // Consequence: a ticked chip LEAVES this panel and reappears below in "Your
+  // alphabet", where removal lives (and correctly retracts both cases). The
+  // panel is therefore add-only in practice; `handleToggle`'s remove branch
+  // survives only for the props contract.
+  const offerable = (candidates: string[]): string[] =>
+    candidates
+      .map((c) => c.normalize("NFC"))
+      .filter((c) => !isFoldedUppercase(c, bcp47))
+      .filter((c) => !casePairOf(c, bcp47).some((p) => chars.includes(p)));
+
+  const mainOffered = offerable(data.main);
+  const auxOffered = offerable(data.auxiliary);
+
+  // Everything CLDR/SLDR knows about is already in the draft — distinct from
+  // the "base covers it" note above: the author put these there (or accepted
+  // the prefill), so say that rather than crediting the base keyboard.
+  if (mainOffered.length === 0 && auxOffered.length === 0) {
+    return (
+      <div style={mutedNote}>
+        <Trans id="survey.phaseB.suggestionPanel.allSuggestionsAdded">
+          Every suggested character is already in your alphabet below.
+        </Trans>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div>
@@ -582,7 +702,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
         <p style={{ margin: "0 0 10px 0", fontSize: 11, color: TEXT_DIM }}>
           <Trans id="survey.phaseB.suggestionPanel.fromCldr">from CLDR exemplars — tick to add</Trans>
         </p>
-        {data.main.length > 0 ? (
+        {mainOffered.length > 0 ? (
           <div
             role="group"
             aria-label={t({
@@ -591,13 +711,8 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
             })}
             style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
           >
-            {data.main.map((c) => (
-              <SuggestionChip
-                key={c}
-                char={c}
-                checked={chars.includes(c.normalize("NFC"))}
-                onToggle={handleToggle}
-              />
+            {mainOffered.map((c) => (
+              <SuggestionChip key={c} char={c} checked={false} onToggle={handleToggle} />
             ))}
           </div>
         ) : (
@@ -607,7 +722,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
         )}
       </div>
 
-      {data.auxiliary.length > 0 && (
+      {auxOffered.length > 0 && (
         <div>
           <button
             type="button"
@@ -628,7 +743,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
           >
             <span>{auxExpanded ? "▼" : "▶"}</span>
             <Trans id="survey.phaseB.suggestionPanel.auxiliaryToggle">
-              Also used in loanwords ({data.auxiliary.length})
+              Also used in loanwords ({auxOffered.length})
             </Trans>
           </button>
           {auxExpanded && (
@@ -640,13 +755,8 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
               })}
               style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}
             >
-              {data.auxiliary.map((c) => (
-                <SuggestionChip
-                  key={c}
-                  char={c}
-                  checked={chars.includes(c.normalize("NFC"))}
-                  onToggle={handleToggle}
-                />
+              {auxOffered.map((c) => (
+                <SuggestionChip key={c} char={c} checked={false} onToggle={handleToggle} />
               ))}
             </div>
           )}
@@ -851,7 +961,21 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   const setAll = usePhaseBDraftStore((s) => s.setAll);
   const selectedFont = usePhaseBDraftStore((s) => s.selectedFont);
   const setSelectedFont = usePhaseBDraftStore((s) => s.setSelectedFont);
+  const provenance = usePhaseBDraftStore((s) => s.provenance);
+  const exemplarDigraphs = usePhaseBDraftStore((s) => s.exemplarDigraphs);
+  const removeChar = usePhaseBDraftStore((s) => s.remove);
   const doneDisabled = chars.length === 0;
+
+  // Chip removal goes through the store's per-character remove(), not setAll,
+  // so removing a PROPOSED character is recorded as a rejection and never
+  // re-proposed (spec 044 FR-017). Removing an authored one records nothing.
+  const removeChars = (toRemove: string[]): void => {
+    for (const ch of toRemove) removeChar(ch);
+  };
+
+  // "Proposed" means a machine origin, not merely "the draft is non-empty" —
+  // an author who typed their whole alphabet by hand has nothing to confirm.
+  const hasProposedChars = Object.values(provenance).some((p) => p !== "author");
 
   return (
     <div
@@ -873,9 +997,16 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         <Trans id="survey.phaseB.buildList.backButton">Back</Trans>
       </button>
 
-      {/* Heading */}
-      <h2 style={phaseHeadingFlush}>
-        <Trans id="survey.phaseB.buildList.heading">Phase B — Add your whole alphabet</Trans>
+      {/* Heading — swaps once something has been PROPOSED into the draft
+          (spec 044 FR-016c): the author's job changes from producing an
+          alphabet to checking one. The confirm action itself is unchanged, and
+          a filled draft is NOT a completed step — Done still has to be pressed. */}
+      <h2 style={phaseHeadingFlush} data-testid="phase-b-heading">
+        {hasProposedChars ? (
+          <Trans id="survey.phaseB.buildList.headingConfirm">Phase B — Confirm your alphabet</Trans>
+        ) : (
+          <Trans id="survey.phaseB.buildList.heading">Phase B — Add your whole alphabet</Trans>
+        )}
       </h2>
 
       {/* Font selection — custom SelectMenu (webview-safe dropdown): native
@@ -955,8 +1086,21 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
             character (for example: a b c ŋ ɛ), then press Enter or + Add.
           </Trans>
         </p>
-        <CharChipEditor chars={chars} onChange={setAll} autoFocus={false} bcp47={context.bcp47_tag} />
+        <CharChipEditor
+          chars={chars}
+          onChange={setAll}
+          onRemove={removeChars}
+          autoFocus={false}
+          bcp47={context.bcp47_tag}
+        />
       </section>
+
+      {/* Section 2b: the other two ways to fill the alphabet. All three
+          affordances stay present regardless of the page-1 choice (spec 044
+          FR-016b / obligation P1b) — declining the offer must not remove a
+          route back to it, and choosing it must not remove the manual routes. */}
+      <ExemplarApplyAffordance context={context} />
+      <TextSamplePlaceholder />
 
       {/* Section 3: visible three-store decomposition (spec 046 US5) + the
           spec-047 category sections — renders once the alphabet implies marks,
@@ -985,6 +1129,10 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
               phase: "B",
               answers: [],
               confirmedInventory: nfcDedup(chars, derivedUppercases),
+              // Alongside the inventory, never inside it: the cluster's own
+              // letters are already in `chars`, so a keyboard needs no extra
+              // key for "dz" — this is the record that d+z also form a unit.
+              ...(exemplarDigraphs.length > 0 ? { attestedDigraphs: exemplarDigraphs } : {}),
             });
           }}
           className="ks-focus-ring ks-hit-target"
@@ -1000,6 +1148,95 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         </button>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ExemplarApplyAffordance — the collapsed "exemplars available" route back
+//
+// Declining the offer on page 1 is a first-class choice, not a dead end: the
+// proposed alphabet stays one click away here, collapsed so it does not nag
+// (spec 044 FR-016b). Renders nothing when there is no inventory to apply, and
+// nothing once the proposal has already been applied.
+// ---------------------------------------------------------------------------
+
+function ExemplarApplyAffordance({ context }: { context: SurveyContext }) {
+  const { t } = useLingui();
+  const { inventory } = useSourcedExemplars(context.bcp47_tag);
+  const provenance = usePhaseBDraftStore((s) => s.provenance);
+  const seedFromProposal = usePhaseBDraftStore((s) => s.seedFromProposal);
+  const [expanded, setExpanded] = useState(false);
+
+  const alreadyApplied = Object.values(provenance).some(
+    (p) => p === "cldr" || p === "sldr",
+  );
+  if (inventory === null || alreadyApplied) return null;
+
+  return (
+    <section
+      data-testid="exemplar-apply-affordance"
+      aria-label={t({
+        id: "survey.phaseB.buildList.exemplarApplyAriaLabel",
+        message: "Apply the exemplar alphabet",
+      })}
+    >
+      <button
+        type="button"
+        data-testid="exemplar-apply-toggle"
+        onClick={() => setExpanded((v) => !v)}
+        className="ks-focus-ring ks-hit-target"
+        style={{ ...secondaryButton, fontSize: 13 }}
+        aria-expanded={expanded}
+      >
+        <Trans id="survey.phaseB.buildList.exemplarApplyToggle">
+          Exemplars available for this language — show
+        </Trans>
+      </button>
+      {expanded && (
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+          <ExemplarOfferDetail inventory={inventory} />
+          <div>
+            <button
+              type="button"
+              data-testid="exemplar-apply-confirm"
+              onClick={() => seedFromProposal(inventory, context.bcp47_tag)}
+              className="ks-focus-ring ks-hit-target"
+              style={primaryButton(false)}
+            >
+              <Trans id="survey.phaseB.buildList.exemplarApplyButton">
+                Add these to my alphabet
+              </Trans>
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TextSamplePlaceholder — the third fill affordance's surface
+//
+// The paste/upload route is owned by spec 050 and is deliberately NOT built
+// here; 044 only guarantees the affordance is present on page 2 alongside the
+// other two (FR-016b), so the set of routes does not depend on the page-1
+// choice.
+// ---------------------------------------------------------------------------
+
+function TextSamplePlaceholder() {
+  return (
+    <section data-testid="text-sample-placeholder">
+      <h3 style={sectionHeading}>
+        <Trans id="survey.phaseB.buildList.textSampleHeading">Paste or upload a text sample</Trans>
+      </h3>
+      <p style={mutedParaFlush}>
+        <Trans id="survey.phaseB.buildList.textSampleComingSoon">
+          Coming soon — you will be able to paste a paragraph of your language
+          and have its characters proposed for you, alongside anything already
+          in your alphabet.
+        </Trans>
+      </p>
+    </section>
   );
 }
 
@@ -1068,6 +1305,12 @@ export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId,
   }
 
   if (discoveryMethod === "build-list") {
+    // Both the "use the exemplar set" and the plain "add your whole alphabet"
+    // choices land here — page 2 is the same screen either way, prefilled or
+    // empty (spec 044 obligations P1/P1a). Which one the author picked is
+    // recorded durably in the draft store's provenance and
+    // exemplarMethodDeclined, not in discoveryMethod, so the persisted survey
+    // traversal and StudioShell's right-pane gating are untouched.
     return (
       <BuildListView
         context={context}
@@ -1117,14 +1360,55 @@ interface IntroChooserProps {
   onBack?: () => void;
 }
 
+/**
+ * The chooser's own option vocabulary. `"exemplars"` is NOT a
+ * `DiscoveryMethod`: accepting the exemplar set lands on the same page 2 as
+ * `"build-list"`, just prefilled, so it resolves to `"build-list"` on Continue.
+ * Keeping it local means the persisted traversal, draft persistence and
+ * StudioShell's right-pane gating all stay unchanged.
+ */
+type IntroChoice = DiscoveryMethod | "exemplars";
+
 function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
   const { t } = useLingui();
-  const [selected, setSelected] = useState<DiscoveryMethod>("build-list");
+  const { inventory, loading } = useSourcedExemplars(context.bcp47_tag);
+  const seedFromProposal = usePhaseBDraftStore((s) => s.seedFromProposal);
+  const declineExemplarMethod = usePhaseBDraftStore((s) => s.declineExemplarMethod);
+  const declinedBefore = usePhaseBDraftStore((s) => s.exemplarMethodDeclined);
+
+  // Defaults-first (spec §3c): when a sourced inventory exists it is the
+  // pre-selected option — unless the author already declined it for this
+  // working copy, in which case the decision is not re-asserted (FR-016a).
+  const offerExemplars = inventory !== null;
+  const [selected, setSelected] = useState<IntroChoice>("build-list");
+  // The offer resolves asynchronously, so the pre-selection is applied once the
+  // lookup settles rather than at first render. Only ever moves the selection
+  // off the initial default — never overrides a choice the author has made.
+  const [autoSelected, setAutoSelected] = useState(false);
+  useEffect(() => {
+    if (loading || autoSelected) return;
+    setAutoSelected(true);
+    if (offerExemplars && !declinedBefore) setSelected("exemplars");
+  }, [loading, autoSelected, offerExemplars, declinedBefore]);
 
   const languageName =
     context["language_name"] ?? context["detected_group"] ?? t({ id: "survey.phaseB.intro.genericLanguage", message: "your language" });
 
-  const methods: Array<{ value: DiscoveryMethod; label: string }> = [
+  const methods: Array<{ value: IntroChoice; label: string; detail?: ReactNode }> = [
+    // Absent ENTIRELY when there is no inventory — not disabled, not empty
+    // (obligation P2). The list then reverts to today's two options.
+    ...(offerExemplars
+      ? [
+          {
+            value: "exemplars" as IntroChoice,
+            label: t({
+              id: "survey.phaseB.intro.method.exemplars",
+              message: "Start from the alphabet we already have for this language — you can change anything",
+            }),
+            detail: <ExemplarOfferDetail inventory={inventory} />,
+          },
+        ]
+      : []),
     {
       value: "build-list",
       label: t({
@@ -1140,6 +1424,20 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
       }),
     },
   ];
+
+  function handleContinue(): void {
+    if (selected === "exemplars" && inventory !== null) {
+      // Exactly once, here — never on the prefill -> B transition (P1a).
+      // seedFromProposal is idempotent, so a Back-and-Continue is safe.
+      seedFromProposal(inventory, context.bcp47_tag);
+      onChoose("build-list");
+      return;
+    }
+    // Any other choice, when an offer was actually available, is a decline —
+    // remembered so it is never re-asserted as the default (FR-016a).
+    if (offerExemplars) declineExemplarMethod();
+    onChoose(selected as DiscoveryMethod);
+  }
 
   return (
     <div
@@ -1174,7 +1472,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
         value={selected}
         options={methods}
         accent={ACCENT}
-        onChange={(v) => setSelected(v as DiscoveryMethod)}
+        onChange={(v) => setSelected(v as IntroChoice)}
         ariaLabelledby="discovery-method-label"
       />
 
@@ -1192,7 +1490,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
         <button
           type="button"
           data-testid="phase-b-intro-next"
-          onClick={() => onChoose(selected)}
+          onClick={handleContinue}
           className="ks-focus-ring ks-hit-target"
           style={primaryButton(false)}
         >
@@ -1201,4 +1499,151 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// ExemplarOfferDetail — the offer's evidence, rendered INLINE on the option
+//
+// The author is being asked to accept a proposed alphabet, so what is being
+// proposed has to be visible at the point of the decision, not one click away
+// (obligation P2). Shows the source, its confidence, how many characters, and
+// the actual main set.
+//
+// The character list is shown IN FULL and is never truncated — the author
+// cannot confirm an alphabet they cannot see. Each character is a read-only
+// card matching the chips on the build-list page (glyph + code-point label);
+// a floating diacritic renders with the dotted circle (U+25CC) via displayChar
+// so a bare combining mark is visible standalone, the same treatment as the
+// breakdown and character-map pages.
+// ---------------------------------------------------------------------------
+
+function ExemplarOfferDetail({ inventory }: { inventory: SourcedInventory }) {
+  const glyphFontStack = useGlyphFontStack();
+  const main = charactersInTier(inventory, "main");
+  // ICU collation, matching the "Your alphabet" list and the breakdown
+  // sections: letters (and letter+mark combos) by default ICU order; bare
+  // combining marks have no meaningful dictionary position, so they sort by
+  // raw code point and trail the letters (spec 047 refinement).
+  const bareMarks = main.filter(isCombiningMarkChar).sort(codePointCompare);
+  const letters = collate(main.filter((c) => !isCombiningMarkChar(c)));
+  const ordered = [...letters, ...bareMarks];
+
+  return (
+    <div
+      data-testid="exemplar-offer-detail"
+      style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}
+    >
+      <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM }}>
+        <ExemplarAttribution
+          source={inventory.source}
+          confidence={inventory.confidence}
+        />{" "}
+        <Trans id="survey.phaseB.intro.exemplars.count">
+          {{ n: main.length }} characters
+        </Trans>
+      </p>
+      <div
+        data-testid="exemplar-offer-preview"
+        style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
+      >
+        {ordered.map((c) => {
+          const { title } = codepointLabel(c);
+          return (
+            <span
+              key={c}
+              title={title}
+              aria-label={`${displayChar(c)} (${title})`}
+              // Read-only VIEW card (not a toggle/remove button) — no pointer
+              // cursor, matching AlphabetBreakdown's chips.
+              style={{ ...charChip(false), cursor: "default" }}
+            >
+              <span style={chipGlyph(true, glyphFontStack)}>{displayChar(c)}</span>
+              <CpLabel grapheme={c} />
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ExemplarAttribution — where a proposed character came from, and how sure
+//
+// Confidence drives WORDING ONLY and never filters (FR-017): most SLDR
+// coverage is drafted or machine-generated, and hiding it would discard the
+// languages this whole feature exists to reach. What it must do is tell the
+// author when to look twice.
+// ---------------------------------------------------------------------------
+
+/** LDML draft statuses that are not human-confirmed — worth flagging. */
+const UNCONFIRMED_CONFIDENCES = new Set([
+  "generated",
+  "suspect",
+  "unconfirmed",
+  "provisional",
+  "tentative",
+]);
+
+// The attribution wordings as extractable descriptors.
+//
+// These MUST be `msg` macro descriptors rather than inline `t({ id, message })`
+// objects: `attributionText` below receives `t` as a PARAMETER, and the babel
+// macro only rewrites `t(...)` where it can see the `useLingui()` binding in
+// the same scope. An inline object there still renders correctly at runtime
+// (it reaches `i18n._` and falls back to `message`), but the extractor never
+// sees the id, so the string cannot be translated. Three of these were rescued
+// by accident — `ExemplarAttribution` below repeats them as <Trans> under the
+// same ids — but `fromText` has no component twin and was invisible to Crowdin.
+const MSG_FROM_CLDR = msg({ id: "survey.phaseB.exemplars.fromCldr", message: "from CLDR" });
+const MSG_FROM_TEXT = msg({
+  id: "survey.phaseB.exemplars.fromText",
+  message: "from your text sample",
+});
+const MSG_FROM_SLDR_UNCONFIRMED = msg({
+  id: "survey.phaseB.exemplars.fromSldrUnconfirmed",
+  message: "from SLDR (machine-generated — please check)",
+});
+const MSG_FROM_SLDR = msg({ id: "survey.phaseB.exemplars.fromSldr", message: "from SLDR" });
+
+/**
+ * The same attribution as a plain string, for a `title` / `aria-label` where a
+ * component cannot go. Kept beside `ExemplarAttribution` so the two wordings
+ * cannot drift.
+ */
+function attributionText(
+  source: string,
+  confidence: string | undefined,
+  t: ReturnType<typeof useLingui>["t"],
+): string {
+  if (source === "cldr") {
+    return t(MSG_FROM_CLDR);
+  }
+  if (source === "text") {
+    return t(MSG_FROM_TEXT);
+  }
+  if (confidence !== undefined && UNCONFIRMED_CONFIDENCES.has(confidence)) {
+    return t(MSG_FROM_SLDR_UNCONFIRMED);
+  }
+  return t(MSG_FROM_SLDR);
+}
+
+function ExemplarAttribution({
+  source,
+  confidence,
+}: {
+  source: ExemplarSource;
+  confidence: string;
+}) {
+  if (source === "cldr") {
+    return <Trans id="survey.phaseB.exemplars.fromCldr">from CLDR</Trans>;
+  }
+  if (UNCONFIRMED_CONFIDENCES.has(confidence)) {
+    return (
+      <Trans id="survey.phaseB.exemplars.fromSldrUnconfirmed">
+        from SLDR (machine-generated — please check)
+      </Trans>
+    );
+  }
+  return <Trans id="survey.phaseB.exemplars.fromSldr">from SLDR</Trans>;
 }

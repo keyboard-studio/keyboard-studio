@@ -10,6 +10,12 @@ on:
   pull_request:
     branches: [main]
 
+# Cancel a superseded run when a newer commit lands on the same ref, so a
+# rapid second push doesn't leave the first full run burning runner minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,10 +32,13 @@ jobs:
         # Don't also set `version` here -- action-setup@v4 errors on a conflict.
         uses: pnpm/action-setup@v4
 
-      - name: Set up Node 22
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          # Single pin shared with local dev. A floating "22" resolves to the
+          # newest 22.x here while a dev box can sit on an older patch --
+          # @lingui/cli needs >= 22.19.0 and no-ops silently below it.
+          node-version-file: .nvmrc
           cache: pnpm
 
       - name: Install dependencies
@@ -37,12 +46,45 @@ jobs:
 
       # Offline codegen the build depends on. Most prebuild steps fetch over
       # the network (langtags/glottolog) and commit their derived index, so CI
-      # skips them; but codegen-charnames derives from the committed,
-      # SHA-pinned lib/ucd/UnicodeData.txt into a gitignored JSON that
+      # skips them. Two exceptions run here, for different reasons: this one
+      # because it is hermetic and the build needs it, and fetch-sldr below
+      # because a test needs its raw input even though the derived index is
+      # committed — see that step's own comment.
+      #
+      # codegen-charnames derives from the committed, SHA-pinned
+      # lib/ucd/UnicodeData.txt into a gitignored JSON that
       # engine/src/character-discovery/charNames.ts imports at build time.
       # Regenerate it here — hermetic, no network — so `pnpm -r build` resolves.
       - name: Codegen (charnames — offline, build input)
         run: pnpm run codegen-charnames
+
+      # The exemplar index (exemplars.generated.json) IS committed, so neither
+      # the build nor the app needs the raw SLDR tree. But the spec 044
+      # determinism test regenerates the index from source and asserts it
+      # reproduces the committed artifact byte for byte — that regeneration
+      # reads packages/engine/data/sldr/sldr/, which is gitignored. Without
+      # this step the test fails on every run with "not found — run
+      # `pnpm run fetch-sldr` first", and the guarantee that a pin bump can't
+      # silently change the index goes unenforced. Commit + tarball SHA-256 are
+      # pinned in scripts/sldr-version.json and the script fails loudly on a
+      # mismatch, so the fetch is reproducible despite touching the network.
+      # Cache the extracted SLDR locale tree, keyed on the pinned version file
+      # (scripts/sldr-version.json holds the commit + tarball SHA-256). On the
+      # common path the pin is unchanged, so the extract is restored and the
+      # download below is skipped. When the pin is bumped the version file
+      # changes, the key misses, and fetch-sldr re-downloads and re-verifies the
+      # SHA-256 — so the checksum guarantee is preserved: any change to what we
+      # fetch invalidates the cache and forces a fresh verified fetch.
+      - name: Cache SLDR extract
+        id: sldr-cache
+        uses: actions/cache@v4
+        with:
+          path: packages/engine/data/sldr/sldr
+          key: sldr-${{ hashFiles('scripts/sldr-version.json') }}
+
+      - name: Fetch SLDR (pinned — determinism-test input)
+        if: steps.sldr-cache.outputs.cache-hit != 'true'
+        run: pnpm run fetch-sldr
 
       # Build before typecheck — engine/studio depend on contracts'
       # dist/*.d.ts at type-resolution time. Without this, downstream
@@ -66,6 +108,14 @@ jobs:
       # vitest config explicitly — otherwise these tests can rot unnoticed.
       - name: Test (api functions)
         run: npx vitest run --config api/vitest.config.ts
+
+      # The i18n-content-extract and content-i18n-lint tools live under
+      # utilities/* (outside pnpm-workspace.yaml), so `pnpm -r test` never
+      # reaches their vitest suites. Run them explicitly — these are the
+      # regression guards for the Tier B content-i18n extractor + drift gate
+      # (spec 046 T024/T031, spec 050 T010/T013), so they must run in CI.
+      - name: Test (i18n utilities — outside the pnpm workspace)
+        run: pnpm run test:i18n-utilities
 
       # Non-blocking: warns in CI log and opens GitHub Issues for any spec
       # sections whose content changed since the last acknowledgement.

@@ -2,6 +2,11 @@
 // is stubbed per-test; no network. Focus: request shape (method, auth header,
 // URL, draftId threading), the multi-project list op, and fail-soft behavior
 // (network/HTTP errors resolve benignly).
+//
+// Ported from dev's reference implementation (specs/047-my-keyboards) with
+// the `StudioDraft` stand-in swapped for main's `DurableDraft` — the
+// transport treats the draft payload opaquely either way, so the minimal
+// stand-in object below is unchanged in shape.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
@@ -13,7 +18,7 @@ import {
   serverMetaToDraftMeta,
   type ServerDraftMeta,
 } from "./serverDraftStore.ts";
-import type { StudioDraft } from "./draftTypes.ts";
+import type { DurableDraft } from "./draftTypes.ts";
 
 const TOKEN = "gho_test";
 const DRAFT_ID = "haus_latn";
@@ -29,8 +34,16 @@ const META: ServerDraftMeta = {
   prUrl: null,
 };
 
-// Minimal StudioDraft stand-in — the transport treats it opaquely.
-const DRAFT = { version: 1, savedAt: META.savedAt, survey: {}, workingCopy: null } as unknown as StudioDraft;
+// Minimal DurableDraft stand-in — the transport treats it opaquely.
+const DRAFT = {
+  version: 1,
+  savedAt: META.savedAt,
+  projectKey: DRAFT_ID,
+  displayName: null,
+  languageTag: null,
+  workingCopy: {},
+  traversal: {},
+} as unknown as DurableDraft;
 
 function mockFetch(impl: (url: string, init: RequestInit) => Response): void {
   vi.stubGlobal(

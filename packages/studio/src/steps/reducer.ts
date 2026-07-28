@@ -21,6 +21,7 @@
 // so this file remains boundary-clean. It captures exactly the store actions
 // and lib helpers the reducer needs — nothing more.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult, PlacementWorklist } from "@keyboard-studio/contracts";
 import type { BaseKeyboard, RemovalCapability } from "@keyboard-studio/contracts";
 import type { MutateContext } from "../survey/types.ts";
@@ -395,13 +396,13 @@ export function applyStepCompletion(
             seedSource,
           });
           if (warnings.length > 0) {
-            console.error("[applyStepCompletion:touch] buildTouchLayoutJson warnings:", warnings);
+            devLog.error("[applyStepCompletion:touch] buildTouchLayoutJson warnings:", warnings);
           }
           // json is null when the R11 matrix said "don't emit" OR the emit
           // pipeline threw — omit rather than injecting null/empty either way.
           deps.setTouchLayoutJson(json);
         } catch (err) {
-          console.error("[applyStepCompletion:touch] buildTouchLayoutJson threw unexpectedly:", err);
+          devLog.error("[applyStepCompletion:touch] buildTouchLayoutJson threw unexpectedly:", err);
           // Per spec, the transition proceeds regardless of build failure.
           // Graceful degradation: no touch layout → KMW falls back to shipped file or its default.
           deps.setTouchLayoutJson(null);
@@ -424,7 +425,7 @@ export function applyStepCompletion(
       const base = payload.base;
       if (base === undefined) {
         // Guard: result must carry a base keyboard. Without it, instantiation cannot proceed.
-        console.warn("[applyStepCompletion:choose_base] no base in result — skipping instantiation");
+        devLog.warn("[applyStepCompletion:choose_base] no base in result — skipping instantiation");
         break;
       }
 
@@ -450,7 +451,7 @@ export function applyStepCompletion(
         // rather than throw so the mock-engine dev/test path degrades without
         // crashing the survey.
         if (ir === null || vfs === null) {
-          console.error(
+          devLog.error(
             "[applyStepCompletion:choose_base] Track 2 (adapt) cannot instantiate: no parsed IR/VFS. " +
             "This is unreachable under the real engine (codec-clean base always parses); " +
             "it indicates the mock engine or a base the codec could not parse.",

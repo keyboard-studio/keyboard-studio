@@ -14,6 +14,9 @@
 // records only the governing posture decision.
 
 import { useEffect, useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { msg } from "@lingui/core/macro";
+import type { MessageDescriptor } from "@lingui/core";
 import type { InheritancePosture, PostureEntry, PostureFacet } from "./posture.ts";
 import { recordConfirmation } from "./confirmationEvents.ts";
 import type { AdaptationEvidence } from "./evidence.ts";
@@ -36,17 +39,28 @@ const FACET_TO_SESSION_FACET: Partial<Record<PostureFacet, string>> = {
   "script-conventions": "community.input-conventions",
 };
 
-const FACET_LABELS: Record<PostureFacet, string> = {
-  script: "Script",
-  "input-strategies": "Input strategies",
-  "device-targets": "Device targets",
-  "script-conventions": "Script conventions",
+// Module-scope label maps — lazy msg descriptors resolved per-render via
+// useLingui().t (no useLingui binding exists at module scope).
+const FACET_LABELS: Record<PostureFacet, MessageDescriptor> = {
+  script: msg({ id: "adaptation.posture.facet.script", message: "Script" }),
+  "input-strategies": msg({
+    id: "adaptation.posture.facet.inputStrategies",
+    message: "Input strategies",
+  }),
+  "device-targets": msg({
+    id: "adaptation.posture.facet.deviceTargets",
+    message: "Device targets",
+  }),
+  "script-conventions": msg({
+    id: "adaptation.posture.facet.scriptConventions",
+    message: "Script conventions",
+  }),
 };
 
-const POSTURE_LABELS: Record<PostureEntry["posture"], string> = {
-  keep: "Keep the base's",
-  propose: "Let the studio re-propose",
-  discard: "Discard",
+const POSTURE_LABELS: Record<PostureEntry["posture"], MessageDescriptor> = {
+  keep: msg({ id: "adaptation.posture.option.keep", message: "Keep the base's" }),
+  propose: msg({ id: "adaptation.posture.option.propose", message: "Let the studio re-propose" }),
+  discard: msg({ id: "adaptation.posture.option.discard", message: "Discard" }),
 };
 
 /** The entries this step governs (script alignment is US1's Prefill rows). */
@@ -67,6 +81,7 @@ export function InheritancePostureStep({
   onConfirm,
   onBack,
 }: InheritancePostureStepProps) {
+  const { t } = useLingui();
   const governed = governedEntries(posture);
   const [choices, setChoices] = useState<Record<string, PostureEntry["posture"]>>(() =>
     Object.fromEntries(governed.map((e) => [e.facet, e.posture])),
@@ -114,12 +129,14 @@ export function InheritancePostureStep({
       }}
     >
       <h2 style={{ margin: "0 0 8px 0", fontSize: "1.1rem", color: "#6ea8fe", fontWeight: 600 }}>
-        Carry forward from your starting keyboard
+        <Trans id="adaptation.posture.heading">Carry forward from your starting keyboard</Trans>
       </h2>
       <p style={{ margin: "0 0 20px 0", fontSize: 13, color: "#8b949e" }}>
-        Each choice below governs every related proposal at once. Confirm the
-        defaults, or change any of them — nothing is applied silently, and you can
-        still override any individual proposal later.
+        <Trans id="adaptation.posture.intro">
+          Each choice below governs every related proposal at once. Confirm the
+          defaults, or change any of them — nothing is applied silently, and you can
+          still override any individual proposal later.
+        </Trans>
       </p>
 
       <div style={{ display: "grid", gap: 16, margin: "0 0 20px 0" }}>
@@ -129,7 +146,7 @@ export function InheritancePostureStep({
             style={{ border: "1px solid #30363d", borderRadius: 6, padding: "10px 12px", margin: 0 }}
           >
             <legend style={{ fontSize: 13, color: "#e6edf3", padding: "0 6px" }}>
-              {FACET_LABELS[entry.facet]}
+              {t(FACET_LABELS[entry.facet])}
             </legend>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
               {(["keep", "propose", "discard"] as const).map((p) => (
@@ -145,7 +162,7 @@ export function InheritancePostureStep({
                     checked={(choices[entry.facet] ?? entry.posture) === p}
                     onChange={() => setChoices((c) => ({ ...c, [entry.facet]: p }))}
                   />
-                  {POSTURE_LABELS[p]}
+                  {t(POSTURE_LABELS[p])}
                 </label>
               ))}
             </div>
@@ -159,7 +176,7 @@ export function InheritancePostureStep({
       <div style={{ display: "flex", gap: 8 }}>
         {onBack !== undefined && (
           <button type="button" data-testid="posture-back" onClick={onBack} style={secondaryButton}>
-            ← Back
+            <Trans id="adaptation.posture.backButton">← Back</Trans>
           </button>
         )}
         <button
@@ -168,7 +185,7 @@ export function InheritancePostureStep({
           onClick={confirm}
           style={primaryButton(false)}
         >
-          Confirm and continue
+          <Trans id="adaptation.posture.confirmButton">Confirm and continue</Trans>
         </button>
       </div>
     </div>

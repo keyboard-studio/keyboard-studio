@@ -19,6 +19,7 @@ export {
   classifyStoreSlotEdit,
   describeStorePairing,
   analyzeStores,
+  storeRoleOf,
 } from "./applyStoreSlotRemovals.js";
 export type {
   StoreSlotRemovalResult,
@@ -26,9 +27,13 @@ export type {
   StoreSlotBlockReason,
   StorePairingDescription,
   StoreAnalysis,
+  StoreRole,
 } from "./applyStoreSlotRemovals.js";
 
-export { parseSlotId } from "./slotId.js";
+export { buildProducerIndex } from "./producerIndex.js";
+export type { ProducerIndex } from "./producerIndex.js";
+
+export { parseSlotId, makeSlotId } from "./slotId.js";
 
 export { isPlusSeparator } from "../shared/rule-shape.js";
 

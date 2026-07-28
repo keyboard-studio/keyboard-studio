@@ -1,0 +1,10 @@
+# Keep co-located api test files out of the deployment.
+#
+# Vercel turns every non-underscore *.ts under api/ into a Serverless Function,
+# and that includes *.test.ts. On the Hobby plan (12-function cap) the four
+# api/**/*.test.ts files push the deployment past the limit
+# (exceeded_serverless_functions_per_deployment). They are never needed at
+# build or runtime — the suite runs via `npx vitest` from api/, not on Vercel —
+# so exclude them from the upload. Scoped to api/ so it cannot affect the
+# workspace `tsc -b` build, which never compiles these anyway.
+api/**/*.test.ts

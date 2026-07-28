@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "CLDR/SLDR exemplars",
   "branch": "044-cldr-sldr-exemplars",
-  "currentStep": "specify",
-  "status": "specified",
+  "currentStep": "implement",
+  "status": "implemented",
   "history": [
     {
       "step": "specify",
@@ -11,6 +11,357 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-07-20T05:29:27.025Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-27T03:27:52.663Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-27T03:27:52.666Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-27T03:21:00.000Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-27T03:25:00.000Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-27T03:34:00.000Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-27T04:24:40.344Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-27T04:29:50.000Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-27T04:41:07.768Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-27T04:41:07.770Z"
+    },
+    {
+      "step": "implement",
+      "substep": "run-tests",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-27T06:04:01.000Z"
+    },
+    {
+      "step": "implement",
+      "substep": "run-tests",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-27T07:13:12.000Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-27T13:28:26.126Z"
+    }
+  ],
+  "telemetryInstanceId": "430d586b-5457-44ee-a1fb-e76460d0983a",
+  "approach": "Pinned, committed offline index over CLDR 48.2.0 (npm cldr-misc-full) + SHA-pinned SLDR tarball, generated deterministically at prebuild and served through one sourcing path; Phase B build-list seeds from it as a propose-then-confirm prefill (new FR-016/FR-017/SC-008).",
+  "coverage": {
+    "FR-001": {
+      "tasks": [
+        "T018",
+        "T019",
+        "T032"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/cldr.test.ts",
+        "packages/engine/src/character-discovery/exemplarSource.test.ts"
+      ]
+    },
+    "FR-002": {
+      "tasks": [
+        "T026",
+        "T032"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/exemplarSource.test.ts"
+      ]
+    },
+    "FR-003": {
+      "tasks": [
+        "T026",
+        "T032",
+        "T034"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/exemplarSource.test.ts"
+      ]
+    },
+    "FR-004": {
+      "tasks": [
+        "T027",
+        "T032",
+        "T052"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/exemplarSource.test.ts"
+      ]
+    },
+    "FR-005": {
+      "tasks": [
+        "T006",
+        "T008",
+        "T039",
+        "T041",
+        "T042"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/cldr.test.ts",
+        "packages/engine/src/character-discovery/characterMap.test.ts"
+      ]
+    },
+    "FR-006": {
+      "tasks": [
+        "T006",
+        "T008",
+        "T039",
+        "T041",
+        "T042"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/cldr.test.ts",
+        "packages/engine/src/character-discovery/characterMap.test.ts"
+      ]
+    },
+    "FR-007": {
+      "tasks": [
+        "T008",
+        "T030",
+        "T037"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/cldr.test.ts",
+        "packages/engine/src/character-discovery/suggestMissing.test.ts"
+      ]
+    },
+    "FR-008": {
+      "tasks": [
+        "T028",
+        "T031"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/exemplarSource.test.ts"
+      ]
+    },
+    "FR-009": {
+      "tasks": [
+        "T010",
+        "T032"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/cldr.test.ts",
+        "packages/engine/src/character-discovery/exemplarSource.test.ts"
+      ]
+    },
+    "FR-010": {
+      "tasks": [
+        "T029",
+        "T032",
+        "T048"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/exemplarSource.test.ts",
+        "packages/engine/src/character-discovery/characterMap.test.ts"
+      ]
+    },
+    "FR-011": {
+      "tasks": [
+        "T016",
+        "T023",
+        "T024"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/exemplarSource.test.ts"
+      ]
+    },
+    "FR-012": {
+      "tasks": [
+        "T001",
+        "T003",
+        "T015",
+        "T017"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/exemplarCodegen.test.ts"
+      ]
+    },
+    "FR-013": {
+      "tasks": [
+        "T014",
+        "T020"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/exemplarCodegen.test.ts"
+      ]
+    },
+    "FR-014": {
+      "tasks": [
+        "T020"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/exemplarCodegen.test.ts"
+      ]
+    },
+    "FR-015": {
+      "tasks": [
+        "T035",
+        "T036",
+        "T038"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/suggestMissing.test.ts",
+        "packages/engine/src/character-discovery/characterMap.test.ts"
+      ]
+    },
+    "FR-016": {
+      "tasks": [
+        "T048",
+        "T049"
+      ],
+      "tests": [
+        "packages/studio/src/stores/phaseBDraftStore.test.ts",
+        "packages/studio/src/survey/PhaseBExemplarPrefill.test.tsx",
+        "packages/studio/e2e/exemplar-prefill.spec.ts"
+      ]
+    },
+    "FR-016a": {
+      "tasks": [
+        "T047",
+        "T049"
+      ],
+      "tests": [
+        "packages/studio/src/stores/phaseBDraftStore.test.ts",
+        "packages/studio/src/survey/PhaseBExemplarPrefill.test.tsx",
+        "packages/studio/e2e/exemplar-prefill.spec.ts"
+      ]
+    },
+    "FR-016b": {
+      "tasks": [
+        "T051"
+      ],
+      "tests": [
+        "packages/studio/src/survey/PhaseBExemplarPrefill.test.tsx",
+        "packages/studio/e2e/exemplar-prefill.spec.ts"
+      ]
+    },
+    "FR-016c": {
+      "tasks": [
+        "T050"
+      ],
+      "tests": [
+        "packages/studio/src/survey/PhaseBExemplarPrefill.test.tsx",
+        "packages/studio/e2e/exemplar-prefill.spec.ts"
+      ]
+    },
+    "FR-017": {
+      "tasks": [
+        "T044",
+        "T046",
+        "T052",
+        "T053"
+      ],
+      "tests": [
+        "packages/studio/src/stores/phaseBDraftStore.test.ts",
+        "packages/studio/src/survey/PhaseBExemplarPrefill.test.tsx"
+      ]
+    }
+  },
+  "step_summaries": {
+    "tasks": {
+      "summary": "61 tasks across 7 phases. Phase order deliberately deviates from spec priority: US3 (P3, offline pinned index) is built before US1/US2 because the index is their delivery substrate. The R0 tier-key defect + R9 parser defects are Foundational and flagged as standalone-shippable. Phase 6 (FR-016/017 prefill) carries a Content sign-off gate on offer wording and accept scope per Article VI.",
+      "taskCount": 61,
+      "phases": 7,
+      "mvp": "Setup + Foundational + US3 + US1"
+    }
+  },
+  "verified": [
+    {
+      "what": "full monorepo test suite",
+      "command": "pnpm -r test",
+      "result": "pass — 6953 tests across 467 files (engine 2077, studio 4165, contracts 450, oauth-backend 137, keyboard-lint 82, glottolog 42), 2 skipped"
+    },
+    {
+      "what": "typecheck",
+      "command": "pnpm typecheck",
+      "result": "pass — all 7 workspace projects"
+    },
+    {
+      "what": "eslint + depcruise + content-i18n-lint + test-antipattern-lint",
+      "command": "npx eslint packages/*/src/**/*.{ts,tsx}; pnpm depcruise; pnpm content-i18n-lint; pnpm test-antipattern-lint",
+      "result": "pass — 0 eslint errors (84 pre-existing warnings), no dependency violations, no test antipatterns. NOTE: pnpm i18n-catalog-lint fails, but it fails identically on a clean stash of this branch — pre-existing, not caused by this work"
+    },
+    {
+      "what": "index determinism (SC-005)",
+      "command": "node --experimental-strip-types scripts/codegen-exemplars.mjs --out A; ... --out B; cmp A B",
+      "result": "pass — byte-identical across regenerations"
+    },
+    {
+      "what": "fetch-sldr fail-loud on a corrupted pin (FR-012)",
+      "command": "sha256 in scripts/sldr-version.json replaced with zeros; node scripts/fetch-sldr.mjs",
+      "result": "pass — [ERROR] SHA-256 mismatch, exit 1, extract left untouched; pin restored"
+    },
+    {
+      "what": "offline authoring (SC-004)",
+      "command": "pnpm --filter @keyboard-studio/engine test src/character-discovery",
+      "result": "pass — full sourcing run with globalThis.fetch stubbed to throw; fetch never called"
+    },
+    {
+      "what": "SC-003 coverage measurement",
+      "command": "node -e (count distinct primary subtags in index vs baseline fixture)",
+      "result": "313 languages before, 1810 now (+1497, 5.8x); 1628 of 2381 locale entries are SLDR-only, covering 1518 distinct languages CLDR lacks"
+    },
+    {
+      "what": "Phase B prefill E2E walks (SC-008/009/010)",
+      "command": "cd packages/studio && npx playwright test exemplar-prefill.spec.ts",
+      "result": "2 passed (28.1s) — accept walk reaches a recorded alphabet in two actions with 0 characters typed; decline walk records only what was typed and does not re-assert on re-entry. Drives the real offline index, no stubbing"
+    },
+    {
+      "what": "full gate after the prefill UI landed",
+      "command": "pnpm typecheck && pnpm -r test && eslint",
+      "result": "pass — typecheck clean, 6976 tests green (studio 4188/306 files, engine 2077), 0 eslint errors"
     }
   ]
 }

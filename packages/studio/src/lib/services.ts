@@ -13,7 +13,15 @@ import type {
   VirtualFS,
   KeyboardIR,
 } from "@keyboard-studio/contracts";
-import type { MissingCharSuggestions, CldrFullLoader, CharacterMapGroup } from "@keyboard-studio/engine";
+import type {
+  MissingCharSuggestions,
+  CharacterMapGroup,
+  ExemplarSource,
+  SourcedCharacter,
+  SourcedInventory,
+  ExemplarTier,
+} from "@keyboard-studio/engine";
+import { charactersInTier } from "@keyboard-studio/engine";
 import { mockBaseBrowser, mockOutputService, mockPatternLibrary, mockScaffolder } from "@keyboard-studio/contracts/mocks";
 import { getBackendUrl } from "./githubOAuth.ts";
 import { localBaseBrowser, LOCAL_PROXY_BASE } from "./localBaseBrowser.ts";
@@ -148,45 +156,67 @@ export function getManagedPRProxyEndpoint(): string {
   return `${base}/submit/managed-pr`;
 }
 
-// suggestMissingChars — Phase B CLDR-grounded missing-character suggestions.
+// suggestMissingChars — Phase B exemplar-grounded missing-character suggestions.
 // When USE_REAL is false returns null (deterministic, no network) so tests
-// render the neutral "no data" note without real CLDR traffic.
-// When real, lazy-imports suggestMissingCharacters + createFetchCldrFullLoader
-// from the engine; caches the loader + engine fn together after first import so
-// subsequent calls skip the dynamic import entirely (mirrors getScaffolderService).
-type SuggestEngineCache = {
-  fn: (opts: { bcp47: string; baseIr: KeyboardIR; loader: CldrFullLoader; languageName?: string }) => Promise<MissingCharSuggestions | null>;
-  loader: CldrFullLoader;
-};
-let suggestEngineCache: SuggestEngineCache | null = null;
+// render the neutral "no data" note without touching real data.
+//
+// Since spec 044 the engine call takes NO loader: it reads the committed,
+// pinned CLDR+SLDR index instead of fetching CLDR at authoring time. The
+// dynamic import is still cached after first use so subsequent calls skip it
+// (mirrors getScaffolderService), and the index chunk is warmed off the startup
+// critical path by warmExemplarSource() below.
+type SuggestEngineFn = (opts: {
+  bcp47: string;
+  baseIr: KeyboardIR;
+  languageName?: string;
+}) => Promise<MissingCharSuggestions | null>;
+let suggestEngineCache: SuggestEngineFn | null = null;
 export async function suggestMissingChars(
   bcp47: string,
   baseIr: KeyboardIR,
   languageName?: string,
 ): Promise<MissingCharSuggestions | null> {
   if (!USE_REAL) return null;
-  if (suggestEngineCache !== null) {
-    return suggestEngineCache.fn({
-      bcp47,
-      baseIr,
-      loader: suggestEngineCache.loader,
-      ...(languageName !== undefined ? { languageName } : {}),
-    });
+  if (suggestEngineCache === null) {
+    const { suggestMissingCharacters } = await import(
+      /* @vite-ignore */ "@keyboard-studio/engine"
+    );
+    suggestEngineCache = suggestMissingCharacters;
   }
-  const { suggestMissingCharacters, createFetchCldrFullLoader } = await import(
-    /* @vite-ignore */ "@keyboard-studio/engine"
-  );
-  suggestEngineCache = {
-    fn: suggestMissingCharacters,
-    loader: createFetchCldrFullLoader(),
-  };
-  return suggestEngineCache.fn({
+  const fn = suggestEngineCache;
+  return fn({
     bcp47,
     baseIr,
-    loader: suggestEngineCache.loader,
     ...(languageName !== undefined ? { languageName } : {}),
   });
 }
+
+// warmExemplarSource — kicks off the lazily-imported exemplar index so the
+// first Characters step does not pay for it inline. Idempotent and safe to
+// fire-and-forget; every consumer awaits the same idempotent warm-up
+// internally, so a call that has not finished yet is never a correctness
+// problem, only a latency one.
+export async function warmExemplarSource(): Promise<void> {
+  if (!USE_REAL) return;
+  const { loadExemplarSource } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
+  await loadExemplarSource();
+}
+
+// sourcedExemplars — the Phase B propose-then-confirm inventory for a target
+// language (spec 044 FR-016/FR-017). Returns null when neither source covers
+// the tag or the confidence gate fires; the discovery-method list then omits
+// the exemplar option entirely rather than offering an empty one.
+export async function sourcedExemplars(bcp47: string): Promise<SourcedInventory | null> {
+  if (!USE_REAL) return null;
+  const { loadExemplarSource, sourceExemplars } = await import(
+    /* @vite-ignore */ "@keyboard-studio/engine"
+  );
+  await loadExemplarSource();
+  return sourceExemplars(bcp47);
+}
+
+export type { SourcedInventory, SourcedCharacter, ExemplarSource, ExemplarTier };
+export { charactersInTier };
 
 // Re-export the type so callers can use it without a direct engine import.
 export type { MissingCharSuggestions };
@@ -233,28 +263,22 @@ export async function characterMapGroups(
 // direct engine import.
 export type { CharacterMapGroup };
 
-// neededCharsForLanguage — the full CLDR needed-char set for a target BCP47
-// language (issue #525 items 2/4, language-driven surplus). Mirrors
-// suggestMissingChars's lazy-import + cache pattern above. When USE_REAL is
-// false returns null (deterministic, no network — matches suggestMissingChars's
-// test-mode contract). When real, lazy-imports neededCharsForLanguage +
-// createFetchCldrFullLoader from the engine and caches both together.
-type NeededCharsEngineCache = {
-  fn: (opts: { bcp47: string; loader: CldrFullLoader }) => Promise<Set<string> | null>;
-  loader: CldrFullLoader;
-};
-let neededCharsEngineCache: NeededCharsEngineCache | null = null;
+// neededCharsForLanguage — the full needed-char set for a target BCP47
+// language (issue #525 items 2/4, language-driven surplus), across all four
+// exemplar tiers. Mirrors suggestMissingChars's lazy-import + cache pattern
+// above. When USE_REAL is false returns null (deterministic, no data access —
+// matches suggestMissingChars's test-mode contract). When real, reads the
+// pinned offline index; no loader, no network.
+type NeededCharsEngineFn = (opts: { bcp47: string }) => Promise<Set<string> | null>;
+let neededCharsEngineCache: NeededCharsEngineFn | null = null;
 export async function neededCharsForLanguage(bcp47: string): Promise<Set<string> | null> {
   if (!USE_REAL) return null;
-  if (neededCharsEngineCache !== null) {
-    return neededCharsEngineCache.fn({ bcp47, loader: neededCharsEngineCache.loader });
+  if (neededCharsEngineCache === null) {
+    const { neededCharsForLanguage: engineNeededCharsForLanguage } = await import(
+      /* @vite-ignore */ "@keyboard-studio/engine"
+    );
+    neededCharsEngineCache = engineNeededCharsForLanguage;
   }
-  const { neededCharsForLanguage: engineNeededCharsForLanguage, createFetchCldrFullLoader } = await import(
-    /* @vite-ignore */ "@keyboard-studio/engine"
-  );
-  neededCharsEngineCache = {
-    fn: engineNeededCharsForLanguage,
-    loader: createFetchCldrFullLoader(),
-  };
-  return neededCharsEngineCache.fn({ bcp47, loader: neededCharsEngineCache.loader });
+  const fn = neededCharsEngineCache;
+  return fn({ bcp47 });
 }

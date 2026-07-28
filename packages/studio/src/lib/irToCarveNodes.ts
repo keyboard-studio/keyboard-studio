@@ -12,10 +12,12 @@ import type {
   StoreItem,
 } from '@keyboard-studio/contracts';
 import { buildProducedSet } from '@keyboard-studio/contracts';
-import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, isCharCoveredForLocale, collectCharContributors, isPlusSeparator, parseSlotId, isCombiningMarkChar } from '@keyboard-studio/engine';
+import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, buildProducerIndex, isCharCoveredForLocale, collectCharContributors, isPlusSeparator, parseSlotId, isCombiningMarkChar } from '@keyboard-studio/engine';
+import type { ProducerIndex } from '@keyboard-studio/engine';
 import type { StoreSlotBlockReason, StoreSlotEditMode, StoreAnalysis, CharContributors, CharNormalizationForm } from '@keyboard-studio/engine';
 import type { I18n } from '@lingui/core';
 import { resolveContentString } from './contentI18n.ts';
+import { caseGroupFor, caseTrimSet } from './carveCasePairs.ts';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 
 // ---------------------------------------------------------------------------
@@ -1502,19 +1504,48 @@ function resolveCoordinatedPartnerItems(
  * Takes an already-classified `mode` (see resolveCoordinatedPartnerItems)
  * rather than (store, ir, analysis) — callers looping over itemsIndex for
  * the same store hoist classifyStoreSlotEdit once outside the loop.
+ *
+ * NARROWED to a three-part conjunction (spec 051 FR-003). "Any partner slot
+ * holds a needed character" over-shielded: on Cameroon QWERTY, trimming the
+ * surplus `ɨ` resolves partner slot `dkf0060#1`, which holds the needed `i` —
+ * so the trim was refused, even though `dkf0060` is the any()-CONSUMED INPUT
+ * store and `i` stays typeable through its own `+ [K_I] > 'i'` rule. Splicing
+ * the pair removes the `i → ɨ` mapping, not the letter `i`.
+ *
+ * A partner now shields only when ALL THREE hold:
+ *   (needed)   the partner's character is in the orthography, AND
+ *   (a) the partner store is an index()/outs() OUTPUT target — dropping from
+ *       it removes a character the keyboard EMITS, not one you merely type; AND
+ *   (b) that character has no OTHER producer — dropping this slot would leave
+ *       it genuinely unproducible.
+ *
+ * Both new facts are engine-side (`asIndexOutputTarget` on the store analysis,
+ * and `buildProducerIndex`), because both are facts about the IR rather than
+ * carve policy. The producer index MUST be hoisted once per IR by the caller
+ * (invariant D4) — building it per candidate character would make the proposal
+ * loop O(chars x rules), the shape the #931 perf note warns against.
  */
 function coordinatedDropHitsNeededChar(
   mode: StoreSlotEditMode,
   itemsIndex: number,
   needed: ReadonlySet<string>,
   bcp47: string | null | undefined,
-  storesByName: ReadonlyMap<string, IRStore>,
+  analysis: StoreAnalysis,
+  producerIndex: ProducerIndex,
   form: CharNormalizationForm = 'NFC',
 ): boolean {
-  const partners = resolveCoordinatedPartnerItems(mode, itemsIndex, storesByName);
-  return partners.some(({ item }) =>
-    isCharCoveredForLocale(item.value, needed, bcp47 ?? '', form),
-  );
+  const partners = resolveCoordinatedPartnerItems(mode, itemsIndex, analysis.storeByName);
+  return partners.some(({ partnerStore, item }) => {
+    const ch = item.value.normalize(form);
+    if (!isCharCoveredForLocale(ch, needed, bcp47 ?? '', form)) return false;
+    if (!isOutputStore(partnerStore, analysis)) return false;
+    return (producerIndex.get(ch) ?? 0) <= 1;
+  });
+}
+
+/** True when the store is an index()/outs() target somewhere in the IR — a producer. */
+function isOutputStore(store: IRStore, analysis: StoreAnalysis): boolean {
+  return analysis.usageByName.get(store.name)?.asIndexOutputTarget === true;
 }
 
 // ---------------------------------------------------------------------------
@@ -1552,6 +1583,20 @@ export interface CoordinatedCollateralChar {
    * though export-time applyStoreSlotRemovals had already dropped it.
    */
   slotId: string;
+  /**
+   * Whether the partner store PRODUCES this character (`output` — an
+   * index()/outs() target) or merely matches on it (`input` — any()-consumed).
+   * Drives the FR-005 severity split: losing a produced character is a warning,
+   * losing an input mapping is informational (the transform stops firing).
+   */
+  role: 'input' | 'output';
+  /**
+   * True when this drop genuinely makes a needed character unproducible —
+   * `isNeeded && role === 'output' && producerCount <= 1`. Exactly the guard's
+   * conjunction (spec 051 FR-003), surfaced for display so the UI splits
+   * severity by real consequence rather than by `isNeeded` alone.
+   */
+  isLost: boolean;
 }
 
 /**
@@ -1583,6 +1628,7 @@ export function coordinatedCollateralForSlots(
   bcp47?: string | null,
   analysis: StoreAnalysis = analyzeStores(ir),
   form: CharNormalizationForm = 'NFC',
+  producerIndex: ProducerIndex = buildProducerIndex(ir),
 ): CoordinatedCollateralChar[] {
   if (storeSlotIds.length === 0) return [];
 
@@ -1609,11 +1655,16 @@ export function coordinatedCollateralForSlots(
 
       seenPartnerSlotIds.add(partnerSlotId);
       const ch = item.value.normalize(form);
+      const isNeeded = isCharCoveredForLocale(ch, needed, bcp47 ?? '', form);
+      const role: 'input' | 'output' = isOutputStore(partnerStore, analysis) ? 'output' : 'input';
       collateral.push({
         ch,
         storeName: partnerStore.name,
-        isNeeded: isCharCoveredForLocale(ch, needed, bcp47 ?? '', form),
+        isNeeded,
         slotId: partnerSlotId,
+        role,
+        // Same conjunction the guard applies — see coordinatedDropHitsNeededChar.
+        isLost: isNeeded && role === 'output' && (producerIndex.get(ch) ?? 0) <= 1,
       });
     }
   }
@@ -1739,6 +1790,9 @@ export function annotateRemovalRecommendations(
   // storesByName is NOT rebuilt here — analysis.storeByName already carries
   // an identical name-keyed map (#931 perf).
   const analysis = analyzeStores(ir);
+  // Also hoisted ONCE per IR (spec 051 invariant D4) — the coordinated guard's
+  // "does this needed char have another producer?" test reads it per slot.
+  const producerIndex = buildProducerIndex(ir);
   const storesByNodeId = new Map(ir.stores.map((s) => [s.nodeId, s]));
 
   return nodes.map((node) => {
@@ -1759,7 +1813,7 @@ export function annotateRemovalRecommendations(
         // so it runs ONCE per store instead of once per item (#931 perf).
         const mode = classifyStoreSlotEdit(store, ir, analysis);
         for (let i = 0; i < store.items.length; i++) {
-          if (coordinatedDropHitsNeededChar(mode, i, needed, bcp47, analysis.storeByName, form)) {
+          if (coordinatedDropHitsNeededChar(mode, i, needed, bcp47, analysis, producerIndex, form)) {
             return { ...node, recommendation: 'none' };
           }
         }
@@ -1848,6 +1902,14 @@ export interface RecommendedRemovalChar {
   ch: string;
   /** Contributor info for removal — pass straight to cascadeDelete(contributors.ruleNodeIds, contributors.storeSlotIds). */
   contributors: CharContributors;
+  /**
+   * All members of this row's case group, sorted by code point, present ONLY when this
+   * row is a paired row (length > 1) — FR-014, contracts/case-pairing.md "Proposal-row
+   * granularity". `contributors` above stays the SURVIVING character's own contributors;
+   * this function does not merge the paired member's CharContributors record — the
+   * gallery unions them at apply time.
+   */
+  caseGroup?: string[];
 }
 
 /**
@@ -1921,6 +1983,9 @@ export function recommendedRemovalChars(args: {
   // store of EVERY candidate character, so without this it's O(chars * rules)
   // rather than O(chars + rules). (#931 perf)
   const analysis = analyzeStores(ir);
+  // Same hoist, same reason (spec 051 invariant D4) — one pass over the IR, not
+  // one per candidate character.
+  const producerIndex = buildProducerIndex(ir);
 
   const results: RecommendedRemovalChar[] = [];
 
@@ -1953,7 +2018,7 @@ export function recommendedRemovalChars(args: {
         if (mode.mode === 'blocked') { allSimple = false; break; }
         // Reuses the `mode` just computed above — coordinatedDropHitsNeededChar
         // takes an already-classified mode rather than re-deriving it (#931 perf).
-        if (coordinatedDropHitsNeededChar(mode, parsed.itemsIndex, needed, bcp47, analysis.storeByName, form)) {
+        if (coordinatedDropHitsNeededChar(mode, parsed.itemsIndex, needed, bcp47, analysis, producerIndex, form)) {
           dependsOnNeeded = true;
           break;
         }
@@ -1965,5 +2030,71 @@ export function recommendedRemovalChars(args: {
     results.push({ ch, contributors });
   }
 
-  return results;
+  // FR-014 (contracts/case-pairing.md "Proposal-row granularity"): when both members of
+  // a case group are surplus, fold them into ONE proposal row rather than surfacing two.
+  // Bucket the already-produced `results` by their case group's shared uppercase — this
+  // deliberately buckets `results` itself, not the full `produced` set, so a member that
+  // was shielded above (blocked, structural, or collateral-guarded, and therefore never
+  // pushed into `results`) can never be pulled into a fold here. The fold only ever
+  // REMOVES rows; it never adds a character the guard already refused.
+  // FR-013 is the constraint that makes this more than a display fold: a SHARED
+  // uppercase may only retire once its LAST produced lowercase referent is also
+  // going. Folding on "two rows share an uppercase" alone gets that wrong — with
+  // produced { s, ſ, S } where `ſ` is in the orthography but `s` and `S` are not,
+  // it would propose trimming `s` + `S` together and leave `ſ` without its
+  // uppercase. `caseTrimSet` is the one implementation of the retire rule
+  // (carveCasePairs.ts); this asks it rather than re-deriving the condition here.
+  const resultChs = new Set(results.map((r) => r.ch));
+  const foldedAway = new Set<string>(); // chars absorbed into another row's paired proposal
+  const retainedUppers = new Set<string>(); // uppercase kept alive by a surviving referent
+  const caseGroupBySurvivor = new Map<string, string[]>();
+  const handledUppers = new Set<string>();
+
+  for (const r of results) {
+    const group = caseGroupFor(r.ch, produced, bcp47 ?? undefined);
+    if (group.upper === null) continue; // no counterpart in produced — stays a single row
+    const upper = group.upper;
+    // Drive this from the LOWERCASE side only, once per uppercase. Two distinct
+    // lowercases that merely share an uppercase (s and ſ) are NOT counterparts of
+    // each other and must never be folded into one row together.
+    if (r.ch === upper || handledUppers.has(upper)) continue;
+    handledUppers.add(upper);
+
+    // The uppercase itself must be surplus and unshielded, or there is no pair to
+    // propose — the lowercase stays a single row and the uppercase is left alone.
+    if (!resultChs.has(upper)) continue;
+
+    // Retire oracle. `resultChs` is the set of characters this banner is proposing,
+    // so "every referent is also being trimmed" == "every referent is proposed".
+    if (!caseTrimSet(r.ch, produced, bcp47 ?? undefined, resultChs).has(upper)) {
+      // A referent survives -> the uppercase is retained, and must not be offered
+      // as a row of its own either; trimming it alone would breach FR-013 just as
+      // surely as folding it in would.
+      retainedUppers.add(upper);
+      continue;
+    }
+
+    // Whole case group is surplus -> ONE row (FR-014). The survivor is the
+    // lowest-code-point lowercase, which is deterministic and always present:
+    // `r.ch` is itself a proposed referent, so this list is never empty.
+    const proposedLowers = group.lowers.filter((l) => resultChs.has(l));
+    const survivor = proposedLowers.reduce((min, l) =>
+      (l.codePointAt(0) ?? 0) < (min.codePointAt(0) ?? 0) ? l : min,
+    );
+    const groupChars = [upper, ...proposedLowers]
+      .sort((a, b) => (a.codePointAt(0) ?? 0) - (b.codePointAt(0) ?? 0));
+    caseGroupBySurvivor.set(survivor, groupChars);
+    for (const c of groupChars) {
+      if (c !== survivor) foldedAway.add(c);
+    }
+  }
+
+  // Preserve the existing result order for surviving rows (the banner is a checklist —
+  // reshuffling it on every trim would be disorienting).
+  return results
+    .filter((r) => !foldedAway.has(r.ch) && !retainedUppers.has(r.ch))
+    .map((r) => {
+      const caseGroup = caseGroupBySurvivor.get(r.ch);
+      return caseGroup === undefined ? r : { ...r, caseGroup };
+    });
 }

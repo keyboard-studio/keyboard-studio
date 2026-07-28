@@ -10,6 +10,7 @@
 //   #output             — OutputScreen: "ship it" — Download .zip +
 //                         SignUpPanel (no interactive OSK)
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import { ResizeHandle } from "./components/ResizeHandle.tsx";
@@ -23,9 +24,12 @@ import {
   deriveProjectKeyFromWorkingCopy,
   discardActiveDraft,
   installDraftAutosave,
-  replaceActiveDraftIfDifferentProject,
+  // Aliased: dev's draftAutosave engine (below) also exports a startCloudSync;
+  // both engines coexist post-merge, so both syncs run under distinct names.
+  startCloudSync as startPersistenceCloudSync,
   wasDraftRestoredThisBoot,
 } from "./lib/draftPersistence.ts";
+import { useGitHubAuth } from "./hooks/useGitHubAuth.ts";
 import { type RouteId } from "./lib/navigate.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
@@ -42,9 +46,10 @@ import { FlowMapView } from "./dashboard/DashboardView.tsx";
 import { runCompleteness } from "./dashboard/completeness.ts";
 import { PreviewScreen } from "./components/PreviewScreen.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
-import { i18n } from "@lingui/core";
-import { I18nProvider } from "@lingui/react";
-import { Trans } from "@lingui/react/macro";
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { resolveMessage } from "./lib/i18nResolve.ts";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { LocaleSwitcher } from "./components/LocaleSwitcher.tsx";
@@ -70,8 +75,8 @@ import {
   pinActiveProject,
   PENDING_PROJECT_KEY,
   type DraftMeta,
+  type StudioDraft,
 } from "./lib/draftAutosave.ts";
-import { useGitHubAuth } from "./hooks/useGitHubAuth.ts";
 import {
   loadServerDraftMeta,
   loadServerDraftContent,
@@ -81,6 +86,7 @@ import {
 import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
 import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
+import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
 
 // Offer the resume banner only once per page load — on the first SurveyView
 // mount in this JS context, not on same-session route remounts (navigating away
@@ -179,24 +185,46 @@ function useRoute(): RouteId {
 
 interface NavItem {
   id: RouteId;
-  label: string;
+  /**
+   * Lazy `msg` descriptor — NAV_ITEMS is built at module scope where no
+   * useLingui() binding exists, so labels are resolved per-render via
+   * resolveMessage(i18n, ...) inside NavBar (the same pattern MechanismGallery
+   * uses for its module-scope option tables).
+   */
+  label: MessageDescriptor;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "survey", label: "Studio" },
-  { id: "preview", label: "Preview" },
-  { id: "output", label: "Output" },
-  ...(SHOW_FLOWMAP ? [{ id: "flowmap" as const, label: "Flow Map" }] : []),
+  { id: "survey", label: msg({ id: "nav.studio", message: "Studio" }) },
+  { id: "preview", label: msg({ id: "nav.preview", message: "Preview" }) },
+  { id: "output", label: msg({ id: "nav.output", message: "Output" }) },
+  ...(SHOW_FLOWMAP
+    ? [{ id: "flowmap" as const, label: msg({ id: "nav.flowMap", message: "Flow Map" }) }]
+    : []),
 ];
 
 interface NavBarProps {
   active: RouteId;
+  /**
+   * P0 fix UX signal (not the authoritative enforcement — that lives in
+   * OutputScreen/usePreviewArtifact's canDownload gate, which is reachable
+   * regardless of how #output was navigated to). Dims the Output tab and
+   * marks it aria-disabled with an explanatory title so the block is obvious
+   * BEFORE the click, not just after landing on a disabled download button.
+   */
+  outputBlocked?: boolean;
+  /** Tooltip / aria explanation shown while outputBlocked is true. */
+  outputBlockedTitle?: string;
 }
 
-function NavBar({ active }: NavBarProps) {
+function NavBar({ active, outputBlocked = false, outputBlockedTitle }: NavBarProps) {
+  const { i18n: activeI18n } = useLingui();
   return (
     <nav
-      aria-label="Studio navigation"
+      aria-label={resolveMessage(
+        activeI18n,
+        msg({ id: "nav.ariaLabel", message: "Studio navigation" }),
+      )}
       style={{
         height: 48,
         flexShrink: 0,
@@ -213,24 +241,28 @@ function NavBar({ active }: NavBarProps) {
       <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
         {NAV_ITEMS.map(({ id, label }) => {
           const isActive = id === active;
+          const isBlocked = id === "output" && outputBlocked;
           return (
             <a
               key={id}
               href={`#${id}`}
               aria-current={isActive ? "page" : undefined}
+              aria-disabled={isBlocked ? "true" : undefined}
+              title={isBlocked ? outputBlockedTitle : undefined}
               style={{
                 padding: "4px 12px",
                 fontSize: 14,
                 fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
                 textDecoration: "none",
-                color: isActive ? "#6ea8fe" : "#e6edf3",
+                color: isBlocked ? "#6e7681" : isActive ? "#6ea8fe" : "#e6edf3",
+                opacity: isBlocked ? 0.6 : 1,
                 borderBottom: isActive ? "2px solid #6ea8fe" : "2px solid transparent",
                 lineHeight: "40px",
                 whiteSpace: "nowrap",
                 transition: "color 120ms ease, border-bottom-color 120ms ease",
               }}
             >
-              {label}
+              {resolveMessage(activeI18n, label)}
             </a>
           );
         })}
@@ -327,6 +359,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const localBase = useSurveySessionStore((s) => s.localBase);
   const surveyContext = useSurveySessionStore((s) => s.surveyContext);
 
+  // Self-contained useGitHubAuth() call (same idiom as MyKeyboardsList /
+  // ManagedPRSubmitPanel) so SurveyView can start/stop the signed-in cloud
+  // draft backup (startCloudSync, below) without threading auth state down
+  // through props. Only the access-token PRIMITIVE is read — see the
+  // cloud-sync effect's dependency array.
+  const { token: githubToken } = useGitHubAuth();
+  const cloudSyncAccessToken = githubToken?.accessToken ?? null;
+
   // Store actions needed by SurveyView (not delegated to StepHost).
   const sessionReset = useSurveySessionStore((s) => s.reset);
   const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
@@ -335,11 +375,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // steps/ importing stores/ directly.
   const setTouchSeedSource = useSurveySessionStore((s) => s.setTouchSeedSource);
 
-  // GitHub auth — signed-in users get a durable server-backed backup of the
-  // draft on top of the localStorage cache; guests use localStorage only.
-  // githubTokenRef lets the cloud-sync loop read the current token lazily, so
-  // signing in mid-session starts syncing without restarting the subscription.
-  const { token: githubToken } = useGitHubAuth();
+  // githubTokenRef lets dev's draftAutosave cloud-sync loop read the current
+  // token lazily (from the single useGitHubAuth() call above), so signing in
+  // mid-session starts syncing without restarting the subscription.
   const githubTokenRef = useRef(githubToken);
   useEffect(() => {
     githubTokenRef.current = githubToken;
@@ -389,7 +427,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     if (!wasDraftRestoredThisBoot()) {
       useSurveySessionStore.getState().reset();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally empty: runs exactly once on mount
+    // Intentionally empty deps: runs exactly once on mount.
   }, []);
 
   // ---------------------------------------------------------------------------
@@ -538,8 +576,31 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       autosaveTeardownRef.current?.();
       autosaveTeardownRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- teardown-on-unmount only; the ref itself is stable
+    // Teardown-on-unmount only; the ref itself is stable.
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // US3a: signed-in cloud-draft backup. Runs ALONGSIDE (never instead of) the
+  // local autosave above — see draftPersistence.ts's startCloudSync docstring
+  // for what it pushes and why this is not a second D3-scoped debounce cycle.
+  // Starts as soon as an access token is present (sign-in can happen before
+  // OR after a working copy is instantiated — startCloudSync's own flush
+  // no-ops while there is no active project yet) and tears down on sign-out
+  // or unmount. `cloudSyncAccessToken` is the effect's ONLY dependency, so
+  // this does not restart the subscription on every render; React calls the
+  // returned cleanup (tearing down the old subscription) before re-running
+  // the effect on a token change, so there is exactly one live subscription
+  // at a time. A project switch (e.g. start-over) does NOT need its own
+  // teardown/restart here — startCloudSync re-resolves the active project on
+  // every flush, so it simply follows whichever project is active next.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (cloudSyncAccessToken === null) {
+      return undefined;
+    }
+    const teardown = startPersistenceCloudSync(() => cloudSyncAccessToken);
+    return teardown;
+  }, [cloudSyncAccessToken]);
 
   // ---------------------------------------------------------------------------
   // ReducerDeps — injected into applyStepCompletion (steps/reducer.ts).
@@ -600,7 +661,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       setMarksMigrationNeeded: (needed) =>
         useSurveySessionStore.getState().setMarksMigrationNeeded(needed),
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
     [lockDesktop, clearStale, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting, setTouchSeedSource],
   );
@@ -639,26 +699,33 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       if (instantiatedForBaseIdRef.current === base.id) return;
       instantiatedForBaseIdRef.current = base.id;
 
-      // T025 (spec 034 US3, VR-5 / FR-009 / AS-4): a durable draft from a
-      // DIFFERENT project may already be active (e.g. the author abandoned an
-      // earlier in-progress keyboard without "start over" and picked a new
-      // base). This is the instantiation entry point, so it is where a genuine
-      // project switch first becomes visible — replace the prior project's
-      // draft now, BEFORE this instantiation's own autosave (below) starts
-      // writing under the new key. MVP policy: clean replace, never silent
-      // merge (a confirm-before-overwrite UX is the non-MVP alternative the
-      // contract also permits, deferred).
-      replaceActiveDraftIfDifferentProject(base.id);
+      // Spec 034's VR-5 used to call `replaceActiveDraftIfDifferentProject`
+      // here: picking a new base DELETED the previously active project's
+      // draft, because the studio could hold only one draft at a time and a
+      // project switch was therefore indistinguishable from abandonment.
+      //
+      // "My keyboards" (spec 047 US3a) is precisely the feature that makes
+      // several drafts co-exist, so that implicit delete is now the direct
+      // negation of SC-001 — it would let an author start keyboard B and find
+      // keyboard A silently gone from their list. The clear-on-switch is
+      // removed, not merely relaxed: there is no longer any sense in which a
+      // project switch implies discarding the project being switched away
+      // from. Abandonment stays explicit, via `discardActiveDraft` on the
+      // start-over paths (WelcomeScreen's "start over" and this shell's own
+      // reset below) — the author's own instruction, not an inference from
+      // navigation. See specs/047-my-keyboards/spec.md ("Superseded: spec
+      // 034 VR-5").
 
       // Pin the active-project pointer to this base's id the moment a working
-      // copy is instantiated (specs/037-my-keyboards/spec.md "Client data
-      // model" — projectKey = identity.keyboardId ?? baseKeyboard.id; the
-      // identity keyboardId, when Track 1 later sets one, isn't chosen yet at
-      // this point, so base.id is the correct starting key for both tracks).
-      // This ONLY repoints THIS session's active-project pointer — it does not
-      // touch any other project's stored record or index row, so starting a
-      // new keyboard never overwrites/wipes an already-in-flight project.
+      // copy is instantiated (specs/047-my-keyboards spec — projectKey =
+      // identity.keyboardId ?? baseKeyboard.id; the identity keyboardId, when
+      // Track 1 later sets one, isn't chosen yet at this point, so base.id is
+      // the correct starting key for both tracks). This ONLY repoints THIS
+      // session's active-project pointer — it does not touch any other
+      // project's stored record or index row, so starting a new keyboard
+      // never overwrites/wipes an already-in-flight project.
       pinActiveProject(base.id);
+
 
       // Reads via getState() escape hatch (not a selector) to avoid a stale closure — the callback is memoised with empty deps.
       const track = useSurveySessionStore.getState().selectedTrack;
@@ -687,7 +754,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         autosaveTeardownRef.current = installDraftAutosave(projectKey);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     // Same escape hatch as the pre-preview-before-commit onInstantiate: all
     // reads are via getState()/reducerDepsRef.current (stable refs), not
     // React state, so an empty dep array is intentional here too.
@@ -730,7 +796,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         setSurveyPatternMap(map);
       })
       .catch((err: unknown) => {
-        console.error("[SurveyView] pattern load for preview failed:", err);
+        devLog.error("[SurveyView] pattern load for preview failed:", err);
       });
   }, [sessionAssignments]);
 
@@ -881,7 +947,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         // (gated on resumeMeta/cloudResume being null), so the active-project
         // pointer can't have moved in between.
         const draftId = getActiveProjectKey() ?? PENDING_PROJECT_KEY;
-        void loadServerDraftContent(accessToken, draftId).then((draft) => {
+        // Dev's engine stores StudioDraft envelopes; pick that envelope off
+        // the shared transport (see serverDraftStore.ts's ServerDraftPayload).
+        void loadServerDraftContent<StudioDraft>(accessToken, draftId).then((draft) => {
           if (applyStudioDraft(draft)) {
             instantiatedForBaseIdRef.current = useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
             setActiveProject(draftId);
@@ -1096,7 +1164,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
             }}
           >
             <span style={{ fontSize: 32, opacity: 0.4, fontFamily: "monospace" }}>[kb]</span>
-            <span>Choose a base keyboard in the wizard to see a live preview here.</span>
+            <span>
+              <Trans id="preview.empty.hint">
+                Choose a base keyboard in the wizard to see a live preview here.
+              </Trans>
+            </span>
           </div>
         ) : (
           <>
@@ -1136,6 +1208,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
 export function StudioShell() {
   const route = useRoute();
+  const { t } = useLingui();
 
   const selectedBaseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
 
@@ -1182,6 +1255,16 @@ export function StudioShell() {
     [desktopLocked, touchLayoutJson, staleSteps, validatorFindings],
   );
 
+  // ---------------------------------------------------------------------------
+  // Output nav-link UX signal (P0 fix) — NOT the authoritative enforcement
+  // (that is OutputScreen's canDownload gate via usePreviewArtifact, which
+  // still applies regardless of how #output was reached). This is purely so
+  // the block is visible on the tab itself before the click. Same shared hook
+  // (hooks/useInventoryCoverageGate.ts) as StepHost/PhaseFGate/OutputScreen —
+  // do not re-derive the desktop-always/touch-only-if-authored booleans here.
+  // ---------------------------------------------------------------------------
+  const outputNavBlocked = useInventoryCoverageGate().blocked;
+
   let content: ReactNode;
   switch (route) {
     case "welcome":
@@ -1204,23 +1287,31 @@ export function StudioShell() {
       break;
   }
 
+  // NOTE: the <I18nProvider> lives in AppRoot, ABOVE this component — never
+  // here. StudioShell calls useLingui() itself (below, for the nav tooltip),
+  // and a component cannot consume a context it renders: that combination
+  // returned a null context and blanked the app in production builds, where
+  // Lingui's dev-only invariant is stripped. See AppRoot.tsx.
   return (
-    <I18nProvider i18n={i18n}>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          height: "100vh",
-          width: "100vw",
-          overflow: "hidden",
-          background: "var(--bg)",
-        }}
-      >
-        <NavBar active={route} />
-        <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-          {content}
-        </div>
-      </div>
-    </I18nProvider>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+        width: "100vw",
+        overflow: "hidden",
+        background: "var(--bg)",
+      }}
+    >
+      <NavBar
+        active={route}
+        outputBlocked={outputNavBlocked}
+        outputBlockedTitle={t({
+          id: "studio.nav.outputBlocked.title",
+          message: "Finish every inventory character before you can access Output",
+        })}
+      />
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{content}</div>
+    </div>
   );
 }

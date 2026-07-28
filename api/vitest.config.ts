@@ -13,7 +13,7 @@ import { dirname } from "node:path";
 export default defineConfig({
   test: {
     root: dirname(fileURLToPath(import.meta.url)),
-    include: ["oauth/**/*.test.ts", "submit/**/*.test.ts"],
+    include: ["oauth/**/*.test.ts", "submit/**/*.test.ts", "drafts/**/*.test.ts"],
     environment: "node",
   },
 });

@@ -42,6 +42,7 @@
 //   caller passes `skipConfirm: true` — see the `options` param doc below),
 //   then dispatches instantiateFromBase.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { BaseKeyboard, RemovalCapability, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 
@@ -128,7 +129,7 @@ export function instantiateFromBaseIfConfirmed(
   options?: { skipConfirm?: boolean },
 ): boolean {
   if (ir === null || vfs === null) {
-    console.warn("[studio] instantiate skipped: no parsed IR (mock engine?)");
+    devLog.warn("[studio] instantiate skipped: no parsed IR (mock engine?)");
     return false;
   }
   if (!options?.skipConfirm && !confirmRebaseIfEdited()) return false;

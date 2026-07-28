@@ -223,3 +223,72 @@ describe('ConfirmDialog — dismissal routing', () => {
     expect(onSecondary).not.toHaveBeenCalled();
   });
 });
+
+describe('ConfirmDialog — dismissAction="primary" (P1(a): leave-warning safe-dismissal)', () => {
+  // The gallery leave-warnings (MechanismGallery / TouchGallery) pass
+  // dismissAction="primary" because their secondaryLabel ("Come back later")
+  // is a proceed-forward/defer action, not a cancel — Escape/backdrop must
+  // NOT silently complete the phase with characters unimplemented.
+
+  it('the native cancel event (Escape) calls onPrimary, not onSecondary', () => {
+    const onPrimary = vi.fn();
+    const onSecondary = vi.fn();
+    const { container } = render(
+      <ConfirmDialog
+        open
+        title="Finish these characters before leaving?"
+        body="b"
+        primaryLabel="Go back and finish"
+        secondaryLabel="Come back later"
+        onPrimary={onPrimary}
+        onSecondary={onSecondary}
+        dismissAction="primary"
+      />,
+    );
+    const dialog = container.querySelector('dialog')!;
+    fireEvent(dialog, new Event('cancel', { cancelable: true }));
+    expect(onPrimary).toHaveBeenCalledTimes(1);
+    expect(onSecondary).not.toHaveBeenCalled();
+  });
+
+  it('a click on the <dialog> element itself (backdrop) calls onPrimary, not onSecondary', () => {
+    const onPrimary = vi.fn();
+    const onSecondary = vi.fn();
+    const { container } = render(
+      <ConfirmDialog
+        open
+        title="Finish these characters before leaving?"
+        body="b"
+        primaryLabel="Go back and finish"
+        secondaryLabel="Come back later"
+        onPrimary={onPrimary}
+        onSecondary={onSecondary}
+        dismissAction="primary"
+      />,
+    );
+    const dialog = container.querySelector('dialog')!;
+    fireEvent.click(dialog);
+    expect(onPrimary).toHaveBeenCalledTimes(1);
+    expect(onSecondary).not.toHaveBeenCalled();
+  });
+
+  it('an explicit click on the secondary button still calls onSecondary (defer requires an explicit click)', () => {
+    const onPrimary = vi.fn();
+    const onSecondary = vi.fn();
+    render(
+      <ConfirmDialog
+        open
+        title="Finish these characters before leaving?"
+        body="b"
+        primaryLabel="Go back and finish"
+        secondaryLabel="Come back later"
+        onPrimary={onPrimary}
+        onSecondary={onSecondary}
+        dismissAction="primary"
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Come back later' }));
+    expect(onSecondary).toHaveBeenCalledTimes(1);
+    expect(onPrimary).not.toHaveBeenCalled();
+  });
+});

@@ -12,9 +12,11 @@
  *   - parse the raw JSON to a plain object (fresh tree — JSON.parse guarantees
  *     this), splice sk[]/flick/multitap into the matching key objects IN PLACE,
  *     stringify.  Unmodified keys/layers/platforms/fields are copied verbatim.
- *   - Apply each assignment to EVERY present platform that has the host key in
- *     its `default` layer.  Warn ONLY when the host key is found in NO
- *     platform's default layer.
+ *   - Apply each mechanism to EVERY present platform that has the host key in
+ *     the layer the mechanism names (`slotValues.layer`, default `"default"`).
+ *     Warn ONLY when the host key is found in NO platform's target layer — an
+ *     unknown layer id lands on that same path, so it warns and skips rather
+ *     than throwing or silently falling back to `"default"`.
  *   - For each platform that GAINS at least one new sk[] entry, add
  *     `defaultHint: "dot"` if the platform object has no `defaultHint` field
  *     already.  This keeps newly-added longpress menus discoverable on
@@ -47,6 +49,7 @@ import type { TouchAssignment } from "@keyboard-studio/contracts";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
 import type { RawKey, RawPlatform } from "./touch-layout-wire-format.js";
+import { resolveTouchLayerId } from "./touchLayer.js";
 
 /** The top-level raw .keyman-touch-layout JSON object. */
 type RawTouchLayout = Record<string, unknown>;
@@ -85,27 +88,31 @@ export function applyTouchAssignmentsToRawJson(
   const layout = JSON.parse(rawJson) as RawTouchLayout;
   const platformNames = Object.keys(layout);
 
-  // Pre-build a lookup: platformName → { keyId → RawKey } for the default layer.
-  // We only look in the "default" layer per the spec.
+  // Pre-build a lookup: platformName → layerId → { keyId → RawKey }, across
+  // every layer present. A mechanism selects its layer with `slotValues.layer`
+  // (absent === "default"), so the map has to be keyed by layer id too.
   // Guard: skip non-platform entries (e.g. top-level "_comment" strings) and
   // platforms whose `layer` field is absent or not an array.
-  const platformDefaultKeyMaps = new Map<string, Map<string, RawKey>>();
+  const platformLayerKeyMaps = new Map<string, Map<string, Map<string, RawKey>>>();
   for (const pName of platformNames) {
     const platform = layout[pName];
     if (!platform || typeof platform !== "object") continue;
     const p = platform as RawPlatform;
     if (!Array.isArray(p.layer)) continue;
-    const defaultLayer = p.layer.find((l) => l.id === "default");
-    if (!defaultLayer) continue;
-    if (!Array.isArray(defaultLayer.row)) continue;
-    const keyMap = new Map<string, RawKey>();
-    for (const row of defaultLayer.row) {
-      if (!Array.isArray(row.key)) continue;
-      for (const key of row.key) {
-        if (key.id) keyMap.set(key.id, key);
+    const layerMaps = new Map<string, Map<string, RawKey>>();
+    for (const layer of p.layer) {
+      if (!layer?.id) continue;
+      if (!Array.isArray(layer.row)) continue;
+      const keyMap = new Map<string, RawKey>();
+      for (const row of layer.row) {
+        if (!Array.isArray(row.key)) continue;
+        for (const key of row.key) {
+          if (key.id) keyMap.set(key.id, key);
+        }
       }
+      layerMaps.set(layer.id, keyMap);
     }
-    platformDefaultKeyMaps.set(pName, keyMap);
+    if (layerMaps.size > 0) platformLayerKeyMaps.set(pName, layerMaps);
   }
 
   // Track which platforms gained at least one new sk[] entry (for defaultHint).
@@ -126,25 +133,28 @@ export function applyTouchAssignmentsToRawJson(
       ) {
         const hostKey = slotValues?.["hostKey"] ?? "";
         const char = slotValues?.["char"] ?? "";
+        const layerId = resolveTouchLayerId(slotValues);
 
-        // Find which platforms have this host key in their default layer.
+        // Find which platforms have this host key in the TARGET layer. A
+        // platform that lacks the layer entirely simply does not match — an
+        // unknown layer therefore matches nothing and takes the warn+skip path
+        // below rather than falling back to "default".
         const matchedPlatforms: string[] = [];
-        for (const [pName, keyMap] of platformDefaultKeyMaps) {
-          if (keyMap.has(hostKey)) matchedPlatforms.push(pName);
+        for (const [pName, layerMaps] of platformLayerKeyMaps) {
+          if (layerMaps.get(layerId)?.has(hostKey)) matchedPlatforms.push(pName);
         }
 
-        // Warn only when the key is found in NO platform.
+        // Warn only when the key is found in NO platform's target layer.
         if (matchedPlatforms.length === 0) {
           warnings.push(
-            `[touch-apply-raw] host key "${hostKey}" not found in any platform's default layer — assignment for "${char}" skipped`,
+            `[touch-apply-raw] host key "${hostKey}" not found in any platform's "${layerId}" layer — assignment for "${char}" skipped`,
           );
           continue;
         }
 
         // Apply to each matched platform.
         for (const pName of matchedPlatforms) {
-          const keyMap = platformDefaultKeyMaps.get(pName)!;
-          const key = keyMap.get(hostKey)!;
+          const key = platformLayerKeyMaps.get(pName)!.get(layerId)!.get(hostKey)!;
 
           if (patternId === "longpress_alternates") {
             applyLongpress(key, char, pName, platformsGainingSk);

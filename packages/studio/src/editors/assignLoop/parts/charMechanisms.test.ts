@@ -121,6 +121,48 @@ describe("getCharMechanisms — producesCount", () => {
 
     expect(getCharMechanisms("中", assignments, "touch").producesCount).toBe(1);
   });
+
+  it("counts a seed-reachable char (inheritedChars) as one producing way even with no assignment at all", () => {
+    expect(
+      getCharMechanisms("a", [], "touch", new Set(["a"])).producesCount,
+    ).toBe(1);
+  });
+
+  it("does NOT double-count a seed-reachable char whose 'already in layout' suggestion was accepted (touch_inherited recorded)", () => {
+    const assignments: MechanismAssignment[] = [
+      {
+        scope: "individual",
+        target: "a",
+        modality: "touch",
+        mechanisms: [{ patternId: "touch_inherited" }],
+      },
+    ];
+
+    expect(
+      getCharMechanisms("a", assignments, "touch", new Set(["a"])).producesCount,
+    ).toBe(1);
+  });
+
+  it("adds a real mechanism on top of seed reachability (inherited + configured = 2 ways)", () => {
+    const assignments: MechanismAssignment[] = [
+      {
+        scope: "individual",
+        target: "a",
+        modality: "touch",
+        mechanisms: [{ patternId: "longpress_alternates" }],
+      },
+    ];
+
+    expect(
+      getCharMechanisms("a", assignments, "touch", new Set(["a"])).producesCount,
+    ).toBe(2);
+  });
+
+  it("leaves a char OUTSIDE inheritedChars at 0 (the set is not a blanket pass)", () => {
+    expect(
+      getCharMechanisms("b", [], "touch", new Set(["a"])).producesCount,
+    ).toBe(0);
+  });
 });
 
 describe("getCharMechanisms — usesSequences", () => {

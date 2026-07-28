@@ -1,11 +1,11 @@
-// MyKeyboardsList — the "My keyboards" section on the profile page
-// (specs/037-my-keyboards/spec.md "UI"). Replaces the disabled placeholder
-// that used to live inline in ProfileScreen.tsx.
+// MyKeyboardsList — the "My keyboards" section on the profile page.
+// Replaces the disabled placeholder that used to live inline in
+// ProfileScreen.tsx.
 //
 // List sourcing:
-//   - Signed-out: the local project index (lib/draftAutosave.ts listDrafts())
-//     only — no server call is attempted (matches the existing guest posture
-//     of startCloudSync / serverDraftStore.ts).
+//   - Signed-out: the local project index (lib/draftPersistence.ts
+//     listDrafts()) only — no server call is attempted (matches the existing
+//     guest posture of serverDraftStore.ts).
 //   - Signed-in: the local index merged with the signed-in cloud list
 //     (serverDraftStore.ts listServerDrafts()), deduped by projectKey (see
 //     mergeProjectEntries below).
@@ -16,33 +16,40 @@
 // distinguish "the signed-in author genuinely has zero cloud-backed projects"
 // from "the cloud fetch failed" — both collapse to the same empty list, and
 // the merge falls back to the local index either way. Surfacing a
-// distinguishable error state (spec.md User Story 1, acceptance scenario 3)
-// would require serverDraftStore.ts to expose the failure reason instead of
-// swallowing it, which is out of this change's scope (the client transport is
-// consumed as-is, not modified). This is a known, reported gap — see the
-// implementation report for this feature — not a silent omission.
+// distinguishable error state would require serverDraftStore.ts to expose the
+// failure reason instead of swallowing it, which is out of scope here (the
+// client transport is consumed as-is, not modified) — a known, reported gap.
 //
-// Resume flow: sets the active-project pointer, then navigates to "survey" —
-// the SAME lazy pattern StudioShell already uses to decide its landing route
-// (getActiveProjectKey() / loadDraftMeta() on mount), rather than eagerly
-// calling resumeProject() here. StudioShell's own resume-draft banner is what
-// actually applies the draft (offering the author a Resume/Discard choice on
-// the next mount) — calling resumeProject() here would apply the working copy
-// a second time outside of that flow and bypass the banner's corrupt-draft
-// surfacing.
+// Resume flow (DEVIATION from the dev reference implementation): dev defers
+// applying the draft to a StudioShell-owned resume banner, and this component
+// only pins the active-project pointer before navigating. Main has no such
+// banner — `main.tsx` calls `loadDraft()` (the boot-time apply) exactly once,
+// pre-mount, so navigating to `#survey` after merely pinning the pointer
+// would NOT actually load the picked project's stores. Instead, Resume here
+// calls `resumeProject()` directly (which applies the draft to both stores
+// via `loadDraft` AND sets the active-project flag `loadDraft` already sets
+// on success — `wasDraftRestoredThisBoot()` — so SurveyView's mount effect
+// does not reset the just-resumed session out from under it), then navigates
+// only on a successful apply.
+//
+// Ported from the dev reference implementation's MyKeyboardsList.tsx
+// (specs/047-my-keyboards) with its draft-engine imports rewired onto main's
+// draftPersistence.ts and its user-facing strings converted to main's
+// @lingui convention.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Trans } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import {
   listDrafts,
   deleteProject,
-  setActiveProject,
+  resumeProject,
   PENDING_PROJECT_KEY,
   type ProjectIndexEntry,
-} from "../lib/draftAutosave.ts";
+} from "../lib/draftPersistence.ts";
 import { listServerDrafts, type ServerDraftMeta } from "../lib/serverDraftStore.ts";
-import { relativeTime } from "../lib/relativeTime.ts";
+import { relativeTime, type RelativeTimeValue } from "../lib/relativeTime.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT } from "../lib/galleryTheme.ts";
 import { SUCCESS_ACCENT } from "../ui/theme.ts";
@@ -95,19 +102,6 @@ function preferEntry(a: ProjectIndexEntry, b: ProjectIndexEntry): ProjectIndexEn
   if (b.status === "submitted" && a.status !== "submitted") return b;
   return a.savedAt >= b.savedAt ? a : b;
 }
-
-/** Display label: entry.label, else the projectKey (unless it's the reserved
- * pending slot, which is not a meaningful name to show), else a generic name. */
-function displayLabel(entry: ProjectIndexEntry): string {
-  if (entry.label !== null && entry.label.trim() !== "") return entry.label;
-  if (entry.projectKey !== PENDING_PROJECT_KEY) return entry.projectKey;
-  return "Untitled keyboard";
-}
-
-const STATUS_LABEL: Record<ProjectIndexEntry["status"], string> = {
-  draft: "Draft",
-  submitted: "Submitted",
-};
 
 // ---------------------------------------------------------------------------
 // Styles — reusing the ProfileScreen left-column visual language.
@@ -217,15 +211,12 @@ const statusLineStyle: React.CSSProperties = {
 // Component
 // ---------------------------------------------------------------------------
 
-const DELETE_CONFIRM_MESSAGE =
-  "Delete this keyboard from My keyboards? This only removes the studio's " +
-  "record — it does not close or affect any pull request already opened on GitHub.";
-
 export function MyKeyboardsList() {
+  const { t } = useLingui();
+
   // Independent useGitHubAuth() call (rather than threading the token down
-  // from ProfileScreen's useIdentitySession()) so this component is
-  // self-contained and independently testable, per the task's component
-  // boundary — mirrors the mocking idiom already used by ProfileScreen.test.tsx
+  // from a parent) so this component is self-contained and independently
+  // testable — mirrors the mocking idiom already used by ProfileScreen.test.tsx
   // and AccountControl.test.tsx (mock useGitHubAuth at the module boundary).
   const { status: ghStatus, token } = useGitHubAuth();
   const isSignedIn = ghStatus === "connected" || ghStatus === "needs-scope";
@@ -289,12 +280,27 @@ export function MyKeyboardsList() {
   }, [refresh]);
 
   function handleResume(projectKey: string): void {
-    setActiveProject(projectKey);
-    navigateTo("survey");
+    // See the module docstring's "Resume flow" note: main applies the draft
+    // right here (resumeProject), rather than deferring to a resume banner
+    // dev's architecture has and main does not.
+    const applied = resumeProject(projectKey);
+    if (applied) {
+      navigateTo("survey");
+    }
+    // else: a corrupt/wrong-shaped draft failed to apply — leave the card in
+    // place rather than silently navigating into an empty wizard.
   }
 
   function handleDelete(projectKey: string): void {
-    if (typeof window !== "undefined" && !window.confirm(DELETE_CONFIRM_MESSAGE)) return;
+    // The lingui macro requires `message` to be a string/template literal —
+    // NOT a `+`-concatenated BinaryExpression — hence the single template
+    // literal here rather than the two-line concatenation this was ported
+    // from.
+    const confirmed = t({
+      id: "profile.myKeyboards.deleteConfirm",
+      message: `Delete this keyboard from My keyboards? This only removes the studio's record — it does not close or affect any pull request already opened on GitHub.`,
+    });
+    if (typeof window !== "undefined" && !window.confirm(confirmed)) return;
     // Record BEFORE the async deleteProject call so a refresh already in
     // flight (its listServerDrafts() call issued before this delete) can't
     // resurrect this key when it resolves — see deletedKeysRef above.
@@ -304,52 +310,118 @@ export function MyKeyboardsList() {
     });
   }
 
+  function displayLabel(entry: ProjectIndexEntry): string {
+    if (entry.label !== null && entry.label.trim() !== "") return entry.label;
+    if (entry.projectKey !== PENDING_PROJECT_KEY) return entry.projectKey;
+    return t({ id: "profile.myKeyboards.untitled", message: "Untitled keyboard" });
+  }
+
+  function statusLabel(status: ProjectIndexEntry["status"]): string {
+    return status === "submitted"
+      ? t({ id: "profile.myKeyboards.status.submitted", message: "Submitted" })
+      : t({ id: "profile.myKeyboards.status.draft", message: "Draft" });
+  }
+
+  // Renders relativeTime.ts's structured { unit, count } (P1-4 — see that
+  // module's header note for why the plural rendering lives here, not
+  // there): each branch is its own translatable id/message rather than one
+  // shared template, so a translator can adapt word order per unit. The
+  // `plural()` macro compiles to a proper ICU `{count, plural, one {...}
+  // other {...}}` message — resolved against THIS component's live `t()`
+  // (from useLingui()), never the argument-less fallback that can't evaluate
+  // plural-category selection.
+  function lastEditedLabel(relative: RelativeTimeValue): string {
+    switch (relative.unit) {
+      case "now":
+        return t({ id: "profile.myKeyboards.lastEdited.now", message: "Last edited just now" });
+      case "minute":
+        return t({
+          id: "profile.myKeyboards.lastEdited.minutes",
+          message: plural(relative.count, {
+            one: "Last edited # minute ago",
+            other: "Last edited # minutes ago",
+          }),
+        });
+      case "hour":
+        return t({
+          id: "profile.myKeyboards.lastEdited.hours",
+          message: plural(relative.count, {
+            one: "Last edited # hour ago",
+            other: "Last edited # hours ago",
+          }),
+        });
+      case "day":
+        return t({
+          id: "profile.myKeyboards.lastEdited.days",
+          message: plural(relative.count, {
+            one: "Last edited # day ago",
+            other: "Last edited # days ago",
+          }),
+        });
+    }
+  }
+
   return (
-    <section aria-label="My keyboards" style={sectionStyle}>
+    <section
+      aria-label={t({ id: "profile.myKeyboards.sectionAriaLabel", message: "My keyboards" })}
+      style={sectionStyle}
+    >
       <h2 style={headingStyle}>
-        <Trans id="profile.myKeyboards.label">My keyboards</Trans>
+        <Trans id="profile.myKeyboards.heading">My keyboards</Trans>
       </h2>
 
       {loading && (
         <p role="status" aria-live="polite" style={statusLineStyle} data-testid="my-keyboards-loading">
-          Loading your keyboards&hellip;
+          <Trans id="profile.myKeyboards.loading">Loading your keyboards&hellip;</Trans>
         </p>
       )}
 
       {!loading && entries.length === 0 && (
         <p style={emptyStyle} data-testid="my-keyboards-empty">
-          You haven&rsquo;t started a keyboard yet.
+          <Trans id="profile.myKeyboards.empty">You haven&rsquo;t started a keyboard yet.</Trans>
         </p>
       )}
 
       {entries.length > 0 && (
-        <ul role="list" aria-label="Your keyboards" style={listStyle}>
+        <ul
+          role="list"
+          aria-label={t({ id: "profile.myKeyboards.listAriaLabel", message: "Your keyboards" })}
+          style={listStyle}
+        >
           {entries.map((entry) => {
             const name = displayLabel(entry);
+            const status = statusLabel(entry.status);
+            const relative = relativeTime(entry.savedAt);
             return (
               <li key={entry.projectKey} style={cardStyle} data-testid="my-keyboards-card">
                 <div style={cardTitleRowStyle}>
                   <span style={cardTitleStyle}>{name}</span>
                   <span
                     style={badgeStyle(entry.status)}
-                    aria-label={`Status: ${STATUS_LABEL[entry.status]}`}
+                    aria-label={t({
+                      id: "profile.myKeyboards.statusAriaLabel",
+                      message: `Status: ${status}`,
+                    })}
                   >
-                    {STATUS_LABEL[entry.status]}
+                    {status}
                   </span>
                 </div>
 
                 {entry.langTag !== null && <div style={metaLineStyle}>{entry.langTag}</div>}
-                <div style={metaLineStyle}>Last edited {relativeTime(entry.savedAt)}</div>
+                <div style={metaLineStyle}>{lastEditedLabel(relative)}</div>
 
                 <div style={actionsRowStyle}>
                   {entry.status === "draft" && (
                     <button
                       type="button"
                       style={actionButtonStyle}
-                      aria-label={`Resume ${name}`}
+                      aria-label={t({
+                        id: "profile.myKeyboards.resumeAriaLabel",
+                        message: `Resume ${name}`,
+                      })}
                       onClick={() => handleResume(entry.projectKey)}
                     >
-                      Resume
+                      <Trans id="profile.myKeyboards.resumeButton">Resume</Trans>
                     </button>
                   )}
                   {entry.status === "submitted" && entry.prUrl !== null && (
@@ -358,18 +430,24 @@ export function MyKeyboardsList() {
                       target="_blank"
                       rel="noopener noreferrer"
                       style={actionButtonStyle}
-                      aria-label={`View PR for ${name}`}
+                      aria-label={t({
+                        id: "profile.myKeyboards.viewPrAriaLabel",
+                        message: `View PR for ${name}`,
+                      })}
                     >
-                      View PR
+                      <Trans id="profile.myKeyboards.viewPrButton">View PR</Trans>
                     </a>
                   )}
                   <button
                     type="button"
                     style={actionButtonStyle}
-                    aria-label={`Delete ${name}`}
+                    aria-label={t({
+                      id: "profile.myKeyboards.deleteAriaLabel",
+                      message: `Delete ${name}`,
+                    })}
                     onClick={() => handleDelete(entry.projectKey)}
                   >
-                    Delete
+                    <Trans id="profile.myKeyboards.deleteButton">Delete</Trans>
                   </button>
                 </div>
               </li>

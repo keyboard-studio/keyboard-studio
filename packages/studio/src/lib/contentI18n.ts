@@ -18,13 +18,18 @@ import type { I18n } from "@lingui/core";
 // English, the one and only source locale, see D6/D2).
 const DEFAULT_LOCALE = "en";
 
-/** The three sidecar catalogs extracted by utilities/i18n-content-extract (T027). */
-export type ContentCatalogType = "patterns" | "adaptationQuestions" | "criteria";
+/**
+ * The four sidecar catalogs extracted by utilities/i18n-content-extract (T027;
+ * `flowQuestions` added by spec 050 US1 for the modular flow-engine's
+ * survey-question prose — see specs/050-flow-question-i18n/research.md D5).
+ */
+export type ContentCatalogType = "patterns" | "adaptationQuestions" | "criteria" | "flowQuestions";
 
 const CONTENT_CATALOG_TYPES: readonly ContentCatalogType[] = [
   "patterns",
   "adaptationQuestions",
   "criteria",
+  "flowQuestions",
 ];
 
 /** The catalog-key namespace segment for each type (D8 id derivation). */
@@ -32,6 +37,7 @@ const NAMESPACE: Record<ContentCatalogType, string> = {
   patterns: "pattern",
   adaptationQuestions: "adaptationQuestion",
   criteria: "criteria",
+  flowQuestions: "flowQuestion",
 };
 
 type ContentCatalog = Record<string, string>;
@@ -44,8 +50,13 @@ type ContentCatalog = Record<string, string>;
  * extraction time. Kept as a small local copy rather than a cross-package
  * import: `utilities/*` is excluded from the pnpm workspace and isn't part of
  * the shipped browser bundle.
+ *
+ * Exported so render sites that compose a catalog-key segment themselves
+ * (e.g. `QuestionField.tsx`'s `option.<value>.label` keys, spec 050 US1) apply
+ * the identical transform the extractor used when generating the key on the
+ * other end — some FlowOption values contain literal dots (e.g. "0.6").
  */
-function slugifyIdSegment(id: string): string {
+export function slugifyIdSegment(id: string): string {
   return id.replace(/\./g, "_");
 }
 
@@ -117,7 +128,14 @@ export function resolveContentString(
   if (locale === undefined || locale === DEFAULT_LOCALE) return englishValue;
   const catalog = localeCatalogs.get(locale)?.[type];
   if (catalog === undefined) return englishValue;
-  return catalog[buildContentKey(type, id, field)] ?? englishValue;
+  // Honour the "never blank" contract above: a present-but-empty (or
+  // whitespace-only) catalog value means the key exists yet is untranslated —
+  // e.g. a new key awaiting a Crowdin sync (skip_untranslated_strings: false
+  // ships every key in every locale, empty until translated). Plain `??` only
+  // catches null/undefined, so it would render such a key as a blank string;
+  // fall back to the English value in that case too.
+  const translated = catalog[buildContentKey(type, id, field)];
+  return translated !== undefined && translated.trim() !== "" ? translated : englishValue;
 }
 
 /**

@@ -73,6 +73,7 @@ function resolveLinguiBin() {
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "i18n-catalog-check-"));
 let freshLocales = [];
+let extractionProducedNothing = false;
 try {
   // Fresh extraction into the temp dir. --overwrite forces source-locale values
   // to match the current messages, so edited English is reflected in en's fresh
@@ -88,6 +89,15 @@ try {
     .readdirSync(tmpRoot, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => d.name);
+
+  // No locale dirs at all means the extraction itself produced nothing — the
+  // catalogs are not the problem, the tool is. Bail with that diagnosis rather
+  // than falling through and reporting every committed locale as an "orphan",
+  // which reads as catalog drift and sends you editing files that are fine.
+  // Seen for real: @lingui/cli >= 6.5 guards its extract entry point with
+  // `import.meta.main`, which only exists from Node 22.19.0 — on an older Node
+  // the CLI exits 0 having written nothing, so execFileSync never throws.
+  extractionProducedNothing = freshLocales.length === 0;
 
   for (const locale of freshLocales) {
     const fresh = readCatalog(path.join(tmpRoot, locale, CATALOG_FILE));
@@ -142,7 +152,7 @@ try {
         .map((d) => d.name)
     : [];
   for (const locale of committedLocales) {
-    if (!freshLocales.includes(locale)) {
+    if (freshLocales.length > 0 && !freshLocales.includes(locale)) {
       problems.push(
         `[${locale}] committed catalog is not a configured locale (orphan).`,
       );
@@ -158,6 +168,21 @@ if (warnings.length > 0) {
   console.warn(
     "\nRun pnpm --filter @keyboard-studio/studio messages:extract to pick these up (not required to pass).",
   );
+}
+
+if (extractionProducedNothing) {
+  console.error(
+    "[ERROR] i18n-catalog-lint: the fresh extraction produced no catalogs — " +
+      "`lingui extract` wrote nothing, so there is nothing to compare against.",
+  );
+  console.error(
+    `  - running node ${process.version}; @lingui/cli requires >= 22.19.0 and ` +
+      "exits 0 without writing on older versions.",
+  );
+  console.error(
+    "\nFix: switch to the Node version pinned in .nvmrc, then re-run. Your committed catalogs are probably fine — do not regenerate them on this diagnosis.",
+  );
+  process.exit(1);
 }
 
 if (problems.length > 0) {

@@ -15,6 +15,7 @@
 // Research decisions: R1 (advance owns the fork), R2 (signature), R3 (mapping),
 // R9 (boundary).
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { manifest } from "./manifest.ts";
 
 // ---------------------------------------------------------------------------
@@ -66,6 +67,15 @@ export interface AdvanceContext {
    * whether to route into the touch_seed_source chooser or straight to touch.
    */
   readonly touchSeedSource: TouchSeedSource | null;
+  /**
+   * The Phase F hard gate: no "come back later" escape, unlike the gallery
+   * leave-warnings. True once every inventory character has an
+   * implementation in every modality actually engaged this session (desktop
+   * always; touch only when a touch layout was authored — see StepHost's
+   * context build and lib/unimplementedInventory.ts). The "help" case below
+   * refuses to advance past Phase F while this is false.
+   */
+  readonly allCharactersImplemented: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +195,7 @@ export function advance(
         // upstream. Log the violation and default to the copy path (project_name) —
         // copy is the safer default because it does NOT skip a step. Do NOT silently
         // route as adapt (which skips project_name and could confuse the user).
-        console.error(
+        devLog.error(
           "[advance] invariant violation: selectedTrack is null at track step. " +
           "trackOptions.onCommit must set selectedTrack before calling onComplete. " +
           "Defaulting to copy path (project_name) to avoid silent wrong-fork routing."
@@ -229,7 +239,14 @@ export function advance(
       return { next: nextSpineStepAfter("touch") }; // help
 
     case "help":
-      return { next: "done", navigate: "output" };
+      // Hard gate (the Phase F hard gate): stay on "help" — no navigate signal — until every
+      // inventory character has an implementation. Unlike the gallery leave-
+      // warnings (the gallery leave-warning), there is no "come back later" escape here; the
+      // host surfaces WHY via the helpStep wrapper (PhaseFGate), never a
+      // silently-dead button.
+      return ctx.allCharactersImplemented
+        ? { next: "done", navigate: "output" }
+        : { next: "help" };
 
     // Terminals — if somehow called, stay put (host does not call advance for terminals).
     case "done":

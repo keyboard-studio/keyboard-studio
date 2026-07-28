@@ -11,6 +11,7 @@
 //     ctx.field != 'x', "or" (space-separated "or" tokens), "and" tokens.
 //     Full boolean DSL is out of scope — these cover the actual YAML content.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useState, useId, useMemo, useRef, useEffect } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { FlowDef, FlowQuestion, FlowOption, FlowGotoRule, SurveyContext, AnswerStackEntry } from "./types.ts";
@@ -148,25 +149,13 @@ function toSurveyAnswer(
 // ---------------------------------------------------------------------------
 // Template interpolation
 // ---------------------------------------------------------------------------
-
-function interpolate(text: string, ctx: SurveyContext): string {
-  return text.replace(/\{\{(\w+)\}\}/g, (_, key: string) => ctx[key] ?? `{{${key}}}`);
-}
-
-function interpolateQuestion(q: FlowQuestion, ctx: SurveyContext): FlowQuestion {
-  return {
-    ...q,
-    ...(q.prompt !== undefined ? { prompt: interpolate(q.prompt, ctx) } : {}),
-    ...(q.help_text !== undefined ? { help_text: interpolate(q.help_text, ctx) } : {}),
-    ...(q.body !== undefined ? { body: interpolate(q.body, ctx) } : {}),
-    ...(q.options !== undefined ? {
-      options: q.options.map((opt) => ({
-        ...opt,
-        label: interpolate(opt.label, ctx),
-      })),
-    } : {}),
-  };
-}
+// `{{token}}` interpolation of a question's prompt/label/help_text/body and
+// option labels happens in QuestionField (see its `resolveFlowText`), AFTER
+// Tier-B content-i18n catalog resolution — a translated catalog value carries
+// its own tokens, so only the resolved string may be interpolated. SurveyRunner
+// therefore hands QuestionField the RAW question (plus any dynamic options) and
+// does NOT pre-interpolate it here: doing so would redundantly process the
+// English fallback and cannot see the translated string's tokens at all.
 
 // ---------------------------------------------------------------------------
 // advanceThrough — moved before SurveyRunner so it is in scope for render-time
@@ -204,12 +193,12 @@ export function advanceThrough(
   while (nextId !== null) {
     const next = index.get(nextId);
     if (next === undefined) {
-      console.error("SurveyRunner: unresolved goto target", nextId);
+      devLog.error("SurveyRunner: unresolved goto target", nextId);
       return null;
     }
     if (next.engine_resolved !== true) return nextId;
     if (visited.has(nextId)) {
-      console.error("SurveyRunner: cycle detected in engine_resolved chain", nextId);
+      devLog.error("SurveyRunner: cycle detected in engine_resolved chain", nextId);
       return null;
     }
     visited.add(nextId);
@@ -424,15 +413,16 @@ export function SurveyRunner({
     );
   }
 
-  const baseDisplayQ = interpolateQuestion(currentQ, context);
   // Dynamic datalist options (spec 030 US2): when the caller supplies non-empty
   // options for this question (e.g. the resolved entry's local names), they
-  // override the static options; the field still accepts free text.
+  // override the static options; the field still accepts free text. The raw
+  // question is handed to QuestionField as-is — it resolves the active-locale
+  // Tier-B catalog string and interpolates `{{token}}`s itself (see above).
   const dynamicOptions = getSeedOptionsRef.current?.(currentQId);
   const displayQ: FlowQuestion =
     dynamicOptions !== undefined && dynamicOptions.length > 0
-      ? { ...baseDisplayQ, options: dynamicOptions }
-      : baseDisplayQ;
+      ? { ...currentQ, options: dynamicOptions }
+      : currentQ;
   const stepNum = stack.length;
 
   const canGoBack = stack.length > 1 || onBack !== undefined;
@@ -689,6 +679,7 @@ export function SurveyRunner({
         <QuestionField
           question={displayQ}
           value={value}
+          context={context}
           onChange={(v) => setCurrentValue(v)}
           onEntryResolved={(entry) => onEntryResolvedRef.current?.(currentQId, entry)}
           {...(advanceOnSelect === true ? { onSelectAdvance: requestAdvance } : {})}

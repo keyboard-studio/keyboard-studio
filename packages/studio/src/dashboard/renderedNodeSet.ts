@@ -26,6 +26,7 @@
 // resolveNext (SurveyRunner.tsx -> stores/debugPinsStore.ts): runtime-reach
 // traversal lives in the depcruise-excluded guardrail test, not here.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { buildModularFlowGraph, buildProposedFlowGraphFromFlow, buildLibraryReserveNodes, buildLeftoverNodes } from "./buildStepGraph.ts";
 import { buildManifestProjection, attachDrillDowns, CHARACTERS_STEP_ID as _CHARACTERS_STEP_ID } from "./manifestProjection.ts";
 import type { FlowGraph, GraphNode } from "./model.ts";
@@ -109,7 +110,7 @@ export function buildFlowSources(): BuiltFlowSource[] {
         // Unresolved ref — surface as an error entry so the map shows the gap.
         // Also fail loud at dev time so a missing flowSources entry is caught early.
         if (import.meta.env.DEV) {
-          console.error(
+          devLog.error(
             `[renderedNodeSet] unresolved flowRef "${ref}" on step "${step.id}" — add it to steps/flowSources.ts`,
           );
         }
@@ -242,7 +243,7 @@ function parseAllSources(): ParsedSource[] {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (import.meta.env.DEV) {
-        console.error(`[renderedNodeSet] flowSources["${source.id}"] failed to parse — ${message}`);
+        devLog.error(`[renderedNodeSet] flowSources["${source.id}"] failed to parse — ${message}`);
       }
       return {
         id: source.id,
