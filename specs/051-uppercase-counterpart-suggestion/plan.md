@@ -1,5 +1,11 @@
 # Implementation Plan: Suggest the uppercase counterpart when a lowercase cased letter is placed
 
+> **Amendment (2026-07-28):** the T047 manual walk surfaced two defects inside the shipped
+> FR-005/FR-006 boundary — the suggestion-Accept path building a touch `MechanismRef` without a
+> `layer`, and the host-key label helper rendering the raw uppercase vkey letter regardless of
+> target layer. Closed as FR-012/FR-013/US4; see [spec.md](spec.md) for the full requirement text
+> and [tasks.md](tasks.md) Phase 7 (T049–T055) for the implementation tasks. Not restated here.
+
 **Branch**: `051-uppercase-counterpart-suggestion` | **Date**: 2026-07-27 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from [specs/051-uppercase-counterpart-suggestion/spec.md](spec.md)
@@ -65,6 +71,10 @@ be byte-identical to today.
 **Scale/Scope**: ~4 studio files touched + 2 new studio files; 2 engine appliers + 1 studio touch-logic
 helper. Four apply sites raise proposals. No new package.
 
+**Amendment (2026-07-28, Phase 7) Scale/Scope**: one already-listed file re-touched —
+`TouchGallery.tsx` (FR-012/FR-013 fixes) and its existing test file — no new files, no engine
+change; i18n catalogs touched only if T053's conditional label-wording change fires.
+
 ## Constitution Check
 
 *GATE: evaluated before Phase 0, re-evaluated after Phase 1 design (below).*
@@ -82,6 +92,11 @@ helper. Four apply sites raise proposals. No new package.
 
 **Post-Phase-1 re-check**: no verdict changed. The design added no locked-type edit, no timer, no
 content-team file, and no new package. **Complexity Tracking is empty — no violations to justify.**
+
+**Post-amendment re-check (2026-07-28, FR-012/FR-013/US4)**: no verdict changed. `slotValues`
+stays an open `Record<string, string>` (Article I holds — data, not schema, per research.md R8);
+no new timer (Article IV / D3); studio-only, Engine-team-owned change with no `content/**` touch
+(Article VI); no emoji, and T053 keeps the shipped i18n id conventions (Article VIII).
 
 ## Project Structure
 
