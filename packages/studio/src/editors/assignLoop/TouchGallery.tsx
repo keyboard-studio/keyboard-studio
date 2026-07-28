@@ -71,23 +71,27 @@ import type {
   TouchAssignment,
   MechanismRef,
   TouchLayoutIR,
+  KeyboardIR,
 } from "@keyboard-studio/contracts";
 import {
   toUPlusNotation,
   isDecomposableAccented,
   formatUncoveredTouchMessage,
 } from "@keyboard-studio/contracts";
-import type { DesktopModifications } from "@keyboard-studio/engine";
+import type { DesktopModifications, ModifierToken } from "@keyboard-studio/engine";
 import {
   parseTouchLayout,
   touchCoverage,
   resolveTouchLayerId,
+  collectLayerCombosInUse,
+  comboToTouchLayerId,
 } from "@keyboard-studio/engine";
 import {
   buildTouchLayoutJson,
   deriveSeedLayout,
 } from "../../lib/buildTouchLayoutJson.ts";
 import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";
+import { formatModifierCombo } from "../../lib/modifierTokenLabel.ts";
 import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
 import { extractMechanismHostKey } from "../../lib/extractMechanismHostKey.ts";
 import {
@@ -271,6 +275,13 @@ export function buildTouchMechanismRef(
   resolvedHostKey: string | null,
   flickDirection: string,
   char: string,
+  // Explicit touch-layer target for #1 longpress / #2 flick's layer picker
+  // (spec: "a layer option just like the desktop does" for those two
+  // methods only — see `TouchMethodChooser`'s `touchLayer` prop). Absent (or
+  // "") falls back to the case-derived default below, so every existing call
+  // site (multitap, touch_key_replace, and any pre-picker caller) is
+  // byte-identical.
+  explicitLayer?: string,
 ): MechanismRef | null {
   if (resolvedHostKey === null) return null;
   const hk = resolvedHostKey;
@@ -278,7 +289,10 @@ export function buildTouchMechanismRef(
   // explicitly is what makes `{K_A, á, default}` and `{K_A, Á, shift}` two
   // distinct refs under mechanismRefEquals — which is exactly the distinction
   // a case pair needs.
-  const layer = touchLayerForChar(char);
+  const layer =
+    explicitLayer !== undefined && explicitLayer !== ""
+      ? explicitLayer
+      : touchLayerForChar(char);
   if (method === "longpress_alternates") {
     return {
       patternId: "longpress_alternates",
@@ -315,6 +329,74 @@ interface TouchMethodChooserProps {
   onHostKeyCustomCharChange: (v: string) => void;
   flickDirection: string;
   onFlickDirectionChange: (v: string) => void;
+  /**
+   * Target touch layer for #1 longpress / #2 flick — the layer picker
+   * modeled on MechanismGallery's S-08 "Layer + key" card. Ignored by
+   * multitap/replace (they keep the pre-existing case-derived layer).
+   */
+  touchLayer: string;
+  onTouchLayerChange: (v: string) => void;
+  /** Options = only the layers the desktop keyboard actually uses (plus the
+   * always-present base/default layer) — see `buildTouchLayerOptions`. */
+  layerOptions: ReadonlyArray<{ value: string; label: string }>;
+}
+
+/**
+ * Human-friendly label for a canonicalized modifier combo, e.g. "Shift+RAlt".
+ * The empty combo is the desktop keyboard's base/default layer.
+ *
+ * The per-token label table (`MODIFIER_TOKEN_LABELS`) and the "+"-joined
+ * formatting are shared with MechanismGallery's S-08 covered-chip badge via
+ * `../../lib/modifierTokenLabel.ts` — only the "Base" fallback for the empty
+ * combo stays local (TouchGallery's own synthetic base option).
+ */
+function touchLayerComboLabel(
+  combo: readonly ModifierToken[],
+  i18n?: I18n,
+): string {
+  if (combo.length === 0) {
+    return resolveMessage(
+      i18n,
+      msg({ id: "editor.assignLoop.touch.layerBase", message: "Base" }),
+    );
+  }
+  return formatModifierCombo(combo);
+}
+
+/**
+ * Layer picker options for #1 longpress / #2 flick. Derives its choices from
+ * the working `KeyboardIR` — `collectLayerCombosInUse` — rather than
+ * hardcoding them, mirroring MechanismGallery's S-08 "Layer + key" picker
+ * (`computeModifierPool`). The option set is ONLY the layers the desktop
+ * keyboard actually uses: the base/default layer is always offered first
+ * (every desktop keyboard has one, and — unlike every other combo —
+ * `collectLayerCombosInUse` does not itself report the empty/no-modifier
+ * combo), so the picker never has zero options and the "default" value used
+ * as the picker's own default selection always resolves to a real option.
+ */
+function buildTouchLayerOptions(
+  ir: KeyboardIR | null,
+  i18n?: I18n,
+): ReadonlyArray<{ value: string; label: string }> {
+  const options: Array<{ value: string; label: string }> = [
+    { value: "default", label: touchLayerComboLabel([], i18n) },
+  ];
+  if (ir === null) return options;
+  const seen = new Set<string>(["default"]);
+  for (const combo of collectLayerCombosInUse(ir)) {
+    // comboToTouchLayerId's `string | null` return type is conservative for
+    // its general signature, but it is total (never null) over any combo
+    // collectLayerCombosInUse reports: TOUCH_ID_FRAGMENT
+    // (engine/src/pattern-apply/modifierCombos.ts) has an entry for every
+    // ModifierToken, and canonicalizeCombo's output only ever contains
+    // ModifierToken members — so there is no id this loop can produce that
+    // TOUCH_ID_FRAGMENT doesn't cover. Asserted non-null rather than guarded.
+    const id = comboToTouchLayerId(combo)!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    options.push({ value: id, label: touchLayerComboLabel(combo, i18n) });
+  }
+  return options;
 }
 
 // Chrome (option labels); built per-render via the optional-i18n +
@@ -386,6 +468,9 @@ function TouchMethodChooser({
   onHostKeyCustomCharChange,
   flickDirection,
   onFlickDirectionChange,
+  touchLayer,
+  onTouchLayerChange,
+  layerOptions,
 }: TouchMethodChooserProps) {
   const { t, i18n } = useLingui();
   const flickDirections = buildFlickDirections(i18n);
@@ -466,6 +551,28 @@ function TouchMethodChooser({
                 })}
               />
             </div>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 12,
+                color: TEXT_DIM,
+                fontFamily: FONT,
+              }}
+            >
+              <Trans id="editor.assignLoop.touch.layerLabel">Layer:</Trans>
+              <SelectMenu
+                value={touchLayer}
+                onChange={onTouchLayerChange}
+                ariaLabel={t({
+                  id: "editor.assignLoop.touch.longpress.layerAriaLabel",
+                  message: "Touch layer for long-press",
+                })}
+                options={layerOptions}
+                style={selectStyle}
+              />
+            </label>
           </div>
         )}
       </div>
@@ -551,6 +658,28 @@ function TouchMethodChooser({
                   message: "Flick direction",
                 })}
                 options={flickDirections}
+                style={selectStyle}
+              />
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 12,
+                color: TEXT_DIM,
+                fontFamily: FONT,
+              }}
+            >
+              <Trans id="editor.assignLoop.touch.layerLabel">Layer:</Trans>
+              <SelectMenu
+                value={touchLayer}
+                onChange={onTouchLayerChange}
+                ariaLabel={t({
+                  id: "editor.assignLoop.touch.flick.layerAriaLabel",
+                  message: "Touch layer for flick",
+                })}
+                options={layerOptions}
                 style={selectStyle}
               />
             </label>
@@ -1259,6 +1388,13 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const [hostKey, setHostKey] = useState("");
   const [hostKeyCustomChar, setHostKeyCustomChar] = useState("");
   const [flickDirection, setFlickDirection] = useState("");
+  // #1 longpress / #2 flick's layer picker (spec: "a layer option just like
+  // the desktop does"). Defaults to `touchLayerForChar(currentChar)` on every
+  // char change (see the reset effect below) — the SAME value
+  // `buildTouchMechanismRef` has always derived automatically — so leaving
+  // the picker untouched reproduces exactly the pre-picker behavior
+  // (defaults-first, spec §3c: "no default is a defect").
+  const [touchLayer, setTouchLayer] = useState<string>("default");
 
   // Resolved host key — shared by canApply, buildMechanismRef, and the
   // manual-edit promotion below. One resolution helper (charInput.ts),
@@ -1267,6 +1403,19 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const resolvedHostKey = useMemo(
     () => resolvedVkeyOf(resolveKeyPickerSelection(hostKey, hostKeyCustomChar)),
     [hostKey, hostKeyCustomChar],
+  );
+
+  // The working desktop IR the layer picker's options are derived from —
+  // same `s.ir ?? s.baseIr` fallback MechanismGallery's S-08 "Layer + key"
+  // card uses for its own IR-derived option pool (`workingIr` there).
+  const workingIrForLayers = useWorkingCopyStore((s) => s.ir ?? s.baseIr);
+
+  // Layer picker options — ONLY the layers the desktop keyboard actually
+  // uses (plus the always-present base/default layer). See
+  // `buildTouchLayerOptions`'s doc.
+  const touchLayerOptions = useMemo(
+    () => buildTouchLayerOptions(workingIrForLayers, i18n),
+    [workingIrForLayers, i18n],
   );
 
   // Whether the suggestion card must stay hidden for the current character —
@@ -1309,12 +1458,18 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // ---------------------------------------------------------------------------
 
   /**
-   * The touch layer the author is editing. Fixed to "default" in v1 — the
-   * gallery has no layer selector yet. It is named rather than inlined so that
-   * adding one widens `casePairTouchLayer`'s mapping instead of rewriting the
-   * proposal site.
+   * The touch layer the author is editing — the picker's `touchLayer` state
+   * for #1 longpress / #2 flick (the two methods that carry a picker), else
+   * the pre-existing hardcoded "default" for multitap/replace (unchanged;
+   * those two cards still auto-derive their layer from the char's own case,
+   * see `buildTouchMechanismRef`). Widens `casePairTouchLayer`'s mapping
+   * rather than rewriting the proposal site, exactly as anticipated when this
+   * was still hardcoded.
    */
-  const editingLayer: TouchLayerId = "default";
+  const editingLayer: TouchLayerId =
+    method === "longpress_alternates" || method === "flick_gestures"
+      ? touchLayer
+      : "default";
 
   const {
     proposal: casePairProposal,
@@ -1328,6 +1483,11 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     setHostKey("");
     setHostKeyCustomChar("");
     setFlickDirection("");
+    // Defaults-first: reproduce the exact pre-picker auto-derived layer for
+    // the new character (base/default for almost every char; shift only for
+    // an uppercase current char — see `touchLayerForChar`) so an author who
+    // never touches the picker sees byte-identical behavior.
+    setTouchLayer(currentChar !== null ? touchLayerForChar(currentChar) : "default");
     clearCompanion();
   }, [currentChar, clearCompanion]);
 
@@ -1358,11 +1518,19 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
    * function for the resolved-vkey invariant this delegates to.
    */
   function buildMechanismRef(char: string): MechanismRef | null {
+    // The layer picker only applies to #1 longpress / #2 flick — multitap
+    // and touch_key_replace keep their pre-existing case-derived layer
+    // (buildTouchMechanismRef's own `touchLayerForChar` fallback).
+    const explicitLayer =
+      method === "longpress_alternates" || method === "flick_gestures"
+        ? touchLayer
+        : undefined;
     return buildTouchMechanismRef(
       method,
       resolvedHostKey,
       flickDirection,
       char,
+      explicitLayer,
     );
   }
 
@@ -1591,6 +1759,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     setHostKey("");
     setHostKeyCustomChar("");
     setFlickDirection("");
+    setTouchLayer(touchLayerForChar(currentChar));
     // `charTouch` is listed because the case-pair "already placed" predicate
     // above closes over it — a stale map would re-propose a pairing the author
     // has already made.
@@ -1602,6 +1771,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     hostKey,
     resolvedHostKey,
     flickDirection,
+    touchLayer,
     charTouch,
     editingLayer,
     proposeCompanion,
@@ -2027,6 +2197,9 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               onHostKeyCustomCharChange={setHostKeyCustomChar}
               flickDirection={flickDirection}
               onFlickDirectionChange={setFlickDirection}
+              touchLayer={touchLayer}
+              onTouchLayerChange={setTouchLayer}
+              layerOptions={touchLayerOptions}
             />
           )}
 
