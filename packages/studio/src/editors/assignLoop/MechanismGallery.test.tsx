@@ -24,7 +24,7 @@
 //   - Already-produced section collapsed by default; toggle expands it.
 //   - Guards: null base → no-base prompt; empty inventory → survey prompt.
 
-import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
+import { describe, it, expect, afterEach, vi, beforeEach, beforeAll } from "vitest";
 import { screen, fireEvent, act, cleanup, waitFor, within, renderHook } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { render } from "../../test/renderWithI18n.tsx";
@@ -50,6 +50,7 @@ import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 import { expectCurrentChar } from "../../test/currentCharChip.ts";
 import { changeSelectMenu, selectMenuValue, selectMenuOptionValues } from "../../test/selectMenuTestUtils.ts";
+import { installDialogShim } from "../../test/dialogShim.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() — variables referenced inside vi.mock() factory closures.
@@ -239,6 +240,12 @@ function instantiateWorkingCopy(opts: { mnemonic?: boolean; caps?: boolean } = {
   const ir = makeTestIR([group], opts.mnemonic === true ? [mnemonicStore()] : []);
   useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: seedVfs, ir });
 }
+
+// jsdom does not implement HTMLDialogElement.showModal()/close() — shared
+// shim (test/dialogShim.ts); see that module for rationale. Needed here
+// because the leave-warning modal (ConfirmDialog) now mounts whenever the
+// whole-inventory unimplemented-characters check finds a gap.
+beforeAll(installDialogShim);
 
 afterEach(() => {
   cleanup();
@@ -932,10 +939,13 @@ describe("MechanismGallery — Done state (positional: last char's forward butto
     expect(onComplete).toHaveBeenCalledOnce();
   });
 
-  it("skipping the only (last) character completes the phase via onComplete", async () => {
-    // Skip on the last position is itself the phase completion — positional
-    // Skip advances by one position, or finishes if there is no next
-    // position, exactly like Next/Done.
+  it("skipping the only (last) character opens the leave-warning modal, then completes via \"Come back later\"", async () => {
+    // Skip on the last position is itself the phase completion attempt —
+    // positional Skip advances by one position, or finishes if there is no
+    // next position, exactly like Next/Done. "á" was skipped (never applied),
+    // so it is unimplemented — the whole-inventory leave-warning modal opens
+    // instead of completing immediately; "Come back later" defers and
+    // completes anyway.
     const onComplete = vi.fn();
     seedInventory(["á"]);
     await act(async () => {
@@ -947,7 +957,118 @@ describe("MechanismGallery — Done state (positional: last char's forward butto
       );
     });
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(onComplete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Come back later/i }));
     expect(onComplete).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Leave-warning modal — open/closed state + the "Go back and finish" (stay)
+// path, and the Back-button-does-not-trigger-it guard. The "Come back later"
+// (defer) path is covered above; this suite closes the gap on the modal's
+// OTHER outcomes and on the dialog's actual open/closed state (queried via
+// the native <dialog> element's `open` attribute, not just button presence —
+// ConfirmDialog always renders both buttons regardless of `open`, so a bare
+// button-exists query cannot distinguish "modal is showing" from "modal is
+// mounted but closed").
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — leave-warning modal open/closed state", () => {
+  it("does NOT open the dialog when Done completes with every character implemented", async () => {
+    const onComplete = vi.fn();
+    seedInventory(["á"]);
+    const { container } = await act(async () =>
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />,
+      ),
+    );
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+    await waitFor(() => {
+      const doneBtn = screen.getByRole("button", { name: "Done" });
+      expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(doneBtn);
+    });
+    // Completed directly — the dialog never opened.
+    expect(onComplete).toHaveBeenCalledOnce();
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+  });
+
+  it("opens the dialog (native <dialog open> attribute) when forward-completing with an unimplemented character", async () => {
+    seedInventory(["á"]);
+    const { container } = await act(async () =>
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(container.querySelector("dialog")?.hasAttribute("open")).toBe(true);
+  });
+
+  it('"Go back and finish" (primary) closes the dialog and does NOT complete — the author stays in the gallery able to finish "á"', async () => {
+    const onComplete = vi.fn();
+    seedInventory(["á"]);
+    const { container } = await act(async () =>
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(container.querySelector("dialog")?.hasAttribute("open")).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: /Go back and finish/i }));
+
+    // No advance — onComplete never fires, and the dialog is closed again.
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+    // Still on "á", with the Apply control still available to actually finish it.
+    expectCurrentChar("á");
+    expect(screen.getByRole("button", { name: /Apply method for á/i })).toBeTruthy();
+  });
+
+  it("Escape (the native <dialog> cancel event) does NOT proceed — it stays in the gallery, same as \"Go back and finish\" (P1(a))", async () => {
+    const onComplete = vi.fn();
+    seedInventory(["á"]);
+    const { container } = await act(async () =>
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    const dialog = container.querySelector("dialog")!;
+    expect(dialog.hasAttribute("open")).toBe(true);
+
+    fireEvent(dialog, new Event("cancel", { cancelable: true }));
+
+    // Escape must map to the STAY action, not the "Come back later" defer —
+    // onComplete must never fire from a dismissal.
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(dialog.hasAttribute("open")).not.toBe(true);
+    expectCurrentChar("á");
+  });
+
+  it("the ← back button never opens the leave-warning modal, even while characters remain unimplemented", async () => {
+    const onBack = vi.fn();
+    seedInventory(["á", "é"]);
+    const { container } = await act(async () =>
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} onComplete={vi.fn()} />,
+      ),
+    );
+    // Advance to "é" (idx 1) without implementing "á" — Skip is pure forward nav.
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    await waitFor(() => {
+      expectCurrentChar("é");
+    });
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+
+    // Navigate backward through both (still-unimplemented) characters via
+    // the Back control — this is a DIFFERENT control from the forward
+    // Done/Skip-on-last path that triggers the modal, and must never open it.
+    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    await waitFor(() => {
+      expectCurrentChar("á");
+    });
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    expect(onBack).toHaveBeenCalledOnce();
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
   });
 });
 
@@ -1525,9 +1646,13 @@ describe("MechanismGallery — Back after skipping the only character", () => {
       );
     });
 
-    // Skipping the only character is itself the phase completion (idx 0 is
-    // also the last position) — it does not move currentChar anywhere.
+    // Skipping the only character is itself the phase completion attempt
+    // (idx 0 is also the last position) — it does not move currentChar
+    // anywhere. "á" was skipped (never applied), so the leave-warning modal
+    // opens instead of completing immediately; defer via "Come back later".
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(onComplete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Come back later/i }));
     expect(onComplete).toHaveBeenCalledOnce();
 
     // "á" is still the selected chip — positional nav never nulled
@@ -3703,5 +3828,442 @@ describe("MechanismGallery — sequence builder accepts real click+type (user-ev
 
     const applyBtn = screen.getByTestId("sequences-apply") as HTMLButtonElement;
     expect(applyBtn.disabled).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 051 — the case-pair proposal now comes from the SHARED hook + banner
+// (useCasePairCompanion / CasePairProposalBanner). The existing companion
+// cases above are the behaviour-preservation gate (SC-005); these two pin the
+// contract's identity surface that the extraction makes load-bearing.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — shared case-pair affordance (spec 051)", () => {
+  it("renders the proposal through the shared banner's role/aria-label contract (FR-011)", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["θ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+
+    const banner = screen.getByRole("note", {
+      name: /Case-pair companion proposal/i,
+    });
+    expect(banner).toBeTruthy();
+    // Exactly two controls, Confirm and Dismiss — no third button, no
+    // "apply to all" (bulk actions are out of scope).
+    expect(within(banner).getAllByRole("button")).toHaveLength(2);
+  });
+
+  it("confirming applies to the RAISING swap when the same character carries two swap assignments (FR-008)", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["θ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // 1. First swap on K_Q — raises a proposal for K_Q.
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+    expect(
+      screen.getByRole("button", { name: /Map Θ to the shift layer of K_Q/i }),
+    ).toBeTruthy();
+
+    // 2. Second swap for the SAME character on K_W — at most one proposal is
+    //    pending, so this replaces the first.
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_W");
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+
+    // 3. Confirm — must pair with K_W (the raising placement), not K_Q. An
+    //    index/target scan would grab the first θ assignment and emit K_Q.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Map Θ to the shift layer of K_W/i }),
+    );
+
+    const assignments = getPhaseCPhysicalAssignments();
+    const companion = assignments.find((a) => a.target === "Θ");
+    expect(companion?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      "+ [SHIFT K_W] > U+0398",
+    );
+    // Both base swaps survive untouched (non-CAPS key → append, not replace).
+    expect(assignments.filter((a) => a.target === "θ")).toHaveLength(2);
+  });
+
+  // "Stale base removed before confirm records nothing" is already pinned by
+  // the two shipping cases above — "removing the base swap while the banner is
+  // up dismisses the companion proposal" (the gallery's own removal paths
+  // dismiss proactively) and "stale-guard: confirming a companion whose base
+  // assignment vanished via an unaudited mutation path records nothing" (the
+  // confirm-time backstop). Both still pass unedited after the extraction, so
+  // they are not restated here.
+});
+
+// ---------------------------------------------------------------------------
+// Spec 051 US2 — S-02 parallel combo (uppercase base letter -> uppercase output)
+//
+// The case-shifted elements are the BASE LETTER and the OUTPUT. The trigger
+// key, its deadkey name, and the accent character are carried across
+// unchanged: a dead key is an accent selector, not a letter.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — S-02 parallel-combo proposal (spec 051 US2)", () => {
+  it("a dead-key apply producing a lowercase accented letter raises a proposal", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // "á" defaults to the pre-enabled deadkey method (§3c).
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+
+    expect(screen.getByText(/has an uppercase form, Á/i)).toBeTruthy();
+  });
+
+  it("confirming records a parallel deadkey ref: trigger unchanged, base letter and output case-shifted", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+
+    const source = getPhaseCPhysicalAssignments().find((a) => a.target === "á");
+    const sourceSlots = source?.mechanisms[0]?.slotValues ?? {};
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Map Á to the shift layer of/i }),
+    );
+
+    const companion = getPhaseCPhysicalAssignments().find(
+      (a) => a.target === "Á",
+    );
+    expect(companion?.mechanisms[0]?.patternId).toBe(PATTERN_DEADKEY);
+    expect(companion?.mechanisms[0]?.strategyId).toBe("S-02");
+
+    const slots = companion?.mechanisms[0]?.slotValues ?? {};
+    // Unchanged across the pair.
+    expect(slots["triggerKey"]).toBe(sourceSlots["triggerKey"]);
+    expect(slots["deadkeyName"]).toBe(sourceSlots["deadkeyName"]);
+    expect(slots["accentChar"]).toBe(sourceSlots["accentChar"]);
+    // Case-shifted.
+    expect(sourceSlots["baseLetters"]).toBe("a");
+    expect(slots["baseLetters"]).toBe("A");
+    expect(slots["accentedForms"]).toBe("Á");
+
+    // The source combo survives untouched.
+    expect(
+      getPhaseCPhysicalAssignments().find((a) => a.target === "á"),
+    ).toBeDefined();
+  });
+
+  it("dismissing the S-02 proposal records nothing", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Do not map Á to the shift layer/i }),
+    );
+
+    const assignments = getPhaseCPhysicalAssignments();
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.target).toBe("á");
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+
+  it("a caseless output raises no S-02 proposal", async () => {
+    instantiateWorkingCopy();
+    // Arabic alef with hamza below — caseless, so no confident capital.
+    seedInventory(["إ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for إ/i }));
+
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+
+  it("stale-guard: confirming a parallel-combo proposal whose raising deadkey assignment vanished via an unaudited mutation path records nothing", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // "á" defaults to the pre-enabled deadkey method (§3c) — apply directly.
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+    expect(screen.getByText(/has an uppercase form, Á/i)).toBeTruthy();
+
+    // Simulate a hypothetical future mutation path that removes the raising
+    // deadkey assignment WITHOUT going through the gallery's own removal
+    // handlers (which proactively dismiss the banner) — direct store
+    // mutation bypassing the component's handlers entirely, the same
+    // technique the physical stale-guard test above uses. The component's
+    // pendingCompanion state is untouched by this, so the banner remains
+    // visible in the DOM, exercising confirmComboCompanion's confirm-time
+    // staleness re-check (`sessionAssignments.includes(proposal.baseAssignment)`)
+    // rather than any removal-time dismissal.
+    await act(async () => {
+      useWorkingCopyStore.getState().recordAssignments([]);
+    });
+    expect(screen.getByText(/has an uppercase form, Á/i)).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Map Á to the shift layer of/i }),
+    );
+
+    // Nothing was recorded for the counterpart — the stale proposal was
+    // dismissed, not applied.
+    expect(
+      getPhaseCPhysicalAssignments().find((a) => a.target === "Á"),
+    ).toBeUndefined();
+    expect(getPhaseCPhysicalAssignments()).toHaveLength(0);
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 051 US2 — S-03 parallel combo. The proposal is raised in the gallery
+// (which owns the one hook and the one banner) from the sequence panel's
+// onApplied seam; the panel renders no banner of its own.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — S-03 parallel-combo proposal (spec 051 US2)", () => {
+  async function applySequence(content: string, indicator: string) {
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByTestId("sequences-content"), {
+      target: { value: content },
+    });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), {
+      target: { value: indicator },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("sequences-apply"));
+    });
+  }
+
+  it("a sequence whose content is a single cased character raises a proposal", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    await applySequence("a", "s");
+
+    expect(screen.getByText(/has an uppercase form, Á/i)).toBeTruthy();
+  });
+
+  it("confirming records a parallel sequence: indicator unchanged, content and collapse target case-shifted", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    await applySequence("a", "s");
+    fireEvent.click(
+      screen.getByRole("button", { name: /Map Á to the shift layer of/i }),
+    );
+
+    const assignments = getPhaseCPhysicalAssignments();
+
+    const source = assignments.find((a) => a.target === "á");
+    expect(source?.mechanisms[0]?.slotValues).toMatchObject({
+      firstLetterOut: "a",
+      secondLetter: "s",
+      collapsedChar: "á",
+    });
+
+    const companion = assignments.find((a) => a.target === "Á");
+    expect(companion?.mechanisms[0]?.patternId).toBe(PATTERN_SEQUENCE);
+    expect(companion?.mechanisms[0]?.strategyId).toBe("S-03");
+    expect(companion?.mechanisms[0]?.slotValues).toMatchObject({
+      // Case-shifted.
+      firstLetterOut: "A",
+      collapsedChar: "Á",
+      // Unchanged — the indicator is a physical key by construction.
+      secondLetter: "s",
+    });
+  });
+
+  it("multi-character content ('ng') raises no proposal", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ŋ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    await applySequence("ng", "y");
+
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+    expect(getPhaseCPhysicalAssignments()).toHaveLength(1);
+  });
+
+  it("confirming twice is a no-op under the existing (firstLetterOut, secondLetter) dedup", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    await applySequence("a", "s");
+    fireEvent.click(
+      screen.getByRole("button", { name: /Map Á to the shift layer of/i }),
+    );
+
+    // Re-apply the identical source sequence: the panel's own dedup makes it a
+    // no-op and hands back no payload, so no second proposal is raised.
+    await applySequence("a", "s");
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+
+    const companion = getPhaseCPhysicalAssignments().find(
+      (a) => a.target === "Á",
+    );
+    expect(companion?.mechanisms).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 051 P1 fix — "counterpart already placed" (spec §Edge Cases), wired to
+// the physical (S-01) and combo (S-02/S-03) mechanisms. The touch mechanism
+// already had this wired (TouchGallery.tsx); these lock the other two.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — 'counterpart already placed' suppression (spec 051 P1 fix)", () => {
+  it("physical (S-01): no companion prompt when the counterpart is already on the shift layer of the same key", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["θ"]);
+    // Θ already recorded on the shift layer of K_Q — the exact slot a
+    // base-layer θ swap on K_Q would otherwise propose.
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "Θ",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: "simple_swap",
+            strategyId: "S-01",
+            slotValues: { kmnRules: "+ [SHIFT K_Q] > U+0398" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for simple swap/i), "K_Q");
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+
+    // No proposal — the parallel slot already produces the counterpart.
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+
+    const assignments = getPhaseCPhysicalAssignments();
+    // Only the pre-seeded Θ assignment plus the new θ swap — nothing added
+    // for a redundant companion.
+    expect(assignments).toHaveLength(2);
+    expect(assignments.filter((a) => a.target === "Θ")).toHaveLength(1);
+  });
+
+  it("combo S-02: no parallel-combo prompt when the counterpart already has a PATTERN_DEADKEY mechanism on the same trigger key", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    // Á already has a deadkey mechanism on the default trigger key (K_COLON,
+    // MechanismGallery's initial triggerKey state) — the parallel combo this
+    // apply would otherwise propose.
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "Á",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_DEADKEY,
+            strategyId: "S-02",
+            slotValues: {
+              triggerKey: "K_COLON",
+              deadkeyName: "dead0",
+              baseLetters: "A",
+              accentedForms: "Á",
+              accentChar: ";",
+            },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // "á" defaults to the pre-enabled deadkey method (§3c) on K_COLON.
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+
+    const assignments = getPhaseCPhysicalAssignments();
+    expect(assignments.filter((a) => a.target === "Á")).toHaveLength(1);
+  });
+
+  it("combo S-03: no parallel-combo prompt when the counterpart already has a PATTERN_SEQUENCE mechanism on the same indicator key", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    // Á already has a sequence mechanism keyed on the same indicator ("s")
+    // the new á sequence below will use.
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "Á",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_SEQUENCE,
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "A", secondLetter: "s", collapsedChar: "Á" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByTestId("sequences-content"), {
+      target: { value: "a" },
+    });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), {
+      target: { value: "s" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("sequences-apply"));
+    });
+
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+
+    const assignments = getPhaseCPhysicalAssignments();
+    expect(assignments.filter((a) => a.target === "Á")).toHaveLength(1);
+    expect(assignments.find((a) => a.target === "á")).toBeDefined();
   });
 });

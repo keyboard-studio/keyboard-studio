@@ -26,6 +26,17 @@ export interface ConfirmDialogProps {
   onPrimary: () => void;
   /** Clicking the secondary button, Escape, or the backdrop. Falls back to onPrimary when omitted. */
   onSecondary?: () => void;
+  /**
+   * Which action Escape / backdrop-click routes to, independent of the
+   * secondary button's own click handler. Defaults to `"secondary"` —
+   * preserves every existing call site's behavior (dismiss = onSecondary ??
+   * onPrimary). Set to `"primary"` for dialogs where the secondary button is
+   * a "proceed anyway" / defer action rather than a cancel — e.g. the
+   * gallery leave-warnings, where "Come back later" (secondary) advances the
+   * phase and Escape must NOT silently do the same thing. Conventional
+   * modal semantics: Escape/backdrop = cancel/stay, never an implicit confirm.
+   */
+  dismissAction?: "primary" | "secondary";
 }
 
 export function ConfirmDialog({
@@ -36,11 +47,22 @@ export function ConfirmDialog({
   secondaryLabel,
   onPrimary,
   onSecondary,
+  dismissAction = "secondary",
 }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  // Dismiss route (Escape / backdrop / secondary button). Single-button dialogs
-  // that omit onSecondary dismiss via the primary action instead.
-  const dismiss = onSecondary ?? onPrimary;
+  // Explicit secondary-button click — ALWAYS onSecondary (falling back to
+  // onPrimary only for single-button info dialogs that omit onSecondary
+  // entirely). This is unaffected by dismissAction: a caller who deliberately
+  // clicks "Come back later" gets exactly that action.
+  const explicitSecondaryClick = onSecondary ?? onPrimary;
+  // Escape / backdrop dismiss route — independent of the button above.
+  // Defaults to "secondary" (dismiss = onSecondary ?? onPrimary), preserving
+  // every existing call site's behavior. dismissAction="primary" routes
+  // Escape/backdrop to onPrimary instead — for dialogs (the gallery leave-
+  // warnings) where the secondary button is a "proceed anyway" / defer
+  // action, not a cancel; conventional modal semantics keep Escape/backdrop
+  // as cancel/stay, never an implicit confirm.
+  const dismiss = dismissAction === "primary" ? onPrimary : explicitSecondaryClick;
 
   // Open / close the native <dialog> in sync with the `open` prop.
   useEffect(() => {
@@ -130,7 +152,7 @@ export function ConfirmDialog({
           {/* Secondary (muted) — "Cancel" / "Just here". Omitted for info dialogs. */}
           {secondaryLabel !== undefined && (
             <button
-              onClick={dismiss}
+              onClick={explicitSecondaryClick}
               style={{
                 ...btnBase,
                 color: 'var(--app-text-muted)',

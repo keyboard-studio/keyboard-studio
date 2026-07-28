@@ -296,7 +296,7 @@ export function ProfileScreen() {
           )}
         </div>
 
-        {/* My keyboards — the real list, replacing the disabled placeholder */}
+        {/* My keyboards — the multi-project draft list (US3a / FR-014). */}
         <MyKeyboardsList />
       </div>
 

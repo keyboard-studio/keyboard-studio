@@ -104,6 +104,89 @@ export type ActiveStepId =
   | "unsupported";
 
 // ---------------------------------------------------------------------------
+// sanitizeHistory — defensive repair for a `history` stack that violates the
+// "forward-only hard gate" invariant (P0 follow-up).
+//
+// Why this exists: `history` is normally only ever mutated by advance()/
+// popHistory()/backToTouchSeedSource()/backToUnfinishedGallery(), none of
+// which can themselves produce an invalid stack. But `applyTraversalSnapshot`
+// (../lib/draftPersistence.ts's loadDraft) patches `history` directly from
+// whatever was serialized to localStorage by a PRIOR page load — including
+// one running an older build. The P0 regression this guards: a build that
+// (bug, now fixed — see backToUnfinishedGallery's docstring above) pushed a
+// stale "help" entry onto `history` via the forward-push `advance()`
+// primitive persisted that stale entry to localStorage; shipping the fix to
+// the store does not repair already-persisted state, so a returning
+// author's draft still carries the bad entry and Back-from-mechanisms still
+// resurfaces "help" indefinitely.
+//
+// The invariant this enforces is narrower than "every history entry must be
+// strictly earlier than activeStepId in spine order" — that broader rule is
+// UNSOUND here: `backToUnfinishedGallery`'s desktop-first "jump past the
+// immediate predecessor" behaviour (see its docstring) deliberately leaves
+// `history` holding entries at/after the CURRENT `activeStepId`'s canonical
+// spine position (e.g. routing help -> "mechanisms" while "touch_seed_source"
+// — which sits AFTER "mechanisms" on the spine — remains on the stack, so the
+// next ordinary Back reaches it). A generic order-comparison sanitizer would
+// wrongly strip that legitimate, intentionally-reordered entry.
+//
+// Instead this targets exactly the actual corruption class: FORWARD_ONLY_GATE
+// lists steps that are hard gates with no ordinary "Back" origin of their own
+// — a step in this table may ONLY legitimately sit in `history` when
+// `activeStepId` equals the one step it is known to advance into. Today the
+// only such step is "help" (the Phase F hard gate — see PhaseFGate.tsx's
+// module comment: no "come back later" escape, and advance()'s "help" case
+// only ever pushes "help" onto history when moving on to "done"). Any other
+// appearance of "help" in `history` is provably stale and dropped.
+// ---------------------------------------------------------------------------
+
+const FORWARD_ONLY_GATE_NEXT: Partial<Record<ActiveStepId, ActiveStepId>> = {
+  help: "done",
+};
+
+/**
+ * Drop any `history` entry that is a forward-only-gate step (FORWARD_ONLY_GATE_NEXT)
+ * whose legitimate successor does not match the current `activeStepId` —
+ * i.e. a stale "help" entry left behind while the author is anywhere other
+ * than "done". Preserves the relative order of the entries that remain.
+ */
+function sanitizeHistory(
+  activeStepId: ActiveStepId,
+  history: readonly ActiveStepId[],
+): readonly ActiveStepId[] {
+  const sanitized = history.filter((id) => {
+    const legitimateNext = FORWARD_ONLY_GATE_NEXT[id];
+    return legitimateNext === undefined || legitimateNext === activeStepId;
+  });
+  // Fast path: identical length means nothing was dropped — return the
+  // original reference so callers that compare-by-reference (none currently
+  // do, but this keeps the common case allocation-free) aren't penalized.
+  return sanitized.length === history.length ? history : sanitized;
+}
+
+/**
+ * Defensive re-derivation of a Back target from a (possibly corrupted)
+ * `history` stack: sanitizes (see sanitizeHistory above) before taking the
+ * new top as the landing step. Used by every back-primitive below so the
+ * "never land on a stale forward-only-gate step" invariant holds even if
+ * `history` was never sanitized on load (belt-and-suspenders alongside
+ * applyTraversalSnapshot's sanitize).
+ *
+ * Returns null when no valid predecessor remains (mirrors the empty-history
+ * no-op case).
+ */
+function popValidHistoryEntry(
+  activeStepId: ActiveStepId,
+  history: readonly ActiveStepId[],
+): { prev: ActiveStepId; rest: readonly ActiveStepId[] } | null {
+  const sanitized = sanitizeHistory(activeStepId, history);
+  if (sanitized.length === 0) return null;
+  // Non-null: length guard above proves this index exists.
+  const prev = sanitized[sanitized.length - 1]!;
+  return { prev, rest: sanitized.slice(0, -1) };
+}
+
+// ---------------------------------------------------------------------------
 // State interface
 // ---------------------------------------------------------------------------
 
@@ -256,6 +339,40 @@ export interface SurveySessionState {
    */
   backToTouchSeedSource: () => void;
 
+  /**
+   * "Go finish the unfinished gallery" action — shared by PhaseFGate.tsx's
+   * hard-gate ConfirmDialog ("Go back and finish", offered when
+   * `inventoryCoverageGate` is still blocked on "help") and OutputScreen.tsx's
+   * coverage-blocked banner ("Go finish them now", reachable from #output
+   * directly, bypassing "help" entirely). Both need to route the author to
+   * whichever gallery still has gaps — desktop ("mechanisms") first if it is
+   * incomplete, else "touch" — and BOTH are conceptually a BACK action, not a
+   * forward one, even though the target may not be the immediate predecessor
+   * in `history` (desktop-first priority can route past "touch" straight to
+   * "mechanisms" — see each caller's blockedOnDesktop-first ordering).
+   *
+   * Regression this guards (P0): the previous PhaseFGate implementation
+   * called the forward-push `advance()` primitive to perform this "route
+   * back to the relevant gallery" jump. `advance()` PUSHES the current
+   * activeStepId (typically "help") onto history before switching —
+   * appropriate for a genuine forward step, but wrong here, since this
+   * action is conceptually a Back. That extra push left a stale "help" entry
+   * sitting on top of the walked stack; the NEXT ordinary Back traversal
+   * from the target gallery (a plain `popHistory()`, or
+   * `backToTouchSeedSource()`'s own history-consuming branch) would then pop
+   * that stale entry and silently land the author back on the blocked
+   * "help" step — "Back" appearing to route to Phase F instead of the
+   * previous step, indefinitely, since the gate stays blocked.
+   *
+   * The fix: behave exactly like `popHistory` (pop the one entry that was
+   * pushed to reach the current screen) but set `activeStepId` to the
+   * caller-supplied `target` rather than trusting whatever was popped. This
+   * keeps `history` exactly as balanced as it was before, so it never
+   * resurfaces later. No-op-safe when history is empty (mirrors
+   * `popHistory`'s empty-history guard) — still honors the caller's target.
+   */
+  backToUnfinishedGallery: (target: "mechanisms" | "touch") => void;
+
   /** Reset every slot to initial (start-over). Includes clearing history. */
   reset: () => void;
 
@@ -322,7 +439,7 @@ export interface SurveySessionState {
 
 type SurveySessionData = Omit<
   SurveySessionState,
-  | "advance" | "popHistory" | "backToTouchSeedSource" | "reset" | "hydrate"
+  | "advance" | "popHistory" | "backToTouchSeedSource" | "backToUnfinishedGallery" | "reset" | "hydrate"
   | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
   | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
   | "setTouchSeedSource" | "setBaseConfirmed" | "setDiscoveryMethod"
@@ -383,30 +500,62 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
 
   popHistory: () =>
     set((s) => {
-      if (s.history.length === 0) return s;
-      // Non-null: length guard above proves this index exists.
-      const prev = s.history[s.history.length - 1]!;
+      // Defensive: re-derive the landing step from a SANITIZED view of
+      // `history` (see popValidHistoryEntry above) rather than trusting the
+      // raw top entry — self-heals a corrupted/persisted-stale stack instead
+      // of ever landing on a step at-or-ahead-of the current one.
+      const popped = popValidHistoryEntry(s.activeStepId, s.history);
+      if (popped === null) return s;
       return {
-        activeStepId: prev,
-        history: s.history.slice(0, -1),
+        activeStepId: popped.prev,
+        history: popped.rest,
         lastNavigation: "pop" as const,
       };
     }),
 
   backToTouchSeedSource: () =>
     set((s) => {
-      const top = s.history[s.history.length - 1];
+      const sanitized = sanitizeHistory(s.activeStepId, s.history);
+      const top = sanitized[sanitized.length - 1];
       if (top === "touch_seed_source") {
         return {
           activeStepId: "touch_seed_source",
-          history: s.history.slice(0, -1),
+          history: sanitized.slice(0, -1),
           lastNavigation: "pop" as const,
         };
       }
       // Fork was skipped this pass — jump without consuming history so
       // "mechanisms" (or whatever is actually on top) stays there for the
-      // chooser's own Back.
-      return { activeStepId: "touch_seed_source", lastNavigation: "pop" as const };
+      // chooser's own Back. Commit the sanitized stack (a no-op unless it was
+      // corrupted) rather than the raw one, so a later Back doesn't re-trip
+      // over the same invalid entries.
+      return {
+        activeStepId: "touch_seed_source",
+        history: sanitized,
+        lastNavigation: "pop" as const,
+      };
+    }),
+
+  // See the interface docstring above for the P0 regression this fixes:
+  // behaves like popHistory (consumes the one entry "help" pushed — always
+  // "touch") but sets activeStepId to the caller's target rather than
+  // whatever was actually on top, so a gate that needs to route past "touch"
+  // to "mechanisms" doesn't leave a stale entry for a later Back to resurface.
+  backToUnfinishedGallery: (target) =>
+    set((s) => {
+      // Sanitize first (defensive, matches popHistory/backToTouchSeedSource) —
+      // this action is called with activeStepId === "help", so any entry at
+      // or after "help" in a corrupted stack is dropped before the top is
+      // consumed, never carried forward.
+      const sanitized = sanitizeHistory(s.activeStepId, s.history);
+      if (sanitized.length === 0) {
+        return { activeStepId: target, history: sanitized, lastNavigation: "pop" as const };
+      }
+      return {
+        activeStepId: target,
+        history: sanitized.slice(0, -1),
+        lastNavigation: "pop" as const,
+      };
     }),
 
   reset: () =>
@@ -488,8 +637,17 @@ export function snapshotTraversal(): TraversalSnapshot {
 /**
  * Patch a `TraversalSnapshot` directly into the survey-session store.
  * `TraversalSnapshot` is exactly the non-action slice of `SurveySessionState`,
- * so this is a direct `setState` — no field-by-field mapping needed.
+ * so this is a direct `setState` — no field-by-field mapping needed, EXCEPT
+ * `history`: sanitized via `sanitizeHistory` first (P0 follow-up) so a stack
+ * persisted by an older, buggy build (or corrupted by any other means) can
+ * never resurrect a stale forward entry (e.g. "help") once restored here.
+ * Shipping a fix to the back-primitives above does not, on its own, repair a
+ * draft a returning author already has sitting in localStorage — this is the
+ * repair step for that case. See the STEP_ORDER/sanitizeHistory doc comment.
  */
 export function applyTraversalSnapshot(snapshot: TraversalSnapshot): void {
-  useSurveySessionStore.setState({ ...snapshot });
+  useSurveySessionStore.setState({
+    ...snapshot,
+    history: sanitizeHistory(snapshot.activeStepId, snapshot.history),
+  });
 }

@@ -202,8 +202,17 @@ export async function pickBaseKeyboard(
 ): Promise<void> {
   const card = page.getByTestId(`base-card-${keyboardId}`);
   if (await card.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    // Fast path: ranked suggestion card
+    // Fast path: ranked suggestion card. Clicking the card SELECTS it — the
+    // step still has to be confirmed, exactly as on the search path below.
+    // (Specs whose base is not a ranked suggestion never exercise this branch,
+    // which is why the missing confirm went unnoticed: the walk simply parked
+    // on the picker until the test timed out.)
     await card.click();
+    const cardConfirm = page.getByTestId("base-confirm");
+    if (await cardConfirm.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await expect(cardConfirm).toBeEnabled({ timeout: 5_000 });
+      await cardConfirm.click();
+    }
     return;
   }
 

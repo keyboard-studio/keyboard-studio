@@ -120,6 +120,37 @@ Three layers gate the working copy (spec [§10](../spec.md#10-validator-and-lint
     debounces persistence only. Neither touches the validation path, so neither
     is a "second debounce timer" in the D3 sense.
 
+## Exemplar sourcing — one offline path
+
+Which characters a language actually needs is answered in exactly one place
+([specs/044](../specs/044-cldr-sldr-exemplars/spec.md) FR-015):
+`sourceExemplars(bcp47)` in
+[`packages/engine/src/character-discovery/exemplarSource.ts`](../packages/engine/src/character-discovery/exemplarSource.ts).
+Its three consumers — `buildCharacterMap` (the Phase B picker), `suggestMissing`
+(gap suggestions and the surplus signal), and the studio's Phase B prefill — all
+read it rather than each wiring their own loader.
+
+It reads a **committed, version-pinned index** baked at prebuild from two
+sources: CLDR (`cldr-misc-full`, npm, lockfile-pinned) and SIL's SLDR (one
+SHA-256-pinned tarball). Consequences worth knowing before touching it:
+
+- **No network at authoring time.** The index is a lazily-imported JSON chunk,
+  so a full survey run makes zero requests. The live CLDR fetch loaders still
+  exist and are still exported, but they are the opt-in refresh route and the
+  test-injection seam — not the authoring path.
+- **Precedence is a lookup-time decision, not a bake-time one.** Both sources'
+  raw sets are retained per locale; CLDR wins where it covers a tag. The rule can
+  change without regenerating the artifact.
+- **Deterministic.** Same pins → byte-identical index. No wall clock anywhere in
+  the codegen; the `version.generated` stamp is derived from the pins.
+- **Attribution is per character.** Every returned character carries its source
+  and its confidence (SLDR's LDML draft rank). Confidence is surfaced in the UI,
+  never filtered on — most SLDR coverage is drafted or machine-generated, and
+  dropping it would discard the point of the feature.
+- **`null` means "no confident seed", never an error.** An uncovered tag or a
+  fired confidence gate falls through to whole-script behaviour; nothing blocks
+  the survey.
+
 ## Subsystem composition map
 
 The trackable architecture index — each subsystem, its spec home, and its code
@@ -131,6 +162,7 @@ not a number maintained by hand here.)
 | Codec / KeyboardIR spine | spec §5a | `packages/engine/src/codec/` |
 | Working-copy spine | spec §8 / [specs/008](../specs/008-data-flow/spec.md) · [workflow-model.md](workflow-model.md) | engine working-copy + `packages/contracts/src/ir/` |
 | Data flow / survey | [specs/008](../specs/008-data-flow/spec.md) | `packages/engine/src/{character-discovery,inventory,loader}/`, `packages/studio/src/survey/` |
+| Exemplar sourcing | [specs/044](../specs/044-cldr-sldr-exemplars/spec.md) | `packages/engine/src/character-discovery/{exemplarSource,exemplarIndex,exemplarTypes}.ts` + `generated/exemplars.generated.json` |
 | Three-group routing | spec §9 | engine routing + `packages/studio` gallery scoping |
 | Strategy selection | [specs/007](../specs/007-strategy-selection/spec.md) | `packages/engine/src/strategy-selector/`, `recognizer/` |
 | Pattern schema (contract) | [specs/005](../specs/005-pattern-schema/spec.md) | `packages/contracts/src/pattern.ts` (+ zod `schemas.ts`) |

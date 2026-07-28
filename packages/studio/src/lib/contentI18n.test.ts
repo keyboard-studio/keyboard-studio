@@ -4,6 +4,7 @@ import { I18n } from "@lingui/core";
 import {
   activateContentLocale,
   resolveContentString,
+  slugifyIdSegment,
   _setContentCatalogForTesting,
   _resetContentI18nForTesting,
 } from "./contentI18n.ts";
@@ -94,6 +95,97 @@ describe("resolveContentString", () => {
         i18nFor("fr"),
       ),
     ).toBe("empreinte de script");
+  });
+});
+
+// spec 050 US1: flowQuestions is the fourth Tier B catalog, feeding the
+// modular flow-engine's survey-question prose (prompt/label/body/help_text/
+// options[].label). See specs/050-flow-question-i18n/research.md D5 and
+// contracts/flow-question-catalog-format.md for the key-namespace contract.
+describe("resolveContentString — flowQuestions catalog (spec 050 US1)", () => {
+  it("resolves a flowQuestions prompt under the singular flowQuestion namespace segment", () => {
+    _setContentCatalogForTesting("fr", {
+      flowQuestions: {
+        "content.flowQuestion.il_language_english.prompt":
+          "Comment votre langue est-elle appelée en anglais ?",
+      },
+    });
+    expect(
+      resolveContentString(
+        "flowQuestions",
+        "il_language_english",
+        "prompt",
+        "What is your language called in English?",
+        i18nFor("fr"),
+      ),
+    ).toBe("Comment votre langue est-elle appelée en anglais ?");
+  });
+
+  it("falls back to English when the flowQuestions key is absent from the seeded catalog", () => {
+    _setContentCatalogForTesting("fr", {
+      flowQuestions: {
+        "content.flowQuestion.some_other_question.prompt": "Autre question",
+      },
+    });
+    expect(
+      resolveContentString(
+        "flowQuestions",
+        "il_language_english",
+        "prompt",
+        "What is your language called in English?",
+        i18nFor("fr"),
+      ),
+    ).toBe("What is your language called in English?");
+  });
+
+  it("falls back to English for flowQuestions when the active locale is English", () => {
+    _setContentCatalogForTesting("en", {
+      flowQuestions: {
+        "content.flowQuestion.il_language_english.prompt": "Should never be read at locale en",
+      },
+    });
+    expect(
+      resolveContentString(
+        "flowQuestions",
+        "il_language_english",
+        "prompt",
+        "What is your language called in English?",
+        i18nFor("en"),
+      ),
+    ).toBe("What is your language called in English?");
+  });
+
+  it("falls back to English for flowQuestions when the locale was never activated", () => {
+    expect(
+      resolveContentString(
+        "flowQuestions",
+        "il_language_english",
+        "prompt",
+        "What is your language called in English?",
+        i18nFor("fr"),
+      ),
+    ).toBe("What is your language called in English?");
+  });
+
+  it("round-trips an option-label key through slugifyIdSegment for a dotted option value", () => {
+    // Some real FlowOption values contain literal dots (e.g. "0.6"); the
+    // extractor slugifies them into the catalog key, so the render-site
+    // lookup must apply the identical transform or it silently never
+    // resolves (research.md D5 / flow-question-catalog-format.md).
+    _setContentCatalogForTesting("fr", {
+      flowQuestions: {
+        "content.flowQuestion.track_choice.option.0_6.label": "Variante zéro virgule six",
+      },
+    });
+    expect(
+      resolveContentString(
+        "flowQuestions",
+        "track_choice",
+        `option.${slugifyIdSegment("0.6")}.label`,
+        "Point six variant",
+        i18nFor("fr"),
+      ),
+    ).toBe("Variante zéro virgule six");
   });
 });
 

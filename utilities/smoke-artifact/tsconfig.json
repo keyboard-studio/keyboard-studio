@@ -1,13 +1,10 @@
 {
+  "extends": "../tsconfig.contracts-paths.json",
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "target": "ES2022",
     "allowImportingTsExtensions": true,
-    "noEmit": true,
-    "paths": {
-      "@keyboard-studio/contracts": ["../../packages/contracts/src/index.ts"],
-      "@keyboard-studio/contracts/fixtures": ["../../packages/contracts/src/fixtures/index.ts"]
-    }
+    "noEmit": true
   }
 }

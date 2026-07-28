@@ -4,8 +4,11 @@
 // This module is the reload-survival counterpart to persistWorkingCopy.ts
 // (which snapshots to sessionStorage across an OAuth redirect only). The
 // durable draft persists BOTH the working copy AND the traversal state (the
-// "where am I in the walk" position), keyed per-project so a future
-// multi-project index (US3a / FR-014) is additive rather than a migration.
+// "where am I in the walk" position), keyed per-project so the multi-project
+// index (US3a / FR-014) is additive rather than a key-scheme migration. The
+// one thing additive-ness does NOT give for free: drafts written before the
+// index existed have no index row, so "My keyboards" would not list them.
+// `reconcileProjectIndex` adopts those on read (US3 / SC-003).
 //
 // See specs/034-mvp-authoring-walk/contracts/persistence.md (the UI contract)
 // and specs/034-mvp-authoring-walk/data-model.md (the DurableDraft envelope).
@@ -17,7 +20,6 @@
 import {
   prepareWorkingCopySnapshot,
   snapshotWorkingCopyData,
-  type WorkingCopySnapshot,
 } from "./persistWorkingCopy.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { WorkingCopyData } from "../stores/workingCopyStore.ts";
@@ -25,15 +27,27 @@ import {
   applyTraversalSnapshot,
   snapshotTraversal,
   useSurveySessionStore,
-  type TraversalSnapshot,
 } from "../stores/surveySessionStore.ts";
 import {
   applyPhaseBDraftSnapshot,
   snapshotPhaseBDraft,
   usePhaseBDraftStore,
-  type PhaseBDraftSnapshot,
 } from "../stores/phaseBDraftStore.ts";
 import { DEFAULT_PHASE_B_FONT, isPhaseBFontValue } from "../survey/surveyStyles.ts";
+// Re-exported (not just imported) so existing external consumers of this
+// module (draftPersistence.test.ts, StudioShell.tsx, etc.) keep importing
+// `DurableDraft`/`ProjectIndexEntry`/`DraftMeta` from here unchanged, even
+// though all three now LIVE in the dependency-free draftTypes.ts leaf — see
+// that module's header for why `DurableDraft` moved out of this file (a
+// depcruise-flagged type-only cycle through serverDraftStore.ts).
+export type { DurableDraft, ProjectIndexEntry, DraftMeta } from "./draftTypes.ts";
+import type { DurableDraft, ProjectIndexEntry, DraftMeta } from "./draftTypes.ts";
+import {
+  saveServerDraft,
+  saveServerDraftBeacon,
+  clearServerDraft,
+  type ServerDraftMeta,
+} from "./serverDraftStore.ts";
 
 // ---------------------------------------------------------------------------
 // Key scheme (T004) — per-project, versioned localStorage keys.
@@ -68,52 +82,45 @@ export function draftKey(projectKey: string): string {
 
 /**
  * localStorage key for the single "which project is active" pointer. Lets
- * boot resolve the one durable draft to load without a full index (G-3). A
- * future multi-project build (US3a) replaces this with a `ks.draftIndex.v1`
- * enumeration; this pointer is the one-project special case of that.
+ * boot resolve the one durable draft to load without a full index (G-3). The
+ * multi-project index below (`DRAFT_INDEX_KEY`) is the "My keyboards" list
+ * this pointer was always meant to be the one-project special case of.
  */
 const ACTIVE_PROJECT_KEY = "ks.draft.active" as const;
 
-// ---------------------------------------------------------------------------
-// DurableDraft envelope (data-model.md)
-// ---------------------------------------------------------------------------
+/**
+ * localStorage key for the multi-project index (US3a / FR-014 — "My
+ * keyboards"). Stores a `ProjectIndexEntry[]`: a lightweight per-project row
+ * (no working-copy payload) so the list can render without deserializing
+ * every project's full `DurableDraft`. Kept up to date by `saveDraft` (upsert)
+ * and `clearDraft` (remove) — every write to a per-project draft record has a
+ * matching write to this index, so no new drift can originate in this build.
+ * Drafts written before this key existed are backfilled by
+ * `reconcileProjectIndex` (US3 / SC-003).
+ */
+export const DRAFT_INDEX_KEY = "ks.draftIndex.v1" as const;
 
 /**
- * The persisted record that lets an author resume across a reload.
- *
- * `workingCopy` and `traversal` are the two sub-entities defined in
- * data-model.md, reused verbatim from persistWorkingCopy.ts (working copy) and
- * surveySessionStore.ts (traversal) — see T017/T018.
- *
- * `phaseBDraft` (P0 fix, post-data-model.md addition) folds in the Phase B
- * build-list screen's in-progress typed/toggled alphabet
- * (../stores/phaseBDraftStore.ts) — NOT part of the original data-model.md
- * envelope because that store didn't exist yet. Without it, a reload/OAuth
- * return mid-build-list restored `traversal.discoveryMethod` /
- * `traversal.charactersSubStage` (already covered by TraversalSnapshot) but
- * landed the author back on the build-list screen with an EMPTY alphabet,
- * silently discarding everything they'd added — this studio-internal
- * persistence type is not the locked Pattern/Criterion contract, so extending
- * it is fine. Optional (`?`) rather than a DRAFT_VERSION bump: a
- * pre-this-change record simply has no `phaseBDraft` field, and `loadDraft`
- * treats that as "no draft alphabet yet" (`chars: []`) rather than discarding
- * an otherwise-good record — see the `envelope.phaseBDraft ??` fallback below.
+ * Reserved projectKey for a survey session with no instantiated working copy
+ * yet. Ported from the dev reference implementation (draftAutosave.ts) for
+ * interface parity, but NOT currently produced by any call site on main:
+ * `saveDraft`'s VR-2 guard already refuses to persist before instantiation,
+ * and `installDraftAutosave` is only ever installed with a real
+ * `deriveProjectKeyFromWorkingCopy` result (see StudioShell's `doCommit`) —
+ * so main never actually writes a draft keyed under this sentinel today.
+ * Exported so a future pre-instantiation persistence build (or a caller
+ * migrating a dev-shaped index) has a stable name to check against, and so
+ * `MyKeyboardsList`'s ported display-label fallback (which treats this key as
+ * "not a real name") continues to compile.
  */
-export interface DurableDraft {
-  version: number;
-  /** Advisory write-time epoch ms (e.g. "resumed a draft from N minutes ago"); not used for correctness. */
-  savedAt: number;
-  /** The per-project namespace this record is stored under (FR-014). */
-  projectKey: string;
-  /** Denormalized so a future project list can render without deserializing `workingCopy`. */
-  displayName: string | null;
-  /** Denormalized BCP47 language+script tag; same rationale as `displayName`. */
-  languageTag: string | null;
-  workingCopy: WorkingCopySnapshot;
-  traversal: TraversalSnapshot;
-  /** The Phase B build-list draft alphabet — see the doc comment above. */
-  phaseBDraft?: PhaseBDraftSnapshot;
-}
+export const PENDING_PROJECT_KEY = "__pending__" as const;
+
+// ---------------------------------------------------------------------------
+// DurableDraft envelope (data-model.md) — the type itself now lives in
+// draftTypes.ts (imported/re-exported above); see that module's header for
+// why. This module still owns all its read/write LOGIC (save/load/clear/
+// index maintenance) below, unchanged.
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // projectKey derivation
@@ -184,6 +191,209 @@ export function clearActiveProjectKey(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Multi-project index ("My keyboards", US3a / FR-014) — storage primitives.
+//
+// Ported from the dev reference implementation's project-index scheme
+// (draftAutosave.ts) onto main's `ks.draftIndex.v1` key. Every helper here is
+// a plain localStorage read/write over `ProjectIndexEntry[]`; the actual
+// upsert/remove call sites live in `saveDraft`/`clearDraft` below, so no NEW
+// drift from the set of `ks.draft.<key>.v1` records can originate in this
+// build. Records written BEFORE the index existed (main has persisted
+// per-project drafts since spec 034) are the one pre-existing source of drift,
+// and `reconcileProjectIndex` below adopts them on read — see its doc comment.
+// ---------------------------------------------------------------------------
+
+function readProjectIndex(): ProjectIndexEntry[] {
+  try {
+    const raw = localStorage.getItem(DRAFT_INDEX_KEY);
+    if (raw === null) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as ProjectIndexEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeProjectIndex(entries: ProjectIndexEntry[]): void {
+  try {
+    localStorage.setItem(DRAFT_INDEX_KEY, JSON.stringify(entries));
+  } catch {
+    // VR-4: quota/security failure — never throw into the authoring flow.
+  }
+}
+
+/** Insert or replace a project's index row (matched by projectKey). */
+function upsertIndexEntry(entry: ProjectIndexEntry): void {
+  const entries = readProjectIndex();
+  const idx = entries.findIndex((e) => e.projectKey === entry.projectKey);
+  if (idx === -1) entries.push(entry);
+  else entries[idx] = entry;
+  writeProjectIndex(entries);
+}
+
+function removeIndexEntry(projectKey: string): void {
+  writeProjectIndex(readProjectIndex().filter((e) => e.projectKey !== projectKey));
+}
+
+/** Carry over an existing project's status/prUrl so autosave never downgrades a submitted project back to "draft". */
+function existingStatusOverrides(
+  projectKey: string,
+): { status?: "draft" | "submitted"; prUrl?: string | null } | undefined {
+  const existing = readProjectIndex().find((e) => e.projectKey === projectKey);
+  return existing === undefined ? undefined : { status: existing.status, prUrl: existing.prUrl };
+}
+
+/**
+ * Whether `projectKey`'s stored "My keyboards" index row is already
+ * `status: "submitted"` — i.e. FROZEN against further autosave/cloud-sync
+ * writes (a submitted project is not re-editable). Used by `saveDraft` and
+ * `startCloudSync` to veto a write before it can overwrite the submitted
+ * snapshot.
+ */
+function isProjectFrozen(projectKey: string): boolean {
+  return readProjectIndex().some((e) => e.projectKey === projectKey && e.status === "submitted");
+}
+
+/** Build the ProjectIndexEntry mirror of a DurableDraft for a given project key. */
+function buildIndexEntry(
+  projectKey: string,
+  draft: DurableDraft,
+  overrides?: { status?: "draft" | "submitted"; prUrl?: string | null },
+): ProjectIndexEntry {
+  return {
+    projectKey,
+    savedAt: draft.savedAt,
+    activeStepId: draft.traversal.activeStepId,
+    label: draft.displayName,
+    langTag: draft.languageTag,
+    status: overrides?.status ?? "draft",
+    prUrl: overrides?.prUrl ?? null,
+  };
+}
+
+/**
+ * Derive the server metadata row for one project. `projectKey` becomes the
+ * server's `draftId` (and, when it's a real key rather than the reserved
+ * pending slot, also `keyboardId` — display-only on the server).
+ */
+function buildServerMeta(
+  draft: DurableDraft,
+  projectKey: string,
+  overrides?: { status?: "draft" | "submitted"; prUrl?: string | null },
+): ServerDraftMeta {
+  return {
+    savedAt: draft.savedAt,
+    activeStepId: draft.traversal.activeStepId,
+    label: draft.displayName,
+    keyboardId: projectKey === PENDING_PROJECT_KEY ? null : projectKey,
+    schemaVersion: draft.version,
+    draftId: projectKey,
+    status: overrides?.status ?? "draft",
+    prUrl: overrides?.prUrl ?? null,
+  };
+}
+
+/**
+ * Adopt every `ks.draft.<projectKey>.v1` record that has no matching
+ * `ks.draftIndex.v1` row into the index. Returns how many rows were adopted
+ * (0 in the steady state).
+ *
+ * WHY THIS EXISTS (US3 / SC-003 — zero silent data loss). `saveDraft` and
+ * `clearDraft` keep the index in lockstep with the draft records *they* write,
+ * so no drift can originate here. But the per-project draft records predate
+ * the index: main's draft engine has been writing `ks.draft.<key>.v1` since
+ * spec 034 while `DRAFT_INDEX_KEY` only arrives with "My keyboards" (US3a).
+ * Every draft an author saved before this feature ships therefore exists on
+ * disk with no index row, and since `listDrafts` reads only the index, those
+ * drafts would be invisible in "My keyboards" — present in localStorage,
+ * unreachable from the UI — until the author happened to re-save that exact
+ * project. This is the real shape of the legacy-draft gap; there is no
+ * separate legacy single-slot key to migrate (main never had one — see the
+ * key-scheme note in specs/047-my-keyboards/spec.md).
+ *
+ * Read-only with respect to draft records: unlike `loadDraft`, a record this
+ * pass cannot adopt is SKIPPED, never deleted. Enumeration is not the place to
+ * destroy data — a version-mismatched record is still `loadDraft`'s to discard
+ * (VR-1) at the point the author actually opens it.
+ *
+ * Skipped (and why):
+ * - version mismatch (VR-1) — not resumable under this build's envelope.
+ * - malformed / unparseable (VR-3) — no trustworthy row to synthesize.
+ * - `workingCopy` not really instantiated (VR-2) — `loadDraft` refuses these,
+ *   so a card for one would render a Resume button that does nothing. Note
+ *   `saveDraft`'s own VR-2 guard means main never writes such a record.
+ *
+ * Idempotent: a second call adopts nothing, because the first gave every
+ * record an index row. Adopted rows land as `status: "draft"` / `prUrl: null`
+ * — a pre-index record carries no submission state by construction.
+ */
+export function reconcileProjectIndex(): number {
+  // Snapshot the key list BEFORE touching the index: adopting a row writes
+  // DRAFT_INDEX_KEY, which can itself change localStorage's key ordering
+  // mid-enumeration.
+  const keys: string[] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key !== null) keys.push(key);
+    }
+  } catch {
+    return 0; // VR-4: a security/quota failure must never throw into boot.
+  }
+
+  const suffix = `.v${DRAFT_VERSION}`;
+  const indexed = new Set(readProjectIndex().map((e) => e.projectKey));
+  let adopted = 0;
+
+  for (const key of keys) {
+    // `ks.draft.active` (no `.v1` suffix) and `ks.draftIndex.v1` (different
+    // prefix — "ks.draftI" !== "ks.draft.") both fall out here.
+    if (!key.startsWith(DRAFT_KEY_PREFIX) || !key.endsWith(suffix)) continue;
+    const projectKey = key.slice(DRAFT_KEY_PREFIX.length, key.length - suffix.length);
+    if (projectKey === "" || indexed.has(projectKey)) continue;
+
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw === null) continue;
+      const envelope = JSON.parse(raw) as DurableDraft;
+      if (envelope === null || typeof envelope !== "object") continue;
+      if (envelope.version !== DRAFT_VERSION) continue;
+      if (typeof envelope.savedAt !== "number") continue;
+      if (envelope.traversal === null || typeof envelope.traversal !== "object") continue;
+      if (
+        envelope.workingCopy === null ||
+        typeof envelope.workingCopy !== "object" ||
+        envelope.workingCopy.instantiationMode === null
+      ) {
+        continue;
+      }
+      upsertIndexEntry(buildIndexEntry(projectKey, envelope));
+      indexed.add(projectKey);
+      adopted += 1;
+    } catch {
+      continue; // VR-3: unparseable/wrong-shaped — skip, leave the record alone.
+    }
+  }
+
+  return adopted;
+}
+
+/**
+ * The local "My keyboards" project list, newest-saved first. Public entry
+ * point for `MyKeyboardsList` (ported from the dev reference implementation).
+ *
+ * Reconciles first (see `reconcileProjectIndex`) so a pre-index draft is
+ * listed on the author's very first visit to "My keyboards" rather than
+ * depending on a boot hook having run. Idempotent and cheap in the steady
+ * state: the scan parses only records that are MISSING an index row, which is
+ * none once the first call has adopted them.
+ */
+export function listDrafts(): ProjectIndexEntry[] {
+  reconcileProjectIndex();
+  return [...readProjectIndex()].sort((a, b) => b.savedAt - a.savedAt);
+}
+
+// ---------------------------------------------------------------------------
 // save / load / clear (T018, T019, T020)
 // ---------------------------------------------------------------------------
 
@@ -195,11 +405,18 @@ export function clearActiveProjectKey(): void {
  * (`instantiationMode === null`) or has no working IR yet (`ir === null`) — a
  * guest who has not picked a keyboard has nothing worth persisting.
  *
+ * FROZEN guard (US3a): a project already recorded as `status: "submitted"`
+ * (see `recordProjectSubmission`) is read-only — this is a no-op, so an
+ * author who keeps editing in the same tab after submitting can't silently
+ * overwrite the submitted snapshot or re-pin the active pointer onto it.
+ *
  * Wraps the localStorage write in try/catch (VR-4): a quota/security failure
  * is skipped silently so the authoring flow never throws; worst case a reload
  * loses the most recent edits, never a crash.
  */
 export function saveDraft(projectKey: string): void {
+  if (isProjectFrozen(projectKey)) return;
+
   const wc = useWorkingCopyStore.getState();
   if (wc.instantiationMode === null || wc.ir === null) {
     return; // VR-2
@@ -236,6 +453,9 @@ export function saveDraft(projectKey: string): void {
   try {
     localStorage.setItem(draftKey(projectKey), JSON.stringify(envelope));
     setActiveProjectKey(projectKey);
+    // Keep the "My keyboards" index in lockstep with every successful write —
+    // see the module note above the index primitives.
+    upsertIndexEntry(buildIndexEntry(projectKey, envelope, existingStatusOverrides(projectKey)));
   } catch {
     // VR-4: quota/security failure — skip silently, author keeps working.
   }
@@ -367,7 +587,20 @@ export function loadDraft(projectKey: string): boolean {
     const restoredFont = isPhaseBFontValue(envelope.phaseBDraft?.selectedFont)
       ? envelope.phaseBDraft.selectedFont
       : DEFAULT_PHASE_B_FONT;
-    applyPhaseBDraftSnapshot({ chars: restoredChars, selectedFont: restoredFont });
+    // Exemplar-attested `{..}` clusters, restored the same tolerant way: a
+    // record written before they were recorded has no field, and a malformed
+    // one degrades to none rather than discarding an otherwise-good draft.
+    // Kept OUT of `chars` on the way back in, exactly as on the way out — the
+    // clusters' constituent letters are the alphabet; the clusters are a note
+    // about it.
+    const restoredDigraphs = Array.isArray(envelope.phaseBDraft?.exemplarDigraphs)
+      ? envelope.phaseBDraft.exemplarDigraphs.filter((d): d is string => typeof d === "string")
+      : [];
+    applyPhaseBDraftSnapshot({
+      chars: restoredChars,
+      exemplarDigraphs: restoredDigraphs,
+      selectedFont: restoredFont,
+    });
 
     _draftRestoredThisBoot = true;
     return true;
@@ -381,11 +614,16 @@ export function loadDraft(projectKey: string): boolean {
 }
 
 /**
- * Remove `projectKey`'s durable draft. Does NOT touch the active-project
- * pointer — callers that also want the pointer cleared (start-over) call
- * `clearActiveProjectKey()` alongside this (see StudioShell.handleStartOver
- * and WelcomeScreen's "I'm new" entry point), so the two concerns stay
- * independently callable per the persistence contract.
+ * Remove `projectKey`'s durable draft AND its "My keyboards" index row. Does
+ * NOT touch the active-project pointer — callers that also want the pointer
+ * cleared (start-over) call `clearActiveProjectKey()` alongside this (see
+ * StudioShell.handleStartOver and WelcomeScreen's "I'm new" entry point), so
+ * the two concerns stay independently callable per the persistence contract.
+ *
+ * Removing the index row here (not just the record) keeps every discard path
+ * — start-over, an explicit "My keyboards" delete, and the VR-1/VR-3
+ * corrupt-draft discard in `discardCorruptDraft` — from leaving a "My
+ * keyboards" card pointing at a record that no longer exists.
  */
 export function clearDraft(projectKey: string): void {
   try {
@@ -393,27 +631,24 @@ export function clearDraft(projectKey: string): void {
   } catch {
     // VR-4: quota/security failure — never throw into the authoring flow.
   }
+  removeIndexEntry(projectKey);
 }
 
-/**
- * VR-5 single-project MVP guard (FR-009 / US3 AS-4): instantiating a working
- * copy under a DIFFERENT projectKey than the currently-active one must be
- * well-defined — replace, never silently merge two projects' state into one
- * record.
- *
- * For the MVP this is a clean REPLACE (no confirmation prompt): the prior
- * project's draft is cleared outright. Call this BEFORE the new
- * instantiation's own autosave starts writing under `newProjectKey` (see
- * StudioShell's onInstantiate). The active pointer is left untouched here —
- * the new project's own saveDraft/installDraftAutosave call repoints it to
- * `newProjectKey` immediately after.
- */
-export function replaceActiveDraftIfDifferentProject(newProjectKey: string): void {
-  const prevKey = resolveActiveProjectKey();
-  if (prevKey !== null && prevKey !== newProjectKey) {
-    clearDraft(prevKey);
-  }
-}
+// REMOVED (spec 047 US3a supersedes spec 034 VR-5):
+// `replaceActiveDraftIfDifferentProject(newProjectKey)` used to clear the
+// previously-active project's draft whenever a working copy was instantiated
+// under a different projectKey — the single-project MVP's answer to "two
+// projects, one draft slot: replace, never silently merge."
+//
+// "My keyboards" removes the premise. Several drafts now co-exist by design,
+// so a project switch is no longer evidence that the previous project was
+// abandoned, and clearing it would violate SC-001 (an author starts keyboard B
+// and finds keyboard A gone from their list). Deleting a draft is now always
+// something the author asked for, which is what `discardActiveDraft` is for.
+//
+// Deliberately deleted rather than kept as an uncalled export: a live function
+// whose whole contract is "destroy the other project's draft" is a hazard for
+// the next caller who reaches for it by name.
 
 /**
  * Discard the currently-active project's persisted draft entirely: clears
@@ -542,8 +777,312 @@ export function flushActiveDraft(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Forward-compat only (NOT built in the MVP — see contracts/persistence.md
-// "Non-goals"). `resolveActiveProjectKey` above IS the MVP single-project
-// facade; a future `listDrafts(): DraftSummary[]` would read a
-// `ks.draftIndex.v1` enumeration instead. Not implemented here.
+// "My keyboards" (US3a / FR-014) — resume / delete / submit by project.
+//
+// `listDrafts()` (the list read) lives up near the index primitives, next to
+// the helpers it shares with `saveDraft`. The three functions below are the
+// project-scoped write actions `MyKeyboardsList` and `ManagedPRSubmitPanel`
+// call, ported from the dev reference implementation (draftAutosave.ts)
+// onto main's engine.
 // ---------------------------------------------------------------------------
+
+/**
+ * Resume a SPECIFIC project (not necessarily the currently-active one): load
+ * its `DurableDraft` into both stores via `loadDraft`, and — only on a
+ * successful apply — pin it as the active project.
+ *
+ * Reuses `loadDraft` rather than re-implementing the parse/validate/apply
+ * sequence: on main, unlike the dev reference implementation, there is no
+ * resume-banner component deciding whether to apply a draft — SurveyView's
+ * mount effect reads `wasDraftRestoredThisBoot()` to decide whether to reset
+ * the session store, and `loadDraft` already sets that flag on success. So
+ * a `MyKeyboardsList` "Resume" click that calls this, then navigates to
+ * `#survey`, resumes into the SAME already-applied stores rather than racing
+ * a fresh reset — see `MyKeyboardsList.tsx`'s handleResume for the other half
+ * of this.
+ *
+ * A corrupt/wrong-shaped draft fails the whole resume (returns false,
+ * pointer left untouched) rather than silently pinning a project whose
+ * working copy never actually loaded.
+ */
+export function resumeProject(projectKey: string): boolean {
+  const applied = loadDraft(projectKey);
+  if (applied) {
+    setActiveProjectKey(projectKey);
+  }
+  return applied;
+}
+
+/**
+ * Delete a SPECIFIC project: its local draft record + "My keyboards" index
+ * row (via `clearDraft`), the active-project pointer (if it was pointing at
+ * this project), and — for a signed-in caller — the server-side row via
+ * `DELETE /drafts?draftId=<key>`. The server call is fire-and-soft-fail
+ * (`clearServerDraft` already swallows every transport error): a guest or an
+ * offline signed-in caller still gets the local removal.
+ */
+export async function deleteProject(projectKey: string, token: string | null): Promise<void> {
+  clearDraft(projectKey);
+  if (resolveActiveProjectKey() === projectKey) {
+    clearActiveProjectKey();
+  }
+  if (token !== null && token !== "") {
+    await clearServerDraft(token, projectKey);
+  }
+}
+
+/**
+ * Transition the ACTIVE project to `status: "submitted"` with the given PR
+ * URL — called on a successful managed-PR submit (see
+ * `ManagedPRSubmitPanel.tsx`) INSTEAD of discarding the draft. The project's
+ * index row is updated in place and, for a signed-in caller, PUT to the
+ * server with the same status/prUrl; the existing draft payload is sent
+ * unchanged so the project keeps its full working-copy record — this is not
+ * a deletion. The active-project pointer is cleared afterward — the survey
+ * session that just submitted is over — but the project's own storage/index
+ * row is NOT removed, so it keeps appearing in "My keyboards" as a Submitted
+ * card. From this point on, `saveDraft`'s frozen-project guard refuses any
+ * further write to this projectKey.
+ *
+ * No-op (but still clears the pointer) when the active project's draft
+ * record is missing or unparseable — there is nothing to transition.
+ */
+export async function recordProjectSubmission(prUrl: string, token: string | null): Promise<void> {
+  const projectKey = resolveActiveProjectKey();
+  if (projectKey === null) return;
+
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(draftKey(projectKey));
+  } catch {
+    raw = null;
+  }
+  if (raw === null) {
+    clearActiveProjectKey();
+    return;
+  }
+
+  let envelope: DurableDraft;
+  try {
+    envelope = JSON.parse(raw) as DurableDraft;
+  } catch {
+    clearActiveProjectKey();
+    return;
+  }
+
+  const overrides = { status: "submitted" as const, prUrl };
+  upsertIndexEntry(buildIndexEntry(projectKey, envelope, overrides));
+
+  if (token !== null && token !== "") {
+    const meta = buildServerMeta(envelope, projectKey, overrides);
+    void saveServerDraft(token, meta, envelope, projectKey);
+  }
+
+  clearActiveProjectKey();
+}
+
+/**
+ * Peek at the ACTIVE project's stored draft WITHOUT applying it — a
+ * lightweight summary for a future resume affordance. Returns null when
+ * there is no active project, or its record is missing/wrong-shaped. Unlike
+ * `loadDraft`, never mutates storage or the stores — a pure read.
+ */
+export function loadDraftMeta(): DraftMeta | null {
+  const projectKey = resolveActiveProjectKey();
+  if (projectKey === null) return null;
+
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(draftKey(projectKey));
+  } catch {
+    return null;
+  }
+  if (raw === null) return null;
+
+  try {
+    const envelope = JSON.parse(raw) as DurableDraft;
+    if (
+      envelope.version !== DRAFT_VERSION ||
+      envelope.workingCopy === null ||
+      typeof envelope.workingCopy !== "object"
+    ) {
+      return null;
+    }
+    return {
+      savedAt: envelope.savedAt,
+      activeStepId: envelope.traversal.activeStepId,
+      label: envelope.displayName,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// startCloudSync — signed-in cloud-draft backup (US3a).
+//
+// Mirrors the in-progress ACTIVE project's draft to the server for a
+// signed-in author, alongside (never instead of) `installDraftAutosave`'s
+// localStorage write — localStorage stays the instant local-first cache; this
+// adds a durable server-side backup so the draft survives a cleared browser,
+// a new tab, or a different device.
+//
+// SIMPLIFICATION vs the dev reference implementation's `startCloudSync`: dev
+// tracks its own `buildStudioDraft()` snapshot; this port instead re-reads
+// whatever `saveDraft` most recently wrote to `ks.draft.<projectKey>.v1`, so
+// there is exactly one place (`saveDraft`) that knows how to build a
+// `DurableDraft` from the live stores. The tradeoff: a cloud push can only
+// ever be as fresh as the last local autosave (≤ AUTOSAVE_DEBOUNCE_MS old),
+// never fresher — acceptable for a "durable backup", not a live sync target.
+//
+// Article IV / decision D3 scope note: this is a SECOND lightweight timer
+// alongside `installDraftAutosave`'s ~500ms one, exactly as
+// `AUTOSAVE_DEBOUNCE_MS` already is relative to the validator's 300ms cycle —
+// neither touches the validation path or produces preview feedback, so
+// neither is "a second debounce cycle" in the D3 sense. That reading is now
+// RATIFIED rather than argued from here: D3's scope clause (CLAUDE.md, and the
+// dated clarification under D3 in docs/spec-signoff.md) states the test
+// explicitly — a timer falls under D3 iff it emits diagnostics. This one does
+// not. This timer is
+// deliberately coarser (20s) than the local autosave: the server push only
+// needs to be eventually-consistent, so requests are batched aggressively.
+// Two checkpoints — the tab becoming hidden and page unload (keepalive
+// fetch) — flush sooner so a close/navigation doesn't lose a full window.
+//
+// `getToken` returns the current GitHub access token or null — read lazily on
+// each flush so signing in mid-session begins syncing without restarting the
+// subscription, and signing out stops it (a guest, token null, never pushes).
+// A content hash suppresses redundant pushes when nothing changed since the
+// last one; an oversized draft is kept local-only (the sibling autosave still
+// has it) since the server would reject it anyway.
+//
+// Returns an unsubscribe that removes the listeners and cancels any pending
+// timer. Call it on sign-out and on unmount, alongside the local autosave's
+// own teardown (see StudioShell.tsx).
+// ---------------------------------------------------------------------------
+
+// Exported (same rationale as AUTOSAVE_DEBOUNCE_MS) so a regression test can
+// pin the cloud-sync window without duplicating the literal.
+export const CLOUD_SYNC_DEBOUNCE_MS = 20_000;
+
+/**
+ * Client-side ceiling on a cloud-synced draft (bytes), mirroring the
+ * server's own limit. A draft above this is kept in localStorage but NOT
+ * pushed — the server would reject it anyway. No console log on this path
+ * (matches this module's convention — see saveDraft's VR-4 comment): the
+ * local autosave already has the draft, so this is a benign skip, not an
+ * error worth surfacing.
+ */
+export const MAX_CLOUD_DRAFT_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Small, fast, non-cryptographic string hash (djb2). Used only to detect "did
+ * the stored draft change since the last successful push?" so redundant cloud
+ * writes are skipped — never for integrity or security.
+ */
+function simpleHash(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) + h) ^ s.charCodeAt(i);
+  }
+  return (h >>> 0).toString(36); // >>> 0 -> unsigned; base36 keeps it short.
+}
+
+export function startCloudSync(getToken: () => string | null): () => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let lastPushedHash: string | null = null;
+  let disposed = false;
+
+  const flush = (viaBeacon: boolean): void => {
+    const token = getToken();
+    if (token === null || token === "") return;
+
+    const projectKey = resolveActiveProjectKey();
+    if (projectKey === null || isProjectFrozen(projectKey)) return;
+
+    let raw: string | null;
+    try {
+      raw = localStorage.getItem(draftKey(projectKey));
+    } catch {
+      return;
+    }
+    if (raw === null) return;
+
+    if (new TextEncoder().encode(raw).length > MAX_CLOUD_DRAFT_BYTES) {
+      // Kept in localStorage by the sibling autosave; skip the server push
+      // silently — this module never logs to console (see saveDraft's VR-4
+      // and every other quota/security-failure branch above), so a bare
+      // console.warn here would be the one call site that doesn't match.
+      return;
+    }
+
+    const hash = simpleHash(raw);
+    if (hash === lastPushedHash) return; // nothing changed since the last push
+
+    let envelope: DurableDraft;
+    try {
+      envelope = JSON.parse(raw) as DurableDraft;
+    } catch {
+      return; // Malformed local record — `loadDraft`/`discardCorruptDraft` handle cleanup elsewhere.
+    }
+
+    const meta = buildServerMeta(envelope, projectKey, existingStatusOverrides(projectKey));
+    if (viaBeacon) {
+      // Unload path: fire-and-forget; assume it lands so we don't re-push.
+      saveServerDraftBeacon(token, meta, envelope, projectKey);
+      lastPushedHash = hash;
+    } else {
+      void saveServerDraft(token, meta, envelope, projectKey).then((ok) => {
+        if (ok) lastPushedHash = hash;
+      });
+    }
+  };
+
+  const schedule = (): void => {
+    if (disposed) return;
+    if (timer !== null) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      flush(false);
+    }, CLOUD_SYNC_DEBOUNCE_MS);
+  };
+
+  const onVisibilityChange = (): void => {
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      flush(false);
+    }
+  };
+  const onBeforeUnload = (): void => flush(true);
+
+  const unsubscribeWorkingCopy = useWorkingCopyStore.subscribe(schedule);
+  const unsubscribeSurveySession = useSurveySessionStore.subscribe(schedule);
+  const unsubscribePhaseBDraft = usePhaseBDraftStore.subscribe(schedule);
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", onVisibilityChange);
+  }
+  if (typeof window !== "undefined") {
+    window.addEventListener("beforeunload", onBeforeUnload);
+  }
+
+  // Immediate flush at install time (mirrors installDraftAutosave's P1 fix):
+  // a signed-in author who already has a local draft gets its first cloud
+  // push right away rather than waiting a full CLOUD_SYNC_DEBOUNCE_MS.
+  flush(false);
+
+  return () => {
+    disposed = true;
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    unsubscribeWorkingCopy();
+    unsubscribeSurveySession();
+    unsubscribePhaseBDraft();
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    }
+    if (typeof window !== "undefined") {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    }
+  };
+}

@@ -3,8 +3,9 @@
 // A signed-in author's in-progress keyboard is mirrored to the server so it
 // survives a cleared browser, a new tab, or a different device. This module is
 // only the HTTP transport to /drafts (see api/drafts/* and the backend
-// draft-handlers); the capture/apply of the StudioDraft itself, and the
-// debounced sync orchestration, live in draftAutosave.ts.
+// draft-handlers); the capture/apply of the draft record itself, and the
+// debounced sync orchestration, live in draftPersistence.ts
+// (recordProjectSubmission / deleteProject / startCloudSync).
 //
 // Guests never reach here — every call requires a verified GitHub token, which
 // the backend re-verifies against GitHub /user. The server, not the client, is
@@ -16,18 +17,36 @@
 // hiccup.
 //
 // Multi-project ("My keyboards") note: every per-project call below threads a
-// `draftId` (the client's projectKey — see draftAutosave.ts) through to the
-// `?draftId=` query string, per spec.md specs/037-my-keyboards §"API contract".
-// The backend's PUT handler actually reads the routing id from `meta.draftId`
-// in the body (not the query string) — see api/drafts/index.ts putDraft — but
-// we still append it to the URL on PUT too, for symmetry with GET/DELETE and
-// because the spec describes all four as "gaining a draftId argument threaded
-// through to the query string." Omitting `draftId` (the pre-multi-draft call
+// `draftId` (the client's projectKey — see draftPersistence.ts) through to the
+// `?draftId=` query string. The backend's PUT handler actually reads the
+// routing id from `meta.draftId` in the body (not the query string) — see
+// api/drafts/index.ts putDraft — but we still append it to the URL on PUT too,
+// for symmetry with GET/DELETE. Omitting `draftId` (the pre-multi-draft call
 // shape) lands in the server's reserved single-slot default, unchanged from
 // today.
+//
+// Ported from dev's reference implementation (specs/047-my-keyboards) with the
+// HTTP contract kept identical; the only change is the local `draft` parameter
+// type, which is main's `DurableDraft` rather than dev's separate `StudioDraft`
+// shape. `DurableDraft` is imported from draftTypes.ts (NOT draftPersistence.ts)
+// deliberately — draftPersistence.ts has a real runtime dependency on THIS
+// module (recordProjectSubmission/deleteProject/startCloudSync call the fetch
+// functions below), so this module must not import anything, even a type,
+// back from draftPersistence.ts — depcruise flags type-only cycles too. See
+// draftTypes.ts's header comment.
 
 import { getBackendUrl } from "./githubOAuth.ts";
-import type { StudioDraft, DraftMeta } from "./draftTypes.ts";
+import type { DurableDraft, StudioDraft, DraftMeta } from "./draftTypes.ts";
+
+/**
+ * Post-merge, BOTH draft engines push through this one transport: main's
+ * draftPersistence.ts stores `DurableDraft` records and dev's draftAutosave.ts
+ * stores `StudioDraft` records (each under its own draftId namespace). The
+ * server treats the blob opaquely — `JSON.stringify({ meta, draft })` both
+ * ways — so the payload type is the union of the two envelopes; readers pick
+ * the envelope they wrote via `loadServerDraftContent`'s type parameter.
+ */
+export type ServerDraftPayload = DurableDraft | StudioDraft;
 
 /** Metadata row the server keeps alongside the opaque draft blob. */
 export interface ServerDraftMeta {
@@ -57,7 +76,7 @@ function authHeaders(token: string): Record<string, string> {
   return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 }
 
-/** Convert a server metadata row to the resume-banner DraftMeta (cloud source). */
+/** Convert a server metadata row to a resume-affordance DraftMeta (cloud source). */
 export function serverMetaToDraftMeta(meta: ServerDraftMeta): DraftMeta {
   return {
     savedAt: meta.savedAt,
@@ -75,7 +94,7 @@ export function serverMetaToDraftMeta(meta: ServerDraftMeta): DraftMeta {
 export async function saveServerDraft(
   token: string,
   meta: ServerDraftMeta,
-  draft: StudioDraft,
+  draft: ServerDraftPayload,
   draftId: string,
 ): Promise<boolean> {
   try {
@@ -98,7 +117,7 @@ export async function saveServerDraft(
 export function saveServerDraftBeacon(
   token: string,
   meta: ServerDraftMeta,
-  draft: StudioDraft,
+  draft: ServerDraftPayload,
   draftId: string,
 ): void {
   try {
@@ -113,7 +132,7 @@ export function saveServerDraftBeacon(
   }
 }
 
-/** Fetch one project's server draft metadata (for the resume banner), or null. */
+/** Fetch one project's server draft metadata (for a future resume affordance), or null. */
 export async function loadServerDraftMeta(
   token: string,
   draftId: string,
@@ -146,17 +165,17 @@ export async function listServerDrafts(token: string): Promise<ServerDraftMeta[]
 }
 
 /** Fetch one project's full server draft payload (for Restore), or null. */
-export async function loadServerDraftContent(
+export async function loadServerDraftContent<D extends ServerDraftPayload = DurableDraft>(
   token: string,
   draftId: string,
-): Promise<StudioDraft | null> {
+): Promise<D | null> {
   try {
     const res = await fetch(draftsUrl("/content", draftId), {
       method: "GET",
       headers: authHeaders(token),
     });
     if (!res.ok) return null;
-    const body = (await res.json()) as { draft: StudioDraft | null };
+    const body = (await res.json()) as { draft: D | null };
     return body.draft ?? null;
   } catch {
     return null;

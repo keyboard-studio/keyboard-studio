@@ -34,13 +34,13 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { PublishManagedPRError } from "@keyboard-studio/contracts";
 import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
-import { recordProjectSubmission } from "../lib/draftAutosave.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { getManagedPROutputService, getManagedPRProxyEndpoint } from "../lib/services.ts";
 import {
   publishManagedPRErrorMessage,
   isPublishManagedPRError,
 } from "../lib/publishManagedPRErrorMessage.ts";
+import { recordProjectSubmission } from "../lib/draftPersistence.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -202,6 +202,15 @@ export function ManagedPRSubmitPanel({
   const emailId = useId();
   const copyrightId = useId();
 
+  // Self-contained useGitHubAuth() call (same idiom as MyKeyboardsList) so
+  // this panel can transition the active "My keyboards" project to
+  // status:"submitted" on a successful publish without threading the token
+  // down as a prop. `accessToken` (the primitive, not the whole `token`
+  // object) is what recordProjectSubmission below actually needs, and is
+  // what the handleSubmit dependency array tracks.
+  const { token } = useGitHubAuth();
+  const accessToken = token?.accessToken ?? null;
+
   const [authorName, setAuthorName] = useState<string>(
     prefill?.displayName ?? "",
   );
@@ -210,10 +219,6 @@ export function ManagedPRSubmitPanel({
   const [nameBlurred, setNameBlurred] = useState(false);
   const [emailBlurred, setEmailBlurred] = useState(false);
   const [submitState, setSubmitState] = useState<SubmitState>({ kind: "idle" });
-
-  // Signed-in submitters also have a server-backed draft; clear it on success
-  // so a later sign-in doesn't offer to restore an already-shipped keyboard.
-  const { token: githubToken } = useGitHubAuth();
 
   // When the prefill values change (e.g. user signs in after the panel mounts),
   // update the inputs — but only if the user has not manually edited them yet
@@ -295,14 +300,13 @@ export function ManagedPRSubmitPanel({
         proxyEndpoint: getManagedPRProxyEndpoint(),
       });
       setSubmitState({ kind: "success", prUrl: result.prUrl });
-      // The keyboard shipped — transition the active project to "submitted"
-      // (specs/037-my-keyboards) rather than deleting its record outright:
-      // it keeps appearing in "My keyboards" with a link to its PR. Updates
-      // the local index entry and, for signed-in submitters, PUTs the same
-      // status/prUrl to the server; clears the active-project pointer (the
-      // survey session that just submitted is over) but keeps the project's
-      // stored draft + index row.
-      const accessToken = githubToken?.accessToken ?? null;
+
+      // Transition the active "My keyboards" project to status:"submitted"
+      // (per specs/047-my-keyboards) rather than leaving it as an
+      // in-progress draft — see draftPersistence.ts's recordProjectSubmission
+      // docstring. Fire-and-forget: this is bookkeeping for the "My
+      // keyboards" list, not load-bearing for the success state already
+      // rendered above.
       void recordProjectSubmission(result.prUrl, accessToken);
     } catch (err: unknown) {
       let message: string;
@@ -319,7 +323,7 @@ export function ManagedPRSubmitPanel({
       }
       setSubmitState({ kind: "error", message });
     }
-  }, [submitEnabled, authorName, email, githubToken, t, i18n]);
+  }, [submitEnabled, authorName, email, t, i18n, accessToken]);
 
   // ---------------------------------------------------------------------------
   // Success state — show PR link, no git jargon.

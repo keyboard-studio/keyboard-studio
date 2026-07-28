@@ -224,6 +224,58 @@ describe("mergePhaseResults()", () => {
     expect(session.confirmedInventory).toEqual(["a", "b", "c"]);
   });
 
+  it("attestedDigraphs is absent when no phase attested a cluster", () => {
+    const session = mergePhaseResults({}, [
+      { phase: "B", answers: [], confirmedInventory: ["d", "z"] },
+    ]);
+    expect(session.attestedDigraphs).toBeUndefined();
+  });
+
+  it("attestedDigraphs unions across phases, deduped, first-appearance order", () => {
+    const phaseB: SurveyPhaseResult = {
+      phase: "B",
+      answers: [],
+      attestedDigraphs: ["dz", "kp"],
+    };
+    const phaseC: SurveyPhaseResult = {
+      phase: "C",
+      answers: [],
+      attestedDigraphs: ["kp", "ng"], // kp is a duplicate
+    };
+    const session = mergePhaseResults({}, [phaseB, phaseC]);
+    expect(session.attestedDigraphs).toEqual(["dz", "kp", "ng"]);
+  });
+
+  it("keeps attestedDigraphs out of confirmedInventory entirely", () => {
+    // A digraph is not a character to type: its letters are already in the
+    // inventory, and folding "dz" in would put it on the placement worklist as
+    // if it needed a key of its own.
+    const session = mergePhaseResults({}, [
+      {
+        phase: "B",
+        answers: [],
+        confirmedInventory: ["d", "z"],
+        attestedDigraphs: ["dz"],
+      },
+    ]);
+    expect(session.confirmedInventory).toEqual(["d", "z"]);
+    expect(session.attestedDigraphs).toEqual(["dz"]);
+  });
+
+  it("a digraph and a same-spelled inventory entry do not suppress each other", () => {
+    // The two lists carry independent `seen` sets.
+    const session = mergePhaseResults({}, [
+      {
+        phase: "B",
+        answers: [],
+        confirmedInventory: ["dz"],
+        attestedDigraphs: ["dz"],
+      },
+    ]);
+    expect(session.confirmedInventory).toEqual(["dz"]);
+    expect(session.attestedDigraphs).toEqual(["dz"]);
+  });
+
   it("confirmedInventory drops empty strings and whitespace-only entries", () => {
     const phaseB: SurveyPhaseResult = {
       phase: "B",

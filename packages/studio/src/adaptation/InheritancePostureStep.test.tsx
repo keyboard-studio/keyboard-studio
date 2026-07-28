@@ -7,7 +7,8 @@
 // other two "confirmed", and the onConfirm payload reflects the override).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { cleanup, screen, fireEvent } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { InheritancePostureStep } from "./InheritancePostureStep.tsx";
 import { buildPosture } from "./posture.ts";
 import type { AdaptationEvidence } from "./evidence.ts";

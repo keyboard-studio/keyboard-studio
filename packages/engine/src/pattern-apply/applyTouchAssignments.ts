@@ -2,13 +2,19 @@
  * applyTouchAssignments — pure function that folds Phase E touch
  * assignments (longpress / flick / multitap) into a TouchLayoutIR.
  *
- * Only the phone platform's "default" layer is mutated (via structural
- * sharing — no original objects are modified). All other platforms and
- * layers are returned by reference.
+ * Only the phone platform is mutated, and within it only the layers a
+ * mechanism actually names (via structural sharing — no original objects
+ * are modified). All other platforms and layers are returned by reference.
+ *
+ * Each mechanism selects its target layer with the optional `layer` slot
+ * value; an ABSENT `layer` means `"default"`, so every assignment written
+ * before that slot existed behaves byte-identically. An unknown layer id
+ * warns and skips that mechanism — it never falls back to `"default"`.
  *
  * Each assignment's `mechanisms[]` are ALL applied, not just the first —
  * one character may carry multiple touch methods simultaneously (e.g.
- * longpress + multitap on the same host key).
+ * longpress + multitap on the same host key), and those methods may target
+ * different layers.
  *
  * @see spec.md §8 Phase E (touch gallery)
  */
@@ -18,6 +24,7 @@ import type { TouchAssignment } from "@keyboard-studio/contracts";
 import { NodeIdMinter } from "../shared/node-ids.js";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
+import { resolveTouchLayerId } from "./touchLayer.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -34,11 +41,25 @@ export interface ApplyTouchAssignmentsResult {
 // Public API
 // ---------------------------------------------------------------------------
 
+/** Mutable per-layer working state, created lazily the first time a
+ *  mechanism names that layer. A layer with no state was never touched and
+ *  is returned by reference. */
+interface LayerWorkState {
+  /** Index of this layer within `phonePlatform.layers`. */
+  layerIndex: number;
+  /** Shallow-cloned rows whose key slots we replace as we accumulate changes. */
+  workingRows: Array<{ keys: TouchKeyIR[] }>;
+  /** key id → { rowIdx, keyIdx }, built once so a `touch_key_replace` that
+   *  rewrites a key's id does not disturb later lookups by the old id. */
+  keyIndex: Map<string, { rowIdx: number; keyIdx: number }>;
+}
+
 /**
  * Apply a list of touch {@link TouchAssignment}s to a {@link TouchLayoutIR},
  * returning a new (pure, non-mutating) layout and any diagnostic warnings.
  *
- * Only the phone platform's "default" layer is modified; all other platforms
+ * Only the phone platform is modified, and within it only the layers named by
+ * a mechanism's `layer` slot value (default `"default"`); all other platforms
  * and layers are returned by reference (structural sharing).
  *
  * @param layout      The base touch layout (from scaffoldTouchLayout or
@@ -63,67 +84,91 @@ export function applyTouchAssignments(
 
   const phonePlatform = layout.platforms[phonePlatformIndex]!;
 
-  // Verify the default layer exists.
-  const defaultLayerIndex = phonePlatform.layers.findIndex(
-    (l) => l.id === "default"
-  );
-  if (defaultLayerIndex === -1) {
-    warnings.push(
-      "[touch-apply] phone platform has no default layer — all touch assignments skipped"
-    );
-    return { layout, warnings };
-  }
+  // Per-layer working state, populated lazily: a layer nobody targets is never
+  // cloned and therefore comes back reference-equal.
+  const layerStates = new Map<string, LayerWorkState>();
 
-  const defaultLayer = phonePlatform.layers[defaultLayerIndex]!;
+  /**
+   * Resolve (and lazily build) the working state for a target layer.
+   * Returns undefined when the phone platform has no such layer — the caller
+   * warns and skips that mechanism. Never falls back to "default".
+   */
+  function resolveLayerState(layerId: string): LayerWorkState | undefined {
+    const existing = layerStates.get(layerId);
+    if (existing) return existing;
 
-  // Build a flat working map: vkey id → row index × key index, pointing into
-  // a mutable copy of each key we may need to update. We structural-share keys
-  // we never touch.
-  // Strategy: shallow-clone all rows up-front (array of arrays), then replace
-  // individual key slots as assignments are processed.
-  const workingRows: Array<{ keys: TouchKeyIR[] }> = defaultLayer.rows.map(
-    (row) => ({ keys: [...row.keys] })
-  );
+    const layerIndex = phonePlatform.layers.findIndex((l) => l.id === layerId);
+    if (layerIndex === -1) return undefined;
 
-  // Build a lookup: id → { rowIdx, keyIdx }
-  const keyIndex = new Map<string, { rowIdx: number; keyIdx: number }>();
-  for (let ri = 0; ri < workingRows.length; ri++) {
-    const row = workingRows[ri]!;
-    for (let ki = 0; ki < row.keys.length; ki++) {
-      const key = row.keys[ki]!;
-      keyIndex.set(key.id, { rowIdx: ri, keyIdx: ki });
+    const layer = phonePlatform.layers[layerIndex]!;
+    // Shallow-clone all rows up-front (array of arrays), then replace
+    // individual key slots as mechanisms are processed. Keys we never touch
+    // stay structurally shared.
+    const workingRows: Array<{ keys: TouchKeyIR[] }> = layer.rows.map((row) => ({
+      keys: [...row.keys],
+    }));
+
+    const keyIndex = new Map<string, { rowIdx: number; keyIdx: number }>();
+    for (let ri = 0; ri < workingRows.length; ri++) {
+      const row = workingRows[ri]!;
+      for (let ki = 0; ki < row.keys.length; ki++) {
+        const key = row.keys[ki]!;
+        keyIndex.set(key.id, { rowIdx: ri, keyIdx: ki });
+      }
     }
+
+    const state: LayerWorkState = { layerIndex, workingRows, keyIndex };
+    layerStates.set(layerId, state);
+    return state;
   }
 
-  // Helper: get the current working copy of a key (already shallow-copied into
-  // workingRows; we replace it in-place as we accumulate changes).
-  function getWorkingKey(hostKey: string): TouchKeyIR | undefined {
-    const pos = keyIndex.get(hostKey);
-    if (!pos) return undefined;
-    return workingRows[pos.rowIdx]!.keys[pos.keyIdx];
-  }
-
-  function setWorkingKey(hostKey: string, updated: TouchKeyIR): void {
-    const pos = keyIndex.get(hostKey);
+  function setWorkingKey(
+    state: LayerWorkState,
+    hostKey: string,
+    updated: TouchKeyIR,
+  ): void {
+    const pos = state.keyIndex.get(hostKey);
     if (!pos) return;
-    workingRows[pos.rowIdx]!.keys[pos.keyIdx] = updated;
+    state.workingRows[pos.rowIdx]!.keys[pos.keyIdx] = updated;
   }
 
-  // Shared not-found path: every mechanism below looks up the host key and,
-  // when absent, emits the same warning shape and skips the assignment.
-  function getWorkingKeyOrWarn(hostKey: string, char: string): TouchKeyIR | undefined {
-    const key = getWorkingKey(hostKey);
-    if (!key) {
+  /**
+   * Resolve the target layer and the host key within it. Both misses warn and
+   * skip the mechanism (never throw, never fall back to another layer).
+   */
+  function resolveTarget(
+    slotValues: Readonly<Record<string, string>> | undefined,
+    char: string,
+  ): { state: LayerWorkState; key: TouchKeyIR; hostKey: string } | undefined {
+    const hostKey = slotValues?.["hostKey"] ?? "";
+    const layerId = resolveTouchLayerId(slotValues);
+
+    const state = resolveLayerState(layerId);
+    if (!state) {
       warnings.push(
-        `[touch-apply] host key "${hostKey}" not found in phone default layer — assignment for "${char}" skipped`
+        `[touch-apply] target layer "${layerId}" not found in phone platform — assignment for "${char}" skipped`
       );
+      return undefined;
     }
-    return key;
+
+    const pos = state.keyIndex.get(hostKey);
+    if (!pos) {
+      warnings.push(
+        `[touch-apply] host key "${hostKey}" not found in phone layer "${layerId}" — assignment for "${char}" skipped`
+      );
+      return undefined;
+    }
+
+    return {
+      state,
+      key: state.workingRows[pos.rowIdx]!.keys[pos.keyIdx]!,
+      hostKey,
+    };
   }
 
   // Process each assignment in order, applying EVERY mechanism it carries —
   // a single character may combine multiple touch methods (e.g. longpress +
-  // multitap on the same host key).
+  // multitap on the same host key), each naming its own target layer.
   for (const assignment of assignments) {
     for (const ref of assignment.mechanisms) {
       const { patternId, slotValues } = ref;
@@ -134,11 +179,11 @@ export function applyTouchAssignments(
       }
 
       if (patternId === "longpress_alternates") {
-        const hostKey = slotValues?.["hostKey"] ?? "";
         const char = slotValues?.["char"] ?? "";
 
-        const key = getWorkingKeyOrWarn(hostKey, char);
-        if (!key) continue;
+        const target = resolveTarget(slotValues, char);
+        if (!target) continue;
+        const { state, key, hostKey } = target;
 
         const existingSk = key.sk ?? [];
         // Dedupe: skip if already present by text/output OR by U_ id (shared
@@ -166,17 +211,17 @@ export function applyTouchAssignments(
         // Keyman runtime because the platform defaultHint is "dot"; an explicit
         // hint would override the dot and re-reveal a character.
 
-        setWorkingKey(hostKey, updated);
+        setWorkingKey(state, hostKey, updated);
         continue;
       }
 
       if (patternId === "flick_gestures") {
-        const hostKey = slotValues?.["hostKey"] ?? "";
         const direction = slotValues?.["direction"] ?? "";
         const char = slotValues?.["char"] ?? "";
 
-        const key = getWorkingKeyOrWarn(hostKey, char);
-        if (!key) continue;
+        const target = resolveTarget(slotValues, char);
+        if (!target) continue;
+        const { state, key, hostKey } = target;
 
         const newFlickKey: TouchKeyIR = {
           nodeId: minter.mint("touchKey"),
@@ -197,16 +242,16 @@ export function applyTouchAssignments(
           flick: mergedFlick,
         };
 
-        setWorkingKey(hostKey, updated);
+        setWorkingKey(state, hostKey, updated);
         continue;
       }
 
       if (patternId === "multitap") {
-        const hostKey = slotValues?.["hostKey"] ?? "";
         const char = slotValues?.["char"] ?? "";
 
-        const key = getWorkingKeyOrWarn(hostKey, char);
-        if (!key) continue;
+        const target = resolveTarget(slotValues, char);
+        if (!target) continue;
+        const { state, key, hostKey } = target;
 
         const existingMt = key.multitap ?? [];
         // Dedupe: same predicate as longpress sk — covers id-only multitap entries.
@@ -227,16 +272,16 @@ export function applyTouchAssignments(
           multitap: [...existingMt, newMtKey],
         };
 
-        setWorkingKey(hostKey, updated);
+        setWorkingKey(state, hostKey, updated);
         continue;
       }
 
       if (patternId === "touch_key_replace") {
-        const hostKey = slotValues?.["hostKey"] ?? "";
         const char = slotValues?.["char"] ?? "";
 
-        const key = getWorkingKeyOrWarn(hostKey, char);
-        if (!key) continue;
+        const target = resolveTarget(slotValues, char);
+        if (!target) continue;
+        const { state, key, hostKey } = target;
 
         // Destructure out any existing `output` field so the U_-id supersedes it.
         // Preserve all other properties: nodeId, geometry (pad, width, sp),
@@ -248,7 +293,7 @@ export function applyTouchAssignments(
           text: char,
         };
 
-        setWorkingKey(hostKey, updated);
+        setWorkingKey(state, hostKey, updated);
         continue;
       }
 
@@ -259,17 +304,24 @@ export function applyTouchAssignments(
     }
   }
 
-  // Reconstruct the layout with structural sharing.
-  // Only replace the default layer and the phone platform; everything else is
-  // returned by reference.
-  const updatedDefaultLayer = {
-    ...defaultLayer,
-    rows: workingRows,
-  };
+  // Nothing resolved to a layer: no layer was cloned, so the input layout is
+  // already the answer.
+  if (layerStates.size === 0) {
+    return { layout, warnings };
+  }
 
-  const updatedLayers = phonePlatform.layers.map((layer, idx) =>
-    idx === defaultLayerIndex ? updatedDefaultLayer : layer
-  );
+  // Reconstruct the layout with structural sharing.
+  // Only the layers a mechanism actually targeted are rebuilt; every other
+  // layer and platform is returned by reference.
+  const rebuiltByIndex = new Map<number, LayerWorkState>();
+  for (const state of layerStates.values()) {
+    rebuiltByIndex.set(state.layerIndex, state);
+  }
+
+  const updatedLayers = phonePlatform.layers.map((layer, idx) => {
+    const state = rebuiltByIndex.get(idx);
+    return state ? { ...layer, rows: state.workingRows } : layer;
+  });
 
   const updatedPhonePlatform = {
     ...phonePlatform,

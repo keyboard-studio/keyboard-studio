@@ -74,7 +74,7 @@ async function ghApi(apiPath, jwt, init = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-async function getInstallationId(jwt) {
+async function getInstallationId(jwt, appId) {
   if (fs.existsSync(INSTALL_CACHE)) {
     try {
       const cached = JSON.parse(fs.readFileSync(INSTALL_CACHE, 'utf8'));
@@ -93,6 +93,25 @@ async function getInstallationId(jwt) {
         `copy the App's html_url, append /installations/new, and install it on the repo. Then retry.`;
       const e = new Error(msg);
       e.code = 'NOT_INSTALLED';
+      throw e;
+    }
+    // 401 "could not be decoded" is NOT an installation problem, though it
+    // surfaces on the installation lookup because that is the first authed
+    // call. GitHub resolves the App by the JWT's `iss`, fetches its public
+    // keys, and reports a decode failure when the signature verifies against
+    // none of them. So a locally well-formed JWT plus this error means the
+    // stored private key no longer belongs to the App — the key was
+    // regenerated or revoked on GitHub, or config.json and private-key.pem
+    // came from different App generations. Re-running setup.js does NOT fix
+    // it (that creates a second App); regenerate the key instead.
+    if (err.status === 401 && /could not be decoded/i.test(err.message)) {
+      const e = new Error(
+        `The stored private key does not match App ${appId}. Regenerate it: ` +
+        `open the App's settings (see html_url in ${CONFIG_FILE}) -> Private keys -> ` +
+        `"Generate a private key", then replace ${KEY_FILE} with the downloaded .pem. ` +
+        `Do not re-run setup.js — it would create a duplicate App.`,
+      );
+      e.code = 'KEY_MISMATCH';
       throw e;
     }
     throw err;
@@ -122,9 +141,9 @@ async function getInstallationId(jwt) {
 
   let installationId;
   try {
-    installationId = await getInstallationId(jwt);
+    installationId = await getInstallationId(jwt, config.id);
   } catch (err) {
-    if (err.code === 'NOT_INSTALLED') {
+    if (err.code === 'NOT_INSTALLED' || err.code === 'KEY_MISMATCH') {
       console.error('[mint-token]', err.message);
       process.exit(2);
     }

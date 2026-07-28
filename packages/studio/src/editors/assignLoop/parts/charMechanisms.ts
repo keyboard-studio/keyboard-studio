@@ -17,10 +17,12 @@
 // inherit it. The one type NEVER counted here is TouchGallery's own
 // `touch_inherited` placeholder mechanism — it marks "already reachable via
 // the base touch layout, not user-configured" (see TouchGallery.tsx's own
-// exclusion of it at ~625-630 and ~769-770), not a real producer; every other
-// touch-coverage check in the codebase excludes it, so this selector must
-// too, or the badge would show green/1 for a character the author never
-// actually assigned. producesCount counts MECHANISMS, not assignments — a
+// exclusion of it), not a real producer; every other touch-coverage check in
+// the codebase excludes it, so this selector must too. Seed reachability is
+// instead counted through the separate `inheritedChars` parameter below, so
+// that a character the base layout already produces badges as reachable
+// whether or not the author ever accepted its "already in layout" suggestion
+// — and is never double-counted when they did. producesCount counts MECHANISMS, not assignments — a
 // single assignment may carry more than one real mechanism for the same
 // target (MechanismGallery's multiple-methods-per-character support), and
 // each counts as a separate "way", matching the badge's own aria-label
@@ -50,7 +52,7 @@ export interface UsedSequenceEntry {
 }
 
 export interface CharMechanismsResult {
-  /** Count of mechanisms (any pattern) whose OUTPUT is `char` — individual-scope, this modality. */
+  /** Count of ways `char` is produced: mechanisms (any pattern) whose OUTPUT is `char` — individual-scope, this modality — plus one for seed reachability when `char` is in the caller's `inheritedChars`. */
   producesCount: number;
   /** Every recorded sequence where `char` appears in ANY slot (input or output), across all modalities in the given assignments. */
   usesSequences: UsedSequenceEntry[];
@@ -72,13 +74,23 @@ function sequenceRefUsesChar(ref: MechanismRef, char: string): boolean {
  * (touch) for the PRODUCES badge, and its Phase C desktop assignments
  * (physical) for the USES list, since sequences are always recorded with
  * physical modality — neither call site concatenates the two.
+ *
+ * `inheritedChars` (optional) is the set of characters the caller's SEED
+ * layout already produces without any author edit — TouchGallery's
+ * `detectedChars` (the "already in touch layout" set). A character in that
+ * set is genuinely produced by the keyboard, so it contributes one way to
+ * `producesCount`. MechanismGallery has no such notion and omits it.
  */
 export function getCharMechanisms(
   char: string,
   assignments: ReadonlyArray<MechanismAssignment>,
   modality: Modality,
+  inheritedChars?: ReadonlySet<string>,
 ): CharMechanismsResult {
-  let producesCount = 0;
+  // Seed reachability is one way to produce the character, independent of the
+  // touch_inherited placeholder the "already" suggestion records (which is
+  // excluded below) — so accepting that suggestion cannot double-count it.
+  let producesCount = inheritedChars?.has(char) === true ? 1 : 0;
   const usesSequences: UsedSequenceEntry[] = [];
 
   for (const a of assignments) {

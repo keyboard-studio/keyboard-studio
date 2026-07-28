@@ -84,6 +84,28 @@ export function upperCounterpartOf(b: string, bcp47?: string): string | null {
 }
 
 /**
+ * True when `c` is an uppercase letter that has a lowercase counterpart — i.e.
+ * a character the character step never OFFERS on its own, because picking the
+ * lowercase adds it automatically (spec 047: one cased letter, one choice).
+ *
+ * Shared source of truth for the two places that offer characters: the
+ * character map's cell fold (CharacterMapPane's `filteredGroups`) and the
+ * exemplar suggestion chips (PhaseB's SuggestionPanel). The exemplar index
+ * itself stores only lowercase, but the CLDR consumer path synthesizes
+ * uppercase into `specials` (cldr.ts's `augmentSpecialsWithUppercase`), so
+ * suggestions arrive case-doubled and must be folded here rather than at the
+ * source — the uppercase is still wanted in the alphabet, just not as a
+ * separate thing to tick.
+ *
+ * Distinct from {@link hiddenUppercaseBases}, which folds only uppercases whose
+ * lowercase is PRESENT in a given list; this asks the question of one character
+ * against the locale's case mapping alone.
+ */
+export function isFoldedUppercase(c: string, bcp47?: string): boolean {
+  return caseCounterpart(c, bcp47)?.direction === "toLower";
+}
+
+/**
  * The set of uppercase bases hidden behind a present lowercase counterpart:
  * for each base whose lowercase counterpart maps up, that uppercase is hidden
  * (FR-001). Caseless / uppercase-only-without-lowercase input yields an empty

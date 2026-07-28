@@ -10,13 +10,16 @@
 //   5. reset(): clears all slots including instantiationMode + identity + base slots.
 //   6. State consistency: mutations via actions are visible in the same store.
 //   7. Cross-slice isolation: IR actions don't bleed into survey state.
+//   8. Per-working-copy Phase B proposal decisions (spec 044 FR-016a): both
+//      instantiate entry points clear the sticky rejected/declined flags.
 //
 // Tests in irStore.test.ts and surveyResultsStore.test.ts own exhaustive
 // coverage of the carve and survey action semantics respectively; this file
 // focuses on the Phase-2 / instantiation surface.
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { useWorkingCopyStore, bindManifest } from "./workingCopyStore.ts";
+import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
 import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
@@ -29,6 +32,7 @@ import type {
   RemovalCapability,
   SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
+import type { SourcedInventory } from "@keyboard-studio/engine";
 import type { Step, EditorStep } from "../steps/types.ts";
 import { promoteOnManualEdit } from "../editors/assignLoop/touchBehavior.ts";
 
@@ -1340,5 +1344,94 @@ describe("workingCopyStore — sequenceFlaggedChars", () => {
     const otherKeyboard = { ...basicKbdus, id: "other_keyboard_id" };
     useWorkingCopyStore.getState().instantiateFromBase(otherKeyboard, { vfs, ir: makeTestIR([]) });
     expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-working-copy Phase B proposal decisions (spec 044 FR-016a)
+//
+// `rejected` and `exemplarMethodDeclined` deliberately survive
+// phaseBDraftStore's own reset() — that runs on every entry to the build-list
+// screen, and clearing them there would re-propose characters the author just
+// removed. They are per-WORKING-COPY, so the two instantiate entry points
+// clear them instead. Without that wiring the decisions were effectively
+// per-browser-session: declining on keyboard A silently pre-declined keyboard
+// B, and a character rejected in A was suppressed from B's proposal.
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — Phase B proposal decisions are per-working-copy", () => {
+  const BM_INVENTORY: SourcedInventory = {
+    resolvedTag: "bm",
+    source: "cldr",
+    confidence: "approved",
+    characters: [{ char: "ɔ", tier: "main", source: "cldr", confidence: "approved" }],
+    digraphs: [],
+  };
+
+  afterEach(() => {
+    usePhaseBDraftStore.getState().reset();
+    resetPhaseBDraftDecisions();
+  });
+
+  /** Seed a proposal, reject one of its characters, and decline the offer. */
+  function declineAndReject(): void {
+    usePhaseBDraftStore.getState().seedFromProposal(BM_INVENTORY, "bm");
+    usePhaseBDraftStore.getState().remove("ɔ");
+    usePhaseBDraftStore.getState().declineExemplarMethod();
+    expect(usePhaseBDraftStore.getState().rejected).toContain("ɔ");
+    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(true);
+  }
+
+  it("instantiateFromBase clears them for a new working copy", () => {
+    const vfs = createVirtualFS();
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+    declineAndReject();
+
+    // Keyboard B, started in the same browser session.
+    const keyboardB = { ...basicKbdus, id: "keyboard_b" };
+    useWorkingCopyStore.getState().instantiateFromBase(keyboardB, { vfs, ir: makeTestIR([]) });
+
+    expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
+    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(false);
+  });
+
+  it("instantiateFromExisting clears them for a new working copy", () => {
+    const vfs = createVirtualFS();
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: makeTestIR([]) });
+    declineAndReject();
+
+    const keyboardB = { ...basicKbdus, id: "keyboard_b" };
+    useWorkingCopyStore.getState().instantiateFromExisting(keyboardB, { vfs, ir: makeTestIR([]) });
+
+    expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
+    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(false);
+  });
+
+  it("a character rejected on keyboard A is proposed normally on keyboard B", () => {
+    const vfs = createVirtualFS();
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+    declineAndReject();
+
+    const keyboardB = { ...basicKbdus, id: "keyboard_b" };
+    useWorkingCopyStore.getState().instantiateFromBase(keyboardB, { vfs, ir: makeTestIR([]) });
+    // Entering B's build-list screen: the per-visit reset, then a fresh seed.
+    usePhaseBDraftStore.getState().reset();
+    usePhaseBDraftStore.getState().seedFromProposal(BM_INVENTORY, "bm");
+
+    expect(usePhaseBDraftStore.getState().chars).toContain("ɔ");
+    expect(usePhaseBDraftStore.getState().provenance["ɔ"]).toBe("cldr");
+  });
+
+  it("a redundant re-fire of the SAME instantiate does not discard a live decision", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    declineAndReject();
+
+    // Case 1 of resolveInstantiationCase: same id AND same mode -> full no-op.
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+
+    expect(usePhaseBDraftStore.getState().rejected).toContain("ɔ");
+    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(true);
   });
 });

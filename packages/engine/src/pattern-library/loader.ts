@@ -1,3 +1,4 @@
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { parse } from "yaml";
 import { PatternSchema } from "./patternSchema.js";
 import { runAllChecks } from "../validator/index.js";
@@ -67,7 +68,7 @@ async function _doLoad(
   try {
     yamlFiles = await collectYamlFiles(dir, readdir, extname, join);
   } catch (e) {
-    console.warn(`[pattern-library] cannot read directory ${dir}: ${String(e)}`);
+    devLog.warn(`[pattern-library] cannot read directory ${dir}: ${String(e)}`);
     _cache = [];
     return { patterns: [], report };
   }
@@ -78,7 +79,7 @@ async function _doLoad(
       raw = await readFile(file, "utf-8");
     } catch (e) {
       const reason = `File read error: ${String(e)}`;
-      console.warn(`[pattern-library] skipping ${file}: ${reason}`);
+      devLog.warn(`[pattern-library] skipping ${file}: ${reason}`);
       report.skipped.push({ file, reason });
       continue;
     }
@@ -88,7 +89,7 @@ async function _doLoad(
       parsed = parse(raw);
     } catch (e) {
       const reason = `YAML parse error: ${String(e)}`;
-      console.warn(`[pattern-library] skipping ${file}: ${reason}`);
+      devLog.warn(`[pattern-library] skipping ${file}: ${reason}`);
       report.skipped.push({ file, reason });
       continue;
     }
@@ -98,7 +99,7 @@ async function _doLoad(
       const reason = result.error.issues
         .map(i => `${i.path.join(".")}: ${i.message}`)
         .join("; ");
-      console.warn(`[pattern-library] skipping ${file}: ${reason}`);
+      devLog.warn(`[pattern-library] skipping ${file}: ${reason}`);
       report.skipped.push({ file, reason });
       continue;
     }
@@ -122,7 +123,7 @@ async function _doLoad(
       );
       if (errors.length > 0) {
         const patternId = String(data.id);
-        console.warn(
+        devLog.warn(
           `[pattern-library] pattern ${patternId} has demo errors: ${errors.map(e => e.code).join(", ")}`,
         );
         report.flagged.push({ patternId, findings: errors });

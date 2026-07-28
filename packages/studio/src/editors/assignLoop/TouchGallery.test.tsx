@@ -9,7 +9,7 @@
 //
 // Defect B regression is covered in StudioShell.test.tsx.
 
-import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
+import { describe, it, expect, afterEach, vi, beforeEach, beforeAll } from "vitest";
 import { screen, fireEvent, act, cleanup, waitFor, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { TouchGallery, buildTouchMechanismRef } from "./TouchGallery.tsx";
@@ -22,13 +22,14 @@ import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 import { expectCurrentChar } from "../../test/currentCharChip.ts";
 import { changeSelectMenu } from "../../test/selectMenuTestUtils.ts";
+import { installDialogShim } from "../../test/dialogShim.ts";
 import { PATTERN_SEQUENCE } from "./patternIds.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() — refs shared across mock closures and test bodies.
 // ---------------------------------------------------------------------------
 
-const { capturedVfsTransformRef, buildTouchLayoutJsonSpy, defaultBuildTouchLayoutJsonImpl, touchLintResultRef } = vi.hoisted(() => {
+const { capturedVfsTransformRef, buildTouchLayoutJsonSpy, defaultBuildTouchLayoutJsonImpl } = vi.hoisted(() => {
   const capturedVfsTransformRef = {
     current: null as null | ((vfs: VirtualFS, kbId: string) => { warnings: string[] }),
   };
@@ -70,12 +71,7 @@ const { capturedVfsTransformRef, buildTouchLayoutJsonSpy, defaultBuildTouchLayou
     };
   }
   const buildTouchLayoutJsonSpy = vi.fn(defaultBuildTouchLayoutJsonImpl);
-  // Configurable ref for useTouchLint mock — tests override .current to inject
-  // specific findings (e.g. LINT_ERROR_FINDING for AC#3 coverage).
-  const touchLintResultRef = {
-    current: { touchFindings: [] as Array<{ code: string; severity: string; layer: string; message: string }>, touchLintRunning: false },
-  };
-  return { capturedVfsTransformRef, buildTouchLayoutJsonSpy, defaultBuildTouchLayoutJsonImpl, touchLintResultRef };
+  return { capturedVfsTransformRef, buildTouchLayoutJsonSpy, defaultBuildTouchLayoutJsonImpl };
 });
 
 // ---------------------------------------------------------------------------
@@ -127,15 +123,7 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) => {
 });
 
 // ---------------------------------------------------------------------------
-// Mock useTouchLint — no real lint engine needed.
-// ---------------------------------------------------------------------------
-
-vi.mock("../../hooks/useTouchLint.ts", () => ({
-  useTouchLint: () => touchLintResultRef.current,
-}));
-
-// ---------------------------------------------------------------------------
-// Mock OSKFrame, OskModeToggle, LintSummary — no iframe / KMW environment.
+// Mock OSKFrame, OskModeToggle — no iframe / KMW environment.
 // ---------------------------------------------------------------------------
 
 vi.mock("../../components/OSKFrame.tsx", () => ({
@@ -148,19 +136,6 @@ vi.mock("../../components/OSKFrame.tsx", () => ({
 
 vi.mock("../../components/OskModeToggle.tsx", () => ({
   OskModeToggle: () => <div data-testid="osk-mode-toggle" />,
-}));
-
-vi.mock("../../lint/LintSummary.tsx", () => ({
-  // Render finding codes as text so tests can assert on them.
-  LintSummary: ({ findings }: { findings: Array<{ code: string }> }) => (
-    <div data-testid="lint-summary">
-      {findings.map((f) => (
-        <span key={f.code} data-finding-code={f.code}>
-          {f.code}
-        </span>
-      ))}
-    </div>
-  ),
 }));
 
 // ---------------------------------------------------------------------------
@@ -206,6 +181,12 @@ function runTransform(kbId: string) {
   return vfs;
 }
 
+// jsdom does not implement HTMLDialogElement.showModal()/close() — shared
+// shim (test/dialogShim.ts); see that module for rationale. Needed here
+// because the leave-warning modal (ConfirmDialog) now mounts whenever the
+// FR-008 gate finds uncovered characters.
+beforeAll(installDialogShim);
+
 // ---------------------------------------------------------------------------
 // Teardown
 // ---------------------------------------------------------------------------
@@ -216,14 +197,11 @@ afterEach(() => {
   useSurveySessionStore.getState().reset();
   vi.clearAllMocks();
   capturedVfsTransformRef.current = null;
-  // Reset useTouchLint mock to the default empty state between tests.
-  touchLintResultRef.current = { touchFindings: [], touchLintRunning: false };
 });
 
 beforeEach(() => {
   useWorkingCopyStore.getState().reset();
   useSurveySessionStore.getState().reset();
-  touchLintResultRef.current = { touchFindings: [], touchLintRunning: false };
   // vi.clearAllMocks() (afterEach, above) clears call history but NOT a
   // custom .mockImplementation() a prior test installed via
   // buildTouchLayoutJsonSpy.mockImplementation(...) — re-pin the covering
@@ -1124,6 +1102,96 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
 });
 
 // ---------------------------------------------------------------------------
+// Leave-warning modal (the same ConfirmDialog contract MechanismGallery uses,
+// see MechanismGallery.test.tsx's own "leave-warning modal open/closed state"
+// suite) — TouchGallery's version fires from the SAME handleContinue gate as
+// the FR-008 inline-alert refusal above, so the modal and the alert always
+// open together on a refused completion attempt. Queried via the native
+// <dialog open> attribute rather than button presence: ConfirmDialog always
+// renders both buttons regardless of `open`, so a bare button-exists query
+// cannot distinguish "modal is showing" from "modal is mounted but closed".
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — leave-warning modal open/closed state", () => {
+  it("does NOT open the dialog when completion succeeds with every character covered", async () => {
+    const onComplete = vi.fn();
+    seedStore({ withInventory: ["a"] }); // "a" is already covered by the default scaffold.
+    const { container } = await act(async () =>
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(onComplete).toHaveBeenCalledOnce();
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+  });
+
+  it("opens the dialog (native <dialog open> attribute) alongside the inline alert when the completion gate refuses", async () => {
+    seedStore({ withInventory: ["中"] });
+    const { container } = await act(async () =>
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(container.querySelector("dialog")?.hasAttribute("open")).toBe(true);
+  });
+
+  it('"Go back and finish" (primary) closes the dialog and does NOT complete — the author stays in the gallery able to finish "中"', async () => {
+    const onComplete = vi.fn();
+    seedStore({ withInventory: ["中"] });
+    const { container } = await act(async () =>
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(container.querySelector("dialog")?.hasAttribute("open")).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: /Go back and finish/i }));
+
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+    // Still on "中" — the method chooser is still available to actually cover it.
+    expectCurrentChar("中");
+    expect(screen.getByLabelText(/Host key for long-press/i)).toBeTruthy();
+  });
+
+  it("Escape (the native <dialog> cancel event) does NOT proceed — it stays in the gallery, same as \"Go back and finish\" (P1(a))", async () => {
+    const onComplete = vi.fn();
+    seedStore({ withInventory: ["中"] });
+    const { container } = await act(async () =>
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    const dialog = container.querySelector("dialog")!;
+    expect(dialog.hasAttribute("open")).toBe(true);
+
+    fireEvent(dialog, new Event("cancel", { cancelable: true }));
+
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(dialog.hasAttribute("open")).not.toBe(true);
+    expectCurrentChar("中");
+  });
+
+  it("the ← back to previous character control never opens the leave-warning modal, even while the current character remains uncovered", async () => {
+    seedStore({ withInventory: ["中", "日"] });
+    const { container } = await act(async () =>
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />),
+    );
+    // Advance to "日" without covering "中" — Skip is pure forward nav.
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    await waitFor(() => {
+      expectCurrentChar("日");
+    });
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+
+    // Back to the still-uncovered "中" — a DIFFERENT control from the forward
+    // Done/Skip-on-last path that triggers the modal, and must never open it.
+    fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
+    await waitFor(() => {
+      expectCurrentChar("中");
+    });
+    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Draft persistence — store round-trip
 // ---------------------------------------------------------------------------
 
@@ -1631,10 +1699,6 @@ describe("TouchGallery — no suggestion goes straight to chooser", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// useTouchLint error surface — AC#3 (swallowed-catch bugfix)
-// ---------------------------------------------------------------------------
-
 describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", () => {
   it("revisiting an already-configured character skips the suggestion and does not duplicate its mechanism", async () => {
     // "ä" is decomposable and not in the default layout → longpress suggestion,
@@ -1831,43 +1895,6 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
   });
 });
 
-describe("TouchGallery — lint error finding surfaces in LintSummary (AC#3)", () => {
-  it("renders KM_WARN_LINT_ERROR code in LintSummary when useTouchLint returns LINT_ERROR_FINDING", async () => {
-    // Import the constant here (dynamic import avoids hoisting issues).
-    const { LINT_ERROR_FINDING } = await import("../../lint/validationErrorFindings.ts");
-
-    // Override the mock to return the error finding before rendering.
-    touchLintResultRef.current = {
-      touchFindings: [LINT_ERROR_FINDING],
-      touchLintRunning: false,
-    };
-
-    seedStore({ withInventory: ["ä"] });
-    await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
-    });
-
-    // The LintSummary mock renders each finding's code as a [data-finding-code] span.
-    // Assert that KM_WARN_LINT_ERROR is rendered — it came through the findings prop.
-    const lintSummary = screen.getByTestId("lint-summary");
-    expect(lintSummary).toBeTruthy();
-    const codeSpan = lintSummary.querySelector("[data-finding-code='KM_WARN_LINT_ERROR']");
-    expect(codeSpan).not.toBeNull();
-    expect(codeSpan?.textContent).toBe("KM_WARN_LINT_ERROR");
-  });
-
-  it("renders no finding codes in LintSummary when useTouchLint returns [] (baseline check)", async () => {
-    // Default: touchLintResultRef.current = { touchFindings: [], ... } (reset in beforeEach).
-    seedStore({ withInventory: ["ä"] });
-    await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
-    });
-
-    const lintSummary = screen.getByTestId("lint-summary");
-    expect(lintSummary.querySelectorAll("[data-finding-code]")).toHaveLength(0);
-  });
-});
-
 // ---------------------------------------------------------------------------
 // "Enter my own character..." custom host-key option + U+ notation —
 // feature coverage for the shared host-key picker (longpress / flick /
@@ -2027,21 +2054,279 @@ describe("buildTouchMechanismRef — resolved-vkey invariant", () => {
   });
 
   it("builds the expected mechanism ref for each method when resolvedHostKey is a real vkey", () => {
+    // Every ref now carries an explicit `layer` derived from the placed
+    // character's case (spec 051 FR-006). "中" is caseless, so it lands on
+    // "default" — the same layer these refs have always targeted, since both
+    // appliers treat an absent `layer` as "default".
     expect(buildTouchMechanismRef("longpress_alternates", "K_B", "", "中")).toEqual({
       patternId: "longpress_alternates",
-      slotValues: { hostKey: "K_B", char: "中" },
+      slotValues: { hostKey: "K_B", char: "中", layer: "default" },
     });
     expect(buildTouchMechanismRef("flick_gestures", "K_B", "n", "中")).toEqual({
       patternId: "flick_gestures",
-      slotValues: { hostKey: "K_B", direction: "n", char: "中" },
+      slotValues: { hostKey: "K_B", direction: "n", char: "中", layer: "default" },
     });
     expect(buildTouchMechanismRef("multitap", "K_B", "", "中")).toEqual({
       patternId: "multitap",
-      slotValues: { hostKey: "K_B", char: "中" },
+      slotValues: { hostKey: "K_B", char: "中", layer: "default" },
     });
     expect(buildTouchMechanismRef("touch_key_replace", "K_B", "", "中")).toEqual({
       patternId: "touch_key_replace",
-      slotValues: { hostKey: "K_B", char: "中" },
+      slotValues: { hostKey: "K_B", char: "中", layer: "default" },
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 051 US3 — case-aware touch placement (FR-006) and the shift-layer
+// case-pair proposal (FR-005).
+//
+// Before the `layer` slot existed, case was UNREPRESENTABLE in a touch
+// placement: both appliers hardcoded the phone "default" layer, so an accented
+// uppercase letter landed on the lowercase layer. buildTouchMechanismRef now
+// derives the layer from the placed character's case.
+// ---------------------------------------------------------------------------
+
+describe("buildTouchMechanismRef — case-derived layer (spec 051 FR-006)", () => {
+  it("emits layer 'default' for a lowercase letter and 'shift' for its capital", () => {
+    expect(
+      buildTouchMechanismRef("longpress_alternates", "K_A", "", "a")
+        ?.slotValues?.["layer"],
+    ).toBe("default");
+    expect(
+      buildTouchMechanismRef("longpress_alternates", "K_A", "", "A")
+        ?.slotValues?.["layer"],
+    ).toBe("shift");
+  });
+
+  it("handles decomposable accented letters in both cases (á / Á)", () => {
+    expect(
+      buildTouchMechanismRef("longpress_alternates", "K_A", "", "á")
+        ?.slotValues?.["layer"],
+    ).toBe("default");
+    // The inverse case the spec did not name: an accented UPPERCASE letter must
+    // not land on the lowercase layer.
+    expect(
+      buildTouchMechanismRef("longpress_alternates", "K_A", "", "Á")
+        ?.slotValues?.["layer"],
+    ).toBe("shift");
+  });
+
+  it("puts a caseless letter on the default layer", () => {
+    expect(
+      buildTouchMechanismRef("multitap", "K_A", "", "ا")?.slotValues?.["layer"],
+    ).toBe("default");
+  });
+
+  it("carries the layer on every method, and never encodes it into hostKey", () => {
+    for (const method of [
+      "longpress_alternates",
+      "flick_gestures",
+      "multitap",
+      "touch_key_replace",
+    ] as const) {
+      const ref = buildTouchMechanismRef(method, "K_A", "n", "Á");
+      expect(ref?.slotValues?.["layer"]).toBe("shift");
+      // hostKey keeps its exact current meaning: a resolved vkey.
+      expect(ref?.slotValues?.["hostKey"]).toBe("K_A");
+    }
+  });
+
+  it("treats {K_A, á, default} and {K_A, Á, shift} as distinct refs", () => {
+    const lower = buildTouchMechanismRef("longpress_alternates", "K_A", "", "á");
+    const upper = buildTouchMechanismRef("longpress_alternates", "K_A", "", "Á");
+    expect(lower).not.toEqual(upper);
+    expect(lower?.slotValues?.["layer"]).not.toBe(upper?.slotValues?.["layer"]);
+  });
+});
+
+describe("TouchGallery — shift-layer case-pair proposal (spec 051 US3)", () => {
+  /** Apply the default long-press method on `hostKey` for the current char. */
+  async function applyLongpressOn(hostKey: string) {
+    const select = screen.queryByRole("button", { name: /host key/i });
+    expect(select).not.toBeNull();
+    await changeSelectMenu(select!, hostKey);
+    const applyBtn =
+      screen
+        .queryAllByRole("button")
+        .find((b) => b.textContent?.trim() === "Apply method") ?? null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+  }
+
+  function touchMechanismsFor(char: string) {
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    return (
+      draft?.charTouchEntries.find(([c]) => c === char)?.[1]?.mechanisms ?? []
+    );
+  }
+
+  it("a lowercase placement raises a proposal whose confirm records the capital on the shift layer", async () => {
+    seedStore({ withInventory: ["θ"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await applyLongpressOn("K_A");
+
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map Θ to the shift layer of/i }),
+      );
+    });
+
+    // The source placement is untouched on the default layer...
+    expect(touchMechanismsFor("θ")[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "θ",
+      layer: "default",
+    });
+    // ...and the capital lands on the shift layer of the same host key.
+    expect(touchMechanismsFor("Θ")[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "Θ",
+      layer: "shift",
+    });
+  });
+
+  it("dismissing records nothing", async () => {
+    seedStore({ withInventory: ["θ"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await applyLongpressOn("K_A");
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Do not map Θ to the shift layer/i }),
+      );
+    });
+
+    expect(touchMechanismsFor("Θ")).toHaveLength(0);
+    expect(touchMechanismsFor("θ")).toHaveLength(1);
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+
+  it("a caseless letter raises no proposal", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await applyLongpressOn("K_A");
+
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+    expect(touchMechanismsFor("中")).toHaveLength(1);
+  });
+
+  it("raises no redundant proposal once the capital is already on that host key's shift layer", async () => {
+    seedStore({ withInventory: ["θ"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // First apply: propose, then confirm — Θ now sits on K_A's shift layer.
+    await applyLongpressOn("K_A");
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map Θ to the shift layer of/i }),
+      );
+    });
+    expect(touchMechanismsFor("Θ")).toHaveLength(1);
+
+    // Re-applying the same placement must not re-offer a pairing that exists
+    // (spec §Edge Cases, "counterpart already placed").
+    await applyLongpressOn("K_A");
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+    expect(touchMechanismsFor("Θ")).toHaveLength(1);
+  });
+
+  it("still proposes when the capital exists on a DIFFERENT host key's shift layer", async () => {
+    seedStore({ withInventory: ["θ"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await applyLongpressOn("K_A");
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map Θ to the shift layer of/i }),
+      );
+    });
+
+    // A placement on another host key is a different parallel slot, so the
+    // suppression must not over-reach.
+    await applyLongpressOn("K_B");
+    expect(screen.queryByText(/has an uppercase form, Θ/i)).toBeTruthy();
+  });
+
+  it("does not consult or write suggestionResolved — that set governs the placement card, not this proposal", async () => {
+    seedStore({ withInventory: ["θ"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const before =
+      useWorkingCopyStore.getState().touchDraft?.suggestionResolvedChars ?? [];
+
+    await applyLongpressOn("K_A");
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map Θ to the shift layer of/i }),
+      );
+    });
+
+    const after =
+      useWorkingCopyStore.getState().touchDraft?.suggestionResolvedChars ?? [];
+    // The capital never enters the placement-suggestion resolved set.
+    expect(after).not.toContain("Θ");
+    expect(after.filter((c) => !before.includes(c))).not.toContain("Θ");
+  });
+
+  it("stale-guard: confirming a proposal whose raising mechanism ref vanished via chip removal records nothing", async () => {
+    seedStore({ withInventory: ["θ"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await applyLongpressOn("K_A");
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+
+    // Remove the just-applied mechanism for "θ" via its configured chip —
+    // the in-UI equivalent of the raising ref vanishing out from under the
+    // banner. handleRemoveMechanism does not proactively dismiss the
+    // companion (unlike the physical/combo removal paths), so the banner
+    // stays visible and confirming it below exercises handleCasePairConfirm's
+    // confirm-time staleness re-check
+    // (`existing.mechanisms.includes(baseRef)`) rather than a removal-time
+    // dismissal.
+    const configuredGroup = screen.getByRole("group", {
+      name: /configured characters/i,
+    });
+    const chips = configuredGroup.querySelectorAll("button");
+    expect(chips.length).toBe(1);
+    await act(async () => {
+      fireEvent.click(chips[0]!);
+    });
+    expect(touchMechanismsFor("θ")).toHaveLength(0);
+
+    // Banner is still up — the component's pending-proposal state is
+    // untouched by the direct chip removal.
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map Θ to the shift layer of/i }),
+      );
+    });
+
+    // Nothing was recorded for the counterpart — the stale proposal was
+    // dismissed, not applied.
+    expect(touchMechanismsFor("Θ")).toHaveLength(0);
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
   });
 });

@@ -21,6 +21,16 @@ export interface RadioOption {
   disabled?: boolean;
   /** Tooltip shown on the input — typically explains why `disabled` is set. */
   title?: string;
+  /**
+   * Rich content rendered inside the option's label, below `label`/`note`.
+   *
+   * For evidence the reader needs AT THE POINT OF CHOOSING rather than one
+   * click away — e.g. spec 044's exemplar offer, which shows the proposed
+   * alphabet's source, size and a character preview on the option itself.
+   * Prefer `note` for plain secondary text; reach for this only when the
+   * content needs markup.
+   */
+  detail?: React.ReactNode;
 }
 
 export interface RadioGroupProps {
@@ -88,6 +98,7 @@ interface RadioItemProps {
   required?: boolean | undefined;
   disabled?: boolean | undefined;
   title?: string | undefined;
+  detail?: React.ReactNode | undefined;
 }
 
 function RadioItem({
@@ -102,6 +113,7 @@ function RadioItem({
   required,
   disabled,
   title,
+  detail,
 }: RadioItemProps): React.ReactElement {
   return (
     <label htmlFor={inputId} style={OPTION_ROW_STYLE} className={OPTION_ROW_CLASSNAME}>
@@ -128,6 +140,7 @@ function RadioItem({
       <span style={OPTION_LABEL_STYLE}>
         {label}
         {note !== undefined && <span style={NOTE_STYLE}>{note}</span>}
+        {detail}
       </span>
     </label>
   );
@@ -192,6 +205,7 @@ export function RadioGroup({
             onChange={onChange}
             disabled={opt.disabled}
             title={opt.title}
+            detail={opt.detail}
           />
         );
       })}

@@ -6,7 +6,7 @@
 
 import type { CSSProperties } from "react";
 import type { DraftMeta } from "../lib/draftAutosave.ts";
-import { relativeTime } from "../lib/relativeTime.ts";
+import { relativeTime, type RelativeTimeValue } from "../lib/relativeTime.ts";
 import { BG_CARD, BORDER, TEXT_MAIN, TEXT_DIM, BLUE_ACTION, FONT } from "../survey/surveyStyles.ts";
 
 // Friendly labels for the step the draft was left on.
@@ -25,6 +25,23 @@ const STEP_LABELS: Record<DraftMeta["activeStepId"], string> = {
   done: "the final step",
   unsupported: "an unsupported script",
 };
+
+// relativeTime() returns a structured {unit, count} so i18n'd consumers
+// (MyKeyboardsList) can plural-select per locale; this banner is not yet
+// Lingui-ized, so it formats the same English strings the pre-extraction
+// helper produced.
+function relativeTimeLabel(v: RelativeTimeValue): string {
+  switch (v.unit) {
+    case "now":
+      return "just now";
+    case "minute":
+      return `${v.count} minute${v.count === 1 ? "" : "s"} ago`;
+    case "hour":
+      return `${v.count} hour${v.count === 1 ? "" : "s"} ago`;
+    case "day":
+      return `${v.count} day${v.count === 1 ? "" : "s"} ago`;
+  }
+}
 
 export interface ResumeDraftBannerProps {
   meta: DraftMeta;
@@ -88,11 +105,11 @@ export function ResumeDraftBanner({ meta, onResume, onDiscard }: ResumeDraftBann
           {isCloud ? (
             <>
               You have an in-progress keyboard saved to your account (last saved{" "}
-              {relativeTime(meta.savedAt)}, on the {stepLabel} step).
+              {relativeTimeLabel(relativeTime(meta.savedAt))}, on the {stepLabel} step).
             </>
           ) : (
             <>
-              You have an unfinished survey (last saved {relativeTime(meta.savedAt)}, on the{" "}
+              You have an unfinished survey (last saved {relativeTimeLabel(relativeTime(meta.savedAt))}, on the{" "}
               {stepLabel} step).
             </>
           )}

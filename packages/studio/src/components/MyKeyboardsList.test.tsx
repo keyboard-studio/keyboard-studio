@@ -1,22 +1,40 @@
-// Tests for MyKeyboardsList — the "My keyboards" section on the profile page
-// (specs/037-my-keyboards/spec.md).
+// Tests for MyKeyboardsList — the "My keyboards" section on the profile page.
 //
 // Mocking idiom: mock useGitHubAuth at the module boundary (same idiom as
-// ProfileScreen.test.tsx / AccountControl.test.tsx). draftAutosave.ts is
+// ProfileScreen.test.tsx / AccountControl.test.tsx). draftPersistence.ts is
 // exercised for real against real localStorage (same idiom as
-// draftAutosave.test.ts) except for `deleteProject`, which is wrapped with
-// `vi.fn(actual.deleteProject)` so we can assert the call AND let the real
-// removal happen. serverDraftStore.ts is likewise real except for
-// `listServerDrafts`, which is stubbed per-test to control the cloud list.
+// draftPersistence.test.ts) except for `deleteProject` and `resumeProject`,
+// which are wrapped with `vi.fn(actual.xxx)` so we can assert the call AND
+// let the real behavior happen. serverDraftStore.ts is likewise real except
+// for `listServerDrafts`, which is stubbed per-test to control the cloud
+// list.
+//
+// Ported from the dev reference implementation's MyKeyboardsList.test.tsx
+// (specs/047-my-keyboards) with the draft-engine mocks/fixtures rewired onto
+// main's `ks.draft*` key scheme (draftPersistence.ts) and its Resume
+// assertion changed to reflect main's "resumeProject applies the draft"
+// architecture (see MyKeyboardsList.tsx's module docstring) rather than
+// dev's "pin the pointer, defer to a resume banner" one.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
+import { createVirtualFS } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
 import { MyKeyboardsList } from "./MyKeyboardsList.tsx";
 import { useGitHubAuth, type UseGitHubAuthResult } from "../hooks/useGitHubAuth.ts";
 import { listServerDrafts, type ServerDraftMeta } from "../lib/serverDraftStore.ts";
 import { navigateTo } from "../lib/navigate.ts";
-import { getActiveProjectKey, deleteProject } from "../lib/draftAutosave.ts";
+import {
+  resolveActiveProjectKey,
+  clearActiveProjectKey,
+  deleteProject,
+  resumeProject,
+  saveDraft,
+} from "../lib/draftPersistence.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 
 vi.mock("../hooks/useGitHubAuth.ts", () => ({ useGitHubAuth: vi.fn() }));
 
@@ -25,9 +43,13 @@ vi.mock("../lib/serverDraftStore.ts", async (importOriginal) => {
   return { ...actual, listServerDrafts: vi.fn(async () => []) };
 });
 
-vi.mock("../lib/draftAutosave.ts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../lib/draftAutosave.ts")>();
-  return { ...actual, deleteProject: vi.fn(actual.deleteProject) };
+vi.mock("../lib/draftPersistence.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/draftPersistence.ts")>();
+  return {
+    ...actual,
+    deleteProject: vi.fn(actual.deleteProject),
+    resumeProject: vi.fn(actual.resumeProject),
+  };
 });
 
 vi.mock("../lib/navigate.ts", () => ({ navigateTo: vi.fn() }));
@@ -36,11 +58,13 @@ const mockedUseGitHubAuth = vi.mocked(useGitHubAuth);
 const mockedListServerDrafts = vi.mocked(listServerDrafts);
 const mockedNavigateTo = vi.mocked(navigateTo);
 const mockedDeleteProject = vi.mocked(deleteProject);
+const mockedResumeProject = vi.mocked(resumeProject);
 
-const PROJECT_INDEX_KEY = "ks.studio.projects.index";
+const DRAFT_INDEX_KEY = "ks.draftIndex.v1";
+const DRAFT_VERSION = 1;
 
-function projectStorageKey(projectKey: string): string {
-  return `ks.studio.project.${projectKey}`;
+function draftKey(projectKey: string): string {
+  return `ks.draft.${projectKey}.v${DRAFT_VERSION}`;
 }
 
 interface Fixture {
@@ -53,9 +77,15 @@ interface Fixture {
   prUrl?: string | null;
 }
 
+/**
+ * Seeds ONLY the "My keyboards" index row for a fixture — sufficient for the
+ * badge/View-PR/Delete tests below, none of which parse or apply the
+ * per-project draft record's contents (`deleteProject` -> `clearDraft` just
+ * removes the localStorage keys by name; it never `JSON.parse`s them).
+ */
 function seedLocalIndex(entries: Fixture[]): void {
   localStorage.setItem(
-    PROJECT_INDEX_KEY,
+    DRAFT_INDEX_KEY,
     JSON.stringify(
       entries.map((e) => ({
         projectKey: e.projectKey,
@@ -68,19 +98,51 @@ function seedLocalIndex(entries: Fixture[]): void {
       })),
     ),
   );
-  // Seed a minimal per-project draft record too, so deleteProject's local
-  // removal has a real record to remove (mirrors draftAutosave.test.ts).
+  // Seed a placeholder per-project record too, so a Delete test has a real
+  // localStorage key to observe being removed. Its content is opaque here —
+  // `clearDraft` never parses it — see the Resume tests below for a fixture
+  // whose record actually needs to `loadDraft()` successfully.
   for (const e of entries) {
-    localStorage.setItem(
-      projectStorageKey(e.projectKey),
-      JSON.stringify({
-        version: 1,
-        savedAt: e.savedAt,
-        survey: { activeStepId: e.activeStepId ?? "carve", history: [], identityResult: null },
-        workingCopy: null,
-      }),
-    );
+    localStorage.setItem(draftKey(e.projectKey), JSON.stringify({ placeholder: true }));
   }
+}
+
+function makeMinimalIr(): KeyboardIR {
+  return {
+    origin: "scaffolded" as const,
+    header: {
+      keyboardId: "test",
+      name: "test",
+      bcp47: [],
+      copyright: "",
+      version: "10.0",
+      targets: [],
+      storeDirectives: [],
+    },
+    stores: [],
+    groups: [],
+    comments: [],
+    raw: [],
+    recognizedPatterns: [],
+  } as unknown as KeyboardIR;
+}
+
+/**
+ * Seeds a REAL, `loadDraft()`-loadable per-project record: instantiates a
+ * real working copy into the (real, unmocked) working-copy/survey-session
+ * stores and calls the real `saveDraft(projectKey)` — the same idiom
+ * draftPersistence.test.ts's `instantiateMinimal` + `saveDraft` uses. Needed
+ * because `resumeProject` (unlike `deleteProject`) routes through the real
+ * `loadDraft`, which validates + applies the record's shape — a hand-rolled
+ * JSON blob would need to mirror that shape exactly and drift silently if it
+ * ever changed.
+ */
+function seedRealDraft(projectKey: string, displayName: string): void {
+  const base = { id: projectKey, displayName, languages: [] } as unknown as BaseKeyboard;
+  useWorkingCopyStore
+    .getState()
+    .instantiateFromBase(base, { vfs: createVirtualFS([]), ir: makeMinimalIr() });
+  saveDraft(projectKey);
 }
 
 function mockGitHubAuth(overrides: Partial<UseGitHubAuthResult>): void {
@@ -124,6 +186,12 @@ beforeEach(() => {
   localStorage.clear();
   mockGitHubAuth({ status: "idle" });
   mockedListServerDrafts.mockResolvedValue([]);
+  // Reset the real stores `seedRealDraft`/`resumeProject` touch, so a Resume
+  // test's instantiation/apply can't leak into the next test (same reset
+  // idiom as draftPersistence.test.ts's beforeEach).
+  useWorkingCopyStore.getState().reset();
+  useSurveySessionStore.getState().reset();
+  usePhaseBDraftStore.getState().reset();
 });
 
 afterEach(() => {
@@ -233,15 +301,40 @@ describe("MyKeyboardsList — View PR", () => {
 });
 
 describe("MyKeyboardsList — Resume", () => {
-  it("sets the project active and navigates to survey", async () => {
-    seedLocalIndex([{ projectKey: "kbd_a", savedAt: Date.now(), label: "Alpha", status: "draft" }]);
+  it("applies the draft via resumeProject, pins it active, and navigates to survey", async () => {
+    // Real, loadDraft()-loadable fixture — see seedRealDraft's docstring for
+    // why a hand-rolled JSON blob isn't used here. `saveDraft` (called inside
+    // seedRealDraft) also upserts the "My keyboards" index row itself, so no
+    // separate `seedLocalIndex` call is needed.
+    seedRealDraft("kbd_a", "Alpha");
+    // The instantiation above pins "kbd_a" as active — clear that so this
+    // test genuinely exercises Resume's OWN re-pin rather than asserting on
+    // a pointer that was already correct beforehand.
+    clearActiveProjectKey();
+
     render(<MyKeyboardsList />);
 
     const resumeButton = await screen.findByRole("button", { name: /Resume Alpha/i });
     fireEvent.click(resumeButton);
 
-    expect(getActiveProjectKey()).toBe("kbd_a");
+    expect(mockedResumeProject).toHaveBeenCalledWith("kbd_a");
+    expect(resolveActiveProjectKey()).toBe("kbd_a");
     expect(mockedNavigateTo).toHaveBeenCalledWith("survey");
+  });
+
+  it("does not navigate when resumeProject fails to apply (corrupt draft)", async () => {
+    seedLocalIndex([{ projectKey: "kbd_bad", savedAt: Date.now(), label: "Bad", status: "draft" }]);
+    // Corrupt the per-project record AFTER seeding the index row, so the card
+    // still renders but the underlying draft record fails loadDraft's shape
+    // guard when Resume is clicked.
+    localStorage.setItem(draftKey("kbd_bad"), "not json");
+
+    render(<MyKeyboardsList />);
+    const resumeButton = await screen.findByRole("button", { name: /Resume Bad/i });
+    fireEvent.click(resumeButton);
+
+    expect(mockedResumeProject).toHaveBeenCalledWith("kbd_bad");
+    expect(mockedNavigateTo).not.toHaveBeenCalled();
   });
 });
 
@@ -381,7 +474,7 @@ describe("MyKeyboardsList — Delete race against an in-flight cloud refresh", (
       expect(mockedDeleteProject).toHaveBeenCalledWith("kbd_e", "gho_test");
     });
     await waitFor(() => {
-      expect(localStorage.getItem(projectStorageKey("kbd_e"))).toBeNull();
+      expect(localStorage.getItem(draftKey("kbd_e"))).toBeNull();
     });
 
     // NOW resolve the stale cloud fetch — its response still lists the
