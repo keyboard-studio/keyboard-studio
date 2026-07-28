@@ -145,6 +145,75 @@ describe("QuestionField content-i18n wiring — option labels (radio)", () => {
   });
 });
 
+describe("QuestionField content-i18n wiring — option notes (radio)", () => {
+  // The per-option helper line (RadioOption.note) is rendered prose and must
+  // resolve through the same flowQuestions catalog path as the label —
+  // extracted as option.<slug>.note. Before spec 050 it rendered raw English.
+  const notedRadio: FlowQuestion = {
+    id: "track_choice",
+    type: "radio",
+    prompt: "How do you want to work with this keyboard?",
+    options: [
+      {
+        value: "copy",
+        label: "Copy",
+        note: "You will give it a new name and keyboard ID. The original is not changed.",
+      },
+      {
+        value: "adapt",
+        label: "Adapt",
+        note: "Keep the keyboard's existing name and ID. Useful for adding a language or fixing a layout.",
+      },
+    ],
+  };
+
+  afterEach(() => {
+    _resetContentI18nForTesting();
+  });
+
+  it("resolves the fr option notes from the seeded catalog", () => {
+    _setContentCatalogForTesting("fr", {
+      flowQuestions: {
+        "content.flowQuestion.track_choice.option.copy.note":
+          "Vous lui donnerez un nouveau nom et un nouvel identifiant. L'original n'est pas modifié.",
+        "content.flowQuestion.track_choice.option.adapt.note":
+          "Conservez le nom et l'identifiant existants du clavier.",
+      },
+    });
+
+    renderAtLocale(<QuestionField question={notedRadio} value="" onChange={() => {}} />, "fr");
+
+    expect(
+      screen.getByText(
+        "Vous lui donnerez un nouveau nom et un nouvel identifiant. L'original n'est pas modifié.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Conservez le nom et l'identifiant existants du clavier."),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(
+        "You will give it a new name and keyboard ID. The original is not changed.",
+      ),
+    ).toBeNull();
+  });
+
+  it("falls back to the English option notes when the locale has no seeded catalog", () => {
+    renderAtLocale(<QuestionField question={notedRadio} value="" onChange={() => {}} />, "fr");
+
+    expect(
+      screen.getByText(
+        "You will give it a new name and keyboard ID. The original is not changed.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Keep the keyboard's existing name and ID. Useful for adding a language or fixing a layout.",
+      ),
+    ).toBeTruthy();
+  });
+});
+
 describe("QuestionField content-i18n wiring — placeholder interpolation", () => {
   // Regression test for the confirmed P0: interpolation must run AFTER Tier-B
   // catalog resolution, for every locale including English — a translated

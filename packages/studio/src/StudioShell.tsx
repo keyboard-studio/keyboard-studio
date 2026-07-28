@@ -44,9 +44,11 @@ import { FlowMapView } from "./dashboard/DashboardView.tsx";
 import { runCompleteness } from "./dashboard/completeness.ts";
 import { PreviewScreen } from "./components/PreviewScreen.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
-import { i18n } from "@lingui/core";
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { I18nProvider } from "@lingui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { resolveMessage } from "./lib/i18nResolve.ts";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { LocaleSwitcher } from "./components/LocaleSwitcher.tsx";
@@ -132,14 +134,22 @@ function useRoute(): RouteId {
 
 interface NavItem {
   id: RouteId;
-  label: string;
+  /**
+   * Lazy `msg` descriptor — NAV_ITEMS is built at module scope where no
+   * useLingui() binding exists, so labels are resolved per-render via
+   * resolveMessage(i18n, ...) inside NavBar (the same pattern MechanismGallery
+   * uses for its module-scope option tables).
+   */
+  label: MessageDescriptor;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "survey", label: "Studio" },
-  { id: "preview", label: "Preview" },
-  { id: "output", label: "Output" },
-  ...(SHOW_FLOWMAP ? [{ id: "flowmap" as const, label: "Flow Map" }] : []),
+  { id: "survey", label: msg({ id: "nav.studio", message: "Studio" }) },
+  { id: "preview", label: msg({ id: "nav.preview", message: "Preview" }) },
+  { id: "output", label: msg({ id: "nav.output", message: "Output" }) },
+  ...(SHOW_FLOWMAP
+    ? [{ id: "flowmap" as const, label: msg({ id: "nav.flowMap", message: "Flow Map" }) }]
+    : []),
 ];
 
 interface NavBarProps {
@@ -157,9 +167,13 @@ interface NavBarProps {
 }
 
 function NavBar({ active, outputBlocked = false, outputBlockedTitle }: NavBarProps) {
+  const { i18n: activeI18n } = useLingui();
   return (
     <nav
-      aria-label="Studio navigation"
+      aria-label={resolveMessage(
+        activeI18n,
+        msg({ id: "nav.ariaLabel", message: "Studio navigation" }),
+      )}
       style={{
         height: 48,
         flexShrink: 0,
@@ -197,7 +211,7 @@ function NavBar({ active, outputBlocked = false, outputBlockedTitle }: NavBarPro
                 transition: "color 120ms ease, border-bottom-color 120ms ease",
               }}
             >
-              {label}
+              {resolveMessage(activeI18n, label)}
             </a>
           );
         })}
@@ -874,7 +888,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
             }}
           >
             <span style={{ fontSize: 32, opacity: 0.4, fontFamily: "monospace" }}>[kb]</span>
-            <span>Choose a base keyboard in the wizard to see a live preview here.</span>
+            <span>
+              <Trans id="preview.empty.hint">
+                Choose a base keyboard in the wizard to see a live preview here.
+              </Trans>
+            </span>
           </div>
         ) : (
           <>

@@ -199,6 +199,8 @@
   "content.flowQuestion.project_keyboard_id.prompt": "Confirmez l'identifiant du clavier",
   "content.flowQuestion.track_choice.help_text": "Choisissez comment vous voulez utiliser ce clavier de base. « Copier » crée un nouveau clavier indépendant que vous pouvez entièrement renommer et posséder. « Adapter » vous permet de modifier le clavier existant en conservant son nom et son identifiant.",
   "content.flowQuestion.track_choice.option.adapt.label": "Adapter — modifier ce clavier sur place",
+  "content.flowQuestion.track_choice.option.adapt.note": "",
   "content.flowQuestion.track_choice.option.copy.label": "Copier — créer un nouveau clavier fondé sur cette disposition",
+  "content.flowQuestion.track_choice.option.copy.note": "",
   "content.flowQuestion.track_choice.prompt": "Comment voulez-vous travailler avec {{base_name}} ?"
 }
