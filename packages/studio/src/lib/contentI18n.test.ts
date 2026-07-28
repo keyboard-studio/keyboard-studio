@@ -138,6 +138,26 @@ describe("resolveContentString — flowQuestions catalog (spec 050 US1)", () => 
     ).toBe("What is your language called in English?");
   });
 
+  it("falls back to English when the flowQuestions key is present but empty (untranslated, awaiting Crowdin)", () => {
+    // skip_untranslated_strings:false ships every key in every locale, empty
+    // until a translator fills it. An empty value must honour the "never blank"
+    // contract and render the English fallback, not a blank string.
+    _setContentCatalogForTesting("fr", {
+      flowQuestions: {
+        "content.flowQuestion.track_choice.option.copy.note": "",
+      },
+    });
+    expect(
+      resolveContentString(
+        "flowQuestions",
+        "track_choice",
+        "option.copy.note",
+        "You will give it a new name and keyboard ID. The original is not changed.",
+        i18nFor("fr"),
+      ),
+    ).toBe("You will give it a new name and keyboard ID. The original is not changed.");
+  });
+
   it("falls back to English for flowQuestions when the active locale is English", () => {
     _setContentCatalogForTesting("en", {
       flowQuestions: {
