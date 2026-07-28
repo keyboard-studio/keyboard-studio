@@ -4,11 +4,20 @@
 
 name: CI
 
+# `pull_request` covers `dev` as well as `main` so the stacked feature branches
+# that integrate through `dev` are not merged unverified. Without `dev` here a
+# PR into it reported only the Vercel preview and the project-board sync —
+# neither runs a test — so the first real build of that code was whenever
+# `dev` -> `main` landed, long after the change.
+#
+# `push` stays main-only on purpose: a `pull_request` run checks out the merge
+# of head into base, so the PR run already validates the integrated result and
+# a post-merge `push` run on `dev` would re-test the same tree.
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 
 # Cancel a superseded run when a newer commit lands on the same ref, so a
 # rapid second push doesn't leave the first full run burning runner minutes.
