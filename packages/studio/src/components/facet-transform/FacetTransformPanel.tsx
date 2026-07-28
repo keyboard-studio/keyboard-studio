@@ -12,6 +12,7 @@
 // button, and the parent wires it to `useFacetTransform().commit`.
 
 import { useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { TransformProposal, UserDisposition } from "@keyboard-studio/engine";
 
 export interface FacetTransformPanelProps {
@@ -45,15 +46,25 @@ export function FacetTransformPanel({
     });
   };
 
+  const { t } = useLingui();
   const { transitionId, preview } = proposal;
+  const { facetId, fromValue, toValue } = transitionId;
+  const impactClass = proposal.transformImpactClass;
 
   return (
-    <section className="facet-transform-panel" aria-label="Facet transform proposal">
+    <section
+      className="facet-transform-panel"
+      aria-label={t({ id: "facetTransform.ariaLabel", message: "Facet transform proposal" })}
+    >
       <header>
         <h3>
-          Switch {transitionId.facetId}: {transitionId.fromValue} → {transitionId.toValue}
+          <Trans id="facetTransform.heading">
+            Switch {facetId}: {fromValue} → {toValue}
+          </Trans>
         </h3>
-        <p className="impact-class">Impact: {proposal.transformImpactClass}</p>
+        <p className="impact-class">
+          <Trans id="facetTransform.impact">Impact: {impactClass}</Trans>
+        </p>
       </header>
 
       {/* Provenance chip — rendered ONLY when a non-default house target fired. */}
@@ -75,13 +86,17 @@ export function FacetTransformPanel({
       {/* Preview by class. */}
       {preview.previewKind === "source-diff" && preview.sourceDiff && (
         <div className="preview source-diff">
-          <p className="assurance">Behaviour is unchanged and this transform is reversible.</p>
+          <p className="assurance">
+            <Trans id="facetTransform.assurance">
+              Behaviour is unchanged and this transform is reversible.
+            </Trans>
+          </p>
           <table>
             <thead>
               <tr>
-                <th>Role</th>
-                <th>Before</th>
-                <th>After</th>
+                <th><Trans id="facetTransform.table.role">Role</Trans></th>
+                <th><Trans id="facetTransform.table.before">Before</Trans></th>
+                <th><Trans id="facetTransform.table.after">After</Trans></th>
               </tr>
             </thead>
             <tbody>
@@ -113,8 +128,8 @@ export function FacetTransformPanel({
               <table>
                 <thead>
                   <tr>
-                    <th>Site</th>
-                    <th>Derived</th>
+                    <th><Trans id="facetTransform.table.site">Site</Trans></th>
+                    <th><Trans id="facetTransform.table.derived">Derived</Trans></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -133,12 +148,16 @@ export function FacetTransformPanel({
 
       {preview.previewKind === "output-diff" && preview.outputDiff && (
         <div className="preview output-diff">
-          <p className="warning">Emitted output will change — review the diff before confirming.</p>
+          <p className="warning">
+            <Trans id="facetTransform.outputWarning">
+              Emitted output will change — review the diff before confirming.
+            </Trans>
+          </p>
           <table>
             <thead>
               <tr>
-                <th>Before</th>
-                <th>After</th>
+                <th><Trans id="facetTransform.table.before">Before</Trans></th>
+                <th><Trans id="facetTransform.table.after">After</Trans></th>
               </tr>
             </thead>
             <tbody>
@@ -165,7 +184,7 @@ export function FacetTransformPanel({
       {/* Per-site disposition controls (FR-005 / FR-012). */}
       {proposal.affectedSites.length > 0 && (
         <fieldset className="affected-sites">
-          <legend>Exception sites</legend>
+          <legend><Trans id="facetTransform.exceptionSites">Exception sites</Trans></legend>
           {proposal.affectedSites.map((site) => (
             <div key={site.siteId} className="site-row">
               <span className="site-framing">{site.framing ?? site.siteId}</span>
@@ -178,8 +197,8 @@ export function FacetTransformPanel({
                   }
                 />
                 {site.defaultDisposition === "preserve"
-                  ? "Convert this site too"
-                  : "Apply this fix"}
+                  ? t({ id: "facetTransform.site.convertToo", message: "Convert this site too" })
+                  : t({ id: "facetTransform.site.applyFix", message: "Apply this fix" })}
               </label>
             </div>
           ))}
@@ -191,26 +210,34 @@ export function FacetTransformPanel({
         <ul className="opaque-untouched">
           {proposal.opaqueUntouched.map((o, i) => (
             <li key={i}>
-              Left untouched: {o.feature} ({o.count})
+              <Trans id="facetTransform.opaqueUntouched">
+                Left untouched: {o.feature} ({o.count})
+              </Trans>
             </li>
           ))}
         </ul>
       )}
 
       {/* Fall-through produced-set delta (FR-011). */}
-      {proposal.fallThroughImpact && (
-        <p className="fall-through">
-          Produced-character set changes: +{proposal.fallThroughImpact.producedCharacterSetDelta.added.length} / −
-          {proposal.fallThroughImpact.producedCharacterSetDelta.removed.length}
-        </p>
-      )}
+      {proposal.fallThroughImpact &&
+        (() => {
+          const added = proposal.fallThroughImpact.producedCharacterSetDelta.added.length;
+          const removed = proposal.fallThroughImpact.producedCharacterSetDelta.removed.length;
+          return (
+            <p className="fall-through">
+              <Trans id="facetTransform.fallThrough">
+                Produced-character set changes: +{added} / −{removed}
+              </Trans>
+            </p>
+          );
+        })()}
 
       <footer className="actions">
         <button type="button" onClick={handleConfirm}>
-          Confirm and apply
+          <Trans id="facetTransform.confirm">Confirm and apply</Trans>
         </button>
         <button type="button" onClick={onCancel}>
-          Cancel
+          <Trans id="facetTransform.cancel">Cancel</Trans>
         </button>
       </footer>
     </section>
