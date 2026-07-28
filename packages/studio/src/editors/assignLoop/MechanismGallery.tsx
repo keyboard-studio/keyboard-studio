@@ -68,7 +68,7 @@ import {
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
 import { getPatternLibraryService } from "../../lib/services.ts";
-import { displayChar, modifierLabel, vkeyLabel } from "../../lib/irToCarveNodes.ts";
+import { displayChar } from "../../lib/irToCarveNodes.ts";
 import { capabilityHint } from "./parts/InfoView.tsx";
 import type { AxisFill, DiscoveryAxisVector } from "@keyboard-studio/contracts";
 import {
@@ -83,7 +83,6 @@ import {
   comboToKeySpec,
   collectModifierTokensInUse,
   collectCharContributors,
-  parseSlotId,
   type ModifierToken,
   type CharContributors,
 } from "@keyboard-studio/engine";
@@ -115,6 +114,7 @@ import {
   type CasePairProposal,
 } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
+import { composeContributorLabel } from "./existingMethodLabels.ts";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
@@ -2661,37 +2661,41 @@ export function MechanismGallery({
   const existingMethods = useMemo<ExistingMethodRow[]>(() => {
     if (existingMethodContributors === null || baseIr === null) return [];
 
-    // Human label for a rule nodeId — "Shift+A" style, built directly from
-    // the rule's own vkey context (modifierLabel/vkeyLabel, both already
-    // used by the full carve gallery's node naming). Deliberately NOT the
-    // heavier toRailNodes()/resolveNodeName() machinery CarveGallery uses —
-    // this section only needs a short label per chip, not a full CarveNode.
-    const labelForRuleNodeId = (nodeId: string): string => {
-      for (const group of baseIr.groups) {
-        const rule = group.rules.find((r) => r.nodeId === nodeId);
-        if (rule === undefined) continue;
-        const vkeyEl = rule.context.find((el) => el.kind === "vkey");
-        const keyName =
-          vkeyEl !== undefined && vkeyEl.kind === "vkey"
-            ? (vkeyLabel(vkeyEl.name) ?? vkeyEl.name)
-            : undefined;
-        const prefix = modifierLabel(rule);
-        if (keyName === undefined) return prefix || nodeId;
-        return prefix ? `${prefix}+${keyName}` : keyName;
-      }
-      return nodeId;
-    };
+    // `descriptors` is INDEX-PARALLEL to ruleNodeIds, then storeSlots, then
+    // blocked, concatenated in that order (see collectCharContributors.ts's
+    // doc comment on `descriptors`) — slice it back into three per-array
+    // views rather than re-deriving a lookup, so each loop below can zip its
+    // own array against the matching descriptor by position.
+    const { descriptors } = existingMethodContributors;
+    const ruleDescriptors = descriptors.slice(
+      0,
+      existingMethodContributors.ruleNodeIds.length,
+    );
+    const storeSlotDescriptors = descriptors.slice(
+      existingMethodContributors.ruleNodeIds.length,
+      existingMethodContributors.ruleNodeIds.length +
+        existingMethodContributors.storeSlots.length,
+    );
+    const blockedDescriptors = descriptors.slice(
+      existingMethodContributors.ruleNodeIds.length +
+        existingMethodContributors.storeSlots.length,
+    );
 
     const rows: ExistingMethodRow[] = [];
 
-    for (const nodeId of existingMethodContributors.ruleNodeIds) {
-      if (isItemDeleted(nodeId)) continue;
+    existingMethodContributors.ruleNodeIds.forEach((nodeId, i) => {
+      if (isItemDeleted(nodeId)) return;
+      const descriptor = ruleDescriptors[i];
+      // Defensive only — the engine's index-parallel invariant guarantees
+      // this is always present; skip rather than mis-attach a label if it
+      // ever isn't.
+      if (descriptor === undefined) return;
       const capability: RemovalCapability | undefined =
         removalCapabilities.get(nodeId);
       const notRemovable = (capability ?? "").startsWith("not-removable:");
       rows.push({
         id: nodeId,
-        label: labelForRuleNodeId(nodeId),
+        label: composeContributorLabel(descriptor, i18n),
         deletable: !notRemovable,
         kind: "rule",
         ...(notRemovable
@@ -2703,29 +2707,28 @@ export function MechanismGallery({
             }
           : {}),
       });
-    }
+    });
 
-    for (const slot of existingMethodContributors.storeSlots) {
-      if (isItemDeleted(slot.slotId)) continue;
-      const parsed = parseSlotId(slot.slotId);
-      const loc =
-        parsed !== null
-          ? existingMethodContributors.locations.find(
-              (l) => l.kind === "store" && l.nodeId === parsed.storeNodeId,
-            )
-          : undefined;
+    existingMethodContributors.storeSlots.forEach((slot, i) => {
+      if (isItemDeleted(slot.slotId)) return;
+      const descriptor = storeSlotDescriptors[i];
+      if (descriptor === undefined) return;
       rows.push({
         id: slot.slotId,
-        label: loc?.label ?? slot.slotId,
+        label: composeContributorLabel(descriptor, i18n),
         deletable: true,
         kind: "slot",
       });
-    }
+    });
 
     existingMethodContributors.blocked.forEach((b, i) => {
+      const descriptor = blockedDescriptors[i];
       rows.push({
         id: `blocked:${i}:${b.label}`,
-        label: b.label,
+        label:
+          descriptor !== undefined
+            ? composeContributorLabel(descriptor, i18n)
+            : b.label,
         deletable: false,
         kind: "blocked",
         reason: b.reason,

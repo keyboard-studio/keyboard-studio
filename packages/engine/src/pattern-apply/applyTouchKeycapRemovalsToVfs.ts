@@ -202,10 +202,14 @@ function stripDeletedFromKey(
   }
 
   // Never delete the key object — row geometry stays stable (mirrors
-  // applyDesktopModifications / applyCarveKeycapRemovalsToVfs).
-  const { text: _droppedText, output: droppedOutput, ...rest } = base;
-  const nextId = droppedOutput !== undefined || key.id.startsWith("U_") ? neutralizeId(key.id) : key.id;
-  return { key: { ...rest, id: nextId }, changed: true };
+  // applyDesktopModifications / applyCarveKeycapRemovalsToVfs). Neutralize
+  // the id UNCONDITIONALLY: a plain `K_<letter>` id, left as-is, would still
+  // emit through the underlying .kmn rule via its vkey binding even with
+  // text/output blanked here — the same reasoning that already applied to a
+  // `U_`/`output`-backed key (see applyCarveKeycapRemovalsToVfs's
+  // `T_carved_*` scheme, the same proven pattern this mirrors).
+  const { text: _droppedText, output: _droppedOutput, ...rest } = base;
+  return { key: { ...rest, id: neutralizeId(key.id) }, changed: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -298,12 +302,12 @@ function stripDeletedFromRawKey(
   }
 
   if (deletedIds.has(touchKeyAddress(platform, layerId, key.id))) {
-    const hadOutput = key.output !== undefined;
+    // Neutralize the id UNCONDITIONALLY — see the Case A comment in
+    // stripDeletedFromKey above for why a `K_<letter>` id can't be left
+    // as-is here either.
     delete key.text;
     delete key.output;
-    if (hadOutput || key.id.startsWith("U_")) {
-      key.id = neutralizeId(key.id);
-    }
+    key.id = neutralizeId(key.id);
     changed = true;
   }
 

@@ -64,7 +64,7 @@ export { propagateDesktopLayersToTouch } from "./propagateDesktopLayersToTouch.j
 export type { PropagateDesktopLayersToTouchResult } from "./propagateDesktopLayersToTouch.js";
 
 export { collectCharContributors } from "./collectCharContributors.js";
-export type { CharContributors } from "./collectCharContributors.js";
+export type { CharContributors, ContributorDescriptor } from "./collectCharContributors.js";
 
 export {
   isMnemonicLayout,

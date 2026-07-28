@@ -2,15 +2,21 @@
  * Unit tests for enumerateTouchMethodsForChar.
  *
  * Coverage:
- *   1. Main key (U_ id) — deletable, correct address + label.
- *   2. Main key with `output` — deletable (output overrides desktop passthrough).
- *   3. Main key, K_-id + `text` only, no `output` — NOT deletable (desktop-backed).
- *   4. Longpress (sk[]) — always deletable, label references the host key.
- *   5. Multitap — always deletable.
- *   6. Flick — always deletable, address encodes the direction.
- *   7. NFC/NFD canonical matching.
- *   8. No match anywhere — empty result.
- *   9. Multiple platforms/layers — every producing method is listed.
+ *   1. Main key (U_ id) — deletable, structured fields.
+ *   2. Main key with `output` — deletable.
+ *   3. Main key, K_-id + `text` only, no `output`, no `nextlayer` — deletable
+ *      (fix: a plain letter key is genuinely deletable; the WRITE side
+ *      neutralizes its id unconditionally so the underlying `.kmn` rule can't
+ *      leak through).
+ *   3b. Main key, K_-id with no `text`/`output` and a non-`U_` id — `host` is
+ *       `undefined`, not the raw id (fix: raw-identifier leak).
+ *   4. Main key with `nextlayer` — NOT deletable (layer-switch guard).
+ *   5. Longpress (sk[]) — always deletable, references the host key.
+ *   6. Multitap — always deletable.
+ *   7. Flick — always deletable, `direction` field set.
+ *   8. NFC/NFD canonical matching.
+ *   9. No match anywhere — empty result.
+ *   10. Multiple platforms/layers — every producing method is listed.
  */
 
 import { describe, it, expect } from "vitest";
@@ -53,13 +59,21 @@ function makeLayout(
 // ---------------------------------------------------------------------------
 
 describe("enumerateTouchMethodsForChar", () => {
-  it("finds a U_-id main key and marks it deletable", () => {
+  it("finds a U_-id main key and marks it deletable with structured fields", () => {
     const layout = makeLayout([makeKey("U_0061", { text: "a" })]);
 
     const result = enumerateTouchMethodsForChar(layout, "a");
 
     expect(result).toEqual([
-      { id: "phone:default:U_0061", label: "key on phone default layer", deletable: true },
+      {
+        id: "phone:default:U_0061",
+        kind: "tap",
+        host: "a",
+        producedChar: "a",
+        platform: "phone",
+        layer: "default",
+        deletable: true,
+      },
     ]);
   });
 
@@ -68,23 +82,45 @@ describe("enumerateTouchMethodsForChar", () => {
 
     const result = enumerateTouchMethodsForChar(layout, "a");
 
-    expect(result).toEqual([
-      { id: "phone:default:K_X", label: "key on phone default layer", deletable: true },
-    ]);
+    expect(result[0]).toMatchObject({ id: "phone:default:K_X", kind: "tap", deletable: true });
   });
 
-  it("marks a K_-id, text-only main key (desktop passthrough) as NOT deletable", () => {
+  it("marks a K_-id, text-only main key (plain letter key) as deletable (fix: was falsely non-deletable)", () => {
     const layout = makeLayout([makeKey("K_A", { text: "a" })]);
 
     const result = enumerateTouchMethodsForChar(layout, "a");
 
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("phone:default:K_A");
-    expect(result[0]!.deletable).toBe(false);
-    expect(result[0]!.reason).toBeDefined();
+    expect(result[0]!.deletable).toBe(true);
+    expect(result[0]!.reasonCode).toBeUndefined();
   });
 
-  it("finds a longpress (sk[]) entry and labels it against the host key", () => {
+  it("omits `host` (rather than leaking the raw id) for a host key with no text/output and a non-U_ id", () => {
+    const layout = makeLayout([
+      makeKey("K_A", {
+        sk: [makeKey("U_00E1", { text: "á" })],
+      }),
+    ]);
+
+    const result = enumerateTouchMethodsForChar(layout, "á");
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.host).toBeUndefined();
+    expect(Object.hasOwn(result[0]!, "host")).toBe(false);
+  });
+
+  it("marks a main key with `nextlayer` as NOT deletable (layer-switch guard)", () => {
+    const layout = makeLayout([makeKey("K_A", { text: "a", nextlayer: "shift" })]);
+
+    const result = enumerateTouchMethodsForChar(layout, "a");
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.deletable).toBe(false);
+    expect(result[0]!.reasonCode).toBe("layer-switch");
+  });
+
+  it("finds a longpress (sk[]) entry and sets host to the host key's display", () => {
     const layout = makeLayout([
       makeKey("U_0061", {
         text: "a",
@@ -95,7 +131,15 @@ describe("enumerateTouchMethodsForChar", () => {
     const result = enumerateTouchMethodsForChar(layout, "á");
 
     expect(result).toEqual([
-      { id: "phone:default:U_0061:sk:U_00E1", label: "long-press on a", deletable: true },
+      {
+        id: "phone:default:U_0061:sk:U_00E1",
+        kind: "longpress",
+        host: "a",
+        producedChar: "á",
+        platform: "phone",
+        layer: "default",
+        deletable: true,
+      },
     ]);
   });
 
@@ -110,11 +154,19 @@ describe("enumerateTouchMethodsForChar", () => {
     const result = enumerateTouchMethodsForChar(layout, "é");
 
     expect(result).toEqual([
-      { id: "phone:default:U_0065:multitap:U_00E9", label: "multitap on e", deletable: true },
+      {
+        id: "phone:default:U_0065:multitap:U_00E9",
+        kind: "multitap",
+        host: "e",
+        producedChar: "é",
+        platform: "phone",
+        layer: "default",
+        deletable: true,
+      },
     ]);
   });
 
-  it("finds a flick entry and encodes the direction in the address", () => {
+  it("finds a flick entry and sets the `direction` field", () => {
     const layout = makeLayout([
       makeKey("U_006E", {
         text: "n",
@@ -125,19 +177,28 @@ describe("enumerateTouchMethodsForChar", () => {
     const result = enumerateTouchMethodsForChar(layout, "ñ");
 
     expect(result).toEqual([
-      { id: "phone:default:U_006E:flick:ne", label: "flick ne on n", deletable: true },
+      {
+        id: "phone:default:U_006E:flick:ne",
+        kind: "flick",
+        host: "n",
+        producedChar: "ñ",
+        platform: "phone",
+        layer: "default",
+        direction: "ne",
+        deletable: true,
+      },
     ]);
   });
 
   it("matches canonically — an NFD-stored key text matches an NFC query char", () => {
-    const nfdA = "á"; // "á" as base + combining acute
+    const nfdA = "á"; // "á" as base + combining acute
     const layout = makeLayout([makeKey("U_00E1", { text: nfdA })]);
 
     const result = enumerateTouchMethodsForChar(layout, "á");
 
-    expect(result).toEqual([
-      { id: "phone:default:U_00E1", label: "key on phone default layer", deletable: true },
-    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.id).toBe("phone:default:U_00E1");
+    expect(result[0]!.deletable).toBe(true);
   });
 
   it("returns an empty list when nothing produces the character", () => {

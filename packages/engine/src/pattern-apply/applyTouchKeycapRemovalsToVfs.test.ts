@@ -4,13 +4,19 @@
  * Coverage:
  *   1. applyTouchKeycapRemovalsToLayout (IR path):
  *      a. Main U_-id key blanked → id neutralized, text/output cleared, row kept.
- *      b. Longpress (sk[]) entry removed, main key untouched.
- *      c. Multitap + flick entries removed independently.
- *      d. Untouched platforms/layers/rows are returned BY REFERENCE (structural sharing).
- *      e. Idempotent: applying the SAME id twice yields the same result.
+ *      b. Main plain `K_<letter>` (text-only, no `output`) key blanked → id
+ *         STILL neutralized (fix: previously left as-is, so the underlying
+ *         `.kmn` rule kept emitting through the vkey binding); a sk[] hosted
+ *         on that same key and NOT itself addressed survives the neutralization.
+ *      c. Longpress (sk[]) entry removed, main key untouched.
+ *      d. Multitap + flick entries removed independently.
+ *      e. Untouched platforms/layers/rows are returned BY REFERENCE (structural sharing).
+ *      f. Idempotent: applying the SAME id twice yields the same result.
  *   2. applyTouchKeycapRemovalsToRawJson (Case B path):
  *      a. Splices a main key + a longpress entry, preserving unrelated fields verbatim.
- *      b. No-op (byte-identical `json`) when no id in the set resolves.
+ *      b. Main plain `K_<letter>` key blanked → id neutralized, longpress
+ *         hosted on it survives (Case B mirror of 1b).
+ *      c. No-op (byte-identical `json`) when no id in the set resolves.
  *   3. applyTouchKeycapRemovalsToVfs (VFS projection step):
  *      a. Removes exactly the addressed key/subkey and nothing else.
  *      b. No .keyman-touch-layout file → silent no-op, no warnings.
@@ -73,6 +79,28 @@ describe("applyTouchKeycapRemovalsToLayout", () => {
     expect(blanked.text).toBeUndefined();
     // Sibling untouched.
     expect(getKey(next, "U_0062")?.text).toBe("b");
+  });
+
+  it("blanks a plain K_<letter> text-only main key: id STILL neutralized, and a hosted sk[] not itself addressed survives", () => {
+    const layout = makeLayout([
+      makeKey("K_A", { text: "a", sk: [makeKey("U_00E1", { text: "á" })] }),
+    ]);
+
+    const { layout: next, warnings } = applyTouchKeycapRemovalsToLayout(
+      layout,
+      new Set(["phone:default:K_A"]),
+    );
+
+    expect(warnings).toEqual([]);
+    const keys = phoneDefaultKeys(next);
+    expect(keys).toHaveLength(1); // never delete the key object
+    const blanked = keys[0]!;
+    expect(blanked.id).toBe("T_touchdel_K_A");
+    expect(blanked.text).toBeUndefined();
+    // A sub-entry hosted on the neutralized main key survives — sub-entry
+    // filtering runs independently of the main-key deletion.
+    expect(blanked.sk).toHaveLength(1);
+    expect(blanked.sk![0]!.id).toBe("U_00E1");
   });
 
   it("removes a longpress (sk[]) entry, leaving the main key untouched", () => {
@@ -181,6 +209,40 @@ describe("applyTouchKeycapRemovalsToRawJson", () => {
     const untouched = keys.find((k) => k.id === "U_0061")!;
     expect(untouched.text).toBe("a");
     expect(untouched.sk).toEqual([{ id: "U_00E1", text: "á" }]);
+  });
+
+  it("blanks a plain K_<letter> text-only main key: id STILL neutralized, and a hosted sk[] not itself addressed survives (Case B)", () => {
+    const raw = JSON.stringify({
+      phone: {
+        layer: [
+          {
+            id: "default",
+            row: [
+              {
+                id: 1,
+                key: [{ id: "K_A", text: "a", sk: [{ id: "U_00E1", text: "á" }] }],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const { json, warnings } = applyTouchKeycapRemovalsToRawJson(
+      raw,
+      new Set(["phone:default:K_A"]),
+    );
+
+    expect(warnings).toEqual([]);
+    const parsed = JSON.parse(json) as {
+      phone: { layer: Array<{ row: Array<{ key: Array<{ id: string; text?: string; sk?: unknown[] }> }> }> };
+    };
+    const keys = parsed.phone.layer[0]!.row[0]!.key;
+    expect(keys).toHaveLength(1); // key kept, never removed
+    expect(keys[0]!.id).toBe("T_touchdel_K_A");
+    expect(keys[0]!.text).toBeUndefined();
+    // The longpress hosted on this key was not itself addressed — survives.
+    expect(keys[0]!.sk).toEqual([{ id: "U_00E1", text: "á" }]);
   });
 
   it("removes exactly the addressed sk[] entry and nothing else", () => {

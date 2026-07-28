@@ -110,6 +110,10 @@ import {
 import { useCasePairCompanion } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
 import { displayChar } from "../../lib/irToCarveNodes.ts";
+import {
+  composeTouchMethodLabel,
+  touchMethodNonDeletableReason,
+} from "./existingMethodLabels.ts";
 import { isMutateSeamEnabled } from "../../flags/mutateFlag.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type {
@@ -1303,6 +1307,21 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawDetectionSeedLayout, currentChar, isTouchKeyDeleted, deletedTouchKeyIds]);
 
+  // The FULL, unfiltered enumeration of touch methods for currentChar —
+  // sourced from rawDetectionSeedLayout (the UNDELETED seed, same source as
+  // deletedExistingTouchMethods above) so it is a superset of both
+  // existingTouchMethods and deletedExistingTouchMethods. Fed to
+  // composeTouchMethodLabel's `allMethodsForChar` argument so the "(platform,
+  // layer)" disambiguation-suffix decision (existingMethodLabels.ts) is
+  // identical whether a given method is currently shown in "Existing
+  // methods" or in the "Deleted methods" restore list — neither of those two
+  // already-filtered arrays alone is a safe stand-in for "every method this
+  // char has".
+  const allTouchMethodsForChar = useMemo<TouchMethodDescriptor[]>(() => {
+    if (rawDetectionSeedLayout === null || currentChar === null) return [];
+    return enumerateTouchMethodsForChar(rawDetectionSeedLayout, currentChar);
+  }, [rawDetectionSeedLayout, currentChar]);
+
   const handleRemoveExistingTouchMethod = useCallback(
     (method: TouchMethodDescriptor) => {
       if (!method.deletable) return;
@@ -2310,14 +2329,23 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             })}
             style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
           >
-            {existingTouchMethods.map((method) =>
-              method.deletable ? (
+            {existingTouchMethods.map((method) => {
+              const label = composeTouchMethodLabel(
+                method,
+                allTouchMethodsForChar,
+                i18n,
+              );
+              const nonDeletableReason = touchMethodNonDeletableReason(
+                method,
+                i18n,
+              );
+              return method.deletable ? (
                 <HoverDangerChip
                   key={method.id}
                   onClick={() => handleRemoveExistingTouchMethod(method)}
                   ariaLabel={t({
                     id: "editor.assignLoop.touch.removeExistingMethodAriaLabel",
-                    message: `Remove existing touch method ${{ label: method.label }} for ${{ notation: toUPlusNotation(currentChar) }}`,
+                    message: `Remove existing touch method ${{ label }} for ${{ notation: toUPlusNotation(currentChar) }}`,
                   })}
                   title={t({
                     id: "editor.assignLoop.clickToRemove",
@@ -2338,7 +2366,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                     cursor: "pointer",
                   }}
                 >
-                  {method.label}
+                  {label}
                   <span
                     aria-hidden="true"
                     style={{ fontSize: 10, color: "inherit", opacity: 0.7 }}
@@ -2349,8 +2377,8 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               ) : (
                 <span
                   key={method.id}
-                  {...(method.reason !== undefined
-                    ? { title: method.reason }
+                  {...(nonDeletableReason !== undefined
+                    ? { title: nonDeletableReason }
                     : {})}
                   style={{
                     display: "inline-flex",
@@ -2365,10 +2393,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                       "ui-monospace, 'Cascadia Code', Consolas, monospace",
                   }}
                 >
-                  {method.label}
+                  {label}
                 </span>
-              ),
-            )}
+              );
+            })}
           </div>
         </div>
       )}
@@ -2404,38 +2432,45 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             })}
             style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
           >
-            {deletedExistingTouchMethods.map((method) => (
-              <HoverDangerChip
-                key={method.id}
-                onClick={() => handleRestoreExistingTouchMethod(method)}
-                hoverDanger={false}
-                ariaLabel={t({
-                  id: "editor.assignLoop.touch.existingMethods.restoreAriaLabel",
-                  message: `Restore deleted touch method ${{ label: method.label }} for ${{ notation: toUPlusNotation(currentChar) }}`,
-                })}
-                title={t({
-                  id: "editor.assignLoop.touch.existingMethods.clickToRestore",
-                  message: "deleted — click to restore",
-                })}
-                baseStyle={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                  padding: "3px 8px",
-                  background: "#161b22",
-                  border: `1px solid ${BORDER}`,
-                  borderRadius: 12,
-                  color: TEXT_DIM,
-                  fontSize: 11,
-                  fontFamily:
-                    "ui-monospace, 'Cascadia Code', Consolas, monospace",
-                  cursor: "pointer",
-                  textDecoration: "line-through",
-                }}
-              >
-                {method.label}
-              </HoverDangerChip>
-            ))}
+            {deletedExistingTouchMethods.map((method) => {
+              const label = composeTouchMethodLabel(
+                method,
+                allTouchMethodsForChar,
+                i18n,
+              );
+              return (
+                <HoverDangerChip
+                  key={method.id}
+                  onClick={() => handleRestoreExistingTouchMethod(method)}
+                  hoverDanger={false}
+                  ariaLabel={t({
+                    id: "editor.assignLoop.touch.existingMethods.restoreAriaLabel",
+                    message: `Restore deleted touch method ${{ label }} for ${{ notation: toUPlusNotation(currentChar) }}`,
+                  })}
+                  title={t({
+                    id: "editor.assignLoop.touch.existingMethods.clickToRestore",
+                    message: "deleted — click to restore",
+                  })}
+                  baseStyle={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "3px 8px",
+                    background: "#161b22",
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: 12,
+                    color: TEXT_DIM,
+                    fontSize: 11,
+                    fontFamily:
+                      "ui-monospace, 'Cascadia Code', Consolas, monospace",
+                    cursor: "pointer",
+                    textDecoration: "line-through",
+                  }}
+                >
+                  {label}
+                </HoverDangerChip>
+              );
+            })}
           </div>
         </div>
       )}

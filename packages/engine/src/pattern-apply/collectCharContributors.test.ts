@@ -408,3 +408,140 @@ describe('collectCharContributors — role-tagged storeSlots (spec 051)', () => 
     expect(result.storeSlots).toEqual([{ slotId: 'sid-word#1', role: 'output' }]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// descriptors — structured, author-friendly contributor view
+//
+// One entry per ruleNodeIds element ("keystroke"), one per storeSlots
+// element in the same order ("deadkey" or "store-slot"), one per blocked
+// element in the same order ("blocked"). Fields that aren't cheaply
+// derivable are left ABSENT, never fabricated.
+// ---------------------------------------------------------------------------
+
+describe('collectCharContributors — descriptors (structured fields)', () => {
+  it('kind "keystroke": a plain vkey rule with no modifiers gets a bare key-name keystrokeDisplay', () => {
+    const rule = makeRule('r-s01',
+      [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
+      [{ kind: 'char', value: 'a' }],
+    );
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'a');
+    expect(result.descriptors).toEqual([
+      { kind: 'keystroke', producedChar: 'a', keystrokeDisplay: 'A' },
+    ]);
+  });
+
+  it('kind "keystroke": a modified vkey rule gets a "Shift+A"-style keystrokeDisplay', () => {
+    const rule = makeRule('r-shift-a',
+      [{ kind: 'vkey', name: 'K_A', modifiers: ['SHIFT'] }],
+      [{ kind: 'char', value: 'A' }],
+    );
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'A');
+    expect(result.descriptors).toEqual([
+      { kind: 'keystroke', producedChar: 'A', keystrokeDisplay: 'Shift+A' },
+    ]);
+  });
+
+  it('kind "deadkey": mark + base are cheaply derived from the trigger rule + aligned any() store (Cameroon fixture)', () => {
+    const result = collectCharContributors(makeCameroonIR(), 'à');
+    // 'à' lives only in dkt003b#0 (output slot) of the fan-out rule, whose
+    // deadkey id 0x003b is set by the trigger rule's K_SEMICOLON, and whose
+    // aligned dkf003b#0 base item is 'a'.
+    expect(result.descriptors).toEqual([
+      { kind: 'deadkey', producedChar: 'à', mark: 'SEMICOLON', base: 'a' },
+    ]);
+  });
+
+  it('kind "deadkey": an input-side-only match leaves mark/base absent (not cheaply derivable from that side alone)', () => {
+    const result = collectCharContributors(makeCameroonIR(), 'a');
+    // 'a' lives only in the any()-consumed input store dkf003b#0.
+    expect(result.descriptors).toEqual([{ kind: 'deadkey', producedChar: 'a' }]);
+  });
+
+  it('kind "store-slot": a plain (non-deadkey) fan-out gets a humanized storeDisplayName', () => {
+    const keys = makeStore('sid-keys', 'keys', [
+      { kind: 'char', value: 'a' }, { kind: 'char', value: 'e' }, { kind: 'char', value: 'z' },
+    ]);
+    const alphabet = makeStore('sid-alpha', 'kAlphabetTable', [
+      { kind: 'char', value: 'a' }, { kind: 'char', value: 'ɛ' }, { kind: 'char', value: 'z' },
+    ]);
+    const rule = makeRule('r-base',
+      [{ kind: 'any', storeRef: 'keys' }],
+      [{ kind: 'index', storeRef: 'kAlphabetTable', offset: 1 }],
+    );
+    const ir = makeIR({
+      stores: [keys, alphabet],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'ɛ');
+    expect(result.descriptors).toEqual([
+      { kind: 'store-slot', producedChar: 'ɛ', storeDisplayName: 'Alphabet Table' },
+    ]);
+  });
+
+  it('kind "store-slot": an un-humanizable raw store name (opaque token + digits) leaves storeDisplayName absent', () => {
+    // 'keys' deliberately does NOT contain the target char, so the only match
+    // is the OUTPUT side (index over 'tbl2') — isolates the raw-name case.
+    const keys = makeStore('sid-keys', 'keys', [{ kind: 'char', value: 'z' }]);
+    const tbl = makeStore('sid-tbl', 'tbl2', [{ kind: 'char', value: 'a' }]);
+    const rule = makeRule('r-tbl2',
+      [{ kind: 'any', storeRef: 'keys' }],
+      [{ kind: 'index', storeRef: 'tbl2', offset: 1 }],
+    );
+    const ir = makeIR({
+      stores: [keys, tbl],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'a');
+    expect(result.descriptors).toEqual([{ kind: 'store-slot', producedChar: 'a' }]);
+  });
+
+  it('kind "blocked": an opaque RawKmnFragment producer gets blockedReasonCode "opaque-fragment"', () => {
+    const ir = makeIR({
+      raw: [{
+        nodeId: 'frag-1',
+        origin: 'imported',
+        sourceText: '+ [K_E] > ε',
+        reason: 'call/return',
+      }],
+    });
+    const result = collectCharContributors(ir, 'ε');
+    expect(result.descriptors).toEqual([
+      { kind: 'blocked', producedChar: 'ε', blockedReasonCode: 'opaque-fragment' },
+    ]);
+  });
+
+  it('kind "blocked": a multi-char literal output gets blockedReasonCode "multi-char-output"', () => {
+    const rule = makeRule('r-multi',
+      [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
+      [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }],
+    );
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'a');
+    expect(result.descriptors).toEqual([
+      { kind: 'blocked', producedChar: 'a', blockedReasonCode: 'multi-char-output' },
+    ]);
+  });
+
+  it('descriptors is ordered rules, then store-slots, then blocked, and is length-parallel to those views', () => {
+    const s01 = makeRule('r-s01',
+      [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
+      [{ kind: 'char', value: 'a' }],
+    );
+    const ir = makeCameroonIR();
+    ir.groups[0]!.rules.push(s01);
+    const result = collectCharContributors(ir, 'a');
+    expect(result.descriptors).toHaveLength(
+      result.ruleNodeIds.length + result.storeSlots.length + result.blocked.length,
+    );
+    expect(result.descriptors[0]!.kind).toBe('keystroke');
+    expect(result.descriptors[1]!.kind).toBe('deadkey');
+  });
+});
