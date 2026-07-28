@@ -84,6 +84,8 @@ export { scaffoldTouchLayout, buildMinimalPhoneTouchLayout } from "./scaffolder/
 // spec 035 — touch coverage guard (FR-008/SC-003).
 export { touchCoverage } from "./pattern-apply/touchCoverage.js";
 export type { TouchCoverageResult } from "./pattern-apply/touchCoverage.js";
+// spec 051 — shared "absent touch `layer` slot === default" rule.
+export { DEFAULT_TOUCH_LAYER, resolveTouchLayerId } from "./pattern-apply/touchLayer.js";
 export type { ScaffolderServiceOptions } from "./scaffolder/index.js";
 export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffolder/scaffold-ir.js";
 

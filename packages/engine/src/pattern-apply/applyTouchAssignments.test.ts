@@ -702,3 +702,140 @@ describe("applyTouchAssignments — emit-side verification", () => {
     expect(mt[0]!["output"]).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Layer targeting — the optional `layer` slot value
+//
+// Absent `layer` === "default" is the compatibility guarantee the whole change
+// rests on; every case above exercises the absent form, so this block covers
+// the explicit form, a non-default target, and the miss paths.
+// ---------------------------------------------------------------------------
+
+/** Build a touch assignment naming an explicit target layer. */
+function longpressOnLayer(hostKey: string, char: string, layer: string): TouchAssignment {
+  return {
+    scope: "individual",
+    target: char,
+    modality: "touch",
+    mechanisms: [
+      { patternId: "longpress_alternates", slotValues: { hostKey, char, layer } },
+    ],
+    source: "user",
+  };
+}
+
+/** Read the keys of a named phone layer from a result layout. */
+function phoneLayerKeys(layout: TouchLayoutIR, layerId: string): TouchKeyIR[] {
+  const phone = layout.platforms.find((p) => p.id === "phone")!;
+  const layer = phone.layers.find((l) => l.id === layerId)!;
+  return layer.rows.flatMap((r) => r.keys);
+}
+
+describe("applyTouchAssignments — layer targeting", () => {
+  it('layer: "default" produces exactly the same result as an absent layer', () => {
+    const withAbsent = applyTouchAssignments(makeLayout([makeKey("K_A")]), [
+      longpress("K_A", "á"),
+    ]);
+    const withExplicit = applyTouchAssignments(makeLayout([makeKey("K_A")]), [
+      longpressOnLayer("K_A", "á", "default"),
+    ]);
+
+    expect(withExplicit.warnings).toEqual(withAbsent.warnings);
+    expect(withExplicit.layout).toEqual(withAbsent.layout);
+  });
+
+  it('layer: "shift" places on the shift layer and leaves the default layer untouched', () => {
+    const layout = makeLayout([makeKey("K_A")], { shiftLayer: true });
+
+    const { layout: out, warnings } = applyTouchAssignments(layout, [
+      longpressOnLayer("K_A", "Á", "shift"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+
+    const shiftKeyA = phoneLayerKeys(out, "shift").find((k) => k.id === "K_A")!;
+    expect(shiftKeyA.sk).toHaveLength(1);
+    expect(shiftKeyA.sk![0]!.text).toBe("Á");
+
+    const defaultKeyA = phoneLayerKeys(out, "default").find((k) => k.id === "K_A")!;
+    expect(defaultKeyA.sk).toBeUndefined();
+  });
+
+  it("two mechanisms on one character targeting different layers both apply", () => {
+    const layout = makeLayout([makeKey("K_A")], { shiftLayer: true });
+
+    const { layout: out, warnings } = applyTouchAssignments(layout, [
+      {
+        scope: "individual",
+        target: "á",
+        modality: "touch",
+        mechanisms: [
+          { patternId: "longpress_alternates", slotValues: { hostKey: "K_A", char: "á" } },
+          {
+            patternId: "longpress_alternates",
+            slotValues: { hostKey: "K_A", char: "Á", layer: "shift" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+
+    expect(warnings).toHaveLength(0);
+    expect(phoneLayerKeys(out, "default").find((k) => k.id === "K_A")!.sk![0]!.text).toBe("á");
+    expect(phoneLayerKeys(out, "shift").find((k) => k.id === "K_A")!.sk![0]!.text).toBe("Á");
+  });
+
+  it("an unknown layer warns and skips the mechanism — no throw, no default fallback", () => {
+    const layout = makeLayout([makeKey("K_A")]);
+
+    const { layout: out, warnings } = applyTouchAssignments(layout, [
+      longpressOnLayer("K_A", "Á", "caps"),
+    ]);
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('target layer "caps" not found in phone platform');
+    // Crucially NOT applied to the default layer.
+    expect(phoneLayerKeys(out, "default").find((k) => k.id === "K_A")!.sk).toBeUndefined();
+    // Nothing was touched, so the layout comes back by reference.
+    expect(out).toBe(layout);
+  });
+
+  it("a host key absent from the target layer warns naming that layer, and does not look elsewhere", () => {
+    // Shift layer carries only K_A; K_S exists on default only.
+    const layout: TouchLayoutIR = {
+      platforms: [
+        {
+          id: "phone",
+          layers: [
+            { id: "default", rows: [{ keys: [makeKey("K_A"), makeKey("K_S")] }] },
+            { id: "shift", rows: [{ keys: [makeKey("K_A")] }] },
+          ],
+        },
+      ],
+      nodeIds: [],
+    };
+
+    const { layout: out, warnings } = applyTouchAssignments(layout, [
+      longpressOnLayer("K_S", "Ś", "shift"),
+    ]);
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('host key "K_S" not found in phone layer "shift"');
+    expect(phoneLayerKeys(out, "default").find((k) => k.id === "K_S")!.sk).toBeUndefined();
+  });
+
+  it("untouched layers and platforms are returned by reference when another layer is targeted", () => {
+    const layout = makeLayout([makeKey("K_A")], { shiftLayer: true, tabletPlatform: true });
+    const phone = layout.platforms.find((p) => p.id === "phone")!;
+    const inputDefaultLayer = phone.layers.find((l) => l.id === "default")!;
+    const inputTablet = layout.platforms.find((p) => p.id === "tablet")!;
+
+    const { layout: out } = applyTouchAssignments(layout, [
+      longpressOnLayer("K_A", "Á", "shift"),
+    ]);
+
+    const outPhone = out.platforms.find((p) => p.id === "phone")!;
+    expect(outPhone.layers.find((l) => l.id === "default")!).toBe(inputDefaultLayer);
+    expect(out.platforms.find((p) => p.id === "tablet")!).toBe(inputTablet);
+  });
+});

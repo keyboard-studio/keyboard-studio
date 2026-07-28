@@ -26,7 +26,10 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { render } from "../../test/renderWithI18n.tsx";
-import { SequenceBuilderPanel } from "./SequenceBuilderPanel.tsx";
+import {
+  SequenceBuilderPanel,
+  type SequenceApplied,
+} from "./SequenceBuilderPanel.tsx";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 
 afterEach(() => {
@@ -194,5 +197,90 @@ describe("SequenceBuilderPanel — index-stable removal", () => {
       { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
       { firstLetterOut: "n", secondLetter: "h", collapsedChar: "ŋ" },
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 051 US2 — the onApplied seam the shared case-pair proposal rides on.
+//
+// The panel renders NO banner of its own: MechanismGallery owns the single
+// hook and the single banner (FR-011), so all this component owes is a
+// faithful payload — and silence when nothing new was recorded.
+// ---------------------------------------------------------------------------
+
+describe("SequenceBuilderPanel — onApplied case-pair seam (spec 051)", () => {
+  function SeamHarness({
+    char,
+    onApplied,
+  }: {
+    char: string;
+    onApplied: (applied?: SequenceApplied) => void;
+  }) {
+    const [assignments, setAssignments] = useState<MechanismAssignment[]>([]);
+    return (
+      <SequenceBuilderPanel
+        char={char}
+        sessionAssignments={assignments}
+        recordAssignments={setAssignments}
+        onApplied={onApplied}
+        onCancel={() => {}}
+      />
+    );
+  }
+
+  it("hands back the content, the indicator, and the recorded assignment by identity", async () => {
+    const user = userEvent.setup();
+    const applied: Array<SequenceApplied | undefined> = [];
+    render(<SeamHarness char="á" onApplied={(a) => applied.push(a)} />);
+
+    await user.type(screen.getByTestId("sequences-content"), "a");
+    await user.type(screen.getByTestId("sequences-indicator"), "s");
+    await user.click(screen.getByTestId("sequences-apply"));
+
+    expect(applied).toHaveLength(1);
+    expect(applied[0]?.content).toBe("a");
+    expect(applied[0]?.indicator).toBe("s");
+    // The assignment handed back IS the one just recorded — the gallery keys
+    // its stale-proposal guard on this object reference (FR-008).
+    expect(applied[0]?.assignment.target).toBe("á");
+    expect(
+      applied[0]?.assignment.mechanisms[0]?.slotValues?.["firstLetterOut"],
+    ).toBe("a");
+  });
+
+  it("passes NO payload when the apply was a dedup no-op — nothing new, nothing to pair", async () => {
+    const user = userEvent.setup();
+    const applied: Array<SequenceApplied | undefined> = [];
+    render(<SeamHarness char="á" onApplied={(a) => applied.push(a)} />);
+
+    const contentInput = screen.getByTestId("sequences-content") as HTMLInputElement;
+    const indicatorInput = screen.getByTestId("sequences-indicator") as HTMLInputElement;
+    const applyBtn = screen.getByTestId("sequences-apply") as HTMLButtonElement;
+
+    await user.type(contentInput, "a");
+    await user.type(indicatorInput, "s");
+    await user.click(applyBtn);
+
+    await user.clear(contentInput);
+    await user.type(contentInput, "a");
+    await user.clear(indicatorInput);
+    await user.type(indicatorInput, "s");
+    await user.click(applyBtn);
+
+    expect(applied).toHaveLength(2);
+    expect(applied[0]).toBeDefined();
+    expect(applied[1]).toBeUndefined();
+  });
+
+  it("hands back multi-character content verbatim — the gallery is what declines to pair it", async () => {
+    const user = userEvent.setup();
+    const applied: Array<SequenceApplied | undefined> = [];
+    render(<SeamHarness char="ŋ" onApplied={(a) => applied.push(a)} />);
+
+    await user.type(screen.getByTestId("sequences-content"), "ng");
+    await user.type(screen.getByTestId("sequences-indicator"), "y");
+    await user.click(screen.getByTestId("sequences-apply"));
+
+    expect(applied[0]?.content).toBe("ng");
   });
 });
