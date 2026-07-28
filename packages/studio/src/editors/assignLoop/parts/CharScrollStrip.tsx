@@ -8,9 +8,12 @@
 // Each chip shows:
 //   - the character's glyph (via displayChar — combining marks get a dotted
 //     circle prefix so they're visible standalone), rendered in WHITE;
-//   - a small count badge below it — the number of mechanisms whose OUTPUT is
-//     that character in the caller's modality (see charMechanisms.ts's
-//     getCharMechanisms — PRODUCES, not USES). Green when >=1, red when 0.
+//   - a small count badge below it — the number of ways that character is
+//     produced in the caller's modality (see charMechanisms.ts's
+//     getCharMechanisms — PRODUCES, not USES): the mechanisms whose OUTPUT is
+//     that character, plus one for a character the caller's SEED layout
+//     already reaches (`inheritedChars`, TouchGallery's "already in touch
+//     layout" set). Green when >=1, red when 0.
 //
 // The CURRENTLY SELECTED chip additionally grows (a larger glyph) and shows
 // its `U+XXXX` notation between the glyph and the badge — this strip is now
@@ -67,6 +70,14 @@ export interface CharScrollStripProps {
   assignments: ReadonlyArray<MechanismAssignment>;
   /** Which modality's producer count to badge — "physical" for MechanismGallery, "touch" for TouchGallery. */
   modality: Modality;
+  /**
+   * Characters the caller's SEED layout already produces with no author edit —
+   * TouchGallery's `detectedChars` ("already in touch layout"). Each counts as
+   * one producing way in the badge, so a character the gallery reports as
+   * already on the keyboard never badges red 0. MechanismGallery has no seed
+   * notion and omits this.
+   */
+  inheritedChars?: ReadonlySet<string>;
 }
 
 /** Hyphen-joined 4+-digit uppercase hex of EVERY codepoint in `char` — the chip/badge testid key (see file header).
@@ -83,6 +94,7 @@ export function CharScrollStrip({
   onSelectChar,
   assignments,
   modality,
+  inheritedChars,
 }: CharScrollStripProps) {
   const { t } = useLingui();
   const chipRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -175,10 +187,14 @@ export function CharScrollStrip({
   const producesCountByChar = useMemo(() => {
     const map = new Map<string, number>();
     for (const c of chars) {
-      map.set(c, getCharMechanisms(c, assignments, modality).producesCount);
+      map.set(
+        c,
+        getCharMechanisms(c, assignments, modality, inheritedChars)
+          .producesCount,
+      );
     }
     return map;
-  }, [chars, assignments, modality]);
+  }, [chars, assignments, modality, inheritedChars]);
 
   if (chars.length === 0) return null;
 

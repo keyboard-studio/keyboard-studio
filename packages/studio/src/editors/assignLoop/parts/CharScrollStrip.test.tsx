@@ -113,6 +113,47 @@ describe("CharScrollStrip — producer-count badge", () => {
 
     expect(screen.getByTestId("char-scroll-badge-0061").textContent).toBe("0");
   });
+
+  it("badges a seed-reachable character (inheritedChars) GREEN at 1 with no assignment — 'already in the layout' must never read red 0", () => {
+    render(
+      <CharScrollStrip
+        chars={["a"]}
+        currentChar="a"
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="touch"
+        inheritedChars={new Set(["a"])}
+      />,
+    );
+
+    const badge = screen.getByTestId("char-scroll-badge-0061");
+    expect(badge.textContent).toBe("1");
+    expect(badge.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — the badge-good color
+  });
+
+  it("keeps a seed-reachable character at 1 once its 'already in layout' suggestion is accepted (touch_inherited is not double-counted)", () => {
+    const assignments: MechanismAssignment[] = [
+      {
+        scope: "individual",
+        target: "a",
+        modality: "touch",
+        mechanisms: [{ patternId: "touch_inherited" }],
+      },
+    ];
+
+    render(
+      <CharScrollStrip
+        chars={["a"]}
+        currentChar="a"
+        onSelectChar={vi.fn()}
+        assignments={assignments}
+        modality="touch"
+        inheritedChars={new Set(["a"])}
+      />,
+    );
+
+    expect(screen.getByTestId("char-scroll-badge-0061").textContent).toBe("1");
+  });
 });
 
 describe("CharScrollStrip — current-chip selection (aria-pressed + accessible name)", () => {
