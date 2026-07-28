@@ -674,6 +674,14 @@
       "implements": [],
       "decisions": [],
       "notes": ""
+    },
+    "specs/046-i18n-localization": {
+      "title": "Feature Specification: Studio UI & Content Localization (i18n)",
+      "hash": "sha256:96900c97e1e54e23",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
     }
   }
 }
