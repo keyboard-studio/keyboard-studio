@@ -196,9 +196,81 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-28T03:33:30.255Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:43.845Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:44.102Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:44.363Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:44.604Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:44.851Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:45.099Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:45.347Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:45.662Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:45.953Z"
     }
   ],
-  "currentTask": "T023",
+  "currentTask": "T032",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -358,6 +430,71 @@
     "T023": {
       "status": "DONE",
       "did": "SC-005 gate PASS: 145 pre-existing MechanismGallery cases pass with a zero-deletion diff (pure append), 147+14=161 total green",
+      "files": [
+        "(verification only)"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Added 4 S-02 cases: dead-key apply raises a proposal, confirm keeps trigger/deadkeyName/accentChar and case-shifts baseLetters/accentedForms, dismiss records nothing, caseless output raises nothing",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.test.tsx"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Added 3 onApplied-seam cases in SequenceBuilderPanel.test.tsx (payload by identity, no payload on dedup no-op, multi-char content passed verbatim) plus 4 end-to-end S-03 cases in MechanismGallery.test.tsx where the banner actually lives",
+      "files": [
+        "packages/studio/src/editors/assignLoop/SequenceBuilderPanel.test.tsx",
+        "packages/studio/src/editors/assignLoop/MechanismGallery.test.tsx"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "DeadkeyCombo/SequenceCombo shapes mirror the existing slot vocabulary; propose's combo branch resolves the INPUT side through caseCounterpart too and raises nothing if either side returns null, exposing the shifted parallelCombo on the proposal",
+      "files": [
+        "packages/studio/src/editors/assignLoop/casePairCompanion.ts"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "S-02 proposal raised from the deadkey branch of handleApply with the combo slots and baseAssignment by object identity",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "S-02 confirm appends a parallel PATTERN_DEADKEY assignment targeting the counterpart, trigger/deadkeyName/accentChar carried across unchanged, behind the same stale-base guard",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "S-03 proposal raised through the existing onApplied seam: the panel now returns a SequenceApplied payload (absent on a dedup no-op) and the gallery raises the proposal - no second banner in the panel",
+      "files": [
+        "packages/studio/src/editors/assignLoop/SequenceBuilderPanel.tsx",
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "S-03 confirm appends a PATTERN_SEQUENCE ref to the counterpart's bucket via partitionSequenceAssignment, secondLetter unchanged, reusing the (firstLetterOut, secondLetter) dedup",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Added the additive id editor.assignLoop.companion.prompt.combo to the shared banner; the physical .prompt id and message are untouched",
+      "files": [
+        "packages/studio/src/editors/assignLoop/CasePairProposalBanner.tsx"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Both suites green: 162 passed (155 MechanismGallery + 7 SequenceBuilderPanel); zero deleted lines in MechanismGallery.test.tsx, one import line rewritten in SequenceBuilderPanel.test.tsx to add the SequenceApplied type",
       "files": [
         "(verification only)"
       ]

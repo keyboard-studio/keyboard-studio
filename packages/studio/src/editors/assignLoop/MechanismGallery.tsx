@@ -56,6 +56,7 @@ import type {
   BaseKeyboard,
   Pattern,
   MechanismAssignment,
+  MechanismRef,
   PlacementMap,
   PlacementWorklist,
 } from "@keyboard-studio/contracts";
@@ -104,7 +105,10 @@ import {
   type ResolveCharInputOptions,
   type KeyPickerResolveOptions,
 } from "../../lib/charInput.ts";
-import { useCasePairCompanion } from "./casePairCompanion.ts";
+import {
+  useCasePairCompanion,
+  type CasePairProposal,
+} from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
@@ -124,6 +128,8 @@ import {
 import {
   SequenceBuilderPanel,
   hasSequenceForChar,
+  partitionSequenceAssignment,
+  type SequenceApplied,
 } from "./SequenceBuilderPanel.tsx";
 import { RadioGroup } from "../../ui/RadioGroup.tsx";
 import { SelectMenu, type SelectMenuOption } from "../../ui/SelectMenu.tsx";
@@ -2034,6 +2040,24 @@ export function MechanismGallery({
         ],
         source: "user",
       };
+
+      // S-02 case-pair proposal: the parallel combo case-shifts the BASE
+      // LETTER and the OUTPUT only. The trigger key, its deadkey name, and the
+      // accent character are untouched — a dead key is an accent selector, not
+      // a letter, and a SHIFT-flagged accent key would be a broken rule.
+      // Suppressed by the hook when either side has no confident capital.
+      proposeCompanion({
+        mechanism: "combo",
+        originalChar: currentChar,
+        combo: {
+          kind: "deadkey",
+          triggerKey: resolvedTriggerVkey,
+          deadkeyName,
+          accentChar,
+          baseLetter: base.value,
+        },
+        baseAssignment: assignment,
+      });
     } else if (method === "swap") {
       const resolvedSwapVkey = resolvedVkeyOf(
         resolveKeyPickerSelection(selectedSwapKey, selectedSwapKeyCustomChar),
@@ -2182,11 +2206,121 @@ export function MechanismGallery({
   // Case-pair companion — confirm/decline handlers
   // ---------------------------------------------------------------------------
 
+  /**
+   * S-03 apply came back from the sequence panel. The panel renders no banner
+   * of its own — the one hook and the one banner live here (FR-011), so this
+   * is where the parallel-combo proposal is raised.
+   */
+  const handleSequenceApplied = useCallback(
+    (applied?: SequenceApplied) => {
+      resetMethodState();
+      if (applied === undefined || currentChar === null) return;
+      proposeCompanion({
+        mechanism: "combo",
+        originalChar: currentChar,
+        combo: {
+          kind: "sequence",
+          content: applied.content,
+          indicator: applied.indicator,
+        },
+        baseAssignment: applied.assignment,
+      });
+    },
+    [resetMethodState, currentChar, proposeCompanion],
+  );
+
+  /**
+   * S-02 / S-03 confirm: record the parallel combo. The trigger (dead key) or
+   * indicator (sequence) is carried across unchanged — only the base/content
+   * letter and the output are case-shifted, and both were shifted by the hook
+   * at propose time (`parallelCombo`), never re-derived here.
+   */
+  const confirmComboCompanion = useCallback(
+    (proposal: Extract<CasePairProposal, { mechanism: "combo" }>) => {
+      // Stale-proposal guard — same rule as the physical path (FR-008): the
+      // assignment this was raised for must still be present, by reference.
+      if (!sessionAssignments.includes(proposal.baseAssignment)) {
+        clearCompanion();
+        return;
+      }
+
+      const { parallelCombo, counterpart } = proposal;
+
+      if (parallelCombo.kind === "deadkey") {
+        const companionAssignment: MechanismAssignment = {
+          scope: "individual",
+          target: counterpart,
+          modality: "physical",
+          mechanisms: [
+            {
+              patternId: PATTERN_DEADKEY,
+              strategyId: "S-02",
+              slotValues: {
+                // Unchanged: the accent key is a selector, not a letter.
+                triggerKey: parallelCombo.triggerKey,
+                deadkeyName: parallelCombo.deadkeyName,
+                accentChar: parallelCombo.accentChar,
+                // Case-shifted: the base letter in, the accented form out.
+                baseLetters: parallelCombo.baseLetter,
+                accentedForms: counterpart,
+              },
+            },
+          ],
+          source: "user",
+        };
+        recordAssignments([...sessionAssignments, companionAssignment]);
+      } else {
+        // The parallel sequence produces the counterpart, so it belongs in the
+        // counterpart's own sequence bucket. The existing
+        // (firstLetterOut, secondLetter) dedup makes a re-confirm a no-op
+        // rather than a duplicate ref.
+        const { mechs: existingMechs, rest } = partitionSequenceAssignment(
+          sessionAssignments,
+          counterpart,
+        );
+        const alreadyRecorded = existingMechs.some(
+          (m) =>
+            m.slotValues?.["firstLetterOut"] === parallelCombo.content &&
+            m.slotValues?.["secondLetter"] === parallelCombo.indicator,
+        );
+        if (!alreadyRecorded) {
+          const newRef: MechanismRef = {
+            patternId: PATTERN_SEQUENCE,
+            strategyId: "S-03",
+            slotValues: {
+              firstLetterOut: parallelCombo.content,
+              // Unchanged: the indicator is a physical key by construction.
+              secondLetter: parallelCombo.indicator,
+              collapsedChar: counterpart,
+            },
+          };
+          recordAssignments([
+            ...rest,
+            {
+              scope: "individual",
+              target: counterpart,
+              modality: "physical",
+              mechanisms: [...existingMechs, newRef],
+              source: "user",
+            },
+          ]);
+        }
+      }
+
+      clearCompanion();
+    },
+    [sessionAssignments, recordAssignments, clearCompanion],
+  );
+
   const handleCompanionConfirm = useCallback(() => {
     if (pendingCompanion === null) return;
-    // Only the physical mechanism is wired here; the other two galleries own
-    // their own confirm paths.
-    if (pendingCompanion.mechanism !== "physical") return;
+    // The touch mechanism confirms in its own gallery.
+    if (pendingCompanion.mechanism === "touch") return;
+
+    if (pendingCompanion.mechanism === "combo") {
+      confirmComboCompanion(pendingCompanion);
+      return;
+    }
 
     // Stale-proposal guard: locate the exact assignment object this proposal
     // was raised for, by reference — not by re-matching target/scope, which
@@ -2262,7 +2396,13 @@ export function MechanismGallery({
     }
 
     clearCompanion();
-  }, [pendingCompanion, sessionAssignments, recordAssignments, clearCompanion]);
+  }, [
+    pendingCompanion,
+    sessionAssignments,
+    recordAssignments,
+    clearCompanion,
+    confirmComboCompanion,
+  ]);
 
   // How many NON-sequence methods have already been applied to the current
   // character (mechanismAssignments already excludes the sequence-owned
@@ -3382,7 +3522,7 @@ export function MechanismGallery({
                 char={currentChar}
                 sessionAssignments={sessionAssignments}
                 recordAssignments={recordAssignments}
-                onApplied={resetMethodState}
+                onApplied={handleSequenceApplied}
                 onCancel={resetMethodState}
               />
             )}

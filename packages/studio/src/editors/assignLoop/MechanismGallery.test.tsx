@@ -3903,3 +3903,198 @@ describe("MechanismGallery — shared case-pair affordance (spec 051)", () => {
   // confirm-time backstop). Both still pass unedited after the extraction, so
   // they are not restated here.
 });
+
+// ---------------------------------------------------------------------------
+// Spec 051 US2 — S-02 parallel combo (uppercase base letter -> uppercase output)
+//
+// The case-shifted elements are the BASE LETTER and the OUTPUT. The trigger
+// key, its deadkey name, and the accent character are carried across
+// unchanged: a dead key is an accent selector, not a letter.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — S-02 parallel-combo proposal (spec 051 US2)", () => {
+  it("a dead-key apply producing a lowercase accented letter raises a proposal", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // "á" defaults to the pre-enabled deadkey method (§3c).
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+
+    expect(screen.getByText(/has an uppercase form, Á/i)).toBeTruthy();
+  });
+
+  it("confirming records a parallel deadkey ref: trigger unchanged, base letter and output case-shifted", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+
+    const source = getPhaseCPhysicalAssignments().find((a) => a.target === "á");
+    const sourceSlots = source?.mechanisms[0]?.slotValues ?? {};
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Map Á to the shift layer of/i }),
+    );
+
+    const companion = getPhaseCPhysicalAssignments().find(
+      (a) => a.target === "Á",
+    );
+    expect(companion?.mechanisms[0]?.patternId).toBe(PATTERN_DEADKEY);
+    expect(companion?.mechanisms[0]?.strategyId).toBe("S-02");
+
+    const slots = companion?.mechanisms[0]?.slotValues ?? {};
+    // Unchanged across the pair.
+    expect(slots["triggerKey"]).toBe(sourceSlots["triggerKey"]);
+    expect(slots["deadkeyName"]).toBe(sourceSlots["deadkeyName"]);
+    expect(slots["accentChar"]).toBe(sourceSlots["accentChar"]);
+    // Case-shifted.
+    expect(sourceSlots["baseLetters"]).toBe("a");
+    expect(slots["baseLetters"]).toBe("A");
+    expect(slots["accentedForms"]).toBe("Á");
+
+    // The source combo survives untouched.
+    expect(
+      getPhaseCPhysicalAssignments().find((a) => a.target === "á"),
+    ).toBeDefined();
+  });
+
+  it("dismissing the S-02 proposal records nothing", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Do not map Á to the shift layer/i }),
+    );
+
+    const assignments = getPhaseCPhysicalAssignments();
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.target).toBe("á");
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+
+  it("a caseless output raises no S-02 proposal", async () => {
+    instantiateWorkingCopy();
+    // Arabic alef with hamza below — caseless, so no confident capital.
+    seedInventory(["إ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for إ/i }));
+
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 051 US2 — S-03 parallel combo. The proposal is raised in the gallery
+// (which owns the one hook and the one banner) from the sequence panel's
+// onApplied seam; the panel renders no banner of its own.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — S-03 parallel-combo proposal (spec 051 US2)", () => {
+  async function applySequence(content: string, indicator: string) {
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByTestId("sequences-content"), {
+      target: { value: content },
+    });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), {
+      target: { value: indicator },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("sequences-apply"));
+    });
+  }
+
+  it("a sequence whose content is a single cased character raises a proposal", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    await applySequence("a", "s");
+
+    expect(screen.getByText(/has an uppercase form, Á/i)).toBeTruthy();
+  });
+
+  it("confirming records a parallel sequence: indicator unchanged, content and collapse target case-shifted", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    await applySequence("a", "s");
+    fireEvent.click(
+      screen.getByRole("button", { name: /Map Á to the shift layer of/i }),
+    );
+
+    const assignments = getPhaseCPhysicalAssignments();
+
+    const source = assignments.find((a) => a.target === "á");
+    expect(source?.mechanisms[0]?.slotValues).toMatchObject({
+      firstLetterOut: "a",
+      secondLetter: "s",
+      collapsedChar: "á",
+    });
+
+    const companion = assignments.find((a) => a.target === "Á");
+    expect(companion?.mechanisms[0]?.patternId).toBe(PATTERN_SEQUENCE);
+    expect(companion?.mechanisms[0]?.strategyId).toBe("S-03");
+    expect(companion?.mechanisms[0]?.slotValues).toMatchObject({
+      // Case-shifted.
+      firstLetterOut: "A",
+      collapsedChar: "Á",
+      // Unchanged — the indicator is a physical key by construction.
+      secondLetter: "s",
+    });
+  });
+
+  it("multi-character content ('ng') raises no proposal", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ŋ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    await applySequence("ng", "y");
+
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+    expect(getPhaseCPhysicalAssignments()).toHaveLength(1);
+  });
+
+  it("confirming twice is a no-op under the existing (firstLetterOut, secondLetter) dedup", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    await applySequence("a", "s");
+    fireEvent.click(
+      screen.getByRole("button", { name: /Map Á to the shift layer of/i }),
+    );
+
+    // Re-apply the identical source sequence: the panel's own dedup makes it a
+    // no-op and hands back no payload, so no second proposal is raised.
+    await applySequence("a", "s");
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+
+    const companion = getPhaseCPhysicalAssignments().find(
+      (a) => a.target === "Á",
+    );
+    expect(companion?.mechanisms).toHaveLength(1);
+  });
+});
