@@ -12,7 +12,8 @@
 // return deterministic values.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
+import { screen, fireEvent, act, cleanup } from "@testing-library/react";
+import { render } from "../../src/test/renderWithI18n.tsx";
 import type { EditorStepProps } from "../../src/steps/types.ts";
 
 // ---------------------------------------------------------------------------

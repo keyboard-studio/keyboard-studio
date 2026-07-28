@@ -128,7 +128,14 @@ export function resolveContentString(
   if (locale === undefined || locale === DEFAULT_LOCALE) return englishValue;
   const catalog = localeCatalogs.get(locale)?.[type];
   if (catalog === undefined) return englishValue;
-  return catalog[buildContentKey(type, id, field)] ?? englishValue;
+  // Honour the "never blank" contract above: a present-but-empty (or
+  // whitespace-only) catalog value means the key exists yet is untranslated —
+  // e.g. a new key awaiting a Crowdin sync (skip_untranslated_strings: false
+  // ships every key in every locale, empty until translated). Plain `??` only
+  // catches null/undefined, so it would render such a key as a blank string;
+  // fall back to the English value in that case too.
+  const translated = catalog[buildContentKey(type, id, field)];
+  return translated !== undefined && translated.trim() !== "" ? translated : englishValue;
 }
 
 /**
