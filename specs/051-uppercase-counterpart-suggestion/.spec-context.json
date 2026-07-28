@@ -1,0 +1,80 @@
+{
+  "workflow": "speckit",
+  "specName": "051-uppercase-counterpart-suggestion",
+  "branch": "051-uppercase-counterpart-suggestion",
+  "selectedAt": "2026-07-28T02:28:15.439Z",
+  "currentStep": "implement",
+  "status": "implementing",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-28T03:03:43.668Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:08:29.908Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:10:56.654Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:10:56.893Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:10:57.145Z"
+    }
+  ],
+  "currentTask": "T004",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Verified toolchain (switched nvm to node 24.11.0 to clear the >=22.19.0 engines floor, corepack-activated pnpm 9.12.0), pnpm install and full pnpm build both green",
+      "files": [
+        "(none - verification only)"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Captured engine touch-applier baseline: 77/77 tests pass across both applier suites (absent-layer regression floor)",
+      "files": [
+        "(baseline capture)"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Captured studio MechanismGallery baseline: 145/145 pass; recorded the 11 existing pendingCompanion cases that must pass unedited (SC-005)",
+      "files": [
+        "(baseline capture)"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Recorded the six shipped editor.assignLoop.companion.* ids and their exact English messages for verbatim reuse",
+      "files": [
+        "packages/studio/src/locales/en/messages.json (read-only)"
+      ]
+    }
+  }
+}
