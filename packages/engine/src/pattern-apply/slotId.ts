@@ -28,3 +28,18 @@ export function parseSlotId(id: string): { storeNodeId: string; itemsIndex: numb
     itemsIndex: parseInt(match[2], 10),
   };
 }
+
+/**
+ * Build a store-slot deletion id of the form `"<storeNodeId>#<itemsIndex>"`.
+ *
+ * The inverse of {@link parseSlotId} — round-trips as
+ * `parseSlotId(makeSlotId(storeNodeId, itemsIndex))` for any `storeNodeId`
+ * that does not itself end in `#<digits>`.
+ *
+ * @param storeNodeId  The store node's id.
+ * @param itemsIndex   0-based index into `IRStore.items`.
+ * @returns            The composed slot id string.
+ */
+export function makeSlotId(storeNodeId: string, itemsIndex: number): string {
+  return `${storeNodeId}#${itemsIndex}`;
+}

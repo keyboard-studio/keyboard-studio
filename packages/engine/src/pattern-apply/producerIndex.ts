@@ -37,6 +37,7 @@
 
 import type { KeyboardIR, IRStore } from "@keyboard-studio/contracts";
 import { isDeadkeyOnlyOutput } from "../shared/rule-shape.js";
+import { makeSlotId } from "./slotId.js";
 
 /** NFC character (as produced) -> number of distinct places that produce it. */
 export type ProducerIndex = ReadonlyMap<string, number>;
@@ -86,7 +87,7 @@ export function buildProducerIndex(ir: KeyboardIR): ProducerIndex {
         for (let i = 0; i < store.items.length; i++) {
           const item = store.items[i];
           if (item === undefined || item.kind !== "char") continue;
-          const slotId = `${store.nodeId}#${i}`;
+          const slotId = makeSlotId(store.nodeId, i);
           if (seenStoreSlotIds.has(slotId)) continue;
           seenStoreSlotIds.add(slotId);
           bump(item.value.normalize("NFC"));

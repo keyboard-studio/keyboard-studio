@@ -14,7 +14,7 @@
 import type { IRStore, KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
-import { parseSlotId } from "./slotId.js";
+import { parseSlotId, makeSlotId } from "./slotId.js";
 import { classifyStoreSlotEdit } from "./applyStoreSlotRemovals.js";
 import { readVfsText, resolveOskAssetPaths, xmlUnescape } from "./oskAssetShared.js";
 import { isPlusSeparator } from "../shared/rule-shape.js";
@@ -157,7 +157,7 @@ export function collectCarvedKeycapTexts(
     // holds keeps being produced, carved slot ids notwithstanding.
     const blocked = isBlockedStore(store);
     store.items.forEach((item, i) => {
-      if (item.kind === "char" && (blocked || !slotIds.has(`${store.nodeId}#${i}`))) {
+      if (item.kind === "char" && (blocked || !slotIds.has(makeSlotId(store.nodeId, i)))) {
         survivors.add(item.value.normalize("NFC"));
       }
     });

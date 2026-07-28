@@ -34,6 +34,7 @@
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { isDeadkeyOnlyOutput } from "../shared/rule-shape.js";
+import { makeSlotId } from "./slotId.js";
 
 // ---------------------------------------------------------------------------
 // Public contract (shared with km-frontend — do not deviate)
@@ -199,7 +200,7 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
         for (let i = 0; i < inputStore.items.length; i++) {
           const item = inputStore.items[i];
           if (item !== undefined && item.kind === 'char' && item.value.normalize('NFC') === target) {
-            addStoreSlot(`${inputStore.nodeId}#${i}`, 'input');
+            addStoreSlot(makeSlotId(inputStore.nodeId, i), 'input');
             addLocation('store', inputStore.name, inputStore.nodeId);
             inputMatched = true;
           }
@@ -223,7 +224,7 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
           for (let i = 0; i < store.items.length; i++) {
             const item = store.items[i];
             if (item !== undefined && item.kind === 'char' && item.value.normalize('NFC') === target) {
-              addStoreSlot(`${store.nodeId}#${i}`, 'output');
+              addStoreSlot(makeSlotId(store.nodeId, i), 'output');
               addLocation('store', store.name, store.nodeId);
               storeMatched = true;
             }

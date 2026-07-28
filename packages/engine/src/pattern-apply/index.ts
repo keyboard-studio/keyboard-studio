@@ -33,7 +33,7 @@ export type {
 export { buildProducerIndex } from "./producerIndex.js";
 export type { ProducerIndex } from "./producerIndex.js";
 
-export { parseSlotId } from "./slotId.js";
+export { parseSlotId, makeSlotId } from "./slotId.js";
 
 export { isPlusSeparator } from "../shared/rule-shape.js";
 
