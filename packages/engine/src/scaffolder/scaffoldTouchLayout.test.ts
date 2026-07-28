@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { scaffoldTouchLayout, buildMinimalPhoneTouchLayout } from "./scaffoldTouchLayout.js";
+import {
+  scaffoldTouchLayout,
+  scaffoldTouchLayoutWithDiagnostics,
+  buildMinimalPhoneTouchLayout,
+} from "./scaffoldTouchLayout.js";
 import { emitTouchLayout } from "../codec/index.js";
 import type {
   KeyboardIR,
@@ -410,6 +414,54 @@ describe("scaffoldTouchLayout", () => {
       const shiftLayer = getLayer(result, "shift")!;
       const allKeys = shiftLayer.rows.flatMap((r) => r.keys);
       expect(allKeys.find((k) => k.id === "K_Q")?.text).toBe("Q");
+    });
+
+    // -------------------------------------------------------------------------
+    // Defect 4 fix: US_KEYCAPS must not fabricate a letter for a layer the
+    // base never assigned on a vkey it DID otherwise assign.
+    // -------------------------------------------------------------------------
+
+    it("a vkey the base assigns ONLY on shift gets a blank (not fabricated) default-layer key — the base never assigned this physical key's default form", () => {
+      const rule = makeCharRule("K_A", ["SHIFT"], "A");
+      const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
+
+      const result = scaffoldTouchLayout(ir);
+      const defaultLayer = getLayer(result, "default")!;
+      const allKeys = defaultLayer.rows.flatMap((r) => r.keys);
+      const kaKey = allKeys.find((k) => k.id === "K_A")!;
+
+      // No fabricated 'a' fallback text/output — the base assigned this
+      // physical key (on shift), so absence on default means "not defined
+      // here", not "invent a US keycap".
+      expect(kaKey.text).toBeUndefined();
+      expect(kaKey.output).toBeUndefined();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Defect 3 fix: multi-char output (digraph / base+combining-mark sequence)
+  // must survive intact, not get truncated to the first char element.
+  // ---------------------------------------------------------------------------
+
+  describe("multi-char output preservation (defect 3 fix)", () => {
+    it("a rule with two consecutive kind:char output elements produces the full concatenated string on its touch key", () => {
+      const rule: IRRule = {
+        nodeId: freshId("rule"),
+        context: [{ kind: "vkey", name: "K_N", modifiers: [] }],
+        output: [
+          { kind: "char", value: "n" },
+          { kind: "char", value: "y" },
+        ],
+      };
+      const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
+
+      const result = scaffoldTouchLayout(ir);
+      const defaultLayer = getLayer(result, "default")!;
+      const allKeys = defaultLayer.rows.flatMap((r) => r.keys);
+      const nKey = allKeys.find((k) => k.id === "K_N");
+
+      expect(nKey?.text).toBe("ny");
+      expect(nKey?.output).toBe("ny");
     });
   });
 
@@ -885,6 +937,246 @@ describe("scaffoldTouchLayout", () => {
       if (kaKey !== undefined) {
         expect(kaKey.sk === undefined || kaKey.sk.length === 0).toBe(true);
       }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Defect 1 fix: trigger/continuation split (canonical store()+dk()+index()
+  // S-02 shape) — a "body" rule with context [deadkey, any(baseStore)] and
+  // output [index(outStore, offset)] has NO vkey of its own and NO direct
+  // char output, so the old single-rule-only logic rejected it outright and
+  // produced empty sk[]. Regression-locks that the fix resolves the index
+  // output against the referenced store and attaches the decorated form to
+  // the vkey that actually produces the base letter.
+  // ---------------------------------------------------------------------------
+
+  describe("deadkey → sk[] (trigger/continuation split — defect 1 fix)", () => {
+    it("a body rule with context [deadkey, any(baseStore)] and output [index(outStore, offset)] yields non-empty sk[] on the base letter's own key", () => {
+      const baseVkey = "K_E";
+      const baseChar = "e";
+      const accentedChar = "è";
+
+      const baseStoreNodeId = freshId("store");
+      const outStoreNodeId = freshId("store");
+      const bodyRuleNodeId = freshId("rule");
+
+      // The desktop rule that actually produces the base letter 'e' on K_E —
+      // this is what the fix's charToVkey reverse-lookup resolves against.
+      const baseLetterRule = makeCharRule(baseVkey, [], baseChar);
+
+      // The canonical S-02 "body"/continuation rule: no vkey, no direct char
+      // output — context is [dk, any(baseStore)], output is index(outStore).
+      const bodyRule: IRRule = {
+        nodeId: bodyRuleNodeId,
+        context: [
+          { kind: "deadkey", id: 1 },
+          { kind: "any", storeRef: "s_grave_base" },
+        ],
+        output: [{ kind: "index", storeRef: "s_grave_out", offset: 2 }],
+      };
+
+      const pattern: Pattern = {
+        id: "test_s02_split_pattern",
+        title: "Split-shape deadkey",
+        description: "Canonical trigger/continuation S-02 pattern",
+        category: "desktop",
+        appliesTo: [],
+        strategyId: "S-02",
+        origin: "recognized",
+        ownedNodes: [{ nodeId: bodyRuleNodeId, kind: "rule" }],
+        questions: [],
+        kmnFragment:
+          "+ [K_GRAVE] > dk(grave)\ndk(grave) + any(s_grave_base) > index(s_grave_out, 2)",
+        tests: [],
+        validatedForFamilies: [],
+        sourceKeyboards: [],
+        reviewedBy: "test",
+        reviewDate: "2026-06-18",
+      };
+
+      const ir = makeMinimalIR({
+        groups: [makeGroup([baseLetterRule, bodyRule])],
+        stores: [
+          {
+            nodeId: baseStoreNodeId,
+            name: "s_grave_base",
+            items: [{ kind: "char", value: baseChar }],
+            isSystem: false,
+          },
+          {
+            nodeId: outStoreNodeId,
+            name: "s_grave_out",
+            items: [{ kind: "char", value: accentedChar }],
+            isSystem: false,
+          },
+        ],
+        recognizedPatterns: [pattern],
+      });
+
+      const result = scaffoldTouchLayout(ir);
+      const defaultLayer = getLayer(result, "default")!;
+      const allKeys = defaultLayer.rows.flatMap((r) => r.keys);
+      const targetKey = allKeys.find((k) => k.id === baseVkey);
+
+      expect(targetKey).toBeDefined();
+      expect(targetKey?.sk).toBeDefined();
+      expect(targetKey?.sk?.length).toBeGreaterThan(0);
+      expect(targetKey?.sk?.map((s) => s.text)).toContain(accentedChar);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // QC follow-up: the kmnFragment-regex "last resort" fallback in
+  // buildDeadkeySuccessors — the branch that runs ONLY when a recognized S-02
+  // pattern's ownedNodes is empty (or its owned rules match neither the
+  // collapsed nor the trigger/continuation shape) — had no regression test.
+  // This drives that exact branch: ownedNodes is empty, so the ownedNodes scan
+  // never sets matchedFromOwnedNodes, forcing the kmnFragment text scan to run.
+  // The fallback resolves the triggering vkey from the "key-name" question's
+  // resolved answer (`q.default`) — NOT the unresolved `{{slotId}}` placeholder
+  // text still present in kmnFragment — so the successor lands on the real key.
+  // ---------------------------------------------------------------------------
+
+  describe("deadkey → sk[] (kmnFragment-regex last-resort fallback)", () => {
+    it("a S-02 pattern with empty ownedNodes yields sk[] on the resolved trigger vkey via the kmnFragment text scan", () => {
+      const vkey = "K_E";
+      const successorChar = "é";
+
+      const pattern: Pattern = {
+        id: "test_s02_fallback_pattern",
+        title: "Fallback-shape deadkey",
+        description: "No ownedNodes — must fall back to the kmnFragment text scan",
+        category: "desktop",
+        appliesTo: [],
+        strategyId: "S-02",
+        origin: "recognized",
+        ownedNodes: [],
+        questions: [
+          {
+            id: "triggerKey",
+            prompt: "Virtual key that triggers the deadkey state",
+            answerType: "key-name",
+            default: vkey,
+          },
+        ],
+        // Collapsed single-rule shape: the triggerKey vkey directly outputs a
+        // quoted char literal — the shape this fallback's regex scan expects.
+        kmnFragment: `+ [{{triggerKey}}] > '${successorChar}'`,
+        tests: [],
+        validatedForFamilies: [],
+        sourceKeyboards: [],
+        reviewedBy: "test",
+        reviewDate: "2026-07-28",
+      };
+
+      const ir = makeMinimalIR({ recognizedPatterns: [pattern] });
+      const result = scaffoldTouchLayout(ir);
+      const defaultLayer = getLayer(result, "default")!;
+      const allKeys = defaultLayer.rows.flatMap((r) => r.keys);
+      const targetKey = allKeys.find((k) => k.id === vkey);
+
+      expect(targetKey).toBeDefined();
+      expect(targetKey?.sk).toBeDefined();
+      expect(targetKey?.sk?.map((s) => s.text)).toContain(successorChar);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Defect 2 fix: characters produced on a vkey outside the compact
+  // skeleton's 26 letter slots (e.g. K_QUOTE, K_BKQUOTE) must never be
+  // silently dropped — they are spilled onto the sk[] of the nearest
+  // occupied slot key, or (with no known physical neighbor) onto the space
+  // bar's "extras" longpress menu.
+  // ---------------------------------------------------------------------------
+
+  describe("overflow spilling for non-slot vkeys (defect 2 fix)", () => {
+    it("a character produced on a non-QWERTY-slot vkey (K_QUOTE) is not dropped — it lands on the nearest slot key's (K_L) sk[]", () => {
+      const overflowChar = "ʼ"; // MODIFIER LETTER APOSTROPHE (saltillo)
+      const rule = makeCharRule("K_QUOTE", [], overflowChar);
+      const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
+
+      const result = scaffoldTouchLayout(ir);
+      const defaultLayer = getLayer(result, "default")!;
+      const allKeys = defaultLayer.rows.flatMap((r) => r.keys);
+
+      // Never dropped: the character appears somewhere in the default layer.
+      const foundOnAnyKey = allKeys.some((k) => k.sk?.some((s) => s.text === overflowChar));
+      expect(foundOnAnyKey).toBe(true);
+
+      // Placed on the documented nearest-neighbor slot (K_L).
+      const klKey = allKeys.find((k) => k.id === "K_L");
+      expect(klKey?.sk?.some((s) => s.text === overflowChar)).toBe(true);
+    });
+
+    it("a character produced on a vkey with no known physical neighbor lands on the space bar's extras sk[] rather than being dropped", () => {
+      const overflowChar = "ʔ"; // LATIN LETTER GLOTTAL STOP
+      const rule = makeCharRule("K_oE2", [], overflowChar);
+      const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
+
+      const result = scaffoldTouchLayout(ir);
+      const defaultLayer = getLayer(result, "default")!;
+      const funcRow = defaultLayer.rows[3]!;
+      const spaceKey = funcRow.keys.find((k) => k.id === "K_SPACE");
+
+      expect(spaceKey?.sk?.some((s) => s.text === overflowChar)).toBe(true);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // P1 fix: unplaced/spilled overflow characters must be surfaced as
+  // structured data (not console-only) so a UI caller (the studio's live
+  // reseed preview) can render an advisory note. scaffoldTouchLayout's own
+  // signature is unchanged (still returns a bare TouchLayoutIR); the new
+  // sibling scaffoldTouchLayoutWithDiagnostics exposes `unplacedChars`.
+  // ---------------------------------------------------------------------------
+
+  describe("scaffoldTouchLayoutWithDiagnostics — unplacedChars structured data", () => {
+    it("returns the same layout as scaffoldTouchLayout for an IR with no overflow", () => {
+      const ir = makeMinimalIR();
+      const plain = scaffoldTouchLayout(ir);
+      const { layout, unplacedChars } = scaffoldTouchLayoutWithDiagnostics(ir);
+
+      expect(layout).toEqual(plain);
+      expect(unplacedChars).toEqual([]);
+    });
+
+    it("unplacedChars contains a character spilled onto the space bar's extras sk[] (no known physical neighbor)", () => {
+      const overflowChar = "ʔ"; // LATIN LETTER GLOTTAL STOP — same fixture as the defect 2 regression above
+      const rule = makeCharRule("K_oE2", [], overflowChar);
+      const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
+
+      const { unplacedChars } = scaffoldTouchLayoutWithDiagnostics(ir);
+
+      expect(unplacedChars).toContain(overflowChar);
+    });
+
+    it("unplacedChars is empty for a character routed to a nearest-neighbor slot (not the extras grouping)", () => {
+      const overflowChar = "ʼ"; // MODIFIER LETTER APOSTROPHE — routes to K_L, not extras
+      const rule = makeCharRule("K_QUOTE", [], overflowChar);
+      const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
+
+      const { unplacedChars } = scaffoldTouchLayoutWithDiagnostics(ir);
+
+      expect(unplacedChars).toEqual([]);
+    });
+
+    it("unplacedChars is populated when a phone platform is synthesized onto an existing non-phone touchLayout", () => {
+      const overflowChar = "ʔ";
+      const rule = makeCharRule("K_oE2", [], overflowChar);
+      const existingTouchLayout: TouchLayoutIR = {
+        platforms: [
+          {
+            id: "tablet",
+            layers: [{ id: "default", rows: [{ keys: [{ nodeId: freshId("key"), id: "K_A" }] }] }],
+          },
+        ],
+        nodeIds: [],
+      };
+      const ir = makeMinimalIR({ groups: [makeGroup([rule])], touchLayout: existingTouchLayout });
+
+      const { unplacedChars } = scaffoldTouchLayoutWithDiagnostics(ir);
+
+      expect(unplacedChars).toContain(overflowChar);
     });
   });
 

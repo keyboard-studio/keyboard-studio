@@ -443,11 +443,24 @@ function extractRuleVkey(rule: IRRule): string | undefined {
   return undefined;
 }
 
+/**
+ * Concatenate the *leading run* of consecutive `kind:"char"` output elements
+ * (e.g. a digraph or a base+combining-mark sequence emitted as two literals)
+ * rather than returning only the first one — the same "assume a single/first
+ * output element" bug shape scaffoldTouchLayout.ts's `charOutputText` fixed
+ * for the fixed 3-layer template; this is `buildComboKeyMap`'s sibling for
+ * arbitrary modifier-combo layers, so it needs the identical fix. Stops at
+ * the first non-char element (a deadkey/index/etc. mid-output changes the
+ * rule's meaning). Returns undefined when the rule produces no leading
+ * literal character(s).
+ */
 function firstRuleCharOutput(rule: IRRule): string | undefined {
+  let text = "";
   for (const el of rule.output) {
-    if (el.kind === "char") return el.value;
+    if (el.kind !== "char") break;
+    text += el.value;
   }
-  return undefined;
+  return text.length > 0 ? text : undefined;
 }
 
 /**

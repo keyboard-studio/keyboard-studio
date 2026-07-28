@@ -7,10 +7,16 @@
 // in surveySessionStore.touchSeedSource; buildTouchLayoutJson's caller reads it
 // to select the Case A/B derivation path (see seed-derivation.md).
 //
-// PREVIEW-ONLY (R4): this panel parses the base's raw `.keyman-touch-layout`
-// JSON directly — no engine calls (no parseTouchLayout, no scaffoldTouchLayout,
-// no compile) and no OSK iframe. It is a lightweight read-only summary so the
-// choice is informed without invoking the compiler.
+// LIVE PREVIEW, PURE-DERIVATION-ONLY (spec 035 R4a amendment, approved —
+// supersedes the earlier "no engine calls" R4 note): the right-hand pane shows
+// a live preview matching the currently-selected card. "Import & adapt" shows
+// the base's shipped `.keyman-touch-layout` (parsed directly from raw JSON —
+// still no engine calls on that path). "Reseed from desktop" shows the ACTUAL
+// derived phone layout by calling `deriveSeedLayout` (buildTouchLayoutJson.ts)
+// — the PURE, non-compiling seed derivation shared with TouchGallery's own
+// "already in touch layout" detection. This panel still never compiles and
+// never touches the OSK iframe/preview worker — `deriveSeedLayout` performs no
+// I/O and returns a `TouchLayoutIR` in memory only.
 //
 // ADVISORY, NEVER GATING (R4): hints (missing phone platform, tablet/desktop
 // discard on reseed) annotate the choices but never disable either one — the
@@ -25,13 +31,28 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { EditorStepProps } from "../../steps/types.ts";
+import type { DesktopModifications } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore, type TouchSeedSource } from "../../stores/surveySessionStore.ts";
 import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";
+import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
+import { deriveSeedLayout } from "../../lib/buildTouchLayoutJson.ts";
 import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
 } from "../../lib/galleryTheme.ts";
+import {
+  TouchLayoutPreview,
+  pickPreviewPlatformId,
+  mapTouchLayoutIrToPreview,
+  type TouchLayoutPreviewData,
+  type TouchPreviewKey,
+  type TouchPreviewLayer,
+} from "../assignLoop/parts/TouchLayoutPreview.tsx";
+
+/** No desktop work to replay when there is no baseIr yet (mirrors TouchGallery's EMPTY_MODS). */
+const EMPTY_MODS: DesktopModifications = { removals: [], placements: [] };
 
 // ---------------------------------------------------------------------------
 // Raw `.keyman-touch-layout` preview parsing.
@@ -40,13 +61,15 @@ import {
 // — this preview never calls into the engine. The wire shape mirrored here
 // (top-level platform keys, each with a `layer` array of `{ id, row: [{ key }] }`)
 // is documented at the top of parse-touch.ts; only the fields a summary needs
-// (id/text/output) are read.
+// (id/text/output/hint/sk) are read.
 // ---------------------------------------------------------------------------
 
 interface RawPreviewKey {
   id?: string;
   text?: string;
   output?: string;
+  hint?: string;
+  sk?: RawPreviewKey[];
 }
 interface RawPreviewRow {
   key?: RawPreviewKey[];
@@ -60,29 +83,30 @@ interface RawPreviewPlatform {
 }
 type RawPreviewTouchLayout = Record<string, RawPreviewPlatform | undefined>;
 
-export interface TouchLayoutPreview {
-  /** Platform ids the base layout ships, e.g. ["phone", "tablet"]. */
-  platformIds: string[];
-  /** The platform id these rows were drawn from (preference order below). */
-  previewPlatformId: string;
-  /** Rows of key labels from the preview platform's "default" layer. */
-  rows: Array<{ keys: Array<{ label: string }> }>;
-}
-
-/** Preference order for which platform's rows to preview when several ship. */
-const PREVIEW_PLATFORM_ORDER = ["phone", "tablet", "desktop"] as const;
-
 function isRawPlatform(v: unknown): v is RawPreviewPlatform {
   return typeof v === "object" && v !== null && Array.isArray((v as RawPreviewPlatform).layer);
 }
 
+function mapRawKeyToPreviewKey(k: RawPreviewKey): TouchPreviewKey {
+  // exactOptionalPropertyTypes: only assign the optional keys that have a
+  // value — see the equivalent note on mapTouchKeyIrToPreviewKey.
+  return {
+    id: k.id ?? "",
+    label: k.text ?? k.output ?? k.id ?? "",
+    ...(k.hint !== undefined ? { hint: k.hint } : {}),
+    ...(k.sk !== undefined ? { sk: k.sk.map(mapRawKeyToPreviewKey) } : {}),
+  };
+}
+
 /**
- * Parse a base's raw `.keyman-touch-layout` JSON string into a lightweight
- * preview. Returns null for absent or malformed input — both are treated as
- * "no usable base layout" by the caller (R4): the malformed case is reported
- * with a distinct note, but neither case blocks either choice.
+ * Parse a base's raw `.keyman-touch-layout` JSON string into the shared
+ * {@link TouchLayoutPreviewData} shape (see
+ * ../assignLoop/parts/TouchLayoutPreview.tsx). Returns null for absent or
+ * malformed input — both are treated as "no usable base layout" by the
+ * caller (R4): the malformed case is reported with a distinct note, but
+ * neither case blocks either choice.
  */
-export function parseBaseTouchPreview(json: string | undefined): TouchLayoutPreview | null {
+export function parseBaseTouchPreview(json: string | undefined): TouchLayoutPreviewData | null {
   if (json === undefined) return null;
   let parsed: unknown;
   try {
@@ -95,16 +119,15 @@ export function parseBaseTouchPreview(json: string | undefined): TouchLayoutPrev
   const platformIds = Object.keys(obj).filter((id) => isRawPlatform(obj[id]));
   if (platformIds.length === 0) return null;
 
-  const previewPlatformId =
-    PREVIEW_PLATFORM_ORDER.find((id) => platformIds.includes(id)) ?? platformIds[0]!;
+  const previewPlatformId = pickPreviewPlatformId(platformIds) ?? platformIds[0]!;
   const platform = obj[previewPlatformId];
-  const layers = isRawPlatform(platform) ? platform.layer ?? [] : [];
-  const defaultLayer = layers.find((l) => (l.id ?? "default") === "default") ?? layers[0];
-  const rows = (defaultLayer?.row ?? []).map((r) => ({
-    keys: (r.key ?? []).map((k) => ({ label: k.text ?? k.output ?? k.id ?? "" })),
+  const rawLayers = isRawPlatform(platform) ? platform.layer ?? [] : [];
+  const layers: TouchPreviewLayer[] = rawLayers.map((l) => ({
+    id: l.id ?? "default",
+    rows: (l.row ?? []).map((r) => ({ keys: (r.key ?? []).map(mapRawKeyToPreviewKey) })),
   }));
 
-  return { platformIds, previewPlatformId, rows };
+  return { platformIds, previewPlatformId, layers };
 }
 
 // ---------------------------------------------------------------------------
@@ -137,28 +160,35 @@ const previewCardStyle: CSSProperties = {
   border: `1px solid ${BORDER}`,
   borderRadius: 8,
   padding: "16px 20px",
-  marginBottom: 20,
 };
 
-const keycapRowStyle: CSSProperties = {
-  display: "flex",
-  gap: 4,
-  flexWrap: "wrap",
-  marginBottom: 4,
+/**
+ * Two-column grid: choices left (minmax(320px,460px)), sticky live preview
+ * right. Collapses to a single column (choices first, preview below) at
+ * <=768px via the scoped `.ks-touch-seed-grid` media-query rule below —
+ * inline styles can't express a media query, so this is a class hook only;
+ * every actual value still comes from tokens/consts here, not from CSS.
+ * The outer wrapper already caps width at 1100px and centers, so this grid
+ * only needs the column/gap shape.
+ */
+const gridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(320px, 460px) 1fr",
+  gap: 32,
+  alignItems: "start",
 };
 
-const keycapStyle: CSSProperties = {
-  minWidth: 22,
-  height: 22,
-  padding: "0 4px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: BG_PAGE,
-  border: `1px solid ${BORDER}`,
-  borderRadius: 4,
-  fontSize: 11,
-  color: TEXT_MAIN,
+const previewColumnStyle: CSSProperties = {
+  position: "sticky",
+  top: 0,
+};
+
+const previewEyebrowStyle: CSSProperties = {
+  margin: "0 0 8px 0",
+  fontSize: 12,
+  color: TEXT_DIM,
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
   fontFamily: FONT,
 };
 
@@ -196,9 +226,24 @@ const confirmBtnStyle = (warn: boolean): CSSProperties => ({
 export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
   const { t } = useLingui();
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
+  const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const touchDraft = useWorkingCopyStore((s) => s.touchDraft);
   const storedSeedSource = useSurveySessionStore((s) => s.touchSeedSource);
   const setTouchSeedSource = useSurveySessionStore((s) => s.setTouchSeedSource);
+
+  // Desktop modifications to replay onto the reseed preview (spec 035 R3) —
+  // same read/derive pattern as TouchGallery's own `mods` memo (carve
+  // removals + Phase C letter placements), with the same EMPTY_MODS
+  // fallback when baseIr hasn't loaded yet.
+  const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
+  const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
+  const modsDepsKey = `${deletedNodeIds.size}:${deletedItemIds.size}:${phaseResults.length}`;
+  const mods = useMemo<DesktopModifications>(() => {
+    if (baseIr === null) return EMPTY_MODS;
+    return deriveDesktopModifications(baseIr, deletedNodeIds, deletedItemIds, phaseResults);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseIr, modsDepsKey]);
 
   const rawJson = useMemo(() => resolveBaseTouchJson(baseVfs), [baseVfs]);
   const preview = useMemo(() => parseBaseTouchPreview(rawJson), [rawJson]);
@@ -207,6 +252,28 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
   const isMalformed = rawJson !== undefined && preview === null;
   const hasPhonePlatform = preview !== null && preview.platformIds.includes("phone");
   const hasOtherPlatforms = preview !== null && preview.platformIds.some((id) => id !== "phone");
+
+  // The ACTUAL derived phone layout (spec 035 R4a) — calls the pure
+  // deriveSeedLayout, never scaffoldTouchLayout's compiling siblings and
+  // never the OSK iframe. Null (never thrown) when baseIr hasn't loaded yet
+  // or the derivation itself fails — both render the same graceful note.
+  const reseedResult = useMemo(() => {
+    if (baseIr === null) return null;
+    try {
+      return deriveSeedLayout(baseIr, { mods, seedSource: "reseed-from-desktop" });
+    } catch (err) {
+      // A genuine derivation failure (as opposed to "no baseIr yet", handled
+      // by the guard above) has no other signal — the graceful
+      // seed-source-reseed-preview-error fallback below still renders, but
+      // this is otherwise silent, so log it for anyone debugging in devtools.
+      devLog.error("[TouchSeedSourcePanel] reseed preview derivation failed:", err);
+      return null;
+    }
+  }, [baseIr, mods]);
+  const reseedPreview = useMemo(
+    () => (reseedResult !== null ? mapTouchLayoutIrToPreview(reseedResult.layout) : null),
+    [reseedResult],
+  );
 
   // Default: Import & adapt when a usable base layout exists, else Reseed (R4).
   // On re-entry, start from the previously recorded choice rather than
@@ -228,7 +295,7 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
 
   return (
     <div style={pageStyle}>
-      <div style={{ maxWidth: 620, margin: "0 auto" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         {onBack !== undefined && (
           <button
             type="button"
@@ -260,133 +327,175 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
           </Trans>
         </p>
 
-        {/* Preview */}
-        <div style={previewCardStyle} data-testid="seed-source-preview">
-          <p
-            style={{
-              margin: "0 0 8px 0",
-              fontSize: 12,
-              color: TEXT_DIM,
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              fontFamily: FONT,
-            }}
-          >
-            <Trans id="editor.touchSeed.baseLayoutEyebrow">Base touch layout</Trans>
-          </p>
-          {preview !== null ? (
-            <>
-              <p style={{ margin: "0 0 10px 0", fontSize: 13, color: TEXT_MAIN, fontFamily: FONT }}>
-                {t({
-                  id: "editor.touchSeed.shipsLine",
-                  message: `Ships: ${{ platforms: preview.platformIds.join(", ") }} (showing "${{ previewPlatform: preview.previewPlatformId }}" default layer)`,
-                })}
-              </p>
-              <div>
-                {preview.rows.map((row, i) => (
-                  <div key={i} style={keycapRowStyle}>
-                    {row.keys.map((k, j) => (
-                      <div key={j} style={keycapStyle}>
-                        {k.label}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-              {!hasPhonePlatform && (
-                <p
-                  data-testid="seed-source-no-phone-warn"
-                  style={{ margin: "10px 0 0 0", fontSize: 12, color: "#d29922", fontFamily: FONT }}
+        {/* Scoped responsive rule — see gridStyle's docstring; <=768px
+            collapses the grid to one column (choices first, preview below)
+            and drops the preview column's sticky positioning. */}
+        <style>{`
+          @media (max-width: 768px) {
+            .ks-touch-seed-grid { grid-template-columns: 1fr !important; }
+            .ks-touch-seed-preview-col { position: static !important; }
+          }
+        `}</style>
+
+        <div className="ks-touch-seed-grid" style={gridStyle}>
+          {/* Left column — choices */}
+          <div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+              <button
+                type="button"
+                aria-pressed={selected === "import-adapt"}
+                data-testid="seed-source-import-adapt"
+                onClick={() => setSelected("import-adapt")}
+                style={choiceCardStyle(selected === "import-adapt")}
+              >
+                <span
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 14,
+                    color: selected === "import-adapt" ? ACCENT : TEXT_MAIN,
+                  }}
                 >
-                  <Trans id="editor.touchSeed.noPhonePlatformWarning">[WARN] this layout has no phone platform.</Trans>
-                </p>
-              )}
-            </>
-          ) : (
-            <p
-              data-testid={isMalformed ? "seed-source-malformed-note" : "seed-source-absent-note"}
-              style={{ margin: 0, fontSize: 13, color: TEXT_DIM, fontFamily: FONT }}
-            >
-              {isMalformed
-                ? <Trans id="editor.touchSeed.malformedNote">This base's touch layout could not be read (malformed JSON) — treated as no layout.</Trans>
-                : <Trans id="editor.touchSeed.absentNote">This base ships no touch layout.</Trans>}
-            </p>
-          )}
-        </div>
+                  <Trans id="editor.touchSeed.importAdaptTitle">Import &amp; adapt</Trans>
+                </span>
+                <span style={{ fontSize: 12, color: TEXT_DIM }}>
+                  {hasUsableBaseLayout
+                    ? <Trans id="editor.touchSeed.importAdaptUsable">Keep the base's shipped touch layout and carry your desktop work onto it.</Trans>
+                    : <Trans id="editor.touchSeed.importAdaptUnusable">There is no base touch layout to import — this option starts from an empty layout.</Trans>}
+                </span>
+              </button>
 
-        {/* Choices */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
-          <button
-            type="button"
-            aria-pressed={selected === "import-adapt"}
-            data-testid="seed-source-import-adapt"
-            onClick={() => setSelected("import-adapt")}
-            style={choiceCardStyle(selected === "import-adapt")}
-          >
-            <span
-              style={{
-                fontWeight: 600,
-                fontSize: 14,
-                color: selected === "import-adapt" ? ACCENT : TEXT_MAIN,
-              }}
-            >
-              <Trans id="editor.touchSeed.importAdaptTitle">Import &amp; adapt</Trans>
-            </span>
-            <span style={{ fontSize: 12, color: TEXT_DIM }}>
-              {hasUsableBaseLayout
-                ? <Trans id="editor.touchSeed.importAdaptUsable">Keep the base's shipped touch layout and carry your desktop work onto it.</Trans>
-                : <Trans id="editor.touchSeed.importAdaptUnusable">There is no base touch layout to import — this option starts from an empty layout.</Trans>}
-            </span>
-          </button>
+              <button
+                type="button"
+                aria-pressed={selected === "reseed-from-desktop"}
+                data-testid="seed-source-reseed"
+                onClick={() => setSelected("reseed-from-desktop")}
+                style={choiceCardStyle(selected === "reseed-from-desktop")}
+              >
+                <span
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 14,
+                    color: selected === "reseed-from-desktop" ? ACCENT : TEXT_MAIN,
+                  }}
+                >
+                  <Trans id="editor.touchSeed.reseedTitle">Reseed from desktop</Trans>
+                </span>
+                <span style={{ fontSize: 12, color: TEXT_DIM }}>
+                  <Trans id="editor.touchSeed.reseedDescription">Derive a fresh phone layout from your desktop key assignments.</Trans>
+                  {hasOtherPlatforms && (
+                    <Trans id="editor.touchSeed.reseedDiscardsPlatforms">
+                      {" "}Choosing this discards the base's shipped tablet/desktop touch platforms — only a phone layout is produced.
+                    </Trans>
+                  )}
+                </span>
+              </button>
+            </div>
 
-          <button
-            type="button"
-            aria-pressed={selected === "reseed-from-desktop"}
-            data-testid="seed-source-reseed"
-            onClick={() => setSelected("reseed-from-desktop")}
-            style={choiceCardStyle(selected === "reseed-from-desktop")}
-          >
-            <span
-              style={{
-                fontWeight: 600,
-                fontSize: 14,
-                color: selected === "reseed-from-desktop" ? ACCENT : TEXT_MAIN,
-              }}
-            >
-              <Trans id="editor.touchSeed.reseedTitle">Reseed from desktop</Trans>
-            </span>
-            <span style={{ fontSize: 12, color: TEXT_DIM }}>
-              <Trans id="editor.touchSeed.reseedDescription">Derive a fresh phone layout from your desktop key assignments.</Trans>
-              {hasOtherPlatforms && (
-                <Trans id="editor.touchSeed.reseedDiscardsPlatforms">
-                  {" "}Choosing this discards the base's shipped tablet/desktop touch platforms — only a phone layout is produced.
+            {showDraftWarning && (
+              <p
+                data-testid="seed-source-draft-warning"
+                style={{ margin: "0 0 14px 0", fontSize: 12, color: "#f0a0a0", fontFamily: FONT }}
+              >
+                <Trans id="editor.touchSeed.draftWarning">
+                  [WARN] Changing the seed source will discard your in-progress touch edits.
                 </Trans>
-              )}
-            </span>
-          </button>
+              </p>
+            )}
+
+            <button
+              type="button"
+              data-testid="seed-source-confirm"
+              onClick={handleConfirm}
+              style={confirmBtnStyle(showDraftWarning)}
+            >
+              {showDraftWarning
+                ? t({ id: "editor.touchSeed.discardAndConfirmButton", message: "Discard touch edits & confirm" })
+                : t({ id: "editor.touchSeed.confirmButton", message: "Confirm" })}
+            </button>
+          </div>
+
+          {/* Right column — live preview, matching the currently-selected card (R4a) */}
+          <div className="ks-touch-seed-preview-col" style={previewColumnStyle}>
+            {selected === "import-adapt" ? (
+              <div style={previewCardStyle} data-testid="seed-source-preview">
+                <p style={previewEyebrowStyle}>
+                  <Trans id="editor.touchSeed.baseLayoutEyebrow">Base touch layout</Trans>
+                </p>
+                {preview !== null ? (
+                  <>
+                    <p style={{ margin: "0 0 10px 0", fontSize: 13, color: TEXT_MAIN, fontFamily: FONT }}>
+                      {t({
+                        id: "editor.touchSeed.shipsLine",
+                        message: `Ships: ${{ platforms: preview.platformIds.join(", ") }} (showing "${{ previewPlatform: preview.previewPlatformId }}" default layer)`,
+                      })}
+                    </p>
+                    <TouchLayoutPreview
+                      data={preview}
+                      emptyMessage={
+                        <Trans id="editor.touchSeed.absentNote">This base ships no touch layout.</Trans>
+                      }
+                    />
+                    {!hasPhonePlatform && (
+                      <p
+                        data-testid="seed-source-no-phone-warn"
+                        style={{ margin: "10px 0 0 0", fontSize: 12, color: "#d29922", fontFamily: FONT }}
+                      >
+                        <Trans id="editor.touchSeed.noPhonePlatformWarning">[WARN] this layout has no phone platform.</Trans>
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p
+                    data-testid={isMalformed ? "seed-source-malformed-note" : "seed-source-absent-note"}
+                    style={{ margin: 0, fontSize: 13, color: TEXT_DIM, fontFamily: FONT }}
+                  >
+                    {isMalformed
+                      ? <Trans id="editor.touchSeed.malformedNote">This base's touch layout could not be read (malformed JSON) — treated as no layout.</Trans>
+                      : <Trans id="editor.touchSeed.absentNote">This base ships no touch layout.</Trans>}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div style={previewCardStyle} data-testid="seed-source-reseed-preview">
+                <p style={previewEyebrowStyle}>
+                  <Trans id="editor.touchSeed.reseedPreviewEyebrow">Derived phone layout (reseed preview)</Trans>
+                </p>
+                {reseedPreview !== null ? (
+                  <>
+                    <TouchLayoutPreview
+                      data={reseedPreview}
+                      emptyMessage={
+                        <Trans id="editor.touchSeed.reseedPreviewError">
+                          Could not derive a preview from the current desktop work.
+                        </Trans>
+                      }
+                    />
+                    {reseedResult !== null && reseedResult.unplacedChars.length > 0 && (
+                      <p
+                        data-testid="seed-source-reseed-extras-note"
+                        style={{ margin: "10px 0 0 0", fontSize: 12, color: "#d29922", fontFamily: FONT }}
+                      >
+                        <Trans id="editor.touchSeed.reseedExtrasNote">
+                          [WARN] These characters had no matching key and were relocated to the
+                          space bar&apos;s longpress &ldquo;extras&rdquo; menu: {reseedResult.unplacedChars.join(", ")}
+                        </Trans>
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p
+                    data-testid="seed-source-reseed-preview-error"
+                    style={{ margin: 0, fontSize: 13, color: TEXT_DIM, fontFamily: FONT }}
+                  >
+                    <Trans id="editor.touchSeed.reseedPreviewError">
+                      Could not derive a preview from the current desktop work.
+                    </Trans>
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-
-        {showDraftWarning && (
-          <p
-            data-testid="seed-source-draft-warning"
-            style={{ margin: "0 0 14px 0", fontSize: 12, color: "#f0a0a0", fontFamily: FONT }}
-          >
-            <Trans id="editor.touchSeed.draftWarning">
-              [WARN] Changing the seed source will discard your in-progress touch edits.
-            </Trans>
-          </p>
-        )}
-
-        <button
-          type="button"
-          data-testid="seed-source-confirm"
-          onClick={handleConfirm}
-          style={confirmBtnStyle(showDraftWarning)}
-        >
-          {showDraftWarning
-            ? t({ id: "editor.touchSeed.discardAndConfirmButton", message: "Discard touch edits & confirm" })
-            : t({ id: "editor.touchSeed.confirmButton", message: "Confirm" })}
-        </button>
       </div>
     </div>
   );

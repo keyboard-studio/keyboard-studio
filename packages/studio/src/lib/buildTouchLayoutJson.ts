@@ -52,7 +52,7 @@ import {
   applyDesktopModificationsToRawJson,
   applyTouchAssignments,
   applyTouchAssignmentsToRawJson,
-  scaffoldTouchLayout,
+  scaffoldTouchLayoutWithDiagnostics,
   emitTouchLayout,
   parseTouchLayout,
   type DesktopModifications,
@@ -67,6 +67,14 @@ export interface BuildTouchLayoutJsonResult {
   json: string | null;
   /** Diagnostic messages for unmatched host keys or unhandled assignments. */
   warnings: string[];
+  /**
+   * Characters the seed derivation (Case A only — `scaffoldTouchLayout`)
+   * could not place on a real compact-layout key or a known adjacent slot,
+   * so it spilled them onto the space bar's "extras" longpress menu instead
+   * of dropping them. Empty on Case B (raw-JSON splice never runs the
+   * scaffolder) or when nothing was spilled. Advisory only.
+   */
+  unplacedChars: string[];
 }
 
 export interface BuildTouchLayoutJsonOpts {
@@ -117,10 +125,11 @@ function resolveSeedCase(opts: BuildTouchLayoutJsonOpts): SeedCase {
 function buildCaseASeed(
   baseIr: KeyboardIR,
   mods: DesktopModifications,
-): { layout: TouchLayoutIR; warnings: string[] } {
+): { layout: TouchLayoutIR; warnings: string[]; unplacedChars: string[] } {
   const { touchLayout: _stripped, ...rest } = baseIr;
-  const seed = scaffoldTouchLayout(rest);
-  return applyDesktopModifications(seed, mods);
+  const { layout: seed, unplacedChars } = scaffoldTouchLayoutWithDiagnostics(rest);
+  const { layout, warnings } = applyDesktopModifications(seed, mods);
+  return { layout, warnings, unplacedChars };
 }
 
 /**
@@ -142,11 +151,13 @@ function buildCaseASeed(
 export function deriveSeedLayout(
   baseIr: KeyboardIR,
   opts: BuildTouchLayoutJsonOpts,
-): { layout: TouchLayoutIR; warnings: string[] } {
+): { layout: TouchLayoutIR; warnings: string[]; unplacedChars: string[] } {
   const seedCase = resolveSeedCase(opts);
   if (seedCase.case === "B") {
     const { json, warnings } = applyDesktopModificationsToRawJson(seedCase.baseTouchJson, opts.mods);
-    return { layout: parseTouchLayout(json), warnings };
+    // Case B never runs the scaffolder (it splices the shipped raw JSON), so
+    // there is nothing for it to spill onto the "extras" grouping.
+    return { layout: parseTouchLayout(json), warnings, unplacedChars: [] };
   }
   return buildCaseASeed(baseIr, opts.mods);
 }
@@ -183,18 +194,20 @@ export function buildTouchLayoutJson(
         afterMods,
         assignments,
       );
-      return { json, warnings: [...modsWarnings, ...assignWarnings] };
+      // Case B never runs the scaffolder — nothing to spill onto "extras".
+      return { json, warnings: [...modsWarnings, ...assignWarnings], unplacedChars: [] };
     }
 
     // Case A — reseed from desktop (explicit choice, or the import-adapt
     // fallback when there is no shipped touch layout to adapt onto).
-    const { layout: seedLayout, warnings: seedWarnings } = buildCaseASeed(baseIr, opts.mods);
+    const { layout: seedLayout, warnings: seedWarnings, unplacedChars } = buildCaseASeed(baseIr, opts.mods);
     const { layout, warnings: assignWarnings } = applyTouchAssignments(seedLayout, assignments);
-    return { json: emitTouchLayout(layout), warnings: [...seedWarnings, ...assignWarnings] };
+    return { json: emitTouchLayout(layout), warnings: [...seedWarnings, ...assignWarnings], unplacedChars };
   } catch (err) {
     return {
       json: null,
       warnings: ["[buildTouchLayoutJson] failed: " + String(err)],
+      unplacedChars: [],
     };
   }
 }

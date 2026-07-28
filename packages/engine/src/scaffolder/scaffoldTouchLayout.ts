@@ -15,8 +15,18 @@
  *   - Base desktop keys (no SHIFT / RALT modifiers) → touch "default" layer
  *   - SHIFT-modified keys                           → touch "shift" layer
  *   - RALT-modified keys                            → touch "altgr" layer
- *   - Deadkey patterns (strategyId starts with "S-02") whose owning key
- *     also appears in the desktop layout → sk[] (longpress menu) on that key
+ *   - Deadkey patterns (strategyId starts with "S-02") → sk[] (longpress
+ *     menu) attached to whichever key actually produces the base letter the
+ *     deadkey decorates (resolved via a char → vkey reverse lookup), which
+ *     covers both the collapsed single-rule shape and the canonical
+ *     trigger/continuation split (a vkey-less "body" rule whose base letters
+ *     and decorated forms live in a paired store() pair, read via kind:
+ *     "index" rather than requiring a direct kind:"char" output)
+ *   - A produced character on a vkey outside the compact skeleton's 26
+ *     letter slots (K_LBRKT, K_QUOTE, K_BKQUOTE, digits, etc.) is spilled
+ *     onto the sk[] of the nearest occupied slot key, or — with no known
+ *     neighbor — onto a dedicated "extras" grouping on the space bar; it is
+ *     never silently dropped
  *
  * If ir.touchLayout is already present (the IR was imported with a
  * .keyman-touch-layout file), that data is used as the base for the phone
@@ -86,6 +96,49 @@ const COMPACT_ROW2_VKEYS = [
 ] as const;
 
 // ---------------------------------------------------------------------------
+// Overflow handling — vkeys the compact skeleton has no slot for.
+//
+// The compact skeleton only renders the 26 vkeys below (rows 0-2 of the
+// default/shift layers). Any OTHER vkey the desktop rules produce a
+// character for (K_LBRKT, K_QUOTE, K_BKQUOTE, digits, AZERTY-style OEM
+// keys, etc.) has no home on the compact keyboard and would otherwise be
+// silently dropped. Instead of dropping it, it is spilled onto the sk[]
+// longpress menu of the nearest occupied slot key (a small, best-effort
+// physical-adjacency table), or — for a vkey with no defined neighbor — into
+// a dedicated "extras" grouping on the space bar's longpress menu, so the
+// full desktop character inventory always surfaces somewhere on the phone
+// layout.
+// ---------------------------------------------------------------------------
+
+/** Every vkey the compact skeleton actually renders a key for. */
+const COVERED_VKEYS: ReadonlySet<string> = new Set<string>([
+  ...COMPACT_ROW1_VKEYS,
+  ...COMPACT_ROW2_VKEYS,
+  "K_Z", "K_X", "K_C", "K_V", "K_B", "K_N", "K_M",
+]);
+
+/**
+ * Nearest occupied slot key for a vkey outside the compact skeleton,
+ * following standard US physical keyboard adjacency (row-above and
+ * row-to-the-right neighbors). Best-effort — not exhaustive; a vkey absent
+ * from this table falls through to the "extras" grouping instead.
+ */
+const OVERFLOW_NEAREST_SLOT: Readonly<Record<string, string>> = {
+  // digits + hyphen/equal sit directly above the QWERTY row on a US layout.
+  K_1: "K_Q", K_2: "K_W", K_3: "K_E", K_4: "K_R", K_5: "K_T",
+  K_6: "K_Y", K_7: "K_U", K_8: "K_I", K_9: "K_O", K_0: "K_P",
+  K_HYPHEN: "K_P", K_EQUAL: "K_P",
+  // right of the QWERTY row.
+  K_LBRKT: "K_P", K_RBRKT: "K_P", K_BKSLASH: "K_P",
+  // left of the QWERTY row.
+  K_BKQUOTE: "K_Q",
+  // right of the ASDF row.
+  K_COLON: "K_L", K_QUOTE: "K_L",
+  // right of the ZXCV row.
+  K_COMMA: "K_M", K_PERIOD: "K_M", K_SLASH: "K_M",
+};
+
+// ---------------------------------------------------------------------------
 // Internal types
 // ---------------------------------------------------------------------------
 
@@ -131,14 +184,25 @@ function classifyModifiers(rule: IRRule): LayerId | null {
 }
 
 /**
- * Extract the first character output from a rule's output elements.
- * Returns null when the rule produces no simple character.
+ * Extract the character output from a rule's output elements.
+ *
+ * Concatenates every element in the *leading run* of consecutive kind:"char"
+ * elements (e.g. a digraph or a base+combining-mark sequence emitted as two
+ * literals: `> 'e' U+0301`) rather than returning only the first one, so
+ * multi-char outputs survive intact on the touch key's text/output. Stops at
+ * the first non-char element (a deadkey/beep/index/etc. mid-output changes
+ * the rule's meaning; only the leading literal run is a "simple character").
+ * Whatever normalization form the source characters are already in is kept
+ * as-is — this is plain string concatenation, never a re-normalize.
+ * Returns null when the rule produces no leading literal character(s).
  */
-function firstCharOutput(rule: IRRule): string | null {
+function charOutputText(rule: IRRule): string | null {
+  let text = "";
   for (const el of rule.output) {
-    if (el.kind === "char") return el.value;
+    if (el.kind !== "char") break;
+    text += el.value;
   }
-  return null;
+  return text.length > 0 ? text : null;
 }
 
 /**
@@ -167,7 +231,7 @@ function buildKeyMap(ir: KeyboardIR): KeyMap {
       const layer = classifyModifiers(rule);
       if (!layer) continue;
 
-      const char = firstCharOutput(rule);
+      const char = charOutputText(rule);
       if (!char) continue;
 
       if (!map.has(vkey)) map.set(vkey, new Map());
@@ -183,21 +247,67 @@ function buildKeyMap(ir: KeyboardIR): KeyMap {
 }
 
 /**
- * Build a (vkey → successor-chars[]) map from recognized deadkey patterns
- * (strategyId starts with "S-02"). The successor characters are parsed from
- * the pattern's kmnFragment as a heuristic: we collect every quoted char
- * literal on the output side adjacent to a deadkey context.
- *
- * This is intentionally simple — the goal is to populate sk[] (longpress menu)
- * with representative characters, not reproduce the full deadkey tree.
- * A recognized pattern's ownedNodes links it to actual IR rules; we read
- * those directly when available, falling back to kmnFragment scanning.
+ * Build a (char → vkey) reverse-lookup from the keyMap, so a base letter
+ * (e.g. from a deadkey pattern's base-letter store) can be traced back to
+ * the physical key that actually produces it. Layer priority is
+ * default > shift > altgr — the base letter a deadkey decorates is
+ * overwhelmingly the plain/default form of a key, so a default-layer
+ * producer of a char wins over a shift/altgr producer of the same char.
  */
-function buildDeadkeySuccessors(ir: KeyboardIR): DeadkeySuccessors {
+function buildCharToVkeyMap(keyMap: KeyMap): Map<string, string> {
+  const map = new Map<string, string>();
+  const layerPriority: LayerId[] = ["default", "shift", "altgr"];
+
+  for (const layer of layerPriority) {
+    for (const [vkey, layerMap] of keyMap) {
+      const ch = layerMap.get(layer);
+      if (ch !== undefined && !map.has(ch)) map.set(ch, vkey);
+    }
+  }
+
+  return map;
+}
+
+/**
+ * Build a (vkey → successor-chars[]) map from recognized deadkey patterns
+ * (strategyId starts with "S-02").
+ *
+ * The canonical S-02 shape is a **trigger/continuation split** across two
+ * rules (see `s02-deadkey-single-tap.ts`):
+ *   - trigger:      `+ [K_QUOTE] > dk(grave)`               — vkey, output kind:"deadkey"
+ *   - continuation: `dk(grave) + any(store1) > index(store2, 2)` — context
+ *     kind:"deadkey" + kind:"any"(store1), output kind:"index"(store2)
+ * The continuation rule owns the actual accent mapping but has no vkey of
+ * its own — the base letters live in store1 and their decorated forms in
+ * store2, paired positionally. Those decorated forms are attached here as
+ * sk[] to whichever vkey *produces the base letter* (via `charToVkey`), not
+ * to the continuation rule.
+ *
+ * A simpler collapsed shape (one rule carrying a deadkey context, a
+ * triggering vkey, AND a direct char output) is also recognized directly,
+ * for patterns that never split trigger from continuation.
+ *
+ * A recognized pattern's ownedNodes links it to actual IR rules; we read
+ * those directly when available. The kmnFragment-regex scan is kept only as
+ * a last resort, for patterns lacking ownedNodes or whose owned rules don't
+ * match either shape above.
+ */
+function buildDeadkeySuccessors(
+  ir: KeyboardIR,
+  charToVkey: ReadonlyMap<string, string>,
+): DeadkeySuccessors {
   const result: DeadkeySuccessors = new Map();
+
+  const addSuccessor = (vkey: string, ch: string): void => {
+    if (!result.has(vkey)) result.set(vkey, []);
+    const list = result.get(vkey)!;
+    if (!list.includes(ch)) list.push(ch);
+  };
 
   for (const pattern of ir.recognizedPatterns) {
     if (!pattern.strategyId?.startsWith("S-02")) continue;
+
+    let matchedFromOwnedNodes = false;
 
     // Collect successor characters from owned IR rules (accurate path).
     if (pattern.ownedNodes && pattern.ownedNodes.length > 0) {
@@ -206,45 +316,87 @@ function buildDeadkeySuccessors(ir: KeyboardIR): DeadkeySuccessors {
         for (const rule of group.rules) {
           if (!ownedIds.has(rule.nodeId)) continue;
 
-          // The context should have a deadkey marker; output has the successor.
           const hasDeadkeyCtx = rule.context.some((el) => el.kind === "deadkey");
           if (!hasDeadkeyCtx) continue;
 
-          const char = firstCharOutput(rule);
-          if (!char) continue;
+          // Shape 1 (collapsed): deadkey context + a triggering vkey + a
+          // direct char output, all on the same rule.
+          const directVkey = extractVkey(rule);
+          const directChar = charOutputText(rule);
+          if (directVkey && directChar) {
+            addSuccessor(directVkey, directChar);
+            matchedFromOwnedNodes = true;
+            continue;
+          }
 
-          // Determine the triggering vkey from the same rule's context.
-          const vkey = extractVkey(rule);
-          if (!vkey) continue;
+          // Shape 2 (trigger -> continuation split): this is the
+          // continuation rule — context has an any(storeRef) alongside the
+          // deadkey marker, output is an index(storeRef, offset) reference.
+          let baseStoreRef: string | undefined;
+          for (const el of rule.context) {
+            if (el.kind === "any") {
+              baseStoreRef = el.storeRef;
+              break;
+            }
+          }
+          if (baseStoreRef === undefined) continue;
 
-          if (!result.has(vkey)) result.set(vkey, []);
-          const list = result.get(vkey)!;
-          if (!list.includes(char)) list.push(char);
+          let accentedStoreRef: string | undefined;
+          for (const el of rule.output) {
+            if (el.kind === "index") {
+              accentedStoreRef = el.storeRef;
+              break;
+            }
+          }
+          if (accentedStoreRef === undefined) continue;
+
+          const baseStore = ir.stores.find((s) => s.name === baseStoreRef);
+          const accentedStore = ir.stores.find((s) => s.name === accentedStoreRef);
+          if (!baseStore || !accentedStore) continue;
+          if (baseStore.items.length !== accentedStore.items.length) continue;
+
+          for (let i = 0; i < baseStore.items.length; i++) {
+            const baseItem = baseStore.items[i]!;
+            const accentedItem = accentedStore.items[i]!;
+            if (baseItem.kind !== "char" || accentedItem.kind !== "char") continue;
+
+            const vkey = charToVkey.get(baseItem.value);
+            if (!vkey) continue;
+
+            addSuccessor(vkey, accentedItem.value);
+            matchedFromOwnedNodes = true;
+          }
         }
       }
-    } else {
-      // Fallback: scan the kmnFragment for quoted char literals after 'deadkey'.
-      // Pattern: look for vkey references (via slotValues) and collect quoted chars.
-      for (const q of pattern.questions) {
-        const slotId = q.id;
-        // If the slot is a key-name type, it identifies the triggering vkey.
-        if (q.answerType !== "key-name") continue;
+    }
 
-        // Scan the kmnFragment for lines with this slot's output chars.
-        const fragLines = pattern.kmnFragment.split("\n");
-        for (const line of fragLines) {
-          if (!line.includes(`{{${slotId}}}`)) continue;
-          // Find quoted characters on the output side (after '>').
-          const outputSide = line.split(">")[1] ?? "";
-          const charMatches = outputSide.match(/'([^']+)'/g) ?? [];
-          for (const m of charMatches) {
-            const ch = m.slice(1, -1);
-            if (ch.length === 1) {
-              const vkeyPlaceholder = `{{${slotId}}}`;
-              if (!result.has(vkeyPlaceholder)) result.set(vkeyPlaceholder, []);
-              const list = result.get(vkeyPlaceholder)!;
-              if (!list.includes(ch)) list.push(ch);
-            }
+    if (matchedFromOwnedNodes) continue;
+
+    // Last-resort fallback: scan the kmnFragment for quoted char literals
+    // after 'deadkey'. Pattern: look for vkey references (via slotValues)
+    // and collect quoted chars.
+    for (const q of pattern.questions) {
+      const slotId = q.id;
+      // If the slot is a key-name type, it identifies the triggering vkey.
+      if (q.answerType !== "key-name") continue;
+      // The slot's resolved answer IS the real vkey name (e.g. "K_E") — the
+      // kmnFragment itself still carries the unresolved `{{slotId}}`
+      // placeholder text, which is never a real vkey and would silently
+      // orphan every successor collected below.
+      const vkeyName = q.default;
+      if (!vkeyName) continue;
+
+      // Scan the kmnFragment for lines with this slot's output chars.
+      const fragLines = pattern.kmnFragment.split("\n");
+      for (const line of fragLines) {
+        if (!line.includes(`{{${slotId}}}`)) continue;
+        // Find quoted characters on the output side (after '>').
+        const outputSide = line.split(">")[1] ?? "";
+        const charMatches = outputSide.match(/'([^']+)'/g) ?? [];
+        for (const m of charMatches) {
+          const ch = m.slice(1, -1);
+          if (ch.length === 1) {
+            addSuccessor(vkeyName, ch);
           }
         }
       }
@@ -263,23 +415,31 @@ function buildDeadkeySuccessors(ir: KeyboardIR): DeadkeySuccessors {
  *
  * Priority:
  *  1. keyMap entry for (vkey, layerId) — the keyboard's own mapping.
- *  2. US fallback keycap for the vkey (index 0 = default, index 1 = shift).
- *  3. Empty string (key exists in template but has no known mapping).
+ *  2. US fallback keycap — ONLY when the desktop rules never assigned this
+ *     physical key at all (no keyMap entry for ANY layer). This is a
+ *     genuinely-unassigned structural key (e.g. no group ever referenced
+ *     this vkey), so a plain US keycap is a safe placeholder.
+ *  3. Empty string — the desktop rules DID assign this vkey (on some other
+ *     layer), just not this one. Falling back to a Latin keycap here would
+ *     fabricate a letter the base never produced (and would silently
+ *     Latin-ize a non-Latin base) — leave it blank instead.
  */
 function resolveKeyText(
   vkey: string,
   layerId: "default" | "shift" | "altgr",
   keyMap: KeyMap,
 ): string {
-  const mapped = keyMap.get(vkey)?.get(layerId);
-  if (mapped !== undefined) return mapped;
+  const layerMap = keyMap.get(vkey);
 
-  const fallback = US_KEYCAPS[vkey];
-  if (fallback !== undefined) {
-    return layerId === "shift" ? fallback[1] : fallback[0];
+  if (layerMap === undefined) {
+    const fallback = US_KEYCAPS[vkey];
+    if (fallback !== undefined) {
+      return layerId === "shift" ? fallback[1] : fallback[0];
+    }
+    return "";
   }
 
-  return "";
+  return layerMap.get(layerId) ?? "";
 }
 
 /**
@@ -319,6 +479,104 @@ function buildLetterKey(
   }
 
   return key;
+}
+
+/**
+ * Merge a vkey → successor-chars[] map (`extra`) into `base`, deduplicating
+ * per vkey. Returns a new map; neither input is mutated.
+ */
+function mergeSuccessorMaps(
+  base: DeadkeySuccessors,
+  extra: Map<string, string[]>,
+): DeadkeySuccessors {
+  const merged: DeadkeySuccessors = new Map();
+  for (const [vkey, chars] of base) merged.set(vkey, [...chars]);
+  for (const [vkey, chars] of extra) {
+    const existing = merged.get(vkey) ?? [];
+    for (const ch of chars) {
+      if (!existing.includes(ch)) existing.push(ch);
+    }
+    merged.set(vkey, existing);
+  }
+  return merged;
+}
+
+/**
+ * Find every character the desktop rules produce on a vkey OUTSIDE the
+ * compact skeleton's 26 covered slots, and route it somewhere it can still
+ * be reached from the phone layout:
+ *   - `bySlot`   — vkeys with a known physical neighbor (OVERFLOW_NEAREST_SLOT)
+ *                  → attached as sk[] longpress on that neighbor.
+ *   - `unplaced` — vkeys with no known neighbor → the caller spills these
+ *                  into a dedicated "extras" grouping (never dropped).
+ */
+function collectOverflowEntries(
+  keyMap: KeyMap,
+  covered: ReadonlySet<string>,
+): { bySlot: Map<string, string[]>; unplaced: string[] } {
+  const bySlot = new Map<string, string[]>();
+  const unplaced: string[] = [];
+
+  for (const [vkey, layerMap] of keyMap) {
+    if (covered.has(vkey)) continue;
+
+    const chars: string[] = [];
+    for (const layer of ["default", "shift", "altgr"] as const) {
+      const ch = layerMap.get(layer);
+      if (ch !== undefined && !chars.includes(ch)) chars.push(ch);
+    }
+    if (chars.length === 0) continue;
+
+    const slot = OVERFLOW_NEAREST_SLOT[vkey];
+    if (slot === undefined) {
+      for (const ch of chars) {
+        if (!unplaced.includes(ch)) unplaced.push(ch);
+      }
+      continue;
+    }
+
+    const existing = bySlot.get(slot) ?? [];
+    for (const ch of chars) {
+      if (!existing.includes(ch)) existing.push(ch);
+    }
+    bySlot.set(slot, existing);
+  }
+
+  return { bySlot, unplaced };
+}
+
+/**
+ * Attach `extras` (characters with no physical neighbor — see
+ * {@link collectOverflowEntries}) as an sk[] longpress menu on the default
+ * layer's space bar, so nothing produced by the desktop rules is ever
+ * silently dropped even when it has no natural key of its own. No-op when
+ * `extras` is empty or the default layer / space key aren't present.
+ */
+function attachOverflowExtras(
+  layers: TouchLayoutIR["platforms"][number]["layers"],
+  minter: NodeIdMinter,
+  extras: string[],
+): void {
+  if (extras.length === 0) return;
+
+  const defaultLayer = layers.find((l) => l.id === "default");
+  const funcRow = defaultLayer?.rows[3];
+  const spaceIdx = funcRow?.keys.findIndex((k) => k.id === "K_SPACE") ?? -1;
+  if (funcRow === undefined || spaceIdx === -1) return;
+
+  const space = funcRow.keys[spaceIdx]!;
+  funcRow.keys[spaceIdx] = {
+    ...space,
+    sk: [
+      ...(space.sk ?? []),
+      ...extras.map((ch) => ({
+        nodeId: minter.mint("touchKey"),
+        id: charToUnicodeKeyId(ch),
+        text: ch,
+        provenance: "physical-suggested" as const,
+      })),
+    ],
+  };
 }
 
 /**
@@ -662,6 +920,40 @@ function buildCanonicalPhoneLayers(
 }
 
 /**
+ * Build the compact phone layers AND route every character the desktop
+ * rules produce that falls outside the compact skeleton's slots (see
+ * {@link collectOverflowEntries}) onto a real key's sk[] longpress menu — a
+ * nearest-neighbor slot when known, otherwise the space bar's "extras"
+ * grouping. Logs a warning (no emoji, per convention) naming any character
+ * that landed in the extras grouping, so a gap is visible rather than only
+ * inferred from the layout, AND returns that same character list as
+ * structured data (`unplacedChars`) so a caller with no console (e.g. the
+ * studio's live preview) can surface it too — see
+ * {@link scaffoldTouchLayoutWithDiagnostics}.
+ */
+function buildCompactPhoneLayers(
+  keyMap: KeyMap,
+  deadkeySuccessors: DeadkeySuccessors,
+  minter: NodeIdMinter,
+): { layers: TouchLayoutIR["platforms"][number]["layers"]; unplacedChars: string[] } {
+  const { bySlot: overflowBySlot, unplaced } = collectOverflowEntries(keyMap, COVERED_VKEYS);
+  const combinedSuccessors = mergeSuccessorMaps(deadkeySuccessors, overflowBySlot);
+
+  const layers = buildCanonicalPhoneLayers(keyMap, combinedSuccessors, minter);
+
+  if (unplaced.length > 0) {
+    attachOverflowExtras(layers, minter, unplaced);
+    console.warn(
+      `[scaffoldTouchLayout] ${unplaced.length} character(s) produced by the desktop rules ` +
+        "have no compact-layout key and no known adjacent slot; placed on the space bar's " +
+        `longpress ("extras") menu instead of being dropped: ${unplaced.join(", ")}`,
+    );
+  }
+
+  return { layers, unplacedChars: unplaced };
+}
+
+/**
  * Tag a carried-through touch key (and any of its carried sk[] / flick{} /
  * multitap[] sub-keys) with `provenance: "base-derived"` when it has no
  * existing provenance. Keys that already carry an explicit provenance (e.g.
@@ -779,6 +1071,110 @@ export function buildMinimalPhoneTouchLayout(): TouchLayoutIR {
   };
 }
 
+/** The result of {@link scaffoldTouchLayoutWithDiagnostics}. */
+export interface ScaffoldTouchLayoutResult {
+  /** The derived TouchLayoutIR — identical to {@link scaffoldTouchLayout}'s return. */
+  layout: TouchLayoutIR;
+  /**
+   * Characters produced by the desktop rules that had no compact-layout key
+   * and no known adjacent slot, so they were spilled onto the space bar's
+   * "extras" longpress menu instead of being dropped (see
+   * {@link collectOverflowEntries} / {@link attachOverflowExtras}). Empty
+   * when nothing was spilled. Advisory only — never gates anything; a caller
+   * with a UI (e.g. the studio's live seed preview) can surface this list to
+   * the author instead of relying on the `console.warn` this function also
+   * emits.
+   */
+  unplacedChars: string[];
+}
+
+/**
+ * Derive a {@link TouchLayoutIR} for the phone platform from the keyboard IR,
+ * plus the structured diagnostics {@link scaffoldTouchLayout} only logs to
+ * the console. See {@link scaffoldTouchLayout} for the derivation itself —
+ * this is the same logic, returning `unplacedChars` alongside the layout for
+ * callers that need it (e.g. a UI preview) rather than re-deriving it.
+ *
+ * The function is pure — it does not mutate `ir`.
+ *
+ * @see spec.md §8 Phase E (touch gallery)
+ */
+export function scaffoldTouchLayoutWithDiagnostics(ir: KeyboardIR): ScaffoldTouchLayoutResult {
+  const minter = new NodeIdMinter();
+  const keyMap = buildKeyMap(ir);
+  const charToVkey = buildCharToVkeyMap(keyMap);
+  const deadkeySuccessors = buildDeadkeySuccessors(ir, charToVkey);
+
+  // ------------------------------------------------------------------
+  // Case A: no existing touch layout — generate from scratch using
+  //         the compact 3-layer phone template.
+  // ------------------------------------------------------------------
+  if (ir.touchLayout === undefined) {
+    const { layers: phoneLayers, unplacedChars } = buildCompactPhoneLayers(
+      keyMap,
+      deadkeySuccessors,
+      minter,
+    );
+
+    return {
+      layout: {
+        platforms: [
+          {
+            id: "phone",
+            layers: phoneLayers,
+          },
+        ],
+        nodeIds: [],
+      },
+      unplacedChars,
+    };
+  }
+
+  // ------------------------------------------------------------------
+  // Case B: existing touch layout — use it as the base, augment phone.
+  // ------------------------------------------------------------------
+  const existingPhoneIdx = ir.touchLayout.platforms.findIndex(
+    (p) => p.id === "phone",
+  );
+
+  let platforms: TouchLayoutIR["platforms"];
+  let unplacedChars: string[] = [];
+
+  if (existingPhoneIdx >= 0) {
+    // Augment the existing phone platform with deadkey sk[] entries.
+    platforms = ir.touchLayout.platforms.map((p, i) => {
+      if (i !== existingPhoneIdx) return p;
+      return augmentExistingPhoneLayers(p, deadkeySuccessors, minter);
+    });
+  } else {
+    // No phone platform in the existing layout — synthesize one and append.
+    const built = buildCompactPhoneLayers(
+      keyMap,
+      deadkeySuccessors,
+      minter,
+    );
+    unplacedChars = built.unplacedChars;
+    platforms = [
+      ...ir.touchLayout.platforms,
+      {
+        id: "phone" as const,
+        layers: built.layers,
+      },
+    ];
+  }
+
+  return {
+    layout: {
+      platforms,
+      // Preserve existing nodeId entries; new keys added during augmentation
+      // carry fresh nodeIds but are not back-referenced here (they are
+      // transient Phase E output, not committed to the IR).
+      nodeIds: [...ir.touchLayout.nodeIds],
+    },
+    unplacedChars,
+  };
+}
+
 /**
  * Derive a {@link TouchLayoutIR} for the phone platform from the keyboard IR.
  *
@@ -791,74 +1187,16 @@ export function buildMinimalPhoneTouchLayout(): TouchLayoutIR {
  *
  * The function is pure — it does not mutate `ir`.
  *
+ * Thin wrapper over {@link scaffoldTouchLayoutWithDiagnostics} that drops the
+ * `unplacedChars` diagnostic, kept so every existing caller of this exact
+ * signature keeps compiling unchanged; callers that need the diagnostic
+ * should call {@link scaffoldTouchLayoutWithDiagnostics} directly.
+ *
  * @param ir  The keyboard IR (from parse or scaffoldIR).
  * @returns   A TouchLayoutIR with at least one platform with id `"phone"`.
  *
  * @see spec.md §8 Phase E (touch gallery)
  */
 export function scaffoldTouchLayout(ir: KeyboardIR): TouchLayoutIR {
-  const minter = new NodeIdMinter();
-  const keyMap = buildKeyMap(ir);
-  const deadkeySuccessors = buildDeadkeySuccessors(ir);
-
-  // ------------------------------------------------------------------
-  // Case A: no existing touch layout — generate from scratch using
-  //         the compact 3-layer phone template.
-  // ------------------------------------------------------------------
-  if (ir.touchLayout === undefined) {
-    const phoneLayers = buildCanonicalPhoneLayers(
-      keyMap,
-      deadkeySuccessors,
-      minter,
-    );
-
-    return {
-      platforms: [
-        {
-          id: "phone",
-          layers: phoneLayers,
-        },
-      ],
-      nodeIds: [],
-    };
-  }
-
-  // ------------------------------------------------------------------
-  // Case B: existing touch layout — use it as the base, augment phone.
-  // ------------------------------------------------------------------
-  const existingPhoneIdx = ir.touchLayout.platforms.findIndex(
-    (p) => p.id === "phone",
-  );
-
-  let platforms: TouchLayoutIR["platforms"];
-
-  if (existingPhoneIdx >= 0) {
-    // Augment the existing phone platform with deadkey sk[] entries.
-    platforms = ir.touchLayout.platforms.map((p, i) => {
-      if (i !== existingPhoneIdx) return p;
-      return augmentExistingPhoneLayers(p, deadkeySuccessors, minter);
-    });
-  } else {
-    // No phone platform in the existing layout — synthesize one and append.
-    const phoneLayers = buildCanonicalPhoneLayers(
-      keyMap,
-      deadkeySuccessors,
-      minter,
-    );
-    platforms = [
-      ...ir.touchLayout.platforms,
-      {
-        id: "phone" as const,
-        layers: phoneLayers,
-      },
-    ];
-  }
-
-  return {
-    platforms,
-    // Preserve existing nodeId entries; new keys added during augmentation
-    // carry fresh nodeIds but are not back-referenced here (they are
-    // transient Phase E output, not committed to the IR).
-    nodeIds: [...ir.touchLayout.nodeIds],
-  };
+  return scaffoldTouchLayoutWithDiagnostics(ir).layout;
 }

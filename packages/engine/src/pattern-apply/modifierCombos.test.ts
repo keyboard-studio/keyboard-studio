@@ -517,6 +517,23 @@ describe("buildComboKeyMap", () => {
     const ir = makeMinimalIR([makeGroup([makeRule("K_A", ["SHIFT"], "a")])]);
     expect(buildComboKeyMap(ir, ["RALT"]).size).toBe(0);
   });
+
+  // Sibling of scaffoldTouchLayout.ts's defect-3 fix (multi-char output
+  // truncation) — buildComboKeyMap's own char extraction had the same
+  // "return only the first kind:char output element" shape (Pattern audit).
+  it("a rule with two consecutive kind:char output elements produces the full concatenated string, not just the first char", () => {
+    const rule: IRRule = {
+      nodeId: freshId("rule"),
+      context: [{ kind: "vkey", name: "K_N", modifiers: ["RALT"] }],
+      output: [
+        { kind: "char", value: "n" },
+        { kind: "char", value: "y" },
+      ],
+    };
+    const ir = makeMinimalIR([makeGroup([rule])]);
+    const map = buildComboKeyMap(ir, ["RALT"]);
+    expect(map.get("K_N")).toBe("ny");
+  });
 });
 
 // ---------------------------------------------------------------------------

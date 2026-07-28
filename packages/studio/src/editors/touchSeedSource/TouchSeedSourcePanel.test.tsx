@@ -9,7 +9,7 @@
 //   - the draft-discard warning (R12) is shown ONLY on re-entry with a
 //     DIFFERENT selection than the recorded choice, while a touch draft exists
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, fireEvent, cleanup } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { TouchSeedSourcePanel } from "./TouchSeedSourcePanel.tsx";
@@ -17,7 +17,24 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
-import type { TouchAssignment } from "@keyboard-studio/contracts";
+import type { TouchAssignment, IRGroup, IRRule } from "@keyboard-studio/contracts";
+import { devLog } from "@keyboard-studio/contracts/dev-log";
+import { deriveSeedLayout } from "../../lib/buildTouchLayoutJson.ts";
+
+// ---------------------------------------------------------------------------
+// deriveSeedLayout mock — wraps the REAL implementation by default (every
+// existing test in this file relies on the real reseed derivation for its
+// preview assertions); only the "genuine derivation error" test below
+// overrides it once, via mockImplementationOnce, to force the catch branch.
+// ---------------------------------------------------------------------------
+
+vi.mock("../../lib/buildTouchLayoutJson.ts", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../lib/buildTouchLayoutJson.ts")>();
+  return {
+    ...original,
+    deriveSeedLayout: vi.fn(original.deriveSeedLayout),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -63,8 +80,8 @@ const fakeTouchAssignment: TouchAssignment = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Seed baseVfs/baseIr, optionally with a `.keyman-touch-layout` file. */
-function seedBase(touchLayoutJson?: string) {
+/** Seed baseVfs/baseIr, optionally with a `.keyman-touch-layout` file and/or IR groups. */
+function seedBase(touchLayoutJson?: string, groups: IRGroup[] = []) {
   const files = [{ path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false }];
   if (touchLayoutJson !== undefined) {
     files.push({
@@ -74,8 +91,23 @@ function seedBase(touchLayoutJson?: string) {
     });
   }
   const vfs = createVirtualFS(files);
-  const ir = makeTestIR([]);
+  const ir = makeTestIR(groups);
   useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+}
+
+/**
+ * A single-rule IRGroup producing `overflowChar` on `K_oE2` — a vkey with no
+ * compact-layout slot AND no known physical neighbor (see
+ * OVERFLOW_NEAREST_SLOT in scaffoldTouchLayout.ts), so scaffoldTouchLayout
+ * spills it onto the space bar's "extras" sk[] rather than dropping it.
+ */
+function makeOverflowGroup(overflowChar: string): IRGroup {
+  const rule: IRRule = {
+    nodeId: "rule:overflow",
+    context: [{ kind: "vkey", name: "K_oE2", modifiers: [] }],
+    output: [{ kind: "char", value: overflowChar }],
+  };
+  return { nodeId: "group:overflow", name: "main", usingKeys: true, rules: [rule], readonly: false };
 }
 
 afterEach(() => {
@@ -103,6 +135,10 @@ describe("TouchSeedSourcePanel — default selection", () => {
 
     expect(screen.getByTestId("seed-source-reseed").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId("seed-source-import-adapt").getAttribute("aria-pressed")).toBe("false");
+    // The live preview pane shows whichever card is selected (R4a) — the
+    // default selection is Reseed, so the base-layout note is only visible
+    // once the author looks at the Import & adapt preview.
+    fireEvent.click(screen.getByTestId("seed-source-import-adapt"));
     expect(screen.getByTestId("seed-source-absent-note")).toBeTruthy();
   });
 
@@ -112,7 +148,9 @@ describe("TouchSeedSourcePanel — default selection", () => {
 
     // Same default as "absent" (Reseed selected)...
     expect(screen.getByTestId("seed-source-reseed").getAttribute("aria-pressed")).toBe("true");
-    // ...but the note text distinguishes malformed from truly absent.
+    // ...but the note text distinguishes malformed from truly absent, visible
+    // in the live preview pane once Import & adapt is selected (R4a).
+    fireEvent.click(screen.getByTestId("seed-source-import-adapt"));
     expect(screen.getByTestId("seed-source-malformed-note")).toBeTruthy();
     expect(screen.queryByTestId("seed-source-absent-note")).toBeNull();
   });
@@ -220,6 +258,100 @@ describe("TouchSeedSourcePanel — confirm", () => {
 
     fireEvent.click(screen.getByTestId("seed-source-back"));
     expect(backCalled).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Live preview switching (spec 035 R4a amendment)
+// ---------------------------------------------------------------------------
+
+describe("TouchSeedSourcePanel — live preview (R4a)", () => {
+  it("shows the base-layout preview when Import & adapt is selected, and the derived reseed preview when Reseed is selected", () => {
+    seedBase(PHONE_ONLY_JSON); // usable base layout -> default is Import & adapt
+    render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
+
+    // Default selection (Import & adapt) shows the base preview, not the
+    // derived-reseed preview.
+    expect(screen.getByTestId("seed-source-preview")).toBeTruthy();
+    expect(screen.queryByTestId("seed-source-reseed-preview")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("seed-source-reseed"));
+
+    // Selecting Reseed swaps the live preview to the derived layout, and
+    // hides the base-layout preview.
+    expect(screen.queryByTestId("seed-source-preview")).toBeNull();
+    expect(screen.getByTestId("seed-source-reseed-preview")).toBeTruthy();
+    // The pure deriveSeedLayout call succeeds against the seeded baseIr, so
+    // this is the success branch (a rendered layout), not the error note.
+    expect(screen.queryByTestId("seed-source-reseed-preview-error")).toBeNull();
+  });
+
+  it("renders the reseed-preview graceful fallback note when there is no baseIr to derive from", () => {
+    // Fresh store, no instantiateFromBase call -> baseIr stays null.
+    render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
+
+    // No usable base layout either -> default selection is already Reseed.
+    expect(screen.getByTestId("seed-source-reseed").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("seed-source-reseed-preview")).toBeTruthy();
+    expect(screen.getByTestId("seed-source-reseed-preview-error")).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P1 fix: unplaced/spilled overflow characters surfaced in the live preview
+// (structured data from scaffoldTouchLayoutWithDiagnostics -> deriveSeedLayout
+// -> reseedResult.unplacedChars), never gating.
+// ---------------------------------------------------------------------------
+
+describe("TouchSeedSourcePanel — reseed extras advisory", () => {
+  it("shows the reseed-extras advisory note listing a character spilled onto the space bar's extras sk[]", () => {
+    const overflowChar = "ʔ"; // LATIN LETTER GLOTTAL STOP — no compact slot, no known neighbor
+    seedBase(undefined, [makeOverflowGroup(overflowChar)]); // no base layout -> default is Reseed
+    render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
+
+    expect(screen.getByTestId("seed-source-reseed").getAttribute("aria-pressed")).toBe("true");
+    const note = screen.getByTestId("seed-source-reseed-extras-note");
+    expect(note).toBeTruthy();
+    expect(note.textContent).toContain(overflowChar);
+  });
+
+  it("does not show the reseed-extras advisory note when nothing was spilled", () => {
+    seedBase(); // no groups -> no overflow characters at all
+    render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
+
+    expect(screen.queryByTestId("seed-source-reseed-extras-note")).toBeNull();
+  });
+
+  it("never gates either choice — both cards stay clickable when the advisory is showing", () => {
+    const overflowChar = "ʔ";
+    seedBase(undefined, [makeOverflowGroup(overflowChar)]);
+    render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
+
+    expect(screen.getByTestId("seed-source-reseed-extras-note")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("seed-source-import-adapt"));
+    expect(screen.getByTestId("seed-source-import-adapt").getAttribute("aria-pressed")).toBe("true");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P2 fix: a genuine deriveSeedLayout failure (as opposed to "no baseIr yet")
+// must be logged, not swallowed identically to the expected empty case.
+// ---------------------------------------------------------------------------
+
+describe("TouchSeedSourcePanel — reseed derivation error logging", () => {
+  it("logs via devLog.error and still renders the graceful fallback when deriveSeedLayout throws", () => {
+    seedBase();
+    const errorSpy = vi.spyOn(devLog, "error").mockImplementation(() => undefined);
+    vi.mocked(deriveSeedLayout).mockImplementationOnce(() => {
+      throw new Error("simulated genuine derivation failure");
+    });
+
+    render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
+
+    expect(errorSpy).toHaveBeenCalled();
+    expect(screen.getByTestId("seed-source-reseed-preview-error")).toBeTruthy();
+
+    errorSpy.mockRestore();
   });
 });
 

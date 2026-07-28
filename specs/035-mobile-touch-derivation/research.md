@@ -167,6 +167,47 @@ gating mechanism (kept only as an advisory hint); brittle and contradicts the sp
 (b) *Reorder the manifest to make `touch_seed_source` spine:true* — rejected: it is correctly
 a side-trail; only the advance policy needs the branch.
 
+**Amended 2026-07-28 — see R4a below.** The chooser panel's "no engine calls / preview-only"
+framing is narrowed (not removed) to permit one pure derivation call for a live reseed
+preview.
+
+---
+
+## R4a — Amendment: live reseed preview via `deriveSeedLayout` (2026-07-28)
+
+**Amends**: R4's "no engine calls" framing. This is a recorded amendment, not a silent
+reinterpretation — R4's literal text names `scaffoldTouchLayout` as forbidden in the chooser
+panel, and this decision permits calling it indirectly, through a pure wrapper, for one
+specific purpose. Approved in a km-lead cycle (single-reviewer prose amendment to a
+feature-spec research note).
+
+**Decision**: The seed-source chooser panel
+([TouchSeedSourcePanel.tsx](../../packages/studio/src/editors/touchSeedSource/TouchSeedSourcePanel.tsx))
+MAY call the pure function
+[`deriveSeedLayout`](../../packages/studio/src/lib/buildTouchLayoutJson.ts) to render a live
+preview of what choosing **Reseed from desktop** will actually produce. `deriveSeedLayout`
+internally runs `scaffoldTouchLayout` but performs **no compilation** and touches **no OSK
+iframe** — those two prohibitions from R4 stay in force, unchanged, for this panel. The
+panel's existing raw-JSON preview path for **Import & adapt** (parsing the base's shipped
+`.keyman-touch-layout` directly, bypassing the engine's `parseTouchLayout`) is unaffected by
+this amendment.
+
+**Rationale**: R4's "no engine calls" rule was written to keep the pre-commit fork choice
+lightweight. But the panel as shipped only previews the base's shipped layout — it never
+shows what reseeding would produce — which is precisely why poor reseed output only surfaces
+*after* the author has already committed to that path. `deriveSeedLayout` is the same pure,
+non-compiling function `TouchGallery` already uses downstream for exactly this derivation;
+surfacing it one step earlier, in the chooser, is a deliberate and bounded widening of R4's
+engine-access boundary — not a wholesale lifting of it.
+
+**Alternatives considered**: (a) *Leave R4 as literally written and reinterpret it in code
+without recording an amendment* — rejected: R4 names `scaffoldTouchLayout` as forbidden by
+name, so calling it (even indirectly) without a recorded amendment would be silent drift, the
+exact class of defect this project's spec-amendment discipline exists to catch. (b) *Widen
+R4 to permit compilation or an OSK iframe in the panel too* — rejected: out of scope for this
+change; the team-lead-approved widening is scoped to the pure derivation call only, and the
+compile/OSK prohibitions are unaffected.
+
 ---
 
 ## R5 — Coverage guard so simplification never orphans a character (FR-008)

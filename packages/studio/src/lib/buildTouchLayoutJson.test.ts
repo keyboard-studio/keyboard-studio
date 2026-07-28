@@ -24,7 +24,7 @@
 
 import { describe, it, expect } from "vitest";
 import { buildTouchLayoutJson, deriveSeedLayout, type BuildTouchLayoutJsonOpts } from "./buildTouchLayoutJson";
-import type { KeyboardIR, TouchAssignment, TouchLayoutIR } from "@keyboard-studio/contracts";
+import type { KeyboardIR, TouchAssignment, TouchLayoutIR, IRGroup, IRRule } from "@keyboard-studio/contracts";
 import { touchCoverage } from "@keyboard-studio/engine";
 
 // ---------------------------------------------------------------------------
@@ -543,6 +543,66 @@ describe("buildTouchLayoutJson — Case A reseed replay (mods.placements land on
     expect(kaKey).toBeDefined();
     const sk = (kaKey["sk"] as Array<Record<string, unknown>>) ?? [];
     expect(sk.some((s) => s["text"] === "á")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P1 fix: unplaced/spilled overflow characters surfaced as structured data
+// (`result.unplacedChars`), not console-only. Case A only — Case B never runs
+// the scaffolder (raw-JSON splice), so it always reports unplacedChars: [].
+// ---------------------------------------------------------------------------
+
+describe("buildTouchLayoutJson / deriveSeedLayout — unplacedChars", () => {
+  /** IR with a rule producing `overflowChar` on a vkey with no compact-layout
+   *  slot and no known physical neighbor (see OVERFLOW_NEAREST_SLOT in
+   *  scaffoldTouchLayout.ts), forcing the "extras" spill path. */
+  function makeOverflowIR(overflowChar: string): KeyboardIR {
+    const rule: IRRule = {
+      nodeId: "rule:overflow",
+      context: [{ kind: "vkey", name: "K_oE2", modifiers: [] }],
+      output: [{ kind: "char", value: overflowChar }],
+    };
+    const group: IRGroup = {
+      nodeId: "group:overflow",
+      name: "main",
+      usingKeys: true,
+      rules: [rule],
+      readonly: false,
+    };
+    return makeMinimalIR({ groups: [group] });
+  }
+
+  it("Case A (reseed): unplacedChars contains a character spilled onto the space bar's extras sk[]", () => {
+    const overflowChar = "ʔ";
+    const result = buildTouchLayoutJson(
+      makeOverflowIR(overflowChar),
+      [],
+      opts({ seedSource: "reseed-from-desktop" }),
+    );
+    expect(result.unplacedChars).toContain(overflowChar);
+  });
+
+  it("Case A: unplacedChars is empty when nothing was spilled", () => {
+    const result = buildTouchLayoutJson(makeMinimalIR(), [], opts({ seedSource: "reseed-from-desktop" }));
+    expect(result.unplacedChars).toEqual([]);
+  });
+
+  it("Case B (raw path): unplacedChars is always empty — the scaffolder never runs", () => {
+    const result = buildTouchLayoutJson(
+      makeOverflowIR("ʔ"),
+      [],
+      opts({ baseTouchJson: TABLET_ONLY_JSON }),
+    );
+    expect(result.unplacedChars).toEqual([]);
+  });
+
+  it("deriveSeedLayout (Case A): unplacedChars contains the spilled character", () => {
+    const overflowChar = "ʔ";
+    const result = deriveSeedLayout(makeOverflowIR(overflowChar), {
+      mods: NO_MODS,
+      seedSource: "reseed-from-desktop",
+    });
+    expect(result.unplacedChars).toContain(overflowChar);
   });
 });
 

@@ -80,7 +80,12 @@ export { isParallelIndexFanOut } from "./recognizer/rules/parallel-index-fanout.
 // Issue #19 — scaffolder (template-cleanup pipeline).
 export { createScaffolderService, renameFilesInVfs } from "./scaffolder/index.js";
 export { scaffoldIR, resetIdentity } from "./scaffolder/scaffold-ir.js";
-export { scaffoldTouchLayout, buildMinimalPhoneTouchLayout } from "./scaffolder/index.js";
+export {
+  scaffoldTouchLayout,
+  scaffoldTouchLayoutWithDiagnostics,
+  buildMinimalPhoneTouchLayout,
+} from "./scaffolder/index.js";
+export type { ScaffoldTouchLayoutResult } from "./scaffolder/index.js";
 // spec 035 — touch coverage guard (FR-008/SC-003).
 export { touchCoverage } from "./pattern-apply/touchCoverage.js";
 export type { TouchCoverageResult } from "./pattern-apply/touchCoverage.js";
