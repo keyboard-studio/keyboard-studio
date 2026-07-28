@@ -24,7 +24,9 @@ import {
   deriveProjectKeyFromWorkingCopy,
   discardActiveDraft,
   installDraftAutosave,
-  startCloudSync,
+  // Aliased: dev's draftAutosave engine (below) also exports a startCloudSync;
+  // both engines coexist post-merge, so both syncs run under distinct names.
+  startCloudSync as startPersistenceCloudSync,
   wasDraftRestoredThisBoot,
 } from "./lib/draftPersistence.ts";
 import { useGitHubAuth } from "./hooks/useGitHubAuth.ts";
@@ -57,15 +59,57 @@ import { hasVisited } from "./lib/firstVisit.ts";
 import { manifest, validateManifestShape } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { StepHost } from "./components/StepHost.tsx";
+import { ResumeDraftBanner } from "./components/ResumeDraftBanner.tsx";
+import { SurveyResetButton } from "./components/SurveyResetButton.tsx";
+import {
+  loadDraftMeta,
+  applyDraft,
+  applyStudioDraft,
+  buildStudioDraft,
+  clearDraft,
+  startDraftAutosave,
+  startCloudSync,
+  migrateLegacyDraft,
+  getActiveProjectKey,
+  setActiveProject,
+  pinActiveProject,
+  PENDING_PROJECT_KEY,
+  type DraftMeta,
+  type StudioDraft,
+} from "./lib/draftAutosave.ts";
+import {
+  loadServerDraftMeta,
+  loadServerDraftContent,
+  clearServerDraft,
+  serverMetaToDraftMeta,
+} from "./lib/serverDraftStore.ts";
 import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
 import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
 import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
 
+// Offer the resume banner only once per page load — on the first SurveyView
+// mount in this JS context, not on same-session route remounts (navigating away
+// and back is a fresh wizard, not a resume). A page reload resets this flag by
+// starting a new JS context.
+let resumeOfferConsumed = false;
+
 // Bind the manifest into the store's staleness actions.
 // Called once at module load; avoids a circular static import in the store
 // (stores/ → steps/manifest.ts → steps/registerEditorSteps.ts → editors/ → stores/).
 bindManifest(manifest);
+
+// One-shot, idempotent adoption of the legacy single-slot `ks.studio.draft`
+// into the per-project "My keyboards" scheme (specs/037-my-keyboards/spec.md
+// "Migration"). Called at module load (this file's existing idiom for
+// one-time setup, alongside bindManifest/validateManifestShape above/below) —
+// module evaluation runs strictly before any component mounts, so this always
+// completes before SurveyView's useEffect starts autosave/cloud-sync, exactly
+// as the spec requires ("Run once ... before autosave/cloud-sync start").
+// migrateLegacyDraft() self-guards on ks.studio.projects.index already
+// existing, so re-importing this module (e.g. tests using vi.resetModules())
+// re-runs it safely against whatever localStorage state is present then.
+migrateLegacyDraft();
 
 // The Flow Map is a developer aid. It shows automatically in `vite dev`; in
 // hosted builds (Vercel previews, future production) it is gated by
@@ -87,33 +131,41 @@ function isRouteId(v: string): v is RouteId {
 // useRoute — reads window.location.hash and reacts to hashchange events
 // ---------------------------------------------------------------------------
 
-// Where a visitor lands when the incoming hash does not dictate otherwise. A
-// genuine first-time visitor (this browser has never entered the app) sees the
-// WelcomeScreen; a returning visitor goes straight into the survey. The flag is
-// durable in localStorage (lib/firstVisit.ts) so it survives reloads and the
-// OAuth sign-in round trip. (main has no resumable-draft path yet, so unlike
-// the dev branch this gate keys on visited-ness alone.)
+// First-visit landing gate (proposal §9). Decides where an empty or unknown
+// hash lands. A genuine first-time visitor sees the welcome screen; a returning
+// visitor — or one with a resumable draft (the survey route surfaces the resume
+// banner) — goes straight into the survey. A newcomer landing also overrides
+// an explicit deep-link hash (a shared #survey/#preview link, a stale
+// bookmark) — see hashToRoute below; internal navigation always sets a valid
+// hash, so beyond that this only governs the initial landing and stale-hash
+// cases.
 function defaultLandingRoute(): RouteId {
-  return hasVisited() ? "survey" : "welcome";
+  if (hasVisited()) return "survey";
+  if (loadDraftMeta() !== null) return "survey";
+  return "welcome";
 }
 
 function useRoute(): RouteId {
   const hashToRoute = (): RouteId => {
     const raw = window.location.hash.slice(1);
-    // A genuine newcomer always lands on welcome first — even on a deep-linked
-    // hash (a shared #survey/#preview link, a stale bookmark). The gate lifts
-    // the moment they leave welcome (markVisited), after which the incoming
+    const landing = defaultLandingRoute();
+    // A genuine newcomer (never visited, no resumable draft) always lands on
+    // welcome first — even on a deep-linked hash (a shared #survey/#preview
+    // link, a stale bookmark). The gate lifts the moment they leave welcome
+    // (markVisited) or once a resumable draft exists, after which the incoming
     // hash is honored normally.
-    if (defaultLandingRoute() === "welcome") {
-      // Keep window.location.hash in sync with the forced route, so that
-      // WelcomeScreen's navigateTo("welcome"→"survey") assignment fires a real
-      // hashchange rather than a same-value no-op that soft-locks welcome.
+    if (landing === "welcome") {
+      // Keep window.location.hash in sync with the forced route. Without this,
+      // a deep-linked hash (e.g. "#survey") is left in place while the route
+      // renders "welcome"; WelcomeScreen's "I'm new" button then calls
+      // navigateTo("survey"), a same-value hash assignment that fires zero
+      // hashchange events per spec, soft-locking the user on WelcomeScreen.
       if (raw !== "welcome") {
         window.history.replaceState(window.history.state, "", "#welcome");
       }
       return "welcome";
     }
-    return isRouteId(raw) ? raw : "survey";
+    return isRouteId(raw) ? raw : landing;
   };
 
   const [route, setRoute] = useState<RouteId>(hashToRoute);
@@ -318,6 +370,15 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // steps/ importing stores/ directly.
   const setTouchSeedSource = useSurveySessionStore((s) => s.setTouchSeedSource);
 
+  // githubTokenRef lets dev's draftAutosave cloud-sync loop read the current
+  // token lazily (from the single useGitHubAuth() call above), so signing in
+  // mid-session starts syncing without restarting the subscription.
+  const githubTokenRef = useRef(githubToken);
+  useEffect(() => {
+    githubTokenRef.current = githubToken;
+  }, [githubToken]);
+  const currentAccessToken = (): string | null => githubTokenRef.current?.accessToken ?? null;
+
   // Derive whether the active step declares layout:"full" (load-bearing per Stage 5,
   // FR-002, R4). SurveyView uses this to skip the two-pane shell for full-screen steps.
   const activeStepIsFullScreen = useMemo(() => {
@@ -353,12 +414,95 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // module-level flag draftPersistence.loadDraft() sets on success; it is
   // stable across StrictMode's double-invoked mount effects because
   // loadDraft() itself only ever runs once, pre-mount, in main.tsx.
+  //
+  // The localStorage draft (lib/draftAutosave.ts) is unaffected either way: it
+  // lives in localStorage, not the store — the resume banner below reads it and
+  // only applyDraft() (on Resume) hydrates the store.
   useEffect(() => {
     if (!wasDraftRestoredThisBoot()) {
       useSurveySessionStore.getState().reset();
     }
     // Intentionally empty deps: runs exactly once on mount.
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // Resume-draft banner + autosave (localStorage draft; lib/draftAutosave.ts).
+  //
+  // On the first SurveyView mount of a page load, peek at any saved draft and
+  // offer to resume it. Autosave does not start until the author decides, so a
+  // pending decision can't overwrite the very draft being offered. When there is
+  // no draft, autosave starts immediately.
+  // ---------------------------------------------------------------------------
+  // The initializer must be PURE: <StrictMode> (main.tsx) double-invokes lazy
+  // useState initializers in dev, and only the *second* return value is kept.
+  // A flag flipped inside the initializer would make invocation 1 consume the
+  // offer and invocation 2 (the kept value) see it already consumed → the banner
+  // would silently never appear in `pnpm dev` / e2e. So read the flag here and
+  // mark it consumed in the mount effect below instead.
+  const [resumeMeta, setResumeMeta] = useState<DraftMeta | null>(() =>
+    resumeOfferConsumed ? null : loadDraftMeta(),
+  );
+
+  // Cloud-restore offer (signed-in only): a server-backed draft found on load —
+  // e.g. a new tab or a different device. Kept separate from the local
+  // resumeMeta so the local draft always wins when both exist; the cloud offer
+  // is only surfaced when there is no local draft to resume. Set at most once
+  // per mount (cloudRestoreCheckedRef).
+  const [cloudResume, setCloudResume] = useState<DraftMeta | null>(null);
+  const cloudRestoreCheckedRef = useRef(false);
+
+  // Mark the one-per-page-load resume offer as consumed after commit (idempotent
+  // under StrictMode's mount/cleanup/mount). Subsequent same-session SurveyView
+  // remounts (route away + back = a fresh wizard) then read the flag and skip the
+  // banner; a real page reload resets the module flag by starting a new JS context.
+  useEffect(() => {
+    // Runs once on mount; touches only the module-level flag, so no deps.
+    resumeOfferConsumed = true;
+  }, []);
+
+  useEffect(() => {
+    // Wait for the author's Resume/Discard choice on either banner before
+    // autosaving, so a pending decision can't overwrite the draft being offered.
+    if (resumeMeta !== null || cloudResume !== null) return;
+    const stopLocal = startDraftAutosave();
+    // Cloud sync runs alongside localStorage autosave; it self-gates on the
+    // token (guests never push) and on meaningful progress, so starting it here
+    // for everyone is safe — a guest or pristine session pushes nothing.
+    const stopCloud = startCloudSync(currentAccessToken);
+    return () => {
+      stopLocal();
+      stopCloud();
+    };
+  }, [resumeMeta, cloudResume]);
+
+  // Cloud-restore check (signed-in only). On the first render where a GitHub
+  // token is present, look for a server-backed draft. Offer it only when there
+  // is no local draft already being offered (local wins) and the author hasn't
+  // started meaningful work — otherwise a fresh session's cloud backup would
+  // pop an unexpected restore. Runs at most once per mount.
+  useEffect(() => {
+    if (cloudRestoreCheckedRef.current) return;
+    const accessToken = githubToken?.accessToken ?? null;
+    if (accessToken === null) return; // guest, or token not yet verified — wait
+    cloudRestoreCheckedRef.current = true;
+    if (resumeMeta !== null) return; // a local draft is offered — prefer it
+    let cancelled = false;
+    // Multi-project note: this one-shot check only looks at the caller's
+    // currently-pinned active project (or the pending pre-instantiation slot
+    // on a genuinely fresh browser) — discovering OTHER cloud-backed projects
+    // from a browser with no local trace of them is the "My keyboards" list
+    // screen's job (next cycle, specs/037-my-keyboards), not this banner's.
+    const draftId = getActiveProjectKey() ?? PENDING_PROJECT_KEY;
+    void loadServerDraftMeta(accessToken, draftId).then((serverMeta) => {
+      if (cancelled || serverMeta === null) return;
+      // Don't surprise an author who began working while the fetch was in flight.
+      if (buildStudioDraft() !== null) return;
+      setCloudResume(serverMetaToDraftMeta(serverMeta));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [githubToken, resumeMeta]);
 
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
   const { containerRef, leftPct, onPointerDown } =
@@ -441,7 +585,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     if (cloudSyncAccessToken === null) {
       return undefined;
     }
-    const teardown = startCloudSync(() => cloudSyncAccessToken);
+    const teardown = startPersistenceCloudSync(() => cloudSyncAccessToken);
     return teardown;
   }, [cloudSyncAccessToken]);
 
@@ -553,6 +697,18 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // reset below) — the author's own instruction, not an inference from
       // navigation. See specs/047-my-keyboards/spec.md ("Superseded: spec
       // 034 VR-5").
+
+      // Pin the active-project pointer to this base's id the moment a working
+      // copy is instantiated (specs/047-my-keyboards spec — projectKey =
+      // identity.keyboardId ?? baseKeyboard.id; the identity keyboardId, when
+      // Track 1 later sets one, isn't chosen yet at this point, so base.id is
+      // the correct starting key for both tracks). This ONLY repoints THIS
+      // session's active-project pointer — it does not touch any other
+      // project's stored record or index row, so starting a new keyboard
+      // never overwrites/wipes an already-in-flight project.
+      pinActiveProject(base.id);
+
+
       // Reads via getState() escape hatch (not a selector) to avoid a stale closure — the callback is memoised with empty deps.
       const track = useSurveySessionStore.getState().selectedTrack;
       applyStepCompletion(
@@ -716,6 +872,73 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // sessionReset() calls reset() which already clears charactersSubStage to
     // "prefill" (spec 027 Stage 4 — the store slot is the authoritative owner).
     // sessionReset() also clears baseConfirmed back to false via INITIAL_STATE.
+    // Discard any saved draft — start-over is an explicit "throw it away".
+    // Read the project key BEFORE clearDraft() (which clears the active
+    // pointer as part of removing the project) so the server call still knows
+    // which project to delete. clearDraft() only removes THIS ONE project's
+    // record + index row — every other in-flight "My keyboards" project is
+    // untouched (spec: start-over must not wipe the whole project index).
+    const projectKey = getActiveProjectKey();
+    clearDraft();
+    if (projectKey !== null) {
+      const accessToken = currentAccessToken();
+      if (accessToken !== null) void clearServerDraft(accessToken, projectKey);
+    }
+    setResumeMeta(null);
+    setCloudResume(null);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Resume banner handlers.
+  //
+  // Resume: restore both stores from the saved draft, then mark the working copy
+  // as already instantiated so the compile pipeline's onInstantiate does not
+  // re-run instantiateFromBase over the restored copy (which would pop the
+  // rebase-confirm dialog / risk discarding restored survey answers).
+  // Discard: drop the draft and continue fresh.
+  // Either way, clearing resumeMeta hides the banner and starts autosave.
+  // ---------------------------------------------------------------------------
+  function handleResumeDraft() {
+    const active = resumeMeta ?? cloudResume;
+    if (active?.source === "cloud") {
+      // Fetch the full payload from the server, then apply it. applyStudioDraft
+      // validates the record shape/version before hydrating the stores.
+      const accessToken = currentAccessToken();
+      if (accessToken !== null) {
+        // Same draftId resolution as the cloud-restore check above — the
+        // window between that check and this click doesn't run autosave
+        // (gated on resumeMeta/cloudResume being null), so the active-project
+        // pointer can't have moved in between.
+        const draftId = getActiveProjectKey() ?? PENDING_PROJECT_KEY;
+        // Dev's engine stores StudioDraft envelopes; pick that envelope off
+        // the shared transport (see serverDraftStore.ts's ServerDraftPayload).
+        void loadServerDraftContent<StudioDraft>(accessToken, draftId).then((draft) => {
+          if (applyStudioDraft(draft)) {
+            instantiatedRef.current = true;
+            setActiveProject(draftId);
+          }
+          setResumeMeta(null);
+          setCloudResume(null);
+        });
+        return;
+      }
+    }
+    if (applyDraft()) {
+      instantiatedRef.current = true;
+    }
+    setResumeMeta(null);
+    setCloudResume(null);
+  }
+
+  function handleDiscardDraft() {
+    const projectKey = getActiveProjectKey();
+    clearDraft();
+    if (projectKey !== null) {
+      const accessToken = currentAccessToken();
+      if (accessToken !== null) void clearServerDraft(accessToken, projectKey);
+    }
+    setResumeMeta(null);
+    setCloudResume(null);
   }
 
   // ---------------------------------------------------------------------------
@@ -788,12 +1011,22 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   const rightPct = 100 - leftPct;
 
+  // Corner reset — visible on every survey step (both layouts). Wired to the
+  // same handleStartOver as the terminal panels' "Start over", so it clears
+  // stores + draft directly and never trips the rebase-confirm dialog.
+  const resetButton = <SurveyResetButton onReset={handleStartOver} />;
+
   // Full-screen steps (carve/mechanisms/sequences/touch) bypass the two-pane layout.
   // StepHost returns the full-screen container; SurveyView renders it directly.
   // This reproduces the pre-Stage-5 early-return pattern without per-step branches
   // in SurveyView — the decision is data-driven via step.layout (R4, FR-002).
   if (activeStepIsFullScreen) {
-    return stepHost;
+    return (
+      <>
+        {stepHost}
+        {resetButton}
+      </>
+    );
   }
 
   return (
@@ -810,6 +1043,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     >
       {/* Left pane: survey questions (StepHost renders pane content) */}
       <section aria-label="Survey questions" style={questionsPaneStyle}>
+        {(resumeMeta ?? cloudResume) !== null && (
+          <ResumeDraftBanner
+            meta={(resumeMeta ?? cloudResume)!}
+            onResume={handleResumeDraft}
+            onDiscard={handleDiscardDraft}
+          />
+        )}
         {globalWarnings.length > 0 && (
           // Rendered flush on "var(--bg)" — the same token the container above
           // paints and the one CharacterMapPane's own root implicitly sits on
@@ -918,6 +1158,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           </>
         )}
       </section>
+
+      {resetButton}
     </div>
   );
 }

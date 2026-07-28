@@ -36,7 +36,17 @@
 // draftTypes.ts's header comment.
 
 import { getBackendUrl } from "./githubOAuth.ts";
-import type { DurableDraft, DraftMeta } from "./draftTypes.ts";
+import type { DurableDraft, StudioDraft, DraftMeta } from "./draftTypes.ts";
+
+/**
+ * Post-merge, BOTH draft engines push through this one transport: main's
+ * draftPersistence.ts stores `DurableDraft` records and dev's draftAutosave.ts
+ * stores `StudioDraft` records (each under its own draftId namespace). The
+ * server treats the blob opaquely — `JSON.stringify({ meta, draft })` both
+ * ways — so the payload type is the union of the two envelopes; readers pick
+ * the envelope they wrote via `loadServerDraftContent`'s type parameter.
+ */
+export type ServerDraftPayload = DurableDraft | StudioDraft;
 
 /** Metadata row the server keeps alongside the opaque draft blob. */
 export interface ServerDraftMeta {
@@ -84,7 +94,7 @@ export function serverMetaToDraftMeta(meta: ServerDraftMeta): DraftMeta {
 export async function saveServerDraft(
   token: string,
   meta: ServerDraftMeta,
-  draft: DurableDraft,
+  draft: ServerDraftPayload,
   draftId: string,
 ): Promise<boolean> {
   try {
@@ -107,7 +117,7 @@ export async function saveServerDraft(
 export function saveServerDraftBeacon(
   token: string,
   meta: ServerDraftMeta,
-  draft: DurableDraft,
+  draft: ServerDraftPayload,
   draftId: string,
 ): void {
   try {
@@ -155,17 +165,17 @@ export async function listServerDrafts(token: string): Promise<ServerDraftMeta[]
 }
 
 /** Fetch one project's full server draft payload (for Restore), or null. */
-export async function loadServerDraftContent(
+export async function loadServerDraftContent<D extends ServerDraftPayload = DurableDraft>(
   token: string,
   draftId: string,
-): Promise<DurableDraft | null> {
+): Promise<D | null> {
   try {
     const res = await fetch(draftsUrl("/content", draftId), {
       method: "GET",
       headers: authHeaders(token),
     });
     if (!res.ok) return null;
-    const body = (await res.json()) as { draft: DurableDraft | null };
+    const body = (await res.json()) as { draft: D | null };
     return body.draft ?? null;
   } catch {
     return null;

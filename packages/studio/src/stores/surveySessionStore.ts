@@ -15,13 +15,18 @@
 //   - `popHistory()` pops the last entry off history and sets it as activeStepId.
 //     No-op when history is empty (back disabled at the first step).
 //   - `reset()` clears every slot to initial (start-over).
+//   - `hydrate(snapshot)` bulk-sets every value slot from a serialized draft.
+//     This store holds no persistence logic of its own; the draft layer
+//     (lib/draftAutosave.ts) reads the slots and calls hydrate() to restore them.
 //   - Plain setters for the five value slots.
 //   - No host-disk writes. No persistence OF ITS OWN — this store never calls
 //     localStorage/sessionStorage directly. Spec 034 US3 adds a serialize/
 //     restore SEAM (`TraversalSnapshot`, `snapshotTraversal`,
 //     `applyTraversalSnapshot` below) that the durable-draft module
-//     (../lib/draftPersistence.ts) drives; the actual read/write of storage
-//     lives entirely in that module, not here.
+//     (../lib/draftPersistence.ts) drives; the localStorage draft layer
+//     (../lib/draftAutosave.ts) likewise drives the `SurveySessionSnapshot`/
+//     `hydrate()` seam. The actual read/write of storage lives entirely in
+//     those modules, not here.
 //   - Worker boundary upheld: WASM is not imported here.
 //   - All survey/hooks imports are type-only (depcruise / bundle hygiene, D-R2).
 
@@ -371,6 +376,13 @@ export interface SurveySessionState {
   /** Reset every slot to initial (start-over). Includes clearing history. */
   reset: () => void;
 
+  /**
+   * Bulk-restore every value slot from a serialized draft (lib/draftAutosave.ts).
+   * Used to resume an in-progress survey after a page reload. Does not touch the
+   * action functions; only the data slots enumerated in SurveySessionSnapshot.
+   */
+  hydrate: (snapshot: SurveySessionSnapshot) => void;
+
   /** Plain setter — identity-lite output. */
   setIdentityResult: (r: IdentityLiteResult | null) => void;
 
@@ -427,7 +439,7 @@ export interface SurveySessionState {
 
 type SurveySessionData = Omit<
   SurveySessionState,
-  | "advance" | "popHistory" | "backToTouchSeedSource" | "backToUnfinishedGallery" | "reset"
+  | "advance" | "popHistory" | "backToTouchSeedSource" | "backToUnfinishedGallery" | "reset" | "hydrate"
   | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
   | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
   | "setTouchSeedSource" | "setBaseConfirmed" | "setDiscoveryMethod"
@@ -443,6 +455,13 @@ type SurveySessionData = Omit<
  * Consumed by ../lib/draftPersistence.ts as the `traversal` envelope field.
  */
 export type TraversalSnapshot = SurveySessionData;
+
+/**
+ * Alias kept for the localStorage draft layer (lib/draftAutosave.ts), which
+ * serializes these slots and restores them via `hydrate()` on resume — the
+ * same data-field shape as `TraversalSnapshot`.
+ */
+export type SurveySessionSnapshot = SurveySessionData;
 
 // ---------------------------------------------------------------------------
 // Initial state (extracted so reset() and the initializer share one source)
@@ -544,6 +563,14 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
       ...INITIAL_STATE,
       // Re-initialize array so mutations do not bleed across resets.
       history: [] as readonly ActiveStepId[],
+    }),
+
+  hydrate: (snapshot) =>
+    set({
+      ...snapshot,
+      // Copy the array so a mutation of the restored draft can't bleed back
+      // into the caller's snapshot object.
+      history: [...snapshot.history],
     }),
 
   setMarksMigrationNeeded: (needed) => set({ marksMigrationNeeded: needed }),

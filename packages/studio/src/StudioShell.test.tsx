@@ -533,6 +533,10 @@ vi.mock("./components/OutputScreen.tsx", () => ({
   OutputScreen: () => <div data-testid="output-screen-root">output-screen</div>,
 }));
 
+vi.mock("./components/WelcomeScreen.tsx", () => ({
+  WelcomeScreen: () => <div data-testid="welcome-screen-root">welcome-screen</div>,
+}));
+
 // Shallow stub for DashboardView — only rendered in dev/VITE_SHOW_FLOWMAP builds.
 vi.mock("./dashboard/DashboardView.tsx", () => ({
   FlowMapView: () => <div data-testid="flow-map-view">flow-map</div>,
@@ -550,6 +554,7 @@ vi.mock("./lib/navigate.ts", () => ({
 
 import { SurveyView, StudioShell } from "./StudioShell.tsx";
 import { navigateTo } from "./lib/navigate.ts";
+import { markVisited } from "./lib/firstVisit.ts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { saveDraft, loadDraft, deriveProjectKeyFromWorkingCopy } from "./lib/draftPersistence.ts";
@@ -636,7 +641,9 @@ afterEach(() => {
   cleanup();
   useWorkingCopyStore.getState().reset();
   vi.clearAllMocks();
-  localStorage.clear(); // reset the first-visit gate (ks.visited) between tests
+  // The first-visit gate reads ks.visited / the ks.studio.draft key from
+  // localStorage; clear it so gate state can't leak between tests.
+  localStorage.clear();
 });
 
 // ---------------------------------------------------------------------------
@@ -870,9 +877,11 @@ describe("StudioShell — first-visit gate forces newcomers to welcome", () => {
       render(<StudioShell />);
     });
 
-    // The deep-linked #preview is overridden — a genuine newcomer lands on welcome.
+    // The deep-linked #preview is overridden — a genuine newcomer lands on
+    // welcome (the shallow WelcomeScreen stub above, per this file's routing-
+    // test idiom).
     expect(screen.queryByTestId("preview-screen-root")).toBeNull();
-    expect(screen.getByText(/I’m new/i)).toBeTruthy();
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
     // The hash is rewritten to #welcome so leaving welcome fires a real hashchange.
     expect(window.location.hash).toBe("#welcome");
   });
@@ -886,6 +895,291 @@ describe("StudioShell — first-visit gate forces newcomers to welcome", () => {
     });
 
     expect(screen.getByTestId("preview-screen-root")).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// StudioShell first-visit landing gate (proposal §9). With no explicit hash:
+//   • a true first-time visitor lands on the WelcomeScreen;
+//   • a returning visitor (ks.visited) or one with a resumable draft skips
+//     welcome and lands in the survey.
+// An explicit valid hash (#preview/#output/#survey) wins for a RETURNING
+// visitor or once a resumable draft exists — see the route regressions above
+// (both now set ks.visited to represent that case). A genuine first-time
+// visitor (never visited, no draft) always lands on WelcomeScreen first, even
+// on a deep-linked hash — see the two tests below.
+// ---------------------------------------------------------------------------
+
+describe("StudioShell — first-visit landing gate", () => {
+  // Seeds the NEW per-project scheme directly (specs/037-my-keyboards), rather
+  // than the legacy `ks.studio.draft` key: this describe block renders the
+  // statically-imported StudioShell (no vi.resetModules()), so the module-init
+  // migrateLegacyDraft() call already ran once for the whole file and will not
+  // re-run per test — a legacy-key seed here would never be adopted. The
+  // "resume draft banner" describe block below (which DOES re-import the
+  // module per test) is what exercises the legacy-key migration path itself.
+  function seedResumableDraft() {
+    const projectKey = "__pending__";
+    const savedAt = Date.now();
+    localStorage.setItem(
+      `ks.studio.project.${projectKey}`,
+      JSON.stringify({
+        version: 1,
+        savedAt,
+        survey: { activeStepId: "identity", identityResult: null, scaffoldSpec: null, history: [] },
+        workingCopy: null,
+      }),
+    );
+    localStorage.setItem(
+      "ks.studio.projects.index",
+      JSON.stringify([
+        { projectKey, savedAt, activeStepId: "identity", label: null, langTag: null, status: "draft", prUrl: null },
+      ]),
+    );
+    localStorage.setItem("ks.studio.activeProject", projectKey);
+  }
+
+  it("mounts WelcomeScreen (not the survey) on a first visit with no hash", async () => {
+    window.location.hash = "";
+    localStorage.clear(); // pristine browser: never visited, no draft
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    // The survey wizard's first step must NOT be present.
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
+  });
+
+  it("falls back to WelcomeScreen for an unknown hash on a first visit", async () => {
+    window.location.hash = "#does-not-exist";
+    localStorage.clear();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+  });
+
+  it("skips welcome and lands in the survey for a returning visitor", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+    localStorage.setItem("ks.visited", "1"); // browser has entered the app before
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("stage-identity")).toBeTruthy();
+    expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
+  });
+
+  it("skips welcome and lands in the survey when a resumable draft exists", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+    // A minimally-valid draft (version + savedAt + survey) so loadDraftMeta()
+    // returns non-null; the survey route surfaces the resume banner.
+    seedResumableDraft();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("stage-identity")).toBeTruthy();
+    expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
+  });
+
+  it("forces WelcomeScreen for a first-time visitor arriving on a deep-linked #survey hash", async () => {
+    window.location.hash = "#survey";
+    localStorage.clear(); // pristine browser: never visited, no draft
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
+  });
+
+  it("forces WelcomeScreen for a first-time visitor arriving on a deep-linked #preview hash", async () => {
+    window.location.hash = "#preview";
+    localStorage.clear(); // pristine browser: never visited, no draft
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(screen.queryByTestId("preview-screen-root")).toBeNull();
+  });
+
+  it("lifts the gate on a live hashchange once the newcomer leaves welcome (no remount)", async () => {
+    window.location.hash = "#survey";
+    localStorage.clear(); // pristine browser: never visited, no draft
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    // A newcomer is forced onto welcome even on a deep-linked #survey hash, and
+    // that hash is normalized to #welcome. Without this normalization the
+    // WelcomeScreen "I'm new" button's navigateTo("survey") would be a
+    // same-value hash assignment that fires zero hashchange events, soft-locking
+    // the user on welcome.
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(window.location.hash).toBe("#welcome");
+
+    // Leaving welcome marks the browser visited; the button then navigates to
+    // #survey. Drive that live transition on the SAME mount: the gate must lift
+    // and the route re-resolve to survey on the next hashchange, WITHOUT the
+    // component remounting (the test never re-renders StudioShell).
+    await act(async () => {
+      markVisited();
+      window.location.hash = "#survey";
+      window.dispatchEvent(new Event("hashchange"));
+    });
+
+    expect(screen.getByTestId("stage-identity")).toBeTruthy();
+    expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
+  });
+
+  it("honors a deep-linked #preview hash for a never-visited browser once a resumable draft exists", async () => {
+    window.location.hash = "#preview";
+    localStorage.clear(); // never visited...
+    // ...but a resumable draft lifts the newcomer gate. Same minimally-valid
+    // draft shape used by the "resumable draft exists" test above.
+    seedResumableDraft();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    // Gate lifted by the draft ⇒ the deep-linked hash is honored: land on
+    // preview, NOT forced onto welcome and NOT defaulted to survey.
+    expect(screen.getByTestId("preview-screen-root")).toBeTruthy();
+    expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// StudioShell — resume draft banner (ResumeDraftBanner.tsx, lib/draftAutosave.ts).
+//
+// The gap closed here: the "first-visit landing gate" tests above only assert
+// ROUTING (stage-identity present) when a resumable draft exists — none of them
+// assert that the banner itself renders, or that Resume/Discard actually
+// hydrate/clear state. This block does.
+//
+// Order-dependence hazard (StudioShell.tsx): the resume offer is gated by a
+// MODULE-LEVEL `resumeOfferConsumed` flag that flips to true on the first
+// SurveyView mount of the JS context (StrictMode-safe: read in the lazy
+// useState initializer, flipped in the mount effect so it survives double-
+// invocation). Many tests earlier in this file already mount SurveyView/
+// StudioShell, so by the time this block runs the flag is already true and a
+// plain `render(<StudioShell />)` would never show the banner regardless of
+// whether a draft exists. Each test below uses vi.resetModules() + a fresh
+// dynamic import of StudioShell.tsx to get a pristine module instance (flag
+// unconsumed), exactly like a real page load starting a new JS context. Same
+// technique already used for a different module-level singleton in
+// survey/SurveyRunner.pinChip.test.tsx (see importSurveyRunner() there).
+// ---------------------------------------------------------------------------
+
+describe("StudioShell — resume draft banner", () => {
+  /**
+   * Seed a well-formed resumable draft. activeStepId defaults to "choose_base"
+   * (not "identity") so a post-Resume hydration is independently observable:
+   * the wizard should show the BaseResolution stage ("stage-base") instead of
+   * staying on the "identity" stage the pre-Resume reset() puts it on.
+   */
+  function seedResumableDraft(activeStepId: string = "choose_base") {
+    localStorage.setItem(
+      "ks.studio.draft",
+      JSON.stringify({
+        version: 1,
+        savedAt: Date.now(),
+        survey: { activeStepId, identityResult: null, scaffoldSpec: null, history: [] },
+        // Explicit null (not omitted): applyDraft() only skips
+        // applyWorkingCopySnapshot when this is === null, so an omitted key
+        // (undefined after JSON.parse) would crash it on Resume.
+        workingCopy: null,
+      }),
+    );
+  }
+
+  /** Fresh StudioShell module instance (see order-dependence note above). */
+  async function renderFreshStudioShell() {
+    vi.resetModules();
+    const mod = await import("./StudioShell.tsx");
+    await act(async () => {
+      render(<mod.StudioShell />);
+    });
+  }
+
+  it("renders resume-draft-banner on the survey route when a resumable draft exists", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+    seedResumableDraft();
+
+    await renderFreshStudioShell();
+
+    expect(screen.getByTestId("resume-draft-banner")).toBeTruthy();
+    // Confirms the landing gate (already covered above) and the banner agree.
+    expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
+  });
+
+  it("Resume dismisses the banner and hydrates the survey to the draft's activeStepId", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+    seedResumableDraft(); // draft.survey.activeStepId === "choose_base"
+
+    await renderFreshStudioShell();
+
+    // Pre-Resume: the mount-effect reset() has put the store back on
+    // "identity" (spec: reset does not touch the localStorage draft), and the
+    // banner is offered independently of that reset.
+    expect(screen.getByTestId("stage-identity")).toBeTruthy();
+    expect(screen.getByTestId("resume-draft-banner")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("resume-draft"));
+
+    // Banner dismissed.
+    expect(screen.queryByTestId("resume-draft-banner")).toBeNull();
+    // Observable hydration outcome: the wizard now reflects the draft's
+    // activeStepId ("choose_base" -> the BaseResolution stage), not "identity".
+    expect(screen.getByTestId("stage-base")).toBeTruthy();
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
+  });
+
+  it("Discard dismisses the banner and clears the draft from localStorage", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+    seedResumableDraft();
+
+    await renderFreshStudioShell();
+
+    expect(screen.getByTestId("resume-draft-banner")).toBeTruthy();
+    // Migration (module-init migrateLegacyDraft(), re-run fresh here via
+    // vi.resetModules()) has already adopted the legacy draft into the new
+    // per-project scheme by the time StudioShell mounts — the legacy key is
+    // gone, and the project lives under its derived key ("__pending__", since
+    // this seeded draft has no working copy) with the active-project pointer
+    // set to it.
+    expect(localStorage.getItem("ks.studio.draft")).toBeNull();
+    expect(localStorage.getItem("ks.studio.activeProject")).toBe("__pending__");
+    expect(localStorage.getItem("ks.studio.project.__pending__")).not.toBeNull();
+
+    fireEvent.click(screen.getByTestId("discard-draft"));
+
+    // Banner dismissed and the draft is gone: the active project's per-project
+    // record + index row are removed, and the active-project pointer is cleared.
+    expect(screen.queryByTestId("resume-draft-banner")).toBeNull();
+    expect(localStorage.getItem("ks.studio.project.__pending__")).toBeNull();
+    expect(localStorage.getItem("ks.studio.activeProject")).toBeNull();
+    expect(JSON.parse(localStorage.getItem("ks.studio.projects.index") ?? "[]")).toEqual([]);
+    // Discard does not hydrate — the wizard stays on "identity" (untouched).
+    expect(screen.getByTestId("stage-identity")).toBeTruthy();
   });
 });
 

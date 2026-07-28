@@ -103,6 +103,12 @@ jobs:
       - name: Test (all packages)
         run: pnpm -r test
 
+      # The co-located Vercel functions under /api are intentionally outside the
+      # pnpm workspace, so `pnpm -r test` does not cover them. Run their standalone
+      # vitest config explicitly — otherwise these tests can rot unnoticed.
+      - name: Test (api functions)
+        run: npx vitest run --config api/vitest.config.ts
+
       # The i18n-content-extract and content-i18n-lint tools live under
       # utilities/* (outside pnpm-workspace.yaml), so `pnpm -r test` never
       # reaches their vitest suites. Run them explicitly — these are the
