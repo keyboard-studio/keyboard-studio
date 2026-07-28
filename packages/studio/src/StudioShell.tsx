@@ -802,8 +802,17 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   // Working-copy transform — projects carve + assignments + identity into the OSK.
   // surveyPatternMap is empty until Phase C completes; null patternMap → skip assignments.
+  //
+  // previewedBaseId: localBase.id — bug F4. `localBase` drives the compile
+  // pipeline below (preview-before-commit) and can differ from the store's
+  // already-instantiated `baseKeyboard` when the author previews a candidate
+  // replacement base without having confirmed the switch yet. Passing it lets
+  // useWorkingCopyTransform suppress the carve/identity overlay for a
+  // candidate base it doesn't belong to, instead of projecting the committed
+  // base's carve deletions onto the candidate's freshly-fetched VFS.
   const workingCopyTransform = useWorkingCopyTransform({
     patternMap: surveyPatternMap.size > 0 ? surveyPatternMap : null,
+    previewedBaseId: localBase?.id ?? null,
   });
 
   // Use localBase (immediately updated on selection) to drive the pipeline.
