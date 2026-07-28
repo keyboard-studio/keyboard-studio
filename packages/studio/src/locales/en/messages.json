@@ -345,6 +345,7 @@
   "dashboard.flowGraph.badge.entry": "entry",
   "dashboard.library.reserve.ok": "Every registered question belongs to a live or proposed flow.",
   "dashboard.leftover.empty": "Every registered question is used by a live flow.",
+  "survey.phaseB.suggestionPanel.allSuggestionsAdded": "Every suggested character is already in your alphabet below.",
   "survey.phaseB.buildList.exemplarApplyToggle": "Exemplars available for this language — show",
   "base.picker.error.placeholder": "failed to load keyboards",
   "dashboard.flow.parseError": "Failed to parse: {error}",

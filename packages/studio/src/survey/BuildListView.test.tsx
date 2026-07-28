@@ -247,20 +247,72 @@ describe("SuggestionPanel — data path with main suggestions", () => {
     }
   });
 
-  it("clicking a suggestion chip adds it to the alphabet and marks it checked", async () => {
+  it("clicking a suggestion chip adds it to the alphabet and drops it from the panel", async () => {
     await renderBuildListView({ bcp47_tag: "yo" });
     await waitFor(() => {
       expect(screen.queryByRole("group", { name: /Suggested main characters/i })).not.toBeNull();
     });
     const chipGroup = screen.getByRole("group", { name: /Suggested main characters/i });
-    const firstChip = chipGroup.querySelectorAll("button")[0]!;
     await act(async () => {
-      fireEvent.click(firstChip);
+      fireEvent.click(chipGroup.querySelectorAll("button")[0]!);
     });
-    // After clicking, the chip should be pressed.
-    expect(firstChip.getAttribute("aria-pressed")).toBe("true");
+    // The panel offers only what is still MISSING, so a ticked character leaves
+    // it — it now lives (removably) in "Your alphabet" below. This is the fold
+    // that stops the exemplar prefill from re-suggesting the whole alphabet it
+    // just seeded.
+    const remaining = Array.from(
+      screen
+        .getByRole("group", { name: /Suggested main characters/i })
+        .querySelectorAll("button"),
+    );
+    expect(remaining.length).toBe(1);
+    expect(remaining[0]!.getAttribute("aria-label")).toMatch(/ọ/);
     // The Done button should reflect 1 character.
     expect(screen.getByRole("button", { name: /Done/i }).textContent).toMatch(/1 character/);
+  });
+
+  it("does not offer a character already in the alphabet, in either case", async () => {
+    // "Ẹ" is the uppercase of the suggested "ẹ" — having it counts as covered.
+    usePhaseBDraftStore.getState().setAll(["Ẹ"]);
+    await renderBuildListView({ bcp47_tag: "yo" });
+    await waitFor(() => {
+      expect(screen.queryByRole("group", { name: /Suggested main characters/i })).not.toBeNull();
+    });
+    const labels = Array.from(
+      screen
+        .getByRole("group", { name: /Suggested main characters/i })
+        .querySelectorAll("button"),
+    ).map((b) => b.getAttribute("aria-label") ?? "");
+    expect(labels.some((l) => l.includes("ẹ"))).toBe(false);
+    expect(labels.some((l) => l.includes("ọ"))).toBe(true);
+  });
+
+  it("folds away the synthesized uppercase twin of a suggested letter", async () => {
+    // suggestMissingChars reports each cased letter twice (cldr.ts's
+    // augmentSpecialsWithUppercase); only the lowercase is offered, since
+    // ticking it brings its uppercase along.
+    getSuggestResult.set({ bcp47: "yo", main: ["ẹ", "Ẹ"], auxiliary: [] });
+    await renderBuildListView({ bcp47_tag: "yo" });
+    await waitFor(() => {
+      expect(screen.queryByRole("group", { name: /Suggested main characters/i })).not.toBeNull();
+    });
+    const labels = Array.from(
+      screen
+        .getByRole("group", { name: /Suggested main characters/i })
+        .querySelectorAll("button"),
+    ).map((b) => b.getAttribute("aria-label") ?? "");
+    expect(labels.length).toBe(1);
+    expect(labels[0]).toMatch(/ẹ/);
+  });
+
+  it("says everything is already added when the whole suggestion set is in the draft", async () => {
+    usePhaseBDraftStore.getState().setAll(["ẹ", "ọ"]);
+    await renderBuildListView({ bcp47_tag: "yo" });
+    await waitFor(() => {
+      expect(screen.queryByText(/Every suggested character is already/i)).not.toBeNull();
+    });
+    // Distinct from the "base covers it" note — the base produces nothing here.
+    expect(screen.queryByText(/already covers this language/i)).toBeNull();
   });
 });
 

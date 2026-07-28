@@ -70,6 +70,29 @@ export interface SurveyPhaseResult {
    */
   confirmedInventory?: string[];
   /**
+   * Multi-letter units the language's exemplar source wrote as `{..}` clusters
+   * — Ewondo's `dz`, `kp`, `ng`, `nk`, `ts`; Hausa's `sh`, `ts`, `ny`.
+   *
+   * **Deliberately NOT part of `confirmedInventory`.** A digraph is not a
+   * character to type: the keyboard produces it by typing its constituent
+   * letters, which the exemplar parse already contributes individually
+   * (`parseUnicodeSet` folds a `{dz}` cluster's `d` and `z` into `used` while
+   * recording the cluster only here). Folding clusters into the inventory would
+   * put "dz" on the placement worklist as if it needed a key of its own.
+   *
+   * Recorded because it is a real orthographic signal downstream operations
+   * want and cannot recover once the parse is discarded — collation order,
+   * the S-01 digraph strategy path (`LinguistInventory.digraphsAsPhonemeUnits`
+   * is its author-declared counterpart), and any "is this two keystrokes or
+   * one unit?" question. Nothing consumes it yet; it is stored so it is there
+   * when something does.
+   *
+   * **Additive** — `undefined` for phases that run no character discovery, and
+   * for a discovery run whose source attested no clusters. Merged across phases
+   * by {@link mergePhaseResults} (deduped union, first-appearance order).
+   */
+  attestedDigraphs?: string[];
+  /**
    * Three-store confirmed alphabet (bases / marks / attested stacks, spec 046).
    * **Additive** — the canonical model behind `confirmedInventory`, which is
    * derived from it via `deriveConfirmedInventory` (confirmedAlphabet.ts) and

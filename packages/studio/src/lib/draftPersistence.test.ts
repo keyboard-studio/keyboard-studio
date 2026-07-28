@@ -658,6 +658,52 @@ describe("draftPersistence", () => {
       expect(usePhaseBDraftStore.getState().chars).toEqual(["a", "b", "ɛ"]);
     });
 
+    it("restores exemplar-attested digraphs alongside the alphabet, never into it", () => {
+      const pk = "phaseb-draft-digraphs";
+      instantiateMinimal(pk);
+      usePhaseBDraftStore.getState().seedFromProposal({
+        resolvedTag: "ewo",
+        source: "cldr",
+        confidence: "approved",
+        characters: [
+          { char: "d", tier: "main", source: "cldr", confidence: "approved" },
+          { char: "z", tier: "main", source: "cldr", confidence: "approved" },
+        ],
+        digraphs: ["dz", "kp"],
+      });
+
+      saveDraft(pk);
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      usePhaseBDraftStore.getState().reset();
+      expect(usePhaseBDraftStore.getState().exemplarDigraphs).toEqual([]);
+
+      expect(loadDraft(pk)).toBe(true);
+      expect(usePhaseBDraftStore.getState().exemplarDigraphs).toEqual(["dz", "kp"]);
+      // The clusters are a fact about the orthography, not characters to type —
+      // the alphabet still holds only their constituent letters.
+      expect(usePhaseBDraftStore.getState().chars).not.toContain("dz");
+      expect(usePhaseBDraftStore.getState().chars).toContain("d");
+    });
+
+    it("a phaseBDraft record written before digraphs were recorded restores to an empty list, not undefined", () => {
+      const pk = "phaseb-draft-legacy-digraphs";
+      instantiateMinimal(pk);
+      usePhaseBDraftStore.getState().setAll(["a"]);
+      saveDraft(pk);
+
+      const envelope = JSON.parse(localStorage.getItem(draftKey(pk))!) as Record<string, unknown>;
+      const phaseBDraft = envelope.phaseBDraft as Record<string, unknown>;
+      delete phaseBDraft.exemplarDigraphs;
+      localStorage.setItem(draftKey(pk), JSON.stringify(envelope));
+
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+
+      expect(loadDraft(pk)).toBe(true);
+      expect(usePhaseBDraftStore.getState().exemplarDigraphs).toEqual([]);
+    });
+
     it("a pre-fix record with no phaseBDraft field restores to an empty alphabet (backward compat — additive optional field, not a version bump)", () => {
       const pk = "phaseb-draft-legacy";
       instantiateMinimal(pk);

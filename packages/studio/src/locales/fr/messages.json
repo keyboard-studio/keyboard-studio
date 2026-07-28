@@ -345,6 +345,7 @@
   "dashboard.flowGraph.badge.entry": "entrée",
   "dashboard.library.reserve.ok": "Chaque question enregistrée appartient à un parcours en direct ou proposé.",
   "dashboard.leftover.empty": "Chaque question enregistrée est utilisée par un parcours en direct.",
+  "survey.phaseB.suggestionPanel.allSuggestionsAdded": "",
   "survey.phaseB.buildList.exemplarApplyToggle": "",
   "base.picker.error.placeholder": "échec du chargement des claviers",
   "dashboard.flow.parseError": "Échec de l’analyse : {error}",
