@@ -146,7 +146,7 @@
     },
     "§11": {
       "title": "11. criteria.md compliance",
-      "hash": "sha256:c88a4687ad623fd7",
+      "hash": "sha256:6aa6972138b421d3",
       "status": "implemented",
       "implements": [
         "packages/contracts/data/criteria.json",
@@ -304,7 +304,7 @@
     },
     "specs/008-data-flow": {
       "title": "Feature spec — Data flow (spec.md §8)",
-      "hash": "sha256:622b8a83725b0127",
+      "hash": "sha256:875f2eb1789213b2",
       "status": "partial",
       "implements": [
         "packages/contracts/src/surveySession.ts",
@@ -317,7 +317,7 @@
     },
     "docs/architecture.md": {
       "title": "Keyboard Studio — architecture & meta-flow",
-      "hash": "sha256:e4a06bb7282b85dd",
+      "hash": "sha256:5f3953eacc747126",
       "status": "reference",
       "implements": [],
       "decisions": [],
@@ -517,7 +517,7 @@
     },
     "specs/030-langtags-identity-autocomplete": {
       "title": "Feature Specification: Langtags-driven identity autocomplete",
-      "hash": "sha256:98fe41fb34b82356",
+      "hash": "sha256:1b3f8b884da96a38",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -605,7 +605,7 @@
     },
     "specs/037-facet-classifiers": {
       "title": "Feature Specification: Deterministic Facet Classifiers (Script + Two Representative Facets)",
-      "hash": "sha256:57f2966926f2d478",
+      "hash": "sha256:a6b4cc496de4e182",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -678,6 +678,70 @@
     "specs/046-i18n-localization": {
       "title": "Feature Specification: Studio UI & Content Localization (i18n)",
       "hash": "sha256:96900c97e1e54e23",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/043-base-selection-facets": {
+      "title": "Feature Specification: Base-Selection & Strategy Facet Classifiers",
+      "hash": "sha256:cdf3150978b2deb8",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/047-alphabet-inventory-categories": {
+      "title": "Feature Specification: Richer character-inventory breakdown on \"Add your whole alphabet\"",
+      "hash": "sha256:2e97691552c74308",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/048-base-facets-in-ir": {
+      "title": "Feature Specification: Bake base-keyboard facets into the working-copy IR (available + overridable)",
+      "hash": "sha256:043eab980690ae15",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/049-lowercase-diacritic-questions": {
+      "title": "Feature Specification: Show only lowercase base letters in the diacritic (marks) survey questions",
+      "hash": "sha256:57a01dcdb5c6b91a",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/047-my-keyboards": {
+      "title": "Feature Specification: My Keyboards — per-user multi-project draft + submission list",
+      "hash": "sha256:ac67a00804861135",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/050-text-sample-prefill": {
+      "title": "Feature Specification: Text-sample prefill (paste or upload)",
+      "hash": "sha256:c1def84ddec203d0",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/051-carve-orthography-trim": {
+      "title": "Feature Specification: Carve gallery trim proposals compare produced characters to the orthography (with cased-letter pairing)",
+      "hash": "sha256:52f42774ce007317",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/051-uppercase-counterpart-suggestion": {
+      "title": "Feature Specification: Suggest the uppercase counterpart when a lowercase cased letter is placed",
+      "hash": "sha256:eb3f01b2411b72b3",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
