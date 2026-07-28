@@ -135,6 +135,35 @@ export interface SurveySession {
 }
 
 /**
+ * Order-preserving deduped union of one string-list field across phases:
+ * NFC-normalise, trim, drop empties, first appearance wins.
+ *
+ * Each call owns its own `seen` set, which is the point — `confirmedInventory`
+ * and `attestedDigraphs` must not suppress each other, so a cluster spelled
+ * the same as a character survives in both lists. The returned `push` lets a
+ * caller keep feeding the same list later under the same rule (the flat
+ * inventory also absorbs the three-store alphabet's projection).
+ */
+function nfcDedupUnion(
+  phaseResults: readonly SurveyPhaseResult[],
+  pick: (phase: SurveyPhaseResult) => readonly string[] | undefined
+): { values: string[]; push: (raw: string) => void } {
+  const seen = new Set<string>();
+  const values: string[] = [];
+  const push = (raw: string): void => {
+    const g = raw.normalize("NFC").trim();
+    if (g.length > 0 && !seen.has(g)) {
+      seen.add(g);
+      values.push(g);
+    }
+  };
+  for (const phase of phaseResults) {
+    for (const raw of pick(phase) ?? []) push(raw);
+  }
+  return { values, push };
+}
+
+/**
  * Merge an ordered list of phase results over an IR-derived axis baseline.
  *
  * Merge rule: `irAxes` is the baseline; each phase's `computedAxes` spreads
@@ -159,34 +188,19 @@ export function mergePhaseResults(
   ];
   const assignments = mergeAssignments(phaseResults.map((p) => p.assignments));
   // Deduped union across phases: NFC-normalise, drop empties/whitespace, first-appearance order.
-  const seen = new Set<string>();
-  const confirmedInventory: string[] = [];
-  const pushInventory = (raw: string): void => {
-    const g = raw.normalize("NFC").trim();
-    if (g.length > 0 && !seen.has(g)) {
-      seen.add(g);
-      confirmedInventory.push(g);
-    }
-  };
-  for (const phase of phaseResults) {
-    for (const raw of phase.confirmedInventory ?? []) pushInventory(raw);
-  }
+  const { values: confirmedInventory, push: pushInventory } = nfcDedupUnion(
+    phaseResults,
+    (p) => p.confirmedInventory
+  );
 
   // Attested multi-letter clusters: same dedupe/normalise rule as the
   // inventory, but a SEPARATE list and a separate `seen` set — a cluster must
   // never suppress or be suppressed by a single character, and must never leak
   // into `confirmedInventory` (see SurveyPhaseResult.attestedDigraphs).
-  const seenDigraphs = new Set<string>();
-  const attestedDigraphs: string[] = [];
-  for (const phase of phaseResults) {
-    for (const raw of phase.attestedDigraphs ?? []) {
-      const d = raw.normalize("NFC").trim();
-      if (d.length > 0 && !seenDigraphs.has(d)) {
-        seenDigraphs.add(d);
-        attestedDigraphs.push(d);
-      }
-    }
-  }
+  const { values: attestedDigraphs } = nfcDedupUnion(
+    phaseResults,
+    (p) => p.attestedDigraphs
+  );
 
   // Three-store alphabet (spec 046): store-wise deduped union across phases;
   // stacks dedupe on their exact ordered shape; declared roles are last-wins.

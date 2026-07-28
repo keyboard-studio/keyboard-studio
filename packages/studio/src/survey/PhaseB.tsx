@@ -651,9 +651,13 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
   //  1. Case fold. `suggestMissingChars` reports each cased letter twice (the
   //     CLDR consumer path synthesizes uppercase into `specials`), so a
   //     lowercase-only exemplar list arrives as "à Á á È é …". Offering both
-  //     is noise: ticking the lowercase brings its uppercase along, exactly as
-  //     the character map already behaves (isFoldedUppercase is the shared
-  //     rule).
+  //     is noise: the uppercase is never a separate decision, because Done
+  //     folds each cased letter's counterpart into `confirmedInventory` via
+  //     `derivedUppercases` (spec 047 FR-009). Note this differs from the
+  //     character map, which pairs the cases EAGERLY on click — here ticking a
+  //     chip adds the one character, and the uppercase joins at submit.
+  //     `isFoldedUppercase` is the fold rule shared with the map's display-side
+  //     case-collapse.
   //  2. Already-in-the-alphabet fold. `suggestMissingChars` filters against the
   //     BASE KEYBOARD's produced set, which knows nothing about the draft — so
   //     after the exemplar prefill seeds the alphabet (IntroChooser's
