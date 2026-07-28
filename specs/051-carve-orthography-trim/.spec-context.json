@@ -1,0 +1,485 @@
+{
+  "workflow": "speckit",
+  "specName": "051-carve-orthography-trim",
+  "branch": "051-carve-orthography-trim",
+  "selectedAt": "2026-07-28T02:44:54.713Z",
+  "currentStep": "implement",
+  "status": "implemented",
+  "history": [
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:03:37.836Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:03:38.509Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-28T03:04:00.978Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T03:07:41.959Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-28T03:07:41.979Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:05.875Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-28T05:00:22.005Z"
+    }
+  ],
+  "coverage": {
+    "FR-001": {
+      "title": "Derive trim proposals by comparing produced characters against the orthography/needed set",
+      "tasks": [
+        "T002",
+        "T003"
+      ]
+    },
+    "FR-002": {
+      "title": "Input/trigger characters MUST NOT be independently compared against the orthography",
+      "tasks": [
+        "T002",
+        "T003",
+        "T010"
+      ]
+    },
+    "FR-003": {
+      "title": "Collateral guard trips only when the partner slot is an output store AND its needed char has no other producer",
+      "tasks": [
+        "T004",
+        "T005",
+        "T011",
+        "T012",
+        "T017"
+      ]
+    },
+    "FR-004": {
+      "title": "Accepting a paired-store trim splices the aligned input/output pair and leaves separate producing rules untouched",
+      "tasks": [
+        "T011",
+        "T013"
+      ]
+    },
+    "FR-005": {
+      "title": "Messages about a dropped paired input character are informational, never a 'character you need' warning",
+      "tasks": [
+        "T013",
+        "T014",
+        "T015",
+        "T016",
+        "T031"
+      ]
+    },
+    "FR-006": {
+      "title": "A trim that would leave a needed character unproducible must warn before applying, never apply silently",
+      "tasks": [
+        "T017",
+        "T019"
+      ]
+    },
+    "FR-007": {
+      "title": "Acting on a trim produces a visible state change on every tile in the trimmed contributor set and updates kept/total",
+      "tasks": [
+        "T020",
+        "T021",
+        "T022"
+      ]
+    },
+    "FR-008": {
+      "title": "A trim resolving to no removable producer or a blocked store class must surface an explicit reason",
+      "tasks": [
+        "T021",
+        "T022",
+        "T023"
+      ]
+    },
+    "FR-009": {
+      "title": "No proposals when there is no orthography signal yet (needed set empty)",
+      "tasks": [
+        "T017",
+        "T018"
+      ]
+    },
+    "FR-010": {
+      "title": "Structural producers (patterns, opaque fragments, deadkey registration rules) are never proposed for whole-node removal",
+      "tasks": [
+        "T005",
+        "T008"
+      ]
+    },
+    "FR-011": {
+      "title": "Trimming a produced letter also trims its produced case counterpart, as one action / one undo entry",
+      "tasks": [
+        "T024",
+        "T025",
+        "T027"
+      ]
+    },
+    "FR-012": {
+      "title": "caseCounterpart returning null leaves the trim acting on the single character only",
+      "tasks": [
+        "T024",
+        "T025"
+      ]
+    },
+    "FR-013": {
+      "title": "Uppercase to lowercase is a reference set; a shared uppercase retires only when its last referencing lowercase is trimmed",
+      "tasks": [
+        "T024",
+        "T025"
+      ]
+    },
+    "FR-014": {
+      "title": "A surplus case pair surfaces as a single paired proposal row",
+      "tasks": [
+        "T024",
+        "T026",
+        "T028"
+      ]
+    },
+    "FR-015": {
+      "title": "Cased-pair trimming composes with store-pair trimming; all resolved trim units apply together",
+      "tasks": [
+        "T024",
+        "T027"
+      ]
+    },
+    "NFR-001": {
+      "title": "Character-level and node-level carve signals agree on whether a produced character is surplus",
+      "tasks": [
+        "T011",
+        "T012"
+      ]
+    },
+    "NFR-002": {
+      "title": "No new debounce/validation timer; proposal recomputation stays a pure pass over the working-copy IR",
+      "tasks": [
+        "T012",
+        "T034"
+      ]
+    },
+    "NFR-003": {
+      "title": "The slot-id contract and applyStoreSlotRemovals coordinated-drop algorithm are unchanged",
+      "tasks": [
+        "T009",
+        "T010",
+        "T027"
+      ]
+    },
+    "NFR-004": {
+      "title": "Team boundary: store role and producer count are engine-side IR facts consumed by the studio",
+      "tasks": [
+        "T004",
+        "T005",
+        "T007",
+        "T030"
+      ]
+    }
+  },
+  "step_summaries": {
+    "tasks": {
+      "summary": "34 tasks across 7 phases: Setup characterization (3), Foundational engine facts (7), US1 the guard fix (6), US2 guard still protects (3), US3 visible trims (4), US4 case pairing (6), Polish (5)."
+    }
+  },
+  "telemetryInstanceId": "f0ef7c4d-241f-4da9-8506-d884e8c4bfcb",
+  "decisions": [
+    {
+      "decision": "US3 (T020) reproduction outcome: the 'trim does nothing visible' symptom WAS the US1 collateral over-shield, fixed by the FR-003 conjunction. The buildPendingCascade plain-toggle fast path is not a second cause -- a second producer always lands in removableCount, blocked, or collateral, each of which opens the dialog. FR-007/FR-008 pass with no production change; pinned as regression tests instead of inventing a fix. T022 = comment only, T023 = no new message ids."
+    }
+  ],
+  "currentTask": "T034"
+}

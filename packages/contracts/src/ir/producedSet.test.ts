@@ -489,3 +489,44 @@ describe("buildProducedSet — range-store interior (spec 042)", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Input-only characters (spec 051, invariant D2a — FR-001/FR-002)
+// ---------------------------------------------------------------------------
+
+describe("buildProducedSet — input-only characters (spec 051)", () => {
+  it("character appearing only in an any()-consumed store is absent from buildProducedSet (invariant D2a)", () => {
+    // FR-001/FR-002: produced characters are rule outputs + output-store slots;
+    // input/trigger characters (any-consumed) are NOT produced characters.
+    // This is the characterization test that pins the existing correct behavior
+    // before touching the collateral guard.
+    const inputStore = makeStore("inputOnly", "xyz");
+    const ir = makeTestIR(
+      [
+        makeGroup([
+          {
+            nodeId: "rule#test",
+            context: [
+              { kind: "vkey", name: "K_A", modifiers: [] },
+              { kind: "any", storeRef: "inputOnly" },
+            ],
+            output: [{ kind: "char", value: "result" }],
+          },
+        ]),
+      ],
+      [inputStore],
+    );
+    const result = buildProducedSet(ir);
+    // The rule produces "result", not the input chars
+    expect(result.has("r")).toBe(true);
+    expect(result.has("e")).toBe(true);
+    expect(result.has("s")).toBe(true);
+    expect(result.has("u")).toBe(true);
+    expect(result.has("l")).toBe(true);
+    expect(result.has("t")).toBe(true);
+    // Characters from the any()-consumed store are NOT produced
+    expect(result.has("x")).toBe(false);
+    expect(result.has("y")).toBe(false);
+    expect(result.has("z")).toBe(false);
+  });
+});
