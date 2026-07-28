@@ -28,6 +28,25 @@ import type { KeyboardIR, TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/con
 export type TouchLayerId = "default" | "shift" | "caps" | (string & {});
 
 /**
+ * The casing-parallel layer for the layer currently being edited, or null when
+ * there is none to pair with.
+ *
+ *   "default"        -> "shift"   (the only case reachable in v1)
+ *   "shift" | "caps" -> null      (already an uppercase layer)
+ *   anything else    -> null      (no defined casing parallel)
+ *
+ * A null return means the caller raises no case-pair proposal. Note the phone
+ * platform ships no `caps` layer, so nothing here invents one — a `caps`
+ * target would be skipped with a warning by the appliers rather than silently
+ * redirected.
+ */
+export function casePairTouchLayer(
+  editingLayer: TouchLayerId,
+): TouchLayerId | null {
+  return editingLayer === "default" ? "shift" : null;
+}
+
+/**
  * Return a structural clone of `layout` with the key whose id is `keyId`
  * promoted to `hand-set`. If the key is already `hand-set` the result is
  * value-equal (idempotent). If no key matches `keyId`, the layout is returned

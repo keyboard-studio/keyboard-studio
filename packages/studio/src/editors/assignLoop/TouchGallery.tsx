@@ -94,7 +94,13 @@ import { formatUncoveredCharsList } from "../../lib/unimplementedInventory.ts";
 import { ErrorText } from "../../ui/index.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
-import { promoteOnManualEdit } from "./touchBehavior.ts";
+import {
+  promoteOnManualEdit,
+  casePairTouchLayer,
+  type TouchLayerId,
+} from "./touchBehavior.ts";
+import { useCasePairCompanion } from "./casePairCompanion.ts";
+import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
 import { displayChar } from "../../lib/irToCarveNodes.ts";
 import { isMutateSeamEnabled } from "../../flags/mutateFlag.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
@@ -219,6 +225,41 @@ export type TouchMethod =
 // MechanismGallery's `if (resolvedSwapVkey === null) return;` style).
 // ---------------------------------------------------------------------------
 
+/**
+ * The touch layer a placement of `char` belongs on, derived from the letter's
+ * case (FR-006). Before this existed, case was simply UNREPRESENTABLE in a
+ * touch placement — both appliers hardcoded the phone `default` layer — so an
+ * accented uppercase letter landed on the lowercase layer.
+ *
+ * This reads the character's case; it does NOT change it. The one
+ * `.toUpperCase()` left on the touch path builds a vkey NAME (`K_A`), not a
+ * letter, and is unrelated.
+ */
+function touchLayerForChar(char: string): TouchLayerId {
+  return /^\p{Lu}$/u.test(char) ? "shift" : "default";
+}
+
+/**
+ * Slot values with an absent `layer` filled in as `"default"`.
+ *
+ * Both appliers treat an absent `layer` as `"default"`, and equality here has
+ * to agree or the compatibility guarantee leaks: a ref stored in a draft
+ * BEFORE the `layer` slot existed carries `{hostKey, char}`, while a freshly
+ * built one carries `{hostKey, char, layer: "default"}`. Comparing raw key
+ * sets would call those distinct and duplicate the chip on every revisit.
+ * `{K_A, á, default}` vs `{K_A, Á, shift}` stay correctly distinct.
+ */
+function normalizeTouchSlots(
+  slots: Record<string, string> | undefined,
+): Record<string, string> {
+  const base = slots ?? {};
+  // Only mechanisms that actually carry a host key participate in layer
+  // targeting; `touch_inherited` has no slotValues at all and must not gain
+  // a phantom one.
+  if (base["hostKey"] === undefined) return base;
+  return base["layer"] === undefined ? { ...base, layer: "default" } : base;
+}
+
 export function buildTouchMechanismRef(
   method: TouchMethod,
   resolvedHostKey: string | null,
@@ -227,26 +268,31 @@ export function buildTouchMechanismRef(
 ): MechanismRef | null {
   if (resolvedHostKey === null) return null;
   const hk = resolvedHostKey;
+  // An absent `layer` means "default" to both appliers, but writing it
+  // explicitly is what makes `{K_A, á, default}` and `{K_A, Á, shift}` two
+  // distinct refs under mechanismRefEquals — which is exactly the distinction
+  // a case pair needs.
+  const layer = touchLayerForChar(char);
   if (method === "longpress_alternates") {
     return {
       patternId: "longpress_alternates",
-      slotValues: { hostKey: hk, char },
+      slotValues: { hostKey: hk, char, layer },
     };
   }
   if (method === "flick_gestures") {
     return {
       patternId: "flick_gestures",
-      slotValues: { hostKey: hk, direction: flickDirection, char },
+      slotValues: { hostKey: hk, direction: flickDirection, char, layer },
     };
   }
   if (method === "touch_key_replace") {
     return {
       patternId: "touch_key_replace",
-      slotValues: { hostKey: hk, char },
+      slotValues: { hostKey: hk, char, layer },
     };
   }
   // multitap
-  return { patternId: "multitap", slotValues: { hostKey: hk, char } };
+  return { patternId: "multitap", slotValues: { hostKey: hk, char, layer } };
 }
 
 // ---------------------------------------------------------------------------
@@ -1252,12 +1298,32 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // `suggestionResolved.has(currentChar) || charTouch.has(currentChar)`, so a
   // revisited configured character is dismissed automatically on every
   // render; there is nothing to reset on navigation.
+  // ---------------------------------------------------------------------------
+  // Case-pair proposal — the SAME hook and banner the other two mechanisms use
+  // ---------------------------------------------------------------------------
+
+  /**
+   * The touch layer the author is editing. Fixed to "default" in v1 — the
+   * gallery has no layer selector yet. It is named rather than inlined so that
+   * adding one widens `casePairTouchLayer`'s mapping instead of rewriting the
+   * proposal site.
+   */
+  const editingLayer: TouchLayerId = "default";
+
+  const {
+    proposal: casePairProposal,
+    propose: proposeCompanion,
+    dismiss: dismissCompanion,
+    clear: clearCompanion,
+  } = useCasePairCompanion();
+
   useEffect(() => {
     setMethod("longpress_alternates");
     setHostKey("");
     setHostKeyCustomChar("");
     setFlickDirection("");
-  }, [currentChar]);
+    clearCompanion();
+  }, [currentChar, clearCompanion]);
 
   // ---------------------------------------------------------------------------
   // canApply
@@ -1303,8 +1369,8 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
    */
   function mechanismRefEquals(a: MechanismRef, b: MechanismRef): boolean {
     if (a.patternId !== b.patternId) return false;
-    const aSlots = a.slotValues ?? {};
-    const bSlots = b.slotValues ?? {};
+    const aSlots = normalizeTouchSlots(a.slotValues);
+    const bSlots = normalizeTouchSlots(b.slotValues);
     const aKeys = Object.keys(aSlots);
     const bKeys = Object.keys(bSlots);
     if (aKeys.length !== bKeys.length) return false;
@@ -1364,6 +1430,38 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     next.set(char, { ...existing, mechanisms: [...existing.mechanisms, ref] });
     return next;
   }
+
+  const handleCasePairConfirm = useCallback(() => {
+    if (casePairProposal === null || casePairProposal.mechanism !== "touch") {
+      return;
+    }
+    const { originalChar, counterpart, hostKey: hk, targetLayer, baseRef } =
+      casePairProposal;
+
+    setCharTouch((prev) => {
+      // Stale-base guard (FR-008): the placement this was raised for must
+      // still be present, by object reference — not by target or index.
+      const existing = prev.get(originalChar);
+      if (existing === undefined || !existing.mechanisms.includes(baseRef)) {
+        return prev;
+      }
+      // The counterpart is a DIFFERENT character, so this lands in its own
+      // charTouch entry and cannot interact with the source character's
+      // touch_inherited exclusivity rules.
+      const ref: MechanismRef = {
+        patternId: baseRef.patternId,
+        slotValues: {
+          ...(baseRef.slotValues ?? {}),
+          char: counterpart,
+          hostKey: hk,
+          layer: targetLayer,
+        },
+      };
+      return appendMechanismToChar(prev, counterpart, ref);
+    });
+
+    clearCompanion();
+  }, [casePairProposal, clearCompanion]);
 
   // ---------------------------------------------------------------------------
   // Suggestion card handlers
@@ -1441,6 +1539,24 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     const ref = buildMechanismRef(currentChar);
     if (ref === null) return;
     setCharTouch((prev) => appendMechanismToChar(prev, currentChar, ref));
+
+    // Case-pair proposal (FR-005): offer the capital on the casing-parallel
+    // layer of the layer being edited. Suppressed when that layer has no
+    // parallel (already a shift/caps layer), and by the hook itself when the
+    // character has no confident capital. Deliberately independent of
+    // `suggestionResolved`, which governs the placement-suggestion card — a
+    // different object entirely.
+    const targetLayer = casePairTouchLayer(editingLayer);
+    if (targetLayer !== null && resolvedHostKey !== null) {
+      proposeCompanion({
+        mechanism: "touch",
+        originalChar: currentChar,
+        hostKey: resolvedHostKey,
+        targetLayer,
+        // Object identity, not target/index (FR-008).
+        baseRef: ref,
+      });
+    }
     // spec-014 FR-014/R4: a manual edit to the host touch key PROMOTES it to
     // `hand-set` in the working IR so subsequent re-propagation never clobbers
     // the author's edit. Flag-gated — off ⇒ byte-identical to P4b (no IR write).
@@ -1963,6 +2079,17 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             </button>
           </div>
         </>
+      )}
+
+      {/* Case-pair proposal — propose-then-confirm, never apply silently
+          (spec v1.3.1 §3c). Offers the capital on the shift layer of the
+          layer being edited. */}
+      {casePairProposal !== null && (
+        <CasePairProposalBanner
+          proposal={casePairProposal}
+          onConfirm={handleCasePairConfirm}
+          onDismiss={dismissCompanion}
+        />
       )}
 
       {/* Configured chip row */}

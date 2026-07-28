@@ -268,9 +268,81 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-28T03:44:45.953Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:44.831Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:45.167Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:45.476Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:45.834Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:46.119Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:46.378Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:46.626Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:46.883Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:47.141Z"
     }
   ],
-  "currentTask": "T032",
+  "currentTask": "T041",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -495,6 +567,69 @@
     "T032": {
       "status": "DONE",
       "did": "Both suites green: 162 passed (155 MechanismGallery + 7 SequenceBuilderPanel); zero deleted lines in MechanismGallery.test.tsx, one import line rewritten in SequenceBuilderPanel.test.tsx to add the SequenceApplied type",
+      "files": [
+        "(verification only)"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Added 5 buildTouchMechanismRef layer cases: default for lowercase, shift for uppercase (including decomposable a-acute/A-acute), caseless to default, layer on all four methods with hostKey unchanged, and lower/upper refs distinct",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.test.tsx"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Added 4 proposal cases: confirm records the capital with layer shift via appendMechanismToChar, dismiss records nothing, caseless raises nothing, and suggestionResolved is neither consulted nor written",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.test.tsx"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Added casePairTouchLayer to touchBehavior.ts (default->shift, shift/caps/other->null) alongside the TouchLayerId alias",
+      "files": [
+        "packages/studio/src/editors/assignLoop/touchBehavior.ts"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "Introduced the explicit editingLayer value in TouchGallery, fixed to default for v1 and named so a future layer selector widens the mapping instead of rewriting the proposal site",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.tsx"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "buildTouchMechanismRef now derives the layer slot from the placed character's case on all four methods; hostKey semantics and the K_ vkey-name toUpperCase left untouched",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.tsx"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "Touch proposal raised from handleApply via casePairTouchLayer(editingLayer), suppressed when that returns null or no host key resolved, carrying baseRef by object identity",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.tsx"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "Rendered the shared banner in TouchGallery and implemented confirm: appends the counterpart's ref with the same hostKey and layer targetLayer, behind an identity stale-baseRef guard",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.tsx"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Added the additive id editor.assignLoop.companion.prompt.touch to the shared banner",
+      "files": [
+        "packages/studio/src/editors/assignLoop/CasePairProposalBanner.tsx"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "TouchGallery 63/63 and the engine pattern-apply suites 441/441 green; full studio suite 4348/4348 confirms a confirmed proposal reaches the shift layer end-to-end",
       "files": [
         "(verification only)"
       ]
