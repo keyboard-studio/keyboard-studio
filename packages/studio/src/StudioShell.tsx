@@ -306,13 +306,18 @@ function NavBar({ active, outputBlocked = false, outputBlockedTitle }: NavBarPro
 // Side effects on step completion are all dispatched through applyStepCompletion()
 // (steps/reducer.ts) — editors are pure (FR-011, R4).
 //
-// Double-instantiation guard (P1 fix):
+// Double-instantiation guard (P1 fix) / re-instantiation on genuine base
+// switch (F1 fix):
 //   setScaffoldSpec() causes a second compile run whose onInstantiate callback
 //   re-captures the artifact into pendingArtifactRef; the commit effect's
 //   doCommit (below) would then run the choose_base side effect
-//   (applyStepCompletion("choose_base", ...)) a second time. An
-//   instantiatedRef flag prevents that side effect from running more than once
-//   per session; it resets on start-over.
+//   (applyStepCompletion("choose_base", ...)) a second time for the SAME base.
+//   An `instantiatedForBaseIdRef` (id-aware, not a plain boolean) prevents
+//   that repeat from running more than once per base id, while still allowing
+//   a confirm for a genuinely DIFFERENT base id later in the same session to
+//   re-run the side effect — see docs/design-notes/switch-base-popup-behavior-log.md
+//   (F1). Resets to null on start-over; set to the restored base's id on
+//   résumé (handleResumeDraft).
 // ---------------------------------------------------------------------------
 
 const SURVEY_DIVIDER_WIDTH = 6;
@@ -526,15 +531,23 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const setValidatorFindings = useWorkingCopyStore((s) => s.setValidatorFindings);
 
   // ---------------------------------------------------------------------------
-  // P1 fix: double-instantiation guard.
+  // P1 fix (double-instantiation guard) + F1 fix (id-aware re-instantiation).
   //
   // For Track 1 (copy), setScaffoldSpec() causes a second compile run whose
-  // onInstantiate fires applyStepCompletion("choose_base")/instantiate a second
-  // time. The rebase-guard in instantiateFromBaseIfConfirmed may no-op the
-  // second call, but edit-state-dependent behavior is non-deterministic.
-  // Gate: the R3 side effect fires exactly once per session; reset on start-over.
+  // onInstantiate re-fires for the SAME base already committed. Originally
+  // gated by a plain boolean ("fire the R3 side effect at most once per
+  // session"), which also — as an unwanted side effect — made it impossible to
+  // ever re-instantiate for a genuinely DIFFERENT base chosen later in the same
+  // session (F1: docs/design-notes/switch-base-popup-behavior-log.md). The gate
+  // is now id-aware: it records WHICH base id doCommit has already committed,
+  // so a second settle for that SAME id (P1) is still a no-op, but a confirm
+  // for a DIFFERENT id (F1, after the synchronous rebase-confirm gate in
+  // BaseResolutionAdapter.onConfirm has already run) proceeds and re-runs
+  // doCommit's body. Null before any commit; reset to null on start-over; set
+  // to the restored base's id on résumé (see handleResumeDraft) so a résumé
+  // over an already-instantiated copy does not re-trigger doCommit either.
   // ---------------------------------------------------------------------------
-  const instantiatedRef = useRef<boolean>(false);
+  const instantiatedForBaseIdRef = useRef<string | null>(null);
 
   // ---------------------------------------------------------------------------
   // Preview-before-commit (choose_base step): the compile pipeline may settle
@@ -542,7 +555,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // several bases first). `onInstantiate` below only CAPTURES the settled
   // artifact here; the actual instantiation (`doCommit`) is deferred until
   // `baseConfirmed` flips true, via the effect that follows `onInstantiate`.
-  // Cleared alongside `instantiatedRef` on start-over.
+  // Cleared alongside `instantiatedForBaseIdRef` on start-over.
   // ---------------------------------------------------------------------------
   const pendingArtifactRef = useRef<{
     base: BaseKeyboard;
@@ -630,8 +643,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         });
       },
       resolveBaseTouchJson: (vfs) => resolveBaseTouchJson(vfs),
-      instantiateFromBaseIfConfirmed: (base, opts) =>
-        instantiateFromBaseIfConfirmed(base, opts),
+      instantiateFromBaseIfConfirmed: (base, opts, options) =>
+        instantiateFromBaseIfConfirmed(base, opts, options),
       // spec-014 mutate seam (T014): read/write the working-copy carve IR for
       // the reducer's path-scoped mutate() apply. Read via getState() (stable,
       // no re-render churn); write via the OVERLAY-PRESERVING setWorkingIR action.
@@ -669,17 +682,22 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // applyStepCompletion("choose_base", ...), which routes Track 2 →
   // instantiateFromExisting, Track 1/default → instantiateFromBaseIfConfirmed.
   //
-  // instantiatedRef still gates this to fire exactly once per session — a
-  // second compile triggered by setScaffoldSpec (or a second confirm click)
-  // will not re-run the instantiate side effect (P1 fix).
+  // instantiatedForBaseIdRef gates this to fire at most once PER BASE ID: a
+  // second compile settle for the SAME base (setScaffoldSpec's re-compile, or
+  // a second confirm click on an unchanged base) is a no-op (P1 fix); a
+  // confirm for a DIFFERENT base id proceeds and re-runs the body below (F1
+  // fix). The rebase-confirm question itself is NOT asked here — by the time
+  // this runs, BaseResolutionAdapter.onConfirm has already resolved it
+  // synchronously (confirmRebaseTo); the `skipRebaseConfirm: true` passed to
+  // applyStepCompletion below tells the reducer not to ask a second time.
   // ---------------------------------------------------------------------------
   const doCommit = useCallback(
     (
       base: BaseKeyboard,
       { vfs, ir, removalCapabilities }: { vfs: VirtualFS; ir: KeyboardIR | null; removalCapabilities: Map<string, RemovalCapability> },
     ) => {
-      if (instantiatedRef.current) return;
-      instantiatedRef.current = true;
+      if (instantiatedForBaseIdRef.current === base.id) return;
+      instantiatedForBaseIdRef.current = base.id;
 
       // Spec 034's VR-5 used to call `replaceActiveDraftIfDifferentProject`
       // here: picking a new base DELETED the previously active project's
@@ -713,7 +731,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       const track = useSurveySessionStore.getState().selectedTrack;
       applyStepCompletion(
         "choose_base",
-        { base, vfs, ir, removalCapabilities, track: track ?? null },
+        { base, vfs, ir, removalCapabilities, track: track ?? null, skipRebaseConfirm: true },
         reducerDepsRef.current,
       );
 
@@ -722,9 +740,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // store state via getState() (identity.keyboardId falls back to
       // baseKeyboard.id — see draftPersistence.ts) so this resolves immediately
       // for both tracks, even before Track 1's Phase A sets a custom keyboardId.
-      // `instantiatedRef` above already guards this whole callback body to run
-      // at most once per mount, so `autosaveTeardownRef.current` is always null
-      // here; the `?.()` is defensive, not load-bearing.
+      // F1 fix: `instantiatedForBaseIdRef` above only guards against a REPEAT
+      // commit for the SAME base id — a genuine base switch (a different id)
+      // reaches this point with a real prior autosave subscription still
+      // live, so `autosaveTeardownRef.current` is NO LONGER always null here;
+      // the `?.()` teardown-then-reinstall below is load-bearing (not
+      // defensive) for that case — it tears down the OLD project's autosave
+      // subscription before installing the NEW project's, so edits after a
+      // switch autosave under the new project key, not the abandoned one.
       const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
       if (projectKey !== null) {
         autosaveTeardownRef.current?.();
@@ -790,23 +813,33 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // ---------------------------------------------------------------------------
   // Single-instantiation effect (preview-before-commit).
   //
-  // Runs `doCommit` at most once, and only once BOTH are true:
+  // Runs `doCommit` once BOTH are true:
   //   - the author has confirmed (`baseConfirmed`, set by
-  //     BaseResolutionAdapter's onConfirm — see editors/adapters/panelAdapters.tsx)
+  //     BaseResolutionAdapter's onConfirm — see editors/adapters/panelAdapters.tsx,
+  //     which has already synchronously resolved any rebase-confirm question
+  //     via confirmRebaseTo BEFORE flipping baseConfirmed — F1 fix)
   //   - the compile pipeline has actually settled for THAT SAME base
   //     (`pendingArtifactRef`, filled by `onInstantiate` above).
   //
-  // Confirm is now gated on `previewStatus === "ready"` in BaseResolution's
-  // commit button, so in practice `baseConfirmed` only flips true once the
-  // pipeline has already settled — the ref is already populated by the time
-  // this effect sees `baseConfirmed`. The `artifactStage`-triggered re-run
-  // (waiting for the ref to be filled after confirm) is retained purely as a
-  // defensive fallback, not a load-bearing path. The `art.base.id === lb.id`
-  // check guards against a stale ref from a PREVIOUS preview surviving a fast
+  // "At most once" is now per-base-id, not per-mount: `doCommit` itself
+  // early-returns via `instantiatedForBaseIdRef` when the settled artifact's
+  // base id has already been committed (P1's repeat-settle case), but
+  // proceeds — and re-instantiates — for a genuinely different confirmed base
+  // id (F1). This effect's own job is unchanged: hand `doCommit` whatever
+  // settled artifact matches the currently confirmed base, whenever that
+  // becomes true, in either order.
+  //
+  // Confirm is gated on `previewStatus === "ready"` in BaseResolution's commit
+  // button, so in practice `baseConfirmed` only flips true once the pipeline
+  // has already settled — the ref is already populated by the time this
+  // effect sees `baseConfirmed`. The `artifactStage`-triggered re-run (waiting
+  // for the ref to be filled after confirm) is retained purely as a defensive
+  // fallback, not a load-bearing path. The `art.base.id === lb.id` check
+  // guards against a stale ref from a PREVIOUS preview surviving a fast
   // re-preview.
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (!baseConfirmed || instantiatedRef.current) return;
+    if (!baseConfirmed) return;
     const art = pendingArtifactRef.current;
     const lb = useSurveySessionStore.getState().localBase;
     if (art && lb && art.base.id === lb.id) {
@@ -854,8 +887,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // ---------------------------------------------------------------------------
   // Start over — reset session store first (clears all traversal slots + history),
   // then reset the working-copy store and local component state.
-  // Ordering: session.reset() before instantiatedRef.current = false so the
-  // guard is clear before any re-instantiation can fire (research D-R5).
+  // Ordering: session.reset() before instantiatedForBaseIdRef.current = null so
+  // the guard is clear before any re-instantiation can fire (research D-R5).
   // ---------------------------------------------------------------------------
   function handleStartOver() {
     // T024 (spec 034 US3, research D5, G-3): clear the durable draft (and the
@@ -867,7 +900,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
     sessionReset();
     resetSurvey();
-    instantiatedRef.current = false;
+    instantiatedForBaseIdRef.current = null;
     pendingArtifactRef.current = null;
     // sessionReset() calls reset() which already clears charactersSubStage to
     // "prefill" (spec 027 Stage 4 — the store slot is the authoritative owner).
@@ -892,9 +925,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Resume banner handlers.
   //
   // Resume: restore both stores from the saved draft, then mark the working copy
-  // as already instantiated so the compile pipeline's onInstantiate does not
-  // re-run instantiateFromBase over the restored copy (which would pop the
-  // rebase-confirm dialog / risk discarding restored survey answers).
+  // as already instantiated FOR THE RESTORED BASE so the compile pipeline's
+  // onInstantiate does not re-run instantiateFromBase over the restored copy
+  // (which would pop the rebase-confirm dialog / risk discarding restored
+  // survey answers — F1/F2). Reads the restored base id back from the
+  // just-patched workingCopyStore rather than hardcoding `true`, so a LATER
+  // genuine switch to a DIFFERENT base (in the same session, after resume)
+  // still re-instantiates normally (F1 fix — see instantiatedForBaseIdRef).
   // Discard: drop the draft and continue fresh.
   // Either way, clearing resumeMeta hides the banner and starts autosave.
   // ---------------------------------------------------------------------------
@@ -914,7 +951,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         // the shared transport (see serverDraftStore.ts's ServerDraftPayload).
         void loadServerDraftContent<StudioDraft>(accessToken, draftId).then((draft) => {
           if (applyStudioDraft(draft)) {
-            instantiatedRef.current = true;
+            instantiatedForBaseIdRef.current = useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
             setActiveProject(draftId);
           }
           setResumeMeta(null);
@@ -924,7 +961,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       }
     }
     if (applyDraft()) {
-      instantiatedRef.current = true;
+      instantiatedForBaseIdRef.current = useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
     }
     setResumeMeta(null);
     setCloudResume(null);
@@ -998,7 +1035,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   //
   // The host handles done/unsupported terminals and the unknown-id error panel.
   // SurveyView retains: resizable panes, OSK right pane, validator, oskMode,
-  // pattern-map effect, instantiatedRef, onInstantiate (FR-009).
+  // pattern-map effect, instantiatedForBaseIdRef, onInstantiate (FR-009).
   // ---------------------------------------------------------------------------
 
   const stepHost = (

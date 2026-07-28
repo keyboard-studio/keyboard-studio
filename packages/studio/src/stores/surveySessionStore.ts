@@ -4,7 +4,7 @@
 // the walked-history stack for back navigation, and the five value slots set
 // across wizard steps. Also holds the characters step's internal substage
 // (CharactersSubStage, spec 027 Stage 4) so it survives component remounts.
-// Does NOT hold pipeline state (instantiatedRef, oskMode) — those remain
+// Does NOT hold pipeline state (instantiatedForBaseIdRef, oskMode) — those remain
 // component-local per spec §4.
 //
 // Architecture contract:
