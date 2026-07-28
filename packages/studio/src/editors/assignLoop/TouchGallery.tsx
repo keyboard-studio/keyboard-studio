@@ -150,9 +150,39 @@ const selectStyle: CSSProperties = gallerySelectMenuStyle(160);
 /** The empty/no-op DesktopModifications — the mods memo's fallback when baseIr is null. */
 const EMPTY_MODS: DesktopModifications = { removals: [], placements: [] };
 
-/** Strip K_ prefix from a key id for user-facing display. */
-function hostKeyShortLabel(keyId: string): string {
-  return keyId.startsWith("K_") ? keyId.slice(2) : keyId;
+/**
+ * Whether a touch layer id carries a casing component (FR-013) — `"shift"`
+ * or `"caps"` — and therefore implies an uppercase keycap. Layer ids are
+ * hyphen-joined components (`comboToTouchLayerId`'s vocabulary, e.g.
+ * `"rightalt-shift"`, `"shift-ctrl-alt"`); this matches whole components,
+ * not substrings, so `"ncaps"` (a real, non-casing layer id) is never
+ * mistaken for a `"caps"` component. Exported so the component-vs-substring
+ * distinction is independently testable — every real vkey id is already
+ * all-uppercase, so testing only through {@link hostKeyShortLabel}'s output
+ * cannot distinguish a correct component match from an accidental substring
+ * match (both produce the same uppercase letter for a real key id).
+ */
+export function isCasingBearingTouchLayer(layer: TouchLayerId): boolean {
+  const components = layer.split("-");
+  return components.includes("shift") || components.includes("caps");
+}
+
+/**
+ * Strip the `K_` prefix from a key id for user-facing display, casing the
+ * result to match the layer it targets (FR-013). A vkey name carries no case
+ * of its own — `K_A` names *the* A key — so a placement's displayed keycap
+ * must derive its case from `layer`, not from the vkey spelling.
+ *
+ * A layer id with no `shift` or `caps` component (`alt`, `ctrl`, `rightalt`,
+ * `rightctrl`, `leftctrl`, `ncaps`) is out of scope for this amendment
+ * (FR-013) and keeps rendering the raw uppercase vkey letter, unchanged from
+ * today.
+ */
+export function hostKeyShortLabel(keyId: string, layer: TouchLayerId): string {
+  const short = keyId.startsWith("K_") ? keyId.slice(2) : keyId;
+  if (layer === "default") return short.toLowerCase();
+  if (isCasingBearingTouchLayer(layer)) return short.toUpperCase();
+  return short;
 }
 
 /** Direction code to arrow character. */
@@ -176,7 +206,12 @@ function touchMechanismLabel(
 ): string {
   const patternId = m.patternId;
   const sv = m.slotValues ?? {};
-  const hkShort = sv["hostKey"] ? hostKeyShortLabel(sv["hostKey"]) : "";
+  // resolveTouchLayerId, not a hand-rolled `?? "default"` — the absent-layer
+  // rule lives in one place (touchLayer.ts), the same helper
+  // normalizeTouchSlots already uses.
+  const hkShort = sv["hostKey"]
+    ? hostKeyShortLabel(sv["hostKey"], resolveTouchLayerId(sv))
+    : "";
   if (patternId === "touch_inherited") {
     return `${target} · ${resolveMessage(i18n, msg({ id: "editor.assignLoop.touch.mechanismLabel.inherited", message: "inherited" }))}`;
   }
@@ -1516,10 +1551,15 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       markSuggestionResolved(currentChar);
       return;
     }
-    const ref: MechanismRef = {
-      patternId: nextMethod,
-      slotValues: { hostKey: hk, char: currentChar },
-    };
+    // Route through buildTouchMechanismRef (FR-012) rather than a bare
+    // literal, so `layer` is always derived via touchLayerForChar — the same
+    // "one casing source" invariant every other placement path already
+    // upholds. `hk` is a non-empty string here (the `hk === ""` guard above
+    // already returned), so the builder's `resolvedHostKey === null` guard
+    // never actually fires on this path — it's a defensive mirror of
+    // handleApply's own `if (ref === null) return;`, not a second real path.
+    const ref = buildTouchMechanismRef(nextMethod, hk, "", currentChar);
+    if (ref === null) return;
     setCharTouch((prev) => appendMechanismToChar(prev, currentChar, ref));
     markSuggestionResolved(currentChar);
   }, [suggestion, currentChar, markSuggestionResolved]);
@@ -1939,7 +1979,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                     <Trans id="editor.assignLoop.touch.suggestion.longpressText">
                       Suggested: long-press{" "}
                       {suggestion.hostKey
-                        ? hostKeyShortLabel(suggestion.hostKey)
+                        ? hostKeyShortLabel(
+                            suggestion.hostKey,
+                            touchLayerForChar(currentChar),
+                          )
                         : t({
                             id: "editor.assignLoop.touch.aKeyPlaceholder",
                             message: "a key",
@@ -1967,7 +2010,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                     <Trans id="editor.assignLoop.touch.suggestion.replaceText">
                       Suggested: replace{" "}
                       {suggestion.hostKey
-                        ? hostKeyShortLabel(suggestion.hostKey)
+                        ? hostKeyShortLabel(
+                            suggestion.hostKey,
+                            touchLayerForChar(currentChar),
+                          )
                         : t({
                             id: "editor.assignLoop.touch.aKeyPlaceholder",
                             message: "a key",
