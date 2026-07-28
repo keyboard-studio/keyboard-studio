@@ -295,6 +295,93 @@ describe("applyDesktopModifications — placements", () => {
 });
 
 // ---------------------------------------------------------------------------
+// 4b. Placements — case-derived layer targeting
+// ---------------------------------------------------------------------------
+
+function phoneLayerKeys(layout: TouchLayoutIR, layerId: string): TouchKeyIR[] {
+  const phone = layout.platforms.find((p) => p.id === "phone")!;
+  const layer = phone.layers.find((l) => l.id === layerId)!;
+  return layer.rows.flatMap((r) => r.keys);
+}
+
+describe("applyDesktopModifications — placements target the case-derived layer", () => {
+  it("lands an uppercase char on the shift layer's host key (empty host -> primary)", () => {
+    const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })], {
+      shiftLayer: [{ nodeId: "node_K_A_shift", id: "K_A" }], // empty shift-layer host
+    });
+    const { layout: out, warnings } = applyDesktopModifications(layout, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }], // "Á" = "A" with acute (upper)
+    });
+    expect(warnings).toHaveLength(0);
+
+    const shiftKeys = phoneLayerKeys(out, "shift");
+    const placed = shiftKeys.find((k) => k.id === "U_00C1")!;
+    expect(placed).toBeDefined();
+    expect(placed.text).toBe("Á");
+
+    // Default layer's K_A is unchanged (still "a", no sk[]).
+    const defaultKa = getKey(out, "K_A")!;
+    expect(defaultKa.text).toBe("a");
+    expect(defaultKa.sk ?? []).toHaveLength(0);
+  });
+
+  it("lands an uppercase char on the shift layer's host key as an sk[] alternate when the shift host is occupied", () => {
+    const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })], {
+      shiftLayer: [makeKey("K_A", { text: "Á", output: "Á" })], // occupied shift-layer host
+    });
+    const { layout: out, warnings } = applyDesktopModifications(layout, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+    expect(warnings).toHaveLength(0);
+
+    const shiftKa = phoneLayerKeys(out, "shift").find((k) => k.id === "K_A")!;
+    expect(shiftKa.sk).toHaveLength(1);
+    expect(shiftKa.sk![0]!.text).toBe("Á");
+
+    // Default layer untouched.
+    const defaultKa = getKey(out, "K_A")!;
+    expect(defaultKa.text).toBe("a");
+    expect(defaultKa.sk ?? []).toHaveLength(0);
+  });
+
+  it("still lands a lowercase char on the default layer (regression guard)", () => {
+    const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })], {
+      shiftLayer: [makeKey("K_A", { text: "Á", output: "Á" })],
+    });
+    const { layout: out, warnings } = applyDesktopModifications(layout, {
+      removals: [],
+      placements: [{ char: "á", hostKey: "K_A" }], // "á" = "a" with acute (lower)
+    });
+    expect(warnings).toHaveLength(0);
+
+    const defaultKa = getKey(out, "K_A")!;
+    expect(defaultKa.sk).toHaveLength(1);
+    expect(defaultKa.sk![0]!.text).toBe("á");
+
+    // Shift layer untouched.
+    const shiftKa = phoneLayerKeys(out, "shift").find((k) => k.id === "K_A")!;
+    expect(shiftKa.text).toBe("Á");
+    expect(shiftKa.sk ?? []).toHaveLength(0);
+  });
+
+  it("falls back to the default layer (with a warning) when no shift layer exists", () => {
+    const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })]); // no shift layer at all
+    const { layout: out, warnings } = applyDesktopModifications(layout, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/shift/);
+
+    const defaultKa = getKey(out, "K_A")!;
+    expect(defaultKa.sk).toHaveLength(1);
+    expect(defaultKa.sk![0]!.text).toBe("Á");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 5. Provenance
 // ---------------------------------------------------------------------------
 
