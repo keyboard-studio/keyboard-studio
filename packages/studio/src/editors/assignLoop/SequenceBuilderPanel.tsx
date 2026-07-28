@@ -149,6 +149,17 @@ const cardStyle: CSSProperties = {
   gap: 8,
 };
 
+/** What a successful Apply hands back so the gallery can raise the parallel
+ *  (uppercase) combo proposal. */
+export interface SequenceApplied {
+  /** `firstLetterOut` — the content letter, case-shifted in the parallel combo. */
+  content: string;
+  /** `secondLetter` — the indicator key; NEVER case-shifted. */
+  indicator: string;
+  /** Identity of the assignment that now carries this char's sequence bucket. */
+  assignment: MechanismAssignment;
+}
+
 export interface SequenceBuilderPanelProps {
   /** The single character the mechanism loop is currently on. */
   char: string;
@@ -156,8 +167,15 @@ export interface SequenceBuilderPanelProps {
   sessionAssignments: MechanismAssignment[];
   /** Commits a new assignments array — the same store action every method uses. */
   recordAssignments: (next: MechanismAssignment[]) => void;
-  /** Called after a sequence is successfully recorded via Apply. */
-  onApplied: () => void;
+  /**
+   * Called after a sequence is successfully recorded via Apply.
+   *
+   * The payload is the seam the shared case-pair proposal rides on: the panel
+   * has no banner of its own, so MechanismGallery (which owns the one hook and
+   * the one banner) raises the S-03 proposal from here. Absent when the Apply
+   * was a dedup no-op — nothing new was recorded, so nothing is proposed.
+   */
+  onApplied: (applied?: SequenceApplied) => void;
   /** Called when the author cancels without recording anything. */
   onCancel: () => void;
 }
@@ -270,8 +288,16 @@ export function SequenceBuilderPanel({
         source: "user",
       };
       recordAssignments([...rest, assignment]);
+      // Hand the gallery what it needs to offer the parallel uppercase combo.
+      onApplied({
+        content: contentValue.value,
+        indicator: indicatorValue.value,
+        assignment,
+      });
+      return;
     }
 
+    // Dedup no-op — nothing new was recorded, so there is nothing to pair.
     onApplied();
   }, [canApply, content, indicator, char, sessionAssignments, recordAssignments, onApplied, seqIndicatorResolveOptions]);
 

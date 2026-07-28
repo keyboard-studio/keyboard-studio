@@ -2054,21 +2054,279 @@ describe("buildTouchMechanismRef — resolved-vkey invariant", () => {
   });
 
   it("builds the expected mechanism ref for each method when resolvedHostKey is a real vkey", () => {
+    // Every ref now carries an explicit `layer` derived from the placed
+    // character's case (spec 051 FR-006). "中" is caseless, so it lands on
+    // "default" — the same layer these refs have always targeted, since both
+    // appliers treat an absent `layer` as "default".
     expect(buildTouchMechanismRef("longpress_alternates", "K_B", "", "中")).toEqual({
       patternId: "longpress_alternates",
-      slotValues: { hostKey: "K_B", char: "中" },
+      slotValues: { hostKey: "K_B", char: "中", layer: "default" },
     });
     expect(buildTouchMechanismRef("flick_gestures", "K_B", "n", "中")).toEqual({
       patternId: "flick_gestures",
-      slotValues: { hostKey: "K_B", direction: "n", char: "中" },
+      slotValues: { hostKey: "K_B", direction: "n", char: "中", layer: "default" },
     });
     expect(buildTouchMechanismRef("multitap", "K_B", "", "中")).toEqual({
       patternId: "multitap",
-      slotValues: { hostKey: "K_B", char: "中" },
+      slotValues: { hostKey: "K_B", char: "中", layer: "default" },
     });
     expect(buildTouchMechanismRef("touch_key_replace", "K_B", "", "中")).toEqual({
       patternId: "touch_key_replace",
-      slotValues: { hostKey: "K_B", char: "中" },
+      slotValues: { hostKey: "K_B", char: "中", layer: "default" },
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 051 US3 — case-aware touch placement (FR-006) and the shift-layer
+// case-pair proposal (FR-005).
+//
+// Before the `layer` slot existed, case was UNREPRESENTABLE in a touch
+// placement: both appliers hardcoded the phone "default" layer, so an accented
+// uppercase letter landed on the lowercase layer. buildTouchMechanismRef now
+// derives the layer from the placed character's case.
+// ---------------------------------------------------------------------------
+
+describe("buildTouchMechanismRef — case-derived layer (spec 051 FR-006)", () => {
+  it("emits layer 'default' for a lowercase letter and 'shift' for its capital", () => {
+    expect(
+      buildTouchMechanismRef("longpress_alternates", "K_A", "", "a")
+        ?.slotValues?.["layer"],
+    ).toBe("default");
+    expect(
+      buildTouchMechanismRef("longpress_alternates", "K_A", "", "A")
+        ?.slotValues?.["layer"],
+    ).toBe("shift");
+  });
+
+  it("handles decomposable accented letters in both cases (á / Á)", () => {
+    expect(
+      buildTouchMechanismRef("longpress_alternates", "K_A", "", "á")
+        ?.slotValues?.["layer"],
+    ).toBe("default");
+    // The inverse case the spec did not name: an accented UPPERCASE letter must
+    // not land on the lowercase layer.
+    expect(
+      buildTouchMechanismRef("longpress_alternates", "K_A", "", "Á")
+        ?.slotValues?.["layer"],
+    ).toBe("shift");
+  });
+
+  it("puts a caseless letter on the default layer", () => {
+    expect(
+      buildTouchMechanismRef("multitap", "K_A", "", "ا")?.slotValues?.["layer"],
+    ).toBe("default");
+  });
+
+  it("carries the layer on every method, and never encodes it into hostKey", () => {
+    for (const method of [
+      "longpress_alternates",
+      "flick_gestures",
+      "multitap",
+      "touch_key_replace",
+    ] as const) {
+      const ref = buildTouchMechanismRef(method, "K_A", "n", "Á");
+      expect(ref?.slotValues?.["layer"]).toBe("shift");
+      // hostKey keeps its exact current meaning: a resolved vkey.
+      expect(ref?.slotValues?.["hostKey"]).toBe("K_A");
+    }
+  });
+
+  it("treats {K_A, á, default} and {K_A, Á, shift} as distinct refs", () => {
+    const lower = buildTouchMechanismRef("longpress_alternates", "K_A", "", "á");
+    const upper = buildTouchMechanismRef("longpress_alternates", "K_A", "", "Á");
+    expect(lower).not.toEqual(upper);
+    expect(lower?.slotValues?.["layer"]).not.toBe(upper?.slotValues?.["layer"]);
+  });
+});
+
+describe("TouchGallery — shift-layer case-pair proposal (spec 051 US3)", () => {
+  /** Apply the default long-press method on `hostKey` for the current char. */
+  async function applyLongpressOn(hostKey: string) {
+    const select = screen.queryByRole("button", { name: /host key/i });
+    expect(select).not.toBeNull();
+    await changeSelectMenu(select!, hostKey);
+    const applyBtn =
+      screen
+        .queryAllByRole("button")
+        .find((b) => b.textContent?.trim() === "Apply method") ?? null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+  }
+
+  function touchMechanismsFor(char: string) {
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    return (
+      draft?.charTouchEntries.find(([c]) => c === char)?.[1]?.mechanisms ?? []
+    );
+  }
+
+  it("a lowercase placement raises a proposal whose confirm records the capital on the shift layer", async () => {
+    seedStore({ withInventory: ["θ"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await applyLongpressOn("K_A");
+
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map Θ to the shift layer of/i }),
+      );
+    });
+
+    // The source placement is untouched on the default layer...
+    expect(touchMechanismsFor("θ")[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "θ",
+      layer: "default",
+    });
+    // ...and the capital lands on the shift layer of the same host key.
+    expect(touchMechanismsFor("Θ")[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "Θ",
+      layer: "shift",
+    });
+  });
+
+  it("dismissing records nothing", async () => {
+    seedStore({ withInventory: ["θ"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await applyLongpressOn("K_A");
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Do not map Θ to the shift layer/i }),
+      );
+    });
+
+    expect(touchMechanismsFor("Θ")).toHaveLength(0);
+    expect(touchMechanismsFor("θ")).toHaveLength(1);
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+
+  it("a caseless letter raises no proposal", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await applyLongpressOn("K_A");
+
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+    expect(touchMechanismsFor("中")).toHaveLength(1);
+  });
+
+  it("raises no redundant proposal once the capital is already on that host key's shift layer", async () => {
+    seedStore({ withInventory: ["θ"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // First apply: propose, then confirm — Θ now sits on K_A's shift layer.
+    await applyLongpressOn("K_A");
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map Θ to the shift layer of/i }),
+      );
+    });
+    expect(touchMechanismsFor("Θ")).toHaveLength(1);
+
+    // Re-applying the same placement must not re-offer a pairing that exists
+    // (spec §Edge Cases, "counterpart already placed").
+    await applyLongpressOn("K_A");
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+    expect(touchMechanismsFor("Θ")).toHaveLength(1);
+  });
+
+  it("still proposes when the capital exists on a DIFFERENT host key's shift layer", async () => {
+    seedStore({ withInventory: ["θ"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await applyLongpressOn("K_A");
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map Θ to the shift layer of/i }),
+      );
+    });
+
+    // A placement on another host key is a different parallel slot, so the
+    // suppression must not over-reach.
+    await applyLongpressOn("K_B");
+    expect(screen.queryByText(/has an uppercase form, Θ/i)).toBeTruthy();
+  });
+
+  it("does not consult or write suggestionResolved — that set governs the placement card, not this proposal", async () => {
+    seedStore({ withInventory: ["θ"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const before =
+      useWorkingCopyStore.getState().touchDraft?.suggestionResolvedChars ?? [];
+
+    await applyLongpressOn("K_A");
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map Θ to the shift layer of/i }),
+      );
+    });
+
+    const after =
+      useWorkingCopyStore.getState().touchDraft?.suggestionResolvedChars ?? [];
+    // The capital never enters the placement-suggestion resolved set.
+    expect(after).not.toContain("Θ");
+    expect(after.filter((c) => !before.includes(c))).not.toContain("Θ");
+  });
+
+  it("stale-guard: confirming a proposal whose raising mechanism ref vanished via chip removal records nothing", async () => {
+    seedStore({ withInventory: ["θ"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await applyLongpressOn("K_A");
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+
+    // Remove the just-applied mechanism for "θ" via its configured chip —
+    // the in-UI equivalent of the raising ref vanishing out from under the
+    // banner. handleRemoveMechanism does not proactively dismiss the
+    // companion (unlike the physical/combo removal paths), so the banner
+    // stays visible and confirming it below exercises handleCasePairConfirm's
+    // confirm-time staleness re-check
+    // (`existing.mechanisms.includes(baseRef)`) rather than a removal-time
+    // dismissal.
+    const configuredGroup = screen.getByRole("group", {
+      name: /configured characters/i,
+    });
+    const chips = configuredGroup.querySelectorAll("button");
+    expect(chips.length).toBe(1);
+    await act(async () => {
+      fireEvent.click(chips[0]!);
+    });
+    expect(touchMechanismsFor("θ")).toHaveLength(0);
+
+    // Banner is still up — the component's pending-proposal state is
+    // untouched by the direct chip removal.
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map Θ to the shift layer of/i }),
+      );
+    });
+
+    // Nothing was recorded for the counterpart — the stale proposal was
+    // dismissed, not applied.
+    expect(touchMechanismsFor("Θ")).toHaveLength(0);
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
   });
 });
