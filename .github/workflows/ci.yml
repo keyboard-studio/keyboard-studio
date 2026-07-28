@@ -10,6 +10,12 @@ on:
   pull_request:
     branches: [main]
 
+# Cancel a superseded run when a newer commit lands on the same ref, so a
+# rapid second push doesn't leave the first full run burning runner minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -62,7 +68,22 @@ jobs:
       # silently change the index goes unenforced. Commit + tarball SHA-256 are
       # pinned in scripts/sldr-version.json and the script fails loudly on a
       # mismatch, so the fetch is reproducible despite touching the network.
+      # Cache the extracted SLDR locale tree, keyed on the pinned version file
+      # (scripts/sldr-version.json holds the commit + tarball SHA-256). On the
+      # common path the pin is unchanged, so the extract is restored and the
+      # download below is skipped. When the pin is bumped the version file
+      # changes, the key misses, and fetch-sldr re-downloads and re-verifies the
+      # SHA-256 — so the checksum guarantee is preserved: any change to what we
+      # fetch invalidates the cache and forces a fresh verified fetch.
+      - name: Cache SLDR extract
+        id: sldr-cache
+        uses: actions/cache@v4
+        with:
+          path: packages/engine/data/sldr/sldr
+          key: sldr-${{ hashFiles('scripts/sldr-version.json') }}
+
       - name: Fetch SLDR (pinned — determinism-test input)
+        if: steps.sldr-cache.outputs.cache-hit != 'true'
         run: pnpm run fetch-sldr
 
       # Build before typecheck — engine/studio depend on contracts'
