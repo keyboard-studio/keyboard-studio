@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-07-27",
+  "lastUpdated": "2026-07-28",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -662,6 +662,14 @@
     "specs/044-cldr-sldr-exemplars": {
       "title": "Feature Specification: CLDR/SLDR exemplars",
       "hash": "sha256:efb413d2330a32fc",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/050-flow-question-i18n": {
+      "title": "Feature Specification: Flow-Question Content i18n (Tier B coverage for the modular flow engine)",
+      "hash": "sha256:a4a726a55cc4a74a",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
