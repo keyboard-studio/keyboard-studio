@@ -152,17 +152,26 @@ const previewCardStyle: CSSProperties = {
 };
 
 /**
- * Two-column grid: choices left (minmax(320px,460px)), sticky live preview
- * right. Collapses to a single column (choices first, preview below) at
- * <=768px via the scoped `.ks-touch-seed-grid` media-query rule below —
- * inline styles can't express a media query, so this is a class hook only;
- * every actual value still comes from tokens/consts here, not from CSS.
- * The outer wrapper already caps width at 1100px and centers, so this grid
- * only needs the column/gap shape.
+ * Two-column grid: choices left (minmax(320px,420px), a comfortably readable
+ * fixed-ish width), sticky live OSK preview right (1fr — takes the rest of
+ * the available width). Collapses to a single column (choices first, preview
+ * below) at <=768px via the scoped `.ks-touch-seed-grid` media-query rule
+ * below — inline styles can't express a media query, so this is a class hook
+ * only; every actual value still comes from tokens/consts here, not from CSS.
+ *
+ * This step is a full-layout screen (StudioShell early-returns; there is no
+ * persistent right pane competing for width), so the preview column is meant
+ * to use the whole remaining page width, the same way the main mobile OSK
+ * preview does (TouchGallery -> AssignLoopShell's flexGrow:1 right pane).
+ * Previously the outer wrapper capped total content width at 1100px, which
+ * squeezed the 1fr preview column down to ~600px — visibly smaller than the
+ * ~700px+ the main preview renders at. The outer wrapper's maxWidth cap has
+ * since been removed (see its render site below) so this column is free to
+ * grow with the viewport instead.
  */
 const gridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "minmax(320px, 460px) 1fr",
+  gridTemplateColumns: "minmax(320px, 420px) 1fr",
   gap: 32,
   alignItems: "start",
 };
@@ -347,7 +356,14 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
 
   return (
     <div style={pageStyle}>
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+      {/* No maxWidth cap here (previously 1100px). This is a full-layout step
+          (StudioShell early-returns — no persistent right pane sharing the
+          width), so the preview column below should be free to grow with the
+          viewport the same way the main mobile OSK preview does (TouchGallery
+          -> AssignLoopShell's flexGrow:1 right pane, which is also uncapped).
+          A hard cap here was squeezing the OSK preview noticeably smaller
+          than that main preview on ordinary desktop widths. */}
+      <div style={{ width: "100%" }}>
         {onBack !== undefined && (
           <button
             type="button"

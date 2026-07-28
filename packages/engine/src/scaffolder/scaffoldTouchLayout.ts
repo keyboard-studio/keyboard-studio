@@ -48,6 +48,8 @@ import type {
 } from "@keyboard-studio/contracts";
 import { NodeIdMinter } from "../shared/node-ids.js";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
+import { decomposeGrapheme } from "../character-discovery/decompose.js";
+import { isCombiningMarkChar } from "../character-discovery/characterMap.js";
 
 // ---------------------------------------------------------------------------
 // US fallback keycaps for unmapped keys
@@ -136,6 +138,85 @@ const OVERFLOW_NEAREST_SLOT: Readonly<Record<string, string>> = {
   K_COLON: "K_L", K_QUOTE: "K_L",
   // right of the ZXCV row.
   K_COMMA: "K_M", K_PERIOD: "K_M", K_SLASH: "K_M",
+};
+
+// ---------------------------------------------------------------------------
+// Overflow character classification (BUG 2 fix) — an unplaced character (no
+// OVERFLOW_NEAREST_SLOT physical neighbor) is a combining mark, a
+// punctuation/symbol character, or something else. Marks and punctuation/
+// symbols get a smarter home than the space bar's "extras" grouping before
+// falling back to it; "other" (e.g. a Latin letter with no compact-layout
+// slot of its own) keeps the pre-existing extras behavior.
+// ---------------------------------------------------------------------------
+
+type OverflowCharKind = "diacritic-mark" | "numeric-or-symbol" | "other";
+
+/**
+ * Classify an overflow character via its Unicode General_Category: Nd (a
+ * decimal digit, any script — not just ASCII 0-9), No (a digit-like but
+ * non-decimal form, e.g. a vulgar fraction), P (punctuation), or S (symbol).
+ *
+ * BUG 3 fix: digits are classified into the same "numeric-or-symbol" bucket
+ * as punctuation/symbols — both are routed to the numeric/symbol layer, never
+ * a letter's sk[] (see {@link collectOverflowEntries}), matching
+ * {@link isValidSuccessorChar}'s digit/No-category rejection for the
+ * deadkey-successor path.
+ */
+function classifyOverflowChar(ch: string): OverflowCharKind {
+  if (isCombiningMarkChar(ch)) return "diacritic-mark";
+  if (/^[\p{Nd}\p{No}\p{P}\p{S}]$/u.test(ch)) return "numeric-or-symbol";
+  return "other";
+}
+
+/**
+ * Every character the numeric layer's hardcoded literal rows already render
+ * (see the numeric-layer construction in buildCanonicalPhoneLayers). An
+ * unplaced punctuation/symbol char that is already one of these needs no
+ * further placement — it is already reachable on the phone layout.
+ */
+const NUMERIC_LAYER_LITERAL_CHARS: ReadonlySet<string> = new Set([
+  "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
+  "$", "@", "#", "%", "&", "_", "=", "|", "\\",
+  "[", "(", ")", "]", "+", "-", "*", "/",
+]);
+
+/**
+ * Nearest numeric-layer literal key (by its rendered char) for an unplaced
+ * punctuation/symbol character NOT already in NUMERIC_LAYER_LITERAL_CHARS —
+ * a small, best-effort table (same spirit as OVERFLOW_NEAREST_SLOT). A char
+ * absent from this table falls through to the space bar's "extras" grouping,
+ * same as any other genuinely unplaceable overflow character.
+ */
+const NUMERIC_NEAREST_SLOT: Readonly<Record<string, string>> = {
+  // semicolon/colon sit on the same physical key as underscore's row on a
+  // US layout (K_MINUS/underscore neighborhood) — nearest existing literal.
+  ";": "_", ":": "_",
+  // exclamation mark is the shifted form of "1" on a US layout.
+  "!": "1",
+  // question mark is the shifted form of "/" on a US layout.
+  "?": "/",
+};
+
+/**
+ * Small, best-effort "mark -> typical base letter's vkey" fallback, used
+ * ONLY when the IR itself carries no character whose decomposition includes
+ * the mark (see resolveDiacriticBaseVkey). Covers the combining marks the
+ * Latin-script orthographies this scaffolder targets use most. A mark absent
+ * from this table falls through to the space bar's extras grouping, tagged
+ * distinctly as unresolvable (see buildCompactPhoneLayers).
+ */
+const MARK_FALLBACK_VKEY: Readonly<Record<string, string>> = {
+  "́": "K_E", // combining acute accent
+  "̀": "K_E", // combining grave accent
+  "̂": "K_O", // combining circumflex accent
+  "̃": "K_N", // combining tilde
+  "̈": "K_U", // combining diaeresis
+  "̧": "K_C", // combining cedilla
+  "̨": "K_A", // combining ogonek
+  "̄": "K_A", // combining macron
+  "̆": "K_A", // combining breve
+  "̌": "K_S", // combining caron
+  "̇": "K_E", // combining dot above
 };
 
 // ---------------------------------------------------------------------------
@@ -269,6 +350,48 @@ function buildCharToVkeyMap(keyMap: KeyMap): Map<string, string> {
 }
 
 /**
+ * Invert a (char → vkey) map into (vkey → base char) — the char that vkey's
+ * OWN (default-priority) rule produces, used by {@link isValidSuccessorChar}
+ * to check that a candidate deadkey successor is actually a diacritic
+ * variant of that same letter. `charToVkey` is built in default > shift >
+ * altgr priority order (see {@link buildCharToVkeyMap}), so the first char
+ * encountered for a given vkey here is its default-layer (plain) form.
+ */
+function buildVkeyToBaseCharMap(charToVkey: ReadonlyMap<string, string>): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const [ch, vkey] of charToVkey) {
+    if (!map.has(vkey)) map.set(vkey, ch);
+  }
+  return map;
+}
+
+/**
+ * BUG 3 guard: reject a deadkey-successor candidate that is not actually
+ * related to `vkey`'s own base letter — the fix for a garbled sk[] longpress
+ * menu mixing the real accented forms with stray digits, fractions, and
+ * punctuation picked up by an over-eager fallback scan.
+ *
+ * Unicode decimal digits (\p{Nd} — any script, not just ASCII 0-9), Unicode
+ * No-category characters (vulgar fractions etc.), and ordinary punctuation/
+ * symbols are rejected outright. When the vkey's own base char is known (via
+ * {@link buildVkeyToBaseCharMap}), `ch` must either case-fold to it or
+ * `decomposeGrapheme(ch)`'s base must match it case-insensitively — i.e.
+ * `ch` must actually be a diacritic variant of the same letter. When the base
+ * char is unknown (the vkey has no known default-layer producer), the
+ * category checks above are the only guard.
+ */
+function isValidSuccessorChar(baseChar: string | undefined, ch: string): boolean {
+  if (/^\p{Nd}$/u.test(ch)) return false;
+  if (/^\p{No}$/u.test(ch)) return false;
+  if (!isCombiningMarkChar(ch) && /^[\p{P}\p{S}]$/u.test(ch)) return false;
+
+  if (baseChar === undefined) return true;
+  if (ch.toLowerCase() === baseChar.toLowerCase()) return true;
+  const decomposed = decomposeGrapheme(ch);
+  return decomposed !== null && decomposed.base.toLowerCase() === baseChar.toLowerCase();
+}
+
+/**
  * Build a (vkey → successor-chars[]) map from recognized deadkey patterns
  * (strategyId starts with "S-02").
  *
@@ -291,14 +414,33 @@ function buildCharToVkeyMap(keyMap: KeyMap): Map<string, string> {
  * those directly when available. The kmnFragment-regex scan is kept only as
  * a last resort, for patterns lacking ownedNodes or whose owned rules don't
  * match either shape above.
+ *
+ * [QC P1 fix] A candidate {@link isValidSuccessorChar} rejects is no longer
+ * dropped with zero diagnostics — it is recorded in the returned `rejected`
+ * list, tagged with the vkey it was rejected from (e.g.
+ * `"3 (rejected from K_E longpress)"`), so a caller can surface it the same
+ * way unresolved overflow characters already are (see
+ * {@link scaffoldTouchLayoutWithDiagnostics}).
  */
 function buildDeadkeySuccessors(
   ir: KeyboardIR,
   charToVkey: ReadonlyMap<string, string>,
-): DeadkeySuccessors {
+): { successors: DeadkeySuccessors; rejected: string[] } {
   const result: DeadkeySuccessors = new Map();
+  const rejected: string[] = [];
+  const vkeyToBaseChar = buildVkeyToBaseCharMap(charToVkey);
 
+  // BUG 3 fix: both call sites below (the accurate owned-rule path and the
+  // kmnFragment-regex fallback) funnel through here, so a garbled candidate
+  // (a digit/fraction/stray punctuation, or a char unrelated to the vkey's
+  // own base letter) is rejected at the single choke point instead of only
+  // one of the two paths.
   const addSuccessor = (vkey: string, ch: string): void => {
+    if (!isValidSuccessorChar(vkeyToBaseChar.get(vkey), ch)) {
+      const tag = `${ch} (rejected from ${vkey} longpress)`;
+      if (!rejected.includes(tag)) rejected.push(tag);
+      return;
+    }
     if (!result.has(vkey)) result.set(vkey, []);
     const list = result.get(vkey)!;
     if (!list.includes(ch)) list.push(ch);
@@ -387,11 +529,21 @@ function buildDeadkeySuccessors(
       if (!vkeyName) continue;
 
       // Scan the kmnFragment for lines with this slot's output chars.
+      //
+      // BUG 3 fix: the `{{slotId}}` match must land on the CONTEXT side
+      // (left of the first '>') — matching it anywhere in the line let a
+      // DIFFERENT line's context (or a stray same-line coincidence further
+      // right) contaminate this slot's collected successors with unrelated
+      // quoted literals (digits, fractions, punctuation) from elsewhere in
+      // the fragment.
       const fragLines = pattern.kmnFragment.split("\n");
       for (const line of fragLines) {
-        if (!line.includes(`{{${slotId}}}`)) continue;
+        const arrowIdx = line.indexOf(">");
+        if (arrowIdx === -1) continue;
+        const contextSide = line.slice(0, arrowIdx);
+        if (!contextSide.includes(`{{${slotId}}}`)) continue;
         // Find quoted characters on the output side (after '>').
-        const outputSide = line.split(">")[1] ?? "";
+        const outputSide = line.slice(arrowIdx + 1);
         const charMatches = outputSide.match(/'([^']+)'/g) ?? [];
         for (const m of charMatches) {
           const ch = m.slice(1, -1);
@@ -403,7 +555,7 @@ function buildDeadkeySuccessors(
     }
   }
 
-  return result;
+  return { successors: result, rejected };
 }
 
 // ---------------------------------------------------------------------------
@@ -505,10 +657,27 @@ function mergeSuccessorMaps(
  * Find every character the desktop rules produce on a vkey OUTSIDE the
  * compact skeleton's 26 covered slots, and route it somewhere it can still
  * be reached from the phone layout:
- *   - `bySlot`   — vkeys with a known physical neighbor (OVERFLOW_NEAREST_SLOT)
- *                  → attached as sk[] longpress on that neighbor.
- *   - `unplaced` — vkeys with no known neighbor → the caller spills these
- *                  into a dedicated "extras" grouping (never dropped).
+ *   - `bySlot`   — a genuine LETTER (or a bare combining mark/other char that
+ *                  reaches this path outside a deadkey pattern — see
+ *                  {@link classifyOverflowChar}'s "other" bucket) on a vkey
+ *                  with a known physical neighbor (OVERFLOW_NEAREST_SLOT) →
+ *                  attached as sk[] longpress on that neighbor.
+ *   - `unplaced` — everything classifyOverflowChar puts in a more specific
+ *                  bucket than "other" (a digit/punctuation/symbol char, or a
+ *                  diacritic mark), regardless of whether the vkey has a
+ *                  known physical neighbor, PLUS any vkey with no known
+ *                  neighbor at all. The caller ({@link buildCompactPhoneLayers})
+ *                  routes a digit/symbol onto the numeric/symbol layer and a
+ *                  mark onto the sk[] of the vkey producing the base letter
+ *                  it decorates, falling back to a dedicated "extras"
+ *                  grouping only when neither resolves (never dropped).
+ *
+ * BUG 3 fix: a number-row vkey (K_1..K_0 etc.) sits in OVERFLOW_NEAREST_SLOT
+ * next to a top-row letter purely for PHYSICAL adjacency — that adjacency is
+ * only a valid routing for a genuine letter/mark, never for the digits and
+ * shift/AltGr symbol variants a number-row key actually produces (e.g. K_3's
+ * "3" / "#" / "¾"). Those always go through `unplaced` so they land on the
+ * numeric layer instead of contaminating a letter's longpress menu.
  */
 function collectOverflowEntries(
   keyMap: KeyMap,
@@ -528,18 +697,23 @@ function collectOverflowEntries(
     if (chars.length === 0) continue;
 
     const slot = OVERFLOW_NEAREST_SLOT[vkey];
-    if (slot === undefined) {
-      for (const ch of chars) {
-        if (!unplaced.includes(ch)) unplaced.push(ch);
-      }
-      continue;
-    }
 
-    const existing = bySlot.get(slot) ?? [];
     for (const ch of chars) {
+      // BUG 3 fix: only a genuine letter ("other") uses the physical-
+      // adjacency slot; a digit/punctuation/symbol or a diacritic mark
+      // always goes through `unplaced` so the caller's category-specific
+      // routing (numeric layer / smart base-letter resolution) handles it,
+      // even when `vkey` has a known letter neighbor.
+      const kind = classifyOverflowChar(ch);
+      if (slot === undefined || kind !== "other") {
+        if (!unplaced.includes(ch)) unplaced.push(ch);
+        continue;
+      }
+
+      const existing = bySlot.get(slot) ?? [];
       if (!existing.includes(ch)) existing.push(ch);
+      bySlot.set(slot, existing);
     }
-    bySlot.set(slot, existing);
   }
 
   return { bySlot, unplaced };
@@ -580,6 +754,28 @@ function attachOverflowExtras(
 }
 
 /**
+ * BUG 1 fix: the altgr layer's toggle key. Without it, a generated altgr
+ * layer has no key anywhere with `nextlayer:"altgr"` — every special letter
+ * placed there (ə, ŋ, ɔ, ɛ, ɗ, æ, etc.) is unreachable in the compiled
+ * keyboard. Modeled on the K_SHIFT round-trip already used here: on the
+ * default/shift layers it is a "special" (sp:1) key that jumps to "altgr";
+ * on the altgr layer itself it is an "active-special" (sp:2) key that always
+ * returns to "default" (the same "always return to default" shape
+ * K_NUMLOCK/K_LOWER use for the numeric layer). Replaces the row-1 trailing
+ * spacer (T_ks_sp_<layer>) ONLY when hasAltgr is true, so every row still
+ * lands at exactly 10 keys in the no-altgr case.
+ */
+function buildAltgrToggleKey(minter: NodeIdMinter, onAltgrLayer: boolean): TouchKeyIR {
+  return {
+    nodeId: minter.mint("touchKey"),
+    id: "T_ks_altgr_toggle",
+    text: "*RAlt*",
+    sp: onAltgrLayer ? 2 : 1,
+    nextlayer: onAltgrLayer ? "default" : "altgr",
+  };
+}
+
+/**
  * Build the compact QWERTY phone default + shift layers (and optionally
  * altgr) from the compact row structure, populating key text from keyMap.
  *
@@ -616,6 +812,13 @@ function buildCanonicalPhoneLayers(
 ): TouchLayoutIR["platforms"][number]["layers"] {
   const layers: TouchLayoutIR["platforms"][number]["layers"] = [];
 
+  // altgr layer only emits when at least one key has an altgr mapping (BUG 1
+  // fix: computed BEFORE the default/shift layers are built below, since the
+  // altgr-reachability toggle key it drives replaces the row-1 trailing
+  // spacer on those layers too — a generated altgr layer with no key ever
+  // reachable from it is otherwise dead weight in the compiled keyboard).
+  const hasAltgr = [...keyMap.values()].some((m) => m.has("altgr"));
+
   // -------------------------------------------------------------------------
   // default and shift layers
   // -------------------------------------------------------------------------
@@ -638,14 +841,18 @@ function buildCanonicalPhoneLayers(
         buildLetterKey(vkey, layerId, keyMap, deadkeySuccessors, minter,
           undefined, isDefault ? undefined : "default"),
       ),
-      // trailing spacer
-      {
-        nodeId: minter.mint("touchKey"),
-        id: `T_ks_sp_${layerId}`,
-        text: "",
-        sp: 10,
-        width: 10,
-      } satisfies TouchKeyIR,
+      // trailing spacer — replaced by the altgr toggle key (BUG 1 fix) when
+      // an altgr layer will actually be generated, so the row still lands
+      // at exactly 10 keys either way.
+      hasAltgr
+        ? buildAltgrToggleKey(minter, false)
+        : ({
+            nodeId: minter.mint("touchKey"),
+            id: `T_ks_sp_${layerId}`,
+            text: "",
+            sp: 10,
+            width: 10,
+          } satisfies TouchKeyIR),
     ];
 
     // Row 2: K_SHIFT  Z X C V B N M  K_PERIOD  K_BKSP (10 keys)
@@ -827,9 +1034,9 @@ function buildCanonicalPhoneLayers(
     ],
   });
 
-  // altgr layer: only emit when at least one key has an altgr mapping.
-  // Uses same row structure as default but with altgr text values.
-  const hasAltgr = [...keyMap.values()].some((m) => m.has("altgr"));
+  // altgr layer: only emit when at least one key has an altgr mapping
+  // (hasAltgr computed above, before the default/shift layers). Uses same
+  // row structure as default but with altgr text values.
   if (hasAltgr) {
     // Row 0: Q W E R T Y U I O P with altgr text
     const altRow0Keys: TouchKeyIR[] = COMPACT_ROW1_VKEYS.map((vkey) => {
@@ -860,13 +1067,9 @@ function buildCanonicalPhoneLayers(
           ...(text !== "" ? { text, output: text } : {}),
         };
       }),
-      {
-        nodeId: minter.mint("touchKey"),
-        id: "T_ks_sp_altgr",
-        text: "",
-        sp: 10,
-        width: 10,
-      } satisfies TouchKeyIR,
+      // The row-1 trailing spacer is always the return-to-default toggle
+      // here — this whole altgr layer only exists because hasAltgr is true.
+      buildAltgrToggleKey(minter, true),
     ];
 
     // Row 2: K_SHIFT  Z X C V B N M  K_PERIOD  K_BKSP
@@ -920,13 +1123,102 @@ function buildCanonicalPhoneLayers(
 }
 
 /**
+ * BUG 2 fix (marks): resolve the vkey that already produces the base letter
+ * `mark` decorates, by scanning every char already known to the keyboard
+ * (every keyMap-produced char, plus every already-collected deadkey
+ * successor) for one whose `decomposeGrapheme()` includes `mark` among its
+ * marks — then mapping THAT base letter to its physical key via
+ * `charToVkey`. Returns undefined when no such char exists anywhere in the
+ * IR; the caller then falls back to {@link MARK_FALLBACK_VKEY}.
+ */
+function resolveDiacriticBaseVkey(
+  mark: string,
+  keyMap: KeyMap,
+  deadkeySuccessors: DeadkeySuccessors,
+  charToVkey: ReadonlyMap<string, string>,
+): string | undefined {
+  const candidates: string[] = [];
+  for (const layerMap of keyMap.values()) {
+    for (const ch of layerMap.values()) candidates.push(ch);
+  }
+  for (const successors of deadkeySuccessors.values()) {
+    for (const ch of successors) candidates.push(ch);
+  }
+
+  for (const ch of candidates) {
+    const decomposed = decomposeGrapheme(ch);
+    if (decomposed === null || !decomposed.marks.includes(mark)) continue;
+    const vkey = charToVkey.get(decomposed.base);
+    if (vkey !== undefined) return vkey;
+  }
+  return undefined;
+}
+
+/**
+ * BUG 2 fix (punctuation/symbols): attach `ch` as an sk[] longpress entry on
+ * the numeric layer's existing literal key for `nearestChar` (looked up by
+ * the same U_<HEX> id {@link charToUnicodeKeyId} used to mint that key).
+ * Returns false (no-op) when the numeric layer or the target key can't be
+ * found, so the caller falls back to the space bar's extras grouping.
+ */
+function attachNumericOverflowExtra(
+  layers: TouchLayoutIR["platforms"][number]["layers"],
+  minter: NodeIdMinter,
+  ch: string,
+  nearestChar: string,
+): boolean {
+  const numericLayer = layers.find((l) => l.id === "numeric");
+  if (numericLayer === undefined) return false;
+
+  const targetId = charToUnicodeKeyId(nearestChar);
+  for (const row of numericLayer.rows) {
+    const idx = row.keys.findIndex((k) => k.id === targetId);
+    if (idx === -1) continue;
+    const key = row.keys[idx]!;
+    row.keys[idx] = {
+      ...key,
+      sk: [
+        ...(key.sk ?? []),
+        {
+          nodeId: minter.mint("touchKey"),
+          id: charToUnicodeKeyId(ch),
+          text: ch,
+          provenance: "physical-suggested" as const,
+        },
+      ],
+    };
+    return true;
+  }
+  return false;
+}
+
+/**
  * Build the compact phone layers AND route every character the desktop
  * rules produce that falls outside the compact skeleton's slots (see
- * {@link collectOverflowEntries}) onto a real key's sk[] longpress menu — a
- * nearest-neighbor slot when known, otherwise the space bar's "extras"
- * grouping. Logs a warning (no emoji, per convention) naming any character
- * that landed in the extras grouping, so a gap is visible rather than only
- * inferred from the layout, AND returns that same character list as
+ * {@link collectOverflowEntries}) onto a real key's sk[] longpress menu.
+ *
+ * BUG 2/3 fix: an overflow char (collectOverflowEntries' `unplaced` list —
+ * now including every digit/punctuation/symbol char, per BUG 3, whether or
+ * not its vkey has a physical letter neighbor) is no longer dumped straight
+ * onto a letter's sk[] or the space bar's "extras" grouping — it is
+ * classified first ({@link classifyOverflowChar}) and routed to a more
+ * sensible home:
+ *   - a diacritic mark   -> the sk[] of the vkey that produces the base
+ *     letter it decorates ({@link resolveDiacriticBaseVkey}, falling back to
+ *     {@link MARK_FALLBACK_VKEY});
+ *   - a digit/punctuation/symbol char already rendered by the numeric
+ *     layer's literal keys ({@link NUMERIC_LAYER_LITERAL_CHARS}) -> needs no
+ *     further placement (e.g. a number-row key's plain digit is already on
+ *     the numeric layer);
+ *   - any other digit/punctuation/symbol char -> the numeric layer's nearest
+ *     literal key ({@link NUMERIC_NEAREST_SLOT} / {@link attachNumericOverflowExtra});
+ *   - anything else, or a mark/digit/punctuation/symbol char neither table
+ *     above can resolve -> the space bar's "extras" grouping, same as before.
+ *
+ * Logs a warning (no emoji, per convention) naming any character that still
+ * landed in the extras grouping — an unresolved mark is tagged distinctly
+ * (e.g. "<mark> (no resolvable base letter)") so the gap is visible rather
+ * than only inferred from the layout — AND returns that same list as
  * structured data (`unplacedChars`) so a caller with no console (e.g. the
  * studio's live preview) can surface it too — see
  * {@link scaffoldTouchLayoutWithDiagnostics}.
@@ -937,20 +1229,74 @@ function buildCompactPhoneLayers(
   minter: NodeIdMinter,
 ): { layers: TouchLayoutIR["platforms"][number]["layers"]; unplacedChars: string[] } {
   const { bySlot: overflowBySlot, unplaced } = collectOverflowEntries(keyMap, COVERED_VKEYS);
-  const combinedSuccessors = mergeSuccessorMaps(deadkeySuccessors, overflowBySlot);
+  const charToVkey = buildCharToVkeyMap(keyMap);
+
+  const markSuccessors = new Map<string, string[]>();
+  const numericAttachments: Array<{ ch: string; nearestChar: string }> = [];
+  const stillUnplaced: string[] = [];
+  const unresolvedMarks = new Set<string>();
+
+  for (const ch of unplaced) {
+    const kind = classifyOverflowChar(ch);
+
+    if (kind === "diacritic-mark") {
+      const vkey =
+        resolveDiacriticBaseVkey(ch, keyMap, deadkeySuccessors, charToVkey) ??
+        MARK_FALLBACK_VKEY[ch];
+      if (vkey !== undefined) {
+        const existing = markSuccessors.get(vkey) ?? [];
+        if (!existing.includes(ch)) existing.push(ch);
+        markSuccessors.set(vkey, existing);
+        continue;
+      }
+      unresolvedMarks.add(ch);
+      stillUnplaced.push(ch);
+      continue;
+    }
+
+    if (kind === "numeric-or-symbol") {
+      if (NUMERIC_LAYER_LITERAL_CHARS.has(ch)) continue; // already reachable
+      const nearestChar = NUMERIC_NEAREST_SLOT[ch];
+      if (nearestChar !== undefined) {
+        numericAttachments.push({ ch, nearestChar });
+        continue;
+      }
+      stillUnplaced.push(ch);
+      continue;
+    }
+
+    stillUnplaced.push(ch);
+  }
+
+  const combinedSuccessors = mergeSuccessorMaps(
+    mergeSuccessorMaps(deadkeySuccessors, overflowBySlot),
+    markSuccessors,
+  );
 
   const layers = buildCanonicalPhoneLayers(keyMap, combinedSuccessors, minter);
 
-  if (unplaced.length > 0) {
-    attachOverflowExtras(layers, minter, unplaced);
+  // [QC P2 fix] attachNumericOverflowExtra's boolean return is honored: when
+  // it can't find the target numeric-layer key (no-op), the char falls back
+  // to the space bar's extras grouping instead of being silently dropped.
+  for (const { ch, nearestChar } of numericAttachments) {
+    const attached = attachNumericOverflowExtra(layers, minter, ch, nearestChar);
+    if (!attached) stillUnplaced.push(ch);
+  }
+
+  const unplacedChars = stillUnplaced.map((ch) =>
+    unresolvedMarks.has(ch) ? `${ch} (no resolvable base letter)` : ch,
+  );
+
+  if (stillUnplaced.length > 0) {
+    attachOverflowExtras(layers, minter, stillUnplaced);
     console.warn(
-      `[scaffoldTouchLayout] ${unplaced.length} character(s) produced by the desktop rules ` +
+      `[scaffoldTouchLayout] ${stillUnplaced.length} character(s) produced by the desktop rules ` +
         "have no compact-layout key and no known adjacent slot; placed on the space bar's " +
-        `longpress ("extras") menu instead of being dropped: ${unplaced.join(", ")}`,
+        `longpress ("extras") menu instead of being dropped: ${unplacedChars.join(", ")}`,
     );
   }
 
-  return { layers, unplacedChars: unplaced };
+  return { layers, unplacedChars };
 }
 
 /**
@@ -1079,11 +1425,13 @@ export interface ScaffoldTouchLayoutResult {
    * Characters produced by the desktop rules that had no compact-layout key
    * and no known adjacent slot, so they were spilled onto the space bar's
    * "extras" longpress menu instead of being dropped (see
-   * {@link collectOverflowEntries} / {@link attachOverflowExtras}). Empty
-   * when nothing was spilled. Advisory only — never gates anything; a caller
-   * with a UI (e.g. the studio's live seed preview) can surface this list to
-   * the author instead of relying on the `console.warn` this function also
-   * emits.
+   * {@link collectOverflowEntries} / {@link attachOverflowExtras}), PLUS
+   * [QC P1 fix] any deadkey-successor candidate {@link isValidSuccessorChar}
+   * rejected (tagged `"<ch> (rejected from <vkey> longpress)"` — see
+   * {@link buildDeadkeySuccessors}). Empty when nothing was spilled or
+   * rejected. Advisory only — never gates anything; a caller with a UI (e.g.
+   * the studio's live seed preview) can surface this list to the author
+   * instead of relying on the `console.warn` this function also emits.
    */
   unplacedChars: string[];
 }
@@ -1103,7 +1451,20 @@ export function scaffoldTouchLayoutWithDiagnostics(ir: KeyboardIR): ScaffoldTouc
   const minter = new NodeIdMinter();
   const keyMap = buildKeyMap(ir);
   const charToVkey = buildCharToVkeyMap(keyMap);
-  const deadkeySuccessors = buildDeadkeySuccessors(ir, charToVkey);
+  const { successors: deadkeySuccessors, rejected: rejectedSuccessors } = buildDeadkeySuccessors(
+    ir,
+    charToVkey,
+  );
+
+  // [QC P1 fix] a rejected deadkey-successor candidate is never silently
+  // dropped — aggregate a single warning (no spam per-candidate) naming every
+  // one, mirroring the overflow-extras warning below.
+  if (rejectedSuccessors.length > 0) {
+    console.warn(
+      `[scaffoldTouchLayout] ${rejectedSuccessors.length} deadkey-successor candidate(s) were ` +
+        `rejected as unrelated to their vkey's own base letter: ${rejectedSuccessors.join(", ")}`,
+    );
+  }
 
   // ------------------------------------------------------------------
   // Case A: no existing touch layout — generate from scratch using
@@ -1126,7 +1487,7 @@ export function scaffoldTouchLayoutWithDiagnostics(ir: KeyboardIR): ScaffoldTouc
         ],
         nodeIds: [],
       },
-      unplacedChars,
+      unplacedChars: [...rejectedSuccessors, ...unplacedChars],
     };
   }
 
@@ -1138,7 +1499,7 @@ export function scaffoldTouchLayoutWithDiagnostics(ir: KeyboardIR): ScaffoldTouc
   );
 
   let platforms: TouchLayoutIR["platforms"];
-  let unplacedChars: string[] = [];
+  let unplacedChars: string[] = [...rejectedSuccessors];
 
   if (existingPhoneIdx >= 0) {
     // Augment the existing phone platform with deadkey sk[] entries.
@@ -1153,7 +1514,7 @@ export function scaffoldTouchLayoutWithDiagnostics(ir: KeyboardIR): ScaffoldTouc
       deadkeySuccessors,
       minter,
     );
-    unplacedChars = built.unplacedChars;
+    unplacedChars = [...unplacedChars, ...built.unplacedChars];
     platforms = [
       ...ir.touchLayout.platforms,
       {
