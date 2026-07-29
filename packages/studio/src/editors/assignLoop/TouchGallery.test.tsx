@@ -3365,7 +3365,8 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     // "ă" itself is recorded directly (unaffected by the accelerator).
     expect(touchMechanismsFor("ă")).toHaveLength(1);
 
-    // The banner offers the family — a's common diacritic family capped at 6.
+    // The banner offers the family — a's full single-mark diacritic family
+    // (no cap), common accents first.
     expect(screen.getByText(/is part of a family of accented letters/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: /Add the related accented letters to K_A/i })).toBeTruthy();
 
@@ -3391,7 +3392,9 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
       fireEvent.click(screen.getByRole("button", { name: /Add the related accented letters to K_A/i }));
     });
 
-    // a's family, minus "ă" itself (not a member of the composed family).
+    // The common accents lead a's (now uncapped) family and are all placed;
+    // "ă" itself is excluded as the accepted char. This checks the common
+    // subset — the full uncapped family is pinned in siblingAccents.test.ts.
     for (const lower of ["à", "á", "â", "ä", "ã", "å"]) {
       const mechanisms = touchMechanismsFor(lower);
       expect(mechanisms).toHaveLength(1);

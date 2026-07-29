@@ -36,10 +36,10 @@ export type CaseCounterpartFn = (
 ) => { counterpart: string; direction: "toUpper" | "toLower" } | null;
 
 /**
- * Fixed priority order of single combining marks defining the "common"
- * diacritic family (linguist-specified order — do not re-sort). Each is
- * tried against the base letter in this order; the first six that compose to
- * a single precomposed code point form the sibling set (RULE 2 below).
+ * Preferred ordering of the common single combining marks (linguist-specified
+ * order — do not re-sort). This governs the ORDER siblings are offered in, not
+ * WHICH ones: siblings whose mark appears here lead, in this order; any further
+ * single-mark siblings of the base follow, by mark code point (RULE 2).
  * Written as explicit `\u` escapes rather than raw combining characters —
  * a bare combining mark in source text renders attached to whatever
  * precedes it (including a comment dash) and is easy to mis-copy.
@@ -58,27 +58,54 @@ const DIACRITIC_PRIORITY: readonly string[] = [
   "\u0307", // dot above
 ];
 
-const MAX_LOWERCASE_SIBLINGS = 6;
+// The combining-diacritical-marks block (Mn). Every single mark in this range
+// is tried against the base; the ones that canonically compose to a single
+// precomposed code point form the sibling family. This is the whole span the
+// generator sweeps — there is deliberately NO numeric cap on the family size
+// (the author asked for the full accent family, not a curated top-N), only the
+// structural single-mark / single-code-point filter below.
+const COMBINING_MARKS_START = 0x0300;
+const COMBINING_MARKS_END = 0x036f;
 
 /**
- * The common single-mark diacritic family of `base` (a bare Latin letter),
- * in `DIACRITIC_PRIORITY` order, capped at {@link MAX_LOWERCASE_SIBLINGS}.
- * A candidate is kept only when `(base + mark).normalize("NFC")` composes to
- * a SINGLE code point different from `base` — this is what naturally excludes
- * "stroke" and other non-NFD-composable marks (RULE 2/5), and excludes any
- * form that would need 2+ combining marks (composing a candidate from a
- * single mark structurally cannot need a second one).
+ * The complete single-mark diacritic family of `base` (a bare Latin letter):
+ * every combining mark in the combining-diacritics block that, appended to
+ * `base`, canonically composes (`normalize("NFC")`) to a SINGLE code point
+ * distinct from `base`. That single-code-point test is what excludes "stroke"
+ * and other non-NFD-composable marks (RULE 2/5) and excludes any multi-mark
+ * stack (composing from a single mark structurally cannot need a second one).
+ *
+ * Ordering (RULE 2): marks listed in `DIACRITIC_PRIORITY` lead, in that order;
+ * remaining siblings follow by mark code point. No cap on the count.
  */
 function lowercaseSiblingsOf(base: string): string[] {
-  const out: string[] = [];
-  for (const mark of DIACRITIC_PRIORITY) {
-    if (out.length >= MAX_LOWERCASE_SIBLINGS) break;
-    const composed = (base + mark).normalize("NFC");
-    if ([...composed].length === 1 && composed !== base) {
-      out.push(composed);
-    }
+  // Keyed by the composed CHARACTER (not the mark) so a base+mark that
+  // normalizes through a canonically-equivalent mark — e.g. U+0340 COMBINING
+  // GRAVE TONE MARK folds to U+0300 — cannot yield a duplicate sibling. The
+  // stored value is the sibling's own CANONICAL combining mark (`NFD[1]`),
+  // which is what the priority ordering keys on.
+  const byChar = new Map<string, string>();
+  for (let cp = COMBINING_MARKS_START; cp <= COMBINING_MARKS_END; cp++) {
+    const composed = (base + String.fromCodePoint(cp)).normalize("NFC");
+    if ([...composed].length !== 1 || composed === base) continue;
+    // Keep ONLY true single-mark siblings: NFD must be exactly
+    // [base, one combining mark]. This excludes multi-diacritic stacks that a
+    // single source mark can still reach (e.g. U+0344 -> u+diaeresis+acute =
+    // ǘ, whose NFD is length 3) — RULE 2's "single-mark family, no stacks".
+    const decomposed = [...composed.normalize("NFD")];
+    if (decomposed.length !== 2 || decomposed[0] !== base) continue;
+    if (!byChar.has(composed)) byChar.set(composed, decomposed[1] as string);
   }
-  return out;
+  const priorityRank = (mark: string): number => {
+    const idx = DIACRITIC_PRIORITY.indexOf(mark);
+    // Non-priority marks sort after every priority mark, then by code point.
+    return idx === -1
+      ? DIACRITIC_PRIORITY.length + (mark.codePointAt(0) ?? 0)
+      : idx;
+  };
+  return [...byChar.entries()]
+    .sort((a, b) => priorityRank(a[1]) - priorityRank(b[1]))
+    .map(([composed]) => composed);
 }
 
 /**
