@@ -31,6 +31,16 @@
  *     resolves the pairing graph and coordinates the drop across any OTHER
  *     paired store at the same position, so the caller doesn't need to (and
  *     shouldn't) duplicate that resolution here.
+ *   - PRODUCED vs. USED (the §0 "used" gate): a rule's `any()`-consumed INPUT
+ *     store occurrence of `target` is only tagged `producedRole: "used"`
+ *     (blue, non-deletable) when that SAME rule does NOT also produce
+ *     `target` on its output side. A rule that outputs `target` is green/
+ *     "produced" for it even when `target` also happens to sit in that
+ *     rule's own input store (e.g. an identity-mapped deadkey combination, or
+ *     a fan-out whose input and output stores share an item) — see
+ *     `ruleProducesChar` below, the single predicate both this gate and the
+ *     canonical deadkey example (`A + ◌̂ → Â`: green on Â's card, blue on A's)
+ *     are decided from.
  *   - SINGLE-CHAR WHOLE-DELETE: whole-rule-delete only when the rule's ENTIRE
  *     NFC output === targetChar (single-char producer). Multi-char producers go
  *     to `blocked`.
@@ -541,6 +551,68 @@ function storeDisplayNameField(storeName: string): { storeDisplayName: string } 
   return displayName !== undefined ? { storeDisplayName: displayName } : {};
 }
 
+/**
+ * True when RULE's OUTPUT side produces `target` — i.e. the SAME production
+ * test the "(a) Store-produced target" and "(b) Literal target" loops below
+ * perform when they build their own descriptors, computed once, ahead of
+ * §0, so §0's input-side loop can ask "does this rule ALSO produce the char
+ * I'm about to tag 'used' for?" without a second, potentially-divergent
+ * definition of "produces".
+ *
+ * Two ways a rule's output can produce `target` (either is sufficient):
+ *   - STORE OUTPUT: an `index()`/`outs()` element over a store that contains
+ *     `target` at a slot the "(a)" loop would ITSELF attribute a production
+ *     to — i.e. every index is scanned (not just the offset-paired one), but
+ *     an index whose ALIGNED any()-consumed input item resolves to backspace
+ *     (`K_BKSP`) is skipped, via the SAME `resolveAlignedAnyElement` +
+ *     `contributorInputHasBackspace` pairing the "(a)" loop uses at its own
+ *     per-slot backspace check below. Without this exclusion, a store whose
+ *     ONLY occurrence of `target` sits at such a backspace-aligned index
+ *     would report a production here that "(a)" itself would never
+ *     attribute — a divergent, false-positive definition of "produces" that
+ *     would wrongly suppress a legitimate blue "used" row for `target`'s
+ *     other, non-backspace input occurrence.
+ *   - LITERAL OUTPUT: `target` appears in the NFC-joined literal `char`
+ *     output (the same `charVals`/`wholeOutput` computation the "(b)" loop
+ *     uses, whether as a single-char whole-rule match or as part of a
+ *     longer, unsplittable literal run).
+ *
+ * A rule producing `target` is GREEN ("produced") for it regardless of
+ * whether `target` ALSO appears on that same rule's input side — the
+ * canonical case being a deadkey combination rule whose base char happens to
+ * equal its own output (an identity mapping), or a fan-out rule where the
+ * any()-consumed store and the index()-targeted store happen to share an
+ * item. Per the produced/used contract, such a rule must never ALSO surface
+ * a spurious blue "used" row for `target` — it is attributed via the
+ * output-side branch alone.
+ */
+function ruleProducesChar(
+  outEls: { kind: string; value?: string; storeRef?: string; offset?: number }[],
+  target: string,
+  storeMap: ReadonlyMap<string, KeyboardIR['stores'][number]>,
+  context: readonly ContextElement[],
+): boolean {
+  for (const el of outEls) {
+    if ((el.kind === 'index' || el.kind === 'outs') && el.storeRef !== undefined) {
+      const store = storeMap.get(el.storeRef);
+      if (store === undefined) continue;
+      const alignedAnyEl = resolveAlignedAnyElement(context, { kind: el.kind, offset: el.offset });
+      const anyStore = alignedAnyEl !== undefined ? storeMap.get(alignedAnyEl.storeRef) : undefined;
+      for (let i = 0; i < store.items.length; i++) {
+        const item = store.items[i];
+        if (item === undefined || item.kind !== 'char' || item.value.normalize('NFC') !== target) continue;
+        const baseItem = anyStore?.items[i];
+        if (contributorInputHasBackspace(context, baseItem)) continue;
+        return true;
+      }
+    }
+  }
+  const charVals = outEls.filter((el) => el.kind === 'char').map((el) => el.value ?? '');
+  if (charVals.length === 0) return false;
+  const wholeOutput = charVals.join('').normalize('NFC');
+  return wholeOutput.includes(target);
+}
+
 // ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
@@ -718,45 +790,58 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
 
       const isDeadkeyRule = rule.context.some((el) => el.kind === 'deadkey');
 
+      const outEls = rule.output as { kind: string; value?: string; storeRef?: string; offset?: number }[];
+
+      // Does THIS rule produce `target` on its own output side (store or
+      // literal)? Computed once, ahead of §0, so §0 can gate its "used"
+      // emission on it — see `ruleProducesChar`'s doc comment. A rule that
+      // produces `target` is GREEN for it regardless of whether `target`
+      // also appears on that rule's input side; only a rule that does NOT
+      // produce `target` gets to tag an input-side occurrence "used".
+      const ruleProducesTarget = ruleProducesChar(outEls, target, storeMap, rule.context);
+
       // (0) Input-store occurrences — any() context elements ("remove everywhere",
       //     #525 v2). Independent of the output-store/literal classification below
       //     (no early `continue` here): a rule's INPUT store slot for this char is a
-      //     contributor regardless of what that same rule's OUTPUT does. `notany()`
+      //     contributor regardless of what that same rule's OUTPUT does — UNLESS
+      //     that same rule's output ALSO produces `target` (`ruleProducesTarget`),
+      //     in which case the char is attributed via the output-side branch alone
+      //     (green/"produced"), never a second, spurious blue "used" row. `notany()`
       //     is deliberately excluded (see the module doc comment) — only `any()`.
-      for (const el of rule.context) {
-        if (el.kind !== 'any') continue;
-        const inputStore = storeMap.get(el.storeRef);
-        if (inputStore === undefined) continue;
-        let inputMatched = false;
-        for (let i = 0; i < inputStore.items.length; i++) {
-          const item = inputStore.items[i];
-          if (item !== undefined && item.kind === 'char' && item.value.normalize('NFC') === target) {
-            // The input side alone doesn't cheaply resolve a deadkey's
-            // mark/base (that requires the OUTPUT-side alignment below), so
-            // this descriptor deliberately leaves mark/base/storeDisplayName
-            // absent when it's a deadkey-context rule — the studio's
-            // fallback template covers it. A non-deadkey input match still
-            // gets a `storeDisplayName`, same as an output-side match.
-            addStoreSlot(
-              makeSlotId(inputStore.nodeId, i),
-              'input',
-              isDeadkeyRule
-                ? { kind: 'deadkey', producedChar: target, producedRole: 'used' }
-                : {
-                    kind: 'store-slot',
-                    producedChar: target,
-                    producedRole: 'used',
-                    ...storeDisplayNameField(inputStore.name),
-                  },
-            );
-            addLocation('store', inputStore.name, inputStore.nodeId);
-            inputMatched = true;
+      if (!ruleProducesTarget) {
+        for (const el of rule.context) {
+          if (el.kind !== 'any') continue;
+          const inputStore = storeMap.get(el.storeRef);
+          if (inputStore === undefined) continue;
+          let inputMatched = false;
+          for (let i = 0; i < inputStore.items.length; i++) {
+            const item = inputStore.items[i];
+            if (item !== undefined && item.kind === 'char' && item.value.normalize('NFC') === target) {
+              // The input side alone doesn't cheaply resolve a deadkey's
+              // mark/base (that requires the OUTPUT-side alignment below), so
+              // this descriptor deliberately leaves mark/base/storeDisplayName
+              // absent when it's a deadkey-context rule — the studio's
+              // fallback template covers it. A non-deadkey input match still
+              // gets a `storeDisplayName`, same as an output-side match.
+              addStoreSlot(
+                makeSlotId(inputStore.nodeId, i),
+                'input',
+                isDeadkeyRule
+                  ? { kind: 'deadkey', producedChar: target, producedRole: 'used' }
+                  : {
+                      kind: 'store-slot',
+                      producedChar: target,
+                      producedRole: 'used',
+                      ...storeDisplayNameField(inputStore.name),
+                    },
+              );
+              addLocation('store', inputStore.name, inputStore.nodeId);
+              inputMatched = true;
+            }
           }
+          if (inputMatched) addRuleLocation(rule, group);
         }
-        if (inputMatched) addRuleLocation(rule, group);
       }
-
-      const outEls = rule.output as { kind: string; value?: string; storeRef?: string; offset?: number }[];
 
       // (a) Store-produced target — the character is emitted through an
       //     index()/outs() over a store (base-layer alphabet fan-out OR a

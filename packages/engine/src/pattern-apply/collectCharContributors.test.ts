@@ -165,15 +165,16 @@ describe('collectCharContributors', () => {
     expect(result.locations.some((l) => l.kind === 'store')).toBe(true);
   });
 
-  it('S-02 fan-out: does not nul other slots (only the matching ones, output AND input)', () => {
+  it('S-02 fan-out: a rule that both consumes AND produces the target char (identity-mapped ε) attributes only the output slot, never a spurious "used" input slot', () => {
     const ir = makeCameroonIR();
     // ε is at index 2 of BOTH the output store (dkt003b) and the any()-consumed
-    // input store (dkf003b) — "remove everywhere" (#525 v2) finds both, and
-    // only those two slots (no other index nul'd).
-    const resultE = collectCharContributors(ir, 'ε'); // ε at slot 2
-    expect(resultE.storeSlotIds).toHaveLength(2);
-    expect(resultE.storeSlotIds).toContain('sid-dkt#2');
-    expect(resultE.storeSlotIds).toContain('sid-dkf#2');
+    // input store (dkf003b) — this single fan-out rule maps ε -> ε (identity).
+    // Per the produced/used contract, a rule that OUTPUTS the target char is
+    // "produced" for it even though the char also sits on that same rule's
+    // input side — so only the output slot (sid-dkt#2) is attributed here;
+    // sid-dkf#2 must NOT surface as a "used" input slot for this rule.
+    const resultE = collectCharContributors(ir, 'ε');
+    expect(resultE.storeSlotIds).toEqual(['sid-dkt#2']);
   });
 
   it('multi-char producer goes to blocked (not ruleNodeIds)', () => {
@@ -469,14 +470,15 @@ describe('collectCharContributors — role-tagged storeSlots (spec 051)', () => 
   });
 
   it('tags a slot reached by BOTH roles as "output" — the producing role dominates', () => {
-    // 'ε' is at index 2 of the input store AND index 2 of the output store, so
-    // the fixture yields one slot of each role; a single store used both ways
-    // must resolve to "output".
-    const both = collectCharContributors(makeCameroonIR(), 'ε');
-    expect(both.storeSlots).toEqual([
-      { slotId: 'sid-dkf#2', role: 'input' },
-      { slotId: 'sid-dkt#2', role: 'output' },
-    ]);
+    // NOTE: 'ε' at index 2 of BOTH the input store (dkf003b) and the output
+    // store (dkt003b) of the SAME rule (an identity-mapped deadkey
+    // combination) is now covered by the produced/used gate (see the "does
+    // not nul other slots" test above): since that rule produces 'ε', its
+    // input-side occurrence is never even attempted as a "used" contributor,
+    // so this scenario no longer yields "one slot of each role" within a
+    // single rule. The genuinely-both-roles case that remains is a SINGLE
+    // slot reached from both directions (below), or two roles split across
+    // TWO SEPARATE rules (covered in a later test in this file).
 
     // A self-paired store (Cameroon's `word` shape): the SAME slot is reached by
     // the input loop and the output loop of the same rule.
@@ -1004,5 +1006,179 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     );
     expect(result.descriptors[0]!.kind).toBe('keystroke');
     expect(result.descriptors[1]!.kind).toBe('deadkey');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// produced vs. used — a rule that OUTPUTS a char is "produced" for it even
+// when that same char ALSO appears on the rule's INPUT side; a rule is only
+// "used" (blue, non-deletable) for a char when it appears as an input AND
+// the rule does NOT output it. Canonical example: the deadkey rule
+// "A + ◌̂ → Â" is green on Â's card (Â is the output) and blue on A's card (A
+// is only an input; the rule outputs Â, not A).
+// ---------------------------------------------------------------------------
+
+describe('collectCharContributors — produced vs. used (rule-level production gate)', () => {
+  /** `dk(x) + any(bases) > index(combined, k)` — bases=['A','E'], combined=['Â','Ê']. */
+  function makeDeadkeyCombineIR(): KeyboardIR {
+    const bases = makeStore('sid-bases', 'bases', [
+      { kind: 'char', value: 'A' },
+      { kind: 'char', value: 'E' },
+    ]);
+    const combined = makeStore('sid-combined', 'combined', [
+      { kind: 'char', value: 'Â' },
+      { kind: 'char', value: 'Ê' },
+    ]);
+    const triggerRule = makeRule('r-trigger',
+      [{ kind: 'vkey', name: 'K_6', modifiers: ['SHIFT'] }],
+      [{ kind: 'deadkey', id: 1 }],
+    );
+    const fanOutRule = makeRule('r-fanout',
+      [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'bases' }],
+      [{ kind: 'index', storeRef: 'combined', offset: 2 }],
+    );
+    return makeIR({
+      stores: [bases, combined],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [triggerRule, fanOutRule] }],
+    });
+  }
+
+  it('canonical example: target "A" (input-only) gets a "used" contributor — the rule outputs "Â", not "A"', () => {
+    const ir = makeDeadkeyCombineIR();
+    const result = collectCharContributors(ir, 'A');
+    expect(result.storeSlots).toEqual([{ slotId: 'sid-bases#0', role: 'input' }]);
+    expect(result.descriptors).toEqual([
+      { kind: 'deadkey', producedChar: 'A', producedRole: 'used' },
+    ]);
+  });
+
+  it('canonical example: target "Â" (the output) gets a "produced" contributor and NO "used" contributor', () => {
+    const ir = makeDeadkeyCombineIR();
+    const result = collectCharContributors(ir, 'Â');
+    expect(result.storeSlots).toEqual([{ slotId: 'sid-combined#0', role: 'output' }]);
+    expect(result.descriptors.some((d) => d.producedRole === 'used')).toBe(false);
+    expect(result.descriptors.every((d) => d.producedRole === 'produced')).toBe(true);
+  });
+
+  it('a rule with C in an any() INPUT store that ALSO produces C (via a different store, same aligned slot) tags C "produced" — no "used" contributor is emitted for that rule', () => {
+    // bases=['C','E'], combined=['C','Ê'] — the deadkey combination is a
+    // no-op ("identity") at slot 0: pressing the deadkey then 'C' yields 'C'
+    // again. The SAME rule both consumes 'C' (bases#0) and produces 'C'
+    // (combined#0) — per the produced/used rule, this rule is green/
+    // "produced" for 'C', and must NOT also surface a blue "used" row from
+    // its input-side occurrence.
+    const bases = makeStore('sid-bases', 'bases', [
+      { kind: 'char', value: 'C' },
+      { kind: 'char', value: 'E' },
+    ]);
+    const combined = makeStore('sid-combined', 'combined', [
+      { kind: 'char', value: 'C' },
+      { kind: 'char', value: 'Ê' },
+    ]);
+    const triggerRule = makeRule('r-trigger',
+      [{ kind: 'vkey', name: 'K_6', modifiers: ['SHIFT'] }],
+      [{ kind: 'deadkey', id: 1 }],
+    );
+    const fanOutRule = makeRule('r-fanout',
+      [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'bases' }],
+      [{ kind: 'index', storeRef: 'combined', offset: 2 }],
+    );
+    const ir = makeIR({
+      stores: [bases, combined],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [triggerRule, fanOutRule] }],
+    });
+    const result = collectCharContributors(ir, 'C');
+    expect(result.storeSlots).toEqual([{ slotId: 'sid-combined#0', role: 'output' }]);
+    expect(result.descriptors.some((d) => d.producedRole === 'used')).toBe(false);
+    expect(result.descriptors).toEqual([
+      {
+        kind: 'deadkey',
+        producedChar: 'C',
+        producedRole: 'produced',
+        mark: 'Shift+6',
+        base: 'C',
+        inputSequence: ['Shift+6', 'C'],
+        output: 'C',
+      },
+    ]);
+  });
+
+  it('a rule with C in an any() INPUT store that produces C via a LITERAL output (not a store) also tags C "produced" — no "used" contributor', () => {
+    // `any(letters) + [K_SPACE] > "C"` — a rule that consumes a whole
+    // any()-store (which happens to include 'C') but whose OUTPUT is the
+    // fixed literal "C", regardless of which store item matched. The rule
+    // still counts as producing 'C', so its own any()-consumed occurrence of
+    // 'C' must not also be tagged "used".
+    const letters = makeStore('sid-letters', 'letters', [
+      { kind: 'char', value: 'C' },
+      { kind: 'char', value: 'D' },
+    ]);
+    const rule = makeRule('r-literal',
+      [{ kind: 'any', storeRef: 'letters' }, { kind: 'vkey', name: 'K_SPACE', modifiers: [] }],
+      [{ kind: 'char', value: 'C' }],
+    );
+    const ir = makeIR({
+      stores: [letters],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'C');
+    expect(result.storeSlotIds).toHaveLength(0);
+    expect(result.ruleNodeIds).toEqual(['r-literal']);
+    expect(result.descriptors.some((d) => d.producedRole === 'used')).toBe(false);
+  });
+
+  it('a rule where C is only input and the output is a DIFFERENT char still tags C "used" (unchanged behavior)', () => {
+    // Regression guard: the gate must not over-suppress — a rule that
+    // genuinely never produces C keeps tagging its input-side occurrence
+    // "used", exactly as before this fix.
+    const ir = makeDeadkeyCombineIR();
+    const result = collectCharContributors(ir, 'E');
+    expect(result.storeSlots).toEqual([{ slotId: 'sid-bases#1', role: 'input' }]);
+    expect(result.descriptors).toEqual([
+      { kind: 'deadkey', producedChar: 'E', producedRole: 'used' },
+    ]);
+  });
+
+  it('an output store whose ONLY occurrence of target sits at a backspace-aligned index is NOT a production — the rule\'s other any()-input occurrence of target is still tagged "used" (regression: ruleProducesChar backspace-alignment exclusion)', () => {
+    // keys2 (any()-consumed INPUT store): index 0 = K_BKSP (backspace),
+    // index 1 = 'a' — a genuine, non-backspace input occurrence of the target.
+    const keys = makeStore('sid-keys', 'keys2', [
+      { kind: 'vkey', name: 'K_BKSP' },
+      { kind: 'char', value: 'a' },
+    ]);
+    // tbl2 (index()-targeted OUTPUT store): index 0 = 'a', aligned (same slot
+    // index) with keys2's backspace item — a diacritic-removal/correction
+    // slot the "(a)" loop itself never attributes as a production. index 1 =
+    // 'b' (not the target), so 'a' has NO OTHER output-side occurrence.
+    const tbl = makeStore('sid-tbl', 'tbl2', [
+      { kind: 'char', value: 'a' },
+      { kind: 'char', value: 'b' },
+    ]);
+    const rule = makeRule('r-tbl2',
+      [{ kind: 'any', storeRef: 'keys2' }],
+      [{ kind: 'index', storeRef: 'tbl2', offset: 1 }],
+    );
+    const ir = makeIR({
+      stores: [keys, tbl],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'a');
+
+    // No production attributed: the ONLY output-store occurrence of 'a' sits
+    // at the backspace-aligned index, exactly like the "(a)" loop's own
+    // per-slot exclusion (~850-853) — `ruleProducesChar` must agree, not
+    // report a false-positive production for a slot "(a)"/"(b)" would never
+    // themselves attribute.
+    expect(result.storeSlots.some((s) => s.role === 'output')).toBe(false);
+    expect(result.descriptors.some((d) => d.producedRole === 'produced')).toBe(false);
+
+    // The rule's OTHER any()-input occurrence of 'a' (keys2#1, non-backspace)
+    // IS attributed as "used" — the §0 gate no longer wrongly suppresses this
+    // legitimate blue row now that `ruleProducesChar` correctly reports this
+    // rule does NOT produce 'a'.
+    expect(result.storeSlots).toEqual([{ slotId: 'sid-keys#1', role: 'input' }]);
+    expect(result.descriptors).toEqual([
+      { kind: 'store-slot', producedChar: 'a', producedRole: 'used' },
+    ]);
   });
 });
