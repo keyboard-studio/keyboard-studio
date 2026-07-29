@@ -1385,7 +1385,6 @@ function buildTabletSpecialsKey(
   keyMap: KeyMap,
   minter: NodeIdMinter,
   hasAltgr: boolean,
-  hasAltgrShift: boolean,
 ): TouchKeyIR {
   const targetLayer: "altgr" | "altgr-shift" = hasAltgr ? "altgr" : "altgr-shift";
   return {
@@ -1635,7 +1634,7 @@ function buildTabletLayers(
           isDefault ? undefined : "default"),
       ),
       ...(hasAltgr || hasAltgrShift
-        ? [buildTabletSpecialsKey(keyMap, minter, hasAltgr, hasAltgrShift)]
+        ? [buildTabletSpecialsKey(keyMap, minter, hasAltgr)]
         : []),
     ];
 
