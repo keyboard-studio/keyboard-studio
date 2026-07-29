@@ -930,6 +930,22 @@ function MethodChooser({
                       </Trans>
                     </button>
                   )}
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 11,
+                      color: TEXT_DIM,
+                      fontFamily: FONT,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    <Trans id="editor.assignLoop.ralt.addLayerHelp">
+                      Add a layer to place this character behind a modifier key
+                      — e.g. Shift for an uppercase/shifted output, or Right Alt
+                      (AltGr) for an extra character. With no layer, the
+                      character is assigned directly to the key.
+                    </Trans>
+                  </p>
                 </div>
                 {raltPreviewSpec !== null && (
                   <p
