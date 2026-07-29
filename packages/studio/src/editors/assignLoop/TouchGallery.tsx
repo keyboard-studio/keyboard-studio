@@ -295,12 +295,11 @@ export function buildTouchMechanismRef(
   resolvedHostKey: string | null,
   flickDirection: string,
   char: string,
-  // Explicit touch-layer target for #1 longpress / #2 flick's layer picker
-  // (spec: "a layer option just like the desktop does" for those two
-  // methods only — see `TouchMethodChooser`'s `touchLayer` prop). Absent (or
-  // "") falls back to the case-derived default below, so every existing call
-  // site (multitap, touch_key_replace, and any pre-picker caller) is
-  // byte-identical.
+  // Explicit touch-layer target for the layer combo builder (spec: "a layer
+  // option just like the desktop does" — see `TouchMethodChooser`'s
+  // `touchLayer` prop), now shared by all four methods. Absent (or "") falls
+  // back to the case-derived default below, so a caller that doesn't pass it
+  // (e.g. a pre-picker unit test) is byte-identical.
   explicitLayer?: string,
 ): MechanismRef | null {
   if (resolvedHostKey === null) return null;
@@ -350,10 +349,10 @@ interface TouchMethodChooserProps {
   flickDirection: string;
   onFlickDirectionChange: (v: string) => void;
   /**
-   * Touch-layer COMBO BUILDER state for #1 longpress / #2 flick — a stack of
-   * modifier slots modeled on MechanismGallery's S-08 "Layer + key" card
-   * (add/remove buttons, one dropdown per slot). Ignored by multitap/replace
-   * (they keep the pre-existing case-derived layer). Unlike S-08's
+   * Touch-layer COMBO BUILDER state, shared by all four methods (#1
+   * longpress, #2 flick, #3 multitap, #4 replace) — a stack of modifier
+   * slots modeled on MechanismGallery's S-08 "Layer + key" card (add/remove
+   * buttons, one dropdown per slot). Unlike S-08's
    * free/constructible pool, this builder may only assemble a combination
    * `validLayerCombos` (the desktop keyboard's own combos, from
    * `collectLayerCombosInUse`) already contains — see
@@ -467,7 +466,7 @@ interface TouchLayerBuilderProps {
 }
 
 /**
- * The add/remove modifier-slot stack shared by #1 longpress / #2 flick's
+ * The add/remove modifier-slot stack shared by all four touch methods'
  * layer builder — one `SelectMenu` per slot (options constrained by
  * `optionsForTouchLayerSlot`), a remove button per slot (every slot is
  * removable, including the last — an empty stack is the valid base/default
@@ -985,6 +984,57 @@ function TouchMethodChooser({
                 })}
               />
             </div>
+            <div
+              role="group"
+              aria-labelledby="touch-layer-builder-heading-multitap"
+              style={{ display: "flex", flexDirection: "column", gap: 6 }}
+            >
+              <span
+                id="touch-layer-builder-heading-multitap"
+                style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
+              >
+                <Trans id="editor.assignLoop.touch.layerLabel">Layer:</Trans>
+              </span>
+              <TouchLayerBuilder
+                layerTokens={layerTokens}
+                onLayerTokenChange={onLayerTokenChange}
+                onAddLayerSlot={onAddLayerSlot}
+                onRemoveLayerSlot={onRemoveLayerSlot}
+                validLayerCombos={validLayerCombos}
+                layerComboValid={layerComboValid}
+                slotAriaLabel={(n) =>
+                  t({
+                    id: "editor.assignLoop.touch.multitap.layerSlotAriaLabel",
+                    message: `Touch layer ${{ n }} for multitap`,
+                  })
+                }
+                removeAriaLabel={(n) =>
+                  t({
+                    id: "editor.assignLoop.touch.multitap.removeLayerAriaLabel",
+                    message: `Remove touch layer ${{ n }} for multitap`,
+                  })
+                }
+                addAriaLabel={t({
+                  id: "editor.assignLoop.touch.multitap.addLayerAriaLabel",
+                  message: "Add another touch layer for multitap",
+                })}
+                selectPlaceholder={layerSelectPlaceholder}
+                addButtonLabel={layerAddButtonLabel}
+                notYetValidNote={layerNotYetValidNote}
+              />
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 11,
+                  color: TEXT_DIM,
+                  fontFamily: FONT,
+                }}
+              >
+                <Trans id="editor.assignLoop.touch.layerResultPreview">
+                  Resulting layer: {layerPreviewLabel}
+                </Trans>
+              </p>
+            </div>
           </div>
         )}
       </div>
@@ -1050,19 +1100,57 @@ function TouchMethodChooser({
                 })}
               />
             </div>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 11,
-                color: TEXT_DIM,
-                fontFamily: FONT,
-              }}
+            <div
+              role="group"
+              aria-labelledby="touch-layer-builder-heading-replace"
+              style={{ display: "flex", flexDirection: "column", gap: 6 }}
             >
-              <Trans id="editor.assignLoop.touch.method.replace.summary">
-                Make a key type {currentCharDisplay} directly on the touch
-                keyboard.
-              </Trans>
-            </p>
+              <span
+                id="touch-layer-builder-heading-replace"
+                style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
+              >
+                <Trans id="editor.assignLoop.touch.layerLabel">Layer:</Trans>
+              </span>
+              <TouchLayerBuilder
+                layerTokens={layerTokens}
+                onLayerTokenChange={onLayerTokenChange}
+                onAddLayerSlot={onAddLayerSlot}
+                onRemoveLayerSlot={onRemoveLayerSlot}
+                validLayerCombos={validLayerCombos}
+                layerComboValid={layerComboValid}
+                slotAriaLabel={(n) =>
+                  t({
+                    id: "editor.assignLoop.touch.replace.layerSlotAriaLabel",
+                    message: `Touch layer ${{ n }} for replace`,
+                  })
+                }
+                removeAriaLabel={(n) =>
+                  t({
+                    id: "editor.assignLoop.touch.replace.removeLayerAriaLabel",
+                    message: `Remove touch layer ${{ n }} for replace`,
+                  })
+                }
+                addAriaLabel={t({
+                  id: "editor.assignLoop.touch.replace.addLayerAriaLabel",
+                  message: "Add another touch layer for replace",
+                })}
+                selectPlaceholder={layerSelectPlaceholder}
+                addButtonLabel={layerAddButtonLabel}
+                notYetValidNote={layerNotYetValidNote}
+              />
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 11,
+                  color: TEXT_DIM,
+                  fontFamily: FONT,
+                }}
+              >
+                <Trans id="editor.assignLoop.touch.layerResultPreview">
+                  Resulting layer: {layerPreviewLabel}
+                </Trans>
+              </p>
+            </div>
           </div>
         )}
       </div>
@@ -1626,8 +1714,8 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const [hostKey, setHostKey] = useState("");
   const [hostKeyCustomChar, setHostKeyCustomChar] = useState("");
   const [flickDirection, setFlickDirection] = useState("");
-  // #1 longpress / #2 flick's layer COMBO BUILDER (spec: "a layer option
-  // just like the desktop does", generalized per the "add" button feature —
+  // The (shared, all-four-method) layer COMBO BUILDER state (spec: "a layer
+  // option just like the desktop does", generalized per the "add" button feature —
   // see the module-level TouchLayerBuilder doc). One slot per chosen
   // ModifierToken; `[]` is the base/default layer. Seeded from
   // `touchLayerForChar(currentChar)` on every char change (see the reset
@@ -1795,17 +1883,13 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
   /**
    * The touch layer the author is editing — the builder's assembled combo
-   * (`layerTouchId`) for #1 longpress / #2 flick (the two methods that carry
-   * a builder), else the pre-existing hardcoded "default" for multitap/replace
-   * (unchanged; those two cards still auto-derive their layer from the
-   * char's own case, see `buildTouchMechanismRef`). Widens
-   * `casePairTouchLayer`'s mapping rather than rewriting the proposal site,
-   * exactly as anticipated when this was still hardcoded.
+   * (`layerTouchId`) for all four methods, which now all carry the same
+   * touch-layer combo builder (see the module-level TouchLayerBuilder doc).
+   * Widens `casePairTouchLayer`'s mapping rather than rewriting the proposal
+   * site, exactly as anticipated when this was still hardcoded to
+   * longpress/flick only.
    */
-  const editingLayer: TouchLayerId =
-    method === "longpress_alternates" || method === "flick_gestures"
-      ? layerTouchId
-      : "default";
+  const editingLayer: TouchLayerId = layerTouchId;
 
   const {
     proposal: casePairProposal,
@@ -1837,11 +1921,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       return (
         resolvedHostKey !== null && flickDirection !== "" && layerComboValid
       );
-    if (method === "longpress_alternates")
-      return resolvedHostKey !== null && layerComboValid;
-    // multitap and touch_key_replace have no layer builder — a host key is
-    // the only requirement, unchanged.
-    return resolvedHostKey !== null;
+    // longpress_alternates, multitap, and touch_key_replace all carry the
+    // same layer builder now — Apply is gated on a complete/valid combo for
+    // all three, same as flick above.
+    return resolvedHostKey !== null && layerComboValid;
   }, [currentChar, method, resolvedHostKey, flickDirection, layerComboValid]);
 
   // ---------------------------------------------------------------------------
@@ -1859,22 +1942,16 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
    * function for the resolved-vkey invariant this delegates to.
    */
   function buildMechanismRef(char: string): MechanismRef | null {
-    // The layer builder only applies to #1 longpress / #2 flick — multitap
-    // and touch_key_replace keep their pre-existing case-derived layer
-    // (buildTouchMechanismRef's own `touchLayerForChar` fallback). canApply
-    // already requires layerComboValid for these two methods, so `Apply` is
-    // unreachable with a partial/invalid combo — this always sends the
-    // FULL, valid assembled combo's touch layer id.
-    const explicitLayer =
-      method === "longpress_alternates" || method === "flick_gestures"
-        ? layerTouchId
-        : undefined;
+    // The layer builder now applies to all four methods — canApply already
+    // requires layerComboValid, so `Apply` is unreachable with a
+    // partial/invalid combo; this always sends the FULL, valid assembled
+    // combo's touch layer id.
     return buildTouchMechanismRef(
       method,
       resolvedHostKey,
       flickDirection,
       char,
-      explicitLayer,
+      layerTouchId,
     );
   }
 
