@@ -77,17 +77,26 @@ import {
   isDecomposableAccented,
   formatUncoveredTouchMessage,
 } from "@keyboard-studio/contracts";
-import type { DesktopModifications } from "@keyboard-studio/engine";
+import type { DesktopModifications, ModifierToken } from "@keyboard-studio/engine";
 import {
   parseTouchLayout,
   touchCoverage,
   resolveTouchLayerId,
+  collectLayerCombosInUse,
+  comboToTouchLayerId,
+  canonicalizeCombo,
+  addableTouchLayerTokens,
+  optionsForTouchLayerSlot,
 } from "@keyboard-studio/engine";
 import {
   buildTouchLayoutJson,
   deriveSeedLayout,
 } from "../../lib/buildTouchLayoutJson.ts";
 import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";
+import {
+  formatModifierCombo,
+  MODIFIER_TOKEN_LABELS,
+} from "../../lib/modifierTokenLabel.ts";
 import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
 import { extractMechanismHostKey } from "../../lib/extractMechanismHostKey.ts";
 import {
@@ -121,7 +130,7 @@ import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
 import { RemovableChipRow } from "./parts/RemovableChipRow.tsx";
-import { SelectMenu } from "../../ui/SelectMenu.tsx";
+import { SelectMenu, type SelectMenuOption } from "../../ui/SelectMenu.tsx";
 import { KEY_OPTIONS, VALID_HOST_KEYS } from "../../lib/keyOptions.ts";
 import {
   resolveKeyPickerSelection,
@@ -279,6 +288,21 @@ function touchLayerForChar(char: string): TouchLayerId {
 }
 
 /**
+ * Seed the touch layer builder's slot state for `char` (requirement 6,
+ * defaults-first). `touchLayerForChar` only ever returns `"default"` or
+ * `"shift"`, so the inverse is trivial — no general
+ * touch-layer-id-to-combo helper exists (`comboToTouchLayerId` has no
+ * exported inverse), and building one for these two cases would be
+ * over-general: `"default"` is the empty combo (zero slots — the builder
+ * renders no rows, matching the pre-builder single-select's "Base" default),
+ * `"shift"` is the single-token `["SHIFT"]` combo.
+ */
+function seedLayerTokensForChar(char: string | null): (ModifierToken | "")[] {
+  if (char === null) return [];
+  return touchLayerForChar(char) === "shift" ? ["SHIFT"] : [];
+}
+
+/**
  * Slot values with an absent `layer` filled in as `"default"`.
  *
  * Both appliers treat an absent `layer` as `"default"`, and equality here has
@@ -306,6 +330,12 @@ export function buildTouchMechanismRef(
   resolvedHostKey: string | null,
   flickDirection: string,
   char: string,
+  // Explicit touch-layer target for the layer combo builder (spec: "a layer
+  // option just like the desktop does" — see `TouchMethodChooser`'s
+  // `touchLayer` prop), now shared by all four methods. Absent (or "") falls
+  // back to the case-derived default below, so a caller that doesn't pass it
+  // (e.g. a pre-picker unit test) is byte-identical.
+  explicitLayer?: string,
 ): MechanismRef | null {
   if (resolvedHostKey === null) return null;
   const hk = resolvedHostKey;
@@ -313,7 +343,10 @@ export function buildTouchMechanismRef(
   // explicitly is what makes `{K_A, á, default}` and `{K_A, Á, shift}` two
   // distinct refs under mechanismRefEquals — which is exactly the distinction
   // a case pair needs.
-  const layer = touchLayerForChar(char);
+  const layer =
+    explicitLayer !== undefined && explicitLayer !== ""
+      ? explicitLayer
+      : touchLayerForChar(char);
   if (method === "longpress_alternates") {
     return {
       patternId: "longpress_alternates",
@@ -350,6 +383,384 @@ interface TouchMethodChooserProps {
   onHostKeyCustomCharChange: (v: string) => void;
   flickDirection: string;
   onFlickDirectionChange: (v: string) => void;
+  /**
+   * Touch-layer COMBO BUILDER state, shared by all four methods (#1
+   * longpress, #2 flick, #3 multitap, #4 replace) — a stack of modifier
+   * slots modeled on MechanismGallery's S-08 "Layer + key" card (add/remove
+   * buttons, one dropdown per slot). Unlike S-08's
+   * free/constructible pool, this builder may only assemble a combination
+   * `validLayerCombos` (the desktop keyboard's own combos, from
+   * `collectLayerCombosInUse`) already contains — see
+   * `addableTouchLayerTokens`. An empty array is the base/default layer,
+   * always valid.
+   */
+  layerTokens: (ModifierToken | "")[];
+  onLayerTokenChange: (index: number, value: string) => void;
+  onAddLayerSlot: () => void;
+  onRemoveLayerSlot: (index: number) => void;
+  /** The desktop keyboard's own combos — the builder's hard constraint pool. */
+  validLayerCombos: ModifierToken[][];
+  /** Whether the assembled combo (or the always-valid empty/base combo) is
+   * currently a member of `validLayerCombos` — surfaced as an inline note
+   * when false (a partial combo under construction); the parent gates Apply
+   * on this via `canApply`. */
+  layerComboValid: boolean;
+  /** Human-friendly label for the currently assembled combo (e.g.
+   * "Shift+RAlt", or "Base" for the empty combo) — see
+   * `touchLayerComboLabel`. Shown as a preview line below the builder. */
+  layerPreviewLabel: string;
+}
+
+/**
+ * Human-friendly label for a canonicalized modifier combo, e.g. "Shift+RAlt".
+ * The empty combo is the desktop keyboard's base/default layer.
+ *
+ * The per-token label table (`MODIFIER_TOKEN_LABELS`) and the "+"-joined
+ * formatting are shared with MechanismGallery's S-08 covered-chip badge via
+ * `../../lib/modifierTokenLabel.ts` — only the "Base" fallback for the empty
+ * combo stays local (TouchGallery's own synthetic base option).
+ */
+function touchLayerComboLabel(
+  combo: readonly ModifierToken[],
+  i18n?: I18n,
+): string {
+  if (combo.length === 0) {
+    return resolveMessage(
+      i18n,
+      msg({ id: "editor.assignLoop.touch.layerBase", message: "Base" }),
+    );
+  }
+  return formatModifierCombo(combo);
+}
+
+// ---------------------------------------------------------------------------
+// Touch layer combo builder — a stack of modifier slots (mirrors
+// MechanismGallery's S-08 "Layer + key" card's raltTokens/optionsForRaltSlot/
+// MAX_RALT_SLOTS), but HARD-CONSTRAINED to combinations the desktop keyboard
+// actually uses (collectLayerCombosInUse's report — "D" below) rather than
+// S-08's free/constructible per-family pool (computeModifierPool). The
+// author may only assemble a combo the desktop already defines; there is no
+// path to constructing a combo the desktop doesn't have.
+// ---------------------------------------------------------------------------
+
+// A combo draws at most one token from each of the four mutually-exclusive
+// modifier families (SHIFT; ctrl: CTRL/RCTRL/LCTRL; alt: ALT/RALT/LALT; caps:
+// CAPS/NCAPS — see MODIFIER_EXCLUSIONS), so no combo `collectLayerCombosInUse`
+// can ever report exceeds 4 tokens. Same structural bound as
+// MechanismGallery's S-08 `MAX_RALT_SLOTS` — a fixed property of the
+// modifier vocabulary, not re-derived per keyboard.
+const MAX_TOUCH_LAYER_SLOTS = 4;
+
+// `addableTouchLayerTokens`/`optionsForTouchLayerSlot` — the combo-
+// reachability constraint this builder is HARD-CONSTRAINED by — are pure
+// combinatorics over `ModifierToken`/`MODIFIER_EXCLUSIONS`, not view logic,
+// so they live in the engine beside `MODIFIER_EXCLUSIONS`/
+// `collectLayerCombosInUse`/`canonicalizeCombo` (see
+// `engine/src/pattern-apply/modifierCombos.ts`) and are imported from
+// `@keyboard-studio/engine` above, same as those other three.
+
+const layerSlotRemoveBtnStyle: CSSProperties = {
+  background: "transparent",
+  border: `1px solid ${BORDER}`,
+  borderRadius: 4,
+  color: TEXT_DIM,
+  fontSize: 12,
+  padding: "2px 8px",
+  cursor: "pointer",
+  fontFamily: FONT,
+};
+
+const layerAddBtnStyle: CSSProperties = {
+  alignSelf: "flex-start",
+  background: "transparent",
+  border: `1px solid ${BORDER}`,
+  borderRadius: 4,
+  color: TEXT_DIM,
+  fontSize: 12,
+  padding: "2px 10px",
+  cursor: "pointer",
+  fontFamily: FONT,
+};
+
+interface TouchLayerBuilderProps {
+  layerTokens: (ModifierToken | "")[];
+  onLayerTokenChange: (index: number, value: string) => void;
+  onAddLayerSlot: () => void;
+  onRemoveLayerSlot: (index: number) => void;
+  validLayerCombos: ModifierToken[][];
+  layerComboValid: boolean;
+  /** 1-based slot number -> aria-label; lets long-press/flick keep distinct
+   * per-card labels (matching the existing per-card hostKey aria-label
+   * convention) even though only one card's builder renders at a time. */
+  slotAriaLabel: (n: number) => string;
+  removeAriaLabel: (n: number) => string;
+  addAriaLabel: string;
+  selectPlaceholder: string;
+  addButtonLabel: string;
+  notYetValidNote: string;
+}
+
+/**
+ * The add/remove modifier-slot stack shared by all four touch methods'
+ * layer builder — one `SelectMenu` per slot (options constrained by
+ * `optionsForTouchLayerSlot`), a remove button per slot (every slot is
+ * removable, including the last — an empty stack is the valid base/default
+ * layer, unlike S-08's `raltTokens`, which must always keep at least one
+ * slot), and an add button shown only while `addableTouchLayerTokens` still
+ * has room to extend the current selection toward a combo in
+ * `validLayerCombos`.
+ */
+function TouchLayerBuilder({
+  layerTokens,
+  onLayerTokenChange,
+  onAddLayerSlot,
+  onRemoveLayerSlot,
+  validLayerCombos,
+  layerComboValid,
+  slotAriaLabel,
+  removeAriaLabel,
+  addAriaLabel,
+  selectPlaceholder,
+  addButtonLabel,
+  notYetValidNote,
+}: TouchLayerBuilderProps) {
+  const filledLayerTokens = layerTokens.filter(
+    (tok): tok is ModifierToken => tok !== "",
+  );
+  const layerAllFilled =
+    layerTokens.length === 0 ||
+    filledLayerTokens.length === layerTokens.length;
+  const layerHasRoomToAdd =
+    layerTokens.length < MAX_TOUCH_LAYER_SLOTS &&
+    layerAllFilled &&
+    addableTouchLayerTokens(new Set(filledLayerTokens), validLayerCombos)
+      .length > 0;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {layerTokens.map((token, index) => {
+        const options = optionsForTouchLayerSlot(
+          validLayerCombos,
+          layerTokens,
+          index,
+        );
+        const slotOptions: SelectMenuOption[] = [
+          { value: "", label: selectPlaceholder },
+          ...options.map((o) => ({
+            value: o,
+            label: MODIFIER_TOKEN_LABELS[o] ?? o,
+          })),
+        ];
+        return (
+          <div
+            key={index}
+            style={{ display: "flex", alignItems: "center", gap: 6 }}
+          >
+            <SelectMenu
+              value={token}
+              onChange={(v) => onLayerTokenChange(index, v)}
+              ariaLabel={slotAriaLabel(index + 1)}
+              options={slotOptions}
+              style={selectStyle}
+            />
+            <button
+              type="button"
+              aria-label={removeAriaLabel(index + 1)}
+              onClick={() => onRemoveLayerSlot(index)}
+              style={layerSlotRemoveBtnStyle}
+            >
+              &times;
+            </button>
+          </div>
+        );
+      })}
+      {layerHasRoomToAdd && (
+        <button
+          type="button"
+          aria-label={addAriaLabel}
+          onClick={onAddLayerSlot}
+          style={layerAddBtnStyle}
+        >
+          {addButtonLabel}
+        </button>
+      )}
+      {!layerComboValid && (
+        <p
+          role="status"
+          style={{ margin: 0, fontSize: 11, color: "#d29922", fontFamily: FONT }}
+        >
+          {notYetValidNote}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TouchLayerBuilderSection — the "Layer:" heading + TouchLayerBuilder +
+// "Resulting layer" preview block shared by all four method cards (longpress/
+// flick/multitap/replace) in TouchMethodChooser below. The four cards were
+// previously near-identical ~55-line copies of this block, differing only in
+// the method slug baked into the heading id, the three per-method aria-label
+// message ids, and the human method label — collapsed here to one
+// parameterized component keyed by `method`.
+// ---------------------------------------------------------------------------
+
+/** Per-method slug (used in element ids) + human label (for reference/
+ * documentation alongside the slug — the aria-label message TEXT itself
+ * stays a literal per-method string below, not built from this label, so the
+ * Lingui extractor keeps seeing stable, literal `t({id, message})` ids). */
+const METHOD_META: Record<TouchMethod, { slug: string; label: string }> = {
+  longpress_alternates: { slug: "longpress", label: "long-press" },
+  flick_gestures: { slug: "flick", label: "flick" },
+  multitap: { slug: "multitap", label: "multitap" },
+  touch_key_replace: { slug: "replace", label: "replace" },
+};
+
+interface TouchLayerBuilderSectionProps {
+  method: TouchMethod;
+  layerTokens: (ModifierToken | "")[];
+  onLayerTokenChange: (index: number, value: string) => void;
+  onAddLayerSlot: () => void;
+  onRemoveLayerSlot: (index: number) => void;
+  validLayerCombos: ModifierToken[][];
+  layerComboValid: boolean;
+  selectPlaceholder: string;
+  addButtonLabel: string;
+  notYetValidNote: string;
+  layerPreviewLabel: string;
+}
+
+/**
+ * Renders the `role="group"` wrapper (`aria-labelledby` -> the per-method
+ * heading id), the "Layer:" heading, the shared `TouchLayerBuilder`, and the
+ * "Resulting layer" preview paragraph — byte-identical across all four method
+ * cards except for the method-scoped heading id and aria-label ids/messages
+ * below. Calls its own `useLingui()` (rather than accepting a `t` prop) so
+ * the per-method `t({id, message})` calls below stay traceable to a
+ * same-scope `useLingui()` binding for Lingui's macro extractor — a `t`
+ * passed in as a parameter is a distinct binding the extractor does not
+ * follow (see `touchMechanismLabel`'s and Inspector.tsx's `storeBlurb`'s note
+ * on the same constraint).
+ */
+function TouchLayerBuilderSection({
+  method,
+  layerTokens,
+  onLayerTokenChange,
+  onAddLayerSlot,
+  onRemoveLayerSlot,
+  validLayerCombos,
+  layerComboValid,
+  selectPlaceholder,
+  addButtonLabel,
+  notYetValidNote,
+  layerPreviewLabel,
+}: TouchLayerBuilderSectionProps) {
+  const { t } = useLingui();
+  const { slug } = METHOD_META[method];
+  const headingId = `touch-layer-builder-heading-${slug}`;
+
+  let slotAriaLabel: (n: number) => string;
+  let removeAriaLabel: (n: number) => string;
+  let addAriaLabel: string;
+
+  switch (method) {
+    case "longpress_alternates":
+      slotAriaLabel = (n) =>
+        t({
+          id: "editor.assignLoop.touch.longpress.layerSlotAriaLabel",
+          message: `Touch layer ${{ n }} for long-press`,
+        });
+      removeAriaLabel = (n) =>
+        t({
+          id: "editor.assignLoop.touch.longpress.removeLayerAriaLabel",
+          message: `Remove touch layer ${{ n }} for long-press`,
+        });
+      addAriaLabel = t({
+        id: "editor.assignLoop.touch.longpress.addLayerAriaLabel",
+        message: "Add another touch layer for long-press",
+      });
+      break;
+    case "flick_gestures":
+      slotAriaLabel = (n) =>
+        t({
+          id: "editor.assignLoop.touch.flick.layerSlotAriaLabel",
+          message: `Touch layer ${{ n }} for flick`,
+        });
+      removeAriaLabel = (n) =>
+        t({
+          id: "editor.assignLoop.touch.flick.removeLayerAriaLabel",
+          message: `Remove touch layer ${{ n }} for flick`,
+        });
+      addAriaLabel = t({
+        id: "editor.assignLoop.touch.flick.addLayerAriaLabel",
+        message: "Add another touch layer for flick",
+      });
+      break;
+    case "multitap":
+      slotAriaLabel = (n) =>
+        t({
+          id: "editor.assignLoop.touch.multitap.layerSlotAriaLabel",
+          message: `Touch layer ${{ n }} for multitap`,
+        });
+      removeAriaLabel = (n) =>
+        t({
+          id: "editor.assignLoop.touch.multitap.removeLayerAriaLabel",
+          message: `Remove touch layer ${{ n }} for multitap`,
+        });
+      addAriaLabel = t({
+        id: "editor.assignLoop.touch.multitap.addLayerAriaLabel",
+        message: "Add another touch layer for multitap",
+      });
+      break;
+    case "touch_key_replace":
+      slotAriaLabel = (n) =>
+        t({
+          id: "editor.assignLoop.touch.replace.layerSlotAriaLabel",
+          message: `Touch layer ${{ n }} for replace`,
+        });
+      removeAriaLabel = (n) =>
+        t({
+          id: "editor.assignLoop.touch.replace.removeLayerAriaLabel",
+          message: `Remove touch layer ${{ n }} for replace`,
+        });
+      addAriaLabel = t({
+        id: "editor.assignLoop.touch.replace.addLayerAriaLabel",
+        message: "Add another touch layer for replace",
+      });
+      break;
+  }
+
+  return (
+    <div
+      role="group"
+      aria-labelledby={headingId}
+      style={{ display: "flex", flexDirection: "column", gap: 6 }}
+    >
+      <span id={headingId} style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+        <Trans id="editor.assignLoop.touch.layerLabel">Layer:</Trans>
+      </span>
+      <TouchLayerBuilder
+        layerTokens={layerTokens}
+        onLayerTokenChange={onLayerTokenChange}
+        onAddLayerSlot={onAddLayerSlot}
+        onRemoveLayerSlot={onRemoveLayerSlot}
+        validLayerCombos={validLayerCombos}
+        layerComboValid={layerComboValid}
+        slotAriaLabel={slotAriaLabel}
+        removeAriaLabel={removeAriaLabel}
+        addAriaLabel={addAriaLabel}
+        selectPlaceholder={selectPlaceholder}
+        addButtonLabel={addButtonLabel}
+        notYetValidNote={notYetValidNote}
+      />
+      <p style={{ margin: 0, fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}>
+        <Trans id="editor.assignLoop.touch.layerResultPreview">
+          Resulting layer: {layerPreviewLabel}
+        </Trans>
+      </p>
+    </div>
+  );
 }
 
 // Chrome (option labels); built per-render via the optional-i18n +
@@ -421,8 +832,28 @@ function TouchMethodChooser({
   onHostKeyCustomCharChange,
   flickDirection,
   onFlickDirectionChange,
+  layerTokens,
+  onLayerTokenChange,
+  onAddLayerSlot,
+  onRemoveLayerSlot,
+  validLayerCombos,
+  layerComboValid,
+  layerPreviewLabel,
 }: TouchMethodChooserProps) {
   const { t, i18n } = useLingui();
+  const layerSelectPlaceholder = t({
+    id: "editor.assignLoop.touch.selectPlaceholder",
+    message: "— Select —",
+  });
+  const layerAddButtonLabel = t({
+    id: "editor.assignLoop.touch.addLayerButton",
+    message: "+ Add layer",
+  });
+  const layerNotYetValidNote = t({
+    id: "editor.assignLoop.touch.layerNotYetValidNote",
+    message:
+      "Not yet a layer this keyboard uses — finish the combination or remove a layer.",
+  });
   const flickDirections = buildFlickDirections(i18n);
   // Named local for the dotted-circle-wrapped char used in the <Trans> macros
   // below — a simple identifier extracts as a NAMED lingui placeholder (e.g.
@@ -501,6 +932,19 @@ function TouchMethodChooser({
                 })}
               />
             </div>
+            <TouchLayerBuilderSection
+              method="longpress_alternates"
+              layerTokens={layerTokens}
+              onLayerTokenChange={onLayerTokenChange}
+              onAddLayerSlot={onAddLayerSlot}
+              onRemoveLayerSlot={onRemoveLayerSlot}
+              validLayerCombos={validLayerCombos}
+              layerComboValid={layerComboValid}
+              selectPlaceholder={layerSelectPlaceholder}
+              addButtonLabel={layerAddButtonLabel}
+              notYetValidNote={layerNotYetValidNote}
+              layerPreviewLabel={layerPreviewLabel}
+            />
           </div>
         )}
       </div>
@@ -589,6 +1033,19 @@ function TouchMethodChooser({
                 style={selectStyle}
               />
             </label>
+            <TouchLayerBuilderSection
+              method="flick_gestures"
+              layerTokens={layerTokens}
+              onLayerTokenChange={onLayerTokenChange}
+              onAddLayerSlot={onAddLayerSlot}
+              onRemoveLayerSlot={onRemoveLayerSlot}
+              validLayerCombos={validLayerCombos}
+              layerComboValid={layerComboValid}
+              selectPlaceholder={layerSelectPlaceholder}
+              addButtonLabel={layerAddButtonLabel}
+              notYetValidNote={layerNotYetValidNote}
+              layerPreviewLabel={layerPreviewLabel}
+            />
           </div>
         )}
       </div>
@@ -653,6 +1110,19 @@ function TouchMethodChooser({
                 })}
               />
             </div>
+            <TouchLayerBuilderSection
+              method="multitap"
+              layerTokens={layerTokens}
+              onLayerTokenChange={onLayerTokenChange}
+              onAddLayerSlot={onAddLayerSlot}
+              onRemoveLayerSlot={onRemoveLayerSlot}
+              validLayerCombos={validLayerCombos}
+              layerComboValid={layerComboValid}
+              selectPlaceholder={layerSelectPlaceholder}
+              addButtonLabel={layerAddButtonLabel}
+              notYetValidNote={layerNotYetValidNote}
+              layerPreviewLabel={layerPreviewLabel}
+            />
           </div>
         )}
       </div>
@@ -718,19 +1188,19 @@ function TouchMethodChooser({
                 })}
               />
             </div>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 11,
-                color: TEXT_DIM,
-                fontFamily: FONT,
-              }}
-            >
-              <Trans id="editor.assignLoop.touch.method.replace.summary">
-                Make a key type {currentCharDisplay} directly on the touch
-                keyboard.
-              </Trans>
-            </p>
+            <TouchLayerBuilderSection
+              method="touch_key_replace"
+              layerTokens={layerTokens}
+              onLayerTokenChange={onLayerTokenChange}
+              onAddLayerSlot={onAddLayerSlot}
+              onRemoveLayerSlot={onRemoveLayerSlot}
+              validLayerCombos={validLayerCombos}
+              layerComboValid={layerComboValid}
+              selectPlaceholder={layerSelectPlaceholder}
+              addButtonLabel={layerAddButtonLabel}
+              notYetValidNote={layerNotYetValidNote}
+              layerPreviewLabel={layerPreviewLabel}
+            />
           </div>
         )}
       </div>
@@ -1294,6 +1764,18 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const [hostKey, setHostKey] = useState("");
   const [hostKeyCustomChar, setHostKeyCustomChar] = useState("");
   const [flickDirection, setFlickDirection] = useState("");
+  // The (shared, all-four-method) layer COMBO BUILDER state (spec: "a layer
+  // option just like the desktop does", generalized per the "add" button feature —
+  // see the module-level TouchLayerBuilder doc). One slot per chosen
+  // ModifierToken; `[]` is the base/default layer. Seeded from
+  // `touchLayerForChar(currentChar)` on every char change (see the reset
+  // effect below) via `seedLayerTokensForChar` — the SAME layer
+  // `buildTouchMechanismRef` has always derived automatically — so leaving
+  // the builder untouched reproduces exactly the pre-picker behavior
+  // (defaults-first, spec §3c: "no default is a defect").
+  const [layerTokens, setLayerTokens] = useState<(ModifierToken | "")[]>(() =>
+    seedLayerTokensForChar(null),
+  );
 
   // Resolved host key — shared by canApply, buildMechanismRef, and the
   // manual-edit promotion below. One resolution helper (charInput.ts),
@@ -1302,6 +1784,112 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const resolvedHostKey = useMemo(
     () => resolvedVkeyOf(resolveKeyPickerSelection(hostKey, hostKeyCustomChar)),
     [hostKey, hostKeyCustomChar],
+  );
+
+  // The working desktop IR the layer builder's constraint pool is derived
+  // from — same `s.ir ?? s.baseIr` fallback MechanismGallery's S-08
+  // "Layer + key" card uses for its own IR-derived option pool (`workingIr`
+  // there).
+  const workingIrForLayers = useWorkingCopyStore((s) => s.ir ?? s.baseIr);
+
+  // The desktop keyboard's own combos ("D" in the constraint spec) — the
+  // builder's hard pool. NOT a free/constructible pool like MechanismGallery's
+  // S-08 (computeModifierPool); the author may only assemble a combination
+  // this keyboard already defines.
+  const validLayerCombos = useMemo<ModifierToken[][]>(
+    () =>
+      workingIrForLayers !== null
+        ? collectLayerCombosInUse(workingIrForLayers)
+        : [],
+    [workingIrForLayers],
+  );
+
+  // "+"-joined canonical-order key set for O(1) "is this combo one the
+  // desktop actually uses" membership checks — every element of
+  // validLayerCombos is already canonicalizeCombo's output
+  // (collectLayerCombosInUse's own contract), so a plain join is a safe,
+  // order-stable key (mirrors modifierCombos.ts's own internal
+  // comboJoinKey, not exported).
+  const validLayerComboKeys = useMemo(
+    () => new Set(validLayerCombos.map((c) => c.join("+"))),
+    [validLayerCombos],
+  );
+
+  // The tokens actually chosen across all slots so far (order-independent,
+  // deduped) — the builder's assembled combo. Canonicalized so it compares
+  // directly against `validLayerComboKeys`/`comboToTouchLayerId`; the
+  // exclusion logic the SelectMenu options are constrained by
+  // (optionsForTouchLayerSlot) already prevents an internally
+  // exclusion-inconsistent selection from being constructible through the
+  // UI, so the catch branch is defensive only.
+  const filledLayerTokens = layerTokens.filter(
+    (tok): tok is ModifierToken => tok !== "",
+  );
+  let assembledLayerCombo: ModifierToken[];
+  try {
+    assembledLayerCombo = canonicalizeCombo(filledLayerTokens);
+  } catch {
+    assembledLayerCombo = filledLayerTokens;
+  }
+
+  // Applicability (requirement 4): the empty combo (no slots filled) is
+  // always valid — it's the base/default layer, which every desktop
+  // keyboard has. A non-empty combo is valid only once it fully matches a
+  // combo the desktop actually uses; a combo under construction (e.g. one
+  // slot chosen toward a longer valid combo, but not yet the full thing) is
+  // NOT valid — this is what blocks Apply on a partial combo.
+  const layerComboValid =
+    assembledLayerCombo.length === 0 ||
+    validLayerComboKeys.has(assembledLayerCombo.join("+"));
+
+  // comboToTouchLayerId is total over any combo built from ModifierToken
+  // members: TOUCH_ID_FRAGMENT (engine/src/pattern-apply/modifierCombos.ts)
+  // has an entry for every ModifierToken, and canonicalizeCombo's output
+  // only ever contains ModifierToken members — so there is no combo this can
+  // produce that TOUCH_ID_FRAGMENT doesn't cover. Asserted non-null rather
+  // than guarded (same rationale the removed buildTouchLayerOptions used).
+  const layerTouchId = comboToTouchLayerId(assembledLayerCombo)!;
+
+  // Human-friendly label for the currently assembled combo (e.g. "Base",
+  // "Shift", "Shift+RAlt") — the builder's preview line.
+  const layerPreviewLabel = touchLayerComboLabel(assembledLayerCombo, i18n);
+
+  const handleAddLayerSlot = useCallback(() => {
+    setLayerTokens((prev) =>
+      prev.length >= MAX_TOUCH_LAYER_SLOTS ? prev : [...prev, ""],
+    );
+  }, []);
+
+  const handleRemoveLayerSlot = useCallback((index: number) => {
+    // Unlike MechanismGallery's S-08 raltTokens (which must always keep at
+    // least one slot — an empty combo is not a valid S-08 method), removing
+    // the last touch-layer slot is fine: zero slots is the base/default
+    // layer, itself always valid.
+    setLayerTokens((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleLayerTokenChange = useCallback(
+    (index: number, value: string) => {
+      const token = (value || "") as ModifierToken | "";
+      setLayerTokens((prev) => {
+        const next = [...prev];
+        next[index] = token;
+        // Forward invalidation, mirroring MechanismGallery's
+        // handleRaltTokenChange: an earlier slot's new value may exclude a
+        // later slot's existing selection (or make it unreachable toward any
+        // combo in D) — drop those now-invalid picks.
+        for (let i = index + 1; i < next.length; i++) {
+          const stillValid = optionsForTouchLayerSlot(
+            validLayerCombos,
+            next,
+            i,
+          ).includes(next[i] as ModifierToken);
+          if (next[i] !== "" && !stillValid) next[i] = "";
+        }
+        return next;
+      });
+    },
+    [validLayerCombos],
   );
 
   // Whether the suggestion card must stay hidden for the current character —
@@ -1344,12 +1932,14 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // ---------------------------------------------------------------------------
 
   /**
-   * The touch layer the author is editing. Fixed to "default" in v1 — the
-   * gallery has no layer selector yet. It is named rather than inlined so that
-   * adding one widens `casePairTouchLayer`'s mapping instead of rewriting the
-   * proposal site.
+   * The touch layer the author is editing — the builder's assembled combo
+   * (`layerTouchId`) for all four methods, which now all carry the same
+   * touch-layer combo builder (see the module-level TouchLayerBuilder doc).
+   * Widens `casePairTouchLayer`'s mapping rather than rewriting the proposal
+   * site, exactly as anticipated when this was still hardcoded to
+   * longpress/flick only.
    */
-  const editingLayer: TouchLayerId = "default";
+  const editingLayer: TouchLayerId = layerTouchId;
 
   const {
     proposal: casePairProposal,
@@ -1363,6 +1953,11 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     setHostKey("");
     setHostKeyCustomChar("");
     setFlickDirection("");
+    // Defaults-first: reproduce the exact pre-picker auto-derived layer for
+    // the new character (base/default for almost every char; shift only for
+    // an uppercase current char — see `touchLayerForChar`/`seedLayerTokensForChar`)
+    // so an author who never touches the builder sees byte-identical behavior.
+    setLayerTokens(seedLayerTokensForChar(currentChar));
     clearCompanion();
   }, [currentChar, clearCompanion]);
 
@@ -1373,10 +1968,14 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const canApply = useMemo(() => {
     if (currentChar === null) return false;
     if (method === "flick_gestures")
-      return resolvedHostKey !== null && flickDirection !== "";
-    // longpress_alternates, multitap, and touch_key_replace require a host key.
-    return resolvedHostKey !== null;
-  }, [currentChar, method, resolvedHostKey, flickDirection]);
+      return (
+        resolvedHostKey !== null && flickDirection !== "" && layerComboValid
+      );
+    // longpress_alternates, multitap, and touch_key_replace all carry the
+    // same layer builder now — Apply is gated on a complete/valid combo for
+    // all three, same as flick above.
+    return resolvedHostKey !== null && layerComboValid;
+  }, [currentChar, method, resolvedHostKey, flickDirection, layerComboValid]);
 
   // ---------------------------------------------------------------------------
   // Build a mechanism from current method state
@@ -1393,11 +1992,16 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
    * function for the resolved-vkey invariant this delegates to.
    */
   function buildMechanismRef(char: string): MechanismRef | null {
+    // The layer builder now applies to all four methods — canApply already
+    // requires layerComboValid, so `Apply` is unreachable with a
+    // partial/invalid combo; this always sends the FULL, valid assembled
+    // combo's touch layer id.
     return buildTouchMechanismRef(
       method,
       resolvedHostKey,
       flickDirection,
       char,
+      layerTouchId,
     );
   }
 
@@ -1631,6 +2235,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     setHostKey("");
     setHostKeyCustomChar("");
     setFlickDirection("");
+    setLayerTokens(seedLayerTokensForChar(currentChar));
     // `charTouch` is listed because the case-pair "already placed" predicate
     // above closes over it — a stale map would re-propose a pairing the author
     // has already made.
@@ -1642,6 +2247,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     hostKey,
     resolvedHostKey,
     flickDirection,
+    layerTokens,
     charTouch,
     editingLayer,
     proposeCompanion,
@@ -2073,6 +2679,13 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               onHostKeyCustomCharChange={setHostKeyCustomChar}
               flickDirection={flickDirection}
               onFlickDirectionChange={setFlickDirection}
+              layerTokens={layerTokens}
+              onLayerTokenChange={handleLayerTokenChange}
+              onAddLayerSlot={handleAddLayerSlot}
+              onRemoveLayerSlot={handleRemoveLayerSlot}
+              validLayerCombos={validLayerCombos}
+              layerComboValid={layerComboValid}
+              layerPreviewLabel={layerPreviewLabel}
             />
           )}
 

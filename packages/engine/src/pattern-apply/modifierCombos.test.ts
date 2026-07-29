@@ -12,6 +12,8 @@ import {
   collectModifierTokensInUse,
   collectLayerCombosInUse,
   buildComboKeyMap,
+  addableTouchLayerTokens,
+  optionsForTouchLayerSlot,
   type ModifierToken,
 } from "./modifierCombos.js";
 import type { KeyboardIR, IRGroup, IRRule } from "@keyboard-studio/contracts";
@@ -585,5 +587,100 @@ describe("comboToTouchLayerId — cross-checked against the live vendored Layout
     for (const [combo, bitmask] of cases) {
       expect(comboToTouchLayerId(combo)).toBe(Layouts.getLayerId(bitmask));
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// addableTouchLayerTokens / optionsForTouchLayerSlot — combo-reachability
+// constraint for a combo-BUILDER UI (e.g. TouchGallery's layer builder)
+// that may only assemble a combination already present in a reported set of
+// valid combos (typically `collectLayerCombosInUse`'s own report), rather
+// than a free/constructible per-family pool. Relocated here from
+// packages/studio/src/editors/assignLoop/TouchGallery.tsx (pure relocation,
+// no behavior change) — this is engine-domain combinatorics over
+// `ModifierToken`/`MODIFIER_EXCLUSIONS`, not view logic.
+// ---------------------------------------------------------------------------
+
+describe("addableTouchLayerTokens", () => {
+  it("offers nothing when validCombos is empty", () => {
+    expect(addableTouchLayerTokens(new Set(), [])).toEqual([]);
+    expect(addableTouchLayerTokens(new Set(["SHIFT"]), [])).toEqual([]);
+  });
+
+  it("offers exactly the single combo's own tokens when nothing is selected yet", () => {
+    const validCombos: ModifierToken[][] = [["SHIFT", "RALT"]];
+    const addable = addableTouchLayerTokens(new Set(), validCombos);
+    expect(new Set(addable)).toEqual(new Set(["SHIFT", "RALT"]));
+  });
+
+  it("a token is offered only while at least one superset combo remains reachable (overlapping combos)", () => {
+    // Two 2-token combos sharing SHIFT: SHIFT+RALT and SHIFT+CTRL.
+    const validCombos: ModifierToken[][] = [
+      ["SHIFT", "RALT"],
+      ["SHIFT", "CTRL"],
+    ];
+    // Nothing selected yet: SHIFT is offered (it's in both), and so are RALT
+    // and CTRL (each completes one of the two combos).
+    expect(new Set(addableTouchLayerTokens(new Set(), validCombos))).toEqual(
+      new Set(["SHIFT", "RALT", "CTRL"]),
+    );
+    // Having picked SHIFT, the next slot offers exactly {RALT, CTRL} — the
+    // two tokens that still complete a reachable combo — and nothing else
+    // (e.g. no CAPS, which appears in no combo at all).
+    expect(new Set(addableTouchLayerTokens(new Set(["SHIFT"]), validCombos))).toEqual(
+      new Set(["RALT", "CTRL"]),
+    );
+    // Having picked SHIFT+RALT (a complete combo in the set), there is no
+    // further legal extension — RALT's own combo is already fully assembled,
+    // and CTRL cannot combine with RALT toward the other combo.
+    expect(
+      addableTouchLayerTokens(new Set(["SHIFT", "RALT"]), validCombos),
+    ).toEqual([]);
+  });
+
+  it("prunes a chosen token's MODIFIER_EXCLUSIONS family from later offers, even when the superset check alone would have passed it", () => {
+    // Contrived (not itself exclusion-consistent — real combos reported by
+    // collectLayerCombosInUse never mix two same-family tokens, since
+    // canonicalizeCombo would reject that) input specifically exercising the
+    // exclusion guard in isolation: the reachability/superset check on its
+    // own would offer LALT here (["RALT","LALT"] is a superset of the
+    // {RALT} already chosen), but RALT's MODIFIER_EXCLUSIONS family
+    // (RALT/LALT/ALT) must still prune LALT from the result.
+    const validCombos: ModifierToken[][] = [["RALT", "LALT"]];
+    const addable = addableTouchLayerTokens(new Set(["RALT"]), validCombos);
+    expect(addable).toEqual([]);
+  });
+});
+
+describe("optionsForTouchLayerSlot", () => {
+  const validCombos: ModifierToken[][] = [
+    ["SHIFT", "RALT"],
+    ["SHIFT", "CTRL"],
+  ];
+
+  it("slot 0 (no earlier slots filled) offers every top-level reachable token", () => {
+    const tokens: (ModifierToken | "")[] = ["", ""];
+    expect(new Set(optionsForTouchLayerSlot(validCombos, tokens, 0))).toEqual(
+      new Set(["SHIFT", "RALT", "CTRL"]),
+    );
+  });
+
+  it("respects earlier slots' selections, ignoring the current slot's own (stale) value", () => {
+    // Slot 0 already holds SHIFT; slot 1's options must reflect only SHIFT
+    // having been chosen — RALT and CTRL, nothing else — regardless of what
+    // slot 1 itself currently holds (a stale/about-to-be-replaced value).
+    const tokens: (ModifierToken | "")[] = ["SHIFT", "CTRL"];
+    expect(new Set(optionsForTouchLayerSlot(validCombos, tokens, 1))).toEqual(
+      new Set(["RALT", "CTRL"]),
+    );
+  });
+
+  it("ignores LATER slots entirely — earlier slots constrain later ones, never the reverse", () => {
+    // Slot 0's options must be computed from indices strictly before it
+    // (none here), not from slot 1's already-chosen RALT.
+    const tokens: (ModifierToken | "")[] = ["", "RALT"];
+    expect(new Set(optionsForTouchLayerSlot(validCombos, tokens, 0))).toEqual(
+      new Set(["SHIFT", "RALT", "CTRL"]),
+    );
   });
 });

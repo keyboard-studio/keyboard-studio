@@ -20,13 +20,22 @@ import {
 } from "./TouchGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
-import type { VirtualFS, MechanismAssignment } from "@keyboard-studio/contracts";
+import type {
+  VirtualFS,
+  MechanismAssignment,
+  IRGroup,
+  IRRule,
+} from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 import { expectCurrentChar } from "../../test/currentCharChip.ts";
-import { changeSelectMenu } from "../../test/selectMenuTestUtils.ts";
+import {
+  changeSelectMenu,
+  selectMenuValue,
+  selectMenuOptionValues,
+} from "../../test/selectMenuTestUtils.ts";
 import { installDialogShim } from "../../test/dialogShim.ts";
 import { PATTERN_SEQUENCE } from "./patternIds.ts";
 
@@ -147,11 +156,21 @@ vi.mock("../../components/OskModeToggle.tsx", () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function seedStore(opts: { withInventory?: string[]; intro?: boolean } = {}) {
+function seedStore(
+  opts: {
+    withInventory?: string[];
+    intro?: boolean;
+    /** Override the seeded desktop IR — used by the touch-layer-picker tests
+     * to give the working copy real SHIFT/RALT rules so
+     * `collectLayerCombosInUse` (the picker's option source) has something
+     * to report beyond the always-present base layer. */
+    ir?: ReturnType<typeof makeTestIR>;
+  } = {},
+) {
   const vfs = createVirtualFS([
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
   ]);
-  const ir = makeTestIR([]);
+  const ir = opts.ir ?? makeTestIR([]);
   useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
   if (opts.withInventory !== undefined) {
     useWorkingCopyStore.getState().recordPhase({
@@ -2337,6 +2356,793 @@ describe("TouchGallery — shift-layer case-pair proposal (spec 051 US3)", () =>
 });
 
 // ---------------------------------------------------------------------------
+// Touch layer picker — #1 longpress / #2 flick gain a layer option modeled
+// on MechanismGallery's S-08 "Layer + key" card: options are derived from
+// the working KeyboardIR (collectLayerCombosInUse), never hardcoded, and are
+// ONLY the layers the desktop keyboard actually uses.
+// ---------------------------------------------------------------------------
+
+describe("buildTouchMechanismRef — explicit layer override (touch layer picker)", () => {
+  it("uses the explicit layer over the case-derived default when provided", () => {
+    // Lowercase "a" would otherwise fall back to "default" — the explicit
+    // layer wins.
+    expect(
+      buildTouchMechanismRef("longpress_alternates", "K_A", "", "a", "rightalt")
+        ?.slotValues?.["layer"],
+    ).toBe("rightalt");
+    expect(
+      buildTouchMechanismRef("flick_gestures", "K_A", "n", "a", "shift")
+        ?.slotValues?.["layer"],
+    ).toBe("shift");
+  });
+
+  it("falls back to the case-derived layer when explicitLayer is omitted or empty", () => {
+    expect(
+      buildTouchMechanismRef("longpress_alternates", "K_A", "", "A", "")
+        ?.slotValues?.["layer"],
+    ).toBe("shift");
+    expect(
+      buildTouchMechanismRef("longpress_alternates", "K_A", "", "A")
+        ?.slotValues?.["layer"],
+    ).toBe("shift");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Touch layer builder fixtures — module scope so both the builder suite
+// below AND the uppercase-current-char regression suite further down (which
+// needs an IR that actually uses SHIFT, so the FR-006 case-derived seed is a
+// combo the desktop keyboard actually uses) can share them.
+// ---------------------------------------------------------------------------
+
+/** A rule with a single vkey context element carrying `modifiers`. */
+function makeVkeyRule(vkey: string, modifiers: string[], output: string): IRRule {
+  return {
+    nodeId: `rule:${vkey}:${modifiers.join(",") || "none"}`,
+    context: [{ kind: "vkey", name: vkey, modifiers }],
+    output: [{ kind: "char", value: output }],
+  };
+}
+
+function makeIrGroup(rules: IRRule[]): IRGroup {
+  return { nodeId: "group:main", name: "main", usingKeys: true, rules, readonly: false };
+}
+
+/** A desktop IR using the base layer, SHIFT, and RALT — the corpus
+ * `collectLayerCombosInUse` reports as `[["SHIFT"], ["RALT"]]` (insertion
+ * order), so the builder must offer exactly Shift + RAlt at slot 1 and
+ * nothing else (e.g. no Ctrl/Caps, which this IR never uses). */
+const irWithShiftAndRaltLayers = makeTestIR([
+  makeIrGroup([
+    makeVkeyRule("K_A", [], "a"),
+    makeVkeyRule("K_A", ["SHIFT"], "A"),
+    makeVkeyRule("K_E", ["RALT"], "é"),
+  ]),
+]);
+
+/** A desktop IR whose ONLY layer combo is the two-token SHIFT+RALT combo —
+ * no bare SHIFT and no bare RALT — so a partial ["SHIFT"] selection is
+ * genuinely invalid (not itself a member of D) until RALT is added too. */
+const irWithShiftRaltComboOnly = makeTestIR([
+  makeIrGroup([makeVkeyRule("K_E", ["SHIFT", "RALT"], "é")]),
+]);
+
+/** A desktop IR with two 2-token combos sharing SHIFT (SHIFT+RALT,
+ * SHIFT+CTRL) — used to show that, having picked SHIFT, the next slot
+ * offers exactly {RALT, CTRL} and nothing else (e.g. never CAPS, which
+ * appears in no combo at all). */
+const irWithTwoShiftCombos = makeTestIR([
+  makeIrGroup([
+    makeVkeyRule("K_E", ["SHIFT", "RALT"], "é"),
+    makeVkeyRule("K_U", ["SHIFT", "CTRL"], "ü"),
+  ]),
+]);
+
+/** A desktop IR where SHIFT alone is already a complete valid combo, with
+ * no combo extending it further — the "add" button must not appear once
+ * SHIFT is chosen, since no token can legally extend the selection toward
+ * ANY other combo in D. */
+const irWithShiftDeadEnd = makeTestIR([
+  makeIrGroup([
+    makeVkeyRule("K_A", ["SHIFT"], "A"),
+    makeVkeyRule("K_B", ["CTRL", "RALT"], "b"),
+  ]),
+]);
+
+/** A desktop IR that never uses bare SHIFT as a layer combo at all —
+ * `collectLayerCombosInUse` reports only `[["RALT"], ["CTRL"]]`. Used to
+ * regression-test the case where `seedLayerTokensForChar`'s case-derived
+ * `["SHIFT"]` seed for an uppercase current char is NOT itself a member of
+ * D — a recoverable edge (not a crash): the note shows, Apply stays
+ * disabled, and removing the seeded slot falls back to the always-valid
+ * base/default combo. */
+const irWithoutShiftCombo = makeTestIR([
+  makeIrGroup([
+    makeVkeyRule("K_E", ["RALT"], "é"),
+    makeVkeyRule("K_B", ["CTRL"], "b"),
+  ]),
+]);
+
+describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
+  /** Dismiss the auto-detected suggestion (if any) so the method chooser is
+   * showing, then switch to the given card (longpress is the default method,
+   * so switching there is a no-op click). */
+  async function openChooser(cardText: RegExp) {
+    const denyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Deny") ?? null;
+    if (denyBtn !== null) {
+      await act(async () => {
+        fireEvent.click(denyBtn);
+      });
+    }
+    const card = screen.queryByText(cardText);
+    expect(card).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(card!);
+    });
+  }
+
+  it("renders a layer builder for #1 longpress, defaulting to the base layer (no slots, add available)", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/long.press on a key/i);
+
+    // No slot dropdown yet — the base/default layer is the empty combo.
+    expect(
+      screen.queryByRole("button", { name: /^touch layer 1 for long-press$/i }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+    ).toBeTruthy();
+    expect(screen.getByText(/Resulting layer: Base/i)).toBeTruthy();
+  });
+
+  it("renders a layer builder for #2 swipe/flick, defaulting to the base layer (no slots, add available)", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/swipe a key \(flick\)/i);
+
+    expect(
+      screen.queryByRole("button", { name: /^touch layer 1 for flick$/i }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /add another touch layer for flick/i }),
+    ).toBeTruthy();
+  });
+
+  it("renders the layer builder for #3 multitap too, defaulting to the base layer", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/tap multiple times \(multitap\)/i);
+
+    expect(
+      screen.queryByRole("button", { name: /^touch layer 1 for multitap$/i }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /add another touch layer for multitap/i }),
+    ).toBeTruthy();
+    expect(screen.getByText(/Resulting layer: Base/i)).toBeTruthy();
+  });
+
+  it("renders the layer builder for #4 replace too, defaulting to the base layer", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/replace a key/i);
+
+    expect(
+      screen.queryByRole("button", { name: /^touch layer 1 for replace$/i }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /add another touch layer for replace/i }),
+    ).toBeTruthy();
+    expect(screen.getByText(/Resulting layer: Base/i)).toBeTruthy();
+  });
+
+  it("slot 1 options reflect ONLY the combos the desktop keyboard actually uses", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/long.press on a key/i);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for long-press$/i,
+    });
+    const values = await selectMenuOptionValues(slot1);
+    // "" is the placeholder ("— Select —"); SHIFT/RALT come from the seeded
+    // IR's own rules; nothing the IR doesn't use (e.g. CAPS/CTRL) leaks in.
+    expect(values).toEqual(["", "SHIFT", "RALT"]);
+  });
+
+  it("a token appearing in no combo at all is never offered, even mid-build", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithTwoShiftCombos });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/long.press on a key/i);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for long-press$/i,
+    });
+    await changeSelectMenu(slot1, "SHIFT");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+      );
+    });
+    const slot2 = screen.getByRole("button", {
+      name: /^touch layer 2 for long-press$/i,
+    });
+    const values = await selectMenuOptionValues(slot2);
+    // RALT and CTRL each complete one of the two SHIFT-combos in D; CAPS
+    // appears in neither and is never offered.
+    expect(values).toEqual(["", "RALT", "CTRL"]);
+  });
+
+  it("hides the add button once the selection has no legal extension toward any combo in D", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftDeadEnd });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/long.press on a key/i);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for long-press$/i,
+    });
+    await changeSelectMenu(slot1, "SHIFT");
+
+    // SHIFT alone is already a complete combo in D with no valid extension
+    // (the other combo, CTRL+RALT, does not contain SHIFT) — no add button.
+    expect(
+      screen.queryByRole("button", { name: /add another touch layer for long-press/i }),
+    ).toBeNull();
+  });
+
+  it("canApply blocks Apply on a partial combo, and applying a completed multi-token combo routes to that combined layer", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftRaltComboOnly });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/long.press on a key/i);
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_B");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for long-press$/i,
+    });
+    await changeSelectMenu(slot1, "SHIFT");
+
+    const applyBtn = () =>
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+
+    // Partial combo ["SHIFT"] is NOT itself a member of D (only [SHIFT,RALT]
+    // is) — Apply must stay disabled.
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(true);
+    expect(screen.getByText(/Not yet a layer this keyboard uses/i)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+      );
+    });
+    const slot2 = screen.getByRole("button", {
+      name: /^touch layer 2 for long-press$/i,
+    });
+    await changeSelectMenu(slot2, "RALT");
+
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(false);
+    expect(screen.getByText(/Resulting layer: Shift\+RAlt/i)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(applyBtn()!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "ä")?.[1]?.mechanisms ?? [];
+    // comboToTouchLayerId(["SHIFT","RALT"]) orders RALT before SHIFT
+    // (TOUCH_LAYER_PRECEDENCE_ORDER) -> "rightalt-shift".
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_B",
+      char: "ä",
+      layer: "rightalt-shift",
+    });
+  });
+
+  it("applying with a single-token layer selection (backward-compat with the single-select picker) routes the mechanism to that layer", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/long.press on a key/i);
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_B");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for long-press$/i,
+    });
+    await changeSelectMenu(slot1, "RALT");
+
+    const applyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+    expect(applyBtn).not.toBeNull();
+    expect(applyBtn?.hasAttribute("disabled")).toBe(false);
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "ä")?.[1]?.mechanisms ?? [];
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_B",
+      char: "ä",
+      layer: "rightalt",
+    });
+  });
+
+  // Twin of the test directly above — #2 flick gets the same layer builder,
+  // and a non-default selection there must route the flick mechanism onto
+  // that layer too.
+  it("applying flick with a single-token layer selection routes the mechanism to that layer", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/swipe a key \(flick\)/i);
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_B");
+
+    const directionSelect = screen.getByRole("button", {
+      name: /flick direction/i,
+    });
+    await changeSelectMenu(directionSelect, "n");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for flick/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for flick$/i,
+    });
+    await changeSelectMenu(slot1, "RALT");
+
+    const applyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "ä")?.[1]?.mechanisms ?? [];
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_B",
+      direction: "n",
+      char: "ä",
+      layer: "rightalt",
+    });
+  });
+
+  // Flick twin of the longpress multi-token apply test above — a completed
+  // 2-token desktop combo (Shift+RAlt) must route the flick mechanism to the
+  // combined layer, carrying BOTH slotValues.layer and slotValues.direction.
+  it("canApply blocks flick's Apply on a partial combo, and applying a completed multi-token combo routes to that combined layer", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftRaltComboOnly });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/swipe a key \(flick\)/i);
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_B");
+
+    const directionSelect = screen.getByRole("button", {
+      name: /flick direction/i,
+    });
+    await changeSelectMenu(directionSelect, "n");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for flick/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for flick$/i,
+    });
+    await changeSelectMenu(slot1, "SHIFT");
+
+    const applyBtn = () =>
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+
+    // Partial combo ["SHIFT"] is NOT itself a member of D (only [SHIFT,RALT]
+    // is) — Apply must stay disabled, same as the longpress case.
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(true);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for flick/i }),
+      );
+    });
+    const slot2 = screen.getByRole("button", {
+      name: /^touch layer 2 for flick$/i,
+    });
+    await changeSelectMenu(slot2, "RALT");
+
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(false);
+
+    await act(async () => {
+      fireEvent.click(applyBtn()!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "ä")?.[1]?.mechanisms ?? [];
+    // comboToTouchLayerId(["SHIFT","RALT"]) -> "rightalt-shift", same
+    // TOUCH_LAYER_PRECEDENCE_ORDER as the longpress twin.
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_B",
+      direction: "n",
+      char: "ä",
+      layer: "rightalt-shift",
+    });
+  });
+
+  // Multitap twin of the longpress/flick multi-token apply tests above — the
+  // layer builder is now shared by #3 multitap too.
+  it("canApply blocks multitap's Apply on a partial combo, and applying a completed multi-token combo routes to that combined layer", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftRaltComboOnly });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/tap multiple times \(multitap\)/i);
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_B");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for multitap/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for multitap$/i,
+    });
+    await changeSelectMenu(slot1, "SHIFT");
+
+    const applyBtn = () =>
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+
+    // Partial combo ["SHIFT"] is NOT itself a member of D (only [SHIFT,RALT]
+    // is) — Apply must stay disabled, same as longpress/flick.
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(true);
+    expect(screen.getByText(/Not yet a layer this keyboard uses/i)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for multitap/i }),
+      );
+    });
+    const slot2 = screen.getByRole("button", {
+      name: /^touch layer 2 for multitap$/i,
+    });
+    await changeSelectMenu(slot2, "RALT");
+
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(false);
+
+    await act(async () => {
+      fireEvent.click(applyBtn()!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "ä")?.[1]?.mechanisms ?? [];
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_B",
+      char: "ä",
+      layer: "rightalt-shift",
+    });
+  });
+
+  // Replace twin of the same test — the layer builder is now shared by #4
+  // replace too.
+  it("canApply blocks replace's Apply on a partial combo, and applying a completed multi-token combo routes to that combined layer", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftRaltComboOnly });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/replace a key/i);
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_B");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for replace/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for replace$/i,
+    });
+    await changeSelectMenu(slot1, "SHIFT");
+
+    const applyBtn = () =>
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+
+    // Partial combo ["SHIFT"] is NOT itself a member of D (only [SHIFT,RALT]
+    // is) — Apply must stay disabled, same as the other three methods.
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(true);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for replace/i }),
+      );
+    });
+    const slot2 = screen.getByRole("button", {
+      name: /^touch layer 2 for replace$/i,
+    });
+    await changeSelectMenu(slot2, "RALT");
+
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(false);
+
+    await act(async () => {
+      fireEvent.click(applyBtn()!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "ä")?.[1]?.mechanisms ?? [];
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_B",
+      char: "ä",
+      layer: "rightalt-shift",
+    });
+  });
+
+  // Defaults-first regression (spec §3c): an author who never touches the
+  // builder for multitap/replace must see byte-identical behavior to before
+  // this feature — the seeded layer (empty for lowercase, SHIFT for
+  // uppercase) is what gets applied, exactly as buildTouchMechanismRef's own
+  // touchLayerForChar fallback always produced.
+  it("multitap applies on the untouched default (base) layer when the builder is left alone", async () => {
+    seedStore({ withInventory: ["ä"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/tap multiple times \(multitap\)/i);
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_B");
+
+    const applyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+    expect(applyBtn).not.toBeNull();
+    expect(applyBtn?.hasAttribute("disabled")).toBe(false);
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "ä")?.[1]?.mechanisms ?? [];
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_B",
+      char: "ä",
+      layer: "default",
+    });
+  });
+
+  it("replace applies on the untouched default (base) layer when the builder is left alone", async () => {
+    seedStore({ withInventory: ["ä"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/replace a key/i);
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_B");
+
+    const applyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+    expect(applyBtn).not.toBeNull();
+    expect(applyBtn?.hasAttribute("disabled")).toBe(false);
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "ä")?.[1]?.mechanisms ?? [];
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_B",
+      char: "ä",
+      layer: "default",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Uppercase current char — touchLayerForChar's pre-existing case-derived
+// default (spec 051 FR-006) must survive the layer picker: the picker's
+// initial value for an uppercase current char is "shift", not "default", and
+// applying on that default layer must not raise a redundant case-pair
+// proposal (casePairTouchLayer("shift") === null — there is no "more
+// uppercase" layer to pair "shift" with). Closes the uppercase-path
+// regression gap: the existing suite above only ever seeds a lowercase
+// current char ("ä"/"θ"/"中").
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — uppercase current char (spec 051 FR-006 layer-picker regression)", () => {
+  it("layer builder seeds a SHIFT slot, and applying raises no case-pair proposal", async () => {
+    // "Á" is both uppercase (touchLayerForChar -> "shift") and decomposable
+    // accented (isDecomposableAccented -> true, so the auto-detected
+    // longpress suggestion card shows first — same shape as the "ä" tests
+    // above); Deny it to reach the method chooser. Seeded with an IR that
+    // actually uses SHIFT (irWithShiftAndRaltLayers) — the hard constraint
+    // (D3 of this feature) requires the FR-006 case-derived seed combo to be
+    // a combo the desktop keyboard actually uses, same as any other combo;
+    // every real Latin-script keyboard with uppercase letters satisfies this
+    // trivially (it must use SHIFT to produce them on desktop too).
+    seedStore({ withInventory: ["Á"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const denyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Deny") ?? null;
+    expect(denyBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(denyBtn!);
+    });
+
+    // longpress_alternates is the per-char default method, so the chooser is
+    // already showing its card — the layer builder's seeded slot must
+    // preserve the pre-existing touchLayerForChar behavior: a single SHIFT
+    // slot for an uppercase current char, not the empty (base) combo.
+    const layerSelect = screen.getByRole("button", {
+      name: /^touch layer 1 for long-press$/i,
+    });
+    expect(selectMenuValue(layerSelect)).toBe("SHIFT");
+    expect(screen.getByText(/Resulting layer: Shift/i)).toBeTruthy();
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_A");
+
+    const applyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    // Applying at the picker's own default (shift) layer must not raise a
+    // redundant case-pair proposal banner — this is already the "uppermost"
+    // case layer, so there is nothing further to pair it with.
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "Á")?.[1]?.mechanisms ?? [];
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "Á",
+      layer: "shift",
+    });
+  });
+
+  // Recoverable-edge regression: the case-derived ["SHIFT"] seed is NOT
+  // itself guaranteed to be a combo the desktop keyboard uses — seed and
+  // hard-constraint are two separate mechanisms, and an IR that never uses
+  // bare SHIFT as a layer (irWithoutShiftCombo) exposes that gap. This must
+  // surface as the same "not yet a layer this keyboard uses" note as any
+  // other invalid partial combo (never a crash), and Apply must stay
+  // disabled until the author removes the seeded slot, after which the
+  // empty/base combo (always valid) re-enables it.
+  it("shows the not-yet-valid note when the case-derived SHIFT seed is not itself a combo the desktop uses, and Apply re-enables once the seeded slot is removed", async () => {
+    seedStore({ withInventory: ["Á"], ir: irWithoutShiftCombo });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const denyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Deny") ?? null;
+    expect(denyBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(denyBtn!);
+    });
+
+    // Seeded with a single SHIFT slot (touchLayerForChar("Á") === "shift"),
+    // but this IR's collectLayerCombosInUse reports only [["RALT"],["CTRL"]]
+    // — ["SHIFT"] is not a member of D.
+    const layerSelect = screen.getByRole("button", {
+      name: /^touch layer 1 for long-press$/i,
+    });
+    expect(selectMenuValue(layerSelect)).toBe("SHIFT");
+    expect(screen.getByText(/Not yet a layer this keyboard uses/i)).toBeTruthy();
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_A");
+
+    const applyBtn = () =>
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(true);
+
+    // Remove the seeded (invalid) slot — the builder falls back to the
+    // empty/base combo, which is always valid.
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /^remove touch layer 1 for long-press$/i }),
+      );
+    });
+
+    expect(screen.queryByText(/Not yet a layer this keyboard uses/i)).toBeNull();
+    expect(screen.getByText(/Resulting layer: Base/i)).toBeTruthy();
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(false);
+  });
+});
 // Spec 051 Phase 7 (T049/T050) — FR-012: the suggestion-Accept path
 // (handleUseSuggestion) must carry an explicit `layer`, derived the same way
 // every other placement path derives it (buildTouchMechanismRef /
