@@ -480,6 +480,31 @@ describe("applyDesktopModificationsToRawJson — placements target the case-deri
     expect(shiftKa.sk ?? []).toHaveLength(0);
   });
 
+  it("is a no-op when the shift host produces the placed char in a different normalization form", () => {
+    // Host text is NFD ("A" + combining acute); the placement is NFC "Á".
+    // `isTouchKeyPrimaryProduction` is shared with the IR applier, but this
+    // path writes straight to the VFS with no IR round-trip, so it needs its
+    // own regression coverage for the normalization-mismatch case.
+    const nfdUpperAAcute = "A" + String.fromCodePoint(0x0301);
+    const json = makePhoneWithShiftJson(
+      [{ id: "K_A", text: "a" }],
+      [{ id: "K_A", text: nfdUpperAAcute }],
+    );
+    const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+    expect(warnings).toHaveLength(0);
+
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string; text?: string; sk?: Array<{ text?: string }> }> }> }> };
+    };
+    const shiftLayer = parsed.phone.layer.find((l) => l.id === "shift")!;
+    const shiftKa = shiftLayer.row.flatMap((r) => r.key).find((k) => k.id === "K_A")!;
+    expect(shiftKa.text).toBe(nfdUpperAAcute); // host production untouched
+    expect(shiftKa.sk ?? []).toHaveLength(0);
+  });
+
   it("still lands a lowercase char on the default layer (regression guard)", () => {
     const json = makePhoneWithShiftJson(
       [{ id: "K_A", text: "a" }],

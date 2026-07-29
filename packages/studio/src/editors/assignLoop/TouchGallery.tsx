@@ -82,6 +82,7 @@ import {
   parseTouchLayout,
   touchCoverage,
   resolveTouchLayerId,
+  touchLayerForChar,
   collectLayerCombosInUse,
   comboToTouchLayerId,
   canonicalizeCombo,
@@ -273,26 +274,12 @@ export type TouchMethod =
 // MechanismGallery's `if (resolvedSwapVkey === null) return;` style).
 // ---------------------------------------------------------------------------
 
-/**
- * The touch layer a placement of `char` belongs on, derived from the letter's
- * case (FR-006). Before this existed, case was simply UNREPRESENTABLE in a
- * touch placement — both appliers hardcoded the phone `default` layer — so an
- * accented uppercase letter landed on the lowercase layer.
- *
- * This reads the character's case; it does NOT change it. The one
- * `.toUpperCase()` left on the touch path builds a vkey NAME (`K_A`), not a
- * letter, and is unrelated.
- *
- * The test is un-anchored (`^\p{Lu}`, no `$`) on purpose: an uppercase base
- * letter plus combining mark(s) with no precomposed code point (e.g. U+014A +
- * U+0300) would otherwise route to the lowercase "default" layer. Must stay
- * byte-identical to the engine's `touchLayerForChar` in
- * packages/engine/src/pattern-apply/touchLayer.ts — this copy exists only
- * because a `.tsx` can't import from there.
- */
-function touchLayerForChar(char: string): TouchLayerId {
-  return /^\p{Lu}/u.test(char) ? "shift" : "default";
-}
+// The touch layer a placement of `char` belongs on (derived from the letter's
+// case, FR-006) is `touchLayerForChar`, imported from
+// `@keyboard-studio/engine` above. It used to be duplicated here, hand-synced
+// with the engine copy "by inspection" — which cost a regression (spec 051
+// FR-012) and made every fix to the rule a two-site edit. The rule now has one
+// definition: packages/engine/src/pattern-apply/touchLayer.ts.
 
 /**
  * Seed the touch layer builder's slot state for `char` (requirement 6,

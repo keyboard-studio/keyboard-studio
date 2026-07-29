@@ -2,9 +2,9 @@
  * touchLayer — the single "absent `layer` slot === `default`" rule shared by
  * both touch-assignment appliers (IR-based and raw-JSON) and the studio's
  * touch gallery. Also the single case->layer placement rule
- * ({@link touchLayerForChar}), shared by the desktop-modification-replay
- * appliers (IR-based and raw-JSON) so they cannot independently drift from
- * the studio touch gallery's own copy of the rule.
+ * ({@link touchLayerForChar}), consumed by the desktop-modification-replay
+ * appliers (IR-based and raw-JSON) AND by the studio touch gallery, which
+ * imports it from the package root rather than keeping its own copy.
  *
  * That invariant used to be encoded three times (applyTouchAssignments.ts,
  * applyTouchAssignmentsToRawJson.ts, TouchGallery.tsx's `normalizeTouchSlots`)
@@ -17,7 +17,8 @@
  * @see applyDesktopModificationsToRawJson.ts
  * @see ../../studio/src/editors/assignLoop/TouchGallery.tsx (`normalizeTouchSlots`)
  * @see ../../studio/src/editors/assignLoop/TouchGallery.tsx (`touchMechanismLabel`)
- * @see ../../studio/src/editors/assignLoop/TouchGallery.tsx (`touchLayerForChar`)
+ * @see ../../studio/src/editors/assignLoop/TouchGallery.tsx (imports
+ *      `touchLayerForChar` from `@keyboard-studio/engine`)
  */
 
 /** The layer a touch mechanism targets when it does not name one. An ABSENT
@@ -42,10 +43,14 @@ export function resolveTouchLayerId(
 /**
  * The case->layer placement rule: a char whose BASE code point is an uppercase
  * letter (`\p{Lu}`) targets the {@link SHIFT_TOUCH_LAYER}; everything else
- * targets {@link DEFAULT_TOUCH_LAYER}. Mirrors studio's `touchLayerForChar` in
- * TouchGallery.tsx exactly — that copy can't import from here (it lives in a
- * `.tsx`), so this is the definition engine code owns and studio's stays in
- * sync with by inspection.
+ * targets {@link DEFAULT_TOUCH_LAYER}.
+ *
+ * This is the ONLY definition of the rule. Studio's touch gallery used to keep
+ * a hand-synced copy on the grounds that a `.tsx` could not import from here —
+ * it can, and does (TouchGallery.tsx already imported `resolveTouchLayerId`
+ * from the package root two functions away). Both prior fixes to this rule had
+ * to be applied twice; re-export from `@keyboard-studio/engine` instead of
+ * copying, so a third fix can't land on one copy only.
  *
  * The test is deliberately un-anchored (`^\p{Lu}`, no `$`): plenty of
  * orthographies stack diacritics that have NO precomposed Unicode code point
