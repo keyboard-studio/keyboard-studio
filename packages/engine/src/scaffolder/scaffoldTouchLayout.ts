@@ -1679,17 +1679,59 @@ function buildTabletLayers(
 }
 
 /**
- * Tablet counterpart to {@link buildCompactPhoneLayers}: same overflow-routing
- * pipeline (mark placement onto a base letter's sk[], numeric-overflow
- * attachment, space-bar "extras" fallback — spec item 6), but building the
- * tablet layer skeleton ({@link buildTabletLayers}) instead of the phone one.
- * Duplicated rather than shared with {@link buildCompactPhoneLayers} so the
- * phone path's own body stays untouched.
+ * Signature shared by the two compact layer-skeleton builders
+ * ({@link buildCanonicalPhoneLayers}, {@link buildTabletLayers}) so
+ * {@link buildCompactLayers} can be parametrized over either.
  */
-function buildCompactTabletLayers(
+type CompactLayerSkeletonBuilder = (
   keyMap: KeyMap,
   deadkeySuccessors: DeadkeySuccessors,
   minter: NodeIdMinter,
+) => TouchLayoutIR["platforms"][number]["layers"];
+
+/**
+ * Shared overflow-routing pipeline for the compact phone/tablet builders
+ * ({@link buildCompactPhoneLayers}, {@link buildCompactTabletLayers}): mark
+ * placement onto a base letter's sk[], numeric-overflow attachment, space-bar
+ * "extras" fallback — spec item 6. `buildLayers` supplies the layer skeleton
+ * ({@link buildCanonicalPhoneLayers} or {@link buildTabletLayers}) the
+ * overflow entries are then routed onto; the routing logic itself is
+ * identical for both paths.
+ *
+ * BUG 2/3 fix: an overflow char (collectOverflowEntries' `unplaced` list —
+ * now including every digit/punctuation/symbol char, per BUG 3, whether or
+ * not its vkey has a physical letter neighbor) is no longer dumped straight
+ * onto a letter's sk[] or the space bar's "extras" grouping — it is
+ * classified first ({@link classifyOverflowChar}) and routed to a more
+ * sensible home:
+ *   - a diacritic mark   -> the sk[] of the vkey that produces the base
+ *     letter it decorates ({@link resolveDiacriticBaseVkey}, falling back to
+ *     {@link MARK_FALLBACK_VKEY});
+ *   - a digit/punctuation/symbol char already rendered by the numeric
+ *     layer's literal keys ({@link NUMERIC_LAYER_LITERAL_CHARS}) -> needs no
+ *     further placement (e.g. a number-row key's plain digit is already on
+ *     the numeric layer);
+ *   - any other digit/punctuation/symbol char -> the numeric layer's nearest
+ *     literal key ({@link NUMERIC_NEAREST_SLOT} / {@link attachNumericOverflowExtra});
+ *   - anything else, or a mark/digit/punctuation/symbol char neither table
+ *     above can resolve -> the space bar's "extras" grouping, same as before.
+ *
+ * Logs a console-only warning (no emoji, per convention) naming any character
+ * that still landed in the extras grouping — an unresolved mark is tagged
+ * distinctly (e.g. "<mark> (no resolvable base letter)") so the gap is
+ * visible rather than only inferred from the layout. This is placement
+ * bookkeeping, not the caller-facing data-loss diagnostic: everything routed
+ * here DOES land somewhere in the emitted layout (the space bar's longpress),
+ * so it is reachable and therefore not part of
+ * {@link scaffoldTouchLayoutWithDiagnostics}'s `unplacedChars` (which is
+ * computed separately from TRUE post-build reachability, not from this
+ * function's placement bookkeeping).
+ */
+function buildCompactLayers(
+  keyMap: KeyMap,
+  deadkeySuccessors: DeadkeySuccessors,
+  minter: NodeIdMinter,
+  buildLayers: CompactLayerSkeletonBuilder,
 ): { layers: TouchLayoutIR["platforms"][number]["layers"] } {
   const { bySlot: overflowBySlot, unplaced } = collectOverflowEntries(keyMap, COVERED_VKEYS);
   const charToVkey = buildCharToVkeyMap(keyMap);
@@ -1736,8 +1778,11 @@ function buildCompactTabletLayers(
     markSuccessors,
   );
 
-  const layers = buildTabletLayers(keyMap, combinedSuccessors, minter);
+  const layers = buildLayers(keyMap, combinedSuccessors, minter);
 
+  // [QC P2 fix] attachNumericOverflowExtra's boolean return is honored: when
+  // it can't find the target numeric-layer key (no-op), the char falls back
+  // to the space bar's extras grouping instead of being silently dropped.
   for (const { ch, nearestChar } of numericAttachments) {
     const attached = attachNumericOverflowExtra(layers, minter, ch, nearestChar);
     if (!attached) stillUnplaced.push(ch);
@@ -1756,6 +1801,20 @@ function buildCompactTabletLayers(
   }
 
   return { layers };
+}
+
+/**
+ * Tablet counterpart to {@link buildCompactPhoneLayers}: thin wrapper over
+ * the shared {@link buildCompactLayers} overflow-routing pipeline, building
+ * the tablet layer skeleton ({@link buildTabletLayers}) instead of the phone
+ * one.
+ */
+function buildCompactTabletLayers(
+  keyMap: KeyMap,
+  deadkeySuccessors: DeadkeySuccessors,
+  minter: NodeIdMinter,
+): { layers: TouchLayoutIR["platforms"][number]["layers"] } {
+  return buildCompactLayers(keyMap, deadkeySuccessors, minter, buildTabletLayers);
 }
 
 /**
@@ -1833,108 +1892,16 @@ function attachNumericOverflowExtra(
  * rules produce that falls outside the compact skeleton's slots (see
  * {@link collectOverflowEntries}) onto a real key's sk[] longpress menu.
  *
- * BUG 2/3 fix: an overflow char (collectOverflowEntries' `unplaced` list —
- * now including every digit/punctuation/symbol char, per BUG 3, whether or
- * not its vkey has a physical letter neighbor) is no longer dumped straight
- * onto a letter's sk[] or the space bar's "extras" grouping — it is
- * classified first ({@link classifyOverflowChar}) and routed to a more
- * sensible home:
- *   - a diacritic mark   -> the sk[] of the vkey that produces the base
- *     letter it decorates ({@link resolveDiacriticBaseVkey}, falling back to
- *     {@link MARK_FALLBACK_VKEY});
- *   - a digit/punctuation/symbol char already rendered by the numeric
- *     layer's literal keys ({@link NUMERIC_LAYER_LITERAL_CHARS}) -> needs no
- *     further placement (e.g. a number-row key's plain digit is already on
- *     the numeric layer);
- *   - any other digit/punctuation/symbol char -> the numeric layer's nearest
- *     literal key ({@link NUMERIC_NEAREST_SLOT} / {@link attachNumericOverflowExtra});
- *   - anything else, or a mark/digit/punctuation/symbol char neither table
- *     above can resolve -> the space bar's "extras" grouping, same as before.
- *
- * Logs a console-only warning (no emoji, per convention) naming any character
- * that still landed in the extras grouping — an unresolved mark is tagged
- * distinctly (e.g. "<mark> (no resolvable base letter)") so the gap is
- * visible rather than only inferred from the layout. This is placement
- * bookkeeping, not the caller-facing data-loss diagnostic: everything routed
- * here DOES land somewhere in the emitted layout (the space bar's longpress),
- * so it is reachable and therefore not part of
- * {@link scaffoldTouchLayoutWithDiagnostics}'s `unplacedChars` (which is
- * computed separately from TRUE post-build reachability, not from this
- * function's placement bookkeeping).
+ * Thin wrapper over the shared {@link buildCompactLayers} overflow-routing
+ * pipeline (see its doc comment for the full routing rules), building the
+ * phone layer skeleton ({@link buildCanonicalPhoneLayers}).
  */
 function buildCompactPhoneLayers(
   keyMap: KeyMap,
   deadkeySuccessors: DeadkeySuccessors,
   minter: NodeIdMinter,
 ): { layers: TouchLayoutIR["platforms"][number]["layers"] } {
-  const { bySlot: overflowBySlot, unplaced } = collectOverflowEntries(keyMap, COVERED_VKEYS);
-  const charToVkey = buildCharToVkeyMap(keyMap);
-
-  const markSuccessors = new Map<string, string[]>();
-  const numericAttachments: Array<{ ch: string; nearestChar: string }> = [];
-  const stillUnplaced: string[] = [];
-  const unresolvedMarks = new Set<string>();
-
-  for (const ch of unplaced) {
-    const kind = classifyOverflowChar(ch);
-
-    if (kind === "diacritic-mark") {
-      const vkey =
-        resolveDiacriticBaseVkey(ch, keyMap, deadkeySuccessors, charToVkey) ??
-        MARK_FALLBACK_VKEY[ch];
-      if (vkey !== undefined) {
-        const existing = markSuccessors.get(vkey) ?? [];
-        if (!existing.includes(ch)) existing.push(ch);
-        markSuccessors.set(vkey, existing);
-        continue;
-      }
-      unresolvedMarks.add(ch);
-      stillUnplaced.push(ch);
-      continue;
-    }
-
-    if (kind === "numeric-or-symbol") {
-      if (NUMERIC_LAYER_LITERAL_CHARS.has(ch)) continue; // already reachable
-      const nearestChar = NUMERIC_NEAREST_SLOT[ch];
-      if (nearestChar !== undefined) {
-        numericAttachments.push({ ch, nearestChar });
-        continue;
-      }
-      stillUnplaced.push(ch);
-      continue;
-    }
-
-    stillUnplaced.push(ch);
-  }
-
-  const combinedSuccessors = mergeSuccessorMaps(
-    mergeSuccessorMaps(deadkeySuccessors, overflowBySlot),
-    markSuccessors,
-  );
-
-  const layers = buildCanonicalPhoneLayers(keyMap, combinedSuccessors, minter);
-
-  // [QC P2 fix] attachNumericOverflowExtra's boolean return is honored: when
-  // it can't find the target numeric-layer key (no-op), the char falls back
-  // to the space bar's extras grouping instead of being silently dropped.
-  for (const { ch, nearestChar } of numericAttachments) {
-    const attached = attachNumericOverflowExtra(layers, minter, ch, nearestChar);
-    if (!attached) stillUnplaced.push(ch);
-  }
-
-  if (stillUnplaced.length > 0) {
-    const tagged = stillUnplaced.map((ch) =>
-      unresolvedMarks.has(ch) ? `${ch} (no resolvable base letter)` : ch,
-    );
-    attachOverflowExtras(layers, minter, stillUnplaced);
-    console.warn(
-      `[scaffoldTouchLayout] ${stillUnplaced.length} character(s) produced by the desktop rules ` +
-        "have no compact-layout key and no known adjacent slot; placed on the space bar's " +
-        `longpress ("extras") menu instead of being dropped: ${tagged.join(", ")}`,
-    );
-  }
-
-  return { layers };
+  return buildCompactLayers(keyMap, deadkeySuccessors, minter, buildCanonicalPhoneLayers);
 }
 
 /**
