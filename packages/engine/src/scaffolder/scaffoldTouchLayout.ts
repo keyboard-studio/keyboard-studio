@@ -1409,10 +1409,15 @@ function buildTabletFunctionalRow(minter: NodeIdMinter): TouchKeyIR[] {
   ];
 }
 
+/** The tablet default/shift number row's digits, 1-0 — shared with
+ *  {@link buildTabletRightAltBlankTopRow} so the blank RAlt top row's slot
+ *  count always tracks this row's width instead of a second hardcoded 10. */
+const TABLET_NUMBER_ROW_DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"] as const;
+
 /** Digit row (1-0 + K_BKSP) — the tablet default/shift layers' row 1. */
 function buildTabletNumberRow(minter: NodeIdMinter): TouchKeyIR[] {
   return [
-    ...(["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"] as const).map((ch) => ({
+    ...TABLET_NUMBER_ROW_DIGITS.map((ch) => ({
       nodeId: minter.mint("touchKey"),
       id: charToUnicodeKeyId(ch),
       text: ch,
@@ -1422,29 +1427,68 @@ function buildTabletNumberRow(minter: NodeIdMinter): TouchKeyIR[] {
 }
 
 /**
- * Build the tablet rightalt layer: row 0 (Q-P), row 1 (A-L, pad on A), row 2
- * (K_SHIFT toggle + Z-M + K_BKSP), row 3 (functional). Every letter key
- * carries `nextlayer:"default"` (auto-return); the K_SHIFT toggle keeps
- * {@link buildRightAltToggleKey}'s hasRightAlt/hasRightAltShift-driven target logic so
- * rightalt-shift stays reachable when both secondary layers exist.
+ * Blank spacer top row for the tablet rightalt/rightalt-shift layers —
+ * geometry-matches {@link buildTabletNumberRow} (same slot count + a
+ * trailing K_BKSP of the same width). This gives all four tablet letter
+ * layers (default/shift/rightalt/rightalt-shift) the same ROW COUNT (5),
+ * which is what closes the "RAlt has one fewer row" gap: previously the
+ * RAlt layers omitted this row, so the whole layer sat one row higher than
+ * default/shift when toggled. Row 0 here is column-aligned to the default
+ * number row; note the letter rows below (1-3) still carry fewer columns
+ * than default/shift because the RAlt layer genuinely has fewer characters,
+ * so some horizontal reflow of those rows remains (pre-existing; not
+ * addressed here). The RAlt layers have no character content for this row,
+ * so every slot but the last is a `T_BLANK` spacer (sp:10 — a canonical
+ * spacer class per `SPACER_SP_VALUES`/`isSpacerKeyClass` in
+ * `@keyboard-studio/contracts`) — mirroring the shipped sil_cameroon_qwerty
+ * corpus, whose own "rightalt" layer's row 0 is exactly this: blank
+ * placeholders plus a real (duplicate) K_BKSP. The lower Z-row's K_BKSP
+ * (see {@link buildTabletRightAltLayer}/{@link buildTabletRightAltShiftLayer})
+ * is left in place, so backspace stays reachable from both rows.
+ */
+function buildTabletRightAltBlankTopRow(minter: NodeIdMinter): TouchKeyIR[] {
+  return [
+    ...TABLET_NUMBER_ROW_DIGITS.map(() => ({
+      nodeId: minter.mint("touchKey"),
+      id: "T_BLANK",
+      text: "",
+      sp: 10,
+    })),
+    { nodeId: minter.mint("touchKey"), id: "K_BKSP", text: "*BkSp*", width: 150, sp: 1 },
+  ];
+}
+
+/**
+ * Build the tablet rightalt layer: row 0 (blank spacer top row, geometry-
+ * matched to the default/shift number row — see
+ * {@link buildTabletRightAltBlankTopRow}), row 1 (Q-P), row 2 (A-L, pad on
+ * A), row 3 (K_SHIFT toggle + Z-M + K_BKSP), row 4 (functional) — five rows,
+ * matching the tablet default/shift layers' ROW COUNT so RAlt no longer sits
+ * a row short (the letter rows themselves stay narrower than default's, a
+ * pre-existing column difference). Every letter key carries `nextlayer:"default"`
+ * (auto-return); the K_SHIFT toggle keeps {@link buildRightAltToggleKey}'s
+ * hasRightAlt/hasRightAltShift-driven target logic so rightalt-shift stays
+ * reachable when both secondary layers exist.
  */
 function buildTabletRightAltLayer(
   keyMap: KeyMap,
   minter: NodeIdMinter,
   hasRightAltShift: boolean,
 ): TouchLayoutIR["platforms"][number]["layers"][number] {
-  const row0Keys: TouchKeyIR[] = COMPACT_ROW1_VKEYS.map((vkey, i) =>
+  const row0Keys: TouchKeyIR[] = buildTabletRightAltBlankTopRow(minter);
+
+  const row1Keys: TouchKeyIR[] = COMPACT_ROW1_VKEYS.map((vkey, i) =>
     buildTabletRightAltLetterKey(vkey, "rightalt", keyMap, minter, i === 0 ? 55 : undefined),
   );
 
-  const row1Keys: TouchKeyIR[] = [
+  const row2Keys: TouchKeyIR[] = [
     buildTabletRightAltLetterKey("K_A", "rightalt", keyMap, minter, 50),
     ...COMPACT_ROW2_VKEYS.slice(1).map((vkey) =>
       buildTabletRightAltLetterKey(vkey, "rightalt", keyMap, minter),
     ),
   ];
 
-  const row2Keys: TouchKeyIR[] = [
+  const row3Keys: TouchKeyIR[] = [
     {
       nodeId: minter.mint("touchKey"),
       id: "K_SHIFT",
@@ -1464,6 +1508,7 @@ function buildTabletRightAltLayer(
       { keys: row0Keys },
       { keys: row1Keys },
       { keys: row2Keys },
+      { keys: row3Keys },
       { keys: buildTabletFunctionalRow(minter) },
     ],
   };
@@ -1471,28 +1516,32 @@ function buildTabletRightAltLayer(
 
 /**
  * Build the tablet rightalt-shift layer — structural mirror of
- * {@link buildTabletRightAltLayer}, reading "rightalt-shift" text. Its K_SHIFT
- * toggle returns to "rightalt" (keeping RAlt held, uppercase specials done) when
- * a rightalt layer exists, else releases straight to "default" (no rightalt layer
- * to hold) — same graph role as the phone skeleton's rightalt-shift K_SHIFT key.
+ * {@link buildTabletRightAltLayer} (including its blank spacer top row —
+ * see {@link buildTabletRightAltBlankTopRow}), reading "rightalt-shift" text.
+ * Its K_SHIFT toggle returns to "rightalt" (keeping RAlt held, uppercase
+ * specials done) when a rightalt layer exists, else releases straight to
+ * "default" (no rightalt layer to hold) — same graph role as the phone
+ * skeleton's rightalt-shift K_SHIFT key.
  */
 function buildTabletRightAltShiftLayer(
   keyMap: KeyMap,
   minter: NodeIdMinter,
   hasRightAlt: boolean,
 ): TouchLayoutIR["platforms"][number]["layers"][number] {
-  const row0Keys: TouchKeyIR[] = COMPACT_ROW1_VKEYS.map((vkey, i) =>
+  const row0Keys: TouchKeyIR[] = buildTabletRightAltBlankTopRow(minter);
+
+  const row1Keys: TouchKeyIR[] = COMPACT_ROW1_VKEYS.map((vkey, i) =>
     buildTabletRightAltLetterKey(vkey, "rightalt-shift", keyMap, minter, i === 0 ? 55 : undefined),
   );
 
-  const row1Keys: TouchKeyIR[] = [
+  const row2Keys: TouchKeyIR[] = [
     buildTabletRightAltLetterKey("K_A", "rightalt-shift", keyMap, minter, 50),
     ...COMPACT_ROW2_VKEYS.slice(1).map((vkey) =>
       buildTabletRightAltLetterKey(vkey, "rightalt-shift", keyMap, minter),
     ),
   ];
 
-  const row2Keys: TouchKeyIR[] = [
+  const row3Keys: TouchKeyIR[] = [
     {
       nodeId: minter.mint("touchKey"),
       id: "K_SHIFT",
@@ -1512,6 +1561,7 @@ function buildTabletRightAltShiftLayer(
       { keys: row0Keys },
       { keys: row1Keys },
       { keys: row2Keys },
+      { keys: row3Keys },
       { keys: buildTabletFunctionalRow(minter) },
     ],
   };

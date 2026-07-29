@@ -2905,6 +2905,85 @@ describe("scaffoldTouchLayoutWithDiagnostics — tablet path (platformStyle:\"ta
     assertNoDanglingNextlayer(result.layout, "tablet");
   });
 
+  // Geometry parity — the tablet default/shift layers have 5 rows (number
+  // row + 2 QWERTY letter rows + Z-row + functional). Before this fix, the
+  // rightalt/rightalt-shift layers had only 4 rows (no number row), so
+  // toggling into RAlt visually reflowed the keyboard. rightalt/rightalt-shift
+  // now carry a matching blank spacer top row.
+  describe("tablet rightalt/rightalt-shift geometry parity with default/shift", () => {
+    it("default and shift layers have 5 rows", () => {
+      const ir = makeEwondoLikeIR();
+      const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+      const defaultLayer = getLayer(result.layout, "default", "tablet")!;
+      const shiftLayer = getLayer(result.layout, "shift", "tablet")!;
+      expect(defaultLayer.rows).toHaveLength(5);
+      expect(shiftLayer.rows).toHaveLength(5);
+    });
+
+    it("rightalt and rightalt-shift layers now also have 5 rows (geometry-consistent with default/shift)", () => {
+      const ir = makeEwondoLikeIR();
+      const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+      const rightaltLayer = getLayer(result.layout, "rightalt", "tablet")!;
+      const rightaltShiftLayer = getLayer(result.layout, "rightalt-shift", "tablet")!;
+      expect(rightaltLayer.rows).toHaveLength(5);
+      expect(rightaltShiftLayer.rows).toHaveLength(5);
+    });
+
+    it("rightalt/rightalt-shift row 0 is a blank spacer row: same slot count as the default number row, no character content", () => {
+      const ir = makeEwondoLikeIR();
+      const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+      const defaultLayer = getLayer(result.layout, "default", "tablet")!;
+      const rightaltLayer = getLayer(result.layout, "rightalt", "tablet")!;
+      const rightaltShiftLayer = getLayer(result.layout, "rightalt-shift", "tablet")!;
+
+      const defaultRow0 = defaultLayer.rows[0]!;
+      const rightaltRow0 = rightaltLayer.rows[0]!;
+      const rightaltShiftRow0 = rightaltShiftLayer.rows[0]!;
+
+      // Same slot count as the default/shift number row.
+      expect(rightaltRow0.keys.length).toBe(defaultRow0.keys.length);
+      expect(rightaltShiftRow0.keys.length).toBe(defaultRow0.keys.length);
+
+      // Every slot but the trailing K_BKSP is a blank T_BLANK spacer with no
+      // character content.
+      for (const row0 of [rightaltRow0, rightaltShiftRow0]) {
+        const blanks = row0.keys.slice(0, -1);
+        for (const key of blanks) {
+          expect(key.id).toBe("T_BLANK");
+          expect(key.text).toBe("");
+          expect(key.output).toBeUndefined();
+          expect(key.sp).toBe(10);
+        }
+        // Trailing key is (a duplicate) K_BKSP, matching the number row shape.
+        expect(row0.keys[row0.keys.length - 1]!.id).toBe("K_BKSP");
+      }
+    });
+
+    it("rightalt/rightalt-shift keep all their pre-existing letter/K_SHIFT/K_BKSP content after gaining the blank top row", () => {
+      const ir = makeEwondoLikeIR();
+      const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+      const rightaltLayer = getLayer(result.layout, "rightalt", "tablet")!;
+      const rightaltShiftLayer = getLayer(result.layout, "rightalt-shift", "tablet")!;
+
+      const rightaltAllKeys = rightaltLayer.rows.flatMap((r) => r.keys);
+      const rightaltShiftAllKeys = rightaltShiftLayer.rows.flatMap((r) => r.keys);
+
+      // Special-char letter keys are still present and reachable.
+      expect(rightaltAllKeys.find((k) => k.id === "K_E")?.output).toBe("ə");
+      expect(rightaltAllKeys.find((k) => k.id === "K_O")?.output).toBe("ɔ");
+      expect(rightaltShiftAllKeys.find((k) => k.id === "K_N")?.output).toBe("Ŋ");
+
+      // Exactly two reachable K_BKSP per layer: the pre-existing one on the
+      // Z-row, plus the new duplicate on the blank top row (corpus idiom).
+      expect(rightaltAllKeys.filter((k) => k.id === "K_BKSP").length).toBe(2);
+      expect(rightaltShiftAllKeys.filter((k) => k.id === "K_BKSP").length).toBe(2);
+
+      // K_SHIFT toggles are unaffected — still reachable in both directions.
+      expect(rightaltAllKeys.find((k) => k.id === "K_SHIFT")?.nextlayer).toBe("rightalt-shift");
+      expect(rightaltShiftAllKeys.find((k) => k.id === "K_SHIFT")?.nextlayer).toBe("rightalt");
+    });
+  });
+
   it("unplacedChars is reachability-based: a produced special char reachable via the rightalt layer is not reported unplaced", () => {
     const ir = makeEwondoLikeIR();
     const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
