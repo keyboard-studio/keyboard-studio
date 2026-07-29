@@ -132,6 +132,18 @@ export interface SurveySession {
    * absent until the marks series' output-form station has been confirmed.
    */
   marksOutputForm?: OutputForm;
+  /**
+   * Deduped union of all phases' `retainedConvenienceChars` — base-keyboard
+   * characters kept for loanwords / email addresses / web addresses despite
+   * not being in the orthography. Held ALONGSIDE `confirmedInventory`, never
+   * inside it (see {@link SurveyPhaseResult.retainedConvenienceChars}): the
+   * carve gallery shields them from removal, and nothing else treats them as
+   * orthography.
+   *
+   * **Additive optional** — absent when no phase asked the convenience
+   * question, so existing literal `SurveySession` objects stay valid.
+   */
+  retainedConvenienceChars?: string[];
 }
 
 /**
@@ -223,6 +235,19 @@ export function mergePhaseResults(
     if (phase.marksOutputForm !== undefined) marksOutputForm = phase.marksOutputForm;
   }
 
+  // Convenience-retained base characters: same dedupe/normalise rule as the
+  // inventory and a separate `seen` set, but the PRESENCE rule differs from
+  // attestedDigraphs' `length > 0` — an author who was asked and deliberately
+  // kept nothing yields `[]`, which is a different state from "never asked"
+  // (absent). So the field is emitted whenever any phase carried one at all.
+  const { values: retainedConvenienceChars } = nfcDedupUnion(
+    phaseResults,
+    (p) => p.retainedConvenienceChars
+  );
+  const convenienceAsked = phaseResults.some(
+    (p) => p.retainedConvenienceChars !== undefined
+  );
+
   return {
     axes,
     irAxes: { ...irAxes },
@@ -234,6 +259,7 @@ export function mergePhaseResults(
     ...(alphabet !== undefined ? { alphabet } : {}),
     ...(marksWorklist !== undefined ? { marksWorklist } : {}),
     ...(marksOutputForm !== undefined ? { marksOutputForm } : {}),
+    ...(convenienceAsked ? { retainedConvenienceChars } : {}),
   };
 }
 

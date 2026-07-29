@@ -1608,7 +1608,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → choose_base → track → characters → marks → carve → mechanisms → touch → help → package (M2, spec 046)", () => {
+  it("manifest spine order is: identity → choose_base → track → characters → marks → convenience → carve → mechanisms → touch → help → package (M2, spec 046)", () => {
     // track is now a real manifest step (P0 fix); project_name is spine:false.
     const spineIds = manifest
       .filter((s) => s.spine !== false)
@@ -1619,6 +1619,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
       "track",
       "characters",
       "marks",
+      "convenience",
       "carve",
       "mechanisms",
       "touch",
