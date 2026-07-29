@@ -10,20 +10,28 @@
 // evaluated on re-handling letters the base already types.
 //
 // Memoization:
-//   - producedSet is memoized on baseIr (object-reference stable because the
-//     working-copy store never mutates baseIr in place — it replaces the slot).
+//   - producedSet is memoized on baseIr + inventory (object-reference stable
+//     because the working-copy store never mutates baseIr in place — it
+//     replaces the slot).
 //   - lettersToAdd / alreadyProduced are memoized on producedSet + inventory.
 //   - NFC normalization: producedSet from buildProducedSet() is already NFC;
 //     each confirmedInventory entry is NFC-normalized here before lookup so that
 //     a decomposed inventory entry (e.g. "é") correctly matches the
 //     precomposed "é" (U+00E9) the base might produce.
+//   - Composability: producedSet is augmented via augmentWithComposable
+//     (@keyboard-studio/contracts) so a precomposed inventory char (e.g.
+//     U+00DB) is treated as already-produced when its base letter and
+//     combining diacritic(s) are separately produced (canonical-NFD, one
+//     level, no recursion — see that helper's doc comment). This both greens
+//     the badge and removes the char from lettersToAdd, so the completion
+//     gate no longer nags for a char the keyboard can already type.
 //
 // baseIr-null fallback: when baseIr is null (working copy not yet instantiated),
 // lettersToAdd === inventory (full alphabet) and alreadyProduced === [] — the
 // gallery behaves exactly as it did before the diff was wired.
 
 import { useMemo } from "react";
-import { buildProducedSet } from "@keyboard-studio/contracts";
+import { augmentWithComposable, buildProducedSet } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 
 export interface InventoryDiff {
@@ -50,8 +58,11 @@ export function useInventoryDiff(): InventoryDiff {
   const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
 
   const producedSet = useMemo<Set<string>>(
-    () => (baseIr !== null ? buildProducedSet(baseIr) : new Set<string>()),
-    [baseIr],
+    () =>
+      baseIr !== null
+        ? augmentWithComposable(buildProducedSet(baseIr), inventory)
+        : new Set<string>(),
+    [baseIr, inventory],
   );
 
   return useMemo<InventoryDiff>(() => {
