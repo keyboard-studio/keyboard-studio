@@ -102,6 +102,7 @@ import {
   ALL_PICKABLE_KEYS,
   CUSTOM_KEY_OPTION_VALUE,
 } from "../../lib/keyOptions.ts";
+import { formatModifierCombo } from "../../lib/modifierTokenLabel.ts";
 import {
   resolveCharInput,
   resolveKeyPickerSelection,
@@ -225,19 +226,6 @@ const TRIGGER_KEY_RESOLVE_OPTIONS: KeyPickerResolveOptions = {
   blockDelimiters: true,
 };
 
-/** Display label per ModifierToken for the S-08 covered-chip badge (methodLabel). */
-const MODIFIER_TOKEN_LABELS: Record<string, string> = {
-  SHIFT: "Shift",
-  CTRL: "Ctrl",
-  RCTRL: "RCtrl",
-  LCTRL: "LCtrl",
-  ALT: "Alt",
-  RALT: "RAlt",
-  LALT: "LAlt",
-  CAPS: "Caps",
-  NCAPS: "NCaps",
-};
-
 // Takes an optional i18n + resolves via msg()/resolveMessage() rather than a
 // bare `t` parameter — Lingui's macro tracks the specific binding introduced
 // by useLingui(), so a re-bound `t` parameter is a distinct binding the
@@ -279,9 +267,12 @@ function methodLabel(
         .split(/\s+/)
         .filter(Boolean);
       const key = parts.pop() ?? "?";
+      // parts came from splitting a bracket-notation combo spec built by this
+      // gallery's own S-08 write path (comboToKeySpec), so its entries are
+      // always ModifierToken strings — asserted rather than re-typed here.
       const prefix =
         parts.length > 0
-          ? parts.map((tok) => MODIFIER_TOKEN_LABELS[tok] ?? tok).join("+")
+          ? formatModifierCombo(parts as ModifierToken[])
           : resolveMessage(
               i18n,
               msg({

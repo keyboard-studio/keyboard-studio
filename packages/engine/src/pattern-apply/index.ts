@@ -88,6 +88,8 @@ export {
   collectModifierTokensInUse,
   collectLayerCombosInUse,
   buildComboKeyMap,
+  addableTouchLayerTokens,
+  optionsForTouchLayerSlot,
 } from "./modifierCombos.js";
 export type { ModifierToken } from "./modifierCombos.js";
 

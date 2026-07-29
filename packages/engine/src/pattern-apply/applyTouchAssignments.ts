@@ -2,9 +2,11 @@
  * applyTouchAssignments — pure function that folds Phase E touch
  * assignments (longpress / flick / multitap) into a TouchLayoutIR.
  *
- * Only the phone platform is mutated, and within it only the layers a
- * mechanism actually names (via structural sharing — no original objects
- * are modified). All other platforms and layers are returned by reference.
+ * Only the mobile platform ("phone", or "tablet" when no "phone" platform is
+ * present — see {@link resolveMobilePlatformIndex}) is mutated, and within it
+ * only the layers a mechanism actually names (via structural sharing — no
+ * original objects are modified). All other platforms and layers are
+ * returned by reference.
  *
  * Each mechanism selects its target layer with the optional `layer` slot
  * value; an ABSENT `layer` means `"default"`, so every assignment written
@@ -17,13 +19,17 @@
  * different layers.
  *
  * @see spec.md §8 Phase E (touch gallery)
+ * @see specs/035-mobile-touch-derivation/ — spec-035 amendment R7a (tablet reseed target)
  */
 
 import type { TouchLayoutIR, TouchKeyIR } from "@keyboard-studio/contracts";
 import type { TouchAssignment } from "@keyboard-studio/contracts";
 import { NodeIdMinter } from "../shared/node-ids.js";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
-import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
+import {
+  isTouchSubKeyDuplicate,
+  resolveMobilePlatformIndex,
+} from "./touch-mechanism-shared.js";
 import { resolveTouchLayerId } from "./touchLayer.js";
 
 // ---------------------------------------------------------------------------
@@ -58,9 +64,11 @@ interface LayerWorkState {
  * Apply a list of touch {@link TouchAssignment}s to a {@link TouchLayoutIR},
  * returning a new (pure, non-mutating) layout and any diagnostic warnings.
  *
- * Only the phone platform is modified, and within it only the layers named by
- * a mechanism's `layer` slot value (default `"default"`); all other platforms
- * and layers are returned by reference (structural sharing).
+ * Only the mobile platform ("phone", or "tablet" fallback — see
+ * {@link resolveMobilePlatformIndex}) is modified, and within it only the
+ * layers named by a mechanism's `layer` slot value (default `"default"`);
+ * all other platforms and layers are returned by reference (structural
+ * sharing).
  *
  * @param layout      The base touch layout (from scaffoldTouchLayout or
  *                    buildMinimalPhoneTouchLayout).
@@ -73,11 +81,14 @@ export function applyTouchAssignments(
   const warnings: string[] = [];
   const minter = new NodeIdMinter();
 
-  // Verify the phone platform exists.
-  const phonePlatformIndex = layout.platforms.findIndex((p) => p.id === "phone");
+  // Verify a mobile platform exists — "phone" wins when both are present
+  // (unchanged legacy behavior); "tablet" is the fallback for a tablet-style
+  // reseed (spec-035 amendment R7a). Same helper Phase C uses, so the two
+  // phases can never resolve different platforms for the same layout.
+  const phonePlatformIndex = resolveMobilePlatformIndex(layout.platforms);
   if (phonePlatformIndex === -1) {
     warnings.push(
-      "[touch-apply] no phone platform found in layout — all touch assignments skipped"
+      "[touch-apply] no phone or tablet platform found in layout — all touch assignments skipped"
     );
     return { layout, warnings };
   }
@@ -90,7 +101,7 @@ export function applyTouchAssignments(
 
   /**
    * Resolve (and lazily build) the working state for a target layer.
-   * Returns undefined when the phone platform has no such layer — the caller
+   * Returns undefined when the mobile platform has no such layer — the caller
    * warns and skips that mechanism. Never falls back to "default".
    */
   function resolveLayerState(layerId: string): LayerWorkState | undefined {
@@ -146,7 +157,7 @@ export function applyTouchAssignments(
     const state = resolveLayerState(layerId);
     if (!state) {
       warnings.push(
-        `[touch-apply] target layer "${layerId}" not found in phone platform — assignment for "${char}" skipped`
+        `[touch-apply] target layer "${layerId}" not found in ${phonePlatform.id} platform — assignment for "${char}" skipped`
       );
       return undefined;
     }
@@ -154,7 +165,7 @@ export function applyTouchAssignments(
     const pos = state.keyIndex.get(hostKey);
     if (!pos) {
       warnings.push(
-        `[touch-apply] host key "${hostKey}" not found in phone layer "${layerId}" — assignment for "${char}" skipped`
+        `[touch-apply] host key "${hostKey}" not found in ${phonePlatform.id} layer "${layerId}" — assignment for "${char}" skipped`
       );
       return undefined;
     }

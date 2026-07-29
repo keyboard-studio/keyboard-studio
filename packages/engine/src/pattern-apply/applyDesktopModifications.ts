@@ -6,10 +6,11 @@
  *
  * Two passes over the layout, run in the same chronological order as the
  * desktop decisions they replay (Phase C placements precede Phase D carve):
- *   1. Placements — for each {char, hostKey}, land the char on the phone
- *      platform's "default" layer only, as the host key's own production when
- *      the host is empty, or as a longpress (sk[]) alternate when the host
- *      already produces something else.
+ *   1. Placements — for each {char, hostKey}, land the char on the mobile
+ *      platform's ("phone", or "tablet" when no "phone" platform is present —
+ *      see {@link resolveMobilePlatformIndex}) "default" layer only, as the
+ *      host key's own production when the host is empty, or as a longpress
+ *      (sk[]) alternate when the host already produces something else.
  *   2. Removals — walk EVERY platform/layer/row/key and strip any trace of a
  *      carved character (text/output/U_-id-decoded, plus sk/flick/multitap
  *      entries). A key whose primary production is carved is never deleted —
@@ -34,6 +35,7 @@ import {
   buildRemovalSet,
   isTouchSubKeyDuplicate,
   keyMatchesRemovalSet,
+  resolveMobilePlatformIndex,
 } from "./touch-mechanism-shared.js";
 
 // ---------------------------------------------------------------------------
@@ -181,7 +183,7 @@ function stripRemovedFromKey(
 }
 
 // ---------------------------------------------------------------------------
-// Pass 2 — placements (phone platform's "default" layer only)
+// Pass 2 — placements (mobile platform's "default" layer only)
 // ---------------------------------------------------------------------------
 
 function applyPlacements(
@@ -192,10 +194,10 @@ function applyPlacements(
 ): TouchLayoutIR {
   if (placements.length === 0) return layout;
 
-  const phonePlatformIndex = layout.platforms.findIndex((p) => p.id === "phone");
+  const phonePlatformIndex = resolveMobilePlatformIndex(layout.platforms);
   if (phonePlatformIndex === -1) {
     warnings.push(
-      "[desktop-modifications] no phone platform found in layout — all placements skipped",
+      "[desktop-modifications] no phone or tablet platform found in layout — all placements skipped",
     );
     return layout;
   }
@@ -204,7 +206,7 @@ function applyPlacements(
   const defaultLayerIndex = phonePlatform.layers.findIndex((l) => l.id === "default");
   if (defaultLayerIndex === -1) {
     warnings.push(
-      "[desktop-modifications] phone platform has no default layer — all placements skipped",
+      `[desktop-modifications] ${phonePlatform.id} platform has no default layer — all placements skipped`,
     );
     return layout;
   }
@@ -274,7 +276,7 @@ function applyPlacements(
 
     if (!existing) {
       warnings.push(
-        `[desktop-modifications] host key "${hostKey}" not found in phone default layer — "${char}" placed via fallback`,
+        `[desktop-modifications] host key "${hostKey}" not found in ${phonePlatform.id} default layer — "${char}" placed via fallback`,
       );
       placeFallback(char);
       continue;
