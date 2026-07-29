@@ -12,7 +12,12 @@
 import { describe, it, expect, afterEach, vi, beforeEach, beforeAll } from "vitest";
 import { screen, fireEvent, act, cleanup, waitFor, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
-import { TouchGallery, buildTouchMechanismRef } from "./TouchGallery.tsx";
+import {
+  TouchGallery,
+  buildTouchMechanismRef,
+  hostKeyShortLabel,
+  isCasingBearingTouchLayer,
+} from "./TouchGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import type {
@@ -3136,5 +3141,211 @@ describe("TouchGallery — uppercase current char (spec 051 FR-006 layer-picker 
     expect(screen.queryByText(/Not yet a layer this keyboard uses/i)).toBeNull();
     expect(screen.getByText(/Resulting layer: Base/i)).toBeTruthy();
     expect(applyBtn()?.hasAttribute("disabled")).toBe(false);
+  });
+});
+// Spec 051 Phase 7 (T049/T050) — FR-012: the suggestion-Accept path
+// (handleUseSuggestion) must carry an explicit `layer`, derived the same way
+// every other placement path derives it (buildTouchMechanismRef /
+// touchLayerForChar) — not a bare literal that silently resolves to
+// "default" for every accepted suggestion, uppercase included.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — suggestion Accept carries an explicit layer (spec 051 FR-012)", () => {
+  function touchMechanismsFor(char: string) {
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    return (
+      draft?.charTouchEntries.find(([c]) => c === char)?.[1]?.mechanisms ?? []
+    );
+  }
+
+  it("accepting the longpress suggestion for a lowercase decomposable letter (ă) records layer: default", async () => {
+    seedStore({ withInventory: ["ă"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const acceptBtn =
+      screen
+        .queryAllByRole("button")
+        .find((b) => b.textContent?.trim() === "Accept") ?? null;
+    expect(acceptBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(acceptBtn!);
+    });
+
+    const mechanisms = touchMechanismsFor("ă");
+    expect(mechanisms).toHaveLength(1);
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "ă",
+      layer: "default",
+    });
+  });
+
+  it("accepting the longpress suggestion for the uppercase counterpart (Ă) records layer: shift, not a silent default", async () => {
+    seedStore({ withInventory: ["Ă"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const acceptBtn =
+      screen
+        .queryAllByRole("button")
+        .find((b) => b.textContent?.trim() === "Accept") ?? null;
+    expect(acceptBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(acceptBtn!);
+    });
+
+    const mechanisms = touchMechanismsFor("Ă");
+    expect(mechanisms).toHaveLength(1);
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "Ă",
+      layer: "shift",
+    });
+  });
+
+  it("accepting a 'replace' suggestion also carries an explicit layer (nextMethod = touch_key_replace dispatch)", async () => {
+    // Seed a Phase C simple_swap desktop assignment so suggestion.kind ===
+    // "replace" — exercises handleUseSuggestion's touch_key_replace branch,
+    // which the ă/Ă cases above (both "longpress") do not reach.
+    const swapAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "ă",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "simple_swap",
+          strategyId: "S-01",
+          slotValues: { kmnRules: "+ [K_A] > U+0103" },
+        },
+      ],
+      source: "user",
+    };
+    seedWithDesktopAssignment("ă", swapAssignment);
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expect(screen.queryByText(/Suggested: replace/i)).not.toBeNull();
+
+    const acceptBtn =
+      screen
+        .queryAllByRole("button")
+        .find((b) => b.textContent?.trim() === "Accept") ?? null;
+    expect(acceptBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(acceptBtn!);
+    });
+
+    const mechanisms = touchMechanismsFor("ă");
+    expect(mechanisms).toHaveLength(1);
+    expect(mechanisms[0]?.patternId).toBe("touch_key_replace");
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "ă",
+      layer: "default",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 051 Phase 7 (T051/T052) — FR-013: case-correct host-key labels.
+//
+// A Keyman vkey name carries no case of its own (`K_A` names the A key);
+// case is a property of the layer a placement targets. `hostKeyShortLabel`
+// takes the layer explicitly and cases the returned letter to match it.
+// ---------------------------------------------------------------------------
+
+// Every real vkey id in keyOptions.ts is already all-uppercase, so testing
+// the casing decision only through hostKeyShortLabel's output cannot tell a
+// correct component match from an accidental substring match — both render
+// "A" for "ncaps" today. This block tests the predicate directly, so a
+// regression from `components.includes("caps")` to the substring form
+// `layer.includes("caps")` fails HERE (isCasingBearingTouchLayer("ncaps")
+// would flip from false to true) even though hostKeyShortLabel's own output
+// would stay byte-identical for every real key id.
+describe("isCasingBearingTouchLayer — component match, not substring (spec 051 FR-013)", () => {
+  it("is true for shift, caps, and casing-bearing compounds", () => {
+    expect(isCasingBearingTouchLayer("shift")).toBe(true);
+    expect(isCasingBearingTouchLayer("caps")).toBe(true);
+    expect(isCasingBearingTouchLayer("rightalt-shift")).toBe(true);
+    expect(isCasingBearingTouchLayer("shift-ctrl-alt")).toBe(true);
+  });
+
+  it("is false for 'ncaps' and other non-casing layer ids", () => {
+    expect(isCasingBearingTouchLayer("ncaps")).toBe(false);
+    expect(isCasingBearingTouchLayer("alt")).toBe(false);
+    expect(isCasingBearingTouchLayer("ctrl")).toBe(false);
+    expect(isCasingBearingTouchLayer("rightalt")).toBe(false);
+    expect(isCasingBearingTouchLayer("rightctrl")).toBe(false);
+    expect(isCasingBearingTouchLayer("leftctrl")).toBe(false);
+    expect(isCasingBearingTouchLayer("default")).toBe(false);
+  });
+});
+
+describe("hostKeyShortLabel — case-correct labels by layer (spec 051 FR-013)", () => {
+  it("reads lowercase on the default layer and uppercase on the shift layer", () => {
+    expect(hostKeyShortLabel("K_A", "default")).toBe("a");
+    expect(hostKeyShortLabel("K_A", "shift")).toBe("A");
+  });
+
+  it("reads uppercase for a casing-bearing compound layer id (rightalt-shift)", () => {
+    expect(hostKeyShortLabel("K_A", "rightalt-shift")).toBe("A");
+  });
+
+  it("does not mistake 'ncaps' for a caps-bearing layer (component match, not substring)", () => {
+    expect(hostKeyShortLabel("K_A", "ncaps")).toBe("A");
+  });
+
+  it("leaves non-casing layer ids reading the raw uppercase vkey letter (today's floor, now pinned)", () => {
+    expect(hostKeyShortLabel("K_A", "alt")).toBe("A");
+    expect(hostKeyShortLabel("K_A", "ctrl")).toBe("A");
+    expect(hostKeyShortLabel("K_A", "rightalt")).toBe("A");
+    expect(hostKeyShortLabel("K_A", "rightctrl")).toBe("A");
+    expect(hostKeyShortLabel("K_A", "leftctrl")).toBe("A");
+  });
+});
+
+describe("TouchGallery — host-key label casing in the UI (spec 051 FR-013)", () => {
+  it("renders the configured-mechanism chip in lowercase for a default-layer mechanism", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const select = screen.queryByRole("button", { name: /host key/i });
+    expect(select).not.toBeNull();
+    await changeSelectMenu(select!, "K_A");
+    const applyBtn =
+      screen
+        .queryAllByRole("button")
+        .find((b) => b.textContent?.trim() === "Apply method") ?? null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    const configuredGroup = screen.getByRole("group", {
+      name: /configured characters/i,
+    });
+    expect(configuredGroup.textContent).toContain("long-press a");
+    expect(configuredGroup.textContent).not.toContain("long-press A");
+  });
+
+  it("renders the placement-suggestion text in lowercase for a lowercase placement", async () => {
+    seedStore({ withInventory: ["ä"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // "ä" is decomposable-accented and derives host key K_A (touchBehavior's
+    // suggestion useMemo) — a lowercase placement, so the suggestion text
+    // must read the lowercase keycap, not the raw uppercase vkey letter.
+    expect(screen.getByText(/Suggested: long-press/i).textContent).toMatch(
+      /long-press a to reach/i,
+    );
   });
 });

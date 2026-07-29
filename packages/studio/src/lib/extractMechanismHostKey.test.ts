@@ -28,6 +28,29 @@ describe("extractMechanismHostKey", () => {
     expect(extractMechanismHostKey(m)).toEqual({ kind: "replace", hostKey: "" });
   });
 
+  // Regression (bug #1422): a modifier-combo host key — the shift-layer
+  // case-pair companion's standalone `+ [SHIFT K_X]` rule — must yield the
+  // trailing vkey, not an empty hostKey that silently drops the placement.
+  it("simple_swap / S-01 with a SHIFT-combo host key -> hostKey is the trailing vkey", () => {
+    const m: MechanismRef = {
+      patternId: "simple_swap",
+      strategyId: "S-01",
+      slotValues: { kmnRules: "+ [SHIFT K_Q] > U+0398" },
+    };
+
+    expect(extractMechanismHostKey(m)).toEqual({ kind: "replace", hostKey: "K_Q" });
+  });
+
+  it("simple_swap / S-01 with a multi-line CAPS/SHIFT-combo host key -> hostKey from the first rule's trailing vkey", () => {
+    const m: MechanismRef = {
+      patternId: "simple_swap",
+      strategyId: "S-01",
+      slotValues: { kmnRules: "+ [NCAPS SHIFT K_A] > U+03B8\n+ [CAPS SHIFT K_A] > U+03B8" },
+    };
+
+    expect(extractMechanismHostKey(m)).toEqual({ kind: "replace", hostKey: "K_A" });
+  });
+
   it("deadkey_single_tap / S-02 -> longpress, hostKey from the first baseLetters letter", () => {
     const m: MechanismRef = {
       patternId: "deadkey_single_tap",
