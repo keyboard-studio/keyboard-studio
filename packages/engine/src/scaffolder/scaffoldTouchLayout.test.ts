@@ -2906,10 +2906,11 @@ describe("scaffoldTouchLayoutWithDiagnostics — tablet path (platformStyle:\"ta
   });
 
   // Geometry parity — the tablet default/shift layers have 5 rows (number
-  // row + 2 QWERTY letter rows + Z-row + functional). Before this fix, the
-  // rightalt/rightalt-shift layers had only 4 rows (no number row), so
-  // toggling into RAlt visually reflowed the keyboard. rightalt/rightalt-shift
-  // now carry a matching blank spacer top row.
+  // row + 2 QWERTY letter rows + Z-row + functional). The rightalt/rightalt-shift
+  // layers carry the SAME digit row as default/shift (shared via
+  // buildTabletNumberRow/TABLET_NUMBER_ROW_DIGITS), column-identical in both
+  // slot count and content, so the number row is stable across all four tablet
+  // letter layers and toggling into RAlt neither drops the top row nor blanks it.
   describe("tablet rightalt/rightalt-shift geometry parity with default/shift", () => {
     it("default and shift layers have 5 rows", () => {
       const ir = makeEwondoLikeIR();
@@ -2929,7 +2930,7 @@ describe("scaffoldTouchLayoutWithDiagnostics — tablet path (platformStyle:\"ta
       expect(rightaltShiftLayer.rows).toHaveLength(5);
     });
 
-    it("rightalt/rightalt-shift row 0 is a blank spacer row: same slot count as the default number row, no character content", () => {
+    it("rightalt/rightalt-shift row 0 is the SAME digit row as default/shift: same slot count, same digits, trailing K_BKSP", () => {
       const ir = makeEwondoLikeIR();
       const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
       const defaultLayer = getLayer(result.layout, "default", "tablet")!;
@@ -2944,22 +2945,38 @@ describe("scaffoldTouchLayoutWithDiagnostics — tablet path (platformStyle:\"ta
       expect(rightaltRow0.keys.length).toBe(defaultRow0.keys.length);
       expect(rightaltShiftRow0.keys.length).toBe(defaultRow0.keys.length);
 
-      // Every slot but the trailing K_BKSP is a blank T_BLANK spacer with no
-      // character content.
+      // Same digit content — column-identical to default/shift's row 0,
+      // reusing TABLET_NUMBER_ROW_DIGITS via buildTabletNumberRow (no forked
+      // digit list). Spot-check the "1" and "0" keys land on both layers.
       for (const row0 of [rightaltRow0, rightaltShiftRow0]) {
-        const blanks = row0.keys.slice(0, -1);
-        for (const key of blanks) {
-          expect(key.id).toBe("T_BLANK");
-          expect(key.text).toBe("");
-          expect(key.output).toBeUndefined();
-          expect(key.sp).toBe(10);
+        const digitTexts = row0.keys.slice(0, -1).map((k) => k.text);
+        expect(digitTexts).toEqual(defaultRow0.keys.slice(0, -1).map((k) => k.text));
+        expect(digitTexts).toContain("1");
+        expect(digitTexts).toContain("0");
+
+        // Each digit key auto-returns to "default" after a tap — consistent
+        // with the rest of the rightalt/rightalt-shift layer's letter keys
+        // (see buildTabletRightAltLetterKey), unlike the default/shift
+        // layers' OWN number row (no nextlayer needed there — those keys
+        // already ARE on "default"/"shift").
+        for (const key of row0.keys.slice(0, -1)) {
+          expect(key.nextlayer).toBe("default");
         }
+
         // Trailing key is (a duplicate) K_BKSP, matching the number row shape.
-        expect(row0.keys[row0.keys.length - 1]!.id).toBe("K_BKSP");
+        // Backspace has no layer semantics — it must NOT auto-return.
+        const trailing = row0.keys[row0.keys.length - 1]!;
+        expect(trailing.id).toBe("K_BKSP");
+        expect(trailing.nextlayer).toBeUndefined();
+      }
+
+      // The default/shift number row itself carries no nextlayer — unchanged.
+      for (const key of defaultRow0.keys.slice(0, -1)) {
+        expect(key.nextlayer).toBeUndefined();
       }
     });
 
-    it("rightalt/rightalt-shift keep all their pre-existing letter/K_SHIFT/K_BKSP content after gaining the blank top row", () => {
+    it("rightalt/rightalt-shift keep all their pre-existing letter/K_SHIFT/K_BKSP content after gaining the shared digit row", () => {
       const ir = makeEwondoLikeIR();
       const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
       const rightaltLayer = getLayer(result.layout, "rightalt", "tablet")!;
@@ -2974,7 +2991,7 @@ describe("scaffoldTouchLayoutWithDiagnostics — tablet path (platformStyle:\"ta
       expect(rightaltShiftAllKeys.find((k) => k.id === "K_N")?.output).toBe("Ŋ");
 
       // Exactly two reachable K_BKSP per layer: the pre-existing one on the
-      // Z-row, plus the new duplicate on the blank top row (corpus idiom).
+      // Z-row, plus the duplicate on the digit top row (corpus idiom).
       expect(rightaltAllKeys.filter((k) => k.id === "K_BKSP").length).toBe(2);
       expect(rightaltShiftAllKeys.filter((k) => k.id === "K_BKSP").length).toBe(2);
 
