@@ -274,33 +274,104 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     expect(buildTouchLayoutJsonSpy).not.toHaveBeenCalled();
   });
 
-  it("does NOT set source/<id>.keyman-touch-layout when the only assignment is touch_inherited (accepted 'already' suggestion)", async () => {
-    // "a" is present in the scaffolded default QWERTY touch layout (K_A), so with
-    // no Phase C desktop assignment the suggestion is "already". The manual
-    // "Already in touch layout" chooser card was removed; the auto-detected
-    // "already" suggestion is now the only path that records a touch_inherited
-    // assignment. Accepting it must NOT be treated as a real edit, so the
-    // touch-layout path must remain absent.
+  it("does NOT set source/<id>.keyman-touch-layout when the only assignment is touch_inherited", async () => {
+    // "a" is present in the scaffolded default QWERTY touch layout (K_A), so
+    // it is auto-detected as already reachable and shown read-only — there
+    // is no "already" suggestion card / Accept click that records
+    // touch_inherited anymore (see the "read-only existing implementation
+    // display" suite below). A touch_inherited entry can still reach
+    // charTouch via a persisted draft from a PRIOR mount that had one (the
+    // pattern-apply engine still understands the patternId, and back-nav
+    // must not resurrect a stray real-edit signal from it) — seed the draft
+    // directly, the way "Back survives a remount" (above) seeds a
+    // prior-mount draft, and assert accepting it is still not treated as a
+    // real edit.
     seedStore({ withInventory: ["a"] });
+    const inheritedAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "a",
+      modality: "touch",
+      mechanisms: [{ patternId: "touch_inherited" }],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [["a", inheritedAssignment]],
+      suggestionResolvedChars: ["a"],
+    });
 
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
-    });
-
-    // The "already" suggestion shows an Accept button — click it to record the
-    // touch_inherited assignment for "a" and advance.
-    const acceptBtn = screen
-      .queryAllByRole("button")
-      .find((b) => b.textContent?.trim() === "Accept") ?? null;
-    expect(acceptBtn).not.toBeNull();
-    await act(async () => {
-      fireEvent.click(acceptBtn!);
     });
 
     const vfs = runTransform("basic_kbdus");
     expect(vfs.get("source/basic_kbdus.keyman-touch-layout")).toBeUndefined();
     // buildTouchLayoutJson must NOT have been called (only inherited assignments).
     expect(buildTouchLayoutJsonSpy).not.toHaveBeenCalled();
+  });
+
+  it("shows the existing implementation read-only (no Accept button) for a character already on the seed layout", async () => {
+    // "a" is present in the scaffolded default QWERTY touch layout (K_A) —
+    // no Phase C desktop assignment, so the ONLY thing offered is the
+    // read-only existing-implementation line; there must be no green
+    // confirm card and no Accept button for it.
+    seedStore({ withInventory: ["a"] });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expect(screen.queryByText(/is already on the touch keyboard/i)).not.toBeNull();
+    // The old "Keep it as is?" confirm prompt is gone.
+    expect(screen.queryByText(/Keep it as is/i)).toBeNull();
+    // No Accept/Deny pair for it — the method chooser (with its own "Apply
+    // method" action) is shown directly instead, never a suggestion card.
+    expect(
+      screen.queryAllByRole("button").some((b) => b.textContent?.trim() === "Accept"),
+    ).toBe(false);
+    expect(screen.queryByText(/How to reach it on touch/i)).not.toBeNull();
+
+    // QC#5/P2#8: the generic substring above matches BOTH the `.precise` and
+    // `.fallback` message variants — "a" resolves to the PRECISE branch (K_A
+    // directly produces "a" as its base character), so assert the
+    // role+host-key wiring (existingPlacementRoleLabel/hostKeyShortLabel)
+    // actually rendered, not just the shared opening clause.
+    expect(screen.getByText(/the key's base character/i)).not.toBeNull();
+    expect(screen.getByText(/\(default layer\)/i)).not.toBeNull();
+
+    // P1 regression guard: a character already detected on the seed layout
+    // must enable the primary forward button (Next/Done) with NO click —
+    // that is the whole point of the read-only display (spec v1.3.1 §3c:
+    // "you shouldn't have to click anything to keep it"). "a" is the only
+    // inventory char here, so it is also the last one and the button reads
+    // "Done".
+    const doneBtn = screen.getByRole("button", { name: "Done" });
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("P1 regression: canGoNext folds in the detected-char gate — 'Next character' is enabled with no click for an already-detected char, and stays disabled for a genuinely unresolved one", async () => {
+    // "a" (idx 0) is present in the default touch layout (K_A) — detected,
+    // no click needed. "中" (idx 1, last) has suggestion kind "none" (not in
+    // the default layout, not a decomposable accented letter — same fixture
+    // precedent as the "Next advances positionally" test above) — genuinely
+    // unresolved, so it must NOT be affected by the detected-char gate.
+    seedStore({ withInventory: ["a", "中"] });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expectCurrentChar("a");
+    const nextBtn = screen.getByRole("button", { name: /Next character/i });
+    expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(nextBtn);
+
+    await waitFor(() => {
+      expectCurrentChar("中");
+    });
+    // "中" is neither detected nor configured — Done must stay disabled, so
+    // the detected-char gate never over-fires for an unresolved character.
+    const doneBtn = screen.getByRole("button", { name: "Done" });
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("DOES set source/<id>.keyman-touch-layout with sk JSON after a longpress edit", async () => {
@@ -1882,22 +1953,34 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
     expect(entryAfter?.[1]?.mechanisms.length).toBe(1);
   });
 
-  it("accepting the 'already in layout' suggestion then adding a real method leaves no stray touch_inherited (mutual exclusivity holds)", async () => {
-    // "a" is present in the scaffolded default QWERTY touch layout → "already"
-    // suggestion (touch_inherited).
+  it("a real method REPLACES a persisted touch_inherited-only placeholder, leaving no stray touch_inherited (mutual exclusivity holds)", async () => {
+    // "a" is present in the scaffolded default QWERTY touch layout, so it is
+    // auto-detected as already reachable — that no longer surfaces an
+    // Accept-able suggestion card (see the "read-only existing
+    // implementation" suite), but a touch_inherited-only entry can still
+    // exist from a prior mount's persisted draft (see the
+    // vfsTransform-inject-only-when-real-edits suite's own touch_inherited
+    // test for the same seeding idiom). appendMechanismToChar's mutual-
+    // exclusivity rule (a real method REPLACES an inherited-only
+    // placeholder) is exercised here via the chooser, which is shown
+    // directly (suggestionDismissed is forced true once charTouch already
+    // has an entry for "a" — see `suggestionDismissed`'s derivation).
     seedStore({ withInventory: ["a"] });
+    const inheritedAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "a",
+      modality: "touch",
+      mechanisms: [{ patternId: "touch_inherited" }],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [["a", inheritedAssignment]],
+      suggestionResolvedChars: ["a"],
+    });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    const acceptBtn = screen.queryAllByRole("button").find(
-      (b) => b.textContent?.trim() === "Accept",
-    ) ?? null;
-    expect(acceptBtn).not.toBeNull();
-    await act(async () => { fireEvent.click(acceptBtn!); });
-
-    // touch_inherited recorded; chooser now visible (suggestionDismissed forced
-    // true by handleSuggestionAccept) so a real method can be added.
     let draft = useWorkingCopyStore.getState().touchDraft;
     let entry = draft?.charTouchEntries.find(([c]) => c === "a");
     expect(entry?.[1]?.mechanisms.map((m) => m.patternId)).toEqual(["touch_inherited"]);
@@ -3248,6 +3331,228 @@ describe("TouchGallery — suggestion Accept carries an explicit layer (spec 051
       char: "ă",
       layer: "default",
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Longpress accelerator (sibling accents) — accepting a longpress suggestion
+// for one accented letter offers the rest of its diacritic family, both
+// cases, in one confirm.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — longpress accelerator (sibling accents)", () => {
+  function touchMechanismsFor(char: string) {
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    return (
+      draft?.charTouchEntries.find(([c]) => c === char)?.[1]?.mechanisms ?? []
+    );
+  }
+
+  it("accepting the longpress suggestion for ă raises the sibling-accent banner for a's family", async () => {
+    seedStore({ withInventory: ["ă"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const acceptBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Accept") ??
+      null;
+    expect(acceptBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(acceptBtn!);
+    });
+
+    // "ă" itself is recorded directly (unaffected by the accelerator).
+    expect(touchMechanismsFor("ă")).toHaveLength(1);
+
+    // The banner offers the family — a's common diacritic family capped at 6.
+    expect(screen.getByText(/is part of a family of accented letters/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Add the related accented letters to K_A/i })).toBeTruthy();
+
+    // Nothing is placed yet — propose-then-confirm, never a silent auto-insert.
+    expect(touchMechanismsFor("à")).toHaveLength(0);
+    expect(touchMechanismsFor("À")).toHaveLength(0);
+  });
+
+  it("Accept places every lowercase sibling on the default layer and every uppercase counterpart on the shift layer, in one click", async () => {
+    seedStore({ withInventory: ["ă"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const acceptBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Accept") ??
+      null;
+    await act(async () => {
+      fireEvent.click(acceptBtn!);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Add the related accented letters to K_A/i }));
+    });
+
+    // a's family, minus "ă" itself (not a member of the composed family).
+    for (const lower of ["à", "á", "â", "ä", "ã", "å"]) {
+      const mechanisms = touchMechanismsFor(lower);
+      expect(mechanisms).toHaveLength(1);
+      expect(mechanisms[0]?.patternId).toBe("longpress_alternates");
+      expect(mechanisms[0]?.slotValues).toMatchObject({
+        hostKey: "K_A",
+        char: lower,
+        layer: "default",
+      });
+    }
+    for (const upper of ["À", "Á", "Â", "Ä", "Ã", "Å"]) {
+      const mechanisms = touchMechanismsFor(upper);
+      expect(mechanisms).toHaveLength(1);
+      expect(mechanisms[0]?.slotValues).toMatchObject({
+        hostKey: "K_A",
+        char: upper,
+        layer: "shift",
+      });
+    }
+
+    // The banner is gone after Accept.
+    expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
+  });
+
+  it("Decline discards the proposal and places nothing", async () => {
+    seedStore({ withInventory: ["ă"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const acceptBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Accept") ??
+      null;
+    await act(async () => {
+      fireEvent.click(acceptBtn!);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Do not add the related accented letters/i }));
+    });
+
+    expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
+    expect(touchMechanismsFor("à")).toHaveLength(0);
+    expect(touchMechanismsFor("À")).toHaveLength(0);
+    // "ă" itself is untouched by declining the accelerator.
+    expect(touchMechanismsFor("ă")).toHaveLength(1);
+  });
+
+  it("does not fire for a 'replace' suggestion accept (desktop simple_swap, not an accent family)", async () => {
+    const swapAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "ă",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "simple_swap",
+          strategyId: "S-01",
+          slotValues: { kmnRules: "+ [K_A] > U+0103" },
+        },
+      ],
+      source: "user",
+    };
+    seedWithDesktopAssignment("ă", swapAssignment);
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    expect(screen.queryByText(/Suggested: replace/i)).not.toBeNull();
+
+    const acceptBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Accept") ??
+      null;
+    await act(async () => {
+      fireEvent.click(acceptBtn!);
+    });
+
+    expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
+  });
+
+  it("skips a sibling that is already produced on that host key's layer instead of duplicating it", async () => {
+    // "à" is pre-seeded as already configured (a prior mount's draft) on
+    // K_A's default layer — the exact hostKey+layer the accelerator's own
+    // "à" sibling placement would target once "ă" (also based on K_A) is
+    // accepted. The accelerator must dedupe against it rather than adding a
+    // second mechanism for the same char.
+    seedStore({ withInventory: ["ă"] });
+    const existingAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "à",
+      modality: "touch",
+      mechanisms: [
+        {
+          patternId: "longpress_alternates",
+          slotValues: { hostKey: "K_A", char: "à", layer: "default" },
+        },
+      ],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [["à", existingAssignment]],
+      suggestionResolvedChars: [],
+    });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const acceptBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Accept") ??
+      null;
+    await act(async () => {
+      fireEvent.click(acceptBtn!);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Add the related accented letters to K_A/i }));
+    });
+
+    // "à" still carries exactly its pre-existing mechanism — not duplicated.
+    expect(touchMechanismsFor("à")).toHaveLength(1);
+    // The rest of the family is still placed normally.
+    expect(touchMechanismsFor("á")).toHaveLength(1);
+  });
+
+  it("P2 fix: removing the just-placed base chip while the sibling-accent banner is still open clears the proposal (no orphaned siblings)", async () => {
+    seedStore({ withInventory: ["ă"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const acceptBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Accept") ??
+      null;
+    await act(async () => {
+      fireEvent.click(acceptBtn!);
+    });
+
+    // "ă" is placed and the sibling-accent banner is open.
+    expect(touchMechanismsFor("ă")).toHaveLength(1);
+    expect(screen.getByText(/is part of a family of accented letters/i)).toBeTruthy();
+
+    // Remove "ă"'s just-placed chip via the Configured row — the author
+    // changed their mind about the base before confirming the accelerator.
+    const removeBtn = screen
+      .queryAllByRole("button")
+      .find((b) => {
+        const label = b.getAttribute("aria-label") ?? "";
+        return label.startsWith("Remove") && label.includes("ă");
+      });
+    expect(removeBtn).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(removeBtn!);
+    });
+    expect(touchMechanismsFor("ă")).toHaveLength(0);
+
+    // The proposal must be cleared, not left dangling — without this fix,
+    // the banner (and its "Add them" button) would still be showing here,
+    // and confirming it would place siblings with no base longpress
+    // underneath them.
+    expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
+    expect(touchMechanismsFor("à")).toHaveLength(0);
+    expect(touchMechanismsFor("À")).toHaveLength(0);
   });
 });
 

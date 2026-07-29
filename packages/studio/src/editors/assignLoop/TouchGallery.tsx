@@ -87,6 +87,7 @@ import {
   canonicalizeCombo,
   addableTouchLayerTokens,
   optionsForTouchLayerSlot,
+  caseCounterpart,
 } from "@keyboard-studio/engine";
 import {
   buildTouchLayoutJson,
@@ -114,6 +115,15 @@ import {
 } from "./touchBehavior.ts";
 import { useCasePairCompanion } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
+import { siblingAccentPlacements } from "./siblingAccents.ts";
+import {
+  SiblingAccentProposalBanner,
+  type SiblingAccentProposal,
+} from "./SiblingAccentProposalBanner.tsx";
+import {
+  describeExistingTouchPlacement,
+  type ExistingTouchPlacementRole,
+} from "./existingTouchPlacement.ts";
 import { displayChar } from "../../lib/irToCarveNodes.ts";
 import { isMutateSeamEnabled } from "../../flags/mutateFlag.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
@@ -240,6 +250,51 @@ function touchMechanismLabel(
   return target;
 }
 
+/** Human-readable label for how an already-placed character is reached — the
+ * read-only "here's where it already is" display's mechanism phrase. Same
+ * optional-i18n + msg()/resolveMessage() pattern as {@link touchMechanismLabel}
+ * above, and for the same reason (a re-bound `t` parameter is a distinct
+ * binding Lingui's extractor does not follow). */
+function existingPlacementRoleLabel(
+  role: ExistingTouchPlacementRole,
+  i18n?: I18n,
+): string {
+  if (role === "longpress") {
+    return resolveMessage(
+      i18n,
+      msg({
+        id: "editor.assignLoop.touch.existing.role.longpress",
+        message: "a long-press option",
+      }),
+    );
+  }
+  if (role === "flick") {
+    return resolveMessage(
+      i18n,
+      msg({
+        id: "editor.assignLoop.touch.existing.role.flick",
+        message: "a flick gesture",
+      }),
+    );
+  }
+  if (role === "multitap") {
+    return resolveMessage(
+      i18n,
+      msg({
+        id: "editor.assignLoop.touch.existing.role.multitap",
+        message: "a multitap option",
+      }),
+    );
+  }
+  return resolveMessage(
+    i18n,
+    msg({
+      id: "editor.assignLoop.touch.existing.role.base",
+      message: "the key's base character",
+    }),
+  );
+}
+
 // ghostBtn, headerBtnStyle, configStyle, and cardStyle are imported
 // (aliased) from ../../lib/galleryTheme.ts — shared byte-for-byte with
 // MechanismGallery.tsx rather than redefined here. The page-level wrapper
@@ -251,10 +306,13 @@ function touchMechanismLabel(
 // ---------------------------------------------------------------------------
 
 // Selectable methods in the chooser. `touch_inherited` is intentionally NOT a
-// chooser option — inherited characters are recorded via the auto-detected
-// "already" suggestion (handleSuggestionAccept), and Skip moves on without an
-// assignment. The pattern-apply engine still understands the touch_inherited
-// patternId those suggestions produce.
+// chooser option — a character already reachable on the seed layout is shown
+// via the read-only existing-implementation display (see
+// existingTouchPlacement.ts / `isCurrentCharDetected` below) and needs no
+// click to keep; nothing is recorded for it. The pattern-apply engine still
+// understands the touch_inherited patternId for a draft persisted from a
+// prior build of this gallery, before the read-only display replaced the
+// accept-to-record suggestion card.
 export type TouchMethod =
   | "touch_key_replace"
   | "longpress_alternates"
@@ -1685,8 +1743,9 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // (phaseResults is read near the top of the component alongside the other
   // spec 035 R3 mods inputs — deletedNodeIds/deletedItemIds/touchSeedSource.)
   //
-  // detectedChars ("already in touch layout" — powers the "already" suggestion,
-  // Accept → touch_inherited) is derived from detectionSeedLayout (the chosen
+  // detectedChars ("already in touch layout" — powers the read-only
+  // existing-implementation display; nothing is recorded for a detected
+  // character) is derived from detectionSeedLayout (the chosen
   // seed source + replayed desktop mods, see the `detectionSeedLayout` memo
   // above) via the shared engine touchCoverage traversal, rather than an
   // inline scaffoldTouchLayout(baseIr) walk — see spec 035
@@ -1719,6 +1778,27 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detectionSeedLayout, inventoryKey]);
 
+  // Whether the CURRENT character is already reachable on the seed — the
+  // read-only "here's the existing implementation" display below is gated on
+  // this rather than re-deriving membership from `existingPlacement`, so a
+  // char detectedChars reports but `describeExistingTouchPlacement` can't
+  // pin down a precise key (defensive — see that helper's own doc) still
+  // shows the plain fallback line rather than nothing.
+  const isCurrentCharDetected =
+    currentChar !== null && detectedChars.has(currentChar);
+
+  // Where (and how) the current character already sits in the seed layout —
+  // host key, mechanism (base/longpress/flick/multitap), and layer — for the
+  // read-only display near the Configured chip row. `null` either means "not
+  // detected" (isCurrentCharDetected is false) or "detected, but this walk
+  // couldn't pin down a single key" (the fallback plain-text line covers
+  // that case at the render site).
+  const existingPlacement = useMemo(() => {
+    if (!isCurrentCharDetected || currentChar === null) return null;
+    if (detectionSeedLayout === null) return null;
+    return describeExistingTouchPlacement(detectionSeedLayout, currentChar);
+  }, [isCurrentCharDetected, currentChar, detectionSeedLayout]);
+
   // ---------------------------------------------------------------------------
   // Per-character suggestion computation
   // ---------------------------------------------------------------------------
@@ -1726,7 +1806,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   type Suggestion =
     | { kind: "longpress"; hostKey: string }
     | { kind: "replace"; hostKey: string }
-    | { kind: "already" }
     | { kind: "none" };
 
   const suggestion = useMemo<Suggestion>(() => {
@@ -1744,9 +1823,14 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       return result;
     }
 
-    // No desktop assignment
+    // No desktop assignment. A character already reachable on the seed
+    // (detectedChars — see the module doc's "already covered" note) needs no
+    // suggestion card at all: it is simply shown, read-only, near the
+    // Configured chip row below (see `isCurrentCharDetected`/
+    // `existingPlacement`) — the author never has to click Accept to "keep"
+    // something that was never at risk of being removed.
     if (detectedChars.has(currentChar)) {
-      return { kind: "already" };
+      return { kind: "none" };
     }
 
     if (isDecomposableAccented(currentChar)) {
@@ -1919,9 +2003,22 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // it is actually configured. Named to match MechanismGallery's canGoNext
   // (cross-gallery naming parity — this gallery has no separate
   // applied-method count, so the gate itself carries the name).
+  //
+  // P1 fix (read-only existing-implementation display, spec v1.3.1 §3c): a
+  // character already detected on the seed layout (`isCurrentCharDetected`)
+  // is also a valid reason to advance — the whole point of the read-only
+  // display is that the author needn't click anything to keep it. Without
+  // this, every already-implemented character disabled the primary
+  // Next/Done button and forced the author onto the secondary "Skip this
+  // character" link, defeating the read-only display's purpose. Detected
+  // chars are never double-counted with `charTouch` — the two sets are
+  // populated from independent sources (the seed layout vs. the author's
+  // own edits) — so this only ever widens, never narrows, the gate.
   const canGoNext = useMemo(
-    () => currentChar !== null && charTouch.has(currentChar),
-    [currentChar, charTouch],
+    () =>
+      currentChar !== null &&
+      (charTouch.has(currentChar) || isCurrentCharDetected),
+    [currentChar, charTouch, isCurrentCharDetected],
   );
 
   // Reset method inputs (not suggestionResolved — that persists per char)
@@ -1954,6 +2051,29 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     clear: clearCompanion,
   } = useCasePairCompanion();
 
+  // ---------------------------------------------------------------------------
+  // Sibling-accent proposal — the longpress accelerator (spec: "accept ù on u
+  // -> offer the rest of u's diacritic family in one click"). Independent of
+  // `casePairProposal` above: this one is multi-character and both-case, and
+  // is raised only from accepting a longpress SUGGESTION card
+  // (`handleUseSuggestion` below) — never from the manual chooser's Apply,
+  // which is `casePairProposal`'s own trigger. Kept as its own state/banner
+  // rather than folded into `useCasePairCompanion` so neither proposal has
+  // to disambiguate a shared "one proposal at a time" slot. The two proposals
+  // CAN render simultaneously (distinct state, independent confirm/dismiss
+  // paths) — that is safe, not something this split is trying to prevent.
+  // ---------------------------------------------------------------------------
+
+  const [siblingAccentProposal, setSiblingAccentProposal] =
+    useState<SiblingAccentProposal | null>(null);
+
+  // Normalize "" -> undefined: an identity with an empty tag is "no locale",
+  // not "the empty locale" — same normalization `useCasePairCompanion` does.
+  const bcp47 =
+    identity?.bcp47 !== undefined && identity.bcp47 !== ""
+      ? identity.bcp47
+      : undefined;
+
   useEffect(() => {
     setMethod("longpress_alternates");
     setHostKey("");
@@ -1965,6 +2085,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // so an author who never touches the builder sees byte-identical behavior.
     setLayerTokens(seedLayerTokensForChar(currentChar));
     clearCompanion();
+    setSiblingAccentProposal(null);
   }, [currentChar, clearCompanion]);
 
   // ---------------------------------------------------------------------------
@@ -2114,35 +2235,84 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     clearCompanion();
   }, [casePairProposal, clearCompanion]);
 
+  // Confirm the sibling-accent proposal: place every sibling in ONE update
+  // (single Accept places all — spec: "one click to accept all"). Each
+  // uppercase sibling is a DIFFERENT character, so it lands in its own
+  // `charTouch` entry keyed by that character (same idiom
+  // `handleCasePairConfirm` above uses for its own counterpart). A sibling
+  // already produced on its target hostKey+layer is skipped (dedupe, mirrors
+  // the case-pair companion's own `alreadyProduced` predicate) rather than
+  // duplicating a chip.
+  const handleSiblingAccentConfirm = useCallback(() => {
+    if (siblingAccentProposal === null) return;
+    const { acceptedChar, hostKey: acceptedHostKey, placements } =
+      siblingAccentProposal;
+    setCharTouch((prev) => {
+      // Stale-base guard (mirrors handleCasePairConfirm's identity guard
+      // above): the accepted char's own longpress placement — on the SAME
+      // host key the siblings would share — must still be present. Without
+      // this, removing the just-placed base chip via the Configured row
+      // while this banner is open (e.g. the author changed their mind, or
+      // undid the placement) and then clicking "Add them" would place
+      // orphaned siblings with no base longpress underneath them.
+      // handleRemoveMechanism also proactively clears the proposal on
+      // removal — this is the defense-in-depth mirror of that fix, for any
+      // other path that could remove the base (e.g. a future carve/undo).
+      const acceptedStillPlaced = (
+        prev.get(acceptedChar)?.mechanisms ?? []
+      ).some((m) => normalizeTouchSlots(m.slotValues)["hostKey"] === acceptedHostKey);
+      if (!acceptedStillPlaced) return prev;
+      let next = prev;
+      for (const placement of placements) {
+        const alreadyProduced = (
+          next.get(placement.char)?.mechanisms ?? []
+        ).some((m) => {
+          const slots = normalizeTouchSlots(m.slotValues);
+          return (
+            slots["hostKey"] === placement.hostKey &&
+            slots["layer"] === placement.layer
+          );
+        });
+        if (alreadyProduced) continue;
+        const ref = buildTouchMechanismRef(
+          "longpress_alternates",
+          placement.hostKey,
+          "",
+          placement.char,
+          placement.layer,
+        );
+        if (ref === null) continue;
+        next = appendMechanismToChar(next, placement.char, ref);
+      }
+      return next;
+    });
+    setSiblingAccentProposal(null);
+  }, [siblingAccentProposal]);
+
+  const handleSiblingAccentDismiss = useCallback(() => {
+    setSiblingAccentProposal(null);
+  }, []);
+
   // ---------------------------------------------------------------------------
   // Suggestion card handlers
   // ---------------------------------------------------------------------------
-
-  // Accept the "already in touch layout" suggestion: records a touch_inherited
-  // mechanism (or replaces an existing touch_inherited-only entry — this is a
-  // re-accept, not a second method — regression 3, multi-method) via
-  // appendMechanismToChar rather than overwriting the assignment (regression:
-  // replace), and marks the suggestion resolved. Stays on currentChar — the
-  // user may still want to make further edits; advancing happens only via
-  // the explicit Next button (gallery-QoL / regression 4, stay-on-char:
-  // answering a suggestion must not force the user forward). The chooser
-  // (via suggestionDismissed → showChooser) is available afterward to add a
-  // real method alongside it.
-  const handleSuggestionAccept = useCallback(() => {
-    if (currentChar === null) return;
-    const ref: MechanismRef = { patternId: "touch_inherited" };
-    setCharTouch((prev) => appendMechanismToChar(prev, currentChar, ref));
-    markSuggestionResolved(currentChar);
-  }, [currentChar, markSuggestionResolved]);
 
   // Accept the suggestion: append the suggested mechanism immediately
   // (regression 3, multi-method — via appendMechanismToChar rather than
   // overwriting the assignment, regression: replace), then mark the
   // suggestion resolved and stay on currentChar (regression 4, stay-on-char)
-  // so the user can keep editing (see handleSuggestionAccept above —
-  // advancing happens only via the explicit Next button). If no host key
-  // could be derived, fall back to opening the chooser pre-filled at the
-  // suggested method so the user can pick a key.
+  // so the user can keep editing — advancing happens only via the explicit
+  // Next button. If no host key could be derived, fall back to opening the
+  // chooser pre-filled at the suggested method so the user can pick a key.
+  //
+  // Longpress accelerator (spec: accept ù on u -> offer the rest of u's
+  // diacritic family in one click): fires ONLY on the "longpress" kind (not
+  // "replace" — a replace suggestion is a desktop simple_swap, not an
+  // accent-family placement) and only once a real host key was derivable, so
+  // there is always a concrete key the siblings can share. Gated on the SAME
+  // isDecomposableAccented check the suggestion memo above already used to
+  // offer the longpress card in the first place; `siblingAccentPlacements`
+  // applies its own Latin-only base gate on top (see that module).
   const handleUseSuggestion = useCallback(() => {
     if (currentChar === null) return;
     if (suggestion.kind !== "longpress" && suggestion.kind !== "replace") {
@@ -2172,7 +2342,23 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     if (ref === null) return;
     setCharTouch((prev) => appendMechanismToChar(prev, currentChar, ref));
     markSuggestionResolved(currentChar);
-  }, [suggestion, currentChar, markSuggestionResolved]);
+
+    if (suggestion.kind === "longpress" && isDecomposableAccented(currentChar)) {
+      const placements = siblingAccentPlacements(
+        currentChar,
+        hk,
+        caseCounterpart,
+        bcp47,
+      );
+      if (placements.length > 0) {
+        setSiblingAccentProposal({
+          acceptedChar: currentChar,
+          hostKey: hk,
+          placements,
+        });
+      }
+    }
+  }, [suggestion, currentChar, markSuggestionResolved, bcp47]);
 
   const handleSuggestionChange = useCallback(() => {
     if (currentChar !== null) markSuggestionResolved(currentChar);
@@ -2271,20 +2457,36 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // from the map — folding what was previously a separate
   // "remove the whole configured character" handler into this one, since a
   // char with exactly one mechanism behaves identically either way.
-  const handleRemoveMechanism = useCallback((char: string, idx: number) => {
-    setCharTouch((prev) => {
-      const existing = prev.get(char);
-      if (existing === undefined) return prev;
-      const nextMechanisms = existing.mechanisms.filter((_, i) => i !== idx);
-      const next = new Map(prev);
-      if (nextMechanisms.length === 0) {
-        next.delete(char);
-      } else {
-        next.set(char, { ...existing, mechanisms: nextMechanisms });
-      }
-      return next;
-    });
-  }, []);
+  //
+  // P2 fix (stale proposal on base removal): if an open sibling-accent
+  // proposal was raised for `char` (the just-placed base longpress) and the
+  // author removes that char's chip via this Configured-row control while
+  // the banner is still open, the proposal's own placements (which share
+  // `char`'s host key) would be orphaned — sibling longpress entries with no
+  // base longpress underneath them. Clear the proposal here rather than
+  // leaving it to dangle; `handleSiblingAccentConfirm` below also re-checks
+  // existence defensively (belt-and-suspenders, same posture as
+  // `handleCasePairConfirm`'s stale-base guard).
+  const handleRemoveMechanism = useCallback(
+    (char: string, idx: number) => {
+      setCharTouch((prev) => {
+        const existing = prev.get(char);
+        if (existing === undefined) return prev;
+        const nextMechanisms = existing.mechanisms.filter((_, i) => i !== idx);
+        const next = new Map(prev);
+        if (nextMechanisms.length === 0) {
+          next.delete(char);
+        } else {
+          next.set(char, { ...existing, mechanisms: nextMechanisms });
+        }
+        return next;
+      });
+      setSiblingAccentProposal((prev) =>
+        prev !== null && prev.acceptedChar === char ? null : prev,
+      );
+    },
+    [],
+  );
 
   // Tap-to-select routing: when a valid host-key-capable method is active and
   // the user taps a key in the OSK preview, route that key id to the host key
@@ -2407,6 +2609,25 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // which case none of the guarded blocks below render it.
   const currentCharDisplay =
     currentChar !== null ? displayChar(currentChar) : null;
+
+  // Named locals for the read-only existing-implementation display's
+  // "precise" <Trans> below — the same rule as `currentCharDisplay` above: a
+  // member expression or function call embedded directly inside a <Trans>
+  // macro collapses to a POSITIONAL {0}/{1}/{2} placeholder rather than a
+  // named one (confirmed against locales/en/messages.json; this is the exact
+  // bug documented at this file's top-of-function fix note). `null` when
+  // there is nothing to describe yet — the JSX below is gated on
+  // `existingPlacement !== null` so these are only read once populated.
+  const existingRoleLabel =
+    existingPlacement !== null
+      ? existingPlacementRoleLabel(existingPlacement.role, i18n)
+      : null;
+  const existingHostLabel =
+    existingPlacement !== null
+      ? hostKeyShortLabel(existingPlacement.hostKey, existingPlacement.layerId)
+      : null;
+  const existingLayerId =
+    existingPlacement !== null ? existingPlacement.layerId : null;
 
   const leftContent = (
     <div
@@ -2647,28 +2868,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                   />
                 </>
               )}
-              {suggestion.kind === "already" && (
-                <>
-                  <p style={suggestionMessageStyle}>
-                    <Trans id="editor.assignLoop.touch.suggestion.alreadyText">
-                      {currentCharDisplay} is already on the touch keyboard.
-                      Keep it as is?
-                    </Trans>
-                  </p>
-                  <SuggestionActions
-                    onAccept={handleSuggestionAccept}
-                    onDeny={handleSuggestionChange}
-                    acceptAriaLabel={t({
-                      id: "editor.assignLoop.touch.suggestion.keepAlreadyAriaLabel",
-                      message: `Keep ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }} as already in touch layout`,
-                    })}
-                    denyAriaLabel={t({
-                      id: "editor.assignLoop.touch.makeChangesAriaLabel",
-                      message: "Make changes to touch method",
-                    })}
-                  />
-                </>
-              )}
             </div>
           )}
 
@@ -2775,6 +2974,36 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
         </>
       )}
 
+      {/* Existing-implementation display (read-only — no Accept click): a
+          character already reachable on the seed layout is simply shown,
+          never a green confirm card. `existingPlacement` pins the exact key
+          + mechanism + layer when the walk in existingTouchPlacement.ts can
+          resolve one; otherwise this falls back to a plain "already on the
+          touch keyboard" line (still true, just less specific). */}
+      {currentChar !== null && isCurrentCharDetected && (
+        <p
+          style={{
+            margin: 0,
+            fontSize: 12,
+            color: TEXT_DIM,
+            fontFamily: FONT,
+          }}
+        >
+          {existingPlacement !== null ? (
+            <Trans id="editor.assignLoop.touch.existing.precise">
+              {currentCharDisplay} is already on the touch keyboard —{" "}
+              {existingRoleLabel} on{" "}
+              {existingHostLabel}{" "}
+              ({existingLayerId} layer).
+            </Trans>
+          ) : (
+            <Trans id="editor.assignLoop.touch.existing.fallback">
+              {currentCharDisplay} is already on the touch keyboard.
+            </Trans>
+          )}
+        </p>
+      )}
+
       {/* Case-pair proposal — propose-then-confirm, never apply silently
           (spec v1.3.1 §3c). Offers the capital on the shift layer of the
           layer being edited. */}
@@ -2783,6 +3012,18 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
           proposal={casePairProposal}
           onConfirm={handleCasePairConfirm}
           onDismiss={dismissCompanion}
+        />
+      )}
+
+      {/* Sibling-accent proposal — the longpress accelerator (propose-then-
+          confirm, spec v1.3.1 §3c). Independent of the case-pair proposal
+          above — see SiblingAccentProposalBanner.tsx's module doc for why
+          the two never collide. */}
+      {siblingAccentProposal !== null && (
+        <SiblingAccentProposalBanner
+          proposal={siblingAccentProposal}
+          onConfirm={handleSiblingAccentConfirm}
+          onDismiss={handleSiblingAccentDismiss}
         />
       )}
 

@@ -89,7 +89,47 @@ function collectKeyNextLayers(key: TouchKeyIR, out: Set<string>): void {
   }
 }
 
-/** Recursively add every char produced by a key and its sk/multitap/flick sub-keys. */
+/**
+ * True when `key` **itself** (not its sk/multitap/flick sub-keys — callers
+ * recurse those separately, since the caller-specific role/mechanism a match
+ * came from differs per caller) directly produces `char` — via a non-empty,
+ * non-`*`-prefixed `text`/`output`, or a decoded `U_<HEX>[_<HEX>]*` id. Both
+ * operands are NFC-normalized before comparing.
+ *
+ * Canonical single-key match predicate — do not re-derive this matching
+ * logic (empty/`*`-prefix skip, NFC normalize, `U_` decode) elsewhere. Used
+ * by {@link collectKeyChars} below (collects every char a key produces, for
+ * "is any inventory char reachable") and by the studio's
+ * `describeExistingTouchPlacement` (existingTouchPlacement.ts — asks "does
+ * THIS key produce THIS one character", for "where, and by what mechanism,
+ * is a specific char already placed").
+ */
+export function keyProducesChar(key: TouchKeyIR, char: string): boolean {
+  if (isSpacerKeyClass(key.sp)) return false;
+  const norm = char.normalize("NFC");
+  const matches = (text: string | undefined): boolean =>
+    text !== undefined &&
+    text.length > 0 &&
+    !text.startsWith("*") &&
+    text.normalize("NFC") === norm;
+  if (matches(key.text) || matches(key.output)) return true;
+  const decoded = decodeUnicodeKeyId(key.id);
+  return decoded !== undefined && decoded.normalize("NFC") === norm;
+}
+
+/**
+ * Recursively add every char produced by a key and its sk/multitap/flick
+ * sub-keys. Collects (rather than testing one candidate via
+ * {@link keyProducesChar}) because this walk doesn't know its target chars
+ * in advance — it builds the full covered set once per layout, then tests
+ * every inventory char against it (see `computeTouchCoverage` below);
+ * inverting that into "for each inventory char, ask every key" would trade
+ * one O(keys) pass for an O(inventory * keys) one for no behavioral gain.
+ * The per-key match semantics still come from the exact same source as
+ * `keyProducesChar` (text/output non-empty & non-`*`, or decoded `U_` id,
+ * NFC-normalized) — this only differs in shape (collect-all vs. test-one),
+ * not in what counts as a match.
+ */
 function collectKeyChars(key: TouchKeyIR, covered: Set<string>): void {
   // Spacer keys (sp:8/sp:10) are never char producers.
   if (isSpacerKeyClass(key.sp)) return;
