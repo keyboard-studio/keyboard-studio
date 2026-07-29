@@ -113,6 +113,36 @@ export interface ContributorDescriptor {
   /** The character this contributor produces (or, for `blocked`, that it can't cleanly remove). */
   producedChar: string;
   /**
+   * Whether this contributor genuinely PRODUCES `producedChar` (`'produced'`)
+   * or merely USES it as input (`'used'`) — the §0 "Input-store occurrences"
+   * branch, where the char sits in an `any()`-consumed INPUT store the rule
+   * matches (a deadkey's base char, or a non-deadkey rule's own input-store
+   * slot). A `'used'` contributor's rule may produce a DIFFERENT character
+   * entirely; it is never a removal target for `producedChar` and the studio
+   * renders it as informational, not deletable.
+   *
+   * Set explicitly at every construction site in this module (never derived
+   * later) so the value always reflects the visit that WON for a given
+   * descriptor. For a `storeSlots` entry, that visit is decided by the SAME
+   * output-dominance rule `addStoreSlot` already applies to `role`: a slot
+   * reached by BOTH an input-side match (one rule) and an output-side
+   * production (another rule) always ends up `'produced'`, in either visit
+   * order — the output-side descriptor (always tagged `'produced'`)
+   * unconditionally overwrites a prior input-side one when `addStoreSlot` is
+   * called with `role: 'output'`, and an input-side visit never overwrites
+   * an existing entry at all. So a genuinely-produced slot is never
+   * downgraded to `'used'` just because some other rule also consumes it as
+   * input.
+   *
+   * Always set (never absent) on every descriptor this module constructs
+   * (`'keystroke'`, `'deadkey'`, `'store-slot'`, `'blocked'`). Optional only
+   * for the two kinds this module never constructs itself — `'composition'`
+   * and `'unattributed'`, synthesized by the studio — which are always
+   * `'produced'` too; absence there is equivalent to `'produced'`, never to
+   * `'used'`.
+   */
+  producedRole?: 'produced' | 'used';
+  /**
    * `kind: "keystroke"` only — a "Shift+A"-style rendering of the rule's
    * triggering vkey + modifiers. Absent when the rule's context isn't a
    * single simple vkey match (an elaborate context isn't cheaply
@@ -643,6 +673,7 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
       blockedDescriptors.push({
         kind: 'blocked',
         producedChar: target,
+        producedRole: 'produced',
         blockedReasonCode: 'opaque-fragment',
       });
     }
@@ -710,8 +741,13 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
               makeSlotId(inputStore.nodeId, i),
               'input',
               isDeadkeyRule
-                ? { kind: 'deadkey', producedChar: target }
-                : { kind: 'store-slot', producedChar: target, ...storeDisplayNameField(inputStore.name) },
+                ? { kind: 'deadkey', producedChar: target, producedRole: 'used' }
+                : {
+                    kind: 'store-slot',
+                    producedChar: target,
+                    producedRole: 'used',
+                    ...storeDisplayNameField(inputStore.name),
+                  },
             );
             addLocation('store', inputStore.name, inputStore.nodeId);
             inputMatched = true;
@@ -799,6 +835,7 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
           ruleDescriptors.push({
             kind: 'keystroke',
             producedChar: target,
+            producedRole: 'produced',
             ...(keystrokeDisplay !== undefined ? { keystrokeDisplay } : {}),
             ...(inputSequence !== undefined ? { inputSequence, output: wholeOutput } : {}),
           });
@@ -814,6 +851,7 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
         blockedDescriptors.push({
           kind: 'blocked',
           producedChar: target,
+          producedRole: 'produced',
           blockedReasonCode: 'multi-char-output',
         });
       }
@@ -879,6 +917,7 @@ function buildOutputSlotDescriptor(
     return {
       kind: 'store-slot',
       producedChar: target,
+      producedRole: 'produced',
       ...storeDisplayNameField(storeName),
       ...typedInputField(baseItem),
       ...sequenceFields,
@@ -895,6 +934,7 @@ function buildOutputSlotDescriptor(
   return {
     kind: 'deadkey',
     producedChar: target,
+    producedRole: 'produced',
     ...(mark !== undefined ? { mark } : {}),
     ...(base !== undefined ? { base } : {}),
     ...sequenceFields,

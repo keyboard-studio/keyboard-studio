@@ -2650,9 +2650,19 @@ export function MechanismGallery({
   //   - a ruleNodeId is a whole-rule delete candidate — deletable unless
   //     removalCapabilities marks it not-removable (context-sensitive /
   //     opaque / unknown), in which case it's shown muted with a reason.
-  //   - a storeSlot is an output/input-store slot drop — always deletable
-  //     (store slots are not separately capability-gated; see
-  //     classifyRemovalCapabilities' keying contract).
+  //     CURATION: when the char also has a PRODUCED store-slot row (see
+  //     below), the keystroke row(s) for the SAME char are omitted — the
+  //     store-slot row is the real, always-current method and a duplicate
+  //     "Press X" row alongside it is noise. Only when a keystroke is the
+  //     char's SOLE producer (no produced store-slot exists) is it kept —
+  //     the completeness floor is a last resort, never routinely skipped.
+  //   - a storeSlot is an output/input-store slot drop — deletable exactly
+  //     when its descriptor's `producedRole` is "produced" (a genuine
+  //     producer of the char). A `producedRole: "used"` slot (the char is
+  //     consumed as INPUT there — a deadkey base, or a non-deadkey rule's
+  //     own input-store occurrence — not produced) renders the same blue,
+  //     non-deletable chip as composition/unattributed/blocked: removing it
+  //     wouldn't remove a method that produces this char at all.
   //   - a `blocked` entry (opaque fragment, or a multi-char literal output
   //     that can't be split) is always muted, never silently dropped.
   // A method already removed THIS session (its id already in
@@ -2700,6 +2710,41 @@ export function MechanismGallery({
 
     const rows: ExistingMethodRow[] = [];
 
+    // Build the store-slot rows FIRST (before the keystroke/rule rows below)
+    // so the keystroke-drop curation can see whether a PRODUCED store-slot
+    // row already exists for this char — pushed into `rows` afterward to
+    // preserve the original rule-then-slot render order.
+    const storeSlotRows: ExistingMethodRow[] = [];
+    let hasProducedStoreSlot = false;
+    existingMethodContributors.storeSlots.forEach((slot, i) => {
+      if (isItemDeleted(slot.slotId)) return;
+      const descriptor = storeSlotDescriptors[i];
+      if (descriptor === undefined) return;
+      // producedRole "used" (a deadkey base, or a non-deadkey rule's own
+      // any()-consumed input-store occurrence — §0 in collectCharContributors)
+      // is not a producer of this char at all; render it exactly like
+      // composition/unattributed/blocked — blue, informational, never
+      // deletable. Absent producedRole (composition/unattributed shapes
+      // never reach this loop) never occurs here — every storeSlots
+      // descriptor is engine-constructed and always carries the field.
+      const isUsed = descriptor.producedRole === "used";
+      // Intentionally `kind === "store-slot"` only — a produced "deadkey" row
+      // (mark+base combination) does NOT count toward `hasProducedStoreSlot`
+      // and so never suppresses the plain-key keystroke row below. A dead-key
+      // combination is a DISTINCT input method, not a redundant restatement
+      // of the plain keystroke the way an alphabet/store fan-out slot is, so
+      // it must not drop the keystroke chip.
+      if (descriptor.kind === "store-slot" && !isUsed) {
+        hasProducedStoreSlot = true;
+      }
+      storeSlotRows.push({
+        id: slot.slotId,
+        label: composeContributorLabel(descriptor, i18n),
+        deletable: !isUsed,
+        kind: "slot",
+      });
+    });
+
     existingMethodContributors.ruleNodeIds.forEach((nodeId, i) => {
       if (isItemDeleted(nodeId)) return;
       const descriptor = ruleDescriptors[i];
@@ -2707,6 +2752,11 @@ export function MechanismGallery({
       // this is always present; skip rather than mis-attach a label if it
       // ever isn't.
       if (descriptor === undefined) return;
+      // Keystroke-drop curation: a produced store-slot row already covers
+      // this char with a real, always-current method — a redundant
+      // "Press X" keystroke row is dropped. Only when NO produced store-slot
+      // exists (the keystroke is the char's sole producer) is this row kept.
+      if (hasProducedStoreSlot) return;
       const capability: RemovalCapability | undefined =
         removalCapabilities.get(nodeId);
       const notRemovable = (capability ?? "").startsWith("not-removable:");
@@ -2726,17 +2776,7 @@ export function MechanismGallery({
       });
     });
 
-    existingMethodContributors.storeSlots.forEach((slot, i) => {
-      if (isItemDeleted(slot.slotId)) return;
-      const descriptor = storeSlotDescriptors[i];
-      if (descriptor === undefined) return;
-      rows.push({
-        id: slot.slotId,
-        label: composeContributorLabel(descriptor, i18n),
-        deletable: true,
-        kind: "slot",
-      });
-    });
+    rows.push(...storeSlotRows);
 
     existingMethodContributors.blocked.forEach((b, i) => {
       const descriptor = blockedDescriptors[i];
@@ -2790,7 +2830,7 @@ export function MechanismGallery({
       rows.push({
         id: `unattributed:${currentChar}`,
         label: composeContributorLabel(
-          { kind: "unattributed", producedChar: currentChar },
+          { kind: "unattributed", producedChar: currentChar, producedRole: "produced" },
           i18n,
         ),
         deletable: false,
@@ -3553,10 +3593,13 @@ export function MechanismGallery({
                   Deletable rows share the exact "click deletes / turns red
                   on hover" chip both the "Added" row and the full carve
                   gallery use; every non-deletable row (blocked/opaque/
-                  multi-char AND composition/unattributed) renders as the
-                  same blue, non-interactive chip naming why, never silently
-                  hidden — the palette is exactly green = deletable, blue =
-                  not deletable. See existingMethods/handleRemoveExistingMethod
+                  multi-char AND composition/unattributed AND a "slot" row
+                  whose descriptor is producedRole "used" — the char is only
+                  CONSUMED there, e.g. a deadkey base or an input-store
+                  occurrence, never produced) renders as the same blue,
+                  non-interactive chip naming why, never silently hidden —
+                  the palette is exactly green = deletable, blue = not
+                  deletable. See existingMethods/handleRemoveExistingMethod
                   above for how rows are built and removed. */}
             {currentChar !== null && existingMethods.length > 0 && (
               <div>

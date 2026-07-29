@@ -1413,7 +1413,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       rows.push({
         id: `unattributed:${currentChar}`,
         label: composeContributorLabel(
-          { kind: "unattributed", producedChar: currentChar },
+          { kind: "unattributed", producedChar: currentChar, producedRole: "produced" },
           i18n,
         ),
         deletable: false,

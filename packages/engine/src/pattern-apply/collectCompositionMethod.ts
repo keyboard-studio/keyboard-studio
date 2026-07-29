@@ -42,5 +42,10 @@ export function collectCompositionMethod(
   if (baseProduced.has(targetChar)) return undefined;
   const result = composableComponentsFor(baseProduced, targetChar);
   if (result === undefined) return undefined;
-  return { kind: 'composition', producedChar: targetChar, components: result.components };
+  return {
+    kind: 'composition',
+    producedChar: targetChar,
+    producedRole: 'produced',
+    components: result.components,
+  };
 }

@@ -46,6 +46,7 @@ import { corpusBackedQwerty } from "@keyboard-studio/contracts/fixtures";
 import type { PatternMatch } from "@keyboard-studio/contracts";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import type { MechanismAssignment, IRGroup, IRRule, IRStore } from "@keyboard-studio/contracts";
+import type { CharContributors } from "@keyboard-studio/engine";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 import { expectCurrentChar } from "../../test/currentCharChip.ts";
@@ -1258,6 +1259,172 @@ describe("MechanismGallery — Existing methods SHOW-ALL (composition + floor)",
         screen.getByText("Your keyboard already produces this character."),
       ).toBeTruthy();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// "Existing methods" curation — Rule 1 (keystroke rows dropped when a
+// PRODUCED store-slot row already covers the char) and Rule 2 (a
+// producedRole "used" contributor renders blue/non-deletable, same as
+// composition/unattributed/blocked).
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — Existing methods curation (producedRole + keystroke-drop)", () => {
+  function baseContributors(
+    overrides: Partial<CharContributors>,
+  ): CharContributors {
+    return {
+      targetChar: "z",
+      ruleNodeIds: [],
+      storeSlotIds: [],
+      storeSlots: [],
+      locations: [],
+      blocked: [],
+      descriptors: [],
+      ...overrides,
+    };
+  }
+
+  it("a char with a keystroke producer AND a produced store-slot: the keystroke row is dropped, the store-slot row is kept", async () => {
+    const ruleZ: IRRule = {
+      nodeId: "r-z",
+      context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [ruleZ],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+    seedInventory(["y", "z"]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    collectCharContributorsSpy.mockImplementationOnce(() =>
+      baseContributors({
+        ruleNodeIds: ["r-z"],
+        storeSlotIds: ["sid-alpha#25"],
+        storeSlots: [{ slotId: "sid-alpha#25", role: "output" }],
+        descriptors: [
+          { kind: "keystroke", producedChar: "z", producedRole: "produced", keystrokeDisplay: "Z" },
+          {
+            kind: "store-slot",
+            producedChar: "z",
+            producedRole: "produced",
+            storeDisplayName: "Alphabet",
+          },
+        ],
+      }),
+    );
+
+    fireEvent.click(screen.getByTestId("char-scroll-chip-007A"));
+
+    await waitFor(() => {
+      expect(screen.getByText("One of your Alphabet keys → z")).toBeTruthy();
+    });
+    expect(screen.queryByText("Press Z → z")).toBeNull();
+  });
+
+  it("a char whose ONLY producer is a keystroke (no produced store-slot): the keystroke row is kept", async () => {
+    const ruleZ: IRRule = {
+      nodeId: "r-z",
+      context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [ruleZ],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+    seedInventory(["y", "z"]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    collectCharContributorsSpy.mockImplementationOnce(() =>
+      baseContributors({
+        ruleNodeIds: ["r-z"],
+        descriptors: [
+          { kind: "keystroke", producedChar: "z", producedRole: "produced", keystrokeDisplay: "Z" },
+        ],
+      }),
+    );
+
+    fireEvent.click(screen.getByTestId("char-scroll-chip-007A"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", {
+          name: /Remove existing method Press Z → z for z/i,
+        }),
+      ).toBeTruthy();
+    });
+  });
+
+  it('a producedRole "used" contributor renders blue/informational — present as text, not as a deletable button', async () => {
+    const ruleZ: IRRule = {
+      nodeId: "r-z",
+      context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [ruleZ],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+    seedInventory(["y", "z"]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    collectCharContributorsSpy.mockImplementationOnce(() =>
+      baseContributors({
+        storeSlotIds: ["sid-dkf#0"],
+        storeSlots: [{ slotId: "sid-dkf#0", role: "input" }],
+        descriptors: [{ kind: "deadkey", producedChar: "z", producedRole: "used" }],
+      }),
+    );
+
+    fireEvent.click(screen.getByTestId("char-scroll-chip-007A"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Part of a two-step combination → z"),
+      ).toBeTruthy();
+    });
+    // A "used" contributor is never a removal target for this char — no
+    // delete button, same treatment as composition/unattributed/blocked.
+    expect(
+      screen.queryByRole("button", { name: /Remove existing method/i }),
+    ).toBeNull();
   });
 });
 

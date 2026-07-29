@@ -12,6 +12,7 @@ describe('collectCompositionMethod', () => {
     expect(result).toEqual({
       kind: 'composition',
       producedChar: 'Û',
+      producedRole: 'produced',
       components: ['U', '̂'],
     });
   });
@@ -30,6 +31,7 @@ describe('collectCompositionMethod', () => {
     expect(result).toEqual({
       kind: 'composition',
       producedChar: 'Ệ',
+      producedRole: 'produced',
       components: ['E', '̣', '̂'],
     });
   });

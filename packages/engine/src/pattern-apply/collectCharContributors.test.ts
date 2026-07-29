@@ -275,6 +275,7 @@ describe('collectCharContributors', () => {
     expect(result.descriptors).toContainEqual({
       kind: 'blocked',
       producedChar: 'ᐔ',
+      producedRole: 'produced',
       blockedReasonCode: 'opaque-fragment',
     });
   });
@@ -522,6 +523,7 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       {
         kind: 'keystroke',
         producedChar: 'a',
+        producedRole: 'produced',
         keystrokeDisplay: 'A',
         inputSequence: ['A'],
         output: 'a',
@@ -542,6 +544,7 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       {
         kind: 'keystroke',
         producedChar: 'A',
+        producedRole: 'produced',
         keystrokeDisplay: 'Shift+A',
         inputSequence: ['Shift+A'],
         output: 'A',
@@ -568,6 +571,7 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       {
         kind: 'keystroke',
         producedChar: 'GHG',
+        producedRole: 'produced',
         inputSequence: ['A', 'Shift+B'],
         output: 'GHG',
       },
@@ -593,7 +597,7 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     // unresolvable element aborts the WHOLE sequence rather than silently
     // dropping just that token.
     expect(result.descriptors).toEqual([
-      { kind: 'keystroke', producedChar: 'a', keystrokeDisplay: 'A' },
+      { kind: 'keystroke', producedChar: 'a', producedRole: 'produced', keystrokeDisplay: 'A' },
     ]);
     expect(result.descriptors[0]).not.toHaveProperty('inputSequence');
     expect(result.descriptors[0]).not.toHaveProperty('output');
@@ -608,6 +612,7 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       {
         kind: 'deadkey',
         producedChar: 'à',
+        producedRole: 'produced',
         mark: 'SEMICOLON',
         base: 'a',
         // The fan-out rule's own context is `dk(0x003b) any(dkf003b)` — the
@@ -647,6 +652,7 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       {
         kind: 'deadkey',
         producedChar: 'á',
+        producedRole: 'produced',
         mark: "'",
         base: 'a',
         inputSequence: ["'", 'a'],
@@ -702,10 +708,14 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     expect(deadkeyDescriptor?.inputSequence).toBeUndefined();
   });
 
-  it('kind "deadkey": an input-side-only match leaves mark/base absent (not cheaply derivable from that side alone)', () => {
+  it('kind "deadkey": an input-side-only match leaves mark/base absent (not cheaply derivable from that side alone), and is tagged producedRole "used"', () => {
     const result = collectCharContributors(makeCameroonIR(), 'a');
-    // 'a' lives only in the any()-consumed input store dkf003b#0.
-    expect(result.descriptors).toEqual([{ kind: 'deadkey', producedChar: 'a' }]);
+    // 'a' lives only in the any()-consumed input store dkf003b#0 — this is the
+    // §0 "Input-store occurrence" case: 'a' is USED as a deadkey base by the
+    // fan-out rule, never itself PRODUCED by it.
+    expect(result.descriptors).toEqual([
+      { kind: 'deadkey', producedChar: 'a', producedRole: 'used' },
+    ]);
   });
 
   it('kind "deadkey": TWO trigger rules sharing a deadkey id with DIFFERENT keystrokes leave `mark` absent, deterministically (not last-write-wins)', () => {
@@ -775,6 +785,7 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       {
         kind: 'store-slot',
         producedChar: 'ɛ',
+        producedRole: 'produced',
         storeDisplayName: 'Alphabet Table',
         // 'ɛ' is at slot 1 of 'kAlphabetTable'; the rule's any()-consumed
         // 'keys' store at the SAME slot 1 is 'e' — the aligned input char,
@@ -804,6 +815,7 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       {
         kind: 'store-slot',
         producedChar: 'a',
+        producedRole: 'produced',
         // 'a' is at slot 0 of 'tbl2'; the rule's any()-consumed 'keys' store
         // at the SAME slot 0 is 'z' — the aligned input char, even though the
         // store's own name couldn't be humanized.
@@ -856,6 +868,7 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       {
         kind: 'store-slot',
         producedChar: 'a',
+        producedRole: 'produced',
         inputKeystroke: 'Space',
       },
     ]);
@@ -873,7 +886,12 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     });
     const result = collectCharContributors(ir, 'ε');
     expect(result.descriptors).toEqual([
-      { kind: 'blocked', producedChar: 'ε', blockedReasonCode: 'opaque-fragment' },
+      {
+        kind: 'blocked',
+        producedChar: 'ε',
+        producedRole: 'produced',
+        blockedReasonCode: 'opaque-fragment',
+      },
     ]);
   });
 
@@ -887,7 +905,89 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     });
     const result = collectCharContributors(ir, 'a');
     expect(result.descriptors).toEqual([
-      { kind: 'blocked', producedChar: 'a', blockedReasonCode: 'multi-char-output' },
+      {
+        kind: 'blocked',
+        producedChar: 'a',
+        producedRole: 'produced',
+        blockedReasonCode: 'multi-char-output',
+      },
+    ]);
+  });
+
+  it('a slot reached by BOTH an input-side match and an output-side production is tagged producedRole "produced" (never demoted to "used")', () => {
+    // Self-paired store shape (`any(word) + [K_SPACE] > index(word, 1)`): the
+    // SAME slot (sid-word#1) is visited once by the §0 input-store loop
+    // (role 'input', producedRole 'used') and once by the store-produced-
+    // target loop (role 'output', producedRole 'produced') — the
+    // output-side descriptor must win, since the slot genuinely produces
+    // the char.
+    const word = makeStore('sid-word', 'word', [
+      { kind: 'char', value: 'a' },
+      { kind: 'char', value: 'ɛ' },
+    ]);
+    const ir = makeIR({
+      stores: [word],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [makeRule('r-self',
+          [{ kind: 'any', storeRef: 'word' }],
+          [{ kind: 'index', storeRef: 'word', offset: 1 }],
+        )],
+      }],
+    });
+    const result = collectCharContributors(ir, 'ɛ');
+    expect(result.storeSlots).toEqual([{ slotId: 'sid-word#1', role: 'output' }]);
+    expect(result.descriptors).toEqual([
+      {
+        kind: 'store-slot',
+        producedChar: 'ɛ',
+        producedRole: 'produced',
+        storeDisplayName: 'Word',
+        inputChar: 'ɛ',
+        inputSequence: ['ɛ'],
+        output: 'ɛ',
+      },
+    ]);
+  });
+
+  it('a slot reached by BOTH roles across TWO SEPARATE rules (output rule walked FIRST, input rule walked SECOND) still resolves to producedRole "produced" (walk-order independence — the reverse of the self-paired case above)', () => {
+    // Unlike the self-paired fixture above (one rule, both roles), here two
+    // DISTINCT rules touch the SAME store slot (sid-fanout#1): the EARLIER
+    // rule's index() output PRODUCES the slot's char first, then the LATER
+    // rule's any() context CONSUMES that same store slot as input. Output
+    // dominance must hold regardless of which role's visit happens first in
+    // walk order — this is the output-first-then-input direction; the test
+    // above covers input-then-output.
+    const fanout = makeStore('sid-fanout', 'fanout', [
+      { kind: 'char', value: 'x' },
+      { kind: 'char', value: 'ɛ' },
+    ]);
+    const outputRule = makeRule('r-out',
+      [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
+      [{ kind: 'index', storeRef: 'fanout', offset: 1 }],
+    );
+    const inputRule = makeRule('r-in',
+      [{ kind: 'any', storeRef: 'fanout' }],
+      [{ kind: 'char', value: 'z' }],
+    );
+    const ir = makeIR({
+      stores: [fanout],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [outputRule, inputRule],
+      }],
+    });
+    const result = collectCharContributors(ir, 'ɛ');
+    expect(result.storeSlots).toEqual([{ slotId: 'sid-fanout#1', role: 'output' }]);
+    expect(result.descriptors).toEqual([
+      {
+        kind: 'store-slot',
+        producedChar: 'ɛ',
+        producedRole: 'produced',
+        storeDisplayName: 'Fanout',
+        inputSequence: ['A'],
+        output: 'ɛ',
+      },
     ]);
   });
 
