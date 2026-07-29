@@ -200,6 +200,43 @@ export interface ContributorDescriptor {
  */
 const isTriggerRule = isDeadkeyOnlyOutput;
 
+/** True when a `{kind:"vkey"}` name is the backspace key (`K_BKSP`), case-insensitively. */
+function isBackspaceVkeyName(name: string): boolean {
+  return name.toUpperCase() === 'K_BKSP';
+}
+
+/**
+ * True when a contributor's INPUT includes the backspace virtual key
+ * (`K_BKSP`) by EITHER of the two known paths — the ONE place both are
+ * decided, so they can't drift apart:
+ *
+ *   1. DIRECT: `{kind:"vkey", name:"K_BKSP"}` appears literally in the rule's
+ *      `context` — the diacritic-removal / correction shape ("type é then
+ *      backspace -> e"). Keys off the CONTEXT (input), never the output: a
+ *      rule whose output happens to include a deadkey/backspace-adjacent
+ *      construct but whose INPUT is a normal keystroke is a legitimate
+ *      producer and must not be dropped by this check.
+ *   2. STORE-RESOLVED: the rule consumes an `any()`-context store whose item
+ *      at the slot ALIGNED with the currently-evaluated output ({@link
+ *      resolveAlignedAnyElement}'s pairing — the SAME item `base`/
+ *      `inputKeystroke` are derived from) resolves to
+ *      `{kind:"vkey", name:"K_BKSP"}` — a store-slot contributor reached only
+ *      by pressing backspace, never typed directly in the context, but still
+ *      genuinely a "press Backspace" method rather than a producing one.
+ *
+ * `resolvedItem` is the aligned store item for the SPECIFIC contributor slot
+ * being evaluated right now (absent for a plain literal-output rule with no
+ * aligned slot, or for the whole-rule direct-context check, which has no
+ * single slot) — pass `undefined` when there is none.
+ */
+function contributorInputHasBackspace(
+  context: readonly ContextElement[],
+  resolvedItem: StoreItem | undefined,
+): boolean {
+  if (context.some((el) => el.kind === 'vkey' && isBackspaceVkeyName(el.name))) return true;
+  return resolvedItem !== undefined && resolvedItem.kind === 'vkey' && isBackspaceVkeyName(resolvedItem.name);
+}
+
 /** Friendly names for the handful of non-letter vkeys likely to trigger a deadkey/keystroke. */
 const VKEY_DISPLAY_NAMES: Record<string, string> = {
   K_BKSP: 'Backspace',
@@ -635,6 +672,19 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
       // contributor. No corpus example currently exercises this shape.
       if (isTriggerRule(rule)) continue;
 
+      // Diacritic-removal / correction rules ("type é then backspace -> e")
+      // are not a producing method for a character — skip the WHOLE rule
+      // (never added to ruleNodeIds/storeSlots/descriptors/blocked) when its
+      // input context contains backspace DIRECTLY. buildProducedSet is
+      // untouched, so a char only reachable via such a rule stays badged
+      // "produced"; the completeness FLOOR row covers it once no other
+      // method remains. The STORE-RESOLVED backspace shape (an any()-consumed
+      // store's aligned item IS the backspace vkey) can't be decided per-rule
+      // — it depends on which output slot is being evaluated — so it's
+      // checked per-slot in the store-produced-target loop below, via the
+      // SAME `contributorInputHasBackspace` helper.
+      if (contributorInputHasBackspace(rule.context, undefined)) continue;
+
       const isDeadkeyRule = rule.context.some((el) => el.kind === 'deadkey');
 
       // (0) Input-store occurrences — any() context elements ("remove everywhere",
@@ -686,6 +736,17 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
           for (let i = 0; i < store.items.length; i++) {
             const item = store.items[i];
             if (item !== undefined && item.kind === 'char' && item.value.normalize('NFC') === target) {
+              // Resolve the SAME aligned any()-consumed item buildOutputSlotDescriptor
+              // would derive `base`/`inputKeystroke` from, ONCE, so the backspace
+              // check and the descriptor build can never disagree about which
+              // item is "the input" for this slot (per-slot: a DIFFERENT slot
+              // index on the same store/rule can align to a different, non-
+              // backspace item, so this can't be decided once for the whole rule).
+              const alignedAnyEl = resolveAlignedAnyElement(rule.context, { kind: el.kind, offset: el.offset });
+              const anyStore = alignedAnyEl !== undefined ? storeMap.get(alignedAnyEl.storeRef) : undefined;
+              const baseItem = anyStore?.items[i];
+              if (contributorInputHasBackspace(rule.context, baseItem)) continue;
+
               addStoreSlot(
                 makeSlotId(store.nodeId, i),
                 'output',
@@ -697,7 +758,8 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
                   i,
                   storeMap,
                   triggerKeystrokeByDeadkeyId,
-                  { kind: el.kind, offset: el.offset },
+                  alignedAnyEl,
+                  baseItem,
                 ),
               );
               addLocation('store', store.name, store.nodeId);
@@ -783,12 +845,15 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
  *     `deadkey` context element's id (resolved by the trigger-rule pre-pass).
  *   - `base`  — the `any()`-consumed store's item at the SAME slot index as
  *     the matched output slot, from the SPECIFIC `any()` context element the
- *     matched output's `index()` `offset` pairs with (resolved once, via
- *     {@link resolveAlignedAnyElement}, and reused for both `base` and
- *     `inputSequence` below) — never just the first `any()` found
- *     positionally, which mislabels the base when a rule carries more than
- *     one `any()` context element.
+ *     matched output's `index()` `offset` pairs with.
  * Either piece is left absent (not fabricated) when it doesn't resolve.
+ *
+ * `alignedAnyEl`/`baseItem` are resolved ONCE by the caller (the "(a)"
+ * loop, via {@link resolveAlignedAnyElement}) — BEFORE deciding whether to
+ * call this at all, so the caller's backspace skip check and this
+ * descriptor's `base`/`inputChar`/`inputKeystroke` derivation always agree
+ * on which item is "the input" for this slot; passed in rather than
+ * re-resolved here to keep that single resolution the only one.
  */
 function buildOutputSlotDescriptor(
   rule: IRRule,
@@ -798,15 +863,9 @@ function buildOutputSlotDescriptor(
   slotIndex: number,
   storeMap: ReadonlyMap<string, KeyboardIR['stores'][number]>,
   triggerKeystrokeByDeadkeyId: ReadonlyMap<number, string>,
-  matchedOutputEl: { kind: string; offset: number | undefined },
+  alignedAnyEl: (ContextElement & { kind: 'any' }) | undefined,
+  baseItem: StoreItem | undefined,
 ): ContributorDescriptor {
-  // Resolve ONCE which `any()` context element the matched output slot is
-  // actually paired with (see resolveAlignedAnyElement's doc comment for the
-  // offset convention, matched to applyStoreSlotRemovals.ts) — both the
-  // `base` derivation and `inputSequence` below use this SAME element, so
-  // they can never disagree about which store is "the base".
-  const alignedAnyEl = resolveAlignedAnyElement(rule.context, matchedOutputEl);
-
   const inputSequence = buildContextInputSequence(
     rule.context,
     storeMap,
@@ -815,12 +874,6 @@ function buildOutputSlotDescriptor(
     alignedAnyEl,
   );
   const sequenceFields = inputSequence !== undefined ? { inputSequence, output: target } : {};
-
-  // Resolve ONCE — the item at the aligned store's SAME slot index — reused
-  // by `inputChar`/`inputKeystroke` below (non-deadkey) and `base` further
-  // down (deadkey); both readings must agree on which item is "the input".
-  const anyStore = alignedAnyEl !== undefined ? storeMap.get(alignedAnyEl.storeRef) : undefined;
-  const baseItem = anyStore?.items[slotIndex];
 
   if (!isDeadkeyRule) {
     return {

@@ -201,6 +201,27 @@ describe("enumerateTouchMethodsForChar", () => {
     expect(result[0]!.deletable).toBe(true);
   });
 
+  it("skips a main key whose id is K_BKSP even if it happens to match (defensive backspace filter)", () => {
+    const layout = makeLayout([makeKey("K_BKSP", { text: "a" })]);
+
+    expect(enumerateTouchMethodsForChar(layout, "a")).toEqual([]);
+  });
+
+  it("skips a longpress/multitap/flick sub-entry whose id is K_BKSP (defensive backspace filter)", () => {
+    const layout = makeLayout([
+      makeKey("U_0061", {
+        text: "a",
+        sk: [makeKey("K_BKSP", { text: "b" })],
+        multitap: [makeKey("K_BKSP", { text: "c" })],
+        flick: { ne: makeKey("K_BKSP", { text: "d" }) },
+      }),
+    ]);
+
+    expect(enumerateTouchMethodsForChar(layout, "b")).toEqual([]);
+    expect(enumerateTouchMethodsForChar(layout, "c")).toEqual([]);
+    expect(enumerateTouchMethodsForChar(layout, "d")).toEqual([]);
+  });
+
   it("returns an empty list when nothing produces the character", () => {
     const layout = makeLayout([makeKey("U_0061", { text: "a" })]);
 

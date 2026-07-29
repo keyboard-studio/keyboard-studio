@@ -117,6 +117,16 @@ function hostLabel(key: TouchKeyIR): string | undefined {
   return key.text ?? key.output ?? unicodeKeyIdToChar(key.id);
 }
 
+/**
+ * True when `id` (case-insensitive) is the backspace key. A dedicated
+ * `K_BKSP` key won't ordinarily match an alphabet char's removal set, but
+ * this is a defensive filter — see `collectCharContributors`'s desktop-side
+ * backspace-input skip for the shape this mirrors.
+ */
+function isBackspaceKeyId(id: string | undefined): boolean {
+  return id !== undefined && id.toUpperCase() === 'K_BKSP';
+}
+
 function collectDescriptorsForKey(
   platform: string,
   layerId: string,
@@ -128,7 +138,7 @@ function collectDescriptorsForKey(
   const host = hostLabel(key);
   const hostField = host !== undefined ? { host } : {};
 
-  if (keyMatchesRemovalSet(key, removalSet)) {
+  if (!isBackspaceKeyId(key.id) && keyMatchesRemovalSet(key, removalSet)) {
     const isLayerSwitch = key.nextlayer !== undefined;
     out.push({
       id: touchKeyAddress(platform, layerId, key.id),
@@ -143,7 +153,7 @@ function collectDescriptorsForKey(
   }
 
   for (const sub of key.sk ?? []) {
-    if (keyMatchesRemovalSet(sub, removalSet)) {
+    if (!isBackspaceKeyId(sub.id) && keyMatchesRemovalSet(sub, removalSet)) {
       out.push({
         id: touchSubKeyAddress(platform, layerId, key.id, "sk", sub.id),
         kind: "longpress",
@@ -157,7 +167,7 @@ function collectDescriptorsForKey(
   }
 
   for (const sub of key.multitap ?? []) {
-    if (keyMatchesRemovalSet(sub, removalSet)) {
+    if (!isBackspaceKeyId(sub.id) && keyMatchesRemovalSet(sub, removalSet)) {
       out.push({
         id: touchSubKeyAddress(platform, layerId, key.id, "multitap", sub.id),
         kind: "multitap",
@@ -173,7 +183,7 @@ function collectDescriptorsForKey(
   if (key.flick) {
     for (const direction of Object.keys(key.flick) as Array<keyof NonNullable<TouchKeyIR["flick"]>>) {
       const sub = key.flick[direction];
-      if (sub !== undefined && keyMatchesRemovalSet(sub, removalSet)) {
+      if (sub !== undefined && !isBackspaceKeyId(sub.id) && keyMatchesRemovalSet(sub, removalSet)) {
         out.push({
           id: touchFlickAddress(platform, layerId, key.id, direction),
           kind: "flick",

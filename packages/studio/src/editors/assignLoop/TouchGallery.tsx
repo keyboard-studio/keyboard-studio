@@ -2402,12 +2402,14 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             follow-up). Deletable rows (touch-only: an explicit `output`, a
             `U_<HEX>` id, or any longpress/multitap/flick sub-entry) share the
             exact "click deletes / turns red on hover" chip the "Configured"
-            row above uses; desktop-backed main keys (deletable: false — the
-            char still comes from the compiled .kmn rule, not this touch key)
-            render as a muted, non-interactive chip naming why via `title`;
-            a composition/unattributed row renders as a BLUE non-deletable
-            chip (same palette as the "Sequences" row) — never silently
-            hidden. See existingMethodRows above for how rows are built; a
+            row above uses; every non-deletable row — desktop-backed main
+            keys (deletable: false — the char still comes from the compiled
+            .kmn rule, not this touch key) layer-switch keys, AND
+            composition/unattributed rows — renders as the same BLUE
+            non-interactive chip naming why via `title` (same palette as the
+            "Sequences" row); the palette is exactly green = deletable, blue
+            = not deletable, never silently hidden. See existingMethodRows
+            above for how rows are built; a
             deletable row's onClick calls deleteTouchKey(row.id) directly
             (only "touch"-kind rows are ever deletable). */}
       {currentChar !== null && existingMethodRows.length > 0 && (
@@ -2469,7 +2471,12 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                     {" ×"}
                   </span>
                 </HoverDangerChip>
-              ) : row.kind === "composition" || row.kind === "unattributed" ? (
+              ) : (
+                // Blue, non-deletable, informational — every non-deletable
+                // row (desktop-backed main keys AND composition/unattributed)
+                // shares this one style. The palette is exactly two colors:
+                // green = deletable, blue = not deletable — no separate
+                // grey/muted branch.
                 <span
                   key={row.id}
                   {...(row.reason !== undefined ? { title: row.reason } : {})}
@@ -2481,25 +2488,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                     border: "1px solid #58a6ff",
                     borderRadius: 12,
                     color: "#58a6ff",
-                    fontSize: 11,
-                    fontFamily:
-                      "ui-monospace, 'Cascadia Code', Consolas, monospace",
-                  }}
-                >
-                  {row.label}
-                </span>
-              ) : (
-                <span
-                  key={row.id}
-                  {...(row.reason !== undefined ? { title: row.reason } : {})}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    padding: "3px 8px",
-                    background: "#161b22",
-                    border: `1px solid ${BORDER}`,
-                    borderRadius: 12,
-                    color: TEXT_DIM,
                     fontSize: 11,
                     fontFamily:
                       "ui-monospace, 'Cascadia Code', Consolas, monospace",

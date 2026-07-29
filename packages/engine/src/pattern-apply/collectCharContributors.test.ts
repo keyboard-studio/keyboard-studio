@@ -104,6 +104,53 @@ describe('collectCharContributors', () => {
     expect(result.blocked).toHaveLength(0);
   });
 
+  it('a rule with K_BKSP in its context (diacritic-removal, e.g. "é then backspace -> e") is NOT attributed', () => {
+    const rule = makeRule('r-bksp-removal',
+      [{ kind: 'char', value: 'é' }, { kind: 'vkey', name: 'K_BKSP', modifiers: [] }],
+      [{ kind: 'char', value: 'e' }],
+    );
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'e');
+    expect(result.ruleNodeIds).not.toContain('r-bksp-removal');
+    expect(result.storeSlotIds).toHaveLength(0);
+    expect(result.blocked).toHaveLength(0);
+    expect(result.descriptors).toHaveLength(0);
+  });
+
+  it('a normal (non-backspace) rule for the same char IS still attributed', () => {
+    const bkspRule = makeRule('r-bksp-removal',
+      [{ kind: 'char', value: 'é' }, { kind: 'vkey', name: 'K_BKSP', modifiers: [] }],
+      [{ kind: 'char', value: 'e' }],
+    );
+    const normalRule = makeRule('r-normal',
+      [{ kind: 'vkey', name: 'K_E', modifiers: [] }],
+      [{ kind: 'char', value: 'e' }],
+    );
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [bkspRule, normalRule] }],
+    });
+    const result = collectCharContributors(ir, 'e');
+    expect(result.ruleNodeIds).not.toContain('r-bksp-removal');
+    expect(result.ruleNodeIds).toContain('r-normal');
+  });
+
+  it('K_BKSP anywhere in a multi-element context still skips the whole rule', () => {
+    // Backspace appearing as a LATER context element (not just first) must
+    // still be caught — the check scans the whole context, not just [0].
+    const rule = makeRule('r-bksp-mid',
+      [{ kind: 'vkey', name: 'K_BKSP', modifiers: [] }, { kind: 'char', value: 'x' }],
+      [{ kind: 'char', value: 'y' }],
+    );
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'y');
+    expect(result.ruleNodeIds).toHaveLength(0);
+    expect(result.descriptors).toHaveLength(0);
+  });
+
   it('S-02 fan-out: finds the matching slot in the output store (not the trigger rule)', () => {
     const ir = makeCameroonIR();
     // ε is at index 2 of dkt003b
@@ -319,7 +366,11 @@ describe('collectCharContributors', () => {
     expect(result.ruleNodeIds).toHaveLength(0);
   });
 
-  it('finds an INPUT-store occurrence even when the same rule\'s output is unrelated (composed-shaped: any(composed) + [K_BKSP] > index(comp-dia,1))', () => {
+  it('a diacritic-removal rule (composed-shaped: any(composed) + [K_BKSP] > index(comp-dia,1)) is skipped entirely, not just its store slot', () => {
+    // Updated for the backspace-input filter: this rule's context contains
+    // K_BKSP (type à, then backspace -> a), so the WHOLE rule is now dropped
+    // — it previously surfaced an INPUT-store slot for "à" here, which is
+    // exactly the "correction" method the filter exists to hide.
     const composed = makeStore('sid-composed', 'composed', [
       { kind: 'char', value: 'à' }, { kind: 'char', value: 'é' },
     ]);
@@ -339,7 +390,9 @@ describe('collectCharContributors', () => {
       groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
     });
     const result = collectCharContributors(ir, 'à');
-    expect(result.storeSlotIds).toContain('sid-composed#0');
+    expect(result.storeSlotIds).not.toContain('sid-composed#0');
+    expect(result.storeSlotIds).toHaveLength(0);
+    expect(result.descriptors).toHaveLength(0);
   });
 
   it('returns the targetChar NFC-normalized', () => {
@@ -761,12 +814,34 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     ]);
   });
 
-  it('kind "store-slot": an aligned any()-consumed store item that is a vkey (not char) surfaces inputKeystroke, not inputChar', () => {
-    // The aligned store item is {kind:'vkey'} rather than {kind:'char'} — a
-    // store of triggering keys rather than literal input chars.
-    // buildContextInputSequence's own any()-token resolution only renders a
-    // char item, so inputSequence is absent here (isolating inputKeystroke).
+  it('kind "store-slot": an aligned any()-consumed store item that resolves to backspace (K_BKSP) is NOT attributed', () => {
+    // The aligned store item is {kind:'vkey', name:'K_BKSP'} — the char is
+    // only reachable through pressing Backspace, not typed directly in the
+    // rule's context. Widened backspace filter (module doc, contributorInputHasBackspace):
+    // a store-slot contributor must be dropped when backspace is reachable
+    // via ANY input path, not just a direct context vkey. Was previously
+    // attributed with `inputKeystroke: 'Backspace'`; now dropped entirely.
     const keys = makeStore('sid-keys', 'keys', [{ kind: 'vkey', name: 'K_BKSP' }]);
+    const tbl = makeStore('sid-tbl', 'tbl2', [{ kind: 'char', value: 'a' }]);
+    const rule = makeRule('r-tbl2',
+      [{ kind: 'any', storeRef: 'keys' }],
+      [{ kind: 'index', storeRef: 'tbl2', offset: 1 }],
+    );
+    const ir = makeIR({
+      stores: [keys, tbl],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'a');
+    expect(result.storeSlotIds).toHaveLength(0);
+    expect(result.descriptors).toHaveLength(0);
+  });
+
+  it('kind "store-slot": a NON-backspace aligned any()-consumed vkey item is still attributed (widening is not over-broad)', () => {
+    // Same shape as the dropped case above, but the aligned store item is a
+    // different vkey (K_SPACE) — must still surface `inputKeystroke`, proving
+    // the widened filter targets backspace specifically, not every vkey-typed
+    // aligned item.
+    const keys = makeStore('sid-keys', 'keys', [{ kind: 'vkey', name: 'K_SPACE' }]);
     const tbl = makeStore('sid-tbl', 'tbl2', [{ kind: 'char', value: 'a' }]);
     const rule = makeRule('r-tbl2',
       [{ kind: 'any', storeRef: 'keys' }],
@@ -781,7 +856,7 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       {
         kind: 'store-slot',
         producedChar: 'a',
-        inputKeystroke: 'Backspace',
+        inputKeystroke: 'Space',
       },
     ]);
   });

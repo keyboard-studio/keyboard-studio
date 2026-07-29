@@ -3552,9 +3552,11 @@ export function MechanismGallery({
                   currentChar (desktop "delete each pre-existing method").
                   Deletable rows share the exact "click deletes / turns red
                   on hover" chip both the "Added" row and the full carve
-                  gallery use; not-removable / opaque producers render as a
-                  muted, non-interactive chip naming why, never silently
-                  hidden. See existingMethods/handleRemoveExistingMethod
+                  gallery use; every non-deletable row (blocked/opaque/
+                  multi-char AND composition/unattributed) renders as the
+                  same blue, non-interactive chip naming why, never silently
+                  hidden — the palette is exactly green = deletable, blue =
+                  not deletable. See existingMethods/handleRemoveExistingMethod
                   above for how rows are built and removed. */}
             {currentChar !== null && existingMethods.length > 0 && (
               <div>
@@ -3616,13 +3618,14 @@ export function MechanismGallery({
                           {" ×"}
                         </span>
                       </HoverDangerChip>
-                    ) : row.kind === "composition" ||
-                      row.kind === "unattributed" ? (
-                      // Blue, non-deletable, informational — same palette as
-                      // the "Sequences" chip row (RemovableChipRow's
-                      // hoverDanger={false} blue), distinct from both the
-                      // green deletable chip above and the grey/muted
-                      // not-removable chip below.
+                    ) : (
+                      // Blue, non-deletable, informational — every
+                      // non-deletable row (composition/unattributed AND
+                      // blocked/opaque/multi-char/not-removable) shares this
+                      // one style, same palette as the "Sequences" chip row
+                      // (RemovableChipRow's hoverDanger={false} blue). The
+                      // palette is exactly two colors: green = deletable,
+                      // blue = not deletable — no separate grey/muted branch.
                       <span
                         key={row.id}
                         {...(row.reason !== undefined
@@ -3636,27 +3639,6 @@ export function MechanismGallery({
                           border: "1px solid #58a6ff",
                           borderRadius: 12,
                           color: "#58a6ff",
-                          fontSize: 11,
-                          fontFamily:
-                            "ui-monospace, 'Cascadia Code', Consolas, monospace",
-                        }}
-                      >
-                        {row.label}
-                      </span>
-                    ) : (
-                      <span
-                        key={row.id}
-                        {...(row.reason !== undefined
-                          ? { title: row.reason }
-                          : {})}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          padding: "3px 8px",
-                          background: "#161b22",
-                          border: `1px solid ${BORDER}`,
-                          borderRadius: 12,
-                          color: TEXT_DIM,
                           fontSize: 11,
                           fontFamily:
                             "ui-monospace, 'Cascadia Code', Consolas, monospace",
