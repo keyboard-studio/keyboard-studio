@@ -66,6 +66,8 @@ export type { PropagateDesktopLayersToTouchResult } from "./propagateDesktopLaye
 export { collectCharContributors } from "./collectCharContributors.js";
 export type { CharContributors, ContributorDescriptor } from "./collectCharContributors.js";
 
+export { collectCompositionMethod } from "./collectCompositionMethod.js";
+
 export {
   isMnemonicLayout,
   keyHasCapsHandling,

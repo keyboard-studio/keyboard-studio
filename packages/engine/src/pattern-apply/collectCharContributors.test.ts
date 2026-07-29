@@ -167,12 +167,16 @@ describe('collectCharContributors', () => {
     expect(result.blocked).toHaveLength(0);
   });
 
-  it('opaque RawKmnFragment producing target char (output side of `>`) goes to blocked', () => {
+  it('opaque RawKmnFragment producing target char (via producedOutput sketch) goes to blocked', () => {
+    // The blocked check walks `producedOutput` structurally (same element-walk
+    // buildProducedSet uses) rather than scanning `sourceText` — see
+    // collectCharContributors.ts's opaque-fragment doc comment.
     const ir = makeIR({
       raw: [{
         nodeId: 'frag-1',
         origin: 'imported',
         sourceText: '+ [K_E] > ε',
+        producedOutput: [{ kind: 'char', value: 'ε' }],
         reason: 'call/return',
       }],
     });
@@ -180,14 +184,16 @@ describe('collectCharContributors', () => {
     expect(result.blocked.some((b) => b.reason.includes('Opaque fragment'))).toBe(true);
   });
 
-  it('opaque RawKmnFragment mentioning target only on the INPUT side is NOT blocked', () => {
-    // The char appears before `>` (a match target), not as output — the fragment
-    // does not produce it, so it must not raise a false "cannot remove" warning.
+  it('opaque RawKmnFragment whose producedOutput does NOT include the target is NOT blocked', () => {
+    // The char appears before `>` in sourceText (a match target), not as
+    // output — producedOutput (output-side only, per its own doc comment)
+    // correctly excludes it, so no false "cannot remove" warning.
     const ir = makeIR({
       raw: [{
         nodeId: 'frag-1',
         origin: 'imported',
         sourceText: 'ε + [K_A] > "x"',
+        producedOutput: [{ kind: 'char', value: 'x' }],
         reason: 'call/return',
       }],
     });
@@ -195,7 +201,38 @@ describe('collectCharContributors', () => {
     expect(result.blocked).toHaveLength(0);
   });
 
-  it('opaque RawKmnFragment NOT containing target char is not in blocked', () => {
+  it('opaque RawKmnFragment with a STORE-BACKED producedOutput (index() ref) goes to blocked, not silently unattributed', () => {
+    // Mirrors producedSet.test.ts's bj_cree_woods regression shape: the
+    // fragment's producedOutput sketch is an index() reference into a typed
+    // store (never a bare {kind:"char"}), resolved via collectFromElements
+    // exactly as buildProducedSet resolves it — isolates the store-lookup path
+    // (storeMap keyed by store NAME) rather than the trivial literal-char case
+    // already covered above.
+    const store = makeStore('sid-efc', 'C_efc', [
+      { kind: 'char', value: 'ᐌ' },
+      { kind: 'char', value: 'ᐐ' },
+      { kind: 'char', value: 'ᐔ' },
+    ]);
+    const ir = makeIR({
+      stores: [store],
+      raw: [{
+        nodeId: 'frag-1',
+        origin: 'imported',
+        sourceText: "if(opt = '') + [K_A] > index(C_efc,3)",
+        producedOutput: [{ kind: 'index', storeRef: 'C_efc', offset: 3 }],
+        reason: 'if-option-store',
+      }],
+    });
+    const result = collectCharContributors(ir, 'ᐔ');
+    expect(result.blocked.some((b) => b.reason.includes('Opaque fragment'))).toBe(true);
+    expect(result.descriptors).toContainEqual({
+      kind: 'blocked',
+      producedChar: 'ᐔ',
+      blockedReasonCode: 'opaque-fragment',
+    });
+  });
+
+  it('opaque RawKmnFragment with no producedOutput sketch is not in blocked (no fabricated attribution)', () => {
     const ir = makeIR({
       raw: [{
         nodeId: 'frag-1',
@@ -687,7 +724,9 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
         producedChar: 'ɛ',
         storeDisplayName: 'Alphabet Table',
         // 'ɛ' is at slot 1 of 'kAlphabetTable'; the rule's any()-consumed
-        // 'keys' store at the SAME slot 1 is 'e' — the aligned input char.
+        // 'keys' store at the SAME slot 1 is 'e' — the aligned input char,
+        // surfaced both as the full inputSequence AND the typed inputChar.
+        inputChar: 'e',
         inputSequence: ['e'],
         output: 'ɛ',
       },
@@ -715,8 +754,34 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
         // 'a' is at slot 0 of 'tbl2'; the rule's any()-consumed 'keys' store
         // at the SAME slot 0 is 'z' — the aligned input char, even though the
         // store's own name couldn't be humanized.
+        inputChar: 'z',
         inputSequence: ['z'],
         output: 'a',
+      },
+    ]);
+  });
+
+  it('kind "store-slot": an aligned any()-consumed store item that is a vkey (not char) surfaces inputKeystroke, not inputChar', () => {
+    // The aligned store item is {kind:'vkey'} rather than {kind:'char'} — a
+    // store of triggering keys rather than literal input chars.
+    // buildContextInputSequence's own any()-token resolution only renders a
+    // char item, so inputSequence is absent here (isolating inputKeystroke).
+    const keys = makeStore('sid-keys', 'keys', [{ kind: 'vkey', name: 'K_BKSP' }]);
+    const tbl = makeStore('sid-tbl', 'tbl2', [{ kind: 'char', value: 'a' }]);
+    const rule = makeRule('r-tbl2',
+      [{ kind: 'any', storeRef: 'keys' }],
+      [{ kind: 'index', storeRef: 'tbl2', offset: 1 }],
+    );
+    const ir = makeIR({
+      stores: [keys, tbl],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'a');
+    expect(result.descriptors).toEqual([
+      {
+        kind: 'store-slot',
+        producedChar: 'a',
+        inputKeystroke: 'Backspace',
       },
     ]);
   });
@@ -727,6 +792,7 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
         nodeId: 'frag-1',
         origin: 'imported',
         sourceText: '+ [K_E] > ε',
+        producedOutput: [{ kind: 'char', value: 'ε' }],
         reason: 'call/return',
       }],
     });

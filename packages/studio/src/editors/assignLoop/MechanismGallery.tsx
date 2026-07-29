@@ -64,6 +64,7 @@ import type {
 import {
   toUPlusNotation,
   isDecomposableAccented,
+  buildProducedSet,
 } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
@@ -83,6 +84,7 @@ import {
   comboToKeySpec,
   collectModifierTokensInUse,
   collectCharContributors,
+  collectCompositionMethod,
   type ModifierToken,
   type CharContributors,
 } from "@keyboard-studio/engine";
@@ -114,7 +116,10 @@ import {
   type CasePairProposal,
 } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
-import { composeContributorLabel } from "./existingMethodLabels.ts";
+import {
+  composeContributorLabel,
+  compositionTooltip,
+} from "./existingMethodLabels.ts";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
@@ -1435,6 +1440,18 @@ export function MechanismGallery({
     [alreadyProduced],
   );
 
+  // The BASE (pre-augmentWithComposable) produced set — same derivation
+  // useInventoryDiff() itself starts from before augmenting, NOT
+  // alreadyProducedSet above (which is already augmented — the composable
+  // membership test the badge uses). Feeds collectCompositionMethod below:
+  // composition must stay strictly ONE level, so it needs the un-augmented
+  // set to decide "is this composable from what's DIRECTLY produced", never
+  // "from what's already-composable".
+  const baseProducedSet = useMemo(
+    () => (baseIr !== null ? buildProducedSet(baseIr) : new Set<string>()),
+    [baseIr],
+  );
+
   // Spec 046 worklist filter (FR-020): a composed unit whose marks are ALL
   // productive mark keys is reachable via base key + mark key — it needs no
   // whole-unit placement of its own, so it leaves the walk. Everything else
@@ -2646,7 +2663,7 @@ export function MechanismGallery({
     id: string;
     label: string;
     deletable: boolean;
-    kind: "rule" | "slot" | "blocked";
+    kind: "rule" | "slot" | "blocked" | "composition" | "unattributed";
     reason?: string;
   }
 
@@ -2735,6 +2752,52 @@ export function MechanismGallery({
       });
     });
 
+    // SHOW-ALL composition row (spec follow-up): currentChar isn't directly
+    // produced by the base (no real method row above covers it), but IS
+    // composable from characters the base DOES directly produce — synthesize
+    // one blue, non-deletable informational row via the SAME
+    // composeContributorLabel composer every other kind goes through.
+    // baseProducedSet is the PRE-augmentation set (see its own doc comment) —
+    // composition stays strictly one level, never chained off an
+    // already-composable char.
+    if (currentChar !== null) {
+      const compositionDescriptor = collectCompositionMethod(
+        baseProducedSet,
+        currentChar,
+      );
+      if (compositionDescriptor !== undefined) {
+        rows.push({
+          id: `composition:${currentChar}`,
+          label: composeContributorLabel(compositionDescriptor, i18n),
+          deletable: false,
+          kind: "composition",
+          reason: compositionTooltip(compositionDescriptor, i18n),
+        });
+      }
+    }
+
+    // SHOW-ALL floor (criterion 18.6-adjacent invariant): currentChar is
+    // GREEN (a member of the augmented alreadyProducedSet the CharScrollStrip
+    // badge uses) but, after everything above, still has zero rows — an
+    // unrecognized-shape producer collectCharContributors couldn't attribute
+    // at all. Append one truthful, no-arrow floor row rather than leave the
+    // section empty under a green badge.
+    if (
+      currentChar !== null &&
+      rows.length === 0 &&
+      alreadyProducedSet.has(currentChar)
+    ) {
+      rows.push({
+        id: `unattributed:${currentChar}`,
+        label: composeContributorLabel(
+          { kind: "unattributed", producedChar: currentChar },
+          i18n,
+        ),
+        deletable: false,
+        kind: "unattributed",
+      });
+    }
+
     return rows;
     // deletedItemIds is an intentional dep even though only isItemDeleted is
     // called in the body — see the store-selector comment above.
@@ -2745,6 +2808,9 @@ export function MechanismGallery({
     isItemDeleted,
     deletedItemIds,
     i18n,
+    currentChar,
+    baseProducedSet,
+    alreadyProducedSet,
   ]);
 
   const handleRemoveExistingMethod = useCallback(
@@ -3550,6 +3616,33 @@ export function MechanismGallery({
                           {" ×"}
                         </span>
                       </HoverDangerChip>
+                    ) : row.kind === "composition" ||
+                      row.kind === "unattributed" ? (
+                      // Blue, non-deletable, informational — same palette as
+                      // the "Sequences" chip row (RemovableChipRow's
+                      // hoverDanger={false} blue), distinct from both the
+                      // green deletable chip above and the grey/muted
+                      // not-removable chip below.
+                      <span
+                        key={row.id}
+                        {...(row.reason !== undefined
+                          ? { title: row.reason }
+                          : {})}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          padding: "3px 8px",
+                          background: "#1c2a3a",
+                          border: "1px solid #58a6ff",
+                          borderRadius: 12,
+                          color: "#58a6ff",
+                          fontSize: 11,
+                          fontFamily:
+                            "ui-monospace, 'Cascadia Code', Consolas, monospace",
+                        }}
+                      >
+                        {row.label}
+                      </span>
                     ) : (
                       <span
                         key={row.id}

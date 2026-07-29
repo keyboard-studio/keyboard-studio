@@ -111,8 +111,15 @@ function expandStore(store: IRStore, collector: Set<string>, includeSpace: boole
  * Walk one output-element sequence (a typed rule's output or an opaque
  * fragment's producedOutput sketch), accumulating produced glyphs into the
  * collector with run-merge NFC semantics and store resolution.
+ *
+ * Exported (beyond this module's own `buildProducedSet` use) so a caller that
+ * needs to test a SINGLE output-element sequence in isolation — e.g. the
+ * engine's `collectCharContributors`, checking whether one opaque fragment's
+ * `producedOutput` sketch actually produces one target character — can reuse
+ * the exact same run-merge + store-resolution walk rather than re-deriving a
+ * second copy.
  */
-function collectFromElements(
+export function collectFromElements(
   output: readonly OutputElement[],
   storeMap: Map<string, IRStore>,
   collector: Set<string>,

@@ -56,7 +56,7 @@ import { installDialogShim } from "../../test/dialogShim.ts";
 // vi.hoisted() — variables referenced inside vi.mock() factory closures.
 // ---------------------------------------------------------------------------
 
-const { applyAssignmentsToVfsSpy } = vi.hoisted(() => {
+const { applyAssignmentsToVfsSpy, collectCharContributorsSpy } = vi.hoisted(() => {
   const applyAssignmentsToVfsSpy = vi.fn(
     (
       _vfs: VirtualFS,
@@ -68,7 +68,13 @@ const { applyAssignmentsToVfsSpy } = vi.hoisted(() => {
       warnings: [] as string[],
     }),
   );
-  return { applyAssignmentsToVfsSpy };
+  // Wraps the REAL collectCharContributors by default (set in the vi.mock
+  // factory below, which has `original` in scope) — every existing test is
+  // unaffected. The SHOW-ALL floor-row test overrides this for one call only
+  // to simulate an unrecognized-shape producer collectCharContributors can't
+  // attribute at all, without needing to construct a real IR edge case for it.
+  const collectCharContributorsSpy = vi.fn();
+  return { applyAssignmentsToVfsSpy, collectCharContributorsSpy };
 });
 
 // ---------------------------------------------------------------------------
@@ -136,7 +142,15 @@ vi.mock("../../hooks/useKeyboardArtifact.ts", () => ({
 
 vi.mock("@keyboard-studio/engine", async (importOriginal) => {
   const original = await importOriginal<typeof import("@keyboard-studio/engine")>();
-  return { ...original, applyAssignmentsToVfs: applyAssignmentsToVfsSpy };
+  collectCharContributorsSpy.mockImplementation(
+    (ir: Parameters<typeof original.collectCharContributors>[0], ch: string) =>
+      original.collectCharContributors(ir, ch),
+  );
+  return {
+    ...original,
+    applyAssignmentsToVfs: applyAssignmentsToVfsSpy,
+    collectCharContributors: collectCharContributorsSpy,
+  };
 });
 
 // ---------------------------------------------------------------------------
@@ -1139,6 +1153,111 @@ describe("MechanismGallery — already-produced section", () => {
     expect(
       screen.queryByRole("button", { name: /characters already covered/i }),
     ).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// "Existing methods" SHOW-ALL — composition row + unattributed floor
+// (spec follow-up: every green-badged character must render >= 1 row).
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — Existing methods SHOW-ALL (composition + floor)", () => {
+  it("a composable-but-not-directly-produced char (base + combining mark both produced) shows a blue composition row", async () => {
+    // 'U' and combining circumflex accent (U+0302) are each directly produced
+    // by their own rule; precomposed 'Û' (U+00DB) is produced by neither —
+    // only reachable via NFD composition of the two.
+    const ruleU: IRRule = {
+      nodeId: "r-U",
+      context: [{ kind: "vkey", name: "K_U", modifiers: [] }],
+      output: [{ kind: "char", value: "U" }],
+    };
+    const ruleCircumflex: IRRule = {
+      nodeId: "r-circumflex",
+      context: [{ kind: "vkey", name: "K_6", modifiers: ["SHIFT"] }],
+      output: [{ kind: "char", value: "̂" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [ruleU, ruleCircumflex],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+
+    // "z" stays in lettersToAdd (not produced at all); "Û" is composable, so
+    // useInventoryDiff folds it into alreadyProduced (green badge) even
+    // though the base never literally produces it.
+    seedInventory(["z", "Û"]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // Jump to "Û" via its char-scroll-strip chip (U+00DB) — reachable even
+    // though it's outside lettersToAdd's positional walk (handleSelectDisplayChar
+    // jumps to any confirmedInventory member for inspection).
+    fireEvent.click(screen.getByTestId("char-scroll-chip-00DB"));
+
+    await waitFor(() => {
+      expect(screen.getByText("U + ◌̂ → Û")).toBeTruthy();
+    });
+  });
+
+  it("a green char (directly produced) with zero enumerable methods shows the unattributed floor row", async () => {
+    const ruleZ: IRRule = {
+      nodeId: "r-z",
+      context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [ruleZ],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+
+    // "y" stays in lettersToAdd (starting currentChar); "z" is directly
+    // produced (green) via ruleZ above.
+    seedInventory(["y", "z"]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // Override collectCharContributors for exactly the NEXT call (currentChar
+    // switching to "z" below) — simulates an unrecognized-shape producer that
+    // genuinely can't be attributed, while "z" stays green (buildProducedSet,
+    // unmocked, still finds it via ruleZ).
+    collectCharContributorsSpy.mockImplementationOnce(() => ({
+      targetChar: "z",
+      ruleNodeIds: [],
+      storeSlotIds: [],
+      storeSlots: [],
+      locations: [],
+      blocked: [],
+      descriptors: [],
+    }));
+
+    fireEvent.click(screen.getByTestId("char-scroll-chip-007A"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Your keyboard already produces this character."),
+      ).toBeTruthy();
+    });
   });
 });
 

@@ -149,12 +149,37 @@ export function composeContributorLabel(
             }),
           );
     case "store-slot":
+      // Priority: a typed single-token input (inputChar/inputKeystroke — the
+      // aligned any()-consumed store item, mutually exclusive) reads more
+      // plainly than the table-name phrasing, so it's preferred whenever the
+      // engine resolved one; storeDisplayName is the next-best fallback, and
+      // "Also produces" is the last resort. (The FULL inputSequence->output
+      // literal path, when resolvable, is handled above this switch and never
+      // reaches here.)
+      if (descriptor.inputChar !== undefined) {
+        return resolveMessage(
+          i18n,
+          msg({
+            id: "editor.assignLoop.existingMethod.desktop.storeSlotInputChar",
+            message: `Type ${{ inputChar: descriptor.inputChar }} → ${{ char }}`,
+          }),
+        );
+      }
+      if (descriptor.inputKeystroke !== undefined) {
+        return resolveMessage(
+          i18n,
+          msg({
+            id: "editor.assignLoop.existingMethod.desktop.storeSlotInputKeystroke",
+            message: `Press ${{ inputKeystroke: descriptor.inputKeystroke }} → ${{ char }}`,
+          }),
+        );
+      }
       return descriptor.storeDisplayName !== undefined
         ? resolveMessage(
             i18n,
             msg({
               id: "editor.assignLoop.existingMethod.desktop.storeSlot",
-              message: `Produced from the ${{ storeDisplayName: descriptor.storeDisplayName }} table → ${{ char }}`,
+              message: `One of your ${{ storeDisplayName: descriptor.storeDisplayName }} keys → ${{ char }}`,
             }),
           )
         : resolveMessage(
@@ -172,12 +197,64 @@ export function composeContributorLabel(
           message: `Bundled with other output — can't remove ${{ char }} alone`,
         }),
       );
+    case "composition": {
+      // Synthesized (never engine-produced from collectCharContributors) —
+      // see collectCompositionMethod. `components` is always populated by
+      // that function; the `?? []` default is defense-in-depth only.
+      const connector = resolveMessage(
+        i18n,
+        msg({
+          id: "editor.assignLoop.existingMethod.composition.connector",
+          message: " + ",
+        }),
+      );
+      const sequence = (descriptor.components ?? [])
+        .map((c) => displayChar(c))
+        .join(connector);
+      return resolveMessage(
+        i18n,
+        msg({
+          id: "editor.assignLoop.existingMethod.composition.label",
+          message: `${{ sequence }} → ${{ char }}`,
+        }),
+      );
+    }
+    case "unattributed":
+      // No arrow, no fabricated keystroke — this row exists only to satisfy
+      // the SHOW-ALL floor for a green-badged char no other row covers.
+      return resolveMessage(
+        i18n,
+        msg({
+          id: "editor.assignLoop.existingMethod.unattributed",
+          message: "Your keyboard already produces this character.",
+        }),
+      );
     default: {
       // Exhaustiveness guard: a new descriptor `kind` must be handled above.
       const _exhaustive: never = descriptor.kind;
       return `${char}${String(_exhaustive)}`;
     }
   }
+}
+
+/**
+ * Tooltip for a `kind: "composition"` row's non-deletable chip — explains
+ * WHY there's no single rule to remove (there is no rule at all; the row is
+ * synthesized from two-or-more separately-produced characters). Mirrors
+ * `touchMethodNonDeletableReason`'s "reason string for a muted chip" shape.
+ */
+export function compositionTooltip(
+  descriptor: Pick<ContributorDescriptor, "producedChar">,
+  i18n?: I18n,
+): string {
+  const char = displayChar(descriptor.producedChar);
+  return resolveMessage(
+    i18n,
+    msg({
+      id: "editor.assignLoop.existingMethod.composition.tooltip",
+      message: `${{ char }} is formed from its base plus combining mark(s); there is no single rule to remove.`,
+    }),
+  );
 }
 
 // ---------------------------------------------------------------------------

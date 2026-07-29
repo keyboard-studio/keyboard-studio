@@ -16,6 +16,7 @@ import type {
 import {
   composeContributorLabel,
   composeTouchMethodLabel,
+  compositionTooltip,
 } from "./existingMethodLabels.ts";
 
 describe("composeContributorLabel", () => {
@@ -79,14 +80,14 @@ describe("composeContributorLabel", () => {
     );
   });
 
-  it("fallback: kind \"store-slot\" with a storeDisplayName -> \"Produced from the ... table -> ...\"", () => {
+  it("fallback: kind \"store-slot\" with a storeDisplayName -> \"One of your ... keys -> ...\"", () => {
     const descriptor: ContributorDescriptor = {
       kind: "store-slot",
       producedChar: "ɛ",
       storeDisplayName: "Alphabet Table",
     };
     expect(composeContributorLabel(descriptor)).toBe(
-      "Produced from the Alphabet Table table → ɛ",
+      "One of your Alphabet Table keys → ɛ",
     );
   });
 
@@ -96,6 +97,54 @@ describe("composeContributorLabel", () => {
       producedChar: "a",
     };
     expect(composeContributorLabel(descriptor)).toBe("Also produces a");
+  });
+
+  it("kind \"store-slot\" with inputChar -> \"Type ... -> ...\" (preferred over storeDisplayName)", () => {
+    const descriptor: ContributorDescriptor = {
+      kind: "store-slot",
+      producedChar: "ɛ",
+      storeDisplayName: "Alphabet Table",
+      inputChar: "e",
+    };
+    expect(composeContributorLabel(descriptor)).toBe("Type e → ɛ");
+  });
+
+  it("kind \"store-slot\" with inputKeystroke -> \"Press ... -> ...\" (preferred over storeDisplayName)", () => {
+    const descriptor: ContributorDescriptor = {
+      kind: "store-slot",
+      producedChar: "a",
+      storeDisplayName: "Keys",
+      inputKeystroke: "Backspace",
+    };
+    expect(composeContributorLabel(descriptor)).toBe("Press Backspace → a");
+  });
+
+  it("kind \"composition\" joins components with \" + \" -> \"U + ◌̂ -> Û\"", () => {
+    const descriptor: ContributorDescriptor = {
+      kind: "composition",
+      producedChar: "Û",
+      components: ["U", "̂"],
+    };
+    expect(composeContributorLabel(descriptor)).toBe("U + ◌̂ → Û");
+  });
+
+  it("kind \"composition\" with 3 components -> \"E + ◌̣ + ◌̂ -> Ệ\"", () => {
+    const descriptor: ContributorDescriptor = {
+      kind: "composition",
+      producedChar: "Ệ",
+      components: ["E", "̣", "̂"],
+    };
+    expect(composeContributorLabel(descriptor)).toBe("E + ◌̣ + ◌̂ → Ệ");
+  });
+
+  it("kind \"unattributed\" -> the truthful no-arrow floor sentence", () => {
+    const descriptor: ContributorDescriptor = {
+      kind: "unattributed",
+      producedChar: "a",
+    };
+    expect(composeContributorLabel(descriptor)).toBe(
+      "Your keyboard already produces this character.",
+    );
   });
 
   it("fallback: kind \"blocked\" -> the bundled-output message", () => {
@@ -182,6 +231,14 @@ describe("composeTouchMethodLabel", () => {
     };
     expect(composeTouchMethodLabel(method, [method])).toBe(
       "Tap [A] → a (phone, Shift)",
+    );
+  });
+});
+
+describe("compositionTooltip", () => {
+  it("names the produced char in the explanation sentence", () => {
+    expect(compositionTooltip({ producedChar: "Û" })).toBe(
+      "Û is formed from its base plus combining mark(s); there is no single rule to remove.",
     );
   });
 });

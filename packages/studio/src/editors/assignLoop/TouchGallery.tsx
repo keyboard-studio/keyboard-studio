@@ -76,6 +76,7 @@ import {
   toUPlusNotation,
   isDecomposableAccented,
   formatUncoveredTouchMessage,
+  computeTouchCoverage,
 } from "@keyboard-studio/contracts";
 import type { DesktopModifications } from "@keyboard-studio/engine";
 import {
@@ -85,6 +86,7 @@ import {
   enumerateTouchMethodsForChar,
   applyTouchKeycapRemovalsToLayout,
   applyTouchKeycapRemovalsToRawJson,
+  collectCompositionMethod,
 } from "@keyboard-studio/engine";
 import type { TouchMethodDescriptor } from "@keyboard-studio/engine";
 import {
@@ -113,6 +115,8 @@ import { displayChar } from "../../lib/irToCarveNodes.ts";
 import {
   composeTouchMethodLabel,
   touchMethodNonDeletableReason,
+  composeContributorLabel,
+  compositionTooltip,
 } from "./existingMethodLabels.ts";
 import { isMutateSeamEnabled } from "../../flags/mutateFlag.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
@@ -1266,6 +1270,30 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detectionSeedLayout, inventoryKey]);
 
+  // The BASE (pre-augmentWithComposable) touch-covered set — the direct-
+  // reachability half of touchCoverage's own two-step traversal
+  // (computeTouchCoverage, then augmentWithComposable — see engine's
+  // touchCoverage.ts), computed directly against the SAME detectionSeedLayout
+  // `detectedChars` above already uses. Feeds collectCompositionMethod below:
+  // composition must stay strictly ONE level, so it needs the un-augmented
+  // set, never `detectedChars` itself (which IS already augmented).
+  const baseTouchCoveredSet = useMemo<Set<string>>(() => {
+    if (detectionSeedLayout === null) return new Set<string>();
+    try {
+      const { uncovered } = computeTouchCoverage(detectionSeedLayout, inventory);
+      const uncoveredSet = new Set(uncovered);
+      return new Set(
+        inventory
+          .filter((c) => !uncoveredSet.has(c))
+          .map((c) => c.normalize("NFC")),
+      );
+    } catch (err) {
+      devLog.error("[TouchGallery] baseTouchCoveredSet coverage failed", err);
+      return new Set<string>();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detectionSeedLayout, inventoryKey]);
+
   // "Existing methods" for currentChar — every pre-existing touch method
   // (main key / longpress / multitap / flick) in the BASE touch layout that
   // STILL produces currentChar, mirroring MechanismGallery's desktop
@@ -1322,13 +1350,86 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     return enumerateTouchMethodsForChar(rawDetectionSeedLayout, currentChar);
   }, [rawDetectionSeedLayout, currentChar]);
 
-  const handleRemoveExistingTouchMethod = useCallback(
-    (method: TouchMethodDescriptor) => {
-      if (!method.deletable) return;
-      deleteTouchKey(method.id);
-    },
-    [deleteTouchKey],
-  );
+  // Unified "Existing methods" row list (SHOW-ALL, spec follow-up — mirrors
+  // MechanismGallery's desktop `existingMethods`): every real touch method
+  // above ("touch" kind), PLUS a synthesized composition row when currentChar
+  // isn't directly reachable but IS composable from characters the base
+  // layout directly reaches, PLUS a floor row when currentChar is green
+  // (detectedChars — the augmented set the badge uses) yet still has zero
+  // rows after all of the above. One array so the section's visibility guard
+  // and rendering both key off ONE list rather than three independent
+  // conditions.
+  interface ExistingTouchMethodRow {
+    id: string;
+    label: string;
+    deletable: boolean;
+    kind: "touch" | "composition" | "unattributed";
+    reason?: string;
+  }
+
+  const existingMethodRows = useMemo<ExistingTouchMethodRow[]>(() => {
+    const rows: ExistingTouchMethodRow[] = existingTouchMethods.map(
+      (method) => {
+        const nonDeletableReason = touchMethodNonDeletableReason(method, i18n);
+        return {
+          id: method.id,
+          label: composeTouchMethodLabel(method, allTouchMethodsForChar, i18n),
+          deletable: method.deletable,
+          kind: "touch",
+          ...(nonDeletableReason !== undefined
+            ? { reason: nonDeletableReason }
+            : {}),
+        };
+      },
+    );
+
+    // SHOW-ALL composition row — baseTouchCoveredSet is the PRE-augmentation
+    // set (see its own doc comment above): composition stays strictly one
+    // level, never chained off an already-composable char.
+    if (currentChar !== null) {
+      const compositionDescriptor = collectCompositionMethod(
+        baseTouchCoveredSet,
+        currentChar,
+      );
+      if (compositionDescriptor !== undefined) {
+        rows.push({
+          id: `composition:${currentChar}`,
+          label: composeContributorLabel(compositionDescriptor, i18n),
+          deletable: false,
+          kind: "composition",
+          reason: compositionTooltip(compositionDescriptor, i18n),
+        });
+      }
+    }
+
+    // SHOW-ALL floor — currentChar is GREEN (detectedChars, the augmented set
+    // the CharScrollStrip badge uses) but still has zero rows after
+    // everything above.
+    if (
+      currentChar !== null &&
+      rows.length === 0 &&
+      detectedChars.has(currentChar)
+    ) {
+      rows.push({
+        id: `unattributed:${currentChar}`,
+        label: composeContributorLabel(
+          { kind: "unattributed", producedChar: currentChar },
+          i18n,
+        ),
+        deletable: false,
+        kind: "unattributed",
+      });
+    }
+
+    return rows;
+  }, [
+    existingTouchMethods,
+    allTouchMethodsForChar,
+    i18n,
+    currentChar,
+    baseTouchCoveredSet,
+    detectedChars,
+  ]);
 
   // Restore affordance (FIX: deleteTouchKey was previously one-way in the UI
   // — the store's restoreTouchKey/isTouchKeyDeleted pair existed but nothing
@@ -2297,16 +2398,19 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
       {/* Existing methods — the BASE keyboard's own touch-layout producers
             for currentChar (mirrors MechanismGallery's desktop "Existing
-            methods" section). Deletable rows (touch-only: an explicit
-            `output`, a `U_<HEX>` id, or any longpress/multitap/flick
-            sub-entry) share the exact "click deletes / turns red on hover"
-            chip the "Configured" row above uses; desktop-backed main keys
-            (deletable: false — the char still comes from the compiled .kmn
-            rule, not this touch key) render as a muted, non-interactive chip
-            naming why via `title`, never silently hidden. See
-            existingTouchMethods/handleRemoveExistingTouchMethod above for how
-            rows are built and removed. */}
-      {currentChar !== null && existingTouchMethods.length > 0 && (
+            methods" section), PLUS the SHOW-ALL composition/floor rows (spec
+            follow-up). Deletable rows (touch-only: an explicit `output`, a
+            `U_<HEX>` id, or any longpress/multitap/flick sub-entry) share the
+            exact "click deletes / turns red on hover" chip the "Configured"
+            row above uses; desktop-backed main keys (deletable: false — the
+            char still comes from the compiled .kmn rule, not this touch key)
+            render as a muted, non-interactive chip naming why via `title`;
+            a composition/unattributed row renders as a BLUE non-deletable
+            chip (same palette as the "Sequences" row) — never silently
+            hidden. See existingMethodRows above for how rows are built; a
+            deletable row's onClick calls deleteTouchKey(row.id) directly
+            (only "touch"-kind rows are ever deletable). */}
+      {currentChar !== null && existingMethodRows.length > 0 && (
         <div>
           <p
             style={{
@@ -2329,23 +2433,14 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             })}
             style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
           >
-            {existingTouchMethods.map((method) => {
-              const label = composeTouchMethodLabel(
-                method,
-                allTouchMethodsForChar,
-                i18n,
-              );
-              const nonDeletableReason = touchMethodNonDeletableReason(
-                method,
-                i18n,
-              );
-              return method.deletable ? (
+            {existingMethodRows.map((row) =>
+              row.deletable ? (
                 <HoverDangerChip
-                  key={method.id}
-                  onClick={() => handleRemoveExistingTouchMethod(method)}
+                  key={row.id}
+                  onClick={() => deleteTouchKey(row.id)}
                   ariaLabel={t({
                     id: "editor.assignLoop.touch.removeExistingMethodAriaLabel",
-                    message: `Remove existing touch method ${{ label }} for ${{ notation: toUPlusNotation(currentChar) }}`,
+                    message: `Remove existing touch method ${{ label: row.label }} for ${{ notation: toUPlusNotation(currentChar) }}`,
                   })}
                   title={t({
                     id: "editor.assignLoop.clickToRemove",
@@ -2366,7 +2461,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                     cursor: "pointer",
                   }}
                 >
-                  {label}
+                  {row.label}
                   <span
                     aria-hidden="true"
                     style={{ fontSize: 10, color: "inherit", opacity: 0.7 }}
@@ -2374,12 +2469,29 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                     {" ×"}
                   </span>
                 </HoverDangerChip>
+              ) : row.kind === "composition" || row.kind === "unattributed" ? (
+                <span
+                  key={row.id}
+                  {...(row.reason !== undefined ? { title: row.reason } : {})}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    padding: "3px 8px",
+                    background: "#1c2a3a",
+                    border: "1px solid #58a6ff",
+                    borderRadius: 12,
+                    color: "#58a6ff",
+                    fontSize: 11,
+                    fontFamily:
+                      "ui-monospace, 'Cascadia Code', Consolas, monospace",
+                  }}
+                >
+                  {row.label}
+                </span>
               ) : (
                 <span
-                  key={method.id}
-                  {...(nonDeletableReason !== undefined
-                    ? { title: nonDeletableReason }
-                    : {})}
+                  key={row.id}
+                  {...(row.reason !== undefined ? { title: row.reason } : {})}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -2393,10 +2505,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                       "ui-monospace, 'Cascadia Code', Consolas, monospace",
                   }}
                 >
-                  {label}
+                  {row.label}
                 </span>
-              );
-            })}
+              ),
+            )}
           </div>
         </div>
       )}

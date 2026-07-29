@@ -38,7 +38,8 @@
  *     deleted; listed in `blocked`.
  */
 
-import type { ContextElement, IRRule, KeyboardIR } from "@keyboard-studio/contracts";
+import type { ContextElement, IRRule, KeyboardIR, StoreItem } from "@keyboard-studio/contracts";
+import { collectFromElements } from "@keyboard-studio/contracts";
 import { isDeadkeyOnlyOutput, isPlusSeparator } from "../shared/rule-shape.js";
 import { makeSlotId } from "./slotId.js";
 
@@ -98,7 +99,17 @@ export interface CharContributors {
  * fields next).
  */
 export interface ContributorDescriptor {
-  kind: 'keystroke' | 'deadkey' | 'store-slot' | 'blocked';
+  /**
+   * `'composition'` and `'unattributed'` are never produced by
+   * {@link collectCharContributors} itself (its job is cascade-DELETE
+   * contributor discovery over the base IR) — they are synthesized by the
+   * studio ("Existing methods" SHOW-ALL floor, spec follow-up) via the
+   * engine's `collectCompositionMethod` (`'composition'`) or directly by the
+   * gallery (`'unattributed'`), reusing this same shared descriptor/label
+   * shape so the two galleries render every kind through one composer
+   * (`composeContributorLabel`).
+   */
+  kind: 'keystroke' | 'deadkey' | 'store-slot' | 'blocked' | 'composition' | 'unattributed';
   /** The character this contributor produces (or, for `blocked`, that it can't cleanly remove). */
   producedChar: string;
   /**
@@ -129,8 +140,35 @@ export interface ContributorDescriptor {
    * derived — the studio falls back to "Also produces {char}".
    */
   storeDisplayName?: string;
+  /**
+   * `kind: "store-slot"` only — the literal char typed to reach this slot,
+   * resolved from the SAME aligned `any()`-consumed store item `base` uses
+   * for a `"deadkey"` descriptor (the item at the matched output's slot
+   * index), when that item is itself a `{kind:"char"}` store item. Mutually
+   * exclusive with `inputKeystroke` (a slot's aligned item is one StoreItem
+   * kind, never both). Absent when there is no aligned item, or it isn't a
+   * `char` — the studio falls back to `storeDisplayName`/generic phrasing.
+   */
+  inputChar?: string;
+  /**
+   * `kind: "store-slot"` only — a friendly keystroke rendering (via the same
+   * `vkeyDisplayName` helper `keystrokeDisplay` uses) of the aligned item,
+   * when that item is a `{kind:"vkey"}` store item instead of a `char`.
+   * Mutually exclusive with `inputChar`. Absent when not applicable/cheaply
+   * derivable.
+   */
+  inputKeystroke?: string;
   /** `kind: "blocked"` only — which of the two blocked shapes this is. */
   blockedReasonCode?: 'opaque-fragment' | 'multi-char-output';
+  /**
+   * `kind: "composition"` only — the NFD-decomposed components (in NFD
+   * order) that, together, canonical-compose to `producedChar` — e.g. `["U",
+   * "̂"]` for "Û". Synthesized by the studio's `collectCompositionMethod`
+   * (spec follow-up: a green-badged composable char must still show >=1
+   * "Existing methods" row) — never produced by `collectCharContributors`
+   * itself.
+   */
+  components?: string[];
   /**
    * The FULL ordered, friendly input sequence for this contributor's rule —
    * one token per `rule.context` element, e.g. `["A", "Shift+B"]` or
@@ -544,14 +582,23 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
   };
 
   // --- 1. Check opaque fragments (RawKmnFragment) ---
-  // These can only be whole-fragment-deleted; list in blocked.
+  // These can only be whole-fragment-deleted; list in blocked. Rather than a
+  // textual scan of `sourceText` for the target char after a `>` (which can't
+  // tell an OUTPUT-side literal from one that merely matches inside a guard
+  // or context), walk the codec-extracted `producedOutput` sketch structurally
+  // — the SAME run-merge + store-resolution element-walk `buildProducedSet`
+  // uses (shared via the exported `collectFromElements`), so a char actually
+  // produced by an opaque fragment is attributed here exactly when it's
+  // attributed to `produced` there. Fragments without a `producedOutput`
+  // sketch (non-rule fragments, older parses, or a RHS with no statically
+  // producible content) are never flagged here — a truthful structural
+  // attribution isn't cheap for those, so they're left to the caller's own
+  // default-safe fallback rather than a fabricated guess.
   for (const frag of ir.raw) {
-    // We can't statically determine what a raw fragment produces. To avoid a
-    // false "cannot be removed" warning on every chip (a fragment's source may
-    // merely MATCH a common character on the input side), only flag it when the
-    // target appears on the OUTPUT side of a rule — i.e. after a `>`.
-    const outputSide = frag.sourceText.split('>').slice(1).join('>');
-    if (outputSide.includes(target)) {
+    if (frag.producedOutput === undefined) continue;
+    const fragProduced = new Set<string>();
+    collectFromElements(frag.producedOutput, storeMap, fragProduced, false);
+    if (fragProduced.has(target)) {
       blocked.push({
         reason: `Opaque fragment (${frag.reason}): cannot surgically remove individual characters`,
         label: frag.reason,
@@ -769,11 +816,18 @@ function buildOutputSlotDescriptor(
   );
   const sequenceFields = inputSequence !== undefined ? { inputSequence, output: target } : {};
 
+  // Resolve ONCE — the item at the aligned store's SAME slot index — reused
+  // by `inputChar`/`inputKeystroke` below (non-deadkey) and `base` further
+  // down (deadkey); both readings must agree on which item is "the input".
+  const anyStore = alignedAnyEl !== undefined ? storeMap.get(alignedAnyEl.storeRef) : undefined;
+  const baseItem = anyStore?.items[slotIndex];
+
   if (!isDeadkeyRule) {
     return {
       kind: 'store-slot',
       producedChar: target,
       ...storeDisplayNameField(storeName),
+      ...typedInputField(baseItem),
       ...sequenceFields,
     };
   }
@@ -783,8 +837,6 @@ function buildOutputSlotDescriptor(
   );
   const mark = deadkeyEl !== undefined ? triggerKeystrokeByDeadkeyId.get(deadkeyEl.id) : undefined;
 
-  const anyStore = alignedAnyEl !== undefined ? storeMap.get(alignedAnyEl.storeRef) : undefined;
-  const baseItem = anyStore?.items[slotIndex];
   const base = baseItem !== undefined && baseItem.kind === 'char' ? baseItem.value : undefined;
 
   return {
@@ -794,4 +846,25 @@ function buildOutputSlotDescriptor(
     ...(base !== undefined ? { base } : {}),
     ...sequenceFields,
   };
+}
+
+/**
+ * `exactOptionalPropertyTypes`-safe helper: derive a typed single-token input
+ * field for a STORE-SLOT (non-deadkey) descriptor from the item aligned with
+ * the matched output slot (the SAME item `base` uses for a deadkey
+ * descriptor) — `inputChar` when it's a literal char item, `inputKeystroke`
+ * when it's a vkey item (via `vkeyDisplayName`). Mutually exclusive; omits
+ * both when `baseItem` is absent or a kind (deadkey/any/raw) with no single
+ * cheap rendering — never fabricated.
+ */
+function typedInputField(
+  baseItem: StoreItem | undefined,
+): { inputChar: string } | { inputKeystroke: string } | Record<string, never> {
+  if (baseItem === undefined) return {};
+  if (baseItem.kind === 'char') return { inputChar: baseItem.value };
+  if (baseItem.kind === 'vkey') {
+    const keyName = vkeyDisplayName(baseItem.name);
+    return keyName !== undefined ? { inputKeystroke: keyName } : {};
+  }
+  return {};
 }

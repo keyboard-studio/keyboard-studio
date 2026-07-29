@@ -30,6 +30,35 @@
  */
 
 /**
+ * The one place the NFD-decompose-and-check composability rule lives.
+ * Canonical-NFD-decomposes `ch` and, when every resulting code point is
+ * already a member of `produced`, returns those components in NFD order.
+ * Returns `undefined` when `ch` is NFD-stable (decomposition length < 2 —
+ * nothing to compose) or when at least one component is missing from
+ * `produced`.
+ *
+ * Shared by {@link augmentWithComposable} (the produced/covered-set
+ * augmenter) and the engine's `collectCompositionMethod` (the "Existing
+ * methods" composition-row synthesizer) — both need the exact same
+ * decompose-and-check rule, so it lives here once rather than being
+ * re-derived at each call site.
+ *
+ * @param produced - The set of glyphs directly produced/reachable (never
+ *                   itself augmented — see this module's "ONE LEVEL only"
+ *                   rule above).
+ * @param ch       - The candidate character to test for composability.
+ */
+export function composableComponentsFor(
+  produced: ReadonlySet<string>,
+  ch: string,
+): { components: string[] } | undefined {
+  const components = [...ch.normalize("NFD")];
+  if (components.length < 2) return undefined;
+  if (!components.every((c) => produced.has(c))) return undefined;
+  return { components };
+}
+
+/**
  * Returns a new set containing `produced` plus every char from
  * `targetInventory` that is not already produced but is composable from
  * chars that are.
@@ -45,9 +74,7 @@ export function augmentWithComposable(
   const out = new Set(produced);
   for (const ch of targetInventory) {
     if (out.has(ch)) continue;
-    const d = ch.normalize("NFD");
-    if ([...d].length < 2) continue;
-    if ([...d].every((c) => out.has(c))) out.add(ch);
+    if (composableComponentsFor(out, ch) !== undefined) out.add(ch);
   }
   return out;
 }
