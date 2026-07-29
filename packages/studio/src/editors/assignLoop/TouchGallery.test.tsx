@@ -2357,9 +2357,10 @@ describe("TouchGallery — shift-layer case-pair proposal (spec 051 US3)", () =>
 
 // ---------------------------------------------------------------------------
 // Touch layer picker — #1 longpress / #2 flick gain a layer option modeled
-// on MechanismGallery's S-08 "Layer + key" card: options are derived from
-// the working KeyboardIR (collectLayerCombosInUse), never hardcoded, and are
-// ONLY the layers the desktop keyboard actually uses.
+// on MechanismGallery's merged "Assign to a key" card's S-08 layer-combo
+// picker: options are derived from the working KeyboardIR
+// (collectLayerCombosInUse), never hardcoded, and are ONLY the layers the
+// desktop keyboard actually uses.
 // ---------------------------------------------------------------------------
 
 describe("buildTouchMechanismRef — explicit layer override (touch layer picker)", () => {

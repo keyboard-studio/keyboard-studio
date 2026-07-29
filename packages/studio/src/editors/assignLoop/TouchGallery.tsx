@@ -386,9 +386,9 @@ interface TouchMethodChooserProps {
   /**
    * Touch-layer COMBO BUILDER state, shared by all four methods (#1
    * longpress, #2 flick, #3 multitap, #4 replace) — a stack of modifier
-   * slots modeled on MechanismGallery's S-08 "Layer + key" card (add/remove
-   * buttons, one dropdown per slot). Unlike S-08's
-   * free/constructible pool, this builder may only assemble a combination
+   * slots modeled on MechanismGallery's merged "Assign to a key" card's S-08
+   * layer-combo picker (add/remove buttons, one dropdown per slot). Unlike
+   * that picker's free/constructible pool, this builder may only assemble a combination
    * `validLayerCombos` (the desktop keyboard's own combos, from
    * `collectLayerCombosInUse`) already contains — see
    * `addableTouchLayerTokens`. An empty array is the base/default layer,
@@ -434,11 +434,12 @@ function touchLayerComboLabel(
 }
 
 // ---------------------------------------------------------------------------
-// Touch layer combo builder — a stack of modifier slots (mirrors
-// MechanismGallery's S-08 "Layer + key" card's raltTokens/optionsForRaltSlot/
-// MAX_RALT_SLOTS), but HARD-CONSTRAINED to combinations the desktop keyboard
-// actually uses (collectLayerCombosInUse's report — "D" below) rather than
-// S-08's free/constructible per-family pool (computeModifierPool). The
+// Touch layer combo builder — a stack of modifier slots (mirrors the
+// merged "Assign to a key" card's raltTokens/optionsForRaltSlot/
+// MAX_RALT_SLOTS in MechanismGallery), but HARD-CONSTRAINED to combinations
+// the desktop keyboard actually uses (collectLayerCombosInUse's report —
+// "D" below) rather than that card's free/constructible per-family pool
+// (computeModifierPool). The
 // author may only assemble a combo the desktop already defines; there is no
 // path to constructing a combo the desktop doesn't have.
 // ---------------------------------------------------------------------------
@@ -1793,9 +1794,9 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   );
 
   // The working desktop IR the layer builder's constraint pool is derived
-  // from — same `s.ir ?? s.baseIr` fallback MechanismGallery's S-08
-  // "Layer + key" card uses for its own IR-derived option pool (`workingIr`
-  // there).
+  // from — same `s.ir ?? s.baseIr` fallback MechanismGallery's merged
+  // "Assign to a key" card uses for its own IR-derived option pool
+  // (`workingIr` there).
   const workingIrForLayers = useWorkingCopyStore((s) => s.ir ?? s.baseIr);
 
   // The desktop keyboard's own combos ("D" in the constraint spec) — the
