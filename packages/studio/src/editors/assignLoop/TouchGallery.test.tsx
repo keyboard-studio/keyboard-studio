@@ -3347,55 +3347,72 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
       draft?.charTouchEntries.find(([c]) => c === char)?.[1]?.mechanisms ?? []
     );
   }
-
-  it("accepting the longpress suggestion for ă raises the sibling-accent banner for a's family", async () => {
-    seedStore({ withInventory: ["ă"] });
-    await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
-    });
-
+  function bulkGroups() {
+    return useWorkingCopyStore.getState().touchDraft?.bulkAccentGroups ?? [];
+  }
+  async function acceptSuggestion() {
     const acceptBtn =
-      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Accept") ??
-      null;
+      screen
+        .queryAllByRole("button")
+        .find((b) => b.textContent?.trim() === "Accept") ?? null;
     expect(acceptBtn).not.toBeNull();
     await act(async () => {
       fireEvent.click(acceptBtn!);
     });
+  }
+  async function confirmBanner() {
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /Add the related accented letters to K_A/i,
+        }),
+      );
+    });
+  }
+  /** The Configured-row remove chip for `char` (aria-label "Remove <notation>
+   *  <char> …"), or undefined. Deliberately excludes the bulk box's "Remove
+   *  all …" control and the Skip/Accept buttons (which also name the current
+   *  char) so callers test the per-mechanism chip specifically. */
+  function individualChipFor(char: string) {
+    return screen.queryAllByRole("button").find((b) => {
+      const label = b.getAttribute("aria-label") ?? "";
+      return (
+        label.startsWith("Remove ") &&
+        !label.startsWith("Remove all") &&
+        label.includes(char)
+      );
+    });
+  }
+
+  it("accepting the longpress suggestion for ă raises the sibling-accent banner", async () => {
+    // Inventory holds only the a-family accents the language uses.
+    seedStore({ withInventory: ["ă", "à", "á", "À", "Á"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await acceptSuggestion();
 
     // "ă" itself is recorded directly (unaffected by the accelerator).
     expect(touchMechanismsFor("ă")).toHaveLength(1);
-
-    // The banner offers the family — a's full single-mark diacritic family
-    // (no cap), common accents first.
     expect(screen.getByText(/is part of a family of accented letters/i)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Add the related accented letters to K_A/i })).toBeTruthy();
 
     // Nothing is placed yet — propose-then-confirm, never a silent auto-insert.
     expect(touchMechanismsFor("à")).toHaveLength(0);
     expect(touchMechanismsFor("À")).toHaveLength(0);
   });
 
-  it("Accept places every lowercase sibling on the default layer and every uppercase counterpart on the shift layer, in one click", async () => {
-    seedStore({ withInventory: ["ă"] });
+  it("Accept places only INVENTORY siblings — lowercase on default, uppercase on shift — in one click", async () => {
+    // The language uses à á and their capitals, but NOT â ä ã å etc.
+    seedStore({ withInventory: ["ă", "à", "á", "À", "Á"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    const acceptBtn =
-      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Accept") ??
-      null;
-    await act(async () => {
-      fireEvent.click(acceptBtn!);
-    });
+    await acceptSuggestion();
+    await confirmBanner();
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Add the related accented letters to K_A/i }));
-    });
-
-    // The common accents lead a's (now uncapped) family and are all placed;
-    // "ă" itself is excluded as the accepted char. This checks the common
-    // subset — the full uncapped family is pinned in siblingAccents.test.ts.
-    for (const lower of ["à", "á", "â", "ä", "ã", "å"]) {
+    for (const lower of ["à", "á"]) {
       const mechanisms = touchMechanismsFor(lower);
       expect(mechanisms).toHaveLength(1);
       expect(mechanisms[0]?.patternId).toBe("longpress_alternates");
@@ -3405,40 +3422,112 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
         layer: "default",
       });
     }
-    for (const upper of ["À", "Á", "Â", "Ä", "Ã", "Å"]) {
-      const mechanisms = touchMechanismsFor(upper);
-      expect(mechanisms).toHaveLength(1);
-      expect(mechanisms[0]?.slotValues).toMatchObject({
+    for (const upper of ["À", "Á"]) {
+      expect(touchMechanismsFor(upper)[0]?.slotValues).toMatchObject({
         hostKey: "K_A",
         char: upper,
         layer: "shift",
       });
     }
 
+    // "extras" NOT in the inventory are never added.
+    for (const extra of ["â", "ä", "ã", "å", "Â"]) {
+      expect(touchMechanismsFor(extra)).toHaveLength(0);
+    }
+
     // The banner is gone after Accept.
     expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
   });
 
-  it("Decline discards the proposal and places nothing", async () => {
-    seedStore({ withInventory: ["ă"] });
+  it("the batch appears as ONE bulk box (not per-sibling chips) and deletes them all at once", async () => {
+    seedStore({ withInventory: ["ă", "à", "á", "À", "Á"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    const acceptBtn =
-      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Accept") ??
-      null;
+    await acceptSuggestion();
+    await confirmBanner();
+
+    // One summary box, one Remove-all control.
+    expect(screen.getByText(/Added .* as long-press/i)).toBeTruthy();
+    const removeAll = screen.getByRole("button", { name: /Remove all/i });
+    expect(removeAll).toBeTruthy();
+    expect(bulkGroups()).toHaveLength(1);
+    expect(bulkGroups()[0]?.members).toEqual(["à", "á", "À", "Á"]);
+
+    // The siblings are NOT rendered as individual Configured chips — only the
+    // base "ă" keeps its own chip.
+    expect(individualChipFor("à")).toBeUndefined();
+    expect(individualChipFor("À")).toBeUndefined();
+    expect(individualChipFor("ă")).toBeTruthy();
+
+    // Remove-all clears every sibling in one click; the box disappears.
     await act(async () => {
-      fireEvent.click(acceptBtn!);
+      fireEvent.click(removeAll);
+    });
+    for (const c of ["à", "á", "À", "Á"]) {
+      expect(touchMechanismsFor(c)).toHaveLength(0);
+    }
+    expect(bulkGroups()).toHaveLength(0);
+    expect(screen.queryByText(/Added .* as long-press/i)).toBeNull();
+    // The base longpress the author accepted directly is untouched.
+    expect(touchMechanismsFor("ă")).toHaveLength(1);
+  });
+
+  it("the bulk box rehydrates from a persisted draft (survives unmount/remount)", async () => {
+    seedStore({ withInventory: ["ă", "à", "À"] });
+    const lp = (char: string, layer: string): MechanismAssignment => ({
+      scope: "individual",
+      target: char,
+      modality: "touch",
+      mechanisms: [
+        {
+          patternId: "longpress_alternates",
+          slotValues: { hostKey: "K_A", char, layer },
+        },
+      ],
+      source: "user",
+    });
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [
+        ["à", lp("à", "default")],
+        ["À", lp("À", "shift")],
+      ],
+      suggestionResolvedChars: [],
+      bulkAccentGroups: [
+        { id: "ă:K_A", hostKey: "K_A", baseChar: "ă", members: ["à", "À"] },
+      ],
     });
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Do not add the related accented letters/i }));
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // The summary box is present on first paint, driven by the persisted group.
+    expect(screen.getByText(/Added .* as long-press/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Remove all/i })).toBeTruthy();
+    // Still not individual chips.
+    expect(individualChipFor("à")).toBeUndefined();
+  });
+
+  it("Decline discards the proposal and places nothing", async () => {
+    seedStore({ withInventory: ["ă", "à", "á"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await acceptSuggestion();
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /Do not add the related accented letters/i,
+        }),
+      );
     });
 
     expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
     expect(touchMechanismsFor("à")).toHaveLength(0);
-    expect(touchMechanismsFor("À")).toHaveLength(0);
+    expect(bulkGroups()).toHaveLength(0);
     // "ă" itself is untouched by declining the accelerator.
     expect(touchMechanismsFor("ă")).toHaveLength(1);
   });
@@ -3464,23 +3553,15 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     });
     expect(screen.queryByText(/Suggested: replace/i)).not.toBeNull();
 
-    const acceptBtn =
-      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Accept") ??
-      null;
-    await act(async () => {
-      fireEvent.click(acceptBtn!);
-    });
-
+    await acceptSuggestion();
     expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
   });
 
-  it("skips a sibling that is already produced on that host key's layer instead of duplicating it", async () => {
-    // "à" is pre-seeded as already configured (a prior mount's draft) on
-    // K_A's default layer — the exact hostKey+layer the accelerator's own
-    // "à" sibling placement would target once "ă" (also based on K_A) is
-    // accepted. The accelerator must dedupe against it rather than adding a
-    // second mechanism for the same char.
-    seedStore({ withInventory: ["ă"] });
+  it("skips a sibling already produced on that host key's layer (not counted in the bulk group)", async () => {
+    // "à" is pre-seeded as already configured on K_A's default layer. Accepting
+    // "ă" must dedupe against it rather than double-placing — and since it was
+    // not NEWLY placed, it is not a member of this confirm's bulk group.
+    seedStore({ withInventory: ["ă", "à", "á"] });
     const existingAssignment: MechanismAssignment = {
       scope: "individual",
       target: "à",
@@ -3502,60 +3583,62 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    const acceptBtn =
-      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Accept") ??
-      null;
-    await act(async () => {
-      fireEvent.click(acceptBtn!);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Add the related accented letters to K_A/i }));
-    });
+    await acceptSuggestion();
+    await confirmBanner();
 
     // "à" still carries exactly its pre-existing mechanism — not duplicated.
     expect(touchMechanismsFor("à")).toHaveLength(1);
-    // The rest of the family is still placed normally.
+    // "á" is newly placed by this batch.
     expect(touchMechanismsFor("á")).toHaveLength(1);
+    expect(bulkGroups()[0]?.members).toEqual(["á"]);
   });
 
-  it("P2 fix: removing the just-placed base chip while the sibling-accent banner is still open clears the proposal (no orphaned siblings)", async () => {
-    seedStore({ withInventory: ["ă"] });
+  it("removing the base chip after confirm removes the orphaned bulk group and its siblings", async () => {
+    seedStore({ withInventory: ["ă", "à", "À"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    const acceptBtn =
-      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Accept") ??
-      null;
+    await acceptSuggestion();
+    await confirmBanner();
+
+    expect(touchMechanismsFor("à")).toHaveLength(1);
+    expect(bulkGroups()).toHaveLength(1);
+
+    // Remove the base "ă"'s chip via the Configured row.
+    const removeBase = individualChipFor("ă");
+    expect(removeBase).toBeTruthy();
     await act(async () => {
-      fireEvent.click(acceptBtn!);
+      fireEvent.click(removeBase!);
     });
 
-    // "ă" is placed and the sibling-accent banner is open.
+    // The base is gone, and its orphaned siblings + group go with it.
+    expect(touchMechanismsFor("ă")).toHaveLength(0);
+    expect(touchMechanismsFor("à")).toHaveLength(0);
+    expect(touchMechanismsFor("À")).toHaveLength(0);
+    expect(bulkGroups()).toHaveLength(0);
+    expect(screen.queryByText(/Added .* as long-press/i)).toBeNull();
+  });
+
+  it("clears an OPEN proposal when the base chip is removed before confirming", async () => {
+    seedStore({ withInventory: ["ă", "à"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await acceptSuggestion();
     expect(touchMechanismsFor("ă")).toHaveLength(1);
     expect(screen.getByText(/is part of a family of accented letters/i)).toBeTruthy();
 
-    // Remove "ă"'s just-placed chip via the Configured row — the author
-    // changed their mind about the base before confirming the accelerator.
-    const removeBtn = screen
-      .queryAllByRole("button")
-      .find((b) => {
-        const label = b.getAttribute("aria-label") ?? "";
-        return label.startsWith("Remove") && label.includes("ă");
-      });
-    expect(removeBtn).toBeTruthy();
+    const removeBase = individualChipFor("ă");
+    expect(removeBase).toBeTruthy();
     await act(async () => {
-      fireEvent.click(removeBtn!);
+      fireEvent.click(removeBase!);
     });
-    expect(touchMechanismsFor("ă")).toHaveLength(0);
 
-    // The proposal must be cleared, not left dangling — without this fix,
-    // the banner (and its "Add them" button) would still be showing here,
-    // and confirming it would place siblings with no base longpress
-    // underneath them.
+    expect(touchMechanismsFor("ă")).toHaveLength(0);
     expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
     expect(touchMechanismsFor("à")).toHaveLength(0);
-    expect(touchMechanismsFor("À")).toHaveLength(0);
   });
 });
 

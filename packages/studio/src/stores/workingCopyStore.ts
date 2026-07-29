@@ -37,6 +37,23 @@ import { resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
 import type { Step } from "../steps/types.ts";
 import { isSequenceAssignmentForChar } from "../editors/assignLoop/patternIds.ts";
 
+/**
+ * One sibling-accent bulk group: the batch of accented siblings the longpress
+ * accelerator placed on a single host key in one confirm. Persisted in
+ * `touchDraft` so the touch gallery can render a single removable summary box
+ * for the batch (and delete it as a unit) that survives unmount/remount.
+ */
+export interface BulkAccentGroup {
+  /** Stable id for this group (`${baseChar}:${hostKey}`). */
+  id: string;
+  /** The Keyman vkey the siblings were placed on (e.g. `K_U`). */
+  hostKey: string;
+  /** The accepted character whose acceptance triggered the batch. */
+  baseChar: string;
+  /** The sibling characters this batch actually placed (both cases). */
+  members: string[];
+}
+
 // ---------------------------------------------------------------------------
 // Manifest binding — avoids a static import of steps/manifest.ts which would
 // create a circular dependency: stores/ → steps/manifest.ts →
@@ -246,6 +263,14 @@ export interface WorkingCopyState {
   touchDraft: {
     charTouchEntries: Array<[string, TouchAssignment]>;
     suggestionResolvedChars: string[];
+    /**
+     * Sibling-accent bulk groups (longpress accelerator): each records a batch
+     * of accented siblings placed together by one "Add them" confirm, so the
+     * touch gallery can summarize the batch in a single removable box rather
+     * than one chip per sibling. Optional for back-compat with drafts persisted
+     * before this field existed (absent reads as `[]`).
+     */
+    bulkAccentGroups?: BulkAccentGroup[];
   } | null;
 
   /**
@@ -401,6 +426,7 @@ export interface WorkingCopyState {
     draft: {
       charTouchEntries: Array<[string, TouchAssignment]>;
       suggestionResolvedChars: string[];
+      bulkAccentGroups?: BulkAccentGroup[];
     } | null,
   ) => void;
   /** Mark a gallery's one-time intro splash as seen for this working-copy session. */

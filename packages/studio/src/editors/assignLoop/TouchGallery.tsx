@@ -87,7 +87,6 @@ import {
   canonicalizeCombo,
   addableTouchLayerTokens,
   optionsForTouchLayerSlot,
-  caseCounterpart,
 } from "@keyboard-studio/engine";
 import {
   buildTouchLayoutJson,
@@ -106,7 +105,10 @@ import {
 } from "../../lib/touchEmission.ts";
 import { formatUncoveredCharsList } from "../../lib/unimplementedInventory.ts";
 import { ErrorText } from "../../ui/index.ts";
-import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import {
+  useWorkingCopyStore,
+  type BulkAccentGroup,
+} from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import {
   promoteOnManualEdit,
@@ -202,6 +204,13 @@ export function hostKeyShortLabel(keyId: string, layer: TouchLayerId): string {
   if (layer === "default") return short.toLowerCase();
   if (isCasingBearingTouchLayer(layer)) return short.toUpperCase();
   return short;
+}
+
+/** Composite lookup key for a bulk-group member: the sibling character plus
+ *  the host key it was placed on. One helper feeds both the built set and the
+ *  chip-row membership test so their separators can never drift apart. */
+function bulkMemberKey(char: string, hostKey: string): string {
+  return `${char} ${hostKey}`;
 }
 
 /** Direction code to arrow character. */
@@ -1417,6 +1426,15 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       touchDraft !== null ? new Map(touchDraft.charTouchEntries) : new Map(),
   );
 
+  // Sibling-accent bulk groups (longpress accelerator): each batch the author
+  // confirms via the "Add them" banner is recorded here so the gallery renders
+  // ONE removable summary box per batch instead of a chip per sibling.
+  // Rehydrated from the draft (absent -> []) so the box survives an
+  // unmount/remount, exactly like the charTouch chips do.
+  const [bulkAccentGroups, setBulkAccentGroups] = useState<BulkAccentGroup[]>(
+    () => touchDraft?.bulkAccentGroups ?? [],
+  );
+
   // Stable primitive key serializing the current charTouch map so useMemo fires
   // exactly when the author's edits change (mirrors assignmentsKey in
   // useWorkingCopyTransform.ts lines ~100-111 — same pattern, different source).
@@ -1733,9 +1751,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     setTouchDraft({
       charTouchEntries: [...charTouch.entries()],
       suggestionResolvedChars: [...suggestionResolved],
+      bulkAccentGroups,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [charTouch, suggestionResolved]);
+  }, [charTouch, suggestionResolved, bulkAccentGroups]);
 
   // ---------------------------------------------------------------------------
   // Phase C desktop assignments + detected-chars from the seed-source derivation
@@ -2067,13 +2086,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const [siblingAccentProposal, setSiblingAccentProposal] =
     useState<SiblingAccentProposal | null>(null);
 
-  // Normalize "" -> undefined: an identity with an empty tag is "no locale",
-  // not "the empty locale" — same normalization `useCasePairCompanion` does.
-  const bcp47 =
-    identity?.bcp47 !== undefined && identity.bcp47 !== ""
-      ? identity.bcp47
-      : undefined;
-
   useEffect(() => {
     setMethod("longpress_alternates");
     setHostKey("");
@@ -2247,47 +2259,77 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     if (siblingAccentProposal === null) return;
     const { acceptedChar, hostKey: acceptedHostKey, placements } =
       siblingAccentProposal;
-    setCharTouch((prev) => {
-      // Stale-base guard (mirrors handleCasePairConfirm's identity guard
-      // above): the accepted char's own longpress placement — on the SAME
-      // host key the siblings would share — must still be present. Without
-      // this, removing the just-placed base chip via the Configured row
-      // while this banner is open (e.g. the author changed their mind, or
-      // undid the placement) and then clicking "Add them" would place
-      // orphaned siblings with no base longpress underneath them.
-      // handleRemoveMechanism also proactively clears the proposal on
-      // removal — this is the defense-in-depth mirror of that fix, for any
-      // other path that could remove the base (e.g. a future carve/undo).
-      const acceptedStillPlaced = (
-        prev.get(acceptedChar)?.mechanisms ?? []
-      ).some((m) => normalizeTouchSlots(m.slotValues)["hostKey"] === acceptedHostKey);
-      if (!acceptedStillPlaced) return prev;
-      let next = prev;
-      for (const placement of placements) {
-        const alreadyProduced = (
-          next.get(placement.char)?.mechanisms ?? []
-        ).some((m) => {
-          const slots = normalizeTouchSlots(m.slotValues);
-          return (
-            slots["hostKey"] === placement.hostKey &&
-            slots["layer"] === placement.layer
-          );
-        });
-        if (alreadyProduced) continue;
-        const ref = buildTouchMechanismRef(
-          "longpress_alternates",
-          placement.hostKey,
-          "",
-          placement.char,
-          placement.layer,
+
+    // Stale-base guard (mirrors handleCasePairConfirm's identity guard above):
+    // the accepted char's own longpress placement — on the SAME host key the
+    // siblings would share — must still be present. Without this, removing the
+    // just-placed base chip while this banner is open and then clicking "Add
+    // them" would place orphaned siblings with no base longpress underneath.
+    const acceptedStillPlaced = (
+      charTouch.get(acceptedChar)?.mechanisms ?? []
+    ).some((m) => normalizeTouchSlots(m.slotValues)["hostKey"] === acceptedHostKey);
+    if (!acceptedStillPlaced) {
+      setSiblingAccentProposal(null);
+      return;
+    }
+
+    // Only placements this confirm NEWLY adds count as "changed by" this bulk
+    // action — a sibling already produced on its target hostKey+layer is
+    // skipped (dedupe, mirrors the case-pair companion's `alreadyProduced`
+    // predicate) and is not recorded as a member of the group.
+    const toPlace = placements.filter((placement) => {
+      const alreadyProduced = (
+        charTouch.get(placement.char)?.mechanisms ?? []
+      ).some((m) => {
+        const slots = normalizeTouchSlots(m.slotValues);
+        return (
+          slots["hostKey"] === placement.hostKey &&
+          slots["layer"] === placement.layer
         );
-        if (ref === null) continue;
-        next = appendMechanismToChar(next, placement.char, ref);
-      }
-      return next;
+      });
+      return !alreadyProduced;
     });
+
+    if (toPlace.length > 0) {
+      setCharTouch((prev) => {
+        let next = prev;
+        for (const placement of toPlace) {
+          const ref = buildTouchMechanismRef(
+            "longpress_alternates",
+            placement.hostKey,
+            "",
+            placement.char,
+            placement.layer,
+          );
+          if (ref === null) continue;
+          next = appendMechanismToChar(next, placement.char, ref);
+        }
+        return next;
+      });
+
+      // Record (or extend) the bulk group so the batch is summarized in one
+      // removable box rather than a chip per sibling.
+      const id = `${acceptedChar}:${acceptedHostKey}`;
+      const members = toPlace.map((p) => p.char);
+      setBulkAccentGroups((prev) => {
+        const existing = prev.find((g) => g.id === id);
+        if (existing) {
+          const mergedMembers = [
+            ...new Set([...existing.members, ...members]),
+          ];
+          return prev.map((g) =>
+            g.id === id ? { ...g, members: mergedMembers } : g,
+          );
+        }
+        return [
+          ...prev,
+          { id, hostKey: acceptedHostKey, baseChar: acceptedChar, members },
+        ];
+      });
+    }
+
     setSiblingAccentProposal(null);
-  }, [siblingAccentProposal]);
+  }, [siblingAccentProposal, charTouch]);
 
   const handleSiblingAccentDismiss = useCallback(() => {
     setSiblingAccentProposal(null);
@@ -2344,12 +2386,9 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     markSuggestionResolved(currentChar);
 
     if (suggestion.kind === "longpress" && isDecomposableAccented(currentChar)) {
-      const placements = siblingAccentPlacements(
-        currentChar,
-        hk,
-        caseCounterpart,
-        bcp47,
-      );
+      // Inventory-driven: only siblings the author's language actually uses
+      // (never a Unicode-derived family) are offered — see siblingAccents.ts.
+      const placements = siblingAccentPlacements(currentChar, hk, inventory);
       if (placements.length > 0) {
         setSiblingAccentProposal({
           acceptedChar: currentChar,
@@ -2358,7 +2397,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
         });
       }
     }
-  }, [suggestion, currentChar, markSuggestionResolved, bcp47]);
+    // inventoryKey is the stable primitive proxy for `inventory` (same
+    // precedent as detectedChars/touchKey above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestion, currentChar, markSuggestionResolved, inventoryKey]);
 
   const handleSuggestionChange = useCallback(() => {
     if (currentChar !== null) markSuggestionResolved(currentChar);
@@ -2451,6 +2493,61 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // button calls handleNext directly (see below) rather than duplicating
   // this logic.
 
+  // Strip every bulk-added longpress mechanism for `members` on `hostKey` from
+  // a charTouch map (dropping any member left with no mechanisms). Touches ONLY
+  // the longpress_alternates mechanism on that host key — never another method
+  // a member char might also carry. Shared by the bulk box's delete-all and the
+  // base-removal orphan cleanup below.
+  const stripBulkMembers = useCallback(
+    (
+      map: Map<string, TouchAssignment>,
+      members: readonly string[],
+      hostKey: string,
+    ): Map<string, TouchAssignment> => {
+      const next = new Map(map);
+      for (const member of members) {
+        const existing = next.get(member);
+        if (existing === undefined) continue;
+        const kept = existing.mechanisms.filter((m) => {
+          const slots = normalizeTouchSlots(m.slotValues);
+          return !(
+            m.patternId === "longpress_alternates" &&
+            slots["hostKey"] === hostKey
+          );
+        });
+        if (kept.length === existing.mechanisms.length) continue;
+        if (kept.length === 0) next.delete(member);
+        else next.set(member, { ...existing, mechanisms: kept });
+      }
+      return next;
+    },
+    [],
+  );
+
+  // Bulk box "Remove all": delete every sibling the group added, in one click.
+  const handleRemoveBulkGroup = useCallback(
+    (group: BulkAccentGroup) => {
+      setCharTouch((prev) =>
+        stripBulkMembers(prev, group.members, group.hostKey),
+      );
+      setBulkAccentGroups((prev) => prev.filter((g) => g.id !== group.id));
+    },
+    [stripBulkMembers],
+  );
+
+  // `${member} ${hostKey}` keys for every bulk-group member, so the
+  // Configured chip row can skip mechanisms that the bulk summary box already
+  // represents (a bulk-added sibling shows in its box, not as its own chip).
+  const bulkMemberKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const group of bulkAccentGroups) {
+      for (const member of group.members) {
+        keys.add(bulkMemberKey(member, group.hostKey));
+      }
+    }
+    return keys;
+  }, [bulkAccentGroups]);
+
   // Remove a single mechanism (by index within that char's mechanisms[]) from
   // the configured chip row (regression 3, multi-method — multiple methods per character). If the
   // removed mechanism was the char's only one, the whole char entry is deleted
@@ -2469,23 +2566,46 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // `handleCasePairConfirm`'s stale-base guard).
   const handleRemoveMechanism = useCallback(
     (char: string, idx: number) => {
+      // If the mechanism being removed is a bulk group's BASE longpress,
+      // removing it would orphan that group's siblings (longpress entries with
+      // no base underneath). Remove those siblings and the group too.
+      const removed = charTouch.get(char)?.mechanisms[idx];
+      const removedHostKey =
+        removed !== undefined
+          ? normalizeTouchSlots(removed.slotValues)["hostKey"]
+          : undefined;
+      const orphanedGroups =
+        removed !== undefined
+          ? bulkAccentGroups.filter(
+              (g) => g.baseChar === char && g.hostKey === removedHostKey,
+            )
+          : [];
+
       setCharTouch((prev) => {
         const existing = prev.get(char);
         if (existing === undefined) return prev;
         const nextMechanisms = existing.mechanisms.filter((_, i) => i !== idx);
-        const next = new Map(prev);
+        let next = new Map(prev);
         if (nextMechanisms.length === 0) {
           next.delete(char);
         } else {
           next.set(char, { ...existing, mechanisms: nextMechanisms });
         }
+        for (const g of orphanedGroups) {
+          next = stripBulkMembers(next, g.members, g.hostKey);
+        }
         return next;
       });
+      if (orphanedGroups.length > 0) {
+        setBulkAccentGroups((prev) =>
+          prev.filter((g) => !orphanedGroups.some((o) => o.id === g.id)),
+        );
+      }
       setSiblingAccentProposal((prev) =>
         prev !== null && prev.acceptedChar === char ? null : prev,
       );
     },
-    [],
+    [charTouch, bulkAccentGroups, stripBulkMembers],
   );
 
   // Tap-to-select routing: when a valid host-key-capable method is active and
@@ -3027,6 +3147,63 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
         />
       )}
 
+      {/* Sibling-accent bulk summary boxes — one green box per accelerator
+          batch, summarizing every sibling it added and removing them all at
+          once. Rendered for every bulk group regardless of the current char
+          (a gallery-level summary), above the per-mechanism Configured row. */}
+      {bulkAccentGroups.map((group) => {
+        const hostLabel = hostKeyShortLabel(group.hostKey, "default");
+        const memberList = group.members.map((c) => displayChar(c)).join(" ");
+        return (
+          <div
+            key={group.id}
+            role="note"
+            aria-label={t({
+              id: "editor.assignLoop.touch.bulkAccents.ariaLabel",
+              message: "Bulk-added accent family",
+            })}
+            style={{
+              background: "#0d2218",
+              border: "1px solid #238636",
+              borderRadius: 8,
+              padding: "10px 14px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            <p style={suggestionMessageStyle}>
+              <Trans id="editor.assignLoop.touch.bulkAccents.summary">
+                Added {memberList} to {hostLabel} as long-press.
+              </Trans>
+            </p>
+            <button
+              type="button"
+              onClick={() => handleRemoveBulkGroup(group)}
+              aria-label={t({
+                id: "editor.assignLoop.touch.bulkAccents.removeAllAriaLabel",
+                message: `Remove all letters added to ${{ hostLabel }}`,
+              })}
+              style={{
+                alignSelf: "flex-start",
+                padding: "4px 12px",
+                background: "transparent",
+                border: "1px solid #238636",
+                borderRadius: 6,
+                color: "#56d364",
+                fontSize: 12,
+                cursor: "pointer",
+                fontFamily: FONT,
+              }}
+            >
+              <Trans id="editor.assignLoop.touch.bulkAccents.removeAll">
+                Remove all
+              </Trans>
+            </button>
+          </div>
+        );
+      })}
+
       {/* Configured chip row */}
       {charTouch.size > 0 && (
         <RemovableChipRow
@@ -3046,23 +3223,35 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
           chipFontSize={12}
           chipWhiteSpaceNowrap
           items={[...charTouch.entries()].flatMap(([c, assignment]) =>
-            assignment.mechanisms.map((m, i) => ({
-              key: `${c}-${i}`,
-              // Visible chip label only — routes the target through
-              // displayChar() so a standalone combining mark shows the
-              // dotted circle; the aria-label below keeps the raw target
-              // (via touchMechanismLabel(c, ...)) untouched.
-              label: touchMechanismLabel(displayChar(c), m, i18n),
-              onClick: () => handleRemoveMechanism(c, i),
-              ariaLabel: t({
-                id: "editor.assignLoop.touch.removeMechanismAriaLabel",
-                message: `Remove ${{ notation: toUPlusNotation(c) }} ${{ label: touchMechanismLabel(c, m, i18n) }}`,
-              }),
-              title: t({
-                id: "editor.assignLoop.removeCharacterTitle",
-                message: `${{ notation: toUPlusNotation(c) }} — click to remove`,
-              }),
-            })),
+            // flatMap (not map) so bulk-group members can be dropped while the
+            // remaining mechanisms keep their TRUE index — handleRemoveMechanism
+            // removes by index, so filtering must not renumber.
+            assignment.mechanisms.flatMap((m, i) => {
+              const slots = normalizeTouchSlots(m.slotValues);
+              const isBulkMember =
+                m.patternId === "longpress_alternates" &&
+                bulkMemberKeys.has(bulkMemberKey(c, slots["hostKey"] ?? ""));
+              if (isBulkMember) return [];
+              return [
+                {
+                  key: `${c}-${i}`,
+                  // Visible chip label only — routes the target through
+                  // displayChar() so a standalone combining mark shows the
+                  // dotted circle; the aria-label below keeps the raw target
+                  // (via touchMechanismLabel(c, ...)) untouched.
+                  label: touchMechanismLabel(displayChar(c), m, i18n),
+                  onClick: () => handleRemoveMechanism(c, i),
+                  ariaLabel: t({
+                    id: "editor.assignLoop.touch.removeMechanismAriaLabel",
+                    message: `Remove ${{ notation: toUPlusNotation(c) }} ${{ label: touchMechanismLabel(c, m, i18n) }}`,
+                  }),
+                  title: t({
+                    id: "editor.assignLoop.removeCharacterTitle",
+                    message: `${{ notation: toUPlusNotation(c) }} — click to remove`,
+                  }),
+                },
+              ];
+            }),
           )}
         />
       )}
