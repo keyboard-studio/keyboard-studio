@@ -70,7 +70,7 @@ export interface BuildTouchLayoutJsonResult {
   /**
    * Characters the seed derivation (Case A only — `scaffoldTouchLayout`)
    * produces that are reachable NOWHERE in the derived layout — not on their
-   * own key, the altgr/numeric layer, or any key's sk[] longpress menu (see
+   * own key, the rightalt/numeric layer, or any key's sk[] longpress menu (see
    * `scaffoldTouchLayoutWithDiagnostics`'s `unplacedChars`, a TRUE
    * reachability check, not a log of internal placement decisions). Empty on
    * Case B (raw-JSON splice never runs the scaffolder) or when every

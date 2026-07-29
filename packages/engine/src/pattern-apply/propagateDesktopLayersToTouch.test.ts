@@ -8,8 +8,7 @@ import { fileURLToPath } from "node:url";
 import { propagateDesktopLayersToTouch } from "./propagateDesktopLayersToTouch.js";
 import { applyAssignments } from "./applyAssignments.js";
 import { loadPatterns, getById } from "../pattern-library/index.js";
-import { parse as parseKmn, emitTouchLayout } from "../codec/index.js";
-import { scaffoldTouchLayout } from "../scaffolder/scaffoldTouchLayout.js";
+import { parse as parseKmn } from "../codec/index.js";
 import type { KeyboardIR, IRGroup, IRRule, MechanismAssignment } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
@@ -403,22 +402,51 @@ describe("propagateDesktopLayersToTouch — real S-08 pattern (any/index store i
 });
 
 // ---------------------------------------------------------------------------
-// P1-1 regression — scaffoldTouchLayout's Case A (no shipped touch layout)
-// synthesizes its RALT-only layer under the id "altgr", not "rightalt"
-// (comboToTouchLayerId's id for the same combo). Propagation must patch
-// that existing layer rather than synthesizing a duplicate "rightalt" one.
+// Legacy-alias regression — a shipped-corpus `.keyman-touch-layout` (Track 2
+// import-adapt) that still carries the pre-migration RALT-only layer under
+// the id "altgr" rather than "rightalt" (comboToTouchLayerId's id for the
+// same combo). scaffoldTouchLayout.ts's Case A (no shipped touch layout) now
+// emits the canonical "rightalt" id directly — see its rename fixing the
+// reseed-from-desktop touch-apply mismatch — so this scenario can no longer
+// arise from a *fresh* scaffold; LEGACY_TOUCH_LAYER_ID_ALIASES exists purely
+// for keyboards whose shipped layout predates that rename. Propagation must
+// still patch that existing "altgr" layer rather than synthesizing a
+// duplicate "rightalt" one.
 // ---------------------------------------------------------------------------
 
-describe("propagateDesktopLayersToTouch — Case A 'altgr' layer-id alias", () => {
-  it("patches the real scaffoldTouchLayout-produced 'altgr' layer, no duplicate 'rightalt' layer", () => {
-    // A RALT rule already present when the touch layout was first scaffolded.
-    const initialIr = makeMinimalIR([
-      makeGroup([makeRule("K_Q", ["RALT"], "1"), makeRule("K_Q", [], "q")]),
-    ]);
-    const rawTouchJson = emitTouchLayout(scaffoldTouchLayout(initialIr));
+/** A minimal shipped-corpus-shaped phone platform with a legacy "altgr" layer. */
+function makeLegacyAltgrTouchJson(): string {
+  return JSON.stringify({
+    phone: {
+      layer: [
+        {
+          id: "default",
+          row: [
+            {
+              id: 1,
+              key: [
+                { id: "K_Q", text: "q" },
+                { id: "K_NUMLOCK", text: "*123*", nextlayer: "numeric" },
+              ],
+            },
+          ],
+        },
+        {
+          id: "altgr",
+          row: [{ id: 1, key: [{ id: "K_Q", text: "1" }, { id: "K_E", text: "" }] }],
+        },
+        { id: "numeric", row: [{ id: 1, key: [{ id: "K_1", text: "1" }] }] },
+      ],
+    },
+  });
+}
 
-    // The author now assigns a second RALT key via the mechanism gallery —
-    // the freshly re-parsed/updated IR carries both RALT rules.
+describe("propagateDesktopLayersToTouch — legacy 'altgr' layer-id alias", () => {
+  it("patches a shipped-corpus 'altgr' layer, no duplicate 'rightalt' layer", () => {
+    const rawTouchJson = makeLegacyAltgrTouchJson();
+
+    // The author assigns a second RALT key via the mechanism gallery — the
+    // freshly re-parsed/updated IR carries both RALT rules.
     const updatedIr = makeMinimalIR([
       makeGroup([
         makeRule("K_Q", ["RALT"], "1"),

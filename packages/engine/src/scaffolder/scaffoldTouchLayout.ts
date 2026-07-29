@@ -14,7 +14,7 @@
  * Mapping table (spec §8 physical→touch):
  *   - Base desktop keys (no SHIFT / RALT modifiers) → touch "default" layer
  *   - SHIFT-modified keys                           → touch "shift" layer
- *   - RALT-modified keys                            → touch "altgr" layer
+ *   - RALT-modified keys                            → touch "rightalt" layer
  *   - Deadkey patterns (strategyId starts with "S-02") → sk[] (longpress
  *     menu) attached to whichever key actually produces the base letter the
  *     deadkey decorates (resolved via a char → vkey reverse lookup), which
@@ -224,7 +224,7 @@ const MARK_FALLBACK_VKEY: Readonly<Record<string, string>> = {
 // ---------------------------------------------------------------------------
 
 /** Modifier buckets we track from the desktop rules. */
-type LayerId = "default" | "shift" | "altgr" | "altgr-shift";
+type LayerId = "default" | "shift" | "rightalt" | "rightalt-shift";
 
 /** The first character output for a given (vkey, layer) pair. */
 type KeyMap = Map<string, Map<LayerId, string>>;
@@ -256,18 +256,18 @@ function classifyModifiers(rule: IRRule): LayerId | null {
 
   // CAPS-keyed rules are stripped by scaffoldIR; skip any that remain.
   if (hasCaps) return null;
-  // RALT alone → "altgr"; SHIFT alone → "shift"; no mods → "default";
-  // RALT+SHIFT → "altgr-shift" (uppercase special letters, reachable via the
-  // shift<->altgr-shift and altgr<->altgr-shift toggle wiring).
+  // RALT alone → "rightalt"; SHIFT alone → "shift"; no mods → "default";
+  // RALT+SHIFT → "rightalt-shift" (uppercase special letters, reachable via the
+  // shift<->rightalt-shift and rightalt<->rightalt-shift toggle wiring).
   //
   // These three checks are exhaustive over (hasRalt, hasShift) ∈ {T,F}×{T,F}
   // minus the three cases already covered — the only combination left is
   // hasRalt && hasShift, so the final return is unconditional (no dead
   // `return null` needed after it).
-  if (hasRalt && !hasShift) return "altgr";
+  if (hasRalt && !hasShift) return "rightalt";
   if (hasShift && !hasRalt) return "shift";
   if (!hasRalt && !hasShift) return "default";
-  return "altgr-shift";
+  return "rightalt-shift";
 }
 
 /**
@@ -337,16 +337,16 @@ function buildKeyMap(ir: KeyboardIR): KeyMap {
  * Build a (char → vkey) reverse-lookup from the keyMap, so a base letter
  * (e.g. from a deadkey pattern's base-letter store) can be traced back to
  * the physical key that actually produces it. Layer priority is
- * default > shift > altgr > altgr-shift — the base letter a deadkey decorates
+ * default > shift > rightalt > rightalt-shift — the base letter a deadkey decorates
  * is overwhelmingly the plain/default form of a key, so a default-layer
- * producer of a char wins over a shift/altgr/altgr-shift producer of the same
- * char. altgr-shift is lowest priority so a char existing only on that layer
+ * producer of a char wins over a shift/rightalt/rightalt-shift producer of the same
+ * char. rightalt-shift is lowest priority so a char existing only on that layer
  * (e.g. an uppercase special letter) is still resolvable for deadkey base
  * lookups when nothing else produces it.
  */
 function buildCharToVkeyMap(keyMap: KeyMap): Map<string, string> {
   const map = new Map<string, string>();
-  const layerPriority: LayerId[] = ["default", "shift", "altgr", "altgr-shift"];
+  const layerPriority: LayerId[] = ["default", "shift", "rightalt", "rightalt-shift"];
 
   for (const layer of layerPriority) {
     for (const [vkey, layerMap] of keyMap) {
@@ -363,7 +363,7 @@ function buildCharToVkeyMap(keyMap: KeyMap): Map<string, string> {
  * OWN (default-priority) rule produces, used by {@link isValidSuccessorChar}
  * to check that a candidate deadkey successor is actually a diacritic
  * variant of that same letter. `charToVkey` is built in default > shift >
- * altgr priority order (see {@link buildCharToVkeyMap}), so the first char
+ * rightalt priority order (see {@link buildCharToVkeyMap}), so the first char
  * encountered for a given vkey here is its default-layer (plain) form.
  */
 function buildVkeyToBaseCharMap(charToVkey: ReadonlyMap<string, string>): Map<string, string> {
@@ -426,7 +426,7 @@ function isValidSuccessorChar(baseChar: string | undefined, ch: string): boolean
  *
  * A candidate {@link isValidSuccessorChar} rejects is internal hygiene, not
  * a data-loss signal by itself — the rejected character is very often
- * reachable elsewhere in the emitted layout (its own key, the altgr layer,
+ * reachable elsewhere in the emitted layout (its own key, the rightalt layer,
  * the numeric layer), which is exactly what it means for a deadkey candidate
  * to be "unrelated to this vkey's base letter". Rejection is recorded in the
  * returned `rejected` list (raw char + the vkey it was rejected from) purely
@@ -590,7 +590,7 @@ function buildDeadkeySuccessors(
  */
 function resolveKeyText(
   vkey: string,
-  layerId: "default" | "shift" | "altgr" | "altgr-shift",
+  layerId: "default" | "shift" | "rightalt" | "rightalt-shift",
   keyMap: KeyMap,
 ): string {
   const layerMap = keyMap.get(vkey);
@@ -687,7 +687,7 @@ function mergeSuccessorMaps(
  * BUG 3 fix: a number-row vkey (K_1..K_0 etc.) sits in OVERFLOW_NEAREST_SLOT
  * next to a top-row letter purely for PHYSICAL adjacency — that adjacency is
  * only a valid routing for a genuine letter/mark, never for the digits and
- * shift/AltGr symbol variants a number-row key actually produces (e.g. K_3's
+ * shift/RAlt symbol variants a number-row key actually produces (e.g. K_3's
  * "3" / "#" / "¾"). Those always go through `unplaced` so they land on the
  * numeric layer instead of contaminating a letter's longpress menu.
  */
@@ -702,7 +702,7 @@ function collectOverflowEntries(
     if (covered.has(vkey)) continue;
 
     const chars: string[] = [];
-    for (const layer of ["default", "shift", "altgr", "altgr-shift"] as const) {
+    for (const layer of ["default", "shift", "rightalt", "rightalt-shift"] as const) {
       const ch = layerMap.get(layer);
       if (ch !== undefined && !chars.includes(ch)) chars.push(ch);
     }
@@ -778,65 +778,65 @@ function attachOverflowExtras(
  * INVARIANT (graph-stranding fix): no key's nextlayer may point to a layer
  * that isn't emitted; every emitted layer must reach "default" in finite
  * hops; the secondary-layer ENTRY key (this *RAlt* toggle, on default/shift)
- * must be emitted whenever ANY secondary layer exists (altgr OR altgr-shift)
- * — the original design assumed an altgr layer always exists when
- * altgr-shift does, which is false (a keyboard can have RALT+SHIFT
+ * must be emitted whenever ANY secondary layer exists (rightalt OR rightalt-shift)
+ * — the original design assumed a rightalt layer always exists when
+ * rightalt-shift does, which is false (a keyboard can have RALT+SHIFT
  * characters with NO plain-RALT characters, e.g. uppercase-only special
  * letters).
  *
- * BUG 1 fix (extended for altgr-shift): the *RAlt* toggle key present on
- * every generated layer. Without it, a generated altgr (or altgr-shift)
+ * BUG 1 fix (extended for rightalt-shift): the *RAlt* toggle key present on
+ * every generated layer. Without it, a generated rightalt (or rightalt-shift)
  * layer has no key anywhere with a `nextlayer` pointing to it — every
  * special letter placed there (ə, ŋ, ɔ, ɛ, ɗ, æ, etc.) is unreachable in the
  * compiled keyboard. Modeled on the K_SHIFT round-trip already used here.
  * `originLayer` is the layer this particular toggle key instance lives on;
- * `hasAltgr` / `hasAltgrShift` (which of the two secondary layers will
+ * `hasRightAlt` / `hasRightAltShift` (which of the two secondary layers will
  * actually be generated) together determine the default/shift toggle
  * targets, since those are the two in/out pairs whose target depends on
  * which secondary layer(s) exist:
- *   - default  → sp:1, nextlayer: hasAltgr ? "altgr" : "altgr-shift" (the
- *     latter only reached when hasAltgr is false but hasAltgrShift is true —
+ *   - default  → sp:1, nextlayer: hasRightAlt ? "rightalt" : "rightalt-shift" (the
+ *     latter only reached when hasRightAlt is false but hasRightAltShift is true —
  *     otherwise this function is never called for "default" at all, see the
  *     call-site gate below).
- *   - shift    → sp:1, nextlayer: hasAltgrShift ? "altgr-shift" : "altgr".
- *   - altgr    → sp:2, nextlayer:"default" (unchanged — the altgr<->default
- *     in/out pair is never repurposed; altgr reaches altgr-shift via its own
+ *   - shift    → sp:1, nextlayer: hasRightAltShift ? "rightalt-shift" : "rightalt".
+ *   - rightalt    → sp:2, nextlayer:"default" (unchanged — the rightalt<->default
+ *     in/out pair is never repurposed; rightalt reaches rightalt-shift via its own
  *     K_SHIFT key instead, not via this toggle).
- *   - altgr-shift → sp:2, nextlayer:"shift" (releases AltGr, keeps Shift —
+ *   - rightalt-shift → sp:2, nextlayer:"shift" (releases RAlt, keeps Shift —
  *     "shift" is unconditionally emitted, so this is always safe).
  * Replaces the row-1 trailing spacer (T_ks_sp_<layer>) ONLY when the
  * corresponding layer will actually be generated, so every row still lands
  * at exactly 10 keys in the no-secondary-layer case.
  */
-function buildAltgrToggleKey(
+function buildRightAltToggleKey(
   minter: NodeIdMinter,
   originLayer: LayerId,
-  hasAltgr: boolean,
-  hasAltgrShift: boolean,
+  hasRightAlt: boolean,
+  hasRightAltShift: boolean,
 ): TouchKeyIR {
   let sp: number;
   let nextlayer: string;
   switch (originLayer) {
     case "default":
       sp = 1;
-      nextlayer = hasAltgr ? "altgr" : "altgr-shift";
+      nextlayer = hasRightAlt ? "rightalt" : "rightalt-shift";
       break;
     case "shift":
       sp = 1;
-      nextlayer = hasAltgrShift ? "altgr-shift" : "altgr";
+      nextlayer = hasRightAltShift ? "rightalt-shift" : "rightalt";
       break;
-    case "altgr":
+    case "rightalt":
       sp = 2;
       nextlayer = "default";
       break;
-    case "altgr-shift":
+    case "rightalt-shift":
       sp = 2;
       nextlayer = "shift";
       break;
   }
   return {
     nodeId: minter.mint("touchKey"),
-    id: "T_ks_altgr_toggle",
+    id: "T_ks_rightalt_toggle",
     text: "*RAlt*",
     sp,
     nextlayer,
@@ -845,7 +845,7 @@ function buildAltgrToggleKey(
 
 /**
  * Build the compact QWERTY phone default + shift layers (and optionally
- * altgr) from the compact row structure, populating key text from keyMap.
+ * rightalt) from the compact row structure, populating key text from keyMap.
  *
  * Layout structure (≤10 keys per row in every layer):
  *
@@ -861,7 +861,7 @@ function buildAltgrToggleKey(
  * numeric layer:
  *   Row 0 (10): 1 2 3 4 5 6 7 8 9 0 (literal)
  *   Row 1 (10): $(pad:50) @ # % & _ = | \  + spacer(sp:10,w:10)
- *   Row 2 (10): spacer(sp:10,w:110) [ ( ) ] + - * /  K_BKSP(sp:1) — K_BKSP at keyIndex 9, no width, matching default/shift/altgr
+ *   Row 2 (10): spacer(sp:10,w:110) [ ( ) ] + - * /  K_BKSP(sp:1) — K_BKSP at keyIndex 9, no width, matching default/shift/rightalt
  *   Row 3  (4): K_LOWER("*abc*",sp:1,w:150,nextlayer:default) K_LOPT K_SPACE K_ENTER
  *
  * Shift key:
@@ -880,17 +880,17 @@ function buildCanonicalPhoneLayers(
 ): TouchLayoutIR["platforms"][number]["layers"] {
   const layers: TouchLayoutIR["platforms"][number]["layers"] = [];
 
-  // altgr layer only emits when at least one key has an altgr mapping (BUG 1
+  // rightalt layer only emits when at least one key has a rightalt mapping (BUG 1
   // fix: computed BEFORE the default/shift layers are built below, since the
-  // altgr-reachability toggle key it drives replaces the row-1 trailing
-  // spacer on those layers too — a generated altgr layer with no key ever
+  // rightalt-reachability toggle key it drives replaces the row-1 trailing
+  // spacer on those layers too — a generated rightalt layer with no key ever
   // reachable from it is otherwise dead weight in the compiled keyboard).
-  const hasAltgr = [...keyMap.values()].some((m) => m.has("altgr"));
-  // altgr-shift layer (uppercase special letters from RALT+SHIFT) only emits
-  // when at least one key has an altgr-shift mapping — same reasoning and
+  const hasRightAlt = [...keyMap.values()].some((m) => m.has("rightalt"));
+  // rightalt-shift layer (uppercase special letters from RALT+SHIFT) only emits
+  // when at least one key has a rightalt-shift mapping — same reasoning and
   // same "computed before the default/shift toggle wiring" requirement as
-  // hasAltgr above, since the shift layer's toggle target depends on it.
-  const hasAltgrShift = [...keyMap.values()].some((m) => m.has("altgr-shift"));
+  // hasRightAlt above, since the shift layer's toggle target depends on it.
+  const hasRightAltShift = [...keyMap.values()].some((m) => m.has("rightalt-shift"));
 
   // -------------------------------------------------------------------------
   // default and shift layers
@@ -914,16 +914,16 @@ function buildCanonicalPhoneLayers(
         buildLetterKey(vkey, layerId, keyMap, deadkeySuccessors, minter,
           undefined, isDefault ? undefined : "default"),
       ),
-      // trailing spacer — replaced by the altgr toggle key (BUG 1 fix, graph-
-      // stranding fix) when EITHER secondary layer (altgr OR altgr-shift)
+      // trailing spacer — replaced by the rightalt toggle key (BUG 1 fix, graph-
+      // stranding fix) when EITHER secondary layer (rightalt OR rightalt-shift)
       // will actually be generated, so the row still lands at exactly 10
-      // keys either way. Gating on `hasAltgr` alone stranded the
-      // hasAltgr=false / hasAltgrShift=true case (RALT+SHIFT chars with no
+      // keys either way. Gating on `hasRightAlt` alone stranded the
+      // hasRightAlt=false / hasRightAltShift=true case (RALT+SHIFT chars with no
       // plain-RALT chars) with no entry toggle at all. Both layers' toggle
-      // targets depend on hasAltgr/hasAltgrShift together — see
-      // buildAltgrToggleKey.
-      (hasAltgr || hasAltgrShift)
-        ? buildAltgrToggleKey(minter, layerId, hasAltgr, hasAltgrShift)
+      // targets depend on hasRightAlt/hasRightAltShift together — see
+      // buildRightAltToggleKey.
+      (hasRightAlt || hasRightAltShift)
+        ? buildRightAltToggleKey(minter, layerId, hasRightAlt, hasRightAltShift)
         : ({
             nodeId: minter.mint("touchKey"),
             id: `T_ks_sp_${layerId}`,
@@ -1054,7 +1054,7 @@ function buildCanonicalPhoneLayers(
   // (they are punctuation keys, not fixed-value literals).
   // ( ) + - * / are literal characters → U_ ids.
   // The leading spacer (width:110) replaces the old pad:110 on K_LBRKT so that
-  // K_BKSP lands at keyIndex 9 — identical to default/shift/altgr layers.
+  // K_BKSP lands at keyIndex 9 — identical to default/shift/rightalt layers.
   const numRow2Keys: TouchKeyIR[] = [
     // index 0: leading spacer to preserve the ~110px visual indent
     { nodeId: minter.mint("touchKey"), id: "T_num_r2_lead_sp", text: "", sp: 10, width: 110 },
@@ -1066,7 +1066,7 @@ function buildCanonicalPhoneLayers(
     { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId("-"), text: "-" },
     { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId("*"), text: "*" },
     { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId("/"), text: "/" },
-    // index 9: K_BKSP — no width, matching default/shift/altgr exactly
+    // index 9: K_BKSP — no width, matching default/shift/rightalt exactly
     { nodeId: minter.mint("touchKey"), id: "K_BKSP",               text: "*BkSp*", sp: 1 },
   ];
 
@@ -1112,13 +1112,13 @@ function buildCanonicalPhoneLayers(
     ],
   });
 
-  // altgr layer: only emit when at least one key has an altgr mapping
-  // (hasAltgr computed above, before the default/shift layers). Uses same
-  // row structure as default but with altgr text values.
-  if (hasAltgr) {
-    // Row 0: Q W E R T Y U I O P with altgr text
+  // rightalt layer: only emit when at least one key has a rightalt mapping
+  // (hasRightAlt computed above, before the default/shift layers). Uses same
+  // row structure as default but with rightalt text values.
+  if (hasRightAlt) {
+    // Row 0: Q W E R T Y U I O P with rightalt text
     const altRow0Keys: TouchKeyIR[] = COMPACT_ROW1_VKEYS.map((vkey) => {
-      const text = resolveKeyText(vkey, "altgr", keyMap);
+      const text = resolveKeyText(vkey, "rightalt", keyMap);
       return {
         nodeId: minter.mint("touchKey"),
         id: vkey,
@@ -1129,7 +1129,7 @@ function buildCanonicalPhoneLayers(
     // Row 1: A(pad:50) S D F G H J K L  spacer
     const altRow1Keys: TouchKeyIR[] = [
       (() => {
-        const text = resolveKeyText("K_A", "altgr", keyMap);
+        const text = resolveKeyText("K_A", "rightalt", keyMap);
         return {
           nodeId: minter.mint("touchKey"),
           id: "K_A",
@@ -1138,7 +1138,7 @@ function buildCanonicalPhoneLayers(
         };
       })(),
       ...COMPACT_ROW2_VKEYS.slice(1).map((vkey) => {
-        const text = resolveKeyText(vkey, "altgr", keyMap);
+        const text = resolveKeyText(vkey, "rightalt", keyMap);
         return {
           nodeId: minter.mint("touchKey"),
           id: vkey,
@@ -1146,24 +1146,24 @@ function buildCanonicalPhoneLayers(
         };
       }),
       // The row-1 trailing spacer is always the return-to-default toggle
-      // here — this whole altgr layer only exists because hasAltgr is true.
-      buildAltgrToggleKey(minter, "altgr", hasAltgr, hasAltgrShift),
+      // here — this whole rightalt layer only exists because hasRightAlt is true.
+      buildRightAltToggleKey(minter, "rightalt", hasRightAlt, hasRightAltShift),
     ];
 
     // Row 2: K_SHIFT  Z X C V B N M  K_PERIOD  K_BKSP
-    // K_SHIFT routes to altgr-shift (uppercase specials) when that layer
-    // will be generated, keeping AltGr held down; falls back to the plain
-    // "shift" layer (releasing AltGr) when there is no altgr-shift layer.
+    // K_SHIFT routes to rightalt-shift (uppercase specials) when that layer
+    // will be generated, keeping RAlt held down; falls back to the plain
+    // "shift" layer (releasing RAlt) when there is no rightalt-shift layer.
     const altRow2Keys: TouchKeyIR[] = [
       {
         nodeId: minter.mint("touchKey"),
         id: "K_SHIFT",
         text: "*Shift*",
         sp: 1,
-        nextlayer: hasAltgrShift ? "altgr-shift" : "shift",
+        nextlayer: hasRightAltShift ? "rightalt-shift" : "shift",
       },
       ...["K_Z", "K_X", "K_C", "K_V", "K_B", "K_N", "K_M"].map((vkey) => {
-        const text = resolveKeyText(vkey, "altgr", keyMap);
+        const text = resolveKeyText(vkey, "rightalt", keyMap);
         return {
           nodeId: minter.mint("touchKey"),
           id: vkey,
@@ -1190,7 +1190,7 @@ function buildCanonicalPhoneLayers(
     ];
 
     layers.push({
-      id: "altgr",
+      id: "rightalt",
       rows: [
         { keys: altRow0Keys },
         { keys: altRow1Keys },
@@ -1200,27 +1200,27 @@ function buildCanonicalPhoneLayers(
     });
   }
 
-  // altgr-shift layer: only emit when at least one key has an RALT+SHIFT
-  // mapping (hasAltgrShift computed above, before the default/shift layers).
-  // Structural clone of the altgr layer above (same row skeleton), but reads
-  // "altgr-shift" text and reaches the rest of the graph via shift (its own
-  // toggle) and — when an altgr layer actually exists — altgr (its own
+  // rightalt-shift layer: only emit when at least one key has an RALT+SHIFT
+  // mapping (hasRightAltShift computed above, before the default/shift layers).
+  // Structural clone of the rightalt layer above (same row skeleton), but reads
+  // "rightalt-shift" text and reaches the rest of the graph via shift (its own
+  // toggle) and — when a rightalt layer actually exists — rightalt (its own
   // K_SHIFT key), instead of default.
   //
-  // Full navigable graph, both cases (see the buildAltgrToggleKey /
+  // Full navigable graph, both cases (see the buildRightAltToggleKey /
   // K_SHIFT-exit invariant: no nextlayer targets a non-emitted layer, and
   // every emitted layer reaches "default" in finite hops):
-  //   - hasAltgr=true, hasAltgrShift=true: default<->shift, default<->altgr,
-  //     shift->altgr-shift, altgr<->altgr-shift, altgr-shift->shift.
-  //   - hasAltgr=false, hasAltgrShift=true: default<->shift (K_SHIFT, always
-  //     emitted), default->altgr-shift (via *RAlt* toggle), shift->altgr-shift
-  //     (via *RAlt* toggle), altgr-shift->default (via K_SHIFT, since there is
-  //     no altgr to hold), altgr-shift->shift (via *RAlt* toggle). No key
-  //     targets "altgr" (not emitted).
-  if (hasAltgrShift) {
-    // Row 0: Q W E R T Y U I O P with altgr-shift text
+  //   - hasRightAlt=true, hasRightAltShift=true: default<->shift, default<->rightalt,
+  //     shift->rightalt-shift, rightalt<->rightalt-shift, rightalt-shift->shift.
+  //   - hasRightAlt=false, hasRightAltShift=true: default<->shift (K_SHIFT, always
+  //     emitted), default->rightalt-shift (via *RAlt* toggle), shift->rightalt-shift
+  //     (via *RAlt* toggle), rightalt-shift->default (via K_SHIFT, since there is
+  //     no rightalt to hold), rightalt-shift->shift (via *RAlt* toggle). No key
+  //     targets "rightalt" (not emitted).
+  if (hasRightAltShift) {
+    // Row 0: Q W E R T Y U I O P with rightalt-shift text
     const altShiftRow0Keys: TouchKeyIR[] = COMPACT_ROW1_VKEYS.map((vkey) => {
-      const text = resolveKeyText(vkey, "altgr-shift", keyMap);
+      const text = resolveKeyText(vkey, "rightalt-shift", keyMap);
       return {
         nodeId: minter.mint("touchKey"),
         id: vkey,
@@ -1229,11 +1229,11 @@ function buildCanonicalPhoneLayers(
     });
 
     // Row 1: A(pad:50) S D F G H J K L  toggle (row-1 trailing key is always
-    // the *RAlt* toggle here — this layer only exists because hasAltgrShift
+    // the *RAlt* toggle here — this layer only exists because hasRightAltShift
     // is true).
     const altShiftRow1Keys: TouchKeyIR[] = [
       (() => {
-        const text = resolveKeyText("K_A", "altgr-shift", keyMap);
+        const text = resolveKeyText("K_A", "rightalt-shift", keyMap);
         return {
           nodeId: minter.mint("touchKey"),
           id: "K_A",
@@ -1242,21 +1242,21 @@ function buildCanonicalPhoneLayers(
         };
       })(),
       ...COMPACT_ROW2_VKEYS.slice(1).map((vkey) => {
-        const text = resolveKeyText(vkey, "altgr-shift", keyMap);
+        const text = resolveKeyText(vkey, "rightalt-shift", keyMap);
         return {
           nodeId: minter.mint("touchKey"),
           id: vkey,
           ...(text !== "" ? { text, output: text } : {}),
         };
       }),
-      buildAltgrToggleKey(minter, "altgr-shift", hasAltgr, hasAltgrShift),
+      buildRightAltToggleKey(minter, "rightalt-shift", hasRightAlt, hasRightAltShift),
     ];
 
-    // Row 2: K_SHIFT — returns to altgr (keeping AltGr held) when an altgr
-    // layer exists; otherwise there IS no altgr layer to hold AltGr on top
-    // of (hasAltgr=false, hasAltgrShift=true — RALT+SHIFT chars with no
+    // Row 2: K_SHIFT — returns to rightalt (keeping RAlt held) when a rightalt
+    // layer exists; otherwise there IS no rightalt layer to hold RAlt on top
+    // of (hasRightAlt=false, hasRightAltShift=true — RALT+SHIFT chars with no
     // plain-RALT chars), so it releases straight to default instead of
-    // dangling on the non-emitted "altgr" (graph-stranding fix).
+    // dangling on the non-emitted "rightalt" (graph-stranding fix).
     // Z X C V B N M  K_PERIOD  K_BKSP
     const altShiftRow2Keys: TouchKeyIR[] = [
       {
@@ -1264,10 +1264,10 @@ function buildCanonicalPhoneLayers(
         id: "K_SHIFT",
         text: "*Shift*",
         sp: 2,
-        nextlayer: hasAltgr ? "altgr" : "default",
+        nextlayer: hasRightAlt ? "rightalt" : "default",
       },
       ...["K_Z", "K_X", "K_C", "K_V", "K_B", "K_N", "K_M"].map((vkey) => {
-        const text = resolveKeyText(vkey, "altgr-shift", keyMap);
+        const text = resolveKeyText(vkey, "rightalt-shift", keyMap);
         return {
           nodeId: minter.mint("touchKey"),
           id: vkey,
@@ -1278,7 +1278,7 @@ function buildCanonicalPhoneLayers(
       { nodeId: minter.mint("touchKey"), id: "K_BKSP",   text: "*BkSp*", sp: 1 },
     ];
 
-    // Row 3: same functional row as default/altgr
+    // Row 3: same functional row as default/rightalt
     const altShiftRow3Keys: TouchKeyIR[] = [
       {
         nodeId: minter.mint("touchKey"),
@@ -1294,7 +1294,7 @@ function buildCanonicalPhoneLayers(
     ];
 
     layers.push({
-      id: "altgr-shift",
+      id: "rightalt-shift",
       rows: [
         { keys: altShiftRow0Keys },
         { keys: altShiftRow1Keys },
@@ -1315,30 +1315,30 @@ function buildCanonicalPhoneLayers(
 // row, QWERTY/ASDF/ZXCM letter rows, and a functional row — but with digits
 // where the reference puts diacritic marks, and diacritics carried instead as
 // sk[] longpress under their base letters (same mechanism as the phone path).
-// A single prominent "specials" key replaces the reference's per-key AltGr
-// toggle-row-spacer approach for reaching the altgr/altgr-shift layers, and
+// A single prominent "specials" key replaces the reference's per-key RAlt
+// toggle-row-spacer approach for reaching the rightalt/rightalt-shift layers, and
 // every letter key on those secondary layers auto-returns to "default" after
 // a tap (the reference's own convention — see e.g. the "rightalt" layer's
 // K_W/K_E/etc, which all carry "nextlayer": "default").
 // ---------------------------------------------------------------------------
 
-/** Every vkey a tablet altgr/altgr-shift layer letter row covers, in on-screen order. */
-const TABLET_ALTGR_VKEYS = [
+/** Every vkey a tablet rightalt/rightalt-shift layer letter row covers, in on-screen order. */
+const TABLET_RIGHTALT_VKEYS = [
   ...COMPACT_ROW1_VKEYS,
   ...COMPACT_ROW2_VKEYS,
   "K_Z", "K_X", "K_C", "K_V", "K_B", "K_N", "K_M",
 ] as const;
 
 /**
- * Build a tablet altgr/altgr-shift layer's letter key: same text resolution as
+ * Build a tablet rightalt/rightalt-shift layer's letter key: same text resolution as
  * {@link buildLetterKey}, but always tagged `nextlayer:"default"` (spec item
  * 3 — a tap types the special char and auto-returns, so the user is never
  * stranded on the specials layer) and never carries sk[] (diacritics are a
  * default-layer-only concept, unchanged from the phone path).
  */
-function buildTabletAltgrLetterKey(
+function buildTabletRightAltLetterKey(
   vkey: string,
-  layerId: "altgr" | "altgr-shift",
+  layerId: "rightalt" | "rightalt-shift",
   keyMap: KeyMap,
   minter: NodeIdMinter,
   pad?: number,
@@ -1358,12 +1358,12 @@ function buildTabletAltgrLetterKey(
  * characters the target secondary layer actually produces, in on-screen
  * reading order (mirrors the reference's "əŋɔ" label on its own T_CAM key).
  * Falls back to a generic label on the (should-not-happen, since the caller
- * only builds this key when `hasAltgr || hasAltgrShift`) case where the
+ * only builds this key when `hasRightAlt || hasRightAltShift`) case where the
  * target layer produces nothing at all.
  */
-function computeSpecialsLabel(keyMap: KeyMap, targetLayer: "altgr" | "altgr-shift"): string {
+function computeSpecialsLabel(keyMap: KeyMap, targetLayer: "rightalt" | "rightalt-shift"): string {
   const chars: string[] = [];
-  for (const vkey of TABLET_ALTGR_VKEYS) {
+  for (const vkey of TABLET_RIGHTALT_VKEYS) {
     if (chars.length >= 3) break;
     const text = resolveKeyText(vkey, targetLayer, keyMap);
     if (text !== "") chars.push(text);
@@ -1375,8 +1375,8 @@ function computeSpecialsLabel(keyMap: KeyMap, targetLayer: "altgr" | "altgr-shif
  * Build the tablet's specials-access key (spec item 3's "combo-key model"):
  * ONE prominent key at the end of row 3, self-labeled from the target
  * secondary layer's own produced characters, routing to whichever of
- * altgr/altgr-shift actually exists (altgr preferred — mirrors
- * {@link buildAltgrToggleKey}'s "default" origin case exactly, since this key
+ * rightalt/rightalt-shift actually exists (rightalt preferred — mirrors
+ * {@link buildRightAltToggleKey}'s "default" origin case exactly, since this key
  * plays the same graph role that origin's row-1 trailing toggle plays on the
  * phone skeleton, just presented as a single named key instead of a spacer
  * replacement).
@@ -1384,9 +1384,9 @@ function computeSpecialsLabel(keyMap: KeyMap, targetLayer: "altgr" | "altgr-shif
 function buildTabletSpecialsKey(
   keyMap: KeyMap,
   minter: NodeIdMinter,
-  hasAltgr: boolean,
+  hasRightAlt: boolean,
 ): TouchKeyIR {
-  const targetLayer: "altgr" | "altgr-shift" = hasAltgr ? "altgr" : "altgr-shift";
+  const targetLayer: "rightalt" | "rightalt-shift" = hasRightAlt ? "rightalt" : "rightalt-shift";
   return {
     nodeId: minter.mint("touchKey"),
     id: "T_ks_specials",
@@ -1398,7 +1398,7 @@ function buildTabletSpecialsKey(
 }
 
 /** Shared functional row (K_LOPT / @ / space / . / K_ENTER) for the tablet's
- *  default/shift/altgr/altgr-shift layers — identical shape on every layer. */
+ *  default/shift/rightalt/rightalt-shift layers — identical shape on every layer. */
 function buildTabletFunctionalRow(minter: NodeIdMinter): TouchKeyIR[] {
   return [
     { nodeId: minter.mint("touchKey"), id: "K_LOPT", text: "*Menu*", width: 120, sp: 1 },
@@ -1422,25 +1422,25 @@ function buildTabletNumberRow(minter: NodeIdMinter): TouchKeyIR[] {
 }
 
 /**
- * Build the tablet altgr layer: row 0 (Q-P), row 1 (A-L, pad on A), row 2
+ * Build the tablet rightalt layer: row 0 (Q-P), row 1 (A-L, pad on A), row 2
  * (K_SHIFT toggle + Z-M + K_BKSP), row 3 (functional). Every letter key
  * carries `nextlayer:"default"` (auto-return); the K_SHIFT toggle keeps
- * {@link buildAltgrToggleKey}'s hasAltgr/hasAltgrShift-driven target logic so
- * altgr-shift stays reachable when both secondary layers exist.
+ * {@link buildRightAltToggleKey}'s hasRightAlt/hasRightAltShift-driven target logic so
+ * rightalt-shift stays reachable when both secondary layers exist.
  */
-function buildTabletAltgrLayer(
+function buildTabletRightAltLayer(
   keyMap: KeyMap,
   minter: NodeIdMinter,
-  hasAltgrShift: boolean,
+  hasRightAltShift: boolean,
 ): TouchLayoutIR["platforms"][number]["layers"][number] {
   const row0Keys: TouchKeyIR[] = COMPACT_ROW1_VKEYS.map((vkey, i) =>
-    buildTabletAltgrLetterKey(vkey, "altgr", keyMap, minter, i === 0 ? 55 : undefined),
+    buildTabletRightAltLetterKey(vkey, "rightalt", keyMap, minter, i === 0 ? 55 : undefined),
   );
 
   const row1Keys: TouchKeyIR[] = [
-    buildTabletAltgrLetterKey("K_A", "altgr", keyMap, minter, 50),
+    buildTabletRightAltLetterKey("K_A", "rightalt", keyMap, minter, 50),
     ...COMPACT_ROW2_VKEYS.slice(1).map((vkey) =>
-      buildTabletAltgrLetterKey(vkey, "altgr", keyMap, minter),
+      buildTabletRightAltLetterKey(vkey, "rightalt", keyMap, minter),
     ),
   ];
 
@@ -1450,16 +1450,16 @@ function buildTabletAltgrLayer(
       id: "K_SHIFT",
       text: "*Shift*",
       sp: 1,
-      nextlayer: hasAltgrShift ? "altgr-shift" : "shift",
+      nextlayer: hasRightAltShift ? "rightalt-shift" : "shift",
     },
     ...["K_Z", "K_X", "K_C", "K_V", "K_B", "K_N", "K_M"].map((vkey) =>
-      buildTabletAltgrLetterKey(vkey, "altgr", keyMap, minter),
+      buildTabletRightAltLetterKey(vkey, "rightalt", keyMap, minter),
     ),
     { nodeId: minter.mint("touchKey"), id: "K_BKSP", text: "*BkSp*", sp: 1 },
   ];
 
   return {
-    id: "altgr",
+    id: "rightalt",
     rows: [
       { keys: row0Keys },
       { keys: row1Keys },
@@ -1470,25 +1470,25 @@ function buildTabletAltgrLayer(
 }
 
 /**
- * Build the tablet altgr-shift layer — structural mirror of
- * {@link buildTabletAltgrLayer}, reading "altgr-shift" text. Its K_SHIFT
- * toggle returns to "altgr" (keeping AltGr held, uppercase specials done) when
- * an altgr layer exists, else releases straight to "default" (no altgr layer
- * to hold) — same graph role as the phone skeleton's altgr-shift K_SHIFT key.
+ * Build the tablet rightalt-shift layer — structural mirror of
+ * {@link buildTabletRightAltLayer}, reading "rightalt-shift" text. Its K_SHIFT
+ * toggle returns to "rightalt" (keeping RAlt held, uppercase specials done) when
+ * a rightalt layer exists, else releases straight to "default" (no rightalt layer
+ * to hold) — same graph role as the phone skeleton's rightalt-shift K_SHIFT key.
  */
-function buildTabletAltgrShiftLayer(
+function buildTabletRightAltShiftLayer(
   keyMap: KeyMap,
   minter: NodeIdMinter,
-  hasAltgr: boolean,
+  hasRightAlt: boolean,
 ): TouchLayoutIR["platforms"][number]["layers"][number] {
   const row0Keys: TouchKeyIR[] = COMPACT_ROW1_VKEYS.map((vkey, i) =>
-    buildTabletAltgrLetterKey(vkey, "altgr-shift", keyMap, minter, i === 0 ? 55 : undefined),
+    buildTabletRightAltLetterKey(vkey, "rightalt-shift", keyMap, minter, i === 0 ? 55 : undefined),
   );
 
   const row1Keys: TouchKeyIR[] = [
-    buildTabletAltgrLetterKey("K_A", "altgr-shift", keyMap, minter, 50),
+    buildTabletRightAltLetterKey("K_A", "rightalt-shift", keyMap, minter, 50),
     ...COMPACT_ROW2_VKEYS.slice(1).map((vkey) =>
-      buildTabletAltgrLetterKey(vkey, "altgr-shift", keyMap, minter),
+      buildTabletRightAltLetterKey(vkey, "rightalt-shift", keyMap, minter),
     ),
   ];
 
@@ -1498,16 +1498,16 @@ function buildTabletAltgrShiftLayer(
       id: "K_SHIFT",
       text: "*Shift*",
       sp: 2,
-      nextlayer: hasAltgr ? "altgr" : "default",
+      nextlayer: hasRightAlt ? "rightalt" : "default",
     },
     ...["K_Z", "K_X", "K_C", "K_V", "K_B", "K_N", "K_M"].map((vkey) =>
-      buildTabletAltgrLetterKey(vkey, "altgr-shift", keyMap, minter),
+      buildTabletRightAltLetterKey(vkey, "rightalt-shift", keyMap, minter),
     ),
     { nodeId: minter.mint("touchKey"), id: "K_BKSP", text: "*BkSp*", sp: 1 },
   ];
 
   return {
-    id: "altgr-shift",
+    id: "rightalt-shift",
     rows: [
       { keys: row0Keys },
       { keys: row1Keys },
@@ -1575,7 +1575,7 @@ function buildTabletSymbolLayer(
 
 /**
  * Build the tablet default + shift layers (and, when the desktop rules carry
- * AltGr mappings, the altgr / altgr-shift secondary layers), plus the tablet
+ * RAlt mappings, the rightalt / rightalt-shift secondary layers), plus the tablet
  * numeric/symbol layer — sibling to {@link buildCanonicalPhoneLayers}, used
  * ONLY by the reseed-from-desktop tablet path (spec item 1's `platformStyle`
  * gate). Default layer rows top-to-bottom (spec item 2):
@@ -1583,7 +1583,7 @@ function buildTabletSymbolLayer(
  *   Row 1 (number row): 1 2 3 4 5 6 7 8 9 0 + K_BKSP.
  *   Row 2: Q-P (leading pad on Q) + trailing literal apostrophe.
  *   Row 3: K_SYMBOLS (nextlayer "numeric") + A-L + the specials-access key
- *          (only when the desktop rules carry any AltGr mapping at all).
+ *          (only when the desktop rules carry any RAlt mapping at all).
  *   Row 4: K_SHIFT + Z-M + "." + "," + K_BKSP (widened to accommodate 11 keys).
  *   Row 5 (functional): K_LOPT + "@" + K_SPACE (wide) + "." + K_ENTER.
  *
@@ -1602,8 +1602,8 @@ function buildTabletLayers(
 ): TouchLayoutIR["platforms"][number]["layers"] {
   const layers: TouchLayoutIR["platforms"][number]["layers"] = [];
 
-  const hasAltgr = [...keyMap.values()].some((m) => m.has("altgr"));
-  const hasAltgrShift = [...keyMap.values()].some((m) => m.has("altgr-shift"));
+  const hasRightAlt = [...keyMap.values()].some((m) => m.has("rightalt"));
+  const hasRightAltShift = [...keyMap.values()].some((m) => m.has("rightalt-shift"));
 
   const letterLayers: Array<"default" | "shift"> = ["default", "shift"];
   for (const layerId of letterLayers) {
@@ -1633,8 +1633,8 @@ function buildTabletLayers(
         buildLetterKey(vkey, layerId, keyMap, deadkeySuccessors, minter, undefined,
           isDefault ? undefined : "default"),
       ),
-      ...(hasAltgr || hasAltgrShift
-        ? [buildTabletSpecialsKey(keyMap, minter, hasAltgr)]
+      ...(hasRightAlt || hasRightAltShift
+        ? [buildTabletSpecialsKey(keyMap, minter, hasRightAlt)]
         : []),
     ];
 
@@ -1672,8 +1672,8 @@ function buildTabletLayers(
 
   layers.push(buildTabletSymbolLayer(minter));
 
-  if (hasAltgr) layers.push(buildTabletAltgrLayer(keyMap, minter, hasAltgrShift));
-  if (hasAltgrShift) layers.push(buildTabletAltgrShiftLayer(keyMap, minter, hasAltgr));
+  if (hasRightAlt) layers.push(buildTabletRightAltLayer(keyMap, minter, hasRightAltShift));
+  if (hasRightAltShift) layers.push(buildTabletRightAltShiftLayer(keyMap, minter, hasRightAlt));
 
   return layers;
 }
@@ -2029,7 +2029,7 @@ export function buildMinimalPhoneTouchLayout(): TouchLayoutIR {
  * to build the "reachable anywhere in the emitted layout" set a produced
  * character is checked against — the true data-loss test, replacing the old
  * rejection-event/overflow-spill bookkeeping (which over-reported: a
- * character reachable via the altgr layer, the numeric layer, or its own key
+ * character reachable via the rightalt layer, the numeric layer, or its own key
  * is not lost just because it was also rejected from — or routed off of —
  * some OTHER key's longpress menu).
  */
@@ -2045,7 +2045,7 @@ function collectKeyText(key: TouchKeyIR, into: Set<string>): void {
  * The set of every character (or multi-char literal, e.g. "FCFA") reachable
  * anywhere in the given platform layers — every key's text/output, plus
  * every sk[]/flick{}/multitap[] sub-key's text/output, across every layer
- * (default, shift, numeric, altgr, and any other layer present). Computed
+ * (default, shift, numeric, rightalt, and any other layer present). Computed
  * AFTER all placement (deadkey sk[] attachment, overflow routing, space-bar
  * extras spill) has already happened, so it reflects the layout the author
  * actually sees/gets, not the intermediate placement bookkeeping.
@@ -2065,7 +2065,7 @@ function collectReachableChars(
 /**
  * The set of every character the desktop rules actually produce — the input
  * inventory the derivation is trying to place. Union of every keyMap value
- * (every vkey's default/shift/altgr output, whatever the compact skeleton
+ * (every vkey's default/shift/rightalt output, whatever the compact skeleton
  * does or doesn't have a slot for) and every deadkey-successor candidate
  * {@link buildDeadkeySuccessors} considered, whether it was accepted onto a
  * sk[] longpress menu or rejected as unrelated to its vkey's own base letter
@@ -2090,7 +2090,7 @@ function collectDesktopProducedChars(
  * scoped correctly this time): every desktop-produced character that is NOT
  * reachable anywhere in the final phone-platform layers. A rejected deadkey
  * candidate or a spilled overflow character that landed on a DIFFERENT key
- * (the altgr layer, the numeric layer, the space bar's extras, its own vkey)
+ * (the rightalt layer, the numeric layer, the space bar's extras, its own vkey)
  * is reachable and therefore not reported here — only a character that ends
  * up nowhere at all is. Order is the (deterministic) Set insertion order —
  * keyMap first, then rejected candidates — so results are stable across
@@ -2116,7 +2116,7 @@ export interface ScaffoldTouchLayoutResult {
   layout: TouchLayoutIR;
   /**
    * Characters the desktop rules produce that are reachable NOWHERE in the
-   * final phone-platform layout — not on their own key, not on the altgr or
+   * final phone-platform layout — not on their own key, not on the rightalt or
    * numeric layer, not on any key's sk[]/flick{}/multitap[] longpress menu
    * (see {@link computeUnplacedChars}). Empty when every desktop-produced
    * character is reachable somewhere. Advisory only — never gates anything;
@@ -2165,7 +2165,7 @@ export function scaffoldTouchLayoutWithDiagnostics(
 
   // A rejected deadkey-successor candidate is internal hygiene bookkeeping,
   // not a user-facing signal by itself — most rejected candidates ARE
-  // reachable elsewhere (their own key, the altgr layer). A single aggregated
+  // reachable elsewhere (their own key, the rightalt layer). A single aggregated
   // console.debug records that the filtering ran, without claiming any of
   // these characters are lost — the actual data-loss check is the
   // post-build reachability computation below (computeUnplacedChars).
