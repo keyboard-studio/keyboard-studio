@@ -429,7 +429,13 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     });
     const result = collectCharContributors(ir, 'a');
     expect(result.descriptors).toEqual([
-      { kind: 'keystroke', producedChar: 'a', keystrokeDisplay: 'A' },
+      {
+        kind: 'keystroke',
+        producedChar: 'a',
+        keystrokeDisplay: 'A',
+        inputSequence: ['A'],
+        output: 'a',
+      },
     ]);
   });
 
@@ -443,8 +449,64 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     });
     const result = collectCharContributors(ir, 'A');
     expect(result.descriptors).toEqual([
-      { kind: 'keystroke', producedChar: 'A', keystrokeDisplay: 'Shift+A' },
+      {
+        kind: 'keystroke',
+        producedChar: 'A',
+        keystrokeDisplay: 'Shift+A',
+        inputSequence: ['Shift+A'],
+        output: 'A',
+      },
     ]);
+  });
+
+  it('kind "keystroke": a MULTI-vkey context yields the full ordered input sequence + joined output (e.g. "A + Shift+B -> GHG")', () => {
+    // Two keystrokes (A, then Shift+B) producing a single multi-char literal
+    // output "GHG" — the shape the pre-existing-method label must now show
+    // as a full sequence, not just a single "Press" keystroke.
+    const rule = makeRule('r-digraph',
+      [
+        { kind: 'vkey', name: 'K_A', modifiers: [] },
+        { kind: 'vkey', name: 'K_B', modifiers: ['SHIFT'] },
+      ],
+      [{ kind: 'char', value: 'G' }, { kind: 'char', value: 'H' }, { kind: 'char', value: 'G' }],
+    );
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'GHG');
+    expect(result.descriptors).toEqual([
+      {
+        kind: 'keystroke',
+        producedChar: 'GHG',
+        inputSequence: ['A', 'Shift+B'],
+        output: 'GHG',
+      },
+    ]);
+  });
+
+  it('kind "keystroke": a context element that cannot be rendered to a friendly token leaves inputSequence absent (fallback path)', () => {
+    // `context(1)` (a previous-match reference) can't be summarized as a
+    // single friendly token without simulating the input buffer.
+    const rule = makeRule('r-ctxref',
+      [
+        { kind: 'vkey', name: 'K_A', modifiers: [] },
+        { kind: 'context', offset: 1 },
+      ],
+      [{ kind: 'char', value: 'a' }],
+    );
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'a');
+    // `keystrokeDisplay` still resolves (it only ever looks at `vkey`
+    // elements), but the new full-sequence fields are absent — a genuinely
+    // unresolvable element aborts the WHOLE sequence rather than silently
+    // dropping just that token.
+    expect(result.descriptors).toEqual([
+      { kind: 'keystroke', producedChar: 'a', keystrokeDisplay: 'A' },
+    ]);
+    expect(result.descriptors[0]).not.toHaveProperty('inputSequence');
+    expect(result.descriptors[0]).not.toHaveProperty('output');
   });
 
   it('kind "deadkey": mark + base are cheaply derived from the trigger rule + aligned any() store (Cameroon fixture)', () => {
@@ -453,14 +515,154 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     // deadkey id 0x003b is set by the trigger rule's K_SEMICOLON, and whose
     // aligned dkf003b#0 base item is 'a'.
     expect(result.descriptors).toEqual([
-      { kind: 'deadkey', producedChar: 'à', mark: 'SEMICOLON', base: 'a' },
+      {
+        kind: 'deadkey',
+        producedChar: 'à',
+        mark: 'SEMICOLON',
+        base: 'a',
+        // The fan-out rule's own context is `dk(0x003b) any(dkf003b)` — the
+        // deadkey token resolves via the same trigger pre-pass as `mark`,
+        // and the any() token resolves via the same aligned-slot lookup as
+        // `base` (both at slot index 0, dkf003b's 'a').
+        inputSequence: ['SEMICOLON', 'a'],
+        output: 'à',
+      },
     ]);
+  });
+
+  it('kind "deadkey": a punctuation-vkey trigger renders as its own glyph in inputSequence (e.g. "\' then a -> á"-shaped)', () => {
+    // Trigger rule: an UNMODIFIED K_QUOTE sets the deadkey — vkeyDisplayName
+    // maps K_QUOTE to the glyph "'" (no modifier prefix), so the fan-out's
+    // inputSequence shows the glyph itself, not a raw vkey id or key name.
+    const inputStore = makeStore('sid-base', 'baseChars', [{ kind: 'char', value: 'a' }]);
+    const outputStore = makeStore('sid-acute', 'acuteChars', [{ kind: 'char', value: 'á' }]);
+    const triggerRule = makeRule('r-trigger',
+      [{ kind: 'vkey', name: 'K_QUOTE', modifiers: [] }],
+      [{ kind: 'deadkey', id: 1 }],
+    );
+    const fanOutRule = makeRule('r-fanout',
+      [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'baseChars' }],
+      // offset is the 1-based position of the matched any() in the LHS
+      // (spec.md §5 index() example) — position 2 here (deadkey is
+      // position 1, any() is position 2), matching the Cameroon fixture's
+      // dk(...) any(...) > index(..., 2) shape above.
+      [{ kind: 'index', storeRef: 'acuteChars', offset: 2 }],
+    );
+    const ir = makeIR({
+      stores: [inputStore, outputStore],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [triggerRule, fanOutRule] }],
+    });
+    const result = collectCharContributors(ir, 'á');
+    expect(result.descriptors).toEqual([
+      {
+        kind: 'deadkey',
+        producedChar: 'á',
+        mark: "'",
+        base: 'a',
+        inputSequence: ["'", 'a'],
+        output: 'á',
+      },
+    ]);
+  });
+
+  it('kind "deadkey": a rule with TWO any() context elements resolves `base` from the OUTPUT index() offset, never the first any() positionally (regression, km-keyman #2)', () => {
+    // Fan-out rule context: dk(9), any(decoyAny) [position 2], any(alignedAny)
+    // [position 3]. The output is `index(outStore, 3)` — 1-based offset 3
+    // pairs with the THIRD context element (alignedAny), not the FIRST any()
+    // found positionally (decoyAny). A naive `.find(el => el.kind === 'any')`
+    // would wrongly report decoyAny's item ('wrong') as the base.
+    const decoyStore = makeStore('sid-decoy', 'decoyAny', [
+      { kind: 'char', value: 'y' }, { kind: 'char', value: 'y' }, { kind: 'char', value: 'wrong' },
+    ]);
+    const alignedStore = makeStore('sid-aligned', 'alignedAny', [
+      { kind: 'char', value: 'q' }, { kind: 'char', value: 'q' }, { kind: 'char', value: 'q' },
+    ]);
+    const outStore = makeStore('sid-out', 'outStore', [
+      { kind: 'char', value: 'x' }, { kind: 'char', value: 'x' }, { kind: 'char', value: 'ź' },
+    ]);
+    const triggerRule = makeRule('r-trigger-multi',
+      [{ kind: 'vkey', name: 'K_SEMICOLON', modifiers: [] }],
+      [{ kind: 'deadkey', id: 9 }],
+    );
+    const fanOutRule = makeRule('r-fanout-multi',
+      [
+        { kind: 'deadkey', id: 9 },
+        { kind: 'any', storeRef: 'decoyAny' },
+        { kind: 'any', storeRef: 'alignedAny' },
+      ],
+      [{ kind: 'index', storeRef: 'outStore', offset: 3 }],
+    );
+    const ir = makeIR({
+      stores: [decoyStore, alignedStore, outStore],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [triggerRule, fanOutRule],
+      }],
+    });
+    const result = collectCharContributors(ir, 'ź');
+    const deadkeyDescriptor = result.descriptors.find((d) => d.kind === 'deadkey');
+    expect(deadkeyDescriptor).toBeDefined();
+    // Base must come from `alignedAny` (the offset-paired store), never
+    // `decoyAny` (the first any() found positionally).
+    expect(deadkeyDescriptor?.base).toBe('q');
+    expect(deadkeyDescriptor?.mark).toBe('SEMICOLON');
+    // The full input sequence can't render: `decoyAny`'s any() element has no
+    // known aligned slot (only the offset-paired position resolves), so the
+    // sequence aborts rather than fabricate a token for it.
+    expect(deadkeyDescriptor?.inputSequence).toBeUndefined();
   });
 
   it('kind "deadkey": an input-side-only match leaves mark/base absent (not cheaply derivable from that side alone)', () => {
     const result = collectCharContributors(makeCameroonIR(), 'a');
     // 'a' lives only in the any()-consumed input store dkf003b#0.
     expect(result.descriptors).toEqual([{ kind: 'deadkey', producedChar: 'a' }]);
+  });
+
+  it('kind "deadkey": TWO trigger rules sharing a deadkey id with DIFFERENT keystrokes leave `mark` absent, deterministically (not last-write-wins)', () => {
+    // Two distinct trigger rules both arm deadkey id 7 — one via K_SEMICOLON,
+    // one via K_QUOTE. Which one is "the" mark is genuinely ambiguous, so
+    // `mark` must stay absent rather than silently pick whichever rule the
+    // pre-pass happened to visit last.
+    const baseChars = makeStore('sid-base', 'baseChars', [{ kind: 'char', value: 'a' }]);
+    const acuteChars = makeStore('sid-acute', 'acuteChars', [{ kind: 'char', value: 'á' }]);
+    const triggerA = makeRule('r-trigger-a',
+      [{ kind: 'vkey', name: 'K_SEMICOLON', modifiers: [] }],
+      [{ kind: 'deadkey', id: 7 }],
+    );
+    const triggerB = makeRule('r-trigger-b',
+      [{ kind: 'vkey', name: 'K_QUOTE', modifiers: [] }],
+      [{ kind: 'deadkey', id: 7 }],
+    );
+    const fanOutRule = makeRule('r-fanout-shared',
+      [{ kind: 'deadkey', id: 7 }, { kind: 'any', storeRef: 'baseChars' }],
+      [{ kind: 'index', storeRef: 'acuteChars', offset: 2 }],
+    );
+    const ir = makeIR({
+      stores: [baseChars, acuteChars],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [triggerA, triggerB, fanOutRule],
+      }],
+    });
+    const result = collectCharContributors(ir, 'á');
+    const deadkeyDescriptor = result.descriptors.find((d) => d.kind === 'deadkey');
+    expect(deadkeyDescriptor).toBeDefined();
+    expect(deadkeyDescriptor?.mark).toBeUndefined();
+    // `base` is still cheaply derivable (it doesn't depend on `mark`).
+    expect(deadkeyDescriptor?.base).toBe('a');
+
+    // Same result with the two trigger rules in the OPPOSITE order —
+    // deterministic, not iteration-order-dependent.
+    const irReversed = makeIR({
+      stores: [baseChars, acuteChars],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [triggerB, triggerA, fanOutRule],
+      }],
+    });
+    const resultReversed = collectCharContributors(irReversed, 'á');
+    const deadkeyDescriptorReversed = resultReversed.descriptors.find((d) => d.kind === 'deadkey');
+    expect(deadkeyDescriptorReversed?.mark).toBeUndefined();
   });
 
   it('kind "store-slot": a plain (non-deadkey) fan-out gets a humanized storeDisplayName', () => {
@@ -480,7 +682,15 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     });
     const result = collectCharContributors(ir, 'ɛ');
     expect(result.descriptors).toEqual([
-      { kind: 'store-slot', producedChar: 'ɛ', storeDisplayName: 'Alphabet Table' },
+      {
+        kind: 'store-slot',
+        producedChar: 'ɛ',
+        storeDisplayName: 'Alphabet Table',
+        // 'ɛ' is at slot 1 of 'kAlphabetTable'; the rule's any()-consumed
+        // 'keys' store at the SAME slot 1 is 'e' — the aligned input char.
+        inputSequence: ['e'],
+        output: 'ɛ',
+      },
     ]);
   });
 
@@ -498,7 +708,17 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
     });
     const result = collectCharContributors(ir, 'a');
-    expect(result.descriptors).toEqual([{ kind: 'store-slot', producedChar: 'a' }]);
+    expect(result.descriptors).toEqual([
+      {
+        kind: 'store-slot',
+        producedChar: 'a',
+        // 'a' is at slot 0 of 'tbl2'; the rule's any()-consumed 'keys' store
+        // at the SAME slot 0 is 'z' — the aligned input char, even though the
+        // store's own name couldn't be humanized.
+        inputSequence: ['z'],
+        output: 'a',
+      },
+    ]);
   });
 
   it('kind "blocked": an opaque RawKmnFragment producer gets blockedReasonCode "opaque-fragment"', () => {

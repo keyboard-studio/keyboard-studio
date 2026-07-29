@@ -31,6 +31,27 @@ import { displayChar } from "../../lib/irToCarveNodes.ts";
 // ---------------------------------------------------------------------------
 
 /**
+ * P2 collision guard: `inputSequence.join(connector)` renders unambiguously
+ * in the overwhelming common case, but a context token that IS ITSELF the
+ * connector text (or the "→" arrow the template uses to join the sequence to
+ * the output) — a rare literal-char rule whose keystroke/char happens to be
+ * e.g. "+" — would render indistinguishably from a genuine multi-token join
+ * or from the sequence/output boundary. Rather than guess which case
+ * applies, treat the sequence as unrenderable in that case and let the
+ * caller fall through to the generic per-kind template (which prints
+ * `mark`/`base`/`keystrokeDisplay` in FIXED positions, never joined from an
+ * arbitrary token array, so it has no equivalent ambiguity). Does not change
+ * the approved format for the normal (non-colliding) case.
+ */
+function sequenceCollidesWithConnector(
+  tokens: readonly string[],
+  connector: string,
+): boolean {
+  const trimmedConnector = connector.trim();
+  return tokens.some((token) => token === trimmedConnector || token === "→");
+}
+
+/**
  * Compose the author-facing label for one desktop contributor descriptor
  * (a whole-rule keystroke, a deadkey fan-out slot, a plain store-fan-out
  * slot, or a blocked/opaque producer).
@@ -40,6 +61,60 @@ export function composeContributorLabel(
   i18n?: I18n,
 ): string {
   const char = displayChar(descriptor.producedChar);
+
+  // The engine hands back the FULL ordered input sequence + exact output
+  // whenever every context element rendered to a friendly token (see
+  // `buildContextInputSequence` in collectCharContributors.ts) — compose the
+  // literal "{sequence} -> {output}" label directly from those engine-
+  // provided tokens rather than the generic per-kind template below. A
+  // deadkey chain reads as "mark then base"; anything else (a single
+  // keystroke or a multi-keystroke sequence) reads as "step + step".
+  if (descriptor.inputSequence !== undefined && descriptor.output !== undefined) {
+    const outputDisplay = displayChar(descriptor.output);
+    if (descriptor.kind === "deadkey") {
+      const connector = resolveMessage(
+        i18n,
+        msg({
+          id: "editor.assignLoop.existingMethod.desktop.deadkeySequenceConnector",
+          message: " then ",
+        }),
+      );
+      if (!sequenceCollidesWithConnector(descriptor.inputSequence, connector)) {
+        const sequence = descriptor.inputSequence.join(connector);
+        return resolveMessage(
+          i18n,
+          msg({
+            id: "editor.assignLoop.existingMethod.desktop.deadkeySequence",
+            message: `${{ sequence }} → ${{ char: outputDisplay }}`,
+          }),
+        );
+      }
+    } else {
+      const connector = resolveMessage(
+        i18n,
+        msg({
+          id: "editor.assignLoop.existingMethod.desktop.sequenceConnector",
+          message: " + ",
+        }),
+      );
+      if (!sequenceCollidesWithConnector(descriptor.inputSequence, connector)) {
+        const sequence = descriptor.inputSequence.join(connector);
+        return resolveMessage(
+          i18n,
+          msg({
+            id: "editor.assignLoop.existingMethod.desktop.sequence",
+            message: `${{ sequence }} → ${{ char: outputDisplay }}`,
+          }),
+        );
+      }
+    }
+    // Fall through to the generic per-kind template below — either the
+    // sequence collided with its own connector/arrow (see
+    // `sequenceCollidesWithConnector`), or `descriptor.kind` is one of the
+    // non-sequence kinds ("store-slot"/"blocked") for which `inputSequence`
+    // is never populated by the engine in the first place.
+  }
+
   switch (descriptor.kind) {
     case "keystroke":
       return descriptor.keystrokeDisplay !== undefined

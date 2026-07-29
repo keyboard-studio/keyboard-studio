@@ -38,8 +38,8 @@
  *     deleted; listed in `blocked`.
  */
 
-import type { IRRule, KeyboardIR } from "@keyboard-studio/contracts";
-import { isDeadkeyOnlyOutput } from "../shared/rule-shape.js";
+import type { ContextElement, IRRule, KeyboardIR } from "@keyboard-studio/contracts";
+import { isDeadkeyOnlyOutput, isPlusSeparator } from "../shared/rule-shape.js";
 import { makeSlotId } from "./slotId.js";
 
 // ---------------------------------------------------------------------------
@@ -131,6 +131,24 @@ export interface ContributorDescriptor {
   storeDisplayName?: string;
   /** `kind: "blocked"` only — which of the two blocked shapes this is. */
   blockedReasonCode?: 'opaque-fragment' | 'multi-char-output';
+  /**
+   * The FULL ordered, friendly input sequence for this contributor's rule —
+   * one token per `rule.context` element, e.g. `["A", "Shift+B"]` or
+   * `["´", "a"]` (deadkey mark then base). Present only when EVERY context
+   * element rendered to a friendly token (see `buildContextInputSequence`);
+   * absent — never fabricated — the moment one element can't be (e.g. a
+   * `context(n)`/`notany()`/`baselayout`/`raw` element, or an `any()`/deadkey
+   * element with nothing cheaply resolvable). The studio falls back to the
+   * per-`kind` generic template in that case.
+   */
+  inputSequence?: string[];
+  /**
+   * The exact produced output string for this contributor, paired with
+   * `inputSequence` (present iff `inputSequence` is). For a whole-rule
+   * keystroke contributor this is the rule's full literal output (e.g.
+   * `"GHG"`); for a store-slot/deadkey contributor it is `producedChar`.
+   */
+  output?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -233,6 +251,158 @@ function keystrokeDisplayForContext(context: IRRule['context']): string | undefi
 }
 
 /**
+ * Render ONE `rule.context` element to a friendly input-sequence token, or
+ * `undefined` when it isn't cheaply resolvable (the caller then aborts the
+ * WHOLE sequence rather than fabricate a placeholder):
+ *   - `char`    — the literal character itself.
+ *   - `vkey`    — modifier-prefixed friendly key label (`vkeyDisplayName` +
+ *                 `modifierDisplayPrefix`, same helpers as the single-vkey
+ *                 `keystrokeDisplay` above, extended to a MULTI-element
+ *                 context here).
+ *   - `deadkey` — the triggering rule's keystroke display, from the same
+ *                 `triggerKeystrokeByDeadkeyId` pre-pass that fills the
+ *                 `mark` field; undefined (abort) when that trigger rule
+ *                 isn't cheaply resolvable.
+ *   - `any`     — the aligned store item at `slotIndex`, but ONLY for the
+ *                 element identified as `alignedAnyElement` (resolved by
+ *                 {@link resolveAlignedAnyElement} from the matched output's
+ *                 `index()` offset — the fan-out mechanism's own
+ *                 position-pairing invariant, same alignment `base` uses
+ *                 below). A rule can carry more than one `any()` context
+ *                 element; only the one the output actually pairs with has a
+ *                 known slot position, so every OTHER `any()` element always
+ *                 returns undefined (abort) rather than guess. Also
+ *                 undefined when `slotIndex` is absent (no known aligned
+ *                 position, e.g. a plain literal rule with no store
+ *                 production) or the aligned item isn't a `char`.
+ *   - `notany`, `context`, `index` (in context position), `baselayout`,
+ *     `raw` — none cheaply resolvable to a single friendly token without
+ *     simulating the input buffer, walking a large excluded set, or
+ *     re-deriving an opaque construct — always undefined (abort).
+ */
+function contextElementTokenDisplay(
+  el: ContextElement,
+  storeMap: ReadonlyMap<string, KeyboardIR['stores'][number]>,
+  triggerKeystrokeByDeadkeyId: ReadonlyMap<number, string>,
+  slotIndex: number | undefined,
+  alignedAnyElement: ContextElement | undefined,
+): string | undefined {
+  switch (el.kind) {
+    case 'char':
+      return el.value;
+    case 'vkey': {
+      const keyName = vkeyDisplayName(el.name);
+      if (keyName === undefined) return undefined;
+      const prefix = modifierDisplayPrefix(el.modifiers);
+      return prefix ? `${prefix}+${keyName}` : keyName;
+    }
+    case 'deadkey':
+      return triggerKeystrokeByDeadkeyId.get(el.id);
+    case 'any': {
+      if (slotIndex === undefined || el !== alignedAnyElement) return undefined;
+      const store = storeMap.get(el.storeRef);
+      const item = store?.items[slotIndex];
+      return item !== undefined && item.kind === 'char' ? item.value : undefined;
+    }
+    case 'notany':
+    case 'context':
+    case 'index':
+    case 'baselayout':
+    case 'raw':
+      return undefined;
+    default: {
+      // Exhaustiveness guard: a new ContextElement kind must be handled above.
+      const _exhaustive: never = el;
+      return _exhaustive;
+    }
+  }
+}
+
+/**
+ * Resolve WHICH `any()` context element is paired with a matched output
+ * store slot, using the SAME offset convention as
+ * `applyStoreSlotRemovals.ts`'s index()/context pairing invariant:
+ * `effectiveContext[offset - 1]` — a 1-based `index()` `offset` into the
+ * rule's context with the codec's synthetic `+` keystroke-boundary separator
+ * filtered out first (see `isPlusSeparator`).
+ *
+ * A rule's context may carry more than one `any()` element (e.g. two
+ * fan-out stores consumed by the same rule); picking the FIRST one
+ * positionally — as opposed to the one the OUTPUT actually pairs with — can
+ * mislabel which store the "base" input comes from. This function is the
+ * one place that resolves the pairing:
+ *
+ *   - When the matched output element is `index()` (the only OutputElement
+ *     kind that carries an `offset`), the pairing is UNAMBIGUOUS: resolve
+ *     the exact context position and require it to be `kind === 'any'`.
+ *   - When the matched output element is `outs()` (no `offset` — the same
+ *     "can't be statically paired" shape `applyStoreSlotRemovals` fails
+ *     closed on) or there is no output element at all (a plain literal-
+ *     output rule), fall back to the single-`any()` convenience: with
+ *     EXACTLY ONE `any()` in context, that one is unambiguous by
+ *     elimination; with zero or more than one, there's no safe pairing.
+ *
+ * Returns the exact `ContextElement` instance (by reference, from
+ * `context`) so callers can identify it via `===` — never a copy — or
+ * `undefined` when the pairing can't be resolved unambiguously (callers then
+ * abort rather than guess).
+ */
+function resolveAlignedAnyElement(
+  context: readonly ContextElement[],
+  matchedOutputEl: { kind: string; offset: number | undefined } | undefined,
+): (ContextElement & { kind: 'any' }) | undefined {
+  const effectiveContext = context.filter((el) => !isPlusSeparator(el));
+
+  if (matchedOutputEl?.kind === 'index' && matchedOutputEl.offset !== undefined) {
+    const target = effectiveContext[matchedOutputEl.offset - 1];
+    return target !== undefined && target.kind === 'any' ? target : undefined;
+  }
+
+  const anyEls = effectiveContext.filter(
+    (el): el is ContextElement & { kind: 'any' } => el.kind === 'any',
+  );
+  return anyEls.length === 1 ? anyEls[0] : undefined;
+}
+
+/**
+ * Build the FULL ordered friendly input sequence from a rule's `context`
+ * (spec follow-up: pre-existing-method labels show the whole input sequence,
+ * not just a single keystroke). `slotIndex` — when known — lets the ALIGNED
+ * `any()` element (`alignedAnyElement`, resolved by
+ * {@link resolveAlignedAnyElement} from the matched output's `index()`
+ * offset) resolve to its aligned store item (a fan-out base char); pass
+ * `undefined` for both when no aligned position exists (a plain
+ * literal-output rule). Any OTHER `any()` element in `context` — i.e. one
+ * that isn't `alignedAnyElement` — always aborts the sequence: only the
+ * offset-paired position has a known slot index.
+ *
+ * Returns `undefined` — never a partially-fabricated array — the moment any
+ * ONE element can't be rendered, or when `context` is empty.
+ */
+function buildContextInputSequence(
+  context: readonly ContextElement[],
+  storeMap: ReadonlyMap<string, KeyboardIR['stores'][number]>,
+  triggerKeystrokeByDeadkeyId: ReadonlyMap<number, string>,
+  slotIndex: number | undefined,
+  alignedAnyElement: ContextElement | undefined,
+): string[] | undefined {
+  if (context.length === 0) return undefined;
+  const tokens: string[] = [];
+  for (const el of context) {
+    const token = contextElementTokenDisplay(
+      el,
+      storeMap,
+      triggerKeystrokeByDeadkeyId,
+      slotIndex,
+      alignedAnyElement,
+    );
+    if (token === undefined) return undefined;
+    tokens.push(token);
+  }
+  return tokens;
+}
+
+/**
  * Turn a raw Keyman store variable name into a human-readable table label —
  * strips a single leading Hungarian-notation "k" (only when followed by an
  * uppercase letter, so "keys" is never mangled into "eys"), splits
@@ -297,13 +467,34 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
   // trigger rule (output is exactly one `{kind:"deadkey"}` element) whose
   // context is cheaply summarizable as one keystroke. Used below to fill in
   // `mark` on a "deadkey" descriptor without a second full scan per slot.
+  //
+  // A deadkey id is normally set by exactly one trigger rule, but nothing in
+  // the IR enforces that — two trigger rules CAN legitimately share an id
+  // (e.g. two different keystrokes both arming the same deadkey family).
+  // When that happens with genuinely different keystrokes, last-write-wins
+  // on a plain Map would silently pick one iteration-order-dependently and
+  // mislabel `mark` for every slot that id feeds. Instead: the first
+  // resolved display for an id wins; a SECOND, DIFFERENT display for the
+  // same id makes that id permanently ambiguous — its entry is removed (and
+  // never re-added by a later rule) so `mark` is left absent, and the
+  // studio's generic "Part of a two-step combination" template covers it,
+  // rather than guessing which trigger is "the" one.
   const triggerKeystrokeByDeadkeyId = new Map<number, string>();
+  const ambiguousDeadkeyIds = new Set<number>();
   for (const group of ir.groups) {
     for (const rule of group.rules) {
       if (!isTriggerRule(rule)) continue;
       const deadkeyId = (rule.output[0] as { kind: 'deadkey'; id: number }).id;
+      if (ambiguousDeadkeyIds.has(deadkeyId)) continue;
       const display = keystrokeDisplayForContext(rule.context);
-      if (display !== undefined) triggerKeystrokeByDeadkeyId.set(deadkeyId, display);
+      if (display === undefined) continue;
+      const existing = triggerKeystrokeByDeadkeyId.get(deadkeyId);
+      if (existing === undefined) {
+        triggerKeystrokeByDeadkeyId.set(deadkeyId, display);
+      } else if (existing !== display) {
+        triggerKeystrokeByDeadkeyId.delete(deadkeyId);
+        ambiguousDeadkeyIds.add(deadkeyId);
+      }
     }
   }
 
@@ -432,7 +623,7 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
         if (inputMatched) addRuleLocation(rule, group);
       }
 
-      const outEls = rule.output as { kind: string; value?: string; storeRef?: string }[];
+      const outEls = rule.output as { kind: string; value?: string; storeRef?: string; offset?: number }[];
 
       // (a) Store-produced target — the character is emitted through an
       //     index()/outs() over a store (base-layer alphabet fan-out OR a
@@ -451,7 +642,16 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
               addStoreSlot(
                 makeSlotId(store.nodeId, i),
                 'output',
-                buildOutputSlotDescriptor(rule, isDeadkeyRule, target, store.name, i, storeMap, triggerKeystrokeByDeadkeyId),
+                buildOutputSlotDescriptor(
+                  rule,
+                  isDeadkeyRule,
+                  target,
+                  store.name,
+                  i,
+                  storeMap,
+                  triggerKeystrokeByDeadkeyId,
+                  { kind: el.kind, offset: el.offset },
+                ),
               );
               addLocation('store', store.name, store.nodeId);
               storeMatched = true;
@@ -477,10 +677,21 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
           seenRuleNodeIds.add(rule.nodeId);
           ruleNodeIds.push(rule.nodeId);
           const keystrokeDisplay = keystrokeDisplayForContext(rule.context);
+          // No aligned store slot for a plain literal-output rule — an
+          // any()/index() context element (rare here) always falls back
+          // (both slotIndex and alignedAnyElement are absent).
+          const inputSequence = buildContextInputSequence(
+            rule.context,
+            storeMap,
+            triggerKeystrokeByDeadkeyId,
+            undefined,
+            undefined,
+          );
           ruleDescriptors.push({
             kind: 'keystroke',
             producedChar: target,
             ...(keystrokeDisplay !== undefined ? { keystrokeDisplay } : {}),
+            ...(inputSequence !== undefined ? { inputSequence, output: wholeOutput } : {}),
           });
         }
         addRuleLocation(rule, group);
@@ -523,10 +734,13 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
  * `deadkey` element), attempts the cheap `mark`/`base` derivation:
  *   - `mark`  — via `triggerKeystrokeByDeadkeyId`, keyed by the rule's own
  *     `deadkey` context element's id (resolved by the trigger-rule pre-pass).
- *   - `base`  — the aligned `any()`-consumed store's item at the SAME slot
- *     index as the matched output slot (the fan-out mechanism's own
- *     alignment invariant — the two stores are position-paired by
- *     construction, the same alignment `applyStoreSlotRemovals` relies on).
+ *   - `base`  — the `any()`-consumed store's item at the SAME slot index as
+ *     the matched output slot, from the SPECIFIC `any()` context element the
+ *     matched output's `index()` `offset` pairs with (resolved once, via
+ *     {@link resolveAlignedAnyElement}, and reused for both `base` and
+ *     `inputSequence` below) — never just the first `any()` found
+ *     positionally, which mislabels the base when a rule carries more than
+ *     one `any()` context element.
  * Either piece is left absent (not fabricated) when it doesn't resolve.
  */
 function buildOutputSlotDescriptor(
@@ -537,9 +751,31 @@ function buildOutputSlotDescriptor(
   slotIndex: number,
   storeMap: ReadonlyMap<string, KeyboardIR['stores'][number]>,
   triggerKeystrokeByDeadkeyId: ReadonlyMap<number, string>,
+  matchedOutputEl: { kind: string; offset: number | undefined },
 ): ContributorDescriptor {
+  // Resolve ONCE which `any()` context element the matched output slot is
+  // actually paired with (see resolveAlignedAnyElement's doc comment for the
+  // offset convention, matched to applyStoreSlotRemovals.ts) — both the
+  // `base` derivation and `inputSequence` below use this SAME element, so
+  // they can never disagree about which store is "the base".
+  const alignedAnyEl = resolveAlignedAnyElement(rule.context, matchedOutputEl);
+
+  const inputSequence = buildContextInputSequence(
+    rule.context,
+    storeMap,
+    triggerKeystrokeByDeadkeyId,
+    slotIndex,
+    alignedAnyEl,
+  );
+  const sequenceFields = inputSequence !== undefined ? { inputSequence, output: target } : {};
+
   if (!isDeadkeyRule) {
-    return { kind: 'store-slot', producedChar: target, ...storeDisplayNameField(storeName) };
+    return {
+      kind: 'store-slot',
+      producedChar: target,
+      ...storeDisplayNameField(storeName),
+      ...sequenceFields,
+    };
   }
 
   const deadkeyEl = rule.context.find(
@@ -547,10 +783,7 @@ function buildOutputSlotDescriptor(
   );
   const mark = deadkeyEl !== undefined ? triggerKeystrokeByDeadkeyId.get(deadkeyEl.id) : undefined;
 
-  const anyEl = rule.context.find(
-    (el): el is { kind: 'any'; storeRef: string } => el.kind === 'any',
-  );
-  const anyStore = anyEl !== undefined ? storeMap.get(anyEl.storeRef) : undefined;
+  const anyStore = alignedAnyEl !== undefined ? storeMap.get(alignedAnyEl.storeRef) : undefined;
   const baseItem = anyStore?.items[slotIndex];
   const base = baseItem !== undefined && baseItem.kind === 'char' ? baseItem.value : undefined;
 
@@ -559,5 +792,6 @@ function buildOutputSlotDescriptor(
     producedChar: target,
     ...(mark !== undefined ? { mark } : {}),
     ...(base !== undefined ? { base } : {}),
+    ...sequenceFields,
   };
 }
