@@ -18,7 +18,12 @@ import { assetFileExtensions } from "../shared/siblingAssetStores.js";
 
 export { scaffoldIR, resetIdentity } from "./scaffold-ir.js";
 export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffold-ir.js";
-export { scaffoldTouchLayout, buildMinimalPhoneTouchLayout } from "./scaffoldTouchLayout.js";
+export {
+  scaffoldTouchLayout,
+  scaffoldTouchLayoutWithDiagnostics,
+  buildMinimalPhoneTouchLayout,
+} from "./scaffoldTouchLayout.js";
+export type { ScaffoldTouchLayoutResult } from "./scaffoldTouchLayout.js";
 
 export interface ScaffolderServiceOptions {
   proxyBase?: string;

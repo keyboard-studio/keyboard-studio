@@ -52,7 +52,7 @@ import {
   applyDesktopModificationsToRawJson,
   applyTouchAssignments,
   applyTouchAssignmentsToRawJson,
-  scaffoldTouchLayout,
+  scaffoldTouchLayoutWithDiagnostics,
   emitTouchLayout,
   parseTouchLayout,
   type DesktopModifications,
@@ -67,6 +67,16 @@ export interface BuildTouchLayoutJsonResult {
   json: string | null;
   /** Diagnostic messages for unmatched host keys or unhandled assignments. */
   warnings: string[];
+  /**
+   * Characters the seed derivation (Case A only — `scaffoldTouchLayout`)
+   * produces that are reachable NOWHERE in the derived layout — not on their
+   * own key, the altgr/numeric layer, or any key's sk[] longpress menu (see
+   * `scaffoldTouchLayoutWithDiagnostics`'s `unplacedChars`, a TRUE
+   * reachability check, not a log of internal placement decisions). Empty on
+   * Case B (raw-JSON splice never runs the scaffolder) or when every
+   * produced character is reachable somewhere. Advisory only.
+   */
+  unplacedChars: string[];
 }
 
 export interface BuildTouchLayoutJsonOpts {
@@ -113,14 +123,20 @@ function resolveSeedCase(opts: BuildTouchLayoutJsonOpts): SeedCase {
  * carry the base's own platforms into a "reseed" and violate US2-AS4 — then
  * scaffolds and replays `mods`. Shared by `buildTouchLayoutJson`'s Case A
  * branch and {@link deriveSeedLayout}.
+ *
+ * Requests the tablet-style skeleton (`platformStyle:"tablet"`) — the ONE
+ * call site in the codebase that does; every other caller of
+ * `scaffoldTouchLayoutWithDiagnostics` omits the param and gets the phone
+ * skeleton unchanged.
  */
 function buildCaseASeed(
   baseIr: KeyboardIR,
   mods: DesktopModifications,
-): { layout: TouchLayoutIR; warnings: string[] } {
+): { layout: TouchLayoutIR; warnings: string[]; unplacedChars: string[] } {
   const { touchLayout: _stripped, ...rest } = baseIr;
-  const seed = scaffoldTouchLayout(rest);
-  return applyDesktopModifications(seed, mods);
+  const { layout: seed, unplacedChars } = scaffoldTouchLayoutWithDiagnostics(rest, "tablet");
+  const { layout, warnings } = applyDesktopModifications(seed, mods);
+  return { layout, warnings, unplacedChars };
 }
 
 /**
@@ -142,11 +158,13 @@ function buildCaseASeed(
 export function deriveSeedLayout(
   baseIr: KeyboardIR,
   opts: BuildTouchLayoutJsonOpts,
-): { layout: TouchLayoutIR; warnings: string[] } {
+): { layout: TouchLayoutIR; warnings: string[]; unplacedChars: string[] } {
   const seedCase = resolveSeedCase(opts);
   if (seedCase.case === "B") {
     const { json, warnings } = applyDesktopModificationsToRawJson(seedCase.baseTouchJson, opts.mods);
-    return { layout: parseTouchLayout(json), warnings };
+    // Case B never runs the scaffolder (it splices the shipped raw JSON), so
+    // there is nothing for it to spill onto the "extras" grouping.
+    return { layout: parseTouchLayout(json), warnings, unplacedChars: [] };
   }
   return buildCaseASeed(baseIr, opts.mods);
 }
@@ -183,18 +201,20 @@ export function buildTouchLayoutJson(
         afterMods,
         assignments,
       );
-      return { json, warnings: [...modsWarnings, ...assignWarnings] };
+      // Case B never runs the scaffolder — nothing to spill onto "extras".
+      return { json, warnings: [...modsWarnings, ...assignWarnings], unplacedChars: [] };
     }
 
     // Case A — reseed from desktop (explicit choice, or the import-adapt
     // fallback when there is no shipped touch layout to adapt onto).
-    const { layout: seedLayout, warnings: seedWarnings } = buildCaseASeed(baseIr, opts.mods);
+    const { layout: seedLayout, warnings: seedWarnings, unplacedChars } = buildCaseASeed(baseIr, opts.mods);
     const { layout, warnings: assignWarnings } = applyTouchAssignments(seedLayout, assignments);
-    return { json: emitTouchLayout(layout), warnings: [...seedWarnings, ...assignWarnings] };
+    return { json: emitTouchLayout(layout), warnings: [...seedWarnings, ...assignWarnings], unplacedChars };
   } catch (err) {
     return {
       json: null,
       warnings: ["[buildTouchLayoutJson] failed: " + String(err)],
+      unplacedChars: [],
     };
   }
 }

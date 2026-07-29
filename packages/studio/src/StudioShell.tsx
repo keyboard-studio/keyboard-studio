@@ -1016,10 +1016,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // stores + draft directly and never trips the rebase-confirm dialog.
   const resetButton = <SurveyResetButton onReset={handleStartOver} />;
 
-  // Full-screen steps (carve/mechanisms/sequences/touch) bypass the two-pane layout.
-  // StepHost returns the full-screen container; SurveyView renders it directly.
-  // This reproduces the pre-Stage-5 early-return pattern without per-step branches
-  // in SurveyView — the decision is data-driven via step.layout (R4, FR-002).
+  // Full-screen steps (carve/mechanisms/touch/touch_seed_source) bypass the
+  // two-pane layout. StepHost returns the full-screen container; SurveyView
+  // renders it directly. This reproduces the pre-Stage-5 early-return pattern
+  // without per-step branches in SurveyView — the decision is data-driven via
+  // step.layout (R4, FR-002). touch_seed_source needs this too (P0 fix, spec
+  // 035 R4b follow-up): its panel renders its own inline live OSK preview, so
+  // the two-pane shell's persistent right-pane OSKFrame must NOT also mount —
+  // that was the redundant-desktop-preview bug.
   if (activeStepIsFullScreen) {
     return (
       <>
