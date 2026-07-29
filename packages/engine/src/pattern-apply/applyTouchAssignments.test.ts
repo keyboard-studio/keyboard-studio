@@ -7,8 +7,9 @@
  *   3. Accumulation across multiple assignments to the same host key
  *   4. Idempotency / deduplication
  *   5. Purity (no mutation of the original layout)
- *   6. Structural isolation (shift layer and tablet platform untouched)
+ *   6. Structural isolation (shift layer untouched; tablet untouched when phone present)
  *   7. Emit-side round-trip for flick/multitap
+ *   8. Mobile platform resolution (phone-preferred, tablet-fallback — spec-035 R7a)
  */
 
 import { describe, it, expect } from "vitest";
@@ -396,16 +397,72 @@ describe("applyTouchAssignments — isolation of other layers and platforms", ()
     expect(outTablet).toBe(inputTablet);
   });
 
-  it("a layout with no phone platform returns unchanged layout + one warning", () => {
-    const noPhoneLayout: TouchLayoutIR = {
-      platforms: [{ id: "tablet", layers: [{ id: "default", rows: [] }] }],
+  it("phone-containing layout is unaffected by tablet's presence — phone still preferred when both exist", () => {
+    // Same layout as the "tablet platform is reference-equal" case above, but
+    // this asserts the OTHER half of the contract: the assignment actually
+    // lands on the phone platform (not silently dropped, not misrouted to
+    // tablet) when both platforms are present.
+    const layout = makeLayout([makeKey("K_A")], { tabletPlatform: true });
+
+    const { layout: out } = applyTouchAssignments(layout, [longpress("K_A", "á")]);
+
+    const key = getKey(out, "K_A")!;
+    expect(key.sk).toHaveLength(1);
+    expect(key.sk![0]!.id).toBe("U_00E1");
+
+    // ...and the tablet platform is still untouched (reference-equal).
+    const inputTablet = layout.platforms.find((p) => p.id === "tablet")!;
+    const outTablet = out.platforms.find((p) => p.id === "tablet")!;
+    expect(outTablet).toBe(inputTablet);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mobile platform resolution — phone-preferred, tablet-fallback (spec-035
+// amendment R7a: the reseed-from-desktop derivation now emits a TABLET
+// platform, and Phase E must apply touch assignments to it just like it
+// always has for phone — not silently no-op).
+// ---------------------------------------------------------------------------
+
+describe("applyTouchAssignments — mobile platform resolution (phone/tablet, spec-035 R7a)", () => {
+  it("tablet-only layout: assignments are APPLIED to the tablet platform's layer", () => {
+    const tabletOnlyLayout: TouchLayoutIR = {
+      platforms: [
+        {
+          id: "tablet",
+          layers: [{ id: "default", rows: [{ keys: [makeKey("K_A")] }] }],
+        },
+      ],
       nodeIds: [],
     };
 
-    const { layout: out, warnings } = applyTouchAssignments(noPhoneLayout, [longpress("K_A", "á")]);
+    const { layout: out, warnings } = applyTouchAssignments(tabletOnlyLayout, [
+      longpress("K_A", "á"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+    const tablet = out.platforms.find((p) => p.id === "tablet")!;
+    const def = tablet.layers.find((l) => l.id === "default")!;
+    const key = def.rows.flatMap((r) => r.keys).find((k) => k.id === "K_A")!;
+    expect(key.sk).toHaveLength(1);
+    expect(key.sk![0]!.id).toBe("U_00E1");
+    expect(key.sk![0]!.text).toBe("á");
+  });
+
+  it("a layout with NEITHER phone nor tablet platform returns unchanged layout + one warning", () => {
+    // The genuine no-mobile-platform guard — still a safe no-op, unlike the
+    // tablet-only case above which R7a supersedes.
+    const noMobileLayout: TouchLayoutIR = {
+      platforms: [{ id: "desktop", layers: [{ id: "default", rows: [] }] }],
+      nodeIds: [],
+    };
+
+    const { layout: out, warnings } = applyTouchAssignments(noMobileLayout, [
+      longpress("K_A", "á"),
+    ]);
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain("no phone platform");
-    expect(out).toBe(noPhoneLayout); // same reference — unchanged
+    expect(warnings[0]).toContain("no phone or tablet platform");
+    expect(out).toBe(noMobileLayout); // same reference — unchanged
   });
 });
 

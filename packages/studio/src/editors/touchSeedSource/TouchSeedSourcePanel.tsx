@@ -3,14 +3,15 @@
 // Renders the off-spine "touch_seed_source" step (contracts/seed-source-fork.md):
 // lets the author pick "Import & adapt" (keep + adapt the base's shipped touch
 // layout) vs "Reseed from desktop" (discard any shipped touch layout and derive
-// a fresh phone projection from the locked desktop work). The choice is recorded
+// a fresh tablet projection from the locked desktop work). The choice is recorded
 // in surveySessionStore.touchSeedSource; buildTouchLayoutJson's caller reads it
 // to select the Case A/B derivation path (see seed-derivation.md).
 //
 // LIVE PREVIEW — REAL OSK (spec 035 R4b amendment; km-doc records the amendment
 // separately). The right-hand pane no longer renders a homemade keycap grid —
 // it renders the SAME live on-screen-keyboard preview TouchGallery uses
-// (OSKFrame, fed by useKeyboardArtifact), forced into mobile/touch OSK mode with
+// (OSKFrame, fed by useKeyboardArtifact), forced into tablet OSK mode (the
+// reseed derivation now emits a tablet-platform layout — see below) with
 // no Desktop/Mobile toggle on this screen. This is a deliberate, explicit
 // override of the earlier "no OSK / no engine calls in this panel" restriction
 // (R4/R4a) — the user asked for the real preview, not a facsimile.
@@ -18,17 +19,17 @@
 // The OSK's VFS transform injects whichever seed layout the currently-selected
 // card represents: "Import & adapt" derives the base's shipped touch layout
 // (Case B: raw-JSON splice) with the locked desktop work (`mods`, spec 035 R3)
-// replayed onto it; "Reseed from desktop" derives a fresh phone layout from
+// replayed onto it; "Reseed from desktop" derives a fresh tablet layout from
 // scratch (Case A) with the same `mods` replayed. Both paths share
 // `deriveSeedLayout` (buildTouchLayoutJson.ts) — the same pure seed-derivation
 // TouchGallery's own "already in touch layout" detection uses — re-serialized
 // via the engine's `emitTouchLayout` for VFS injection. There are no Phase E
 // touch assignments yet at this step, so there is nothing else to apply.
 //
-// ADVISORY, NEVER GATING (R4): hints (missing phone platform, tablet/desktop
-// discard on reseed, unplaced/spilled reseed characters) annotate the choices
-// but never disable either one — the author decides which seed to use,
-// "usable" is not auto-classified.
+// ADVISORY, NEVER GATING (R4): hints (missing phone platform on the base's
+// shipped layout, phone/desktop discard on reseed, unplaced/spilled reseed
+// characters) annotate the choices but never disable either one — the author
+// decides which seed to use, "usable" is not auto-classified.
 //
 // GRACEFUL DEGRADATION: if there is no baseIr yet, or the seed derivation
 // throws, the OSK is not mounted at all (a blank iframe with no explanation is
@@ -357,7 +358,7 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
     }
     return (
       <div data-testid="seed-source-osk-preview">
-        <OSKFrame baseKeyboard={baseKeyboard} oskMode="touch" stage={stage} retry={retry} />
+        <OSKFrame baseKeyboard={baseKeyboard} oskMode="tablet" stage={stage} retry={retry} />
       </div>
     );
   }
@@ -467,10 +468,10 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
                   <Trans id="editor.touchSeed.reseedTitle">Reseed from desktop</Trans>
                 </span>
                 <span style={{ fontSize: 12, color: TEXT_DIM }}>
-                  <Trans id="editor.touchSeed.reseedDescription">Derive a fresh phone layout from your desktop key assignments.</Trans>
+                  <Trans id="editor.touchSeed.reseedDescription">Derive a fresh tablet layout from your desktop key assignments.</Trans>
                   {hasOtherPlatforms && (
                     <Trans id="editor.touchSeed.reseedDiscardsPlatforms">
-                      {" "}Choosing this discards the base's shipped tablet/desktop touch platforms — only a phone layout is produced.
+                      {" "}Choosing this discards the base's shipped phone/desktop touch platforms — only a tablet layout is produced.
                     </Trans>
                   )}
                 </span>
@@ -501,7 +502,7 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
           </div>
 
           {/* Right column — live OSK preview, matching the currently-selected
-              card (spec 035 R4b) — forced mobile/touch mode, no desktop OSK
+              card (spec 035 R4b) — forced tablet mode, no desktop OSK
               and no mode toggle on this screen. */}
           <div className="ks-touch-seed-preview-col" style={previewColumnStyle}>
             {selected === "import-adapt" ? (
@@ -542,7 +543,7 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
             ) : (
               <div style={previewCardStyle} data-testid="seed-source-reseed-preview">
                 <p style={previewEyebrowStyle}>
-                  <Trans id="editor.touchSeed.reseedPreviewEyebrow">Derived phone layout (reseed preview)</Trans>
+                  <Trans id="editor.touchSeed.reseedPreviewEyebrow">Derived tablet layout (reseed preview)</Trans>
                 </p>
 
                 {renderTouchOsk("seed-source-reseed-preview-error")}

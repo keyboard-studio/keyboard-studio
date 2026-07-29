@@ -737,6 +737,11 @@ function collectOverflowEntries(
  * layer's space bar, so nothing produced by the desktop rules is ever
  * silently dropped even when it has no natural key of its own. No-op when
  * `extras` is empty or the default layer / space key aren't present.
+ *
+ * Searches every row of the default layer for the `K_SPACE` key rather than
+ * assuming a fixed row index — the phone skeleton's functional row is always
+ * `rows[3]`, but the tablet skeleton's (5 rows, digit row first) is `rows[4]`;
+ * this scan finds either without needing to know which shape it was given.
  */
 function attachOverflowExtras(
   layers: TouchLayoutIR["platforms"][number]["layers"],
@@ -746,23 +751,27 @@ function attachOverflowExtras(
   if (extras.length === 0) return;
 
   const defaultLayer = layers.find((l) => l.id === "default");
-  const funcRow = defaultLayer?.rows[3];
-  const spaceIdx = funcRow?.keys.findIndex((k) => k.id === "K_SPACE") ?? -1;
-  if (funcRow === undefined || spaceIdx === -1) return;
+  if (defaultLayer === undefined) return;
 
-  const space = funcRow.keys[spaceIdx]!;
-  funcRow.keys[spaceIdx] = {
-    ...space,
-    sk: [
-      ...(space.sk ?? []),
-      ...extras.map((ch) => ({
-        nodeId: minter.mint("touchKey"),
-        id: charToUnicodeKeyId(ch),
-        text: ch,
-        provenance: "physical-suggested" as const,
-      })),
-    ],
-  };
+  for (const row of defaultLayer.rows) {
+    const spaceIdx = row.keys.findIndex((k) => k.id === "K_SPACE");
+    if (spaceIdx === -1) continue;
+
+    const space = row.keys[spaceIdx]!;
+    row.keys[spaceIdx] = {
+      ...space,
+      sk: [
+        ...(space.sk ?? []),
+        ...extras.map((ch) => ({
+          nodeId: minter.mint("touchKey"),
+          id: charToUnicodeKeyId(ch),
+          text: ch,
+          provenance: "physical-suggested" as const,
+        })),
+      ],
+    };
+    return;
+  }
 }
 
 /**
@@ -1298,6 +1307,458 @@ function buildCanonicalPhoneLayers(
   return layers;
 }
 
+// ---------------------------------------------------------------------------
+// Tablet layer builder — reseed-from-desktop tablet-style layout.
+//
+// Modeled on the STRUCTURE of a shipped tablet layout (see e.g.
+// sil_cameroon_qwerty.keyman-touch-layout in keymanapp/keyboards): a number
+// row, QWERTY/ASDF/ZXCM letter rows, and a functional row — but with digits
+// where the reference puts diacritic marks, and diacritics carried instead as
+// sk[] longpress under their base letters (same mechanism as the phone path).
+// A single prominent "specials" key replaces the reference's per-key AltGr
+// toggle-row-spacer approach for reaching the altgr/altgr-shift layers, and
+// every letter key on those secondary layers auto-returns to "default" after
+// a tap (the reference's own convention — see e.g. the "rightalt" layer's
+// K_W/K_E/etc, which all carry "nextlayer": "default").
+// ---------------------------------------------------------------------------
+
+/** Every vkey a tablet altgr/altgr-shift layer letter row covers, in on-screen order. */
+const TABLET_ALTGR_VKEYS = [
+  ...COMPACT_ROW1_VKEYS,
+  ...COMPACT_ROW2_VKEYS,
+  "K_Z", "K_X", "K_C", "K_V", "K_B", "K_N", "K_M",
+] as const;
+
+/**
+ * Build a tablet altgr/altgr-shift layer's letter key: same text resolution as
+ * {@link buildLetterKey}, but always tagged `nextlayer:"default"` (spec item
+ * 3 — a tap types the special char and auto-returns, so the user is never
+ * stranded on the specials layer) and never carries sk[] (diacritics are a
+ * default-layer-only concept, unchanged from the phone path).
+ */
+function buildTabletAltgrLetterKey(
+  vkey: string,
+  layerId: "altgr" | "altgr-shift",
+  keyMap: KeyMap,
+  minter: NodeIdMinter,
+  pad?: number,
+): TouchKeyIR {
+  const text = resolveKeyText(vkey, layerId, keyMap);
+  return {
+    nodeId: minter.mint("touchKey"),
+    id: vkey,
+    ...(text !== "" ? { text, output: text } : {}),
+    ...(pad !== undefined ? { pad } : {}),
+    nextlayer: "default",
+  };
+}
+
+/**
+ * Compute the specials-access key's self-label: the first 2-3 non-empty
+ * characters the target secondary layer actually produces, in on-screen
+ * reading order (mirrors the reference's "əŋɔ" label on its own T_CAM key).
+ * Falls back to a generic label on the (should-not-happen, since the caller
+ * only builds this key when `hasAltgr || hasAltgrShift`) case where the
+ * target layer produces nothing at all.
+ */
+function computeSpecialsLabel(keyMap: KeyMap, targetLayer: "altgr" | "altgr-shift"): string {
+  const chars: string[] = [];
+  for (const vkey of TABLET_ALTGR_VKEYS) {
+    if (chars.length >= 3) break;
+    const text = resolveKeyText(vkey, targetLayer, keyMap);
+    if (text !== "") chars.push(text);
+  }
+  return chars.length > 0 ? chars.join("") : "*Specials*";
+}
+
+/**
+ * Build the tablet's specials-access key (spec item 3's "combo-key model"):
+ * ONE prominent key at the end of row 3, self-labeled from the target
+ * secondary layer's own produced characters, routing to whichever of
+ * altgr/altgr-shift actually exists (altgr preferred — mirrors
+ * {@link buildAltgrToggleKey}'s "default" origin case exactly, since this key
+ * plays the same graph role that origin's row-1 trailing toggle plays on the
+ * phone skeleton, just presented as a single named key instead of a spacer
+ * replacement).
+ */
+function buildTabletSpecialsKey(
+  keyMap: KeyMap,
+  minter: NodeIdMinter,
+  hasAltgr: boolean,
+  hasAltgrShift: boolean,
+): TouchKeyIR {
+  const targetLayer: "altgr" | "altgr-shift" = hasAltgr ? "altgr" : "altgr-shift";
+  return {
+    nodeId: minter.mint("touchKey"),
+    id: "T_ks_specials",
+    text: computeSpecialsLabel(keyMap, targetLayer),
+    width: 150,
+    sp: 1,
+    nextlayer: targetLayer,
+  };
+}
+
+/** Shared functional row (K_LOPT / @ / space / . / K_ENTER) for the tablet's
+ *  default/shift/altgr/altgr-shift layers — identical shape on every layer. */
+function buildTabletFunctionalRow(minter: NodeIdMinter): TouchKeyIR[] {
+  return [
+    { nodeId: minter.mint("touchKey"), id: "K_LOPT", text: "*Menu*", width: 120, sp: 1 },
+    { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId("@"), text: "@" },
+    { nodeId: minter.mint("touchKey"), id: "K_SPACE", text: "", width: 610 },
+    { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId("."), text: "." },
+    { nodeId: minter.mint("touchKey"), id: "K_ENTER", text: "*Enter*", width: 150, sp: 1 },
+  ];
+}
+
+/** Digit row (1-0 + K_BKSP) — the tablet default/shift layers' row 1. */
+function buildTabletNumberRow(minter: NodeIdMinter): TouchKeyIR[] {
+  return [
+    ...(["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"] as const).map((ch) => ({
+      nodeId: minter.mint("touchKey"),
+      id: charToUnicodeKeyId(ch),
+      text: ch,
+    })),
+    { nodeId: minter.mint("touchKey"), id: "K_BKSP", text: "*BkSp*", width: 150, sp: 1 },
+  ];
+}
+
+/**
+ * Build the tablet altgr layer: row 0 (Q-P), row 1 (A-L, pad on A), row 2
+ * (K_SHIFT toggle + Z-M + K_BKSP), row 3 (functional). Every letter key
+ * carries `nextlayer:"default"` (auto-return); the K_SHIFT toggle keeps
+ * {@link buildAltgrToggleKey}'s hasAltgr/hasAltgrShift-driven target logic so
+ * altgr-shift stays reachable when both secondary layers exist.
+ */
+function buildTabletAltgrLayer(
+  keyMap: KeyMap,
+  minter: NodeIdMinter,
+  hasAltgrShift: boolean,
+): TouchLayoutIR["platforms"][number]["layers"][number] {
+  const row0Keys: TouchKeyIR[] = COMPACT_ROW1_VKEYS.map((vkey, i) =>
+    buildTabletAltgrLetterKey(vkey, "altgr", keyMap, minter, i === 0 ? 55 : undefined),
+  );
+
+  const row1Keys: TouchKeyIR[] = [
+    buildTabletAltgrLetterKey("K_A", "altgr", keyMap, minter, 50),
+    ...COMPACT_ROW2_VKEYS.slice(1).map((vkey) =>
+      buildTabletAltgrLetterKey(vkey, "altgr", keyMap, minter),
+    ),
+  ];
+
+  const row2Keys: TouchKeyIR[] = [
+    {
+      nodeId: minter.mint("touchKey"),
+      id: "K_SHIFT",
+      text: "*Shift*",
+      sp: 1,
+      nextlayer: hasAltgrShift ? "altgr-shift" : "shift",
+    },
+    ...["K_Z", "K_X", "K_C", "K_V", "K_B", "K_N", "K_M"].map((vkey) =>
+      buildTabletAltgrLetterKey(vkey, "altgr", keyMap, minter),
+    ),
+    { nodeId: minter.mint("touchKey"), id: "K_BKSP", text: "*BkSp*", sp: 1 },
+  ];
+
+  return {
+    id: "altgr",
+    rows: [
+      { keys: row0Keys },
+      { keys: row1Keys },
+      { keys: row2Keys },
+      { keys: buildTabletFunctionalRow(minter) },
+    ],
+  };
+}
+
+/**
+ * Build the tablet altgr-shift layer — structural mirror of
+ * {@link buildTabletAltgrLayer}, reading "altgr-shift" text. Its K_SHIFT
+ * toggle returns to "altgr" (keeping AltGr held, uppercase specials done) when
+ * an altgr layer exists, else releases straight to "default" (no altgr layer
+ * to hold) — same graph role as the phone skeleton's altgr-shift K_SHIFT key.
+ */
+function buildTabletAltgrShiftLayer(
+  keyMap: KeyMap,
+  minter: NodeIdMinter,
+  hasAltgr: boolean,
+): TouchLayoutIR["platforms"][number]["layers"][number] {
+  const row0Keys: TouchKeyIR[] = COMPACT_ROW1_VKEYS.map((vkey, i) =>
+    buildTabletAltgrLetterKey(vkey, "altgr-shift", keyMap, minter, i === 0 ? 55 : undefined),
+  );
+
+  const row1Keys: TouchKeyIR[] = [
+    buildTabletAltgrLetterKey("K_A", "altgr-shift", keyMap, minter, 50),
+    ...COMPACT_ROW2_VKEYS.slice(1).map((vkey) =>
+      buildTabletAltgrLetterKey(vkey, "altgr-shift", keyMap, minter),
+    ),
+  ];
+
+  const row2Keys: TouchKeyIR[] = [
+    {
+      nodeId: minter.mint("touchKey"),
+      id: "K_SHIFT",
+      text: "*Shift*",
+      sp: 2,
+      nextlayer: hasAltgr ? "altgr" : "default",
+    },
+    ...["K_Z", "K_X", "K_C", "K_V", "K_B", "K_N", "K_M"].map((vkey) =>
+      buildTabletAltgrLetterKey(vkey, "altgr-shift", keyMap, minter),
+    ),
+    { nodeId: minter.mint("touchKey"), id: "K_BKSP", text: "*BkSp*", sp: 1 },
+  ];
+
+  return {
+    id: "altgr-shift",
+    rows: [
+      { keys: row0Keys },
+      { keys: row1Keys },
+      { keys: row2Keys },
+      { keys: buildTabletFunctionalRow(minter) },
+    ],
+  };
+}
+
+/**
+ * Build the tablet's numeric/symbol layer: the phone numeric layer's row 1
+ * (currency/misc symbols) and row 2 (brackets/math) verbatim, MINUS its digit
+ * row (item 5 — digits now live on the tablet default layer's row 1), plus
+ * the same "*abc*" return-to-default functional row. Kept under the id
+ * "numeric" for continuity with K_SYMBOLS' nextlayer target on the phone path.
+ */
+function buildTabletSymbolLayer(
+  minter: NodeIdMinter,
+): TouchLayoutIR["platforms"][number]["layers"][number] {
+  const row1Symbols: Array<[string, number | undefined]> = [
+    ["$", 50], ["@", undefined], ["#", undefined], ["%", undefined],
+    ["&", undefined], ["_", undefined], ["=", undefined],
+    ["|", undefined], ["\\", undefined],
+  ];
+  const row1Keys: TouchKeyIR[] = [
+    ...row1Symbols.map(([ch, pad]) => ({
+      nodeId: minter.mint("touchKey"),
+      id: charToUnicodeKeyId(ch),
+      text: ch,
+      ...(pad !== undefined ? { pad } : {}),
+    })),
+    { nodeId: minter.mint("touchKey"), id: "K_BKSP", text: "*BkSp*", width: 150, sp: 1 },
+  ];
+
+  const row2Keys: TouchKeyIR[] = [
+    { nodeId: minter.mint("touchKey"), id: "K_LBRKT", text: "[" },
+    { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId("("), text: "(" },
+    { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId(")"), text: ")" },
+    { nodeId: minter.mint("touchKey"), id: "K_RBRKT", text: "]" },
+    { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId("+"), text: "+" },
+    { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId("-"), text: "-" },
+    { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId("*"), text: "*" },
+    { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId("/"), text: "/" },
+  ];
+
+  const row3Keys: TouchKeyIR[] = [
+    {
+      nodeId: minter.mint("touchKey"),
+      id: "K_LOWER",
+      text: "*abc*",
+      sp: 1,
+      width: 150,
+      nextlayer: "default",
+    },
+    { nodeId: minter.mint("touchKey"), id: "K_LOPT", text: "*Menu*", sp: 1, width: 120 },
+    { nodeId: minter.mint("touchKey"), id: "K_SPACE", text: "", width: 610 },
+    { nodeId: minter.mint("touchKey"), id: "K_ENTER", text: "*Enter*", sp: 1, width: 150 },
+  ];
+
+  return {
+    id: "numeric",
+    rows: [{ keys: row1Keys }, { keys: row2Keys }, { keys: row3Keys }],
+  };
+}
+
+/**
+ * Build the tablet default + shift layers (and, when the desktop rules carry
+ * AltGr mappings, the altgr / altgr-shift secondary layers), plus the tablet
+ * numeric/symbol layer — sibling to {@link buildCanonicalPhoneLayers}, used
+ * ONLY by the reseed-from-desktop tablet path (spec item 1's `platformStyle`
+ * gate). Default layer rows top-to-bottom (spec item 2):
+ *
+ *   Row 1 (number row): 1 2 3 4 5 6 7 8 9 0 + K_BKSP.
+ *   Row 2: Q-P (leading pad on Q) + trailing literal apostrophe.
+ *   Row 3: K_SYMBOLS (nextlayer "numeric") + A-L + the specials-access key
+ *          (only when the desktop rules carry any AltGr mapping at all).
+ *   Row 4: K_SHIFT + Z-M + "." + "," + K_BKSP (widened to accommodate 11 keys).
+ *   Row 5 (functional): K_LOPT + "@" + K_SPACE (wide) + "." + K_ENTER.
+ *
+ * The shift layer mirrors this with uppercase letters and the phone
+ * skeleton's established "tap a shift-layer letter, auto-return to default"
+ * convention (same `buildLetterKey` nextlayer wiring already used by
+ * {@link buildCanonicalPhoneLayers}). Diacritics remain layer-agnostic sk[]
+ * attached to the default layer's letter keys via `buildLetterKey` — reused
+ * as-is, so {@link resolveDiacriticBaseVkey}/{@link buildDeadkeySuccessors}
+ * need no changes for the tablet path (spec item 4).
+ */
+function buildTabletLayers(
+  keyMap: KeyMap,
+  deadkeySuccessors: DeadkeySuccessors,
+  minter: NodeIdMinter,
+): TouchLayoutIR["platforms"][number]["layers"] {
+  const layers: TouchLayoutIR["platforms"][number]["layers"] = [];
+
+  const hasAltgr = [...keyMap.values()].some((m) => m.has("altgr"));
+  const hasAltgrShift = [...keyMap.values()].some((m) => m.has("altgr-shift"));
+
+  const letterLayers: Array<"default" | "shift"> = ["default", "shift"];
+  for (const layerId of letterLayers) {
+    const isDefault = layerId === "default";
+
+    const row1Keys = buildTabletNumberRow(minter);
+
+    const row2Keys: TouchKeyIR[] = [
+      buildLetterKey("K_Q", layerId, keyMap, deadkeySuccessors, minter, 55,
+        isDefault ? undefined : "default"),
+      ...COMPACT_ROW1_VKEYS.slice(1).map((vkey) =>
+        buildLetterKey(vkey, layerId, keyMap, deadkeySuccessors, minter, undefined,
+          isDefault ? undefined : "default"),
+      ),
+      { nodeId: minter.mint("touchKey"), id: "U_0027", text: "'" },
+    ];
+
+    const row3Keys: TouchKeyIR[] = [
+      {
+        nodeId: minter.mint("touchKey"),
+        id: "K_SYMBOLS",
+        text: "*Symbol*",
+        sp: 1,
+        nextlayer: "numeric",
+      },
+      ...COMPACT_ROW2_VKEYS.map((vkey) =>
+        buildLetterKey(vkey, layerId, keyMap, deadkeySuccessors, minter, undefined,
+          isDefault ? undefined : "default"),
+      ),
+      ...(hasAltgr || hasAltgrShift
+        ? [buildTabletSpecialsKey(keyMap, minter, hasAltgr, hasAltgrShift)]
+        : []),
+    ];
+
+    const shiftSp = isDefault ? 1 : 2;
+    const shiftNextlayer = isDefault ? "shift" : "default";
+    const row4Keys: TouchKeyIR[] = [
+      {
+        nodeId: minter.mint("touchKey"),
+        id: "K_SHIFT",
+        text: "*Shift*",
+        width: 150,
+        sp: shiftSp,
+        nextlayer: shiftNextlayer,
+      },
+      ...["K_Z", "K_X", "K_C", "K_V", "K_B", "K_N", "K_M"].map((vkey) =>
+        buildLetterKey(vkey, layerId, keyMap, deadkeySuccessors, minter, undefined,
+          isDefault ? undefined : "default"),
+      ),
+      { nodeId: minter.mint("touchKey"), id: "K_PERIOD", text: "." },
+      { nodeId: minter.mint("touchKey"), id: charToUnicodeKeyId(","), text: "," },
+      { nodeId: minter.mint("touchKey"), id: "K_BKSP", text: "*BkSp*", width: 150, sp: 1 },
+    ];
+
+    layers.push({
+      id: layerId,
+      rows: [
+        { keys: row1Keys },
+        { keys: row2Keys },
+        { keys: row3Keys },
+        { keys: row4Keys },
+        { keys: buildTabletFunctionalRow(minter) },
+      ],
+    });
+  }
+
+  layers.push(buildTabletSymbolLayer(minter));
+
+  if (hasAltgr) layers.push(buildTabletAltgrLayer(keyMap, minter, hasAltgrShift));
+  if (hasAltgrShift) layers.push(buildTabletAltgrShiftLayer(keyMap, minter, hasAltgr));
+
+  return layers;
+}
+
+/**
+ * Tablet counterpart to {@link buildCompactPhoneLayers}: same overflow-routing
+ * pipeline (mark placement onto a base letter's sk[], numeric-overflow
+ * attachment, space-bar "extras" fallback — spec item 6), but building the
+ * tablet layer skeleton ({@link buildTabletLayers}) instead of the phone one.
+ * Duplicated rather than shared with {@link buildCompactPhoneLayers} so the
+ * phone path's own body stays untouched.
+ */
+function buildCompactTabletLayers(
+  keyMap: KeyMap,
+  deadkeySuccessors: DeadkeySuccessors,
+  minter: NodeIdMinter,
+): { layers: TouchLayoutIR["platforms"][number]["layers"] } {
+  const { bySlot: overflowBySlot, unplaced } = collectOverflowEntries(keyMap, COVERED_VKEYS);
+  const charToVkey = buildCharToVkeyMap(keyMap);
+
+  const markSuccessors = new Map<string, string[]>();
+  const numericAttachments: Array<{ ch: string; nearestChar: string }> = [];
+  const stillUnplaced: string[] = [];
+  const unresolvedMarks = new Set<string>();
+
+  for (const ch of unplaced) {
+    const kind = classifyOverflowChar(ch);
+
+    if (kind === "diacritic-mark") {
+      const vkey =
+        resolveDiacriticBaseVkey(ch, keyMap, deadkeySuccessors, charToVkey) ??
+        MARK_FALLBACK_VKEY[ch];
+      if (vkey !== undefined) {
+        const existing = markSuccessors.get(vkey) ?? [];
+        if (!existing.includes(ch)) existing.push(ch);
+        markSuccessors.set(vkey, existing);
+        continue;
+      }
+      unresolvedMarks.add(ch);
+      stillUnplaced.push(ch);
+      continue;
+    }
+
+    if (kind === "numeric-or-symbol") {
+      if (NUMERIC_LAYER_LITERAL_CHARS.has(ch)) continue; // already reachable
+      const nearestChar = NUMERIC_NEAREST_SLOT[ch];
+      if (nearestChar !== undefined) {
+        numericAttachments.push({ ch, nearestChar });
+        continue;
+      }
+      stillUnplaced.push(ch);
+      continue;
+    }
+
+    stillUnplaced.push(ch);
+  }
+
+  const combinedSuccessors = mergeSuccessorMaps(
+    mergeSuccessorMaps(deadkeySuccessors, overflowBySlot),
+    markSuccessors,
+  );
+
+  const layers = buildTabletLayers(keyMap, combinedSuccessors, minter);
+
+  for (const { ch, nearestChar } of numericAttachments) {
+    const attached = attachNumericOverflowExtra(layers, minter, ch, nearestChar);
+    if (!attached) stillUnplaced.push(ch);
+  }
+
+  if (stillUnplaced.length > 0) {
+    const tagged = stillUnplaced.map((ch) =>
+      unresolvedMarks.has(ch) ? `${ch} (no resolvable base letter)` : ch,
+    );
+    attachOverflowExtras(layers, minter, stillUnplaced);
+    console.warn(
+      `[scaffoldTouchLayout] ${stillUnplaced.length} character(s) produced by the desktop rules ` +
+        "have no compact-layout key and no known adjacent slot; placed on the space bar's " +
+        `longpress ("extras") menu instead of being dropped: ${tagged.join(", ")}`,
+    );
+  }
+
+  return { layers };
+}
+
 /**
  * BUG 2 fix (marks): resolve the vkey that already produces the base letter
  * `mark` decorates, by scanning every char already known to the keyboard
@@ -1707,17 +2168,27 @@ export interface ScaffoldTouchLayoutResult {
 }
 
 /**
- * Derive a {@link TouchLayoutIR} for the phone platform from the keyboard IR,
- * plus the structured diagnostics {@link scaffoldTouchLayout} only logs to
- * the console. See {@link scaffoldTouchLayout} for the derivation itself —
- * this is the same logic, returning `unplacedChars` alongside the layout for
- * callers that need it (e.g. a UI preview) rather than re-deriving it.
+ * Derive a {@link TouchLayoutIR} for the phone (or, when requested, tablet)
+ * platform from the keyboard IR, plus the structured diagnostics
+ * {@link scaffoldTouchLayout} only logs to the console. See
+ * {@link scaffoldTouchLayout} for the derivation itself — this is the same
+ * logic, returning `unplacedChars` alongside the layout for callers that need
+ * it (e.g. a UI preview) rather than re-deriving it.
  *
  * The function is pure — it does not mutate `ir`.
  *
+ * @param platformStyle  Which Case-A ("no existing touch layout") skeleton to
+ *   generate: `"phone"` (default, {@link buildCanonicalPhoneLayers}'s compact
+ *   3-layer QWERTY) or `"tablet"` ({@link buildTabletLayers}'s richer
+ *   tablet-style skeleton — spec's reseed-from-desktop tablet derivation).
+ *   Has no effect on Case B (an existing `ir.touchLayout` is always
+ *   preserved-and-augmented on its own phone platform, unchanged).
  * @see spec.md §8 Phase E (touch gallery)
  */
-export function scaffoldTouchLayoutWithDiagnostics(ir: KeyboardIR): ScaffoldTouchLayoutResult {
+export function scaffoldTouchLayoutWithDiagnostics(
+  ir: KeyboardIR,
+  platformStyle: "phone" | "tablet" = "phone",
+): ScaffoldTouchLayoutResult {
   const minter = new NodeIdMinter();
   const keyMap = buildKeyMap(ir);
   const charToVkey = buildCharToVkeyMap(keyMap);
@@ -1742,9 +2213,31 @@ export function scaffoldTouchLayoutWithDiagnostics(ir: KeyboardIR): ScaffoldTouc
 
   // ------------------------------------------------------------------
   // Case A: no existing touch layout — generate from scratch using
-  //         the compact 3-layer phone template.
+  //         the compact 3-layer phone template, or (platformStyle:"tablet")
+  //         the richer tablet template.
   // ------------------------------------------------------------------
   if (ir.touchLayout === undefined) {
+    if (platformStyle === "tablet") {
+      const { layers: tabletLayers } = buildCompactTabletLayers(
+        keyMap,
+        deadkeySuccessors,
+        minter,
+      );
+
+      return {
+        layout: {
+          platforms: [
+            {
+              id: "tablet",
+              layers: tabletLayers,
+            },
+          ],
+          nodeIds: [],
+        },
+        unplacedChars: computeUnplacedChars(keyMap, rejectedSuccessors, tabletLayers),
+      };
+    }
+
     const { layers: phoneLayers } = buildCompactPhoneLayers(
       keyMap,
       deadkeySuccessors,

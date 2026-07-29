@@ -72,7 +72,7 @@ vi.mock("../../hooks/useKeyboardArtifact.ts", () => ({
 
 // ---------------------------------------------------------------------------
 // Mock OSKFrame — no iframe / KMW environment; surface the props this panel
-// is contractually required to lock (oskMode="touch", no mode toggle).
+// is contractually required to lock (oskMode="tablet", no mode toggle).
 // ---------------------------------------------------------------------------
 
 vi.mock("../../components/OSKFrame.tsx", () => ({
@@ -307,12 +307,12 @@ describe("TouchSeedSourcePanel — advisories", () => {
     expect(screen.queryByTestId("seed-source-no-phone-warn")).toBeNull();
   });
 
-  it("states the Reseed option discards tablet/desktop platforms when the base ships one", () => {
+  it("states the Reseed option discards phone/desktop platforms when the base ships one", () => {
     seedBase(PHONE_AND_TABLET_JSON);
     render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
 
     expect(screen.getByTestId("seed-source-reseed").textContent).toContain(
-      "discards the base's shipped tablet/desktop touch platforms",
+      "discards the base's shipped phone/desktop touch platforms",
     );
   });
 
@@ -363,7 +363,7 @@ describe("TouchSeedSourcePanel — confirm", () => {
     // The drop advisory is present on the Reseed card regardless of which
     // choice is currently selected (it reflects the base's shipped platforms).
     expect(screen.getByTestId("seed-source-reseed").textContent).toContain(
-      "discards the base's shipped tablet/desktop touch platforms",
+      "discards the base's shipped phone/desktop touch platforms",
     );
 
     fireEvent.click(screen.getByTestId("seed-source-reseed"));
@@ -432,17 +432,17 @@ describe("TouchSeedSourcePanel — live preview (R4a)", () => {
 // Real OSK live preview (spec 035 R4b amendment — supersedes the homemade
 // TouchLayoutPreview keycap grid). The OSK itself is mocked (no iframe/KMW in
 // jsdom, same pattern as TouchGallery.test.tsx); these tests assert the
-// wiring: forced mobile/touch mode, no mode toggle, and the injected VFS
+// wiring: forced tablet mode, no mode toggle, and the injected VFS
 // content swapping per the currently-selected card.
 // ---------------------------------------------------------------------------
 
 describe("TouchSeedSourcePanel — real OSK preview (R4b)", () => {
-  it("mounts the real OSK forced into touch/mobile mode, with no desktop/mobile toggle on this screen", () => {
+  it("mounts the real OSK forced into tablet mode, with no desktop/mobile toggle on this screen", () => {
     seedBase(PHONE_ONLY_JSON);
     render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
 
     const osk = screen.getByTestId("osk-frame");
-    expect(osk.getAttribute("data-osk-mode")).toBe("touch");
+    expect(osk.getAttribute("data-osk-mode")).toBe("tablet");
     // This screen never renders the Desktop OSK / Mobile KB toggle.
     expect(screen.queryByTestId("osk-mode-toggle")).toBeNull();
     expect(screen.queryByText("Desktop OSK")).toBeNull();

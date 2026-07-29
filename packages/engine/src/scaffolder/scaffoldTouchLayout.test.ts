@@ -99,9 +99,9 @@ function makeS02Pattern(
 // Helper: get the phone platform + named layer
 // ---------------------------------------------------------------------------
 
-function getLayer(result: TouchLayoutIR, layerId: string) {
-  const phone = result.platforms.find((p) => p.id === "phone")!;
-  return phone.layers.find((l) => l.id === layerId);
+function getLayer(result: TouchLayoutIR, layerId: string, platformId = "phone") {
+  const platform = result.platforms.find((p) => p.id === platformId)!;
+  return platform.layers.find((l) => l.id === layerId);
 }
 
 /**
@@ -115,14 +115,14 @@ function getLayer(result: TouchLayoutIR, layerId: string) {
  * Locks the INVARIANT stated in scaffoldTouchLayout.ts's buildAltgrToggleKey
  * doc comment, not just the one instance the bug report described.
  */
-function assertNoDanglingNextlayer(result: TouchLayoutIR): void {
-  const phone = result.platforms.find((p) => p.id === "phone")!;
-  const emittedLayerIds = new Set(phone.layers.map((l) => l.id));
+function assertNoDanglingNextlayer(result: TouchLayoutIR, platformId = "phone"): void {
+  const platform = result.platforms.find((p) => p.id === platformId)!;
+  const emittedLayerIds = new Set(platform.layers.map((l) => l.id));
 
   const edges = new Map<string, Set<string>>();
   for (const id of emittedLayerIds) edges.set(id, new Set());
 
-  for (const layer of phone.layers) {
+  for (const layer of platform.layers) {
     for (const row of layer.rows) {
       for (const key of row.keys) {
         if (key.nextlayer === undefined) continue;
@@ -2756,5 +2756,181 @@ describe("scaffoldTouchLayout", () => {
       const skTexts = targetKey?.sk?.map((s) => s.text);
       expect(skTexts).toContain(successorChar);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tablet path (platformStyle:"tablet") — reseed-from-desktop tablet-style
+// derivation. An ewondo-like fixture: base letters, RALT-modified special
+// letters (altgr), an RALT+SHIFT uppercase special (altgr-shift), and an
+// S-02 deadkey pattern (acute accent) so diacritics still attach as sk[]
+// longpress under their base letter, same mechanism as the phone path.
+// ---------------------------------------------------------------------------
+
+describe("scaffoldTouchLayoutWithDiagnostics — tablet path (platformStyle:\"tablet\")", () => {
+  function makeEwondoLikeIR(): KeyboardIR {
+    const rules: IRRule[] = [
+      makeCharRule("K_A", [], "a"),
+      makeCharRule("K_A", ["SHIFT"], "A"),
+      makeCharRule("K_E", [], "e"),
+      makeCharRule("K_E", ["SHIFT"], "E"),
+      makeCharRule("K_E", ["RALT"], "ə"),
+      makeCharRule("K_O", [], "o"),
+      makeCharRule("K_O", ["RALT"], "ɔ"),
+      makeCharRule("K_N", [], "n"),
+      makeCharRule("K_N", ["RALT"], "ŋ"),
+      makeCharRule("K_N", ["RALT", "SHIFT"], "Ŋ"),
+    ];
+
+    const deadkeyRule: IRRule = {
+      nodeId: "rule:deadkey_body",
+      context: [
+        { kind: "deadkey", id: 1 } as never,
+        { kind: "any", storeRef: "s_base" },
+      ],
+      output: [{ kind: "index", storeRef: "s_out", offset: 2 }],
+    };
+
+    const pattern = makeS02Pattern("K_E", "é", "rule:deadkey_body");
+
+    return makeMinimalIR({
+      groups: [makeGroup([...rules, deadkeyRule])],
+      stores: [
+        { nodeId: "store:base", name: "s_base", items: [{ kind: "char", value: "e" }], isSystem: false },
+        { nodeId: "store:out", name: "s_out", items: [{ kind: "char", value: "é" }], isSystem: false },
+      ],
+      recognizedPatterns: [pattern],
+    });
+  }
+
+  it("emits platform id 'tablet' (not 'phone')", () => {
+    const ir = makeEwondoLikeIR();
+    const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+
+    expect(result.layout.platforms.map((p) => p.id)).toEqual(["tablet"]);
+  });
+
+  it("default layer row 1 is the digit row (1-0 + K_BKSP)", () => {
+    const ir = makeEwondoLikeIR();
+    const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+    const defaultLayer = getLayer(result.layout, "default", "tablet")!;
+    const row1 = defaultLayer.rows[0]!;
+
+    expect(row1.keys.slice(0, 10).map((k) => k.text)).toEqual([
+      "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
+    ]);
+    expect(row1.keys[row1.keys.length - 1]!.id).toBe("K_BKSP");
+  });
+
+  it("the T_ks_specials key exists on row 3 and points to an emitted specials layer", () => {
+    const ir = makeEwondoLikeIR();
+    const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+    const defaultLayer = getLayer(result.layout, "default", "tablet")!;
+    const row3 = defaultLayer.rows[2]!;
+    const specialsKey = row3.keys.find((k) => k.id === "T_ks_specials");
+
+    expect(specialsKey).toBeDefined();
+    expect(specialsKey?.width).toBe(150);
+    expect(specialsKey?.nextlayer).toBeDefined();
+
+    const emittedLayerIds = new Set(
+      result.layout.platforms.find((p) => p.id === "tablet")!.layers.map((l) => l.id),
+    );
+    expect(emittedLayerIds.has(specialsKey!.nextlayer!)).toBe(true);
+    // Self-labeled from the target layer's own produced chars (not a generic
+    // fallback label), per spec item 3.
+    expect(specialsKey?.text).not.toBe("*Specials*");
+    expect(specialsKey?.text?.length).toBeGreaterThan(0);
+  });
+
+  it("the shift layer's row 3 also carries T_ks_specials, symmetric with default", () => {
+    const ir = makeEwondoLikeIR();
+    const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+    const defaultLayer = getLayer(result.layout, "default", "tablet")!;
+    const shiftLayer = getLayer(result.layout, "shift", "tablet")!;
+    const defaultRow3 = defaultLayer.rows[2]!;
+    const shiftRow3 = shiftLayer.rows[2]!;
+    const shiftSpecialsKey = shiftRow3.keys.find((k) => k.id === "T_ks_specials");
+
+    expect(shiftSpecialsKey).toBeDefined();
+    expect(shiftSpecialsKey?.width).toBe(150);
+    // Same nextlayer target logic (hasAltgr ? "altgr" : "altgr-shift") as the
+    // default layer's specials key — both hop directly to the same layer.
+    const defaultSpecialsKey = defaultRow3.keys.find((k) => k.id === "T_ks_specials");
+    expect(shiftSpecialsKey?.nextlayer).toBe(defaultSpecialsKey?.nextlayer);
+
+    // Row lengths match between default and shift row 3 (no 11-vs-10 key
+    // asymmetry).
+    expect(shiftRow3.keys.length).toBe(defaultRow3.keys.length);
+
+    // Still dangling-free with the shift layer's specials key wired in.
+    assertNoDanglingNextlayer(result.layout, "tablet");
+  });
+
+  it("altgr letter keys carry nextlayer:\"default\" (auto-return after a tap)", () => {
+    const ir = makeEwondoLikeIR();
+    const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+    const altgrLayer = getLayer(result.layout, "altgr", "tablet")!;
+    const oKey = altgrLayer.rows.flatMap((r) => r.keys).find((k) => k.id === "K_O");
+
+    expect(oKey).toBeDefined();
+    expect(oKey?.output).toBe("ɔ");
+    expect(oKey?.nextlayer).toBe("default");
+  });
+
+  it("altgr-shift letter keys also carry nextlayer:\"default\"", () => {
+    const ir = makeEwondoLikeIR();
+    const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+    const altgrShiftLayer = getLayer(result.layout, "altgr-shift", "tablet")!;
+    const nKey = altgrShiftLayer.rows.flatMap((r) => r.keys).find((k) => k.id === "K_N");
+
+    expect(nKey).toBeDefined();
+    expect(nKey?.output).toBe("Ŋ");
+    expect(nKey?.nextlayer).toBe("default");
+  });
+
+  it("diacritics are long-press (sk[]) under their base letter on the default layer", () => {
+    const ir = makeEwondoLikeIR();
+    const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+    const defaultLayer = getLayer(result.layout, "default", "tablet")!;
+    const eKey = defaultLayer.rows.flatMap((r) => r.keys).find((k) => k.id === "K_E");
+
+    expect(eKey).toBeDefined();
+    expect(eKey?.sk?.some((s) => s.text === "é")).toBe(true);
+  });
+
+  it("has no dangling nextlayer references and every layer reaches default", () => {
+    const ir = makeEwondoLikeIR();
+    const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+    assertNoDanglingNextlayer(result.layout, "tablet");
+  });
+
+  it("unplacedChars is reachability-based: a produced special char reachable via the altgr layer is not reported unplaced", () => {
+    const ir = makeEwondoLikeIR();
+    const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+
+    expect(result.unplacedChars).not.toContain("ə");
+    expect(result.unplacedChars).not.toContain("ɔ");
+    expect(result.unplacedChars).not.toContain("Ŋ");
+    expect(result.unplacedChars.length).toBe(0);
+  });
+
+  it("an IR with no AltGr mappings at all emits no T_ks_specials key and no altgr/altgr-shift layers", () => {
+    const ir = makeMinimalIR({
+      groups: [makeGroup([makeCharRule("K_A", [], "a")])],
+    });
+    const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+    const platform = result.layout.platforms.find((p) => p.id === "tablet")!;
+
+    expect(platform.layers.map((l) => l.id)).toEqual(["default", "shift", "numeric"]);
+    const defaultLayer = getLayer(result.layout, "default", "tablet")!;
+    const row3 = defaultLayer.rows[2]!;
+    expect(row3.keys.find((k) => k.id === "T_ks_specials")).toBeUndefined();
+  });
+
+  it("scaffoldTouchLayoutWithDiagnostics without platformStyle still defaults to 'phone' (phone path unaffected)", () => {
+    const ir = makeEwondoLikeIR();
+    const result = scaffoldTouchLayoutWithDiagnostics(ir);
+    expect(result.layout.platforms.map((p) => p.id)).toEqual(["phone"]);
   });
 });

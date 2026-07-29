@@ -948,6 +948,12 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       resolvedSeedSource === "reseed-from-desktop"
         ? undefined
         : resolveBaseTouchJson(baseVfs);
+    // NOTE: `.warnings` (e.g. a genuine "no phone or tablet platform found"
+    // guard from applyTouchAssignments/applyDesktopModifications) is
+    // intentionally discarded here — this useMemo only surfaces `.json`, and
+    // there is no UI surface wired to show engine warnings yet. Not expanding
+    // scope to wire that up in this change; tracked as a follow-up rather
+    // than silently dropped-and-forgotten.
     return buildTouchLayoutJson(baseIr, appliedEdits, {
       ...(baseTouchJson !== undefined ? { baseTouchJson } : {}),
       mods,

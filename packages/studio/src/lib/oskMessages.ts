@@ -33,7 +33,7 @@ export interface SetKeyboardCommand {
 
 export interface SetOskModeCommand {
   type: "SET_OSK_MODE";
-  mode: "desktop" | "touch";
+  mode: "desktop" | "touch" | "tablet";
 }
 
 export type OskCommand = SetKeyboardCommand | SetOskModeCommand;

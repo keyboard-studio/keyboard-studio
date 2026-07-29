@@ -4,7 +4,7 @@
 //
 // postMessage contract:
 //   host -> frame: { type: "SET_KEYBOARD",  jsUrl, keyboardId, bcp47?, fontFaceUrl?, fontFaceFamily?, keyboardCssUrls? }
-//   host -> frame: { type: "SET_OSK_MODE",  mode: "desktop" | "touch" }
+//   host -> frame: { type: "SET_OSK_MODE",  mode: "desktop" | "touch" | "tablet" }
 //   frame -> host: { type: "ENGINE_READY" }
 //   frame -> host: { type: "ENGINE_ERROR", message }
 //   frame -> host: { type: "TEXT_UPDATED", value }
@@ -50,7 +50,10 @@
   var loadToken = 0;
 
   // [SCAFFOLD] Device profiles cribbed from Keyman Developer test.js.
-  // Two entries (desktop + phone) cover the toggle; dimensions drive
+  // desktop + touch cover the gallery's Desktop/Mobile toggle; tablet is a
+  // third, dedicated profile (spec 035 touch-seed reseed now derives a
+  // tablet-platform layout, not phone) selected directly by callers that
+  // bypass the toggle (e.g. TouchSeedSourcePanel). Dimensions drive
   // InlinedOSKView.setSize().
   var devices = {
     desktop: {
@@ -68,6 +71,14 @@
       OS: "android",
       touchable: true,
       dimensions: [320, 290],
+    },
+    tablet: {
+      name: "iPad",
+      browser: "chrome",
+      formFactor: "tablet",
+      OS: "ios",
+      touchable: true,
+      dimensions: [980, 420],
     },
   };
 
@@ -451,7 +462,8 @@
     }
 
     if (msg.type === "SET_OSK_MODE") {
-      var nextMode = msg.mode === "touch" ? "touch" : "desktop";
+      var nextMode =
+        msg.mode === "touch" ? "touch" : msg.mode === "tablet" ? "tablet" : "desktop";
       if (nextMode === currentMode) return;
       currentMode = nextMode;
       if (engineReady && window.keyman.getActiveKeyboard()) {

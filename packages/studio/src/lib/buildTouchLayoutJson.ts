@@ -123,13 +123,18 @@ function resolveSeedCase(opts: BuildTouchLayoutJsonOpts): SeedCase {
  * carry the base's own platforms into a "reseed" and violate US2-AS4 — then
  * scaffolds and replays `mods`. Shared by `buildTouchLayoutJson`'s Case A
  * branch and {@link deriveSeedLayout}.
+ *
+ * Requests the tablet-style skeleton (`platformStyle:"tablet"`) — the ONE
+ * call site in the codebase that does; every other caller of
+ * `scaffoldTouchLayoutWithDiagnostics` omits the param and gets the phone
+ * skeleton unchanged.
  */
 function buildCaseASeed(
   baseIr: KeyboardIR,
   mods: DesktopModifications,
 ): { layout: TouchLayoutIR; warnings: string[]; unplacedChars: string[] } {
   const { touchLayout: _stripped, ...rest } = baseIr;
-  const { layout: seed, unplacedChars } = scaffoldTouchLayoutWithDiagnostics(rest);
+  const { layout: seed, unplacedChars } = scaffoldTouchLayoutWithDiagnostics(rest, "tablet");
   const { layout, warnings } = applyDesktopModifications(seed, mods);
   return { layout, warnings, unplacedChars };
 }

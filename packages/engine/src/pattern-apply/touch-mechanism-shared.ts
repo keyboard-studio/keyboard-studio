@@ -72,3 +72,21 @@ export function keyMatchesRemovalSet(
   const decoded = candidate.id !== undefined ? unicodeKeyIdToChar(candidate.id) : undefined;
   return decoded !== undefined && removalSet.has(decoded.normalize("NFC"));
 }
+
+/**
+ * Resolve the index of the mobile platform ("phone" or "tablet") that Phase C
+ * placement replay ({@link applyDesktopModifications.ts}'s `applyPlacements`)
+ * and Phase E touch-assignment application (`applyTouchAssignments.ts`)
+ * target. "phone" wins when both are present — unchanged legacy behavior for
+ * every existing phone-only seed/shipped layout. "tablet" is the fallback so
+ * a tablet-style seed (`buildCaseASeed`'s `platformStyle:"tablet"` reseed
+ * path, scaffoldTouchLayout.ts) is still a valid replay/assignment target
+ * instead of silently no-op'ing. Returns -1 when neither is present.
+ */
+export function resolveMobilePlatformIndex(
+  platforms: ReadonlyArray<{ id: string }>,
+): number {
+  const phoneIdx = platforms.findIndex((p) => p.id === "phone");
+  if (phoneIdx !== -1) return phoneIdx;
+  return platforms.findIndex((p) => p.id === "tablet");
+}

@@ -329,6 +329,9 @@ provenance axis exists precisely for this.
 
 ## R7 — Phone vs tablet platform scope
 
+**Amended by R7a below (2026-07-29) — the phone-only target this decision sets is superseded
+for the reseed path; see R7a.**
+
 **Decision**: The derivation targets the **phone** platform (what `scaffoldTouchLayout` and
 `applyTouchAssignments` operate on today). Tablet is **not** in scope for this feature beyond
 whatever the base layout already ships (Case B preserves shipped tablet verbatim). Record as a
@@ -349,6 +352,58 @@ author is trading the base's tablet coverage for a clean desktop-derived phone l
 
 **Alternatives considered**: Emit phone + tablet in the reseed — deferred: no acceptance
 criterion requires it; can be a follow-up once the phone path is proven.
+
+---
+
+## R7a — Amendment: reseed-from-desktop now emits a TABLET platform, not phone (2026-07-29)
+
+**Amends**: R7's "the derivation targets the phone platform … tablet is not in scope for this
+feature" decision. This is a recorded amendment, not a silent reinterpretation — R7's literal
+text names phone as the reseed target and tablet as out of scope, and this decision reverses
+that for the reseed path specifically. Directed by the user in a km-lead cycle, after review
+of the phone reseed output.
+
+**Decision**: The reseed-from-desktop derivation now emits a **tablet** platform, modeled on
+the base's shipped tablet design, instead of a phone platform. Concretely: a **number row**
+replaces the phone projection's diacritic row; special/extended letters are reached via a
+**combo access key** to the altgr/altgr-shift layers (mirroring how the base's own tablet
+layout exposes those layers); and diacritics are placed as **base-letter long-press**
+affordances rather than their own row or layer. Import-and-adapt (Case B) is unaffected — it
+continues to preserve whatever platform(s) the base ships, verbatim, per R9.
+
+**Rationale**: The user reviewed the phone reseed output and found the compact phone layout
+too sparse; a tablet-style output resembling the base's own touch design — with a full number
+row and the base's established long-press/combo-key conventions — was directed instead. This
+narrows R7's scope rather than reopening its finding that a distinct desktop-shaped grid is
+avoidable clutter: the tablet target here is *modeled on the base's shipped tablet*, not a
+reintroduction of Developer's undifferentiated 5-row desktop grid.
+
+**Known limitation — RESOLVED (was: tracked follow-up)**: the Phase E touch-editing step
+(`applyTouchAssignments`) and the Phase C placement replay (`applyDesktopModifications`) were
+initially phone-platform-hardcoded, so a tablet-seeded reseed layout was not hand-editable in
+the touch gallery. Both are now generalized via a shared `resolveMobilePlatformIndex` helper
+(`touch-mechanism-shared.ts`) — "phone" wins when both platforms are present (unchanged legacy
+behavior), "tablet" is the fallback target when no "phone" platform exists — so a tablet-seeded
+reseed layout is placed onto, and hand-editable on, the tablet platform with no silent drop.
+Diagnostic/warning strings on both paths were also generalized to name whichever platform
+actually resolved (e.g. `${platform.id}` in place of a hardcoded "phone").
+
+**Remaining follow-up (genuinely outstanding)**: two spots are still phone-hardcoded, neither
+of which this amendment's reseed path exercises:
+- `applyDesktopModificationsToRawJson.ts` (the Case B raw-JSON splice used by the
+  import-and-adapt path, not reseed) still reads `layout["phone"]` directly and warns
+  "no phone platform found" — untouched by this change since Case B always preserves the
+  base's own shipped platform verbatim (R9) and reseed never reaches this function.
+- [TouchGallery.tsx](../../packages/studio/src/editors/assignLoop/TouchGallery.tsx) still
+  discards `.warnings` from both `applyTouchAssignments`/`applyDesktopModifications` calls
+  (no UI surface wired to show engine warnings yet) — noted in-line where the discard happens,
+  tracked as its own follow-up rather than silently dropped.
+
+**Alternatives considered**: (a) *Keep phone-only, per R7* — rejected by the user after
+reviewing the phone reseed output as too sparse. (b) *Emit both phone and tablet platforms* —
+rejected: the Phase E touch-editing UI is hardcoded to the phone platform, so a co-emitted
+phone platform would become the one the author actually edits while the tablet sat inert and
+unedited, which is a worse outcome than a single, clearly-tablet-only seed.
 
 ---
 
