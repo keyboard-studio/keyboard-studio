@@ -24,9 +24,26 @@
 //     envelope already exists as `DurableDraft` (below) and is reused
 //     directly rather than re-invented under a second name.
 
-import type { ActiveStepId, TraversalSnapshot } from "../stores/surveySessionStore.ts";
+import type { ActiveStepId, TraversalSnapshot, SurveySessionSnapshot } from "../stores/surveySessionStore.ts";
 import type { WorkingCopySnapshot } from "./persistWorkingCopy.ts";
 import type { PhaseBDraftSnapshot } from "../stores/phaseBDraftStore.ts";
+
+/**
+ * Dev-engine draft envelope (draftAutosave.ts / serverDraftStore callers).
+ * The merge of main's "My keyboards" port (spec 047) onto dev left BOTH draft
+ * engines in place — main's draftPersistence.ts persists `DurableDraft`
+ * (below); dev's draftAutosave.ts persists this envelope. Each engine keeps
+ * its own record shape; neither is a rename of the other (this one carries a
+ * full SurveySessionSnapshot and a nullable workingCopy).
+ */
+export interface StudioDraft {
+  version: number;
+  /** Epoch ms when the draft was written (Date.now()). */
+  savedAt: number;
+  survey: SurveySessionSnapshot;
+  /** Working copy, or null when the survey hasn't instantiated one yet. */
+  workingCopy: WorkingCopySnapshot | null;
+}
 
 /** Lightweight peek at a stored draft, for a future resume-affordance. */
 export interface DraftMeta {

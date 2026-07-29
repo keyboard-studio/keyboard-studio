@@ -20,7 +20,11 @@
 //   3. One FlowStepOptions record passed to makeFlowStepComponent
 
 import { useMemo, useRef, useCallback } from "react";
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react/macro";
 import type { SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
+import { resolveMessage } from "../../lib/i18nResolve.ts";
 import { FlowStepHost } from "../../survey/FlowStepHost.tsx";
 import { loadModularFlow } from "../../survey/loadModularFlow.ts";
 import { flowSources } from "../../steps/flowSources.ts";
@@ -29,6 +33,25 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import type { SurveyContext } from "../../survey/types.ts";
+
+// ---------------------------------------------------------------------------
+// Step-title localization (Tier A UI chrome). The heading FlowStepHost paints
+// as <h2>{title}</h2> is engine-owned chrome, not flow-question content, so it
+// resolves through the Lingui catalog rather than the Tier B content path. The
+// map is keyed by the stable `flowRef`; a flow with no entry falls back to the
+// plain options.title / flowSource.title string (unlocalized, as before). Kept
+// as literal `msg` descriptors at module scope so `lingui extract` sees them —
+// resolved per-render via resolveMessage(i18n, ...) inside the component.
+// ---------------------------------------------------------------------------
+
+const STEP_TITLE_MESSAGES: Record<string, MessageDescriptor> = {
+  track: msg({ id: "step.track.title", message: "Authoring Track" }),
+  project_name: msg({ id: "step.projectName.title", message: "Name your keyboard" }),
+  phase_f_helpdocs: msg({
+    id: "step.phaseF.title",
+    message: "Phase F — Help documentation",
+  }),
+};
 
 // ---------------------------------------------------------------------------
 // FlowStepDeps — live store/hook values the per-flow options consume.
@@ -118,6 +141,9 @@ export function makeFlowStepComponent<Extracted>(
   // Capture at factory-call time so the produced component closure is stable.
   const capturedSource = source;
   const resolvedTitle = options.title ?? capturedSource.title;
+  // Localized heading descriptor for this flow (undefined → keep the plain
+  // English title). Captured at factory-call time; resolved per-render below.
+  const titleMessage = STEP_TITLE_MESSAGES[options.flowRef];
 
   // ---------------------------------------------------------------------------
   // The produced component — satisfies EditorStepProps (C2.1).
@@ -127,6 +153,11 @@ export function makeFlowStepComponent<Extracted>(
     // C2.3 — load the flow once, memoised.
     // capturedSource is bound at factory-call time; stable for this component's lifetime.
     const flow = useMemo(() => loadModularFlow(capturedSource.raw), []);
+
+    // Resolve the heading for the active locale (Tier A chrome). Falls back to
+    // the plain English title when this flow has no catalog entry.
+    const { i18n } = useLingui();
+    const localizedTitle = titleMessage ? resolveMessage(i18n, titleMessage) : resolvedTitle;
 
     // C2.5 — all store access here, never in FlowStepHost.
     const localBase = useSurveySessionStore((s) => s.localBase);
@@ -199,7 +230,7 @@ export function makeFlowStepComponent<Extracted>(
     return (
       <FlowStepHost
         flow={flow}
-        title={resolvedTitle}
+        title={localizedTitle}
         context={context}
         onComplete={wrappedOnComplete}
         {...(onBack ? { onBack } : {})}

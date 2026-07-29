@@ -155,12 +155,14 @@ export function extractCriteriaStrings(): ContentCatalog {
 
 /**
  * Flow-question prose: `prompt`, `label`, `body`, `help_text`,
- * `options[].label` (spec 050 research.md D4). Read only from `mod.definition`
- * of the four LIVE phase sub-registries (a/b/f/g) — `mod.fixtures` (test
- * vectors) and every control field (id, type, required, next, options_source,
- * engine_resolved, advisory, option.value, option.note) are never read.
- * `registry.reserve.ts`'s demoted modules are excluded per D2 — no live flow
- * renders them.
+ * `options[].label`, `options[].note` (spec 050 research.md D4). Read only from
+ * `mod.definition` of the four LIVE phase sub-registries (a/b/f/g) —
+ * `mod.fixtures` (test vectors) and every control field (id, type, required,
+ * next, options_source, engine_resolved, advisory, option.value) are never
+ * read. `option.note` is rendered prose, not control: RadioField paints it as
+ * the per-option helper line (QuestionField.tsx), so it is extracted like
+ * `option.label`. `registry.reserve.ts`'s demoted modules are excluded per D2 —
+ * no live flow renders them.
  */
 export function extractFlowQuestionStrings(): ContentCatalog {
   const out: ContentCatalog = {};
@@ -195,9 +197,12 @@ export function extractFlowQuestionStrings(): ContentCatalog {
         }
       }
       for (const option of definition.options ?? []) {
+        const optionId = slugifyIdSegment(option.value);
         if (option.label.trim().length > 0) {
-          const optionId = slugifyIdSegment(option.value);
           out[`${base}.option.${optionId}.label`] = option.label;
+        }
+        if (typeof option.note === "string" && option.note.trim().length > 0) {
+          out[`${base}.option.${optionId}.note`] = option.note;
         }
       }
     }

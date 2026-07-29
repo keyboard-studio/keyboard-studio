@@ -59,6 +59,17 @@ interface PendingBulkCascade {
   gids: string[];
   /** Coordinated-drop collateral aggregated across the WHOLE batch (deduped by partner slot id). */
   collateral: CoordinatedCollateralChar[];
+  /**
+   * Not-removable producers found while resolving a case-paired proposal row's
+   * OTHER member (spec 051 FR-011/FR-015, contracts/case-pairing.md
+   * "Composition with store pairing") — always `[]` for the plain store-card
+   * bulk-toggle caller (handleSetManyGlyphs never populates this). A blocked
+   * producer must not silently drop out of the union (FR-008), so it rides
+   * along in the SAME dialog this already opens for isLost collateral,
+   * reusing the identical warning box the single-chip dialog renders for
+   * `pendingCascade.contributors.blocked` — no second dialog is introduced.
+   */
+  blocked: CharContributors['blocked'];
 }
 
 interface BuildPendingCascadeArgs {
@@ -171,6 +182,15 @@ function buildPendingCascade({
   // Plain toggle (no dialog) ONLY for a removable chip that is its char's sole
   // producer, nothing blocked, AND no coordinated collateral. A not-removable
   // chip, or ANY collateral (even for a sole producer), ALWAYS opens the dialog.
+  //
+  // FR-008 (spec 051) — "closes with no visible effect" is unreachable here,
+  // and these three conditions are exactly why. A second producer cannot slip
+  // past them: a removable one is counted in `removableCount`, a not-removable
+  // one lands in `blocked`, and a coordinated partner lands in `collateral` —
+  // each of which opens the dialog and names its reason. So this fast path
+  // fires only when the clicked tile IS the whole trim, which is why flipping
+  // that one gid is a complete and visible outcome. Pinned by the FR-007/FR-008
+  // tests in CarveGallery.test.tsx; see research.md §R5's recorded outcome.
   if (!clickedIsNotRemovable && removableCount <= 1 && blocked.length === 0 && collateral.length === 0) return null;
 
   return {
@@ -181,17 +201,15 @@ function buildPendingCascade({
 }
 
 /**
- * Coordinated-removal collateral warning box — shared markup for both the
- * single-cascade dialog (one clicked chip) and the bulk-cascade dialog (a
- * whole batch), which previously duplicated this `role="alert"` block
- * near-verbatim (#525/#931 follow-up review fix — dedup). Only the
- * anyNeeded lead-in copy differs between the two callers (singular chip vs
- * plural batch), switched via `plural`; the non-anyNeeded copy was already
- * identical in both.
+ * "Marked not-removable" warning box — shared by the single-chip cascade
+ * dialog (`pendingCascade.contributors.blocked`) and the bulk cascade dialog
+ * (`pendingBulkCascade.blocked`, populated only by a case-paired proposal
+ * row's OTHER member — spec 051 FR-008/FR-011/FR-015). Extracted so the paired
+ * bulk path reuses the IDENTICAL box rather than a second one (no new dialog,
+ * no divergent copy).
  */
-function CollateralWarning({ collateral, isBulk }: { collateral: CoordinatedCollateralChar[]; isBulk: boolean }) {
-  const { t } = useLingui();
-  const anyNeeded = collateral.some((c) => c.isNeeded);
+function BlockedWarning({ blocked }: { blocked: CharContributors['blocked'] }) {
+  if (blocked.length === 0) return null;
   return (
     <div
       role="alert"
@@ -200,28 +218,128 @@ function CollateralWarning({ collateral, isBulk }: { collateral: CoordinatedColl
         padding: '8px 12px',
         borderRadius: 8,
         background: 'color-mix(in srgb, var(--sil-orange) 10%, var(--app-surface))',
-        border: anyNeeded
-          ? '1px solid var(--sil-orange)'
-          : '1px solid color-mix(in srgb, var(--sil-orange) 40%, transparent)',
+        border: '1px solid color-mix(in srgb, var(--sil-orange) 40%, transparent)',
         fontSize: 12,
         color: 'var(--sil-orange-dark)',
       }}
     >
-      <b>
-        {anyNeeded
-          ? isBulk
-            ? t({ id: "editor.carve.collateralWarning.anyNeededPlural", message: "⚠ This will also remove characters you need, from paired stores:" })
-            : t({ id: "editor.carve.collateralWarning.anyNeededSingular", message: "⚠ This will also remove a character you need, from a paired store:" })
-          : t({ id: "editor.carve.collateralWarning.removing", message: "Removing this will also remove from paired stores:" })}
-      </b>{' '}
-      {collateral.map((c, i) => (
+      <b><Trans id="editor.carve.cascade.markedNotRemovable">⚠ Marked not-removable — these will stay:</Trans></b>{' '}
+      {blocked.map((b, i) => (
         <span key={i}>
-          &quot;{displayChar(c.ch)}&quot; from {c.storeName}
-          {c.isNeeded ? <b> — needed for your language</b> : null}
-          {i < collateral.length - 1 ? ', ' : ''}
+          {b.label} ({b.reason}){i < blocked.length - 1 ? ', ' : ''}
         </span>
       ))}
     </div>
+  );
+}
+
+/** Comma-joined "<char> from <store>" list, shared by both collateral boxes. */
+function CollateralList({ entries }: { entries: CoordinatedCollateralChar[] }) {
+  return (
+    <>
+      {entries.map((c, i) => (
+        <span key={c.slotId}>
+          &quot;{displayChar(c.ch)}&quot; from {c.storeName}
+          {i < entries.length - 1 ? ', ' : ''}
+        </span>
+      ))}
+    </>
+  );
+}
+
+/**
+ * Coordinated-removal collateral box — shared markup for both the
+ * single-cascade dialog (one clicked chip) and the bulk-cascade dialog (a
+ * whole batch), which previously duplicated this block near-verbatim
+ * (#525/#931 follow-up review fix — dedup).
+ *
+ * Severity is split by CONSEQUENCE, not by `isNeeded` (spec 051 FR-005). The
+ * old copy warned "this will also remove a character you need" for every
+ * needed partner char, including the common and harmless case where the
+ * partner is an any()-consumed INPUT store: trimming `ɨ` off Cameroon's
+ * grave-accent pair drops `i` from the deadkey's input store, but `i` is still
+ * typeable through its own base rule — only the `i → ɨ` combination stops
+ * firing. Telling the author they are about to lose a letter they need was
+ * simply wrong there.
+ *
+ *   isLost          -> warning,       role="alert",  must be confirmed (FR-006)
+ *   role === input  -> informational, role="status", names the lost transform
+ *   otherwise       -> informational, role="status", neutral copy
+ */
+function CollateralWarning({
+  collateral,
+  isBulk,
+  targetChar,
+}: {
+  collateral: CoordinatedCollateralChar[];
+  isBulk: boolean;
+  /** The character being trimmed, when a single one is (drives the input-drop copy). */
+  targetChar?: string | undefined;
+}) {
+  const { t } = useLingui();
+  const lost = collateral.filter((c) => c.isLost);
+  const inputDrops = collateral.filter((c) => !c.isLost && c.role === 'input');
+  const otherDrops = collateral.filter((c) => !c.isLost && c.role !== 'input');
+
+  const boxStyle = (emphatic: boolean) => ({
+    marginTop: 8,
+    padding: '8px 12px',
+    borderRadius: 8,
+    background: 'color-mix(in srgb, var(--sil-orange) 10%, var(--app-surface))',
+    border: emphatic
+      ? '1px solid var(--sil-orange)'
+      : '1px solid color-mix(in srgb, var(--sil-orange) 40%, transparent)',
+    fontSize: 12,
+    color: 'var(--sil-orange-dark)',
+  });
+
+  return (
+    <>
+      {lost.length > 0 && (
+        <div role="alert" style={boxStyle(true)}>
+          <b>
+            {isBulk
+              ? t({ id: "editor.carve.collateralWarning.anyNeededPlural", message: "This will also remove characters you need, from paired stores:" })
+              : t({ id: "editor.carve.collateralWarning.anyNeededSingular", message: "This will also remove a character you need, from a paired store:" })}
+          </b>{' '}
+          {lost.map((c, i) => (
+            <span key={c.slotId}>
+              &quot;{displayChar(c.ch)}&quot; from {c.storeName}
+              <b> — {t({ id: "editor.carve.collateralWarning.neededForLanguage", message: "needed for your language" })}</b>
+              {i < lost.length - 1 ? ', ' : ''}
+            </span>
+          ))}
+        </div>
+      )}
+      {inputDrops.length > 0 && (
+        <div role="status" style={boxStyle(false)}>
+          {inputDrops.map((c, i) => (
+            <span key={c.slotId}>
+              {/* Wording per the km-domain read of OQ-2 (spec 051 T031): "combination"
+                  is the right mechanism-neutral noun for BOTH a deadkey sequence and an
+                  AltGr fan-out, but "fire" is event-system jargon and "stays typeable"
+                  buries the reassurance in the passive. Plain, active phrasing instead. */}
+              {targetChar === undefined
+                ? t({
+                    id: "editor.carve.collateralWarning.inputDropGeneric",
+                    message: `The "${displayChar(c.ch)}" combination will no longer work. You can still type "${displayChar(c.ch)}" on its own.`,
+                  })
+                : t({
+                    id: "editor.carve.collateralWarning.inputDrop",
+                    message: `The "${displayChar(c.ch)}" → "${displayChar(targetChar)}" combination will no longer work. You can still type "${displayChar(c.ch)}" on its own.`,
+                  })}
+              {i < inputDrops.length - 1 ? ' ' : ''}
+            </span>
+          ))}
+        </div>
+      )}
+      {otherDrops.length > 0 && (
+        <div role="status" style={boxStyle(false)}>
+          <b>{t({ id: "editor.carve.collateralWarning.removing", message: "Removing this will also remove from paired stores:" })}</b>{' '}
+          <CollateralList entries={otherDrops} />
+        </div>
+      )}
+    </>
   );
 }
 
@@ -385,16 +503,93 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   // the checklist itself (every row pre-checked, individually uncheckable
   // before the author clicks "Remove all selected") IS the confirmation for
   // this batch, so a second per-character dialog would be redundant.
+  //
+  // FR-006 (spec 051) qualifies that: the checklist is confirmation enough for
+  // an ordinary trim, but NOT for one that would leave a needed character
+  // unproducible. `recommendedRemovalChars` already shields those (an `isLost`
+  // partner is exactly the guard's conjunction), so this is a backstop rather
+  // than the common path — but "silently applied" must not be reachable for a
+  // lost character by any route. Any isLost collateral routes the batch to the
+  // same bulk confirm dialog the store-card master toggle uses.
+  //
+  // FR-011/FR-015 (spec 051, contracts/case-pairing.md "Composition with store
+  // pairing") — a paired proposal row names its WHOLE case group in
+  // `row.caseGroup` (present only on a paired row; `caseGroupFor` already
+  // resolved which characters must trim together upstream, in
+  // recommendedRemovalChars). `row.contributors` only carries the row's own
+  // surviving character's contributors, so before this accepts a paired row it
+  // resolves collectCharContributors for every OTHER member of the group and
+  // unions rule/slot ids in — one action, one undo entry, same as any other
+  // selected row. Deduped: a case pair can share a rule or store slot (e.g. a
+  // deadkey table that maps both cases through the same producer), and folding
+  // the same id in twice would just be redundant work for cascadeDelete
+  // (harmless, but the dedup keeps the ids list matching the actual affected
+  // set 1:1). A group member's contributors can be `blocked` even though the
+  // row itself is not (its own shielding was checked, not its partner's) —
+  // collected below and, when non-empty, folded into `pendingBulkCascade` so
+  // it surfaces through the SAME warning box `pendingCascade.contributors.blocked`
+  // already renders (FR-008: never silently dropped, never a second dialog).
+  //
+  // Deliberately NOT done for the per-chip cascade (handleCascadeDelete /
+  // buildPendingCascade / handleStoreChipCascade) — that single-character path
+  // is the OQ-5 escape hatch an author uses to keep one case while trimming
+  // the other after declining a paired row. Case-pairing that path too would
+  // remove the only way to decline the pairing.
   const handleRemoveSelectedRecommended = useCallback((selected: RecommendedRemovalChar[]) => {
     const ruleNodeIds: string[] = [];
     const storeSlotIds: string[] = [];
-    for (const { contributors } of selected) {
-      ruleNodeIds.push(...contributors.ruleNodeIds);
-      storeSlotIds.push(...contributors.storeSlotIds);
+    const blocked: CharContributors['blocked'] = [];
+    const seenRuleIds = new Set<string>();
+    const seenSlotIds = new Set<string>();
+    const seenBlocked = new Set<string>();
+    const addContributors = (contributors: CharContributors) => {
+      for (const id of contributors.ruleNodeIds) {
+        if (seenRuleIds.has(id)) continue;
+        seenRuleIds.add(id);
+        ruleNodeIds.push(id);
+      }
+      for (const id of contributors.storeSlotIds) {
+        if (seenSlotIds.has(id)) continue;
+        seenSlotIds.add(id);
+        storeSlotIds.push(id);
+      }
+      for (const b of contributors.blocked) {
+        const key = `${b.label}::${b.reason}`;
+        if (seenBlocked.has(key)) continue;
+        seenBlocked.add(key);
+        blocked.push(b);
+      }
+    };
+    for (const row of selected) {
+      addContributors(row.contributors);
+      // Expand a paired row to its OTHER case-group members. Only possible
+      // with an `ir` to resolve them against — with no `ir` there is nothing
+      // to look up, so the row's own (already-resolved) contributors are all
+      // this can act on, same as the ir==null early-return below.
+      if (ir != null && row.caseGroup) {
+        for (const ch of row.caseGroup) {
+          if (ch === row.ch) continue; // already folded in via row.contributors above
+          addContributors(collectCharContributors(ir, ch));
+        }
+      }
     }
     if (ruleNodeIds.length === 0 && storeSlotIds.length === 0) return;
-    cascadeDelete(ruleNodeIds, storeSlotIds);
-  }, [cascadeDelete]);
+    if (ir == null) {
+      cascadeDelete(ruleNodeIds, storeSlotIds);
+      return;
+    }
+    const collateral = coordinatedCollateralForSlots(storeSlotIds, ir, neededSet, identityBcp47, storeAnalysis, carveNormalizationForm);
+    if (collateral.some((c) => c.isLost) || blocked.length > 0) {
+      // cascadeDelete unions both id params into one item-channel set, so the
+      // rule ids ride in `gids` alongside the slot ids (see handleBulkCascadePrimary).
+      setPendingBulkCascade({ gids: [...ruleNodeIds, ...storeSlotIds], collateral, blocked });
+      return;
+    }
+    // Fold the resolved collateral slots into the SAME call, so the gallery's
+    // kept/removed state matches what export-time applyStoreSlotRemovals does
+    // — the identical P1 fix the single-chip and store-card paths already apply.
+    cascadeDelete(ruleNodeIds, [...storeSlotIds, ...collateral.map((c) => c.slotId)]);
+  }, [cascadeDelete, ir, neededSet, identityBcp47, storeAnalysis, carveNormalizationForm]);
 
   // Cross-reference web: character → all the group/pattern/store cards it lives in.
   // Built ONCE per node set (not per glyph). Powers the summary tags on each card.
@@ -472,7 +667,10 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       gids.forEach((gid) => deleteItem(gid));
       return;
     }
-    setPendingBulkCascade({ gids, collateral });
+    // Never populates `blocked` — the store-card master toggle's gids are
+    // resolved capability-filtered ids already, not a case-group expansion
+    // (that's handleRemoveSelectedRecommended's concern above).
+    setPendingBulkCascade({ gids, collateral, blocked: [] });
   }, [ir, deleteItem, restoreItem, neededSet, identityBcp47, storeAnalysis, carveNormalizationForm]);
 
   const handleBulkCascadePrimary = useCallback(() => {
@@ -940,29 +1138,13 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
                   silent: shown for every collateral char, with a needed one
                   flagged prominently so the author can back out via Cancel. */}
               {!isRestore && pendingCascade.collateral.length > 0 && (
-                <CollateralWarning collateral={pendingCascade.collateral} isBulk={false} />
+                <CollateralWarning
+                  collateral={pendingCascade.collateral}
+                  isBulk={false}
+                  targetChar={pendingCascade.contributors.targetChar}
+                />
               )}
-              {pendingCascade.contributors.blocked.length > 0 && (
-                <div
-                  role="alert"
-                  style={{
-                    marginTop: 8,
-                    padding: '8px 12px',
-                    borderRadius: 8,
-                    background: 'color-mix(in srgb, var(--sil-orange) 10%, var(--app-surface))',
-                    border: '1px solid color-mix(in srgb, var(--sil-orange) 40%, transparent)',
-                    fontSize: 12,
-                    color: 'var(--sil-orange-dark)',
-                  }}
-                >
-                  <b><Trans id="editor.carve.cascade.markedNotRemovable">⚠ Marked not-removable — these will stay:</Trans></b>{' '}
-                  {pendingCascade.contributors.blocked.map((b, i) => (
-                    <span key={i}>
-                      {b.label} ({b.reason}){i < pendingCascade.contributors.blocked.length - 1 ? ', ' : ''}
-                    </span>
-                  ))}
-                </div>
-              )}
+              <BlockedWarning blocked={pendingCascade.contributors.blocked} />
             </div>
           }
           primaryLabel={
@@ -1010,6 +1192,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
                   </Trans>
                 </p>
                 <CollateralWarning collateral={pendingBulkCascade.collateral} isBulk={true} />
+                <BlockedWarning blocked={pendingBulkCascade.blocked} />
               </div>
             }
             primaryLabel={t({ id: "editor.carve.cascade.removePrimaryButton", message: "Yes, remove everywhere" })}

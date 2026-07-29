@@ -34,12 +34,12 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { PublishManagedPRError } from "@keyboard-studio/contracts";
 import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
+import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { getManagedPROutputService, getManagedPRProxyEndpoint } from "../lib/services.ts";
 import {
   publishManagedPRErrorMessage,
   isPublishManagedPRError,
 } from "../lib/publishManagedPRErrorMessage.ts";
-import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { recordProjectSubmission } from "../lib/draftPersistence.ts";
 
 // ---------------------------------------------------------------------------

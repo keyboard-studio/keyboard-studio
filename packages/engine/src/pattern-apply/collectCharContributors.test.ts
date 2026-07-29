@@ -346,3 +346,65 @@ describe('collectCharContributors', () => {
     expect(result.blocked).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Role-tagged store slots (spec 051 T010 — invariant D1)
+//
+// `storeSlots` is a projection of `storeSlotIds`, never a different set. The
+// role tells a caller whether a slot PRODUCES the character (output store) or
+// merely TRIGGERS on it (any()-consumed input store) — the distinction the
+// carve collateral guard turns on.
+// ---------------------------------------------------------------------------
+
+describe('collectCharContributors — role-tagged storeSlots (spec 051)', () => {
+  it('keeps storeSlots a strict element-for-element projection of storeSlotIds (invariant D1)', () => {
+    const ir = makeCameroonIR();
+    for (const ch of ['a', 'e', 'ε', 'à', 'é', 'z']) {
+      const result = collectCharContributors(ir, ch);
+      expect(result.storeSlots.map((s) => s.slotId)).toEqual(result.storeSlotIds);
+    }
+  });
+
+  it('tags an any()-consumed input-store slot as "input"', () => {
+    // 'a' lives only in dkf003b, the any() context source.
+    const result = collectCharContributors(makeCameroonIR(), 'a');
+    expect(result.storeSlots).toEqual([{ slotId: 'sid-dkf#0', role: 'input' }]);
+  });
+
+  it('tags an index()-targeted output-store slot as "output"', () => {
+    // 'à' lives only in dkt003b, the index() output target.
+    const result = collectCharContributors(makeCameroonIR(), 'à');
+    expect(result.storeSlots).toEqual([{ slotId: 'sid-dkt#0', role: 'output' }]);
+  });
+
+  it('tags a slot reached by BOTH roles as "output" — the producing role dominates', () => {
+    // 'ε' is at index 2 of the input store AND index 2 of the output store, so
+    // the fixture yields one slot of each role; a single store used both ways
+    // must resolve to "output".
+    const both = collectCharContributors(makeCameroonIR(), 'ε');
+    expect(both.storeSlots).toEqual([
+      { slotId: 'sid-dkf#2', role: 'input' },
+      { slotId: 'sid-dkt#2', role: 'output' },
+    ]);
+
+    // A self-paired store (Cameroon's `word` shape): the SAME slot is reached by
+    // the input loop and the output loop of the same rule.
+    const word = makeStore('sid-word', 'word', [
+      { kind: 'char', value: 'a' },
+      { kind: 'char', value: 'ɛ' },
+    ]);
+    const selfPaired = makeIR({
+      stores: [word],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [makeRule('r-self',
+          [{ kind: 'any', storeRef: 'word' }],
+          [{ kind: 'index', storeRef: 'word', offset: 1 }],
+        )],
+      }],
+    });
+    const result = collectCharContributors(selfPaired, 'ɛ');
+    expect(result.storeSlotIds).toEqual(['sid-word#1']);
+    expect(result.storeSlots).toEqual([{ slotId: 'sid-word#1', role: 'output' }]);
+  });
+});

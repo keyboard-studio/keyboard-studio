@@ -5,12 +5,13 @@
  *
  * That invariant used to be encoded three times (applyTouchAssignments.ts,
  * applyTouchAssignmentsToRawJson.ts, TouchGallery.tsx's `normalizeTouchSlots`)
- * — this module is the one place it is stated, so the three call sites can
+ * — this module is the one place it is stated, so the four call sites can
  * never independently drift on what "no `layer` slot" means.
  *
  * @see applyTouchAssignments.ts
  * @see applyTouchAssignmentsToRawJson.ts
  * @see ../../studio/src/editors/assignLoop/TouchGallery.tsx (`normalizeTouchSlots`)
+ * @see ../../studio/src/editors/assignLoop/TouchGallery.tsx (`touchMechanismLabel`)
  */
 
 /** The layer a touch mechanism targets when it does not name one. An ABSENT

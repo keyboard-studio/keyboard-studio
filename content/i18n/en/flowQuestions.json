@@ -199,6 +199,8 @@
   "content.flowQuestion.project_keyboard_id.prompt": "Confirm the keyboard ID",
   "content.flowQuestion.track_choice.help_text": "Choose how you want to use this base keyboard. Copy creates an independent new keyboard you can fully rename and own. Adapt lets you modify the existing keyboard keeping its name and ID.",
   "content.flowQuestion.track_choice.option.adapt.label": "Adapt — modify this keyboard in place",
+  "content.flowQuestion.track_choice.option.adapt.note": "Keep the keyboard's existing name and ID. Useful for adding a language or fixing a layout.",
   "content.flowQuestion.track_choice.option.copy.label": "Copy — start a new keyboard based on this layout",
+  "content.flowQuestion.track_choice.option.copy.note": "You will give it a new name and keyboard ID. The original is not changed.",
   "content.flowQuestion.track_choice.prompt": "How do you want to work with {{base_name}}?"
 }

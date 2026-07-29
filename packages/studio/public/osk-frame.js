@@ -5,6 +5,7 @@
 // postMessage contract:
 //   host -> frame: { type: "SET_KEYBOARD",  jsUrl, keyboardId, bcp47?, fontFaceUrl?, fontFaceFamily?, keyboardCssUrls? }
 //   host -> frame: { type: "SET_OSK_MODE",  mode: "desktop" | "touch" | "tablet" }
+//   host -> frame: { type: "SET_STRINGS",   strings: { placeholder?, statusReady? } }
 //   frame -> host: { type: "ENGINE_READY" }
 //   frame -> host: { type: "ENGINE_ERROR", message }
 //   frame -> host: { type: "TEXT_UPDATED", value }
@@ -40,6 +41,9 @@
   var pendingKeyboard = null;
   var currentOsk = null;
   var currentMode = "desktop";
+  // Idle "pick a keyboard" prompt. Localized copy arrives from the host via
+  // SET_STRINGS; this English fallback shows only if that message never lands.
+  var statusReadyText = "Ready — pick a keyboard";
   // Monotonic token to supersede in-flight keyboard loads. Each loadKeyboard()
   // call claims the next token; when its async addKeyboards/setActiveKeyboard
   // chain settles, it bails if a newer load has since started. This prevents a
@@ -368,7 +372,7 @@
       .then(function () {
         try { window.keyman.attachToControl(oskTarget); } catch (_) {}
         engineReady = true;
-        setStatus("KMW ready — pick a keyboard");
+        setStatus(statusReadyText);
         post({ type: "ENGINE_READY" });
         if (pendingKeyboard) {
           var k = pendingKeyboard;
@@ -457,6 +461,25 @@
           Array.isArray(msg.keyboardCssUrls) ? msg.keyboardCssUrls : null,
           typeof msg.bcp47 === "string" ? msg.bcp47 : null,
         );
+      }
+      return;
+    }
+
+    if (msg.type === "SET_STRINGS") {
+      var strings = msg.strings && typeof msg.strings === "object" ? msg.strings : {};
+      if (typeof strings.placeholder === "string") {
+        oskTarget.placeholder = strings.placeholder;
+      }
+      if (typeof strings.statusReady === "string") {
+        statusReadyText = strings.statusReady;
+        // If the engine is already up and idle (no keyboard active yet), the
+        // status line is showing the ready prompt — refresh it in place so a
+        // late-arriving or locale-switched translation takes effect.
+        if (engineReady) {
+          var activeIdle = "";
+          try { activeIdle = window.keyman.getActiveKeyboard() || ""; } catch (_) {}
+          if (!activeIdle) setStatus(statusReadyText);
+        }
       }
       return;
     }

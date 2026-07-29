@@ -34,6 +34,7 @@
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { isDeadkeyOnlyOutput } from "../shared/rule-shape.js";
+import { makeSlotId } from "./slotId.js";
 
 // ---------------------------------------------------------------------------
 // Public contract (shared with km-frontend — do not deviate)
@@ -46,6 +47,24 @@ export interface CharContributors {
   ruleNodeIds: string[];
   /** "<storeNodeId>#<index>" output-store slots to remove (one slot per matching position). */
   storeSlotIds: string[];
+  /**
+   * Parallel, role-tagged view of `storeSlotIds` (spec 051 T006).
+   *
+   * INVARIANT D1: `storeSlots.map(s => s.slotId)` equals `storeSlotIds`,
+   * element-for-element. This is a projection, never a different set.
+   *
+   * `storeSlotIds` merges input and output slots by design (a removal must reach
+   * every store a char appears in), which leaves callers unable to ask "is this
+   * slot a PRODUCER?". The collateral guard needs exactly that. Additive rather
+   * than a shape change to `storeSlotIds`, which is threaded positionally through
+   * `cascadeDelete`, `coordinatedCollateralForSlots`, `buildPendingCascade`, and
+   * the restore path.
+   *
+   * A slot reached by both roles (a store any()-consumed in one rule and an
+   * index() target in another) is tagged "output" — the producing role dominates,
+   * since that is what the guard asks about.
+   */
+  storeSlots: { slotId: string; role: 'input' | 'output' }[];
   /** Human-readable origin labels for the confirmation dialog. */
   locations: { kind: 'group' | 'pattern' | 'store'; label: string; nodeId: string }[];
   /** Opaque or multi-char producers that cannot be surgically removed. */
@@ -80,6 +99,7 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
 
   const ruleNodeIds: string[] = [];
   const storeSlotIds: string[] = [];
+  const storeSlots: CharContributors['storeSlots'] = [];
   const locations: CharContributors['locations'] = [];
   const blocked: CharContributors['blocked'] = [];
 
@@ -105,7 +125,27 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
 
   // Track already-added ruleNodeIds / storeSlotIds to avoid duplicates.
   const seenRuleNodeIds = new Set<string>();
-  const seenStoreSlotIds = new Set<string>();
+  // slotId -> its position in `storeSlots`, so a slot first seen on the input
+  // side can be upgraded to "output" without disturbing `storeSlotIds` order.
+  const storeSlotIndexById = new Map<string, number>();
+
+  /**
+   * Record a matching store slot, keeping `storeSlots` a strict projection of
+   * `storeSlotIds` (invariant D1). Output role dominates on a re-visit.
+   */
+  const addStoreSlot = (slotId: string, role: 'input' | 'output') => {
+    const existing = storeSlotIndexById.get(slotId);
+    if (existing !== undefined) {
+      if (role === 'output') {
+        const entry = storeSlots[existing];
+        if (entry !== undefined) entry.role = 'output';
+      }
+      return;
+    }
+    storeSlotIndexById.set(slotId, storeSlots.length);
+    storeSlotIds.push(slotId);
+    storeSlots.push({ slotId, role });
+  };
 
   // --- 1. Check opaque fragments (RawKmnFragment) ---
   // These can only be whole-fragment-deleted; list in blocked.
@@ -160,8 +200,7 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
         for (let i = 0; i < inputStore.items.length; i++) {
           const item = inputStore.items[i];
           if (item !== undefined && item.kind === 'char' && item.value.normalize('NFC') === target) {
-            const slotId = `${inputStore.nodeId}#${i}`;
-            if (!seenStoreSlotIds.has(slotId)) { seenStoreSlotIds.add(slotId); storeSlotIds.push(slotId); }
+            addStoreSlot(makeSlotId(inputStore.nodeId, i), 'input');
             addLocation('store', inputStore.name, inputStore.nodeId);
             inputMatched = true;
           }
@@ -185,8 +224,7 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
           for (let i = 0; i < store.items.length; i++) {
             const item = store.items[i];
             if (item !== undefined && item.kind === 'char' && item.value.normalize('NFC') === target) {
-              const slotId = `${store.nodeId}#${i}`;
-              if (!seenStoreSlotIds.has(slotId)) { seenStoreSlotIds.add(slotId); storeSlotIds.push(slotId); }
+              addStoreSlot(makeSlotId(store.nodeId, i), 'output');
               addLocation('store', store.name, store.nodeId);
               storeMatched = true;
             }
@@ -220,5 +258,5 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
     }
   }
 
-  return { targetChar: target, ruleNodeIds, storeSlotIds, locations, blocked };
+  return { targetChar: target, ruleNodeIds, storeSlotIds, storeSlots, locations, blocked };
 }

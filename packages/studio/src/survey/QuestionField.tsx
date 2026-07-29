@@ -698,6 +698,7 @@ function SelectField({ question, value, onChange, context }: FieldProps) {
 
 function RadioField({ question, value, onChange, context }: FieldProps) {
   const { i18n } = useLingui();
+  const ctx = context ?? {};
   const strVal = stringValue(value);
   const radioOptions: RadioOption[] = (question.options ?? []).map((opt) => ({
     value: opt.value,
@@ -706,9 +707,21 @@ function RadioField({ question, value, onChange, context }: FieldProps) {
       `option.${slugifyIdSegment(opt.value)}.label`,
       opt.label,
       i18n,
-      context ?? {},
+      ctx,
     ),
-    ...(opt.note !== undefined ? { note: opt.note } : {}),
+    // The per-option helper line is rendered prose — resolve it through the
+    // same Tier B catalog path as the label (extracted as option.<slug>.note).
+    ...(opt.note !== undefined
+      ? {
+          note: resolveFlowText(
+            question,
+            `option.${slugifyIdSegment(opt.value)}.note`,
+            opt.note,
+            i18n,
+            ctx,
+          ),
+        }
+      : {}),
   }));
   return (
     <RadioGroup

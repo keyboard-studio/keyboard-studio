@@ -145,7 +145,7 @@ function makeIR(groups: IRGroup[], stores: IRStore[] = []): KeyboardIR {
 }
 
 function emptyContributors(targetChar: string): CharContributors {
-  return { targetChar, ruleNodeIds: [], storeSlotIds: [], locations: [], blocked: [] };
+  return { targetChar, ruleNodeIds: [], storeSlotIds: [], storeSlots: [], locations: [], blocked: [] };
 }
 
 /** Instantiate the working copy (Track 2 — bypasses the "all clear" gate screen
@@ -604,6 +604,41 @@ describe('CarveGallery — coordinated collateral (manual carve safety, #525/#93
     expect(dialog.textContent).not.toContain('needed for your language');
   });
 
+  // G10 (spec 051 FR-005) — the same dialog, but the partner is the INPUT store.
+  // Trimming the composed character off the OUTPUT store drops the trigger
+  // letter from the deadkey's any()-consumed input store. That letter is NOT
+  // lost — it stays typeable through its own base rule — so this must read as
+  // information, not as "you are about to lose a character you need".
+  it('G10: an INPUT-store partner renders as role="status" with no warning wording and no emoji', () => {
+    const ir = makeCrossPairedIr('α');
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => ({
+      ...emptyContributors(ch),
+      // Target the OUTPUT store this time — so the partner resolved is `dkf`,
+      // the any()-consumed INPUT store holding 'a'.
+      storeSlotIds: ['store#dkt#0'],
+    }));
+
+    renderGallery(ir);
+    // 'a' (the input trigger letter) IS needed by the language.
+    useWorkingCopyStore.setState((s) => ({ session: { ...s.session, confirmedInventory: ['a'] } }));
+
+    fireEvent.click(screen.getByTestId('carve-card-store#dkt'));
+    fireEvent.click(screen.getByRole('button', { name: 'α' }));
+
+    const dialog = screen.getByRole('alertdialog');
+    const info = within(dialog).getByRole('status');
+    expect(info.textContent).toContain('no longer work');
+    expect(info.textContent).toContain('You can still type');
+    expect(info.textContent).toContain('a');
+    // FR-005: informational, never framed as a loss.
+    expect(dialog.textContent).not.toContain('character you need');
+    expect(dialog.textContent).not.toContain('needed for your language');
+    // Article VIII: no emoji in the collateral copy.
+    expect(dialog.textContent).not.toContain('⚠');
+    // Nothing is "lost", so there is no alert-severity collateral box.
+    expect(within(dialog).queryByText(/characters? you need/)).toBeNull();
+  });
+
   it('a sole-producer char with NO coordinated collateral still plain-toggles (regression guard, unpaired store)', () => {
     // Reuses the existing #523 fixture shape: an unpaired store, no
     // classifyStoreSlotEdit coordinatedWith partner — collateral must be [].
@@ -870,5 +905,314 @@ describe('CarveGallery — removal banner (#525 BANNER slice)', () => {
 
     expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(false);
     expect(useWorkingCopyStore.getState().isItemDeleted('r-b')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Every acted-on trim is visibly reflected (spec 051 US3)
+//
+// FR-007 is asserted over RENDERED state, not the store: the bug report was
+// "the dialog closes and nothing changes colour", which a store-level
+// assertion cannot see. GlyphCell renders its removed state as
+// `aria-pressed`, so that is what these read.
+//
+// FR-008: a trim request terminates in exactly one of three outcomes —
+// applied / applied-with-explicitly-retained-producers / refused-with-reason.
+// "Closes with no visible effect" is not among them.
+// ---------------------------------------------------------------------------
+
+/**
+ * Two keys producing 'g' — a two-producer character. Both rules live in the
+ * SAME group so both tiles render at once; the invariant under test is about
+ * what the author can see in one render.
+ */
+function makeTwoProducerIR(): KeyboardIR {
+  return makeIR([
+    makeGroup('g-main', 'main', [
+      makeSimpleRule('r-g1', 'K_G', 'g'),
+      makeSimpleRule('r-g2', 'K_H', 'g'),
+    ]),
+  ]);
+}
+
+/** Rendered removed-state of a glyph tile, read off GlyphCell's aria-pressed. */
+function tileIsRemoved(name: string): boolean {
+  return screen.getByRole('button', { name }).getAttribute('aria-pressed') === 'true';
+}
+
+describe('CarveGallery — every applied trim is visible (spec 051 US3)', () => {
+  it('FR-007: after a confirmed trim, EVERY tile in the contributor set renders removed, in the same render', () => {
+    const caps = new Map<string, RemovalCapability>([
+      ['r-g1', 'removable:simple'],
+      ['r-g2', 'removable:simple'],
+    ]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => ({
+      ...emptyContributors(ch),
+      ruleNodeIds: ['r-g1', 'r-g2'],
+    }));
+
+    renderGallery(makeTwoProducerIR(), caps);
+    expect(tileIsRemoved('g — K_G')).toBe(false);
+    expect(tileIsRemoved('g — K_H')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'g — K_G' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, remove everywhere' }));
+
+    // The clicked tile AND the other producer's tile both flip — the trimmed
+    // contributor set is a subset of the tiles rendered removed.
+    expect(tileIsRemoved('g — K_G')).toBe(true);
+    expect(tileIsRemoved('g — K_H')).toBe(true);
+  });
+
+  it('FR-007: the kept/total counter updates in the same render', () => {
+    const caps = new Map<string, RemovalCapability>([
+      ['r-g1', 'removable:simple'],
+      ['r-g2', 'removable:simple'],
+    ]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => ({
+      ...emptyContributors(ch),
+      ruleNodeIds: ['r-g1', 'r-g2'],
+    }));
+
+    renderGallery(makeTwoProducerIR(), caps);
+    expect(screen.getByText('2').textContent).toBe('2'); // 2 of 2 kept
+
+    fireEvent.click(screen.getByRole('button', { name: 'g — K_G' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, remove everywhere' }));
+
+    expect(screen.getByText('0').textContent).toBe('0'); // 0 of 2 kept
+  });
+
+  it('FR-008 outcome 1 — APPLIED: a sole-producer trim flips its tile with no dialog', () => {
+    const ir = makeIR([makeGroup('g-main', 'main', [makeSimpleRule('r-a', 'K_A', 'a')])]);
+    const caps = new Map<string, RemovalCapability>([['r-a', 'removable:simple']]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => ({
+      ...emptyContributors(ch),
+      ruleNodeIds: ['r-a'],
+    }));
+
+    renderGallery(ir, caps);
+    fireEvent.click(screen.getByRole('button', { name: 'a — K_A' }));
+
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(tileIsRemoved('a — K_A')).toBe(true);
+  });
+
+  it('FR-008 outcome 2 — APPLIED WITH RETAINED PRODUCERS: the retained one is named with a reason, and stays lit', () => {
+    const caps = new Map<string, RemovalCapability>([
+      ['r-g1', 'removable:simple'],
+      ['r-g2', 'not-removable:context-sensitive'],
+    ]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => ({
+      ...emptyContributors(ch),
+      ruleNodeIds: ['r-g1', 'r-g2'],
+    }));
+
+    renderGallery(makeTwoProducerIR(), caps);
+    fireEvent.click(screen.getByRole('button', { name: 'g — K_G' }));
+
+    // The dialog says WHICH producer is being kept and WHY — never silent.
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog.textContent).toContain('Marked not-removable');
+    expect(dialog.textContent).toContain('Only produces this character after certain keys are pressed');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, remove everywhere' }));
+
+    expect(tileIsRemoved('g — K_G')).toBe(true);
+    expect(tileIsRemoved('g — K_H')).toBe(false); // retained, and the author was told
+  });
+
+  it('FR-008 outcome 3 — REFUSED WITH REASON: nothing is removable, nothing flips, and the reason is shown', () => {
+    const ir = makeIR([makeGroup('g-main', 'main', [makeSimpleRule('r-e', 'K_E', 'e')])]);
+    const caps = new Map<string, RemovalCapability>([['r-e', 'not-removable:context-sensitive']]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => emptyContributors(ch));
+
+    renderGallery(ir, caps);
+    fireEvent.click(screen.getByRole('button', { name: 'e — K_E' }));
+
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog.textContent).toContain('can\'t be fully removed');
+    expect(dialog.textContent).toContain('Only produces this character after certain keys are pressed');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+    expect(tileIsRemoved('e — K_E')).toBe(false);
+  });
+
+  it('FR-008: a trim never closes with no visible effect — the plain-toggle fast path only fires for a complete trim', () => {
+    // The fast path (removableCount <= 1 && nothing blocked && no collateral)
+    // is reachable ONLY when the clicked tile is the whole trim. A second
+    // producer raises removableCount (dialog), and a not-removable one lands in
+    // `blocked` (dialog) — so it can never flip one gid and leave a sibling lit.
+    const caps = new Map<string, RemovalCapability>([
+      ['r-g1', 'removable:simple'],
+      ['r-g2', 'not-removable:opaque'],
+    ]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => ({
+      ...emptyContributors(ch),
+      ruleNodeIds: ['r-g1', 'r-g2'],
+    }));
+
+    renderGallery(makeTwoProducerIR(), caps);
+    fireEvent.click(screen.getByRole('button', { name: 'g — K_G' }));
+
+    expect(screen.queryByRole('alertdialog')).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T028 — gallery-level cased-letter tests (spec 051 FR-011/FR-014/FR-015,
+// contracts/case-pairing.md "Proposal-row granularity", OQ-5).
+//
+// Fixture: U+018E (Ǝ, LATIN CAPITAL LETTER REVERSED E) <-> U+01DD (ǝ, LATIN
+// SMALL LETTER TURNED E) — a REAL, verified case fold (`'Ǝ'.toLowerCase() ===
+// 'ǝ'`), NOT the U+0259/U+018E near-miss the task briefing warned off (U+0259
+// schwa's uppercase is U+018F, a different letter). Both members are surplus
+// (absent from the resolved needed-set) and each is produced by its own
+// isSimpleRemovableRule-eligible rule, so recommendedRemovalChars's
+// allow-listing lets both through and `caseGroupFor` (via `caseCounterpart`,
+// which is plain toUpperCase/toLowerCase-based — verified above, not
+// locale-sensitive here) folds them into ONE row per FR-014.
+// ---------------------------------------------------------------------------
+
+const CASE_UPPER = 'Ǝ'; // Ǝ
+const CASE_LOWER = 'ǝ'; // ǝ
+
+/** Two rules producing a real case pair, each individually removable. */
+function makeCasePairIR(): { ir: KeyboardIR; caps: Map<string, RemovalCapability> } {
+  const ir = makeIR([
+    makeGroup('g-main', 'main', [
+      makeSimpleRule('r-cap', 'K_A', CASE_UPPER),
+      makeSimpleRule('r-low', 'K_B', CASE_LOWER),
+    ]),
+  ]);
+  const caps = new Map<string, RemovalCapability>([
+    ['r-cap', 'removable:simple'],
+    ['r-low', 'removable:simple'],
+  ]);
+  return { ir, caps };
+}
+
+/** Mocks collectCharContributors so each case member resolves to its OWN rule id only —
+ * the per-chip cascade path never consults the other member (that's the escape hatch). */
+function mockCasePairContributors() {
+  collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => {
+    if (ch === CASE_UPPER) return { ...emptyContributors(ch), ruleNodeIds: ['r-cap'] };
+    if (ch === CASE_LOWER) return { ...emptyContributors(ch), ruleNodeIds: ['r-low'] };
+    return emptyContributors(ch);
+  });
+}
+
+/** Opens the RemovalBanner checklist (mirrors the #525 BANNER slice tests' expand step). */
+async function expandBanner() {
+  await screen.findByText(/We recommend removing/);
+  fireEvent.click(screen.getByRole('button', { expanded: false }));
+}
+
+describe('CarveGallery — cased-letter proposal rows (spec 051 T028)', () => {
+  it('(a) FR-014: both case members surplus -> exactly ONE paired row, not two separate rows', async () => {
+    const { ir, caps } = makeCasePairIR();
+    mockCasePairContributors();
+    neededCharsResult.set(new Set(['q'])); // neither case member is needed — both surplus
+
+    renderGallery(ir, caps);
+    await expandBanner();
+
+    // Exactly one checkbox in the whole checklist — the fold produced ONE row, not two.
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+
+    // The combined paired-row aria-label/codepoint text is present...
+    const pairedCheckbox = screen.getByRole('checkbox', { name: 'Remove U+018E / U+01DD (both cases)' });
+    expect(pairedCheckbox).not.toBeNull();
+
+    // ...and neither single-member aria-label rendered as its OWN separate row.
+    expect(screen.queryByRole('checkbox', { name: 'Remove U+018E' })).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: 'Remove U+01DD' })).toBeNull();
+
+    // The row's glyph/codepoint cells show BOTH members, not just the survivor.
+    const checklist = screen.getByRole('list', { name: 'Recommended characters to remove' });
+    expect(checklist.textContent).toContain('Ǝ / ǝ');
+    expect(checklist.textContent).toContain('U+018E / U+01DD');
+  });
+
+  it('(b1) escape-hatch hint renders when a paired row is present', async () => {
+    const { ir, caps } = makeCasePairIR();
+    mockCasePairContributors();
+    neededCharsResult.set(new Set(['q']));
+
+    renderGallery(ir, caps);
+    await expandBanner();
+    expect(screen.getByText(/A paired row removes both cases together/)).not.toBeNull();
+  });
+
+  it('(b2) escape-hatch hint is absent when every recommended row is unpaired', async () => {
+    // A single surplus character with no case counterpart in the produced set
+    // (mirrors the existing 'removal banner' describe block's fixture) —
+    // recommendedRemovalChars never sets `caseGroup` on an unpaired row, so
+    // RemovalBanner's `hasPairedRow` must stay false and the hint must not render.
+    const ir = makeIR([makeGroup('g-main', 'main', [makeSimpleRule('r-z', 'K_Z', 'z')])]);
+    const caps = new Map<string, RemovalCapability>([['r-z', 'removable:simple']]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) =>
+      ch === 'z' ? { ...emptyContributors(ch), ruleNodeIds: ['r-z'] } : emptyContributors(ch),
+    );
+    neededCharsResult.set(new Set(['q']));
+
+    renderGallery(ir, caps);
+    await expandBanner();
+    expect(screen.queryByText(/A paired row removes both cases together/)).toBeNull();
+  });
+
+  it('(c) FR-011/FR-015: accepting the paired row trims BOTH cases as ONE action, ONE undo entry', async () => {
+    const { ir, caps } = makeCasePairIR();
+    mockCasePairContributors();
+    neededCharsResult.set(new Set(['q']));
+
+    renderGallery(ir, caps);
+    await expandBanner();
+
+    const undoDepthBefore = useWorkingCopyStore.getState().undoStack.length;
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-cap')).toBe(false);
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-low')).toBe(false);
+
+    // The paired row is pre-checked by construction — "Remove all selected (1)"
+    // acts on it directly, no per-row confirm dialog (the checklist IS the confirm).
+    fireEvent.click(screen.getByRole('button', { name: /Remove all selected \(1\)/ }));
+
+    // Both rule ids — the survivor's own contributors AND the folded-in
+    // counterpart's — land deleted.
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-cap')).toBe(true);
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-low')).toBe(true);
+
+    // ONE action / ONE undo entry (FR-011/FR-015) — not two separate cascades.
+    // cascadeDelete pushes exactly one 'batch' undo entry per call; prove it
+    // directly off the undo stack rather than inferring it from deletion state.
+    const undoStackAfter = useWorkingCopyStore.getState().undoStack;
+    expect(undoStackAfter.length).toBe(undoDepthBefore + 1);
+    const lastEntry = undoStackAfter[undoStackAfter.length - 1]!;
+    expect(lastEntry.k).toBe('batch');
+    expect(lastEntry.itemIds).toEqual(expect.arrayContaining(['r-cap', 'r-low']));
+  });
+
+  it('(d) OQ-5 escape hatch: declining the paired row and trimming ONE case via its own chip leaves the counterpart untouched', () => {
+    const { ir, caps } = makeCasePairIR();
+    mockCasePairContributors();
+    neededCharsResult.set(new Set(['q']));
+
+    renderGallery(ir, caps);
+    // Deliberately does NOT expand/accept the banner row — the author is using
+    // the per-chip cascade directly, i.e. declining the paired proposal.
+    const upperTileName = `${CASE_UPPER} — K_A`;
+    const lowerTileName = `${CASE_LOWER} — K_B`;
+    expect(tileIsRemoved(upperTileName)).toBe(false);
+    expect(tileIsRemoved(lowerTileName)).toBe(false);
+
+    // Sole-producer, capability-removable chip — plain toggle, no dialog, and
+    // (unlike the banner path) it never consults the case-group partner.
+    fireEvent.click(screen.getByRole('button', { name: upperTileName }));
+
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-cap')).toBe(true);
+    // The counterpart's rule is untouched, and its tile stays lit.
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-low')).toBe(false);
+    expect(tileIsRemoved(lowerTileName)).toBe(false);
   });
 });

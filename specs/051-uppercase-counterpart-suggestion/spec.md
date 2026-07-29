@@ -4,7 +4,11 @@
 
 **Created**: 2026-07-28
 
-**Status**: Draft
+**Status**: **Implemented / shipped, with an open follow-up** — Original scope (FR-001–FR-011,
+US1–US3) shipped via PR #1411, merged to main (tasks.md T001–T046 and T048 checked). T047 (the
+manual `pnpm dev` walk of quickstart.md §5) remains open and surfaced two defects in the shipped
+touch-gallery behavior; these are closed under the 2026-07-28 amendment below (US4, FR-012,
+FR-013) rather than a new spec.
 
 **Input**: Issue #1356 — "feat(studio): suggest uppercase counterparts when a lowercase cased letter is placed"
 
@@ -32,6 +36,25 @@ a long-press host from the NFD base and uppercases it into a vkey (`K_${base.toU
 default-vs-shift **layer** by the letter's case — so accented lowercase letters get suggested onto the uppercase
 (shift-layer) key rather than the lowercase (default-layer) key. Placement must be case-correct before a parallel
 "add the uppercase on the shift layer" suggestion can mean anything.
+
+*(This paragraph's literal description of the defect is corrected by [research.md](research.md) R5:
+`K_A` already resolves to the default layer, so a lowercase `á` was never actually landing on the
+uppercase key — what was unrepresentable was the inverse, an accented **uppercase** letter deriving
+the same `K_A` and landing on the lowercase layer. See the 2026-07-28 amendment below, which confirms
+R5 for the suggestion-Accept path too: the placement was correct and only the label read wrong.)*
+
+**Amendment (2026-07-28, T047 manual-walk findings):** The mandatory T047 walk-through of
+quickstart.md §5 exposed two further defects in the shipped touch behavior, both sitting inside
+the FR-005/FR-006 boundary rather than new scope. First, the suggestion-Accept shortcut
+(`handleUseSuggestion` in [TouchGallery.tsx](../../packages/studio/src/editors/assignLoop/TouchGallery.tsx))
+builds its `MechanismRef` as a bare literal, bypassing `buildTouchMechanismRef`/`touchLayerForChar`
+entirely — so accepting the suggestion for an uppercase decomposable letter silently places the
+capital on the lowercase (`default`) layer, FR-006's exact defect surviving on the one placement
+path the original fix never covered. Second, every user-visible host-key label in the gallery
+(`hostKeyShortLabel`) strips the `K_` vkey prefix without regard to which layer it targets, so it
+always reads as the uppercase letter — a correctly-placed lowercase letter still displays as if it
+targeted the uppercase key. Both are closed here as User Story 4 and FR-012/FR-013, under this
+spec rather than a new one.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -116,6 +139,42 @@ edited.
 
 ---
 
+### User Story 4 - Touch suggestion Accept: explicit layer and case-correct host-key labels (Priority: P1)
+
+An author accepts the touch gallery's placement suggestion (the longpress/replace Accept shortcut,
+not the mechanism chooser). The accepted mechanism carries an explicit layer derived from the
+placed character's case, and every host-key label the author reads — the suggestion text and the
+configured-mechanism chip — presents the keycap in the case that matches the layer it targets.
+
+**Why this priority**: The T047 manual walk found the suggestion-Accept path is the one placement
+route FR-006 never covered, and that the host-key label helper never carried layer information at
+all — so a correct placement can still read as the wrong one, and an uppercase Accept can silently
+miswrite the layer. Both sit inside the shipped FR-005/FR-006 boundary and block the walk from
+passing.
+
+**Independent Test**: On a touch layer, place `ă` and accept the suggestion — the assignment lands
+on the `default` layer and its label (chip and suggestion text) reads lowercase `a`; place `Ă` and
+accept the suggestion — the assignment lands on the `shift` layer and its label reads uppercase `A`.
+
+**Acceptance Scenarios**:
+
+1. **Given** a lowercase decomposable accented letter (e.g. `ă`) whose suggested placement is
+   accepted via the Accept shortcut, **When** the mechanism is recorded, **Then** its `layer` slot
+   is explicitly `"default"`.
+2. **Given** the uppercase counterpart (e.g. `Ă`) whose suggested placement is accepted via the
+   Accept shortcut, **When** the mechanism is recorded, **Then** its `layer` slot is explicitly
+   `"shift"` — not silently defaulted to `"default"`.
+3. **Given** a host key rendered on the `default` layer, **When** its label is displayed
+   (suggestion text or configured-mechanism chip), **Then** the keycap reads lowercase.
+4. **Given** the same host key rendered on a layer whose id carries a `shift` component (the
+   concrete touch case), or a `caps` component where the touch layout actually defines a `caps`
+   layer, **When** its label is displayed, **Then** the keycap reads uppercase.
+5. **Given** the vkey name stored in `slotValues.hostKey`, **When** the layer or label changes,
+   **Then** the stored vkey name itself (e.g. `K_A`) is unchanged — only its human-facing label
+   varies.
+
+---
+
 ### Edge Cases
 
 - **No confident counterpart.** A lowercase letter with no single-character uppercase counterpart — caseless scripts
@@ -190,6 +249,25 @@ edited.
   physical-key suggestion.
 - **FR-011**: The three mechanisms MUST present the suggestion through the same propose-then-confirm affordance
   (Accept/Deny) the galleries already use, so the interaction reads identically regardless of mechanism.
+- **FR-012 (suggestion Accept must carry the layer)**: For every touch mechanism that carries a
+  `hostKey` slot, the placement-suggestion Accept path (`handleUseSuggestion`) MUST derive its
+  target layer from the placed character's case via the same helper the chooser path uses
+  (`buildTouchMechanismRef` / `touchLayerForChar`) — FR-006's case-to-layer rule, applied here to
+  the one placement path it did not yet cover — no such path may construct a touch `MechanismRef`
+  with a `hostKey` but no explicit `layer` slot value. **Excepted**: `touch_inherited`, which the
+  Accept path also raises (`handleSuggestionAccept`) but which carries no `slotValues` at all and
+  is special-cased as a no-op by the applier before layer resolution ever runs
+  (`applyTouchAssignments.ts`) — it has no host key, and therefore no layer to target.
+- **FR-013 (case-correct host-key labels)**: For a touch host key whose target layer id is
+  `default` or carries a `shift`/`caps` component, every user-visible rendering (the
+  configured-mechanism chip and the placement-suggestion text) MUST present the keycap in the case
+  that layer implies — lowercase for `default`, uppercase for `shift`, `caps`, and casing-bearing
+  compounds such as `rightalt-shift` or `shift-ctrl-alt` — never the raw uppercase vkey letter. A
+  layer id carrying no casing component (e.g. `alt`, `ctrl`, `rightalt`, `rightctrl`, `leftctrl`,
+  `ncaps`) is outside this requirement: it renders as the raw uppercase vkey letter, exactly as it
+  does today; this amendment does not define a labeling rule for those layers. The vkey name
+  written into `slotValues.hostKey` (e.g. `K_A`) is unaffected by this requirement in either case;
+  only the human-facing label varies.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -216,6 +294,12 @@ edited.
   three mechanisms.
 - **SC-005**: No regression to the existing physical-key/shift-layer companion (US1 scenarios all still pass,
   including the mnemonic-layout suppression).
+- **SC-006**: Accepting the touch placement suggestion for an uppercase decomposable letter (e.g. `Ă`) records
+  `layer: "shift"`, never a silent `"default"` — zero cases of an Accept-shortcut mechanism missing an explicit
+  `layer` slot across the test samples (FR-012, the T047 defect, gone).
+- **SC-007**: Every touch host-key label (configured-mechanism chip and suggestion text) matches the case of its
+  target layer across the test samples — lowercase on `default`, uppercase on `shift`/`caps` — with the underlying
+  vkey name in `slotValues.hostKey` unchanged (FR-013).
 
 ## Assumptions
 
@@ -250,6 +334,11 @@ edited.
   only on comparable corpus evidence, not a hunch.
 - CJK/Ethiopic and other caseless scripts (no case pairs to propose) and any out-of-scope items from spec §16.
 - Bulk "add all capitals" actions — each proposal remains an independent per-placement confirm.
+- `nextlayer` semantics for long-press-to-shift-layer chaining. This amendment fixes layer
+  targeting and label casing for the placement-suggestion Accept path; it does not address
+  whether or how a long-press mechanism should itself chain into a shift-layer `nextlayer`
+  transition. Unaddressed here, not judged unnecessary — left for a follow-up with its own
+  investigation.
 
 ## Related
 
