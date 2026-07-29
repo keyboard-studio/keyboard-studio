@@ -282,9 +282,16 @@ export type TouchMethod =
  * This reads the character's case; it does NOT change it. The one
  * `.toUpperCase()` left on the touch path builds a vkey NAME (`K_A`), not a
  * letter, and is unrelated.
+ *
+ * The test is un-anchored (`^\p{Lu}`, no `$`) on purpose: an uppercase base
+ * letter plus combining mark(s) with no precomposed code point (e.g. U+014A +
+ * U+0300) would otherwise route to the lowercase "default" layer. Must stay
+ * byte-identical to the engine's `touchLayerForChar` in
+ * packages/engine/src/pattern-apply/touchLayer.ts — this copy exists only
+ * because a `.tsx` can't import from there.
  */
 function touchLayerForChar(char: string): TouchLayerId {
-  return /^\p{Lu}$/u.test(char) ? "shift" : "default";
+  return /^\p{Lu}/u.test(char) ? "shift" : "default";
 }
 
 /**

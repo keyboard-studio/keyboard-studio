@@ -48,6 +48,7 @@
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import {
   buildRemovalSet,
+  isTouchKeyPrimaryProduction,
   isTouchSubKeyDuplicate,
   keyMatchesRemovalSet,
 } from "./touch-mechanism-shared.js";
@@ -281,6 +282,11 @@ function applyPlacementsToRawLayout(
       delete key.output;
       continue;
     }
+
+    // The host's own primary production is already this char (common on a
+    // shift-layer seed) — nothing to place; never hand a key itself as its own
+    // longpress alternate. Same guard as the IR applier.
+    if (isTouchKeyPrimaryProduction(key, char)) continue;
 
     // Host already produces another char — add as a longpress alternate.
     if (!Array.isArray(key.sk)) key.sk = [];

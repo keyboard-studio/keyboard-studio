@@ -328,7 +328,9 @@ describe("applyDesktopModifications — placements target the case-derived layer
 
   it("lands an uppercase char on the shift layer's host key as an sk[] alternate when the shift host is occupied", () => {
     const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })], {
-      shiftLayer: [makeKey("K_A", { text: "Á", output: "Á" })], // occupied shift-layer host
+      // Occupied shift-layer host producing a DIFFERENT char than the
+      // placement — the realistic shift seed, where "K_A" already gives "A".
+      shiftLayer: [makeKey("K_A", { text: "A", output: "A" })],
     });
     const { layout: out, warnings } = applyDesktopModifications(layout, {
       removals: [],
@@ -337,6 +339,7 @@ describe("applyDesktopModifications — placements target the case-derived layer
     expect(warnings).toHaveLength(0);
 
     const shiftKa = phoneLayerKeys(out, "shift").find((k) => k.id === "K_A")!;
+    expect(shiftKa.text).toBe("A"); // primary production kept
     expect(shiftKa.sk).toHaveLength(1);
     expect(shiftKa.sk![0]!.text).toBe("Á");
 
@@ -344,6 +347,41 @@ describe("applyDesktopModifications — placements target the case-derived layer
     const defaultKa = getKey(out, "K_A")!;
     expect(defaultKa.text).toBe("a");
     expect(defaultKa.sk ?? []).toHaveLength(0);
+  });
+
+  it("is a no-op when the shift host already produces the placed char (no self-referential sk[])", () => {
+    // A shift-layer seed commonly already carries the uppercase form as its
+    // primary production. Re-placing that same char must not append the key to
+    // its own sk[] — a key offering itself as its own longpress alternate.
+    const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })], {
+      shiftLayer: [makeKey("K_A", { text: "Á", output: "Á" })],
+    });
+    const { layout: out, warnings } = applyDesktopModifications(layout, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+    expect(warnings).toHaveLength(0);
+
+    const shiftKa = phoneLayerKeys(out, "shift").find((k) => k.id === "K_A")!;
+    expect(shiftKa.text).toBe("Á");
+    expect(shiftKa.sk ?? []).toHaveLength(0);
+  });
+
+  it("is a no-op when the host produces the placed char in a different normalization form", () => {
+    // Host text is NFD ("A" + combining acute); the placement is NFC "Á".
+    // Placements NFC-normalize before matching, so this is the same character
+    // and must not become an sk[] alternate.
+    const nfdUpperAAcute = "A" + String.fromCodePoint(0x0301);
+    const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })], {
+      shiftLayer: [makeKey("K_A", { text: nfdUpperAAcute, output: nfdUpperAAcute })],
+    });
+    const { layout: out } = applyDesktopModifications(layout, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+
+    const shiftKa = phoneLayerKeys(out, "shift").find((k) => k.id === "K_A")!;
+    expect(shiftKa.sk ?? []).toHaveLength(0);
   });
 
   it("still lands a lowercase char on the default layer (regression guard)", () => {

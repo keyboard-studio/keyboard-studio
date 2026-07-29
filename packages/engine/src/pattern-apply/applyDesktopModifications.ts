@@ -37,6 +37,7 @@ import { NodeIdMinter } from "../shared/node-ids.js";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import {
   buildRemovalSet,
+  isTouchKeyPrimaryProduction,
   isTouchSubKeyDuplicate,
   keyMatchesRemovalSet,
   resolveMobilePlatformIndex,
@@ -360,6 +361,13 @@ function applyPlacements(
         provenance: "physical-suggested",
       };
       setWorkingKey(state, hostKey, updated);
+      continue;
+    }
+
+    // The host's own primary production is already this char (common on a
+    // shift-layer seed) — nothing to place; never hand a key itself as its own
+    // longpress alternate.
+    if (isTouchKeyPrimaryProduction(existing, char)) {
       continue;
     }
 

@@ -40,18 +40,25 @@ export function resolveTouchLayerId(
 }
 
 /**
- * The case->layer placement rule: an uppercase-letter char (`\p{Lu}`) targets
- * the {@link SHIFT_TOUCH_LAYER}; everything else targets
- * {@link DEFAULT_TOUCH_LAYER}. Mirrors studio's `touchLayerForChar` in
+ * The case->layer placement rule: a char whose BASE code point is an uppercase
+ * letter (`\p{Lu}`) targets the {@link SHIFT_TOUCH_LAYER}; everything else
+ * targets {@link DEFAULT_TOUCH_LAYER}. Mirrors studio's `touchLayerForChar` in
  * TouchGallery.tsx exactly — that copy can't import from here (it lives in a
  * `.tsx`), so this is the definition engine code owns and studio's stays in
  * sync with by inspection.
  *
- * This reads the character's case; it does NOT change it. Callers should
- * NFC-normalize `char` first, same as every other placement/removal
- * codepath — an un-normalized combining-mark sequence is not a single
- * `\p{Lu}` code point even when its precomposed form is uppercase.
+ * The test is deliberately un-anchored (`^\p{Lu}`, no `$`): plenty of
+ * orthographies stack diacritics that have NO precomposed Unicode code point
+ * (e.g. capital eng U+014A + combining grave U+0300), so NFC-normalizing an
+ * uppercase grapheme does not necessarily collapse it to one `\p{Lu}` code
+ * point. Anchoring both ends would route every such char to the lowercase
+ * "default" layer. Reading the base code point's case covers the precomposed
+ * and the non-composable case alike.
+ *
+ * This reads the character's case; it does NOT change it. Callers still
+ * NFC-normalize `char` first, same as every other placement/removal codepath,
+ * so `text`/`id` agree downstream.
  */
 export function touchLayerForChar(char: string): string {
-  return /^\p{Lu}$/u.test(char) ? SHIFT_TOUCH_LAYER : DEFAULT_TOUCH_LAYER;
+  return /^\p{Lu}/u.test(char) ? SHIFT_TOUCH_LAYER : DEFAULT_TOUCH_LAYER;
 }

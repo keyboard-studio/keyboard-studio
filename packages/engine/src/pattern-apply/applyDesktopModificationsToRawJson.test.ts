@@ -434,7 +434,9 @@ describe("applyDesktopModificationsToRawJson — placements target the case-deri
   it("lands an uppercase char on the shift layer's host key as an sk[] alternate when the shift host is occupied", () => {
     const json = makePhoneWithShiftJson(
       [{ id: "K_A", text: "a" }],
-      [{ id: "K_A", text: "Á" }], // occupied shift-layer host
+      // Occupied shift-layer host producing a DIFFERENT char than the
+      // placement — the realistic shift seed, where "K_A" already gives "A".
+      [{ id: "K_A", text: "A" }],
     );
     const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
       removals: [],
@@ -443,16 +445,39 @@ describe("applyDesktopModificationsToRawJson — placements target the case-deri
     expect(warnings).toHaveLength(0);
 
     const parsed = JSON.parse(out) as {
-      phone: { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string; sk?: Array<{ text?: string }> }> }> }> };
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string; text?: string; sk?: Array<{ text?: string }> }> }> }> };
     };
     const shiftLayer = parsed.phone.layer.find((l) => l.id === "shift")!;
     const shiftKa = shiftLayer.row.flatMap((r) => r.key).find((k) => k.id === "K_A")!;
+    expect(shiftKa.text).toBe("A"); // primary production kept
     expect(shiftKa.sk).toHaveLength(1);
     expect(shiftKa.sk![0]!.text).toBe("Á");
 
     const defLayer = parsed.phone.layer.find((l) => l.id === "default")!;
     const defKa = defLayer.row.flatMap((r) => r.key).find((k) => k.id === "K_A")!;
     expect(defKa.sk ?? []).toHaveLength(0);
+  });
+
+  it("is a no-op when the shift host already produces the placed char (no self-referential sk[])", () => {
+    // Mirror of the IR applier's guard: a shift-layer seed that already carries
+    // the uppercase form must not gain itself as its own longpress alternate.
+    const json = makePhoneWithShiftJson(
+      [{ id: "K_A", text: "a" }],
+      [{ id: "K_A", text: "Á" }],
+    );
+    const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+    expect(warnings).toHaveLength(0);
+
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string; text?: string; sk?: Array<{ text?: string }> }> }> }> };
+    };
+    const shiftLayer = parsed.phone.layer.find((l) => l.id === "shift")!;
+    const shiftKa = shiftLayer.row.flatMap((r) => r.key).find((k) => k.id === "K_A")!;
+    expect(shiftKa.text).toBe("Á");
+    expect(shiftKa.sk ?? []).toHaveLength(0);
   });
 
   it("still lands a lowercase char on the default layer (regression guard)", () => {
