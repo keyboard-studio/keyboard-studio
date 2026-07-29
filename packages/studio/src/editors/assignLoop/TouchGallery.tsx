@@ -143,6 +143,7 @@ import {
   TEXT_MAIN,
   FONT,
   BLUE_ACTION,
+  BG_CARD,
   galleryGhostBtn as ghostBtn,
   gallerySelectMenuStyle,
   galleryHeaderBtnStyle as headerBtnStyle,
@@ -1437,15 +1438,15 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // !== "touch_inherited" (an assignment may carry several mechanisms — issue
   // 3, multiple methods per character). This filter matches handleContinue
   // exactly (the single source of truth).
-  const touchLayoutJson = useMemo(() => {
+  const touchLayoutResult = useMemo(() => {
     const appliedEdits = [...charTouch.values()].filter((a) =>
       a.mechanisms.some((m) => m.patternId !== "touch_inherited"),
     );
-    if (baseIr === null) return null;
+    if (baseIr === null) return { json: null, warnings: [] };
     if (
       !shouldEmitTouchLayout(resolvedSeedSource, mods, appliedEdits.length > 0)
     )
-      return null;
+      return { json: null, warnings: [] };
     // Case B: base ships a touch layout AND the author chose import-adapt →
     // apply faithfully onto raw JSON copy. Case A (including reseed, which
     // must NOT receive the shipped layout — R10 discards it): IR-based path.
@@ -1453,22 +1454,31 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       resolvedSeedSource === "reseed-from-desktop"
         ? undefined
         : resolveBaseTouchJson(baseVfs);
-    // NOTE: `.warnings` (e.g. a genuine "no phone or tablet platform found"
-    // guard from applyTouchAssignments/applyDesktopModifications) is
-    // intentionally discarded here — this useMemo only surfaces `.json`, and
-    // there is no UI surface wired to show engine warnings yet. Not expanding
-    // scope to wire that up in this change; tracked as a follow-up rather
-    // than silently dropped-and-forgotten.
+    // `.warnings` (e.g. a genuine "host key not found in any platform's
+    // layer" skip from applyTouchAssignments(ToRawJson)/
+    // applyDesktopModifications) is threaded through — see
+    // `touchApplyWarnings` below, rendered so an "Apply method" click that
+    // the engine could not honour is never a silent no-op.
     return buildTouchLayoutJson(baseIr, appliedEdits, {
       ...(baseTouchJson !== undefined ? { baseTouchJson } : {}),
       mods,
       seedSource: resolvedSeedSource,
-    }).json;
+    });
     // touchKey drives re-evaluation when charTouch changes (Map identity is
     // not stable; the key is). baseIr is a stable snapshot post-lockDesktop.
     // baseVfs is stable after instantiation but included for correctness.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseIr, touchKey, baseVfs, mods, resolvedSeedSource]);
+
+  const touchLayoutJson = touchLayoutResult.json;
+  // Diagnostic messages for touch assignments the engine could not apply
+  // (e.g. an unmatched host key/layer) — already name the char + host key +
+  // layer (see applyTouchAssignmentsToRawJson's warning strings). Rendered
+  // below, next to Apply/Skip, using the same visual + aria-live convention
+  // as the existing "Apply warnings:" banner (GalleryPreviewPane) rather than
+  // a new toast system. Recomputes on the same touchKey-driven memo as
+  // touchLayoutJson — no second debounce timer (D3).
+  const touchApplyWarnings = touchLayoutResult.warnings;
 
   // The seed layout for the chosen seed source, with desktop mods (spec 035
   // R3) replayed but NO Phase E edits — via `deriveSeedLayout`
@@ -2772,6 +2782,53 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               </Trans>
             </button>
           </div>
+
+          {/* Touch-apply warnings — assignments the engine could not honour
+              (e.g. an unmatched host key/layer), so an "Apply method" click
+              is never a silent no-op. Same visual + aria-live convention as
+              the compiler-diagnostics area in GalleryPreviewPane
+              (PreviewPane.tsx) — role="status", aria-live="polite", calm
+              BG_CARD/BORDER treatment, monospace — rather than a new toast
+              system. Each message already names the char + host key + layer
+              (see applyTouchAssignmentsToRawJson's warning strings). */}
+          {touchApplyWarnings.length > 0 && (
+            <div
+              role="status"
+              aria-live="polite"
+              aria-label={t({
+                id: "editor.assignLoop.touch.applyWarningsAriaLabel",
+                message: plural(touchApplyWarnings.length, {
+                  one: "# touch assignment warning",
+                  other: "# touch assignment warnings",
+                }),
+              })}
+              style={{
+                marginTop: 4,
+                background: BG_CARD,
+                border: `1px solid ${BORDER}`,
+                borderRadius: 6,
+                padding: "8px 12px",
+                fontSize: 11,
+                color: TEXT_DIM,
+                fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+              }}
+            >
+              <div style={{ color: "#d29922", marginBottom: 4 }}>
+                {t({
+                  id: "editor.assignLoop.touch.applyWarningsHeading",
+                  message: plural(touchApplyWarnings.length, {
+                    one: "# touch assignment could not be applied:",
+                    other: "# touch assignments could not be applied:",
+                  }),
+                })}
+              </div>
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {touchApplyWarnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </>
       )}
 
