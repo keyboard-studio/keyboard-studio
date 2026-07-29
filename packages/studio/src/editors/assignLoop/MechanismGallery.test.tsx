@@ -1207,7 +1207,7 @@ describe("MechanismGallery — Existing methods SHOW-ALL (composition + floor)",
 
     let compositionRow: HTMLElement;
     await waitFor(() => {
-      compositionRow = screen.getByText("U + ◌̂ → Û");
+      compositionRow = screen.getByText("U + ◌̂ → Û - NOT DELETABLE");
       expect(compositionRow).toBeTruthy();
     });
     // GREEN (produced), not blue — composition rows produce the character;
@@ -1216,7 +1216,7 @@ describe("MechanismGallery — Existing methods SHOW-ALL (composition + floor)",
     expect(compositionRow!.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
     // Static: a <span>, not a <button> — no delete affordance at all.
     expect(compositionRow!.tagName).toBe("SPAN");
-    expect(compositionRow!.textContent).toBe("U + ◌̂ → Û"); // no trailing "×"
+    expect(compositionRow!.textContent).toBe("U + ◌̂ → Û - NOT DELETABLE"); // real path + suffix, no "×"
     expect(
       screen.queryByRole("button", { name: /Remove existing method/i }),
     ).toBeNull();
@@ -1268,7 +1268,7 @@ describe("MechanismGallery — Existing methods SHOW-ALL (composition + floor)",
 
     let blockedRow: HTMLElement;
     await waitFor(() => {
-      blockedRow = screen.getByText("Bundled with other output — can't remove z alone");
+      blockedRow = screen.getByText("Bundled with other output — can't remove z alone - NOT DELETABLE");
       expect(blockedRow).toBeTruthy();
     });
     expect(blockedRow!.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — GREEN, not blue
@@ -1326,7 +1326,7 @@ describe("MechanismGallery — Existing methods SHOW-ALL (composition + floor)",
     let floorRow: HTMLElement;
     await waitFor(() => {
       floorRow = screen.getByText(
-        "Your keyboard already produces this character.",
+        "Your keyboard already produces this character. - NOT DELETABLE",
       );
       expect(floorRow).toBeTruthy();
     });
@@ -1509,7 +1509,7 @@ describe("MechanismGallery — Existing methods curation (producedRole + keystro
 
     let usedRow: HTMLElement;
     await waitFor(() => {
-      usedRow = screen.getByText("Part of a two-step combination → z");
+      usedRow = screen.getByText("Part of a two-step combination → z - NOT DELETABLE");
       expect(usedRow).toBeTruthy();
     });
     // BLUE — this row only USES "z" as input (a deadkey base), it never

@@ -47,6 +47,7 @@
  */
 
 import type { KeyboardIR, IRStore, OutputElement } from "../keyboard-ir.js";
+import { contextHasDirectBackspace } from "./backspaceContext.js";
 
 // ---------------------------------------------------------------------------
 // Options
@@ -58,6 +59,30 @@ export interface BuildProducedSetOptions {
    * Default: false (space is excluded as it is not a language character).
    */
   includeSpace?: boolean;
+  /**
+   * OPT-IN, default false (preserves prior behavior for every existing
+   * caller — facet-index, Layer C `keyboard-lint`, and all current tests).
+   *
+   * When true, a rule whose CONTEXT directly contains a
+   * `{kind:"vkey", name:"K_BKSP"}` element (the diacritic-removal /
+   * correction shape, e.g. `any(composed) + [K_BKSP] > index(comp-dia,1)`)
+   * contributes NOTHING to the produced set — its output-store/literal
+   * expansion is skipped entirely. Such a rule CORRECTS a prior mistake
+   * (typed é then backspace -> e); it does not PRODUCE the char sitting in
+   * its output store, so counting it there is what let a backspace-only
+   * "correction" store item wrongly mark a char (e.g. Â) as directly
+   * produced and suppress its real composition method.
+   *
+   * Uses the SAME direct-context predicate ({@link contextHasDirectBackspace},
+   * `@keyboard-studio/contracts`) that `collectCharContributors`
+   * (`@keyboard-studio/engine`) already applies when skipping a whole
+   * backspace-context rule, so the two can't diverge.
+   *
+   * Only the DIRECT-context shape is checked here — the STORE-RESOLVED
+   * variant (an `any()`-consumed store's aligned item resolving to
+   * `K_BKSP`) is per-slot and stays local to `collectCharContributors`.
+   */
+  excludeBackspaceCorrections?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -219,6 +244,7 @@ export function buildProducedSet(
   options?: BuildProducedSetOptions,
 ): Set<string> {
   const includeSpace = options?.includeSpace === true;
+  const excludeBackspaceCorrections = options?.excludeBackspaceCorrections === true;
 
   const storeMap = new Map<string, IRStore>(
     ir.stores.map((s) => [s.name, s]),
@@ -228,6 +254,7 @@ export function buildProducedSet(
 
   for (const group of ir.groups) {
     for (const rule of group.rules) {
+      if (excludeBackspaceCorrections && contextHasDirectBackspace(rule.context)) continue;
       collectFromElements(rule.output, storeMap, collector, includeSpace);
     }
   }

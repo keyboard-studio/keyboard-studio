@@ -117,6 +117,7 @@ import {
 } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
 import {
+  appendNotDeletableSuffix,
   composeContributorLabel,
   compositionTooltip,
 } from "./existingMethodLabels.ts";
@@ -1450,9 +1451,17 @@ export function MechanismGallery({
   // membership test the badge uses). Feeds collectCompositionMethod below:
   // composition must stay strictly ONE level, so it needs the un-augmented
   // set to decide "is this composable from what's DIRECTLY produced", never
-  // "from what's already-composable".
+  // "from what's already-composable". `excludeBackspaceCorrections: true` —
+  // SAME option useInventoryDiff() passes — so a char reachable ONLY via a
+  // backspace-correction store rule (e.g. the SIL Cameroon Â shape) is not
+  // wrongly treated as directly produced here either; without this, the
+  // early-out in collectCompositionMethod (`baseProduced.has(targetChar)`)
+  // would suppress the real "A + ◌̂ → Â" composition row.
   const baseProducedSet = useMemo(
-    () => (baseIr !== null ? buildProducedSet(baseIr) : new Set<string>()),
+    () =>
+      baseIr !== null
+        ? buildProducedSet(baseIr, { excludeBackspaceCorrections: true })
+        : new Set<string>(),
     [baseIr],
   );
 
@@ -2752,9 +2761,10 @@ export function MechanismGallery({
       if (descriptor.kind === "store-slot" && !isUsed) {
         hasProducedStoreSlot = true;
       }
+      const baseLabel = composeContributorLabel(descriptor, i18n);
       storeSlotRows.push({
         id: slot.slotId,
-        label: composeContributorLabel(descriptor, i18n),
+        label: isUsed ? appendNotDeletableSuffix(baseLabel, i18n) : baseLabel,
         deletable: !isUsed,
         isUsed,
         kind: "slot",
@@ -2776,9 +2786,12 @@ export function MechanismGallery({
       const capability: RemovalCapability | undefined =
         removalCapabilities.get(nodeId);
       const notRemovable = (capability ?? "").startsWith("not-removable:");
+      const ruleBaseLabel = composeContributorLabel(descriptor, i18n);
       rows.push({
         id: nodeId,
-        label: composeContributorLabel(descriptor, i18n),
+        label: notRemovable
+          ? appendNotDeletableSuffix(ruleBaseLabel, i18n)
+          : ruleBaseLabel,
         deletable: !notRemovable,
         isUsed: false,
         kind: "rule",
@@ -2797,12 +2810,13 @@ export function MechanismGallery({
 
     existingMethodContributors.blocked.forEach((b, i) => {
       const descriptor = blockedDescriptors[i];
+      const blockedBaseLabel =
+        descriptor !== undefined
+          ? composeContributorLabel(descriptor, i18n)
+          : b.label;
       rows.push({
         id: `blocked:${i}:${b.label}`,
-        label:
-          descriptor !== undefined
-            ? composeContributorLabel(descriptor, i18n)
-            : b.label,
+        label: appendNotDeletableSuffix(blockedBaseLabel, i18n),
         deletable: false,
         isUsed: false,
         kind: "blocked",
@@ -2826,7 +2840,10 @@ export function MechanismGallery({
       if (compositionDescriptor !== undefined) {
         rows.push({
           id: `composition:${currentChar}`,
-          label: composeContributorLabel(compositionDescriptor, i18n),
+          label: appendNotDeletableSuffix(
+            composeContributorLabel(compositionDescriptor, i18n),
+            i18n,
+          ),
           deletable: false,
           isUsed: false,
           kind: "composition",
@@ -2848,8 +2865,11 @@ export function MechanismGallery({
     ) {
       rows.push({
         id: `unattributed:${currentChar}`,
-        label: composeContributorLabel(
-          { kind: "unattributed", producedChar: currentChar, producedRole: "produced" },
+        label: appendNotDeletableSuffix(
+          composeContributorLabel(
+            { kind: "unattributed", producedChar: currentChar, producedRole: "produced" },
+            i18n,
+          ),
           i18n,
         ),
         deletable: false,

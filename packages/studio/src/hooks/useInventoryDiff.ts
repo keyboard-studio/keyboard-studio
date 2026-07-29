@@ -12,7 +12,12 @@
 // Memoization:
 //   - producedSet is memoized on baseIr + inventory (object-reference stable
 //     because the working-copy store never mutates baseIr in place — it
-//     replaces the slot).
+//     replaces the slot). Computed with `excludeBackspaceCorrections: true` so
+//     a char reachable ONLY via a backspace-correction rule (e.g. a
+//     composed-char store entry only reached by `+ [K_BKSP] > ...`) is not
+//     wrongly counted as directly produced — this lets MechanismGallery's
+//     `collectCompositionMethod` synthesize the real composition path for
+//     such a char instead of falling through to a generic floor.
 //   - lettersToAdd / alreadyProduced are memoized on producedSet + inventory.
 //   - NFC normalization: producedSet from buildProducedSet() is already NFC;
 //     each confirmedInventory entry is NFC-normalized here before lookup so that
@@ -60,7 +65,10 @@ export function useInventoryDiff(): InventoryDiff {
   const producedSet = useMemo<Set<string>>(
     () =>
       baseIr !== null
-        ? augmentWithComposable(buildProducedSet(baseIr), inventory)
+        ? augmentWithComposable(
+            buildProducedSet(baseIr, { excludeBackspaceCorrections: true }),
+            inventory,
+          )
         : new Set<string>(),
     [baseIr, inventory],
   );

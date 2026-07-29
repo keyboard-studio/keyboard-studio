@@ -238,6 +238,28 @@ export function composeContributorLabel(
 }
 
 /**
+ * Append the " - NOT DELETABLE" suffix (localized) to an already-composed
+ * method label — used for every row the gallery renders as a static,
+ * non-deletable chip (both the desktop MechanismGallery and TouchGallery):
+ * green-static rows (composition, blocked/opaque/multi-char, unattributed,
+ * and a produced rule/slot removalCapabilities marks not-removable) as well
+ * as blue "used" rows (the char is only consumed, never produced, at that
+ * site). The real method path (e.g. "A + ◌̂ → Â") is always kept; this only
+ * adds the trailing suffix. Deletable rows never call this — they render
+ * with the green "×" hover-delete chip instead.
+ */
+export function appendNotDeletableSuffix(label: string, i18n?: I18n): string {
+  const suffix = resolveMessage(
+    i18n,
+    msg({
+      id: "editor.assignLoop.existingMethod.notDeletableSuffix",
+      message: " - NOT DELETABLE",
+    }),
+  );
+  return `${label}${suffix}`;
+}
+
+/**
  * Tooltip for a `kind: "composition"` row's non-deletable chip — explains
  * WHY there's no single rule to remove (there is no rule at all; the row is
  * synthesized from two-or-more separately-produced characters). Mirrors

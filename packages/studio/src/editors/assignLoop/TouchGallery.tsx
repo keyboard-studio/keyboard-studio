@@ -113,6 +113,7 @@ import { useCasePairCompanion } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
 import { displayChar } from "../../lib/irToCarveNodes.ts";
 import {
+  appendNotDeletableSuffix,
   composeTouchMethodLabel,
   touchMethodNonDeletableReason,
   composeContributorLabel,
@@ -1372,9 +1373,16 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     const rows: ExistingTouchMethodRow[] = existingTouchMethods.map(
       (method) => {
         const nonDeletableReason = touchMethodNonDeletableReason(method, i18n);
+        const touchBaseLabel = composeTouchMethodLabel(
+          method,
+          allTouchMethodsForChar,
+          i18n,
+        );
         return {
           id: method.id,
-          label: composeTouchMethodLabel(method, allTouchMethodsForChar, i18n),
+          label: method.deletable
+            ? touchBaseLabel
+            : appendNotDeletableSuffix(touchBaseLabel, i18n),
           deletable: method.deletable,
           kind: "touch",
           ...(nonDeletableReason !== undefined
@@ -1395,7 +1403,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       if (compositionDescriptor !== undefined) {
         rows.push({
           id: `composition:${currentChar}`,
-          label: composeContributorLabel(compositionDescriptor, i18n),
+          label: appendNotDeletableSuffix(
+            composeContributorLabel(compositionDescriptor, i18n),
+            i18n,
+          ),
           deletable: false,
           kind: "composition",
           reason: compositionTooltip(compositionDescriptor, i18n),
@@ -1413,8 +1424,11 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     ) {
       rows.push({
         id: `unattributed:${currentChar}`,
-        label: composeContributorLabel(
-          { kind: "unattributed", producedChar: currentChar, producedRole: "produced" },
+        label: appendNotDeletableSuffix(
+          composeContributorLabel(
+            { kind: "unattributed", producedChar: currentChar, producedRole: "produced" },
+            i18n,
+          ),
           i18n,
         ),
         deletable: false,

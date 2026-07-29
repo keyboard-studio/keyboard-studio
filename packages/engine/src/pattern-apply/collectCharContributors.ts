@@ -49,7 +49,7 @@
  */
 
 import type { ContextElement, IRRule, KeyboardIR, StoreItem } from "@keyboard-studio/contracts";
-import { collectFromElements } from "@keyboard-studio/contracts";
+import { collectFromElements, contextHasDirectBackspace, isBackspaceVkeyName } from "@keyboard-studio/contracts";
 import { isDeadkeyOnlyOutput, isPlusSeparator } from "../shared/rule-shape.js";
 import { makeSlotId } from "./slotId.js";
 
@@ -240,11 +240,6 @@ export interface ContributorDescriptor {
  */
 const isTriggerRule = isDeadkeyOnlyOutput;
 
-/** True when a `{kind:"vkey"}` name is the backspace key (`K_BKSP`), case-insensitively. */
-function isBackspaceVkeyName(name: string): boolean {
-  return name.toUpperCase() === 'K_BKSP';
-}
-
 /**
  * True when a contributor's INPUT includes the backspace virtual key
  * (`K_BKSP`) by EITHER of the two known paths — the ONE place both are
@@ -255,7 +250,10 @@ function isBackspaceVkeyName(name: string): boolean {
  *      backspace -> e"). Keys off the CONTEXT (input), never the output: a
  *      rule whose output happens to include a deadkey/backspace-adjacent
  *      construct but whose INPUT is a normal keystroke is a legitimate
- *      producer and must not be dropped by this check.
+ *      producer and must not be dropped by this check. Delegates to the
+ *      shared `contextHasDirectBackspace` (`@keyboard-studio/contracts`) —
+ *      the SAME predicate `buildProducedSet`'s opt-in
+ *      `excludeBackspaceCorrections` uses, so the two can't diverge.
  *   2. STORE-RESOLVED: the rule consumes an `any()`-context store whose item
  *      at the slot ALIGNED with the currently-evaluated output ({@link
  *      resolveAlignedAnyElement}'s pairing — the SAME item `base`/
@@ -263,6 +261,8 @@ function isBackspaceVkeyName(name: string): boolean {
  *      `{kind:"vkey", name:"K_BKSP"}` — a store-slot contributor reached only
  *      by pressing backspace, never typed directly in the context, but still
  *      genuinely a "press Backspace" method rather than a producing one.
+ *      This half is per-slot (depends on which output slot is being
+ *      evaluated) and stays local to this module.
  *
  * `resolvedItem` is the aligned store item for the SPECIFIC contributor slot
  * being evaluated right now (absent for a plain literal-output rule with no
@@ -273,7 +273,7 @@ function contributorInputHasBackspace(
   context: readonly ContextElement[],
   resolvedItem: StoreItem | undefined,
 ): boolean {
-  if (context.some((el) => el.kind === 'vkey' && isBackspaceVkeyName(el.name))) return true;
+  if (contextHasDirectBackspace(context)) return true;
   return resolvedItem !== undefined && resolvedItem.kind === 'vkey' && isBackspaceVkeyName(resolvedItem.name);
 }
 

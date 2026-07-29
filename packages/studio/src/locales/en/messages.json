@@ -1,4 +1,5 @@
 {
+  "editor.assignLoop.existingMethod.notDeletableSuffix": " - NOT DELETABLE",
   "survey.characterMapPane.cell.fromBase": " — from your base keyboard",
   "editor.assignLoop.existingMethod.touch.platformLayerSuffix": " ({platform}, {layer})",
   "editor.assignLoop.ralt.inUseSuffix": " (in use)",

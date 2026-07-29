@@ -2403,7 +2403,7 @@ describe("TouchGallery — Existing methods color model (produced vs. used)", ()
 
     let row: HTMLElement;
     await waitFor(() => {
-      row = screen.getByText(`Tap [4] → ${targetChar}`);
+      row = screen.getByText(`Tap [4] → ${targetChar} - NOT DELETABLE`);
       expect(row).toBeTruthy();
     });
     // GREEN (produced), not blue — a layer-switch key still produces the

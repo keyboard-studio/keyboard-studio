@@ -52,6 +52,7 @@ export * from "./validator";
 // IR utilities — shared helpers that operate on KeyboardIR at the contracts
 // layer (both engine and keyboard-lint consume these; lint cannot import engine).
 // ---------------------------------------------------------------------------
+export * from "./ir/backspaceContext";
 export * from "./ir/composable";
 export * from "./ir/producedSet";
 export * from "./keyboardIRRoundTrip";
