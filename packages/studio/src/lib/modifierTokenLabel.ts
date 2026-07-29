@@ -1,10 +1,11 @@
-// Shared modifier-token display vocabulary — was byte-identically hand-copied
-// as `MODIFIER_TOKEN_LABELS` in MechanismGallery.tsx (methodLabel's S-08
-// covered-chip badge) and `TOUCH_LAYER_TOKEN_LABELS` in TouchGallery.tsx
-// (touchLayerComboLabel, the touch layer picker's option labels). Both are
-// keyed on the engine-exported `ModifierToken` union, so hand-copied maps
-// would silently desync if that type ever grows a token; consolidated here so
-// there is exactly one table to update.
+// Shared modifier-token display vocabulary. This module consolidates the
+// `MODIFIER_TOKEN_LABELS` map that was duplicated in MechanismGallery.tsx
+// (methodLabel's S-08 covered-chip badge), and prevents a second copy that
+// TouchGallery.tsx's `touchLayerComboLabel` (the touch layer picker's option
+// labels) would otherwise have needed. Both consumers key on the
+// engine-exported `ModifierToken` union, so a hand-copied map would silently
+// desync if that type ever grows a token; consolidated here so there is
+// exactly one table to update.
 //
 // Pure chrome — not i18n-wrapped (these are technical vocabulary strings, same
 // as the rest of each gallery's non-translated chrome around them).

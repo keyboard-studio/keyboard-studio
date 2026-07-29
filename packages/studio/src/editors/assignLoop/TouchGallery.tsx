@@ -596,6 +596,173 @@ function TouchLayerBuilder({
   );
 }
 
+// ---------------------------------------------------------------------------
+// TouchLayerBuilderSection — the "Layer:" heading + TouchLayerBuilder +
+// "Resulting layer" preview block shared by all four method cards (longpress/
+// flick/multitap/replace) in TouchMethodChooser below. The four cards were
+// previously near-identical ~55-line copies of this block, differing only in
+// the method slug baked into the heading id, the three per-method aria-label
+// message ids, and the human method label — collapsed here to one
+// parameterized component keyed by `method`.
+// ---------------------------------------------------------------------------
+
+/** Per-method slug (used in element ids) + human label (for reference/
+ * documentation alongside the slug — the aria-label message TEXT itself
+ * stays a literal per-method string below, not built from this label, so the
+ * Lingui extractor keeps seeing stable, literal `t({id, message})` ids). */
+const METHOD_META: Record<TouchMethod, { slug: string; label: string }> = {
+  longpress_alternates: { slug: "longpress", label: "long-press" },
+  flick_gestures: { slug: "flick", label: "flick" },
+  multitap: { slug: "multitap", label: "multitap" },
+  touch_key_replace: { slug: "replace", label: "replace" },
+};
+
+interface TouchLayerBuilderSectionProps {
+  method: TouchMethod;
+  layerTokens: (ModifierToken | "")[];
+  onLayerTokenChange: (index: number, value: string) => void;
+  onAddLayerSlot: () => void;
+  onRemoveLayerSlot: (index: number) => void;
+  validLayerCombos: ModifierToken[][];
+  layerComboValid: boolean;
+  selectPlaceholder: string;
+  addButtonLabel: string;
+  notYetValidNote: string;
+  layerPreviewLabel: string;
+}
+
+/**
+ * Renders the `role="group"` wrapper (`aria-labelledby` -> the per-method
+ * heading id), the "Layer:" heading, the shared `TouchLayerBuilder`, and the
+ * "Resulting layer" preview paragraph — byte-identical across all four method
+ * cards except for the method-scoped heading id and aria-label ids/messages
+ * below. Calls its own `useLingui()` (rather than accepting a `t` prop) so
+ * the per-method `t({id, message})` calls below stay traceable to a
+ * same-scope `useLingui()` binding for Lingui's macro extractor — a `t`
+ * passed in as a parameter is a distinct binding the extractor does not
+ * follow (see `touchMechanismLabel`'s and Inspector.tsx's `storeBlurb`'s note
+ * on the same constraint).
+ */
+function TouchLayerBuilderSection({
+  method,
+  layerTokens,
+  onLayerTokenChange,
+  onAddLayerSlot,
+  onRemoveLayerSlot,
+  validLayerCombos,
+  layerComboValid,
+  selectPlaceholder,
+  addButtonLabel,
+  notYetValidNote,
+  layerPreviewLabel,
+}: TouchLayerBuilderSectionProps) {
+  const { t } = useLingui();
+  const { slug } = METHOD_META[method];
+  const headingId = `touch-layer-builder-heading-${slug}`;
+
+  let slotAriaLabel: (n: number) => string;
+  let removeAriaLabel: (n: number) => string;
+  let addAriaLabel: string;
+
+  switch (method) {
+    case "longpress_alternates":
+      slotAriaLabel = (n) =>
+        t({
+          id: "editor.assignLoop.touch.longpress.layerSlotAriaLabel",
+          message: `Touch layer ${{ n }} for long-press`,
+        });
+      removeAriaLabel = (n) =>
+        t({
+          id: "editor.assignLoop.touch.longpress.removeLayerAriaLabel",
+          message: `Remove touch layer ${{ n }} for long-press`,
+        });
+      addAriaLabel = t({
+        id: "editor.assignLoop.touch.longpress.addLayerAriaLabel",
+        message: "Add another touch layer for long-press",
+      });
+      break;
+    case "flick_gestures":
+      slotAriaLabel = (n) =>
+        t({
+          id: "editor.assignLoop.touch.flick.layerSlotAriaLabel",
+          message: `Touch layer ${{ n }} for flick`,
+        });
+      removeAriaLabel = (n) =>
+        t({
+          id: "editor.assignLoop.touch.flick.removeLayerAriaLabel",
+          message: `Remove touch layer ${{ n }} for flick`,
+        });
+      addAriaLabel = t({
+        id: "editor.assignLoop.touch.flick.addLayerAriaLabel",
+        message: "Add another touch layer for flick",
+      });
+      break;
+    case "multitap":
+      slotAriaLabel = (n) =>
+        t({
+          id: "editor.assignLoop.touch.multitap.layerSlotAriaLabel",
+          message: `Touch layer ${{ n }} for multitap`,
+        });
+      removeAriaLabel = (n) =>
+        t({
+          id: "editor.assignLoop.touch.multitap.removeLayerAriaLabel",
+          message: `Remove touch layer ${{ n }} for multitap`,
+        });
+      addAriaLabel = t({
+        id: "editor.assignLoop.touch.multitap.addLayerAriaLabel",
+        message: "Add another touch layer for multitap",
+      });
+      break;
+    case "touch_key_replace":
+      slotAriaLabel = (n) =>
+        t({
+          id: "editor.assignLoop.touch.replace.layerSlotAriaLabel",
+          message: `Touch layer ${{ n }} for replace`,
+        });
+      removeAriaLabel = (n) =>
+        t({
+          id: "editor.assignLoop.touch.replace.removeLayerAriaLabel",
+          message: `Remove touch layer ${{ n }} for replace`,
+        });
+      addAriaLabel = t({
+        id: "editor.assignLoop.touch.replace.addLayerAriaLabel",
+        message: "Add another touch layer for replace",
+      });
+      break;
+  }
+
+  return (
+    <div
+      role="group"
+      aria-labelledby={headingId}
+      style={{ display: "flex", flexDirection: "column", gap: 6 }}
+    >
+      <span id={headingId} style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+        <Trans id="editor.assignLoop.touch.layerLabel">Layer:</Trans>
+      </span>
+      <TouchLayerBuilder
+        layerTokens={layerTokens}
+        onLayerTokenChange={onLayerTokenChange}
+        onAddLayerSlot={onAddLayerSlot}
+        onRemoveLayerSlot={onRemoveLayerSlot}
+        validLayerCombos={validLayerCombos}
+        layerComboValid={layerComboValid}
+        slotAriaLabel={slotAriaLabel}
+        removeAriaLabel={removeAriaLabel}
+        addAriaLabel={addAriaLabel}
+        selectPlaceholder={selectPlaceholder}
+        addButtonLabel={addButtonLabel}
+        notYetValidNote={notYetValidNote}
+      />
+      <p style={{ margin: 0, fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}>
+        <Trans id="editor.assignLoop.touch.layerResultPreview">
+          Resulting layer: {layerPreviewLabel}
+        </Trans>
+      </p>
+    </div>
+  );
+}
+
 // Chrome (option labels); built per-render via the optional-i18n +
 // msg()/resolveMessage() pattern (see Inspector.tsx's storeBlurb) rather than
 // a bare `t` parameter — Lingui's macro tracks the specific binding
@@ -675,7 +842,7 @@ function TouchMethodChooser({
 }: TouchMethodChooserProps) {
   const { t, i18n } = useLingui();
   const layerSelectPlaceholder = t({
-    id: "editor.assignLoop.ralt.selectPlaceholder",
+    id: "editor.assignLoop.touch.selectPlaceholder",
     message: "— Select —",
   });
   const layerAddButtonLabel = t({
@@ -765,57 +932,19 @@ function TouchMethodChooser({
                 })}
               />
             </div>
-            <div
-              role="group"
-              aria-labelledby="touch-layer-builder-heading-longpress"
-              style={{ display: "flex", flexDirection: "column", gap: 6 }}
-            >
-              <span
-                id="touch-layer-builder-heading-longpress"
-                style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
-              >
-                <Trans id="editor.assignLoop.touch.layerLabel">Layer:</Trans>
-              </span>
-              <TouchLayerBuilder
-                layerTokens={layerTokens}
-                onLayerTokenChange={onLayerTokenChange}
-                onAddLayerSlot={onAddLayerSlot}
-                onRemoveLayerSlot={onRemoveLayerSlot}
-                validLayerCombos={validLayerCombos}
-                layerComboValid={layerComboValid}
-                slotAriaLabel={(n) =>
-                  t({
-                    id: "editor.assignLoop.touch.longpress.layerSlotAriaLabel",
-                    message: `Touch layer ${{ n }} for long-press`,
-                  })
-                }
-                removeAriaLabel={(n) =>
-                  t({
-                    id: "editor.assignLoop.touch.longpress.removeLayerAriaLabel",
-                    message: `Remove touch layer ${{ n }} for long-press`,
-                  })
-                }
-                addAriaLabel={t({
-                  id: "editor.assignLoop.touch.longpress.addLayerAriaLabel",
-                  message: "Add another touch layer for long-press",
-                })}
-                selectPlaceholder={layerSelectPlaceholder}
-                addButtonLabel={layerAddButtonLabel}
-                notYetValidNote={layerNotYetValidNote}
-              />
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 11,
-                  color: TEXT_DIM,
-                  fontFamily: FONT,
-                }}
-              >
-                <Trans id="editor.assignLoop.touch.layerResultPreview">
-                  Resulting layer: {layerPreviewLabel}
-                </Trans>
-              </p>
-            </div>
+            <TouchLayerBuilderSection
+              method="longpress_alternates"
+              layerTokens={layerTokens}
+              onLayerTokenChange={onLayerTokenChange}
+              onAddLayerSlot={onAddLayerSlot}
+              onRemoveLayerSlot={onRemoveLayerSlot}
+              validLayerCombos={validLayerCombos}
+              layerComboValid={layerComboValid}
+              selectPlaceholder={layerSelectPlaceholder}
+              addButtonLabel={layerAddButtonLabel}
+              notYetValidNote={layerNotYetValidNote}
+              layerPreviewLabel={layerPreviewLabel}
+            />
           </div>
         )}
       </div>
@@ -904,57 +1033,19 @@ function TouchMethodChooser({
                 style={selectStyle}
               />
             </label>
-            <div
-              role="group"
-              aria-labelledby="touch-layer-builder-heading-flick"
-              style={{ display: "flex", flexDirection: "column", gap: 6 }}
-            >
-              <span
-                id="touch-layer-builder-heading-flick"
-                style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
-              >
-                <Trans id="editor.assignLoop.touch.layerLabel">Layer:</Trans>
-              </span>
-              <TouchLayerBuilder
-                layerTokens={layerTokens}
-                onLayerTokenChange={onLayerTokenChange}
-                onAddLayerSlot={onAddLayerSlot}
-                onRemoveLayerSlot={onRemoveLayerSlot}
-                validLayerCombos={validLayerCombos}
-                layerComboValid={layerComboValid}
-                slotAriaLabel={(n) =>
-                  t({
-                    id: "editor.assignLoop.touch.flick.layerSlotAriaLabel",
-                    message: `Touch layer ${{ n }} for flick`,
-                  })
-                }
-                removeAriaLabel={(n) =>
-                  t({
-                    id: "editor.assignLoop.touch.flick.removeLayerAriaLabel",
-                    message: `Remove touch layer ${{ n }} for flick`,
-                  })
-                }
-                addAriaLabel={t({
-                  id: "editor.assignLoop.touch.flick.addLayerAriaLabel",
-                  message: "Add another touch layer for flick",
-                })}
-                selectPlaceholder={layerSelectPlaceholder}
-                addButtonLabel={layerAddButtonLabel}
-                notYetValidNote={layerNotYetValidNote}
-              />
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 11,
-                  color: TEXT_DIM,
-                  fontFamily: FONT,
-                }}
-              >
-                <Trans id="editor.assignLoop.touch.layerResultPreview">
-                  Resulting layer: {layerPreviewLabel}
-                </Trans>
-              </p>
-            </div>
+            <TouchLayerBuilderSection
+              method="flick_gestures"
+              layerTokens={layerTokens}
+              onLayerTokenChange={onLayerTokenChange}
+              onAddLayerSlot={onAddLayerSlot}
+              onRemoveLayerSlot={onRemoveLayerSlot}
+              validLayerCombos={validLayerCombos}
+              layerComboValid={layerComboValid}
+              selectPlaceholder={layerSelectPlaceholder}
+              addButtonLabel={layerAddButtonLabel}
+              notYetValidNote={layerNotYetValidNote}
+              layerPreviewLabel={layerPreviewLabel}
+            />
           </div>
         )}
       </div>
@@ -1019,57 +1110,19 @@ function TouchMethodChooser({
                 })}
               />
             </div>
-            <div
-              role="group"
-              aria-labelledby="touch-layer-builder-heading-multitap"
-              style={{ display: "flex", flexDirection: "column", gap: 6 }}
-            >
-              <span
-                id="touch-layer-builder-heading-multitap"
-                style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
-              >
-                <Trans id="editor.assignLoop.touch.layerLabel">Layer:</Trans>
-              </span>
-              <TouchLayerBuilder
-                layerTokens={layerTokens}
-                onLayerTokenChange={onLayerTokenChange}
-                onAddLayerSlot={onAddLayerSlot}
-                onRemoveLayerSlot={onRemoveLayerSlot}
-                validLayerCombos={validLayerCombos}
-                layerComboValid={layerComboValid}
-                slotAriaLabel={(n) =>
-                  t({
-                    id: "editor.assignLoop.touch.multitap.layerSlotAriaLabel",
-                    message: `Touch layer ${{ n }} for multitap`,
-                  })
-                }
-                removeAriaLabel={(n) =>
-                  t({
-                    id: "editor.assignLoop.touch.multitap.removeLayerAriaLabel",
-                    message: `Remove touch layer ${{ n }} for multitap`,
-                  })
-                }
-                addAriaLabel={t({
-                  id: "editor.assignLoop.touch.multitap.addLayerAriaLabel",
-                  message: "Add another touch layer for multitap",
-                })}
-                selectPlaceholder={layerSelectPlaceholder}
-                addButtonLabel={layerAddButtonLabel}
-                notYetValidNote={layerNotYetValidNote}
-              />
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 11,
-                  color: TEXT_DIM,
-                  fontFamily: FONT,
-                }}
-              >
-                <Trans id="editor.assignLoop.touch.layerResultPreview">
-                  Resulting layer: {layerPreviewLabel}
-                </Trans>
-              </p>
-            </div>
+            <TouchLayerBuilderSection
+              method="multitap"
+              layerTokens={layerTokens}
+              onLayerTokenChange={onLayerTokenChange}
+              onAddLayerSlot={onAddLayerSlot}
+              onRemoveLayerSlot={onRemoveLayerSlot}
+              validLayerCombos={validLayerCombos}
+              layerComboValid={layerComboValid}
+              selectPlaceholder={layerSelectPlaceholder}
+              addButtonLabel={layerAddButtonLabel}
+              notYetValidNote={layerNotYetValidNote}
+              layerPreviewLabel={layerPreviewLabel}
+            />
           </div>
         )}
       </div>
@@ -1135,57 +1188,19 @@ function TouchMethodChooser({
                 })}
               />
             </div>
-            <div
-              role="group"
-              aria-labelledby="touch-layer-builder-heading-replace"
-              style={{ display: "flex", flexDirection: "column", gap: 6 }}
-            >
-              <span
-                id="touch-layer-builder-heading-replace"
-                style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
-              >
-                <Trans id="editor.assignLoop.touch.layerLabel">Layer:</Trans>
-              </span>
-              <TouchLayerBuilder
-                layerTokens={layerTokens}
-                onLayerTokenChange={onLayerTokenChange}
-                onAddLayerSlot={onAddLayerSlot}
-                onRemoveLayerSlot={onRemoveLayerSlot}
-                validLayerCombos={validLayerCombos}
-                layerComboValid={layerComboValid}
-                slotAriaLabel={(n) =>
-                  t({
-                    id: "editor.assignLoop.touch.replace.layerSlotAriaLabel",
-                    message: `Touch layer ${{ n }} for replace`,
-                  })
-                }
-                removeAriaLabel={(n) =>
-                  t({
-                    id: "editor.assignLoop.touch.replace.removeLayerAriaLabel",
-                    message: `Remove touch layer ${{ n }} for replace`,
-                  })
-                }
-                addAriaLabel={t({
-                  id: "editor.assignLoop.touch.replace.addLayerAriaLabel",
-                  message: "Add another touch layer for replace",
-                })}
-                selectPlaceholder={layerSelectPlaceholder}
-                addButtonLabel={layerAddButtonLabel}
-                notYetValidNote={layerNotYetValidNote}
-              />
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 11,
-                  color: TEXT_DIM,
-                  fontFamily: FONT,
-                }}
-              >
-                <Trans id="editor.assignLoop.touch.layerResultPreview">
-                  Resulting layer: {layerPreviewLabel}
-                </Trans>
-              </p>
-            </div>
+            <TouchLayerBuilderSection
+              method="touch_key_replace"
+              layerTokens={layerTokens}
+              onLayerTokenChange={onLayerTokenChange}
+              onAddLayerSlot={onAddLayerSlot}
+              onRemoveLayerSlot={onRemoveLayerSlot}
+              validLayerCombos={validLayerCombos}
+              layerComboValid={layerComboValid}
+              selectPlaceholder={layerSelectPlaceholder}
+              addButtonLabel={layerAddButtonLabel}
+              notYetValidNote={layerNotYetValidNote}
+              layerPreviewLabel={layerPreviewLabel}
+            />
           </div>
         )}
       </div>
