@@ -1163,7 +1163,7 @@ describe("MechanismGallery — already-produced section", () => {
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — Existing methods SHOW-ALL (composition + floor)", () => {
-  it("a composable-but-not-directly-produced char (base + combining mark both produced) shows a blue composition row", async () => {
+  it("a composable-but-not-directly-produced char (base + combining mark both produced) shows a GREEN, static composition row — it PRODUCES the char, it just has no single rule to delete", async () => {
     // 'U' and combining circumflex accent (U+0302) are each directly produced
     // by their own rule; precomposed 'Û' (U+00DB) is produced by neither —
     // only reachable via NFD composition of the two.
@@ -1205,12 +1205,81 @@ describe("MechanismGallery — Existing methods SHOW-ALL (composition + floor)",
     // jumps to any confirmedInventory member for inspection).
     fireEvent.click(screen.getByTestId("char-scroll-chip-00DB"));
 
+    let compositionRow: HTMLElement;
     await waitFor(() => {
-      expect(screen.getByText("U + ◌̂ → Û")).toBeTruthy();
+      compositionRow = screen.getByText("U + ◌̂ → Û");
+      expect(compositionRow).toBeTruthy();
     });
+    // GREEN (produced), not blue — composition rows produce the character;
+    // color tracks produced-vs-used, not deletability.
+    expect(compositionRow!.style.color).toBe("rgb(86, 211, 100)"); // #56d364
+    expect(compositionRow!.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
+    // Static: a <span>, not a <button> — no delete affordance at all.
+    expect(compositionRow!.tagName).toBe("SPAN");
+    expect(compositionRow!.textContent).toBe("U + ◌̂ → Û"); // no trailing "×"
+    expect(
+      screen.queryByRole("button", { name: /Remove existing method/i }),
+    ).toBeNull();
   });
 
-  it("a green char (directly produced) with zero enumerable methods shows the unattributed floor row", async () => {
+  it("a blocked (opaque/multi-char) row is GREEN and static — it PRODUCES the char, it just can't be surgically removed", async () => {
+    const ruleZ: IRRule = {
+      nodeId: "r-z",
+      context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [ruleZ],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+    seedInventory(["y", "z"]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    collectCharContributorsSpy.mockImplementationOnce(() => ({
+      targetChar: "z",
+      ruleNodeIds: [],
+      storeSlotIds: [],
+      storeSlots: [],
+      locations: [],
+      blocked: [{ reason: "multi-char literal output", label: "g-main / r-z" }],
+      descriptors: [
+        {
+          kind: "blocked",
+          producedChar: "z",
+          producedRole: "produced",
+          blockedReasonCode: "multi-char-output",
+        },
+      ],
+    }));
+
+    fireEvent.click(screen.getByTestId("char-scroll-chip-007A"));
+
+    let blockedRow: HTMLElement;
+    await waitFor(() => {
+      blockedRow = screen.getByText("Bundled with other output — can't remove z alone");
+      expect(blockedRow).toBeTruthy();
+    });
+    expect(blockedRow!.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — GREEN, not blue
+    expect(blockedRow!.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
+    expect(blockedRow!.tagName).toBe("SPAN");
+    expect(
+      screen.queryByRole("button", { name: /Remove existing method/i }),
+    ).toBeNull();
+  });
+
+  it("a green char (directly produced) with zero enumerable methods shows the unattributed floor row, GREEN and static", async () => {
     const ruleZ: IRRule = {
       nodeId: "r-z",
       context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
@@ -1254,19 +1323,29 @@ describe("MechanismGallery — Existing methods SHOW-ALL (composition + floor)",
 
     fireEvent.click(screen.getByTestId("char-scroll-chip-007A"));
 
+    let floorRow: HTMLElement;
     await waitFor(() => {
-      expect(
-        screen.getByText("Your keyboard already produces this character."),
-      ).toBeTruthy();
+      floorRow = screen.getByText(
+        "Your keyboard already produces this character.",
+      );
+      expect(floorRow).toBeTruthy();
     });
+    expect(floorRow!.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — GREEN, not blue
+    expect(floorRow!.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
+    expect(floorRow!.tagName).toBe("SPAN");
+    expect(
+      screen.queryByRole("button", { name: /Remove existing method/i }),
+    ).toBeNull();
   });
 });
 
 // ---------------------------------------------------------------------------
 // "Existing methods" curation — Rule 1 (keystroke rows dropped when a
 // PRODUCED store-slot row already covers the char) and Rule 2 (a
-// producedRole "used" contributor renders blue/non-deletable, same as
-// composition/unattributed/blocked).
+// producedRole "used" contributor renders blue and static — the ONE row kind
+// that is never deletable AND never green, since it never produces the
+// char at all; see the color-model describe block further below for the
+// full three-state matrix).
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — Existing methods curation (producedRole + keystroke-drop)", () => {
@@ -1335,7 +1414,7 @@ describe("MechanismGallery — Existing methods curation (producedRole + keystro
     expect(screen.queryByText("Press Z → z")).toBeNull();
   });
 
-  it("a char whose ONLY producer is a keystroke (no produced store-slot): the keystroke row is kept", async () => {
+  it("a char whose ONLY producer is a keystroke (no produced store-slot): the keystroke row is kept, GREEN, with a working delete affordance (× + click-to-remove)", async () => {
     const ruleZ: IRRule = {
       nodeId: "r-z",
       context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
@@ -1371,16 +1450,29 @@ describe("MechanismGallery — Existing methods curation (producedRole + keystro
 
     fireEvent.click(screen.getByTestId("char-scroll-chip-007A"));
 
+    let deleteButton: HTMLElement;
+    await waitFor(() => {
+      deleteButton = screen.getByRole("button", {
+        name: /Remove existing method Press Z → z for z/i,
+      });
+      expect(deleteButton).toBeTruthy();
+    });
+    // GREEN, and it genuinely carries the delete affordance — the "×" glyph
+    // plus a working onClick, not just the right color.
+    expect(deleteButton!.style.color).toBe("rgb(86, 211, 100)"); // #56d364
+    expect(deleteButton!.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
+    expect(deleteButton!.textContent).toContain("×");
+    fireEvent.click(deleteButton!);
     await waitFor(() => {
       expect(
-        screen.getByRole("button", {
+        screen.queryByRole("button", {
           name: /Remove existing method Press Z → z for z/i,
         }),
-      ).toBeTruthy();
+      ).toBeNull();
     });
   });
 
-  it('a producedRole "used" contributor renders blue/informational — present as text, not as a deletable button', async () => {
+  it('a producedRole "used" contributor renders BLUE and static — informational only, never a delete target', async () => {
     const ruleZ: IRRule = {
       nodeId: "r-z",
       context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
@@ -1415,11 +1507,16 @@ describe("MechanismGallery — Existing methods curation (producedRole + keystro
 
     fireEvent.click(screen.getByTestId("char-scroll-chip-007A"));
 
+    let usedRow: HTMLElement;
     await waitFor(() => {
-      expect(
-        screen.getByText("Part of a two-step combination → z"),
-      ).toBeTruthy();
+      usedRow = screen.getByText("Part of a two-step combination → z");
+      expect(usedRow).toBeTruthy();
     });
+    // BLUE — this row only USES "z" as input (a deadkey base), it never
+    // produces it, so it gets the one color reserved for "used" rows.
+    expect(usedRow!.style.color).toBe("rgb(88, 166, 255)"); // #58a6ff
+    expect(usedRow!.style.backgroundColor).toBe("rgb(28, 42, 58)"); // #1c2a3a
+    expect(usedRow!.tagName).toBe("SPAN");
     // A "used" contributor is never a removal target for this char — no
     // delete button, same treatment as composition/unattributed/blocked.
     expect(

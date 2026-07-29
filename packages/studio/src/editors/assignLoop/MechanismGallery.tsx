@@ -128,7 +128,11 @@ import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
-import { RemovableChipRow, HoverDangerChip } from "./parts/RemovableChipRow.tsx";
+import {
+  RemovableChipRow,
+  HoverDangerChip,
+  NonDeletableMethodChip,
+} from "./parts/RemovableChipRow.tsx";
 import { ConfirmDialog } from "./parts/ConfirmDialog.tsx";
 import {
   unimplementedDesktopChars,
@@ -2673,6 +2677,17 @@ export function MechanismGallery({
     id: string;
     label: string;
     deletable: boolean;
+    /**
+     * True exactly when this row's descriptor is `producedRole: "used"` — the
+     * char is only CONSUMED here (a deadkey base, or a non-deadkey rule's
+     * own any()-consumed input-store occurrence), never produced by it. Only
+     * a "slot" row can ever be `true`; every other kind (rule/blocked/
+     * composition/unattributed) always PRODUCES the char and is `false`.
+     * Drives the color split (blue vs. green) independently of `deletable`
+     * (the delete-affordance signal) — see `NonDeletableMethodChip`'s doc
+     * comment in parts/RemovableChipRow.tsx.
+     */
+    isUsed: boolean;
     kind: "rule" | "slot" | "blocked" | "composition" | "unattributed";
     reason?: string;
   }
@@ -2741,6 +2756,7 @@ export function MechanismGallery({
         id: slot.slotId,
         label: composeContributorLabel(descriptor, i18n),
         deletable: !isUsed,
+        isUsed,
         kind: "slot",
       });
     });
@@ -2764,6 +2780,7 @@ export function MechanismGallery({
         id: nodeId,
         label: composeContributorLabel(descriptor, i18n),
         deletable: !notRemovable,
+        isUsed: false,
         kind: "rule",
         ...(notRemovable
           ? {
@@ -2787,6 +2804,7 @@ export function MechanismGallery({
             ? composeContributorLabel(descriptor, i18n)
             : b.label,
         deletable: false,
+        isUsed: false,
         kind: "blocked",
         reason: b.reason,
       });
@@ -2810,6 +2828,7 @@ export function MechanismGallery({
           id: `composition:${currentChar}`,
           label: composeContributorLabel(compositionDescriptor, i18n),
           deletable: false,
+          isUsed: false,
           kind: "composition",
           reason: compositionTooltip(compositionDescriptor, i18n),
         });
@@ -2834,6 +2853,7 @@ export function MechanismGallery({
           i18n,
         ),
         deletable: false,
+        isUsed: false,
         kind: "unattributed",
       });
     }
@@ -3590,17 +3610,28 @@ export function MechanismGallery({
 
             {/* Existing methods — the BASE keyboard's own producers for
                   currentChar (desktop "delete each pre-existing method").
-                  Deletable rows share the exact "click deletes / turns red
-                  on hover" chip both the "Added" row and the full carve
-                  gallery use; every non-deletable row (blocked/opaque/
-                  multi-char AND composition/unattributed AND a "slot" row
-                  whose descriptor is producedRole "used" — the char is only
-                  CONSUMED there, e.g. a deadkey base or an input-store
-                  occurrence, never produced) renders as the same blue,
-                  non-interactive chip naming why, never silently hidden —
-                  the palette is exactly green = deletable, blue = not
-                  deletable. See existingMethods/handleRemoveExistingMethod
-                  above for how rows are built and removed. */}
+                  COLOR tracks PRODUCED vs. USED; deletability is a SEPARATE
+                  signal carried by which of the two branches below a row
+                  takes, not by color:
+                    - row.deletable        -> green HoverDangerChip: "×" +
+                      red-on-hover + click-to-delete (real keystroke/store-
+                      slot/deadkey producers removalCapabilities allows).
+                    - !deletable && isUsed  -> BLUE NonDeletableMethodChip: a
+                      "slot" row whose descriptor is producedRole "used" — the
+                      char is only CONSUMED here (a deadkey base, or a
+                      non-deadkey rule's own any()-consumed input-store
+                      occurrence), never produced by this row.
+                    - !deletable && !isUsed -> GREEN NonDeletableMethodChip,
+                      static: composition, unattributed (SHOW-ALL floor),
+                      blocked/opaque/multi-char, and a produced rule
+                      removalCapabilities marked not-removable. All of these
+                      PRODUCE the char but have no single rule/slot to
+                      surgically delete — green-without-"×" is the visual
+                      signal for "produced here, nothing single to delete."
+                  See existingMethods/handleRemoveExistingMethod above for how
+                  rows are built and removed, and NonDeletableMethodChip
+                  (parts/RemovableChipRow.tsx) for the shared static-chip
+                  palette. */}
             {currentChar !== null && existingMethods.length > 0 && (
               <div>
                 <p
@@ -3662,33 +3693,15 @@ export function MechanismGallery({
                         </span>
                       </HoverDangerChip>
                     ) : (
-                      // Blue, non-deletable, informational — every
-                      // non-deletable row (composition/unattributed AND
-                      // blocked/opaque/multi-char/not-removable) shares this
-                      // one style, same palette as the "Sequences" chip row
-                      // (RemovableChipRow's hoverDanger={false} blue). The
-                      // palette is exactly two colors: green = deletable,
-                      // blue = not deletable — no separate grey/muted branch.
-                      <span
+                      <NonDeletableMethodChip
                         key={row.id}
+                        variant={row.isUsed ? "blue" : "green"}
                         {...(row.reason !== undefined
-                          ? { title: row.reason }
+                          ? { reason: row.reason }
                           : {})}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          padding: "3px 8px",
-                          background: "#1c2a3a",
-                          border: "1px solid #58a6ff",
-                          borderRadius: 12,
-                          color: "#58a6ff",
-                          fontSize: 11,
-                          fontFamily:
-                            "ui-monospace, 'Cascadia Code', Consolas, monospace",
-                        }}
                       >
                         {row.label}
-                      </span>
+                      </NonDeletableMethodChip>
                     ),
                   )}
                 </div>

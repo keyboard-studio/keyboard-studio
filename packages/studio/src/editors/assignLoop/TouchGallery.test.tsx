@@ -29,10 +29,31 @@ import { PATTERN_SEQUENCE } from "./patternIds.ts";
 // vi.hoisted() — refs shared across mock closures and test bodies.
 // ---------------------------------------------------------------------------
 
-const { capturedVfsTransformRef, buildTouchLayoutJsonSpy, defaultBuildTouchLayoutJsonImpl } = vi.hoisted(() => {
+const {
+  capturedVfsTransformRef,
+  buildTouchLayoutJsonSpy,
+  defaultBuildTouchLayoutJsonImpl,
+  enumerateTouchMethodsForCharSpy,
+  originalEnumerateTouchMethodsForCharRef,
+} = vi.hoisted(() => {
   const capturedVfsTransformRef = {
     current: null as null | ((vfs: VirtualFS, kbId: string) => { warnings: string[] }),
   };
+  // Spy over the real `enumerateTouchMethodsForChar` — the color-model test
+  // below overrides it for exactly one, otherwise-unused target character
+  // (never colliding with any other test's inventory in this file) so it can
+  // assert a "layer-switch" row's rendering without constructing a real
+  // `.keyman-touch-layout` fixture. Every other call (any other character)
+  // falls through to the real implementation, captured via
+  // `originalEnumerateTouchMethodsForCharRef` in the `@keyboard-studio/engine`
+  // mock factory below — same "wrap by default" pattern MechanismGallery.
+  // test.tsx uses for `collectCharContributorsSpy`.
+  const originalEnumerateTouchMethodsForCharRef = {
+    current: null as
+      | null
+      | ((...args: unknown[]) => unknown),
+  };
+  const enumerateTouchMethodsForCharSpy = vi.fn();
   // Default spy implementation: deterministic JSON including the assignments so
   // tests can assert the transform's injected content differs between edits.
   // The `phone` platform below is real parseTouchLayout-shaped JSON — one key
@@ -71,7 +92,13 @@ const { capturedVfsTransformRef, buildTouchLayoutJsonSpy, defaultBuildTouchLayou
     };
   }
   const buildTouchLayoutJsonSpy = vi.fn(defaultBuildTouchLayoutJsonImpl);
-  return { capturedVfsTransformRef, buildTouchLayoutJsonSpy, defaultBuildTouchLayoutJsonImpl };
+  return {
+    capturedVfsTransformRef,
+    buildTouchLayoutJsonSpy,
+    defaultBuildTouchLayoutJsonImpl,
+    enumerateTouchMethodsForCharSpy,
+    originalEnumerateTouchMethodsForCharRef,
+  };
 });
 
 // ---------------------------------------------------------------------------
@@ -115,10 +142,15 @@ vi.mock("../../lib/buildTouchLayoutJson.ts", async (importOriginal) => {
 
 vi.mock("@keyboard-studio/engine", async (importOriginal) => {
   const original = await importOriginal<typeof import("@keyboard-studio/engine")>();
+  originalEnumerateTouchMethodsForCharRef.current = original.enumerateTouchMethodsForChar as (
+    ...args: unknown[]
+  ) => unknown;
+  enumerateTouchMethodsForCharSpy.mockImplementation(original.enumerateTouchMethodsForChar);
   return {
     ...original,
     // emitTouchLayout is used for minimalTouchJson; return a stable string.
     emitTouchLayout: vi.fn(() => '{"_minimal":true}'),
+    enumerateTouchMethodsForChar: enumerateTouchMethodsForCharSpy,
   };
 });
 
@@ -2328,5 +2360,62 @@ describe("TouchGallery — shift-layer case-pair proposal (spec 051 US3)", () =>
     // dismissed, not applied.
     expect(touchMechanismsFor("Θ")).toHaveLength(0);
     expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// "Existing methods" color model — touch side (mirrors MechanismGallery's
+// desktop suite). Touch method descriptors carry no "used" concept at all
+// (unlike desktop's storeSlot rows), so every non-deletable touch row —
+// including a layer-switch main key, which still PRODUCES the character, it
+// just also switches layers — is GREEN, never blue.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — Existing methods color model (produced vs. used)", () => {
+  it("a layer-switch existing touch method renders GREEN and static — it produces the char, so it is never blue, and it has no delete affordance", async () => {
+    // A unique target char, never used by another test in this file, so this
+    // persistent conditional override can never affect anything else here.
+    const targetChar = "☃";
+    enumerateTouchMethodsForCharSpy.mockImplementation(
+      (layout: unknown, ch: string) => {
+        if (ch !== targetChar) {
+          return originalEnumerateTouchMethodsForCharRef.current!(layout, ch);
+        }
+        return [
+          {
+            id: "layer-switch:snowman",
+            kind: "tap",
+            host: "4",
+            producedChar: targetChar,
+            platform: "phone",
+            layer: "default",
+            deletable: false,
+            reasonCode: "layer-switch",
+          },
+        ];
+      },
+    );
+
+    seedStore({ withInventory: [targetChar] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    let row: HTMLElement;
+    await waitFor(() => {
+      row = screen.getByText(`Tap [4] → ${targetChar}`);
+      expect(row).toBeTruthy();
+    });
+    // GREEN (produced), not blue — a layer-switch key still produces the
+    // char; color tracks produced-vs-used, not deletability.
+    expect(row!.style.color).toBe("rgb(86, 211, 100)"); // #56d364
+    expect(row!.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
+    // Static: a <span>, not a <button> — no delete affordance at all.
+    expect(row!.tagName).toBe("SPAN");
+    expect(
+      screen.queryByRole("button", {
+        name: /Remove existing touch method/i,
+      }),
+    ).toBeNull();
   });
 });

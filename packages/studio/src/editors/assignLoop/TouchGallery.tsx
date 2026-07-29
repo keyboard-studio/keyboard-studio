@@ -135,6 +135,7 @@ import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
 import {
   RemovableChipRow,
   HoverDangerChip,
+  NonDeletableMethodChip,
 } from "./parts/RemovableChipRow.tsx";
 import { SelectMenu } from "../../ui/SelectMenu.tsx";
 import { KEY_OPTIONS, VALID_HOST_KEYS } from "../../lib/keyOptions.ts";
@@ -2399,19 +2400,21 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       {/* Existing methods — the BASE keyboard's own touch-layout producers
             for currentChar (mirrors MechanismGallery's desktop "Existing
             methods" section), PLUS the SHOW-ALL composition/floor rows (spec
-            follow-up). Deletable rows (touch-only: an explicit `output`, a
-            `U_<HEX>` id, or any longpress/multitap/flick sub-entry) share the
-            exact "click deletes / turns red on hover" chip the "Configured"
-            row above uses; every non-deletable row — desktop-backed main
-            keys (deletable: false — the char still comes from the compiled
-            .kmn rule, not this touch key) layer-switch keys, AND
-            composition/unattributed rows — renders as the same BLUE
-            non-interactive chip naming why via `title` (same palette as the
-            "Sequences" row); the palette is exactly green = deletable, blue
-            = not deletable, never silently hidden. See existingMethodRows
-            above for how rows are built; a
-            deletable row's onClick calls deleteTouchKey(row.id) directly
-            (only "touch"-kind rows are ever deletable). */}
+            follow-up). COLOR tracks PRODUCED vs. USED; deletability is a
+            SEPARATE signal (which branch below a row takes), not color:
+              - row.deletable       -> green HoverDangerChip: "×" +
+                red-on-hover + click-to-delete, calling deleteTouchKey(row.id)
+                directly (only "touch"-kind rows are ever deletable — an
+                explicit `output`, a `U_<HEX>` id, or any longpress/multitap/
+                flick sub-entry).
+              - !deletable          -> GREEN NonDeletableMethodChip, static:
+                a layer-switch main key (still PRODUCES the char — it just
+                also switches layers, so it can't be removed here), AND the
+                composition/unattributed SHOW-ALL rows. Touch method
+                descriptors carry no "used" concept at all (unlike desktop's
+                storeSlot rows) — every non-deletable touch row produces the
+                char, so every one is green, never blue. See
+                existingMethodRows above for how rows are built. */}
       {currentChar !== null && existingMethodRows.length > 0 && (
         <div>
           <p
@@ -2472,29 +2475,18 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                   </span>
                 </HoverDangerChip>
               ) : (
-                // Blue, non-deletable, informational — every non-deletable
-                // row (desktop-backed main keys AND composition/unattributed)
-                // shares this one style. The palette is exactly two colors:
-                // green = deletable, blue = not deletable — no separate
-                // grey/muted branch.
-                <span
+                // GREEN, static — every non-deletable touch row (layer-switch
+                // main keys AND composition/unattributed) PRODUCES the
+                // character; there is simply no single key/sub-entry to
+                // surgically remove. See NonDeletableMethodChip's doc comment
+                // (parts/RemovableChipRow.tsx) for the shared palette.
+                <NonDeletableMethodChip
                   key={row.id}
-                  {...(row.reason !== undefined ? { title: row.reason } : {})}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    padding: "3px 8px",
-                    background: "#1c2a3a",
-                    border: "1px solid #58a6ff",
-                    borderRadius: 12,
-                    color: "#58a6ff",
-                    fontSize: 11,
-                    fontFamily:
-                      "ui-monospace, 'Cascadia Code', Consolas, monospace",
-                  }}
+                  variant="green"
+                  {...(row.reason !== undefined ? { reason: row.reason } : {})}
                 >
                   {row.label}
-                </span>
+                </NonDeletableMethodChip>
               ),
             )}
           </div>

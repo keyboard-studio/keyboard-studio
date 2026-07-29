@@ -124,6 +124,76 @@ export function HoverDangerChip({
   );
 }
 
+/**
+ * Palette for a non-deletable "Existing methods" chip (MechanismGallery
+ * desktop + TouchGallery touch) — see {@link NonDeletableMethodChip}'s doc
+ * comment for the two variants' meaning. Colors match the deletable green
+ * chip's own palette (`#0d2218`/`#238636`/`#56d364`) so a green row reads as
+ * one consistent color regardless of whether it happens to carry the "×"
+ * delete affordance.
+ */
+const NON_DELETABLE_CHIP_PALETTE = {
+  green: { background: "#0d2218", border: "#238636", color: "#56d364" },
+  blue: { background: "#1c2a3a", border: "#58a6ff", color: "#58a6ff" },
+} as const;
+
+export type NonDeletableChipVariant = keyof typeof NON_DELETABLE_CHIP_PALETTE;
+
+/**
+ * Shared static (non-interactive) "Existing methods" chip — the color-model
+ * split introduced alongside {@link HoverDangerChip}'s deletable green chip:
+ * color tracks PRODUCED vs. USED, deletability is a separate signal carried
+ * by whether a row renders as this chip at all (never deletable) or as
+ * {@link HoverDangerChip} (deletable).
+ *
+ *   - `variant: "blue"`  — this row only USES the character as input (a
+ *     desktop deadkey base / any()-consumed input-store occurrence,
+ *     `ContributorDescriptor.producedRole === "used"`). The character is
+ *     never removed by deleting this row because this row never produced it.
+ *   - `variant: "green"` — this row PRODUCES the character (composition,
+ *     unattributed SHOW-ALL floor, a blocked/opaque producer, or a produced
+ *     rule the capability check marked not-removable) but there is no single
+ *     rule/slot to surgically delete. Rendered in the SAME green as a
+ *     deletable row, just without the "×" glyph, the hover-red swap, or a
+ *     click handler — "green without ×" is the visual cue for "produced
+ *     here, nothing single to delete."
+ *
+ * No `onClick` prop exists on this component at all (unlike
+ * {@link HoverDangerChip}, which always takes one) — that absence is what
+ * keeps a static row from ever accidentally growing a delete affordance.
+ */
+export function NonDeletableMethodChip({
+  variant,
+  reason,
+  children,
+}: {
+  variant: NonDeletableChipVariant;
+  /** Tooltip explaining why this row can't be deleted (or, for `blue`, why it's shown at all). */
+  reason?: string;
+  children: ReactNode;
+}) {
+  const palette = NON_DELETABLE_CHIP_PALETTE[variant];
+  return (
+    <span
+      {...(reason !== undefined ? { title: reason } : {})}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "3px 8px",
+        background: palette.background,
+        border: `1px solid ${palette.border}`,
+        borderRadius: 12,
+        color: palette.color,
+        fontSize: 11,
+        fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+        cursor: "default",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
 export function RemovableChipRow({
   heading,
   groupAriaLabel,
