@@ -772,6 +772,7 @@
   "survey.characterMapPane.blocksOnly.label": "Show only blocks my keyboard uses",
   "editor.carve.infoPanelHoverBody": "Show or hide this panel. It describes whatever your cursor is over.",
   "survey.phaseB.breakdown.showUppercase": "Show uppercase letters",
+  "editor.assignLoop.charScroll.truncatedNote": "Showing {0} of {1} characters — navigate to a character to bring it into view.",
   "survey.characterMapPane.group.hiddenCount": "Showing {0} of {1} characters — use search or \"Add any character by code point\" above to find a specific one.",
   "survey.characterMapPane.group.announceShown": "Showing {block}",
   "base.picker.truncationFooter": "showing {MAX_VISIBLE} of {0} — keep typing to narrow",

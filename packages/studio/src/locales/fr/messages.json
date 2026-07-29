@@ -772,6 +772,7 @@
   "survey.characterMapPane.blocksOnly.label": "Afficher uniquement les blocs utilisés par mon clavier",
   "editor.carve.infoPanelHoverBody": "Afficher ou masquer ce panneau. Il décrit ce qui se trouve sous votre curseur.",
   "survey.phaseB.breakdown.showUppercase": "Afficher les lettres majuscules",
+  "editor.assignLoop.charScroll.truncatedNote": "",
   "survey.characterMapPane.group.hiddenCount": "Affichage de {0} sur {1} caractères — utilisez la recherche ou « Ajouter n’importe quel caractère par point de code » ci-dessus pour en trouver un en particulier.",
   "survey.characterMapPane.group.announceShown": "{block} affiché",
   "base.picker.truncationFooter": "affichage de {MAX_VISIBLE} sur {0} — continuez à taper pour affiner",
