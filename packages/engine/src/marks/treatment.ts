@@ -19,7 +19,6 @@
 
 import type { MarkInputOrder } from "@keyboard-studio/contracts";
 import type { MarkClass } from "./mark-classes.js";
-import type { MarkTreatmentPrefill } from "./treatment-prefill.js";
 
 /**
  * Does this mark receive a key of its own?
@@ -53,6 +52,39 @@ export interface MarkTreatmentAnswer {
   promoted: PromotedComposedCharacter[];
   /** One value per keyboard, folded in from the retired S3 station (FR-004). */
   inputOrder: MarkInputOrder;
+}
+
+/** How the base keyboard produces marked letters, when detectable. */
+export type BaseMarkMechanism = "combining-keystroke" | "precomposed";
+
+/**
+ * The prefill each class's answer starts from (FR-009: never an open choice).
+ *
+ * Declared here beside the answer type rather than in `treatment-prefill.ts`,
+ * where it is computed, because `treatmentFor` resolves *through* it — a mark
+ * with neither an override nor a class answer falls back to its class's
+ * recommendation. Putting it in the computing module made the vocabulary module
+ * import the computing module and the computing module import the vocabulary
+ * module (via `promotion.ts`), a dependency cycle the architecture rules
+ * correctly reject. The contract's own layout agrees: the prefill is documented
+ * as part of the answer contract, not as a separate one.
+ */
+export interface MarkTreatmentPrefill {
+  classId: string;
+  recommended: MarkTreatment;
+  /** Composed characters proposed for promotion, already budget-filtered. */
+  promotionProposal: PromotedComposedCharacter[];
+  /** The proposal signals (shown to the designer, amended spec 046 FR-011). */
+  signals: {
+    /** Widest attested base count among the class's marks. */
+    productivitySpread: number;
+    /** The base keyboard's own mechanism, when detectable. */
+    baseMechanism: BaseMarkMechanism | null;
+    /** False when the key budget cannot seat the promoted keys (FR-015). */
+    promotionAffordable: boolean;
+    /** Plain-language reason, present iff promotionAffordable is false. */
+    unaffordableReason?: string;
+  };
 }
 
 /** An empty answer with the given input order — every mark falls to its prefill. */

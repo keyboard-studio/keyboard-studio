@@ -191,8 +191,8 @@ Written first, failing. The engine tests pin the contract's behavioural guarante
 
 **⟶ Wait for Wave 1 to finish, then:**
 
-- [ ] **T042** Run the full gate: `pnpm typecheck`, `pnpm -r test`, `pnpm lint` (including `test-antipattern-lint` and the i18n catalog lints). Record each result; a failure is fixed here, not deferred
-- [ ] **T043** Acknowledge the spec-corpus drift introduced by the 046 and 007 amendments — `node utilities/spec-trace check` then `acknowledge` · `utilities/spec-trace`
+- [x] **T042** Run the full gate: `pnpm typecheck`, `pnpm -r test`, `pnpm lint` (including `test-antipattern-lint` and the i18n catalog lints). Record each result; a failure is fixed here, not deferred
+- [x] **T043** Acknowledge the spec-corpus drift introduced by the 046 and 007 amendments — `node utilities/spec-trace check` then `acknowledge` · `utilities/spec-trace`
 
 ---
 

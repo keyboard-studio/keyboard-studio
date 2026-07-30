@@ -371,7 +371,6 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   // (re-seeded) decisions must be walked again before completing.
   useEffect(() => {
     setStationIndex(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alphabetKey]);
   const currentStation = visibleStations[Math.min(stationIndex, visibleStations.length - 1)];
 

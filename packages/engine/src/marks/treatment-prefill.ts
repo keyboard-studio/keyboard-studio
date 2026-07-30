@@ -29,32 +29,20 @@ import { isCombiningMarkChar } from "../character-discovery/characterMap.js";
 import type { MarkClass } from "./mark-classes.js";
 import { attestedBasesOf } from "./mark-classes.js";
 import type { AttachmentProposal } from "./attachment-proposals.js";
-import type { MarkTreatment, PromotedComposedCharacter } from "./treatment.js";
+import type {
+  BaseMarkMechanism,
+  MarkTreatment,
+  MarkTreatmentPrefill,
+} from "./treatment.js";
 import { promotableCharacters } from "./promotion.js";
+
+// `MarkTreatmentPrefill` and `BaseMarkMechanism` are declared in treatment.ts —
+// see the JSDoc there for why. Re-exported so this module stays the single
+// import site for everything prefill-related.
+export type { BaseMarkMechanism, MarkTreatmentPrefill };
 
 /** Attested-base spread at or above this suggests the mark earns its own key. */
 export const PRODUCTIVITY_SPREAD_THRESHOLD = 3;
-
-/** How the base keyboard produces marked letters, when detectable. */
-export type BaseMarkMechanism = "combining-keystroke" | "precomposed";
-
-export interface MarkTreatmentPrefill {
-  classId: string;
-  recommended: MarkTreatment;
-  /** Composed characters proposed for promotion, already budget-filtered. */
-  promotionProposal: PromotedComposedCharacter[];
-  /** The proposal signals (shown to the designer, amended spec 046 FR-011). */
-  signals: {
-    /** Widest attested base count among the class's marks. */
-    productivitySpread: number;
-    /** The base keyboard's own mechanism, when detectable. */
-    baseMechanism: BaseMarkMechanism | null;
-    /** False when the key budget cannot seat the promoted keys (FR-015). */
-    promotionAffordable: boolean;
-    /** Plain-language reason, present iff promotionAffordable is false. */
-    unaffordableReason?: string;
-  };
-}
 
 /**
  * Sibling detector to `detectMarkInputOrderFromImport`: does the base keyboard

@@ -7,7 +7,7 @@
 // series-level assertions (station count, skip, re-proposal, the FR-007/FR-008
 // wording matrix) live in MarksSeriesStep.test.tsx.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, cleanup, fireEvent, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import type {

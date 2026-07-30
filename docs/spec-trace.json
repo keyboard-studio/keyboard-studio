@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-07-28",
+  "lastUpdated": "2026-07-30",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -291,7 +291,7 @@
     },
     "specs/007-strategy-selection": {
       "title": "Feature spec — Strategy selection (spec.md §7)",
-      "hash": "sha256:fb3303c77cd43be5",
+      "hash": "sha256:72d56c2fead04937",
       "status": "partial",
       "implements": [
         "packages/contracts/src/strategy.ts",
@@ -653,7 +653,7 @@
     },
     "specs/046-marks-question-series": {
       "title": "Feature Specification: Mark Composition Model and the Marks Question Series",
-      "hash": "sha256:3833307b9bed16c9",
+      "hash": "sha256:1fd45ce21e849469",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -742,6 +742,14 @@
     "specs/051-uppercase-counterpart-suggestion": {
       "title": "Feature Specification: Suggest the uppercase counterpart when a lowercase cased letter is placed",
       "hash": "sha256:f09f4bced33a0614",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/052-marks-treatment-question": {
+      "title": "Feature Specification: Marks treatment question",
+      "hash": "sha256:c67294a07baf3ef8",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

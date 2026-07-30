@@ -3,7 +3,7 @@
   "specName": "Marks treatment question",
   "branch": "052-marks-treatment-question",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "implemented",
   "history": [
     {
       "step": "specify",
@@ -402,6 +402,29 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-30T03:06:38.122Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T03:30:48.059Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T03:30:48.378Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-30T03:30:48.772Z"
     }
   ],
   "decisions": [
@@ -447,6 +470,31 @@
       "decision": "The 7.5 EuroLatin multi-family gap is RESTATED AS OPEN with its reason unchanged, not closed. PlacementWorklists shape is left unchanged (ownLetterUnits keeps its now-misleading name); only verifyWorklistCoverages classified-twice assertion is deleted.",
       "why": "The EuroLatin rows reason is that MML-as-target is out of scope for v1; nothing in this feature changes MML scope, so closing it would need evidence this feature does not produce. Restating unchanged is what FR-026/US4-AC4 permit and what is honest. Leaving the worklist shape alone keeps the spec assumption that drafts load without migration (FR-021/SC-010) and avoids touching the reducer, carves needed-set derivation, and the mechanism gallery for no behavioural gain.",
       "rejected": "Renaming ownLetterUnits to keyedUnits for honesty - breaks the worklist-shape-unchanged assumption and touches every downstream consumer; worth a separate maint(contracts) change."
+    },
+    {
+      "decision": "MarkTreatmentPrefill and BaseMarkMechanism are declared in treatment.ts (the vocabulary module), not in treatment-prefill.ts (the computing module), and re-exported from the latter.",
+      "why": "treatmentFor resolves THROUGH the prefill, so the vocabulary module needs its type; declaring it in the computing module produced a real depcruise no-circular violation (treatment-prefill -> promotion -> treatment -> treatment-prefill). The contract doc already documents the prefill as part of the answer contract, so this placement matches it.",
+      "rejected": "Suppressing the depcruise rule for a type-only cycle, or inlining a structural duplicate of the prefill shape in treatment.ts."
+    },
+    {
+      "decision": "KeyBudget carries a fourth field, planes: { shiftBound, altgrBound, stockKeys }, beyond the three the contract doc pins.",
+      "why": "The facet classifier reports the total bound-key count as its evidenceSize. Without machine-readable plane counts the only options were re-deriving the plane analysis inside the tool - the exact duplication FR-016 exists to remove - or regex-parsing the counts back out of the notes prose, which makes a prose string load-bearing.",
+      "rejected": "Parsing the counts out of KeyBudget.notes (implemented first, then removed as fragile); dropping evidenceSize, which would have moved a shipped facet-index value."
+    },
+    {
+      "decision": "The FR-024 disagreement check runs after selectStrategy, on the selection, and fires only when every mark is composed while the selected primary is a compose-as-you-type strategy.",
+      "why": "Research D6 and the spec edge case: a base whose mechanism the author knowingly overrode is a legitimate override, not a disagreement. Only a contradiction with the SELECTED strategy counts. The check is also not redundant with the A4 derivation - rule 5 fires on A3/A1 alone, so a composing primary can still be selected when the derived A4 is none.",
+      "rejected": "Checking the raw axis vector, which would fire on every deliberate override of a base-derived signal."
+    },
+    {
+      "decision": "@keyboard-studio/contracts bumped 0.16.0 -> 0.17.0 alongside the engine 0.1.0 -> 0.2.0 that tasks.md specified.",
+      "why": "US3 adds a new locked surface to contracts (keyBudget.ts, its zod mirrors and Art. I drift guards, and the relocated pinned table). The package bumps its 0ver minor for every locked-surface change (0.11.0 IRPath, 0.12.0 TouchKeyIR.provenance, 0.13.0 touch schemas); leaving it unbumped would break that convention silently.",
+      "rejected": "Leaving contracts at 0.16.0 because tasks.md did not name a contracts bump."
+    },
+    {
+      "decision": "promotableCharacters does not require a promoted character to have a single-codepoint precomposed form.",
+      "why": "The data model defines a promotion as a reachable base+mark pair placed on a dedicated key; a key can emit a two-codepoint sequence just as well as one. Filtering to precomposed-only would silently exclude exactly the orthographies (Cameroonian tone among them) this feature exists to serve.",
+      "rejected": "Restricting promotion to pairs with a precomposed NFC form."
     }
   ],
   "concerns": [
@@ -479,6 +527,22 @@
     },
     {
       "note": "Engine is at 0.1.0, so the 18 major-version-bump lands as 0.1.0 -> 0.2.0 under pre-1.0 semver (the minor is the breaking signal). Intent is satisfied but the literal wording of 18 says major - confirm at the required joint engine+content session rather than assuming."
+    },
+    {
+      "note": "FR-014 clause 1 (the mark-before-character option MUST NOT be OFFERED for a touch target) is satisfied only vacuously: the spine routes every project through both the desktop and touch steps, so there is no touch-only target to withhold an option from. Only clause 2 (not PRODUCIBLE there) is actually verified. This matches research D5 and was a deliberate plan decision, but it means US2 AC4 has no non-vacuous test and would need revisiting if a touch-only target is ever introduced.",
+      "step": "implement"
+    },
+    {
+      "note": "T033 asked for a zero-line facet-index diff and got a one-line one: manifest.referencePins[].file records the relocated path of base-layouts.json. The sha256 is unchanged and zero Categorization values moved, so the MEASUREMENT is provably identical - but a reviewer scanning for a clean diff should know the one line is expected and why.",
+      "step": "implement"
+    },
+    {
+      "note": "eslint-plugin-lingui was declared in the root package.json but absent from node_modules, so pnpm lint could not run at all until pnpm install --frozen-lockfile restored it. Pre-existing local install drift, not caused by this feature, but it means the lint gate had not been runnable in this working copy.",
+      "step": "implement"
+    },
+    {
+      "note": "The station renders each mark as its glyph plus U+XXXX notation (inherited verbatim from the retired MentalModelStation and the sibling attachment station). U+ notation is arguably the character-encoding jargon FR-008 bans, but it is outside the five regexes contracts/station-ui.md pins as the assertion surface, and changing it would diverge this station from its siblings. Flagged for the content reviewer rather than changed unilaterally.",
+      "step": "implement"
     }
   ],
   "context": [
@@ -509,6 +573,48 @@
     },
     {
       "what": "FR-014s load-bearing half already holds structurally: scaffoldTouchLayout.ts resolves recognized deadkey patterns into long-press sk[] subkey menus, so no answer produces a deadkey on touch. And advance.ts routes every project through BOTH mechanisms and touch, so no touch-only target exists - which is the evidence confirming the owner-flagged platform-collapse assumption."
+    },
+    {
+      "what": "Full monorepo typecheck",
+      "command": "pnpm typecheck",
+      "result": "PASS - 7 projects, 0 errors",
+      "warnings": []
+    },
+    {
+      "what": "Full test suite",
+      "command": "pnpm -r test",
+      "result": "PASS - 7574 tests passed, 2 skipped, 0 failed (contracts 487, engine 2248, studio 4548, keyboard-lint 82, glottolog 42, llm 9, oauth-backend 160)",
+      "warnings": [
+        "jsdom HTMLCanvasElement.getContext not-implemented noise in fontSupport tests and a useLingui-without-provider probe in AppRoot.test.tsx - both pre-existing, both inside passing tests"
+      ]
+    },
+    {
+      "what": "Full lint gate incl. depcruise and the five plain-node linters",
+      "command": "pnpm lint",
+      "result": "PASS - 0 errors; depcruise clean (869 modules), facet-index-lint/i18n-catalog-lint/content-i18n-lint/test-antipattern-lint all GREEN",
+      "warnings": [
+        "120 pre-existing lingui/no-unlocalized-strings warnings across the studio, none in files this feature added"
+      ]
+    },
+    {
+      "what": "Facet-index corpus re-run and artifact diff (T033, FR-016/SC-008)",
+      "command": "npx tsx utilities/facet-index/cli.ts --classified-only over 927 corpus keyboards, then a structural leaf diff against the committed artifact",
+      "result": "PASS - exactly ONE differing leaf: manifest.referencePins[].file, the recorded path of the relocated base-layouts.json. Its sha256 is unchanged, proving byte-identical data. Zero Categorization values moved, so the measurement did not change",
+      "warnings": [
+        "T033 says expect no change; the one-line path rename is accepted and recorded as a deviation rather than treated as a measurement change"
+      ]
+    },
+    {
+      "what": "Strategy self-consistency suite (T038, FR-026/SC-012)",
+      "command": "pnpm --filter @keyboard-studio/engine test src/strategy-selector",
+      "result": "PASS - all 13 covered keyboards select exactly what they selected before; zero rows changed, so no row required amendment",
+      "warnings": []
+    },
+    {
+      "what": "Engine package builds after the import-cycle fix",
+      "command": "pnpm --filter @keyboard-studio/engine build && pnpm run depcruise",
+      "result": "PASS - no dependency violations (869 modules, 2832 dependencies cruised)",
+      "warnings": []
     }
   ],
   "telemetryInstanceId": "a28a87a4-2fbe-4296-a91b-6e1e6a97c053",
@@ -520,6 +626,9 @@
     },
     "tasks": {
       "summary": "43 tasks across 7 phases: Setup (2, S18 gate + version bump), Foundational (4, answer type + promotion + prefill + barrel), US1 P1 (10), US2 P2 (5), US3 P3 (12), US4 P4 (5), Polish (5). Laid out as 18 waves with explicit join points; largest independent waves are US1 wave 2 (4 files) and US3 wave 4 (5 files)."
+    },
+    "implement": {
+      "summary": "Replaced the marks-series unithood question with a three-part answer (per-mark treatment + promoted composed characters + folded input order), added operable per-option demonstrations, made the key budget a single authoritative determination read by both the station and the facet index, and projected the recorded answer onto A4/A3a so strategy selection can finally see it."
     }
   },
   "coverage": {
@@ -531,6 +640,10 @@
         "T008",
         "T011",
         "T014"
+      ],
+      "tests": [
+        "packages/engine/src/marks/marks-foundations.test.ts::resolves override > class > prefill",
+        "packages/engine/src/marks/marks-foundations.test.ts::US1 AC3"
       ]
     },
     "FR-002": {
@@ -539,6 +652,10 @@
         "T004",
         "T011",
         "T014"
+      ],
+      "tests": [
+        "packages/engine/src/marks/marks-foundations.test.ts::promotableCharacters",
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::promotion is a set of CHECKBOXES"
       ]
     },
     "FR-003": {
@@ -548,6 +665,10 @@
         "T010",
         "T011",
         "T007"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::toggling a promotion reports the character",
+        "packages/engine/src/marks/worklist-and-prefill.test.ts::US1 AC1"
       ]
     },
     "FR-004": {
@@ -563,6 +684,9 @@
       "tasks": [
         "T010",
         "T007"
+      ],
+      "tests": [
+        "packages/engine/src/marks/worklist-and-prefill.test.ts::US1 AC1 / FR-005+FR-006"
       ]
     },
     "FR-006": {
@@ -571,6 +695,10 @@
         "T010",
         "T007",
         "T012"
+      ],
+      "tests": [
+        "packages/engine/src/marks/worklist-and-prefill.test.ts::the 'classified twice' problem no longer exists at all",
+        "packages/engine/src/marks/worklist-and-prefill.test.ts::SC-009"
       ]
     },
     "FR-007": {
@@ -579,6 +707,9 @@
         "T009",
         "T011",
         "T016"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::FR-007/SC-004/US1 AC4"
       ]
     },
     "FR-008": {
@@ -587,6 +718,9 @@
         "T009",
         "T011",
         "T016"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::FR-008/SC-004"
       ]
     },
     "FR-009": {
@@ -603,6 +737,9 @@
         "T017",
         "T018",
         "T019"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::FR-010/SC-005"
       ]
     },
     "FR-011": {
@@ -610,6 +747,10 @@
       "tasks": [
         "T017",
         "T018"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::FR-011/SC-006/US2 AC2",
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::the pending state announces itself"
       ]
     },
     "FR-012": {
@@ -618,6 +759,10 @@
         "T017",
         "T018",
         "T019"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::FR-012/US2 AC1",
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::FR-012/US2 AC5"
       ]
     },
     "FR-013": {
@@ -625,12 +770,18 @@
       "tasks": [
         "T017",
         "T018"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::FR-013"
       ]
     },
     "FR-014": {
       "title": "Mark-before-letter is not offered on touch and is not producible there by any answer",
       "tasks": [
         "T020"
+      ],
+      "tests": [
+        "packages/engine/src/scaffolder/scaffoldTouchLayout.test.ts::spec 052 FR-014"
       ]
     },
     "FR-015": {
@@ -640,6 +791,10 @@
         "T031",
         "T032",
         "T011"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::US3 AC1/SC-007",
+        "packages/engine/src/marks/worklist-and-prefill.test.ts::an over-budget promotion is UNAVAILABLE"
       ]
     },
     "FR-016": {
@@ -652,6 +807,10 @@
         "T030",
         "T022",
         "T033"
+      ],
+      "tests": [
+        "packages/contracts/src/keyBudget.test.ts::keyBudgetToSpareKeyAvailability",
+        "packages/contracts/src/keyBudget.test.ts::rule 10's predicate fires on exactly one band"
       ]
     },
     "FR-017": {
@@ -659,6 +818,10 @@
       "tasks": [
         "T023",
         "T031"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::FR-017/US3 AC3",
+        "packages/engine/src/marks/worklist-and-prefill.test.ts::FR-017"
       ]
     },
     "FR-018": {
@@ -667,6 +830,9 @@
         "T009",
         "T014",
         "T012"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::FR-018/SC-003"
       ]
     },
     "FR-019": {
@@ -674,6 +840,9 @@
       "tasks": [
         "T009",
         "T014"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::FR-019/US1 AC6"
       ]
     },
     "FR-020": {
@@ -682,6 +851,10 @@
         "T009",
         "T014",
         "T008"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::FR-020/US1 AC7",
+        "packages/engine/src/marks/marks-foundations.test.ts::prunePromotions"
       ]
     },
     "FR-021": {
@@ -689,6 +862,9 @@
       "tasks": [
         "T040",
         "T010"
+      ],
+      "tests": [
+        "packages/studio/src/lib/draftPersistence.test.ts::spec 052 FR-021/SC-010"
       ]
     },
     "FR-022": {
@@ -696,6 +872,9 @@
       "tasks": [
         "T013",
         "T014"
+      ],
+      "tests": [
+        "packages/engine/src/marks/output-form-policy.test.ts::FR-016: all pairs compose + an own-key mark"
       ]
     },
     "FR-023": {
@@ -703,6 +882,9 @@
       "tasks": [
         "T004",
         "T008"
+      ],
+      "tests": [
+        "packages/engine/src/marks/marks-foundations.test.ts::expandCaseCounterpartPromotions"
       ]
     },
     "FR-024": {
@@ -711,6 +893,9 @@
         "T034",
         "T035",
         "T036"
+      ],
+      "tests": [
+        "packages/engine/src/marks/strategy-reconcile.test.ts::surfaceStrategyDisagreement"
       ]
     },
     "FR-025": {
@@ -724,6 +909,9 @@
       "tasks": [
         "T038",
         "T022"
+      ],
+      "tests": [
+        "packages/engine/src/strategy-selector/index.test.ts::7.5 seed fixtures"
       ]
     },
     "FR-027": {
@@ -732,10 +920,13 @@
         "T034",
         "T035",
         "T036"
+      ],
+      "tests": [
+        "packages/engine/src/marks/strategy-reconcile.test.ts::FR-027"
       ]
     }
   },
-  "currentTask": "T041",
+  "currentTask": "T043",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1032,6 +1223,24 @@
       "files": [
         "specs/052-marks-treatment-question/checklists/requirements.md"
       ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Ran the full gate green: pnpm typecheck (7 projects), pnpm -r test (7574 passed, 2 skipped), pnpm lint (0 errors incl. depcruise, facet-index-lint, i18n-catalog-lint, content-i18n-lint, test-antipattern-lint). Fixed two lint findings in-place: an unused test import and a real depcruise import cycle",
+      "files": [
+        "packages/engine/src/marks/treatment.ts",
+        "packages/engine/src/marks/treatment-prefill.ts",
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx",
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "Acknowledged spec-corpus drift for the three changed sections (007-strategy-selection, 046-marks-question-series, 052-marks-treatment-question); spec-trace check now clean across 82 sections",
+      "files": [
+        "docs/spec-trace.json"
+      ]
     }
-  }
+  },
+  "last_action": "all 43 tasks done - typecheck/lint clean, 7574 tests pass, facet-index corpus re-run shows zero measurement change, §7.5 suite unchanged across all 13 rows"
 }
