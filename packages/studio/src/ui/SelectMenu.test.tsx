@@ -348,12 +348,11 @@ describe("SelectMenu", () => {
   });
 
   describe("positioning (portalled, position: fixed derived from the trigger's rect)", () => {
-    // MENU_GAP / MENU_MAX_HEIGHT mirrors the private constants in
-    // SelectMenu.tsx (not exported — asserted against their literal values
-    // here, same idiom as other tests in this file reading rendered inline
-    // styles rather than internal component state).
+    // MENU_GAP mirrors the private gap constant in SelectMenu.tsx (not
+    // exported — asserted against its literal value here, same idiom as other
+    // tests in this file reading rendered inline styles rather than internal
+    // component state).
     const MENU_GAP = 4;
-    const MENU_MAX_HEIGHT = 240;
 
     let originalGetBoundingClientRect: () => DOMRect;
     let originalInnerHeight: number;
