@@ -64,7 +64,9 @@ export { propagateDesktopLayersToTouch } from "./propagateDesktopLayersToTouch.j
 export type { PropagateDesktopLayersToTouchResult } from "./propagateDesktopLayersToTouch.js";
 
 export { collectCharContributors } from "./collectCharContributors.js";
-export type { CharContributors } from "./collectCharContributors.js";
+export type { CharContributors, ContributorDescriptor } from "./collectCharContributors.js";
+
+export { collectCompositionMethod } from "./collectCompositionMethod.js";
 
 export {
   isMnemonicLayout,
@@ -90,4 +92,19 @@ export {
   optionsForTouchLayerSlot,
 } from "./modifierCombos.js";
 export type { ModifierToken } from "./modifierCombos.js";
+
+export { touchKeyAddress, touchSubKeyAddress, touchFlickAddress } from "./touchKeyAddress.js";
+
+export { enumerateTouchMethodsForChar } from "./enumerateTouchMethodsForChar.js";
+export type { TouchMethodDescriptor } from "./enumerateTouchMethodsForChar.js";
+
+export {
+  applyTouchKeycapRemovalsToLayout,
+  applyTouchKeycapRemovalsToRawJson,
+  applyTouchKeycapRemovalsToVfs,
+} from "./applyTouchKeycapRemovalsToVfs.js";
+export type {
+  ApplyTouchKeycapRemovalsResult,
+  ApplyTouchKeycapRemovalsToRawJsonResult,
+} from "./applyTouchKeycapRemovalsToVfs.js";
 

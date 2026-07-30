@@ -67,6 +67,7 @@ describe("workingCopyStore — initial state", () => {
     const s = useWorkingCopyStore.getState();
     expect(s.ir).toBeNull();
     expect(s.deletedNodeIds.size).toBe(0);
+    expect(s.deletedTouchKeyIds.size).toBe(0);
     expect(s.undoStack).toHaveLength(0);
   });
 
@@ -599,6 +600,14 @@ describe("workingCopyStore — reset", () => {
     expect(s.desktopLocked).toBe(false);
   });
 
+  it("reset clears deletedTouchKeyIds", () => {
+    useWorkingCopyStore.getState().deleteTouchKey("phone:default:U_0064");
+    expect(useWorkingCopyStore.getState().deletedTouchKeyIds.size).toBe(1);
+
+    useWorkingCopyStore.getState().reset();
+    expect(useWorkingCopyStore.getState().deletedTouchKeyIds.size).toBe(0);
+  });
+
   it("reset clears sequenceFlaggedChars", () => {
     useWorkingCopyStore.getState().flagCharForSequence("á");
     expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
@@ -815,6 +824,134 @@ describe("workingCopyStore — deleteItem/restoreItem round-trip with a chip-for
     useWorkingCopyStore.getState().undoDelete();
     expect(useWorkingCopyStore.getState().isItemDeleted(chipId)).toBe(false);
     expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deleteTouchKey/restoreTouchKey/isTouchKeyDeleted — the touch-method deletion
+// overlay (separate id space + undo channel from deletedItemIds/deleteItem).
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — deleteTouchKey/restoreTouchKey round-trip", () => {
+  it("deleteTouchKey marks the address deleted and pushes a 't' undo entry", () => {
+    const touchId = "phone:default:U_0061:sk:U_00E1";
+
+    useWorkingCopyStore.getState().deleteTouchKey(touchId);
+    expect(useWorkingCopyStore.getState().isTouchKeyDeleted(touchId)).toBe(true);
+    expect(useWorkingCopyStore.getState().undoStack).toEqual([{ k: "t", id: touchId }]);
+  });
+
+  it("restoreTouchKey clears the address and pops its undo entry", () => {
+    const touchId = "phone:default:U_0061";
+
+    useWorkingCopyStore.getState().deleteTouchKey(touchId);
+    useWorkingCopyStore.getState().restoreTouchKey(touchId);
+
+    expect(useWorkingCopyStore.getState().isTouchKeyDeleted(touchId)).toBe(false);
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
+  });
+
+  it("undoDelete reverses the most recent touch-key deletion", () => {
+    const touchId = "phone:default:U_0062";
+
+    useWorkingCopyStore.getState().deleteTouchKey(touchId);
+    expect(useWorkingCopyStore.getState().isTouchKeyDeleted(touchId)).toBe(true);
+
+    useWorkingCopyStore.getState().undoDelete();
+    expect(useWorkingCopyStore.getState().isTouchKeyDeleted(touchId)).toBe(false);
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
+  });
+
+  it("touch-key deletions and item deletions occupy separate id spaces and undo independently", () => {
+    const touchId = "phone:default:U_0063";
+    const itemId = "phone:default:U_0063"; // same literal string, different channel
+
+    useWorkingCopyStore.getState().deleteTouchKey(touchId);
+    useWorkingCopyStore.getState().deleteItem(itemId);
+
+    expect(useWorkingCopyStore.getState().isTouchKeyDeleted(touchId)).toBe(true);
+    expect(useWorkingCopyStore.getState().isItemDeleted(itemId)).toBe(true);
+
+    // Undo pops the most recent entry (the item deletion) without touching
+    // the touch-key deletion.
+    useWorkingCopyStore.getState().undoDelete();
+    expect(useWorkingCopyStore.getState().isItemDeleted(itemId)).toBe(false);
+    expect(useWorkingCopyStore.getState().isTouchKeyDeleted(touchId)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// keepAll/restoreAll must account for deletedTouchKeyIds — regression for the
+// bug where a pending 't' undo entry was orphaned (undoStack wiped while
+// deletedTouchKeyIds stayed applied) by a carve keepAll/restoreAll. Both
+// actions restore the invariant: after either call, undoStack is empty AND
+// deletedNodeIds/deletedItemIds/deletedTouchKeyIds are all empty — no
+// deletion of any kind can outlive the undo history that was its only path
+// back. See the keepAll implementation comment in workingCopyStore.ts.
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — keepAll/restoreAll clear deletedTouchKeyIds", () => {
+  it("deleteTouchKey then restoreAll clears deletedTouchKeyIds and undoStack", () => {
+    const touchId = "phone:default:U_0064";
+
+    useWorkingCopyStore.getState().deleteTouchKey(touchId);
+    expect(useWorkingCopyStore.getState().deletedTouchKeyIds.size).toBe(1);
+
+    useWorkingCopyStore.getState().restoreAll();
+
+    const s = useWorkingCopyStore.getState();
+    expect(s.deletedTouchKeyIds.size).toBe(0);
+    expect(s.isTouchKeyDeleted(touchId)).toBe(false);
+    expect(s.undoStack).toHaveLength(0);
+  });
+
+  it("deleteTouchKey then keepAll leaves no orphaned 't' undo entry and no applied touch deletion", () => {
+    const touchId = "phone:default:U_0065";
+
+    useWorkingCopyStore.getState().deleteTouchKey(touchId);
+    expect(useWorkingCopyStore.getState().undoStack).toEqual([{ k: "t", id: touchId }]);
+
+    useWorkingCopyStore.getState().keepAll();
+
+    const s = useWorkingCopyStore.getState();
+    // The undo stack is wiped by keepAll — so deletedTouchKeyIds must be wiped
+    // in the same call, or this 't' entry's deletion would be permanently
+    // un-undoable while still applied (the orphan this test locks).
+    expect(s.undoStack).toHaveLength(0);
+    expect(s.deletedTouchKeyIds.size).toBe(0);
+    expect(s.isTouchKeyDeleted(touchId)).toBe(false);
+  });
+
+  it("mixed carve (node + item) and touch deletions: keepAll leaves all three deletion Sets and undoStack empty", () => {
+    useWorkingCopyStore.getState().deleteNode("n1");
+    useWorkingCopyStore.getState().deleteItem("n2#0");
+    useWorkingCopyStore.getState().deleteTouchKey("phone:default:U_0066");
+
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(3);
+
+    useWorkingCopyStore.getState().keepAll();
+
+    const s = useWorkingCopyStore.getState();
+    expect(s.deletedNodeIds.size).toBe(0);
+    expect(s.deletedItemIds.size).toBe(0);
+    expect(s.deletedTouchKeyIds.size).toBe(0);
+    expect(s.undoStack).toHaveLength(0);
+  });
+
+  it("mixed carve (node + item) and touch deletions: restoreAll leaves all three deletion Sets and undoStack empty", () => {
+    useWorkingCopyStore.getState().deleteNode("n1");
+    useWorkingCopyStore.getState().deleteItem("n2#0");
+    useWorkingCopyStore.getState().deleteTouchKey("phone:default:U_0067");
+
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(3);
+
+    useWorkingCopyStore.getState().restoreAll();
+
+    const s = useWorkingCopyStore.getState();
+    expect(s.deletedNodeIds.size).toBe(0);
+    expect(s.deletedItemIds.size).toBe(0);
+    expect(s.deletedTouchKeyIds.size).toBe(0);
+    expect(s.undoStack).toHaveLength(0);
   });
 });
 

@@ -530,3 +530,68 @@ describe("buildProducedSet — input-only characters (spec 051)", () => {
     expect(result.has("z")).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// excludeBackspaceCorrections (opt-in) — direct-context backspace exclusion
+// ---------------------------------------------------------------------------
+
+describe("buildProducedSet — excludeBackspaceCorrections option (opt-in)", () => {
+  it("a backspace-correction rule's store output is INCLUDED by default (unchanged)", () => {
+    // any(composed) + [K_BKSP] > index(comp-dia,1) — the SIL Cameroon Â shape.
+    const compDia = makeStore("comp-dia", "X");
+    const composed = makeStore("composed", "X");
+    const ir = makeTestIR(
+      [
+        makeGroup([
+          {
+            nodeId: "rule#bksp-correction",
+            context: [
+              { kind: "any", storeRef: "composed" },
+              { kind: "vkey", name: "K_BKSP", modifiers: [] },
+            ],
+            output: [{ kind: "index", storeRef: "comp-dia", offset: 1 }],
+          },
+        ]),
+      ],
+      [compDia, composed],
+    );
+    const defaultResult = buildProducedSet(ir);
+    expect(defaultResult.has("X")).toBe(true);
+  });
+
+  it("with excludeBackspaceCorrections:true, the same rule's store output is EXCLUDED", () => {
+    const compDia = makeStore("comp-dia", "X");
+    const composed = makeStore("composed", "X");
+    const ir = makeTestIR(
+      [
+        makeGroup([
+          {
+            nodeId: "rule#bksp-correction",
+            context: [
+              { kind: "any", storeRef: "composed" },
+              { kind: "vkey", name: "K_BKSP", modifiers: [] },
+            ],
+            output: [{ kind: "index", storeRef: "comp-dia", offset: 1 }],
+          },
+        ]),
+      ],
+      [compDia, composed],
+    );
+    const result = buildProducedSet(ir, { excludeBackspaceCorrections: true });
+    expect(result.has("X")).toBe(false);
+  });
+
+  it("a normal (non-backspace) rule still contributes under both default and excludeBackspaceCorrections:true", () => {
+    const ir = makeTestIR([
+      makeGroup([
+        {
+          nodeId: "rule#normal",
+          context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
+          output: [{ kind: "char", value: "A" }],
+        },
+      ]),
+    ]);
+    expect(buildProducedSet(ir).has("A")).toBe(true);
+    expect(buildProducedSet(ir, { excludeBackspaceCorrections: true }).has("A")).toBe(true);
+  });
+});

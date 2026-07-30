@@ -96,6 +96,7 @@ export type ActiveStepId =
   | "characters"
   | "carve"
   | "marks"
+  | "convenience"
   | "mechanisms"
   | "touch_seed_source"
   | "touch"

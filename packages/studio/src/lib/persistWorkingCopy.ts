@@ -70,7 +70,8 @@ export interface SerializedEntry {
  *
  * The base type is narrowed by serialization overrides:
  *   - `baseVfs` (a VirtualFS instance) → `baseVfsEntries` (Base64-encoded plain array)
- *   - `deletedNodeIds` / `deletedItemIds` / `staleSteps` (Set<string>) → `string[]`
+ *   - `deletedNodeIds` / `deletedItemIds` / `deletedTouchKeyIds` / `staleSteps`
+ *     (Set<string>) → `string[]`
  * and two derived fields are dropped entirely (`removalCapabilities`, `session`)
  * because they are re-derived on rehydration, never stored.
  *
@@ -89,6 +90,7 @@ export type WorkingCopySnapshot = Omit<
   | "baseVfs"
   | "deletedNodeIds"
   | "deletedItemIds"
+  | "deletedTouchKeyIds"
   | "staleSteps"
   | "removalCapabilities"
   | "session"
@@ -96,6 +98,7 @@ export type WorkingCopySnapshot = Omit<
   baseVfsEntries: SerializedEntry[];
   deletedNodeIds: string[];
   deletedItemIds: string[];
+  deletedTouchKeyIds: string[];
   staleSteps: string[];
 };
 
@@ -178,6 +181,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     ir: s.ir,
     deletedNodeIds: [...s.deletedNodeIds],
     deletedItemIds: [...s.deletedItemIds],
+    deletedTouchKeyIds: [...s.deletedTouchKeyIds],
     undoStack: s.undoStack,
     phaseResults: s.phaseResults,
     irAxes: s.irAxes,
@@ -223,6 +227,9 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     removalCapabilities,
     deletedNodeIds: new Set(snapshot.deletedNodeIds),
     deletedItemIds: new Set(snapshot.deletedItemIds),
+    // Tolerate snapshots saved before this field existed (dev-branch drafts):
+    // an absent value must not clobber the store default with undefined.
+    deletedTouchKeyIds: new Set(snapshot.deletedTouchKeyIds ?? []),
     undoStack: snapshot.undoStack,
     phaseResults: snapshot.phaseResults,
     irAxes: snapshot.irAxes,
