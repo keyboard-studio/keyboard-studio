@@ -10,6 +10,7 @@ import type {
   IRGroup,
   IRRule,
   TouchLayoutIR,
+  TouchKeyIR,
   Pattern,
 } from "@keyboard-studio/contracts";
 

@@ -17,7 +17,7 @@
 //     disagreement, so the check runs AFTER selectStrategy.
 
 import { describe, expect, it } from "vitest";
-import type { DiscoveryAxisVector } from "@keyboard-studio/contracts";
+import type { DiscoveryAxisVector, StrategyRecommendation } from "@keyboard-studio/contracts";
 import { makeConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { selectStrategy } from "../strategy-selector/index.js";
 import { groupMarkClasses } from "./mark-classes.js";
@@ -104,6 +104,42 @@ describe("deriveMarksComputedAxes (spec 052 FR-027, research D6)", () => {
       attestedStacks: [
         { base: "a", marks: [ACUTE] },
         { base: "a", marks: [UNDERDOT] },
+      ],
+    });
+    const classes = groupMarkClasses(alphabet);
+    const axes = deriveMarksComputedAxes({
+      alphabet,
+      classes,
+      prefills: NO_PREFILLS,
+      treatment: answer({
+        classTreatment: Object.fromEntries(classes.map((c) => [c.id, "own-key" as const])),
+      }),
+    });
+    expect(axes.diacriticBehavior).toBe("multi-family");
+  });
+
+  it("KNOWN LIMITATION: a single-family tone system spanning above+below reads as 'multi-family'", () => {
+    // A mixed-above/below tone orthography — one functional system (three tone
+    // levels), two attachment positions. `familyOf` derives family from the
+    // attachment-position bucket, which is a glyph signal, so this derives
+    // "multi-family" and can steer §7.2 rule 6 (S-06 two-tier) where a
+    // single-family S-02 would serve. Pinned deliberately: fixing it needs a
+    // functional-family signal the survey does not yet elicit, and the caveat is
+    // documented on `familyOf`. If a future change adds that signal, this
+    // expectation should flip to "stacking-combining" — knowingly, not silently.
+    const alphabet = makeConfirmedAlphabet({
+      bases: ["a", "e", "o"],
+      marks: [ACUTE, GRAVE, UNDERDOT], // high, low, and a below-marked third level
+      attestedStacks: [
+        { base: "a", marks: [ACUTE] },
+        { base: "e", marks: [ACUTE] },
+        { base: "o", marks: [ACUTE] },
+        { base: "a", marks: [GRAVE] },
+        { base: "e", marks: [GRAVE] },
+        { base: "o", marks: [GRAVE] },
+        { base: "a", marks: [UNDERDOT] },
+        { base: "e", marks: [UNDERDOT] },
+        { base: "o", marks: [UNDERDOT] },
       ],
     });
     const classes = groupMarkClasses(alphabet);
@@ -295,10 +331,29 @@ describe("surfaceStrategyDisagreement (spec 052 FR-024, US4 AC1, SC-011)", () =>
     ];
     const treatment = answer({ classTreatment: { [classId]: "composed" } });
     const derived = deriveMarksComputedAxes({ alphabet, classes, prefills, treatment });
-    // A3=weak + A7a=full-remap selects S-06 (rule 8) — a mechanism that does not
-    // compose marked characters as you type, so it honours the recorded answer.
-    // The base's contrary `combining-keystroke` signal is present in `prefills`
-    // and must NOT by itself produce a disagreement.
+    // A1=tiny + A3=strong selects S-01 (rule 11) — direct substitution puts the
+    // marked character ON a key, which is exactly what the recorded `composed`
+    // treatment asks for, so the selection honours the answer. The base's
+    // contrary `combining-keystroke` signal is present in `prefills` and must NOT
+    // by itself produce a disagreement.
+    const selection = selectStrategy(
+      baseAxes({ diacriticBehavior: derived.diacriticBehavior, scale: "tiny" }),
+    );
+    expect(selection.primary).toBe("S-01");
+    expect(
+      surfaceStrategyDisagreement({ alphabet, classes, prefills, treatment, selection }),
+    ).toEqual([]);
+  });
+
+  it("S-06 chained deadkeys against an every-mark-composed answer is SURFACED", () => {
+    // Rule 8 (A2=alphabetic AND A7a=full-remap) fires on the remap posture alone
+    // and never consults A4, so a keyboard whose author recorded `composed` for
+    // every mark can still land on S-06. S-06's own §7.3 card is a two-tier
+    // deadkey mechanism (`dk(family)+any(base)>index(...)`) — the marked form is
+    // composed from a sequence, never keyed — so this is the same contradiction
+    // as the S-02/S-03/S-05 case and must not pass silently.
+    const treatment = answer({ classTreatment: { [classId]: "composed" } });
+    const derived = deriveMarksComputedAxes({ alphabet, classes, prefills: NO_PREFILLS, treatment });
     const selection = selectStrategy(
       baseAxes({
         diacriticBehavior: derived.diacriticBehavior,
@@ -308,8 +363,37 @@ describe("surfaceStrategyDisagreement (spec 052 FR-024, US4 AC1, SC-011)", () =>
     );
     expect(selection.primary).toBe("S-06");
     expect(
-      surfaceStrategyDisagreement({ alphabet, classes, prefills, treatment, selection }),
-    ).toEqual([]);
+      surfaceStrategyDisagreement({
+        alphabet,
+        classes,
+        prefills: NO_PREFILLS,
+        treatment,
+        selection,
+      }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("S-07 diacritic cycle against an every-mark-composed answer is SURFACED", () => {
+    // S-07 is selected by rule 3 on A4=replacing-cycling, which this station
+    // never derives — so the axis must have arrived from an import-derived fill
+    // or a script prior, which is exactly the cross-source case FR-024 guards.
+    // The selection is stated directly rather than routed through selectStrategy,
+    // because the disagreement check is defined on the selection, not the axes.
+    const treatment = answer({ classTreatment: { [classId]: "composed" } });
+    const selection: StrategyRecommendation = {
+      primary: "S-07",
+      secondaries: ["S-04"],
+      triggeredRule: 3,
+    };
+    expect(
+      surfaceStrategyDisagreement({
+        alphabet,
+        classes,
+        prefills: NO_PREFILLS,
+        treatment,
+        selection,
+      }).length,
+    ).toBeGreaterThan(0);
   });
 
   it("the derived axis wins over a default-filled prior automatically", () => {

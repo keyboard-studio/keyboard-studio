@@ -73,6 +73,23 @@ export interface MarksComputedAxes {
  *
  * A mark class is the unit here: `groupMarkClasses` already clusters by function
  * bucket first, so a class id's bucket prefix IS its family.
+ *
+ * KNOWN LIMITATION (inherited from `mark-classes.ts`'s documented v1
+ * approximation, and now load-bearing for the first time — before this module the
+ * bucket only backed the §7.5 fixture table, which supplies its own axis vector).
+ * Attachment position is a *glyph* signal, not a linguistic one. A single
+ * functional mark system that happens to span positions — a tone orthography
+ * using above-marks plus one below-mark, in the style of some Southeast Asian and
+ * West African orthographies — derives `"multi-family"` from glyph geometry
+ * alone, and A4=multi-family plus A1=large fires §7.2 rule 6 (S-06 two-tier
+ * chained deadkeys) where a single-family S-02 would have served. The failure
+ * mode is a *more elaborate* mechanism than needed, never a broken one, and the
+ * author can still override the axis downstream — so it is recorded as a caveat
+ * rather than guessed around. `strategy-reconcile.test.ts` pins the behaviour so
+ * a future functional-family signal changes it deliberately.
+ *
+ * Fixing it properly needs a functional-family signal the survey does not yet
+ * elicit (which marks belong to one system, independent of where they sit).
  */
 function familyOf(markClass: MarkClass): string {
   const [bucket] = markClass.id.split("-");
@@ -134,8 +151,28 @@ export function deriveMarksComputedAxes(inputs: MarksReconcileInputs): MarksComp
   };
 }
 
-/** Strategies that produce a marked character by composing it as you type. */
-const COMPOSE_AS_YOU_TYPE_STRATEGIES = new Set(["S-02", "S-03", "S-05"]);
+/**
+ * Strategies that produce a marked character by composing it as you type — i.e.
+ * the marked form is never on a key of its own; it is built from a sequence.
+ *
+ * All five §7.3 cards that structurally qualify are listed, not just the obvious
+ * three: an omission here is a silent pass, which is exactly the failure mode
+ * this module exists to close.
+ *
+ *   - S-02 Deadkey composition — trigger then base.
+ *   - S-03 Sequence replace — base then ASCII suffix.
+ *   - S-05 Mnemonic spelling — a spelling expands to the marked char.
+ *   - S-06 Chained deadkeys (two-tier) — `dk(family)+any(base)>index(...)`; the
+ *     second tier IS the base key, so the marked form is composed, not keyed.
+ *   - S-07 Diacritic cycle — a cycle key rewrites the preceding base into its
+ *     marked forms; the marked char is still produced by a key sequence.
+ *
+ * Not listed: S-01 (direct substitution) and S-08 (modifier plane) place the
+ * marked character on a key, which is what a `composed` treatment asks for;
+ * S-09/S-11/S-13 are structural wrappers or cluster-shaping rules that do not by
+ * themselves decide how a mark reaches the page.
+ */
+const COMPOSE_AS_YOU_TYPE_STRATEGIES = new Set(["S-02", "S-03", "S-05", "S-06", "S-07"]);
 
 export interface DisagreementInputs extends MarksReconcileInputs {
   /** The recommendation `selectStrategy` actually returned. */
