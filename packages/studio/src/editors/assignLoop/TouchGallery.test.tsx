@@ -2623,6 +2623,18 @@ const irWithoutShiftCombo = makeTestIR([
   ]),
 ]);
 
+/** A desktop IR using BOTH bare RALT and the SHIFT+RALT combo — so an author
+ * can select the RAlt layer (bare RALT is a valid combo) AND that layer has a
+ * casing parallel the keyboard actually defines (`rightalt-shift`). The
+ * fixture the compound case-pair proposal needs; `irWithShiftAndRaltLayers`
+ * deliberately lacks the SHIFT+RALT combo and is used for the negative. */
+const irWithRaltAndShiftRalt = makeTestIR([
+  makeIrGroup([
+    makeVkeyRule("K_E", ["RALT"], "é"),
+    makeVkeyRule("K_E", ["SHIFT", "RALT"], "É"),
+  ]),
+]);
+
 describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
   /** Dismiss the auto-detected suggestion (if any) so the method chooser is
    * showing, then switch to the given card (longpress is the default method,
@@ -3188,8 +3200,8 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
 // default (spec 051 FR-006) must survive the layer picker: the picker's
 // initial value for an uppercase current char is "shift", not "default", and
 // applying on that default layer must not raise a redundant case-pair
-// proposal (casePairTouchLayer("shift") === null — there is no "more
-// uppercase" layer to pair "shift" with). Closes the uppercase-path
+// proposal (casePairTouchLayer(["SHIFT"], …) === null — there is no "more
+// uppercase" layer to pair a SHIFT-bearing combo with). Closes the uppercase-path
 // regression gap: the existing suite above only ever seeds a lowercase
 // current char ("ä"/"θ"/"中").
 // ---------------------------------------------------------------------------
@@ -3301,6 +3313,140 @@ describe("TouchGallery — uppercase current char (spec 051 FR-006 layer-picker 
     expect(screen.queryByText(/Not yet a layer this keyboard uses/i)).toBeNull();
     expect(screen.getByText(/Resulting layer: Base/i)).toBeTruthy();
     expect(applyBtn()?.hasAttribute("disabled")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Case-pair proposal on a NON-DEFAULT touch layer.
+//
+// `casePairTouchLayer` used to be keyed on the flattened layer id and mapped
+// exactly `"default"` -> `"shift"`, so an author editing any other layer got
+// no case-pair proposal at all — silently, with the companion layer perfectly
+// derivable. Reachable on a base with an AltGr/RAlt layer, which is common
+// (French, EuroLatin). The rule is now keyed on the modifier COMBO ("this
+// combo plus SHIFT"), which composes with the builder's open vocabulary.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — case-pair proposal on a non-default touch layer", () => {
+  /** Deny the auto-detected suggestion card if one is showing. */
+  async function denyAnySuggestion() {
+    const denyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Deny") ?? null;
+    if (denyBtn !== null) {
+      await act(async () => {
+        fireEvent.click(denyBtn!);
+      });
+    }
+  }
+
+  /** Add one layer slot and set it to `token`. */
+  async function selectLayerToken(token: string) {
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+      );
+    });
+    await changeSelectMenu(
+      screen.getByRole("button", { name: /^touch layer 1 for long-press$/i }),
+      token,
+    );
+  }
+
+  async function applyOnHostKey(hostKey: string) {
+    await changeSelectMenu(screen.getByRole("button", { name: /host key/i }), hostKey);
+    const applyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+    expect(applyBtn).not.toBeNull();
+    expect(applyBtn!.hasAttribute("disabled")).toBe(false);
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+  }
+
+  function touchMechanismsFor(char: string) {
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    return draft?.charTouchEntries.find(([c]) => c === char)?.[1]?.mechanisms ?? [];
+  }
+
+  it("offers the capital on the combo-plus-SHIFT layer when editing the RAlt layer", async () => {
+    seedStore({ withInventory: ["θ"], ir: irWithRaltAndShiftRalt });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await denyAnySuggestion();
+    await selectLayerToken("RALT");
+    expect(screen.getByText(/Resulting layer: RAlt/i)).toBeTruthy();
+    await applyOnHostKey("K_A");
+
+    // The proposal is raised at all — under the id-keyed rule this banner never
+    // appeared for any layer but the base one.
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Map Θ to the shift layer of/i }));
+    });
+
+    // Source placement stays on the layer the author was editing...
+    expect(touchMechanismsFor("θ")[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "θ",
+      layer: "rightalt",
+    });
+    // ...and the capital lands on that layer's casing parallel — NOT on the
+    // plain "shift" layer, and not on "default".
+    expect(touchMechanismsFor("Θ")[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "Θ",
+      layer: "rightalt-shift",
+    });
+  });
+
+  it("raises no proposal when the combo-plus-SHIFT layer is one the keyboard never uses", async () => {
+    // irWithShiftAndRaltLayers uses bare SHIFT and bare RALT but never
+    // SHIFT+RALT — so the RAlt layer is selectable, yet its casing parallel is
+    // a layer this keyboard has no combo for. Raise nothing rather than
+    // propose a placement onto a layer that isn't there.
+    seedStore({ withInventory: ["θ"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await denyAnySuggestion();
+    await selectLayerToken("RALT");
+    await applyOnHostKey("K_A");
+
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+    // The source placement itself still lands normally.
+    expect(touchMechanismsFor("θ")[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "θ",
+      layer: "rightalt",
+    });
+    expect(touchMechanismsFor("Θ")).toHaveLength(0);
+  });
+
+  it("still offers the plain shift layer from the base layer (no regression)", async () => {
+    // The base-layer path is the one that worked before; it must keep working
+    // even on a keyboard whose combos-in-use do not include bare SHIFT,
+    // because the shift layer always exists (scaffolder's fixed buckets).
+    seedStore({ withInventory: ["θ"], ir: irWithoutShiftCombo });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await denyAnySuggestion();
+    await applyOnHostKey("K_A"); // no layer slot -> base/default layer
+
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Map Θ to the shift layer of/i }));
+    });
+    expect(touchMechanismsFor("Θ")[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "Θ",
+      layer: "shift",
+    });
   });
 });
 // Spec 051 Phase 7 (T049/T050) — FR-012: the suggestion-Accept path

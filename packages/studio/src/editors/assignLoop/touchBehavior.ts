@@ -19,6 +19,8 @@
 //   specs/014-mutate-seam-touch-propagation/contracts/repropagation.contract.md (R4)
 
 import type { KeyboardIR, TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/contracts";
+import type { ModifierToken } from "@keyboard-studio/engine";
+import { canonicalizeCombo, comboToTouchLayerId } from "@keyboard-studio/engine";
 
 /**
  * A touch layer id, matching `comboToTouchLayerId`'s vocabulary. The named
@@ -29,21 +31,62 @@ export type TouchLayerId = "default" | "shift" | "caps" | (string & {});
 
 /**
  * The casing-parallel layer for the layer currently being edited, or null when
- * there is none to pair with.
+ * there is none to pair with. A null return means the caller raises no
+ * case-pair proposal.
  *
- *   "default"        -> "shift"   (the only case reachable in v1)
- *   "shift" | "caps" -> null      (already an uppercase layer)
- *   anything else    -> null      (no defined casing parallel)
+ * Keyed on the editing layer's **modifier combo**, not on its flattened layer
+ * id. That distinction is the whole point: `comboToTouchLayerId` is
+ * compositional (it sorts the canonical combo into touch-layer precedence
+ * order and joins the per-token fragments with `-`), so its vocabulary is open
+ * — `default`, `shift`, `rightalt`, `alt`, `ctrl`, `rightalt-shift`,
+ * `rightctrl-rightalt-shift`, and so on. An id-keyed rule could only ever
+ * enumerate a fixed handful, and this one enumerated exactly two: it mapped
+ * the literal `"default"` to `"shift"` and returned null for everything else.
+ * Every author editing a non-default layer therefore silently got no
+ * case-pair proposal at all, even though the companion layer was derivable.
  *
- * A null return means the caller raises no case-pair proposal. Note the phone
- * platform ships no `caps` layer, so nothing here invents one — a `caps`
- * target would be skipped with a warning by the appliers rather than silently
- * redirected.
+ * The relation stated over combos instead: **the case-pair layer is this combo
+ * plus SHIFT.**
+ *
+ *   []                -> "shift"           (base layer's parallel)
+ *   ["RALT"]          -> "rightalt-shift"  (when the keyboard uses that combo)
+ *   ["SHIFT", …]      -> null              (already an uppercase layer)
+ *   ["CAPS", …]       -> null              (likewise)
+ *
+ * `isComboInUse` gates the compound candidates: a layer only exists in the
+ * touch layout because some desktop combo produced it, so proposing a
+ * placement onto `rightalt-shift` when this keyboard has no SHIFT+RAlt combo
+ * would target a layer that isn't there. The plain-SHIFT candidate skips that
+ * gate deliberately — the scaffolder's fixed default/shift/altgr buckets mean
+ * a shift layer always exists, so gating it would *remove* proposals that work
+ * today for a keyboard that happens to define no explicit `[SHIFT K_x]` rule.
+ *
+ * Note the phone platform ships no `caps` layer, so nothing here invents one —
+ * a `caps` target would be skipped with a warning by the appliers rather than
+ * silently redirected.
+ *
+ * @param editingCombo The canonical combo of the layer being edited
+ *                     (`canonicalizeCombo` output — the builder's assembled
+ *                     combo, pre-flattening).
+ * @param isComboInUse Whether a combo is one this keyboard actually defines.
  */
 export function casePairTouchLayer(
-  editingLayer: TouchLayerId,
+  editingCombo: readonly ModifierToken[],
+  isComboInUse: (combo: readonly ModifierToken[]) => boolean,
 ): TouchLayerId | null {
-  return editingLayer === "default" ? "shift" : null;
+  // Already an uppercase layer — there is no "more uppercase" layer to pair
+  // with. (NCAPS is not special-cased: [NCAPS] + SHIFT is a compound candidate
+  // like any other, and the gate below drops it unless the keyboard uses it.)
+  if (editingCombo.includes("SHIFT") || editingCombo.includes("CAPS")) return null;
+
+  // Safe to canonicalize without the caller's try/catch: MODIFIER_EXCLUSIONS
+  // has SHIFT excluding only itself, and the guard above already established
+  // SHIFT is absent, so adding it cannot make the combo exclusion-invalid.
+  const candidate = canonicalizeCombo([...editingCombo, "SHIFT"]);
+
+  if (editingCombo.length > 0 && !isComboInUse(candidate)) return null;
+
+  return comboToTouchLayerId(candidate);
 }
 
 /**

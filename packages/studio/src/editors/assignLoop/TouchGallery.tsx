@@ -2250,14 +2250,15 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // ---------------------------------------------------------------------------
 
   /**
-   * The touch layer the author is editing — the builder's assembled combo
-   * (`layerTouchId`) for all four methods, which now all carry the same
-   * touch-layer combo builder (see the module-level TouchLayerBuilder doc).
-   * Widens `casePairTouchLayer`'s mapping rather than rewriting the proposal
-   * site, exactly as anticipated when this was still hardcoded to
-   * longpress/flick only.
+   * Is `combo` one this keyboard actually defines? Same membership test
+   * `layerComboValid` uses, in the shape `casePairTouchLayer` consumes — it
+   * gates the compound case-pair candidates (e.g. SHIFT+RAlt) so the proposal
+   * never targets a touch layer the keyboard has no combo for.
    */
-  const editingLayer: TouchLayerId = layerTouchId;
+  const isLayerComboInUse = useCallback(
+    (combo: readonly ModifierToken[]) => validLayerComboKeys.has(combo.join("+")),
+    [validLayerComboKeys],
+  );
 
   const {
     proposal: casePairProposal,
@@ -2622,11 +2623,16 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
     // Case-pair proposal (FR-005): offer the capital on the casing-parallel
     // layer of the layer being edited. Suppressed when that layer has no
-    // parallel (already a shift/caps layer), and by the hook itself when the
-    // character has no confident capital. Deliberately independent of
+    // parallel (already a shift/caps layer) or when the parallel is a combo
+    // this keyboard does not define, and by the hook itself when the character
+    // has no confident capital. Deliberately independent of
     // `suggestionResolved`, which governs the placement-suggestion card — a
     // different object entirely.
-    const targetLayer = casePairTouchLayer(editingLayer);
+    //
+    // Passed the assembled COMBO, not `layerTouchId` — the flattened id cannot
+    // express "this combo plus SHIFT", which is what the case-pair relation
+    // actually is (see casePairTouchLayer).
+    const targetLayer = casePairTouchLayer(assembledLayerCombo, isLayerComboInUse);
     if (targetLayer !== null && resolvedHostKey !== null) {
       const hk = resolvedHostKey;
       proposeCompanion({
@@ -2679,7 +2685,8 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     flickDirection,
     layerTokens,
     charTouch,
-    editingLayer,
+    assembledLayerCombo,
+    isLayerComboInUse,
     proposeCompanion,
   ]);
 
