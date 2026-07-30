@@ -185,9 +185,9 @@ Written first, failing. The engine tests pin the contract's behavioural guarante
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T039** [P] Update the stale design note's S2/S3 sections — it quotes the retired "own letter of the alphabet" wording and describes input order as its own station · `docs/design-notes/mark-composition-model.md`
-- [ ] **T040** [P] Verify FR-021/SC-010 by loading a draft saved before this feature and confirming it loads **unmigrated** — station answers are transient; only the derived worklist and output form persist, and `PlacementWorklist`'s shape is unchanged · `packages/studio/src/lib/draftPersistence.test.ts`
-- [ ] **T041** [P] Walk the requirements checklist and mark each item against the shipped behaviour · `specs/052-marks-treatment-question/checklists/requirements.md`
+- [x] **T039** [P] Update the stale design note's S2/S3 sections — it quotes the retired "own letter of the alphabet" wording and describes input order as its own station · `docs/design-notes/mark-composition-model.md`
+- [x] **T040** [P] Verify FR-021/SC-010 by loading a draft saved before this feature and confirming it loads **unmigrated** — station answers are transient; only the derived worklist and output form persist, and `PlacementWorklist`'s shape is unchanged · `packages/studio/src/lib/draftPersistence.test.ts`
+- [x] **T041** [P] Walk the requirements checklist and mark each item against the shipped behaviour · `specs/052-marks-treatment-question/checklists/requirements.md`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
