@@ -242,6 +242,102 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-30T02:27:15.647Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:32.735Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:32.995Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:33.253Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:33.520Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:33.779Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:34.045Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:34.296Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:34.549Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:34.838Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:35.100Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:35.378Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:35.761Z"
     }
   ],
   "decisions": [
@@ -575,7 +671,7 @@
       ]
     }
   },
-  "currentTask": "T021",
+  "currentTask": "T033",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -728,6 +824,91 @@
       "files": [
         "packages/studio/src/locales/en/messages.json",
         "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Added key-budget tests: total+bijective band->A7 projection, rule-10 fires on exactly one band, the intermediate band stays 'RAlt only', null for a base binding no stock key, spareKeys never negative and 0 when fully booked, schema-valid output, determinism",
+      "files": [
+        "packages/contracts/src/keyBudget.test.ts"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Station budget tests (authored in the same file as T017): fully-booked -> unavailable-with-reason, ample -> offered, absent vs unavailable distinction, composed selectable at every band, exhausted-budget+high-productivity still completable",
+      "files": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "git mv'd base-layouts.json to packages/contracts/data/ byte-identically (sha256 unchanged) and updated the SOURCES.json pin with a relocatedFrom/relocationNote provenance record",
+      "files": [
+        "packages/contracts/data/base-layouts.json",
+        "utilities/facet-index/data/SOURCES.json"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Created packages/contracts/src/keyBudget.ts: KeyBudgetBand/KeyBudget/measureKeyBudget/keyBudgetToSpareKeyAvailability, algorithm ported unchanged (stock kbdus universe, base plane and reserved chords excluded, distinct bound keys per plane, half-of-N boundary), IR-only, null rather than a false 'many'",
+      "files": [
+        "packages/contracts/src/keyBudget.ts"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Added KeyBudgetBandSchema/KeyBudgetSchema zod mirrors and their compile-time drift guards alongside the existing mirrors",
+      "files": [
+        "packages/contracts/src/schemas.ts"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Documented A7 spareKeyAvailability as a projection of keyBudget.ts with the mapping table, restating that its display-string values stay unsafe as map keys",
+      "files": [
+        "packages/contracts/src/axes.ts"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Exported ./keyBudget from the contracts barrel",
+      "files": [
+        "packages/contracts/src/index.ts"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Made spare-key-budget-classifier a thin delegate to measureKeyBudget, leaving the Categorization wrapper (confidence, provenance tier, analysed coverage, undetermined fallback) untouched; evidenceSize now reads the measurement's machine-readable plane counts",
+      "files": [
+        "utilities/facet-index/spare-key-budget-classifier.ts"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "base-layout.ts now takes the default table from @keyboard-studio/contracts STOCK_BASE_LAYOUTS (fail-loud validation retained), keeping the fixture-path test hook",
+      "files": [
+        "utilities/facet-index/base-layout.ts"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Replaced the stub with the real budget in the prefill: promotionAffordable/unaffordableReason and the budget-filtered promotionProposal derive from spareKeys, gating promotion only and never treatment",
+      "files": [
+        "packages/engine/src/marks/treatment-prefill.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "MarksSeriesStep now calls measureKeyBudget(baseIr) and passes { baseIr, keyBudget } to the prefill, threading the budget to the station's promotion gate",
+      "files": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Re-ran facet-index over 927 corpus keyboards: structural diff shows exactly ONE differing leaf, manifest.referencePins[5].file (path rename), sha256 unchanged; zero Categorization values moved, facet-index-lint green",
+      "files": [
+        "docs/keyboard-facet-index.json"
       ]
     }
   }

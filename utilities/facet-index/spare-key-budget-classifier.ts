@@ -21,90 +21,57 @@
  *                      room left anywhere.
  * Half-of-N is the deterministic saturation boundary (auditable, tunable), the
  * same style of contiguous banding `added-char-count` uses for axis A1.
+ *
+ * **Spec 052 (FR-016): this classifier is now a thin DELEGATE.** The measurement
+ * itself was promoted verbatim to `packages/contracts/src/keyBudget.ts` as the
+ * single authoritative key-budget determination, so the marks station and this
+ * index cannot report different answers for the same base (SC-008). Everything
+ * below the delegation is unchanged: the `Categorization` wrapper still owns
+ * confidence, provenance tier, analysed coverage, and the honest `undetermined`
+ * fallback, so the shipped `docs/keyboard-facet-index.json` values do not move.
  */
 
-import type { ContextElement, KeyboardIR } from "@keyboard-studio/contracts";
+import type { KeyboardIR, KeyBudgetBand } from "@keyboard-studio/contracts";
+import { measureKeyBudget } from "@keyboard-studio/contracts";
 
-import { loadBaseLayoutTable, DEFAULT_BASELAYOUT } from "./base-layout.js";
 import { undeterminedFallback } from "./measurement.js";
 import { computeAnalyzedCoverage } from "./outcome.js";
-import { eachRule, ruleKey } from "./ir-scan.js";
 import type { Categorization, FacetDefinition } from "./types.js";
 import type { ScannedKeyboard } from "./scan.js";
 
-/** Modifiers that mark a rule as a reserved system chord (excluded from budget). */
-const RESERVED_MODIFIERS = new Set(["CTRL", "LCTRL", "RCTRL", "ALT", "LALT"]);
-/** Modifiers that select the AltGr plane. */
-const ALTGR_MODIFIERS = new Set(["RALT", "ALTGR"]);
-
-export type SpareKeyBudget = "many" | "ralt-only" | "fully-booked";
-
-/** The plane a struck-key context element occupies, or null when it is not a physical-key press / is reserved. */
-function planeOf(key: ContextElement | undefined): "shift" | "altgr" | "base" | null {
-  if (key === undefined || key.kind !== "vkey") return null;
-  const mods = key.modifiers;
-  if (mods.some((m) => ALTGR_MODIFIERS.has(m))) return "altgr";
-  if (mods.some((m) => RESERVED_MODIFIERS.has(m))) return null; // reserved system chord
-  if (mods.includes("SHIFT")) return "shift";
-  return "base";
-}
-
-/** The stock `kbdus` physical char-key vkey set (the placement universe). */
-function stockKeys(): Set<string> {
-  const table = loadBaseLayoutTable();
-  return new Set(table.get(DEFAULT_BASELAYOUT)?.keys() ?? []);
-}
+/**
+ * The facet's value domain. Structurally identical to the canonical
+ * `KeyBudgetBand` — aliased rather than redeclared so the two cannot drift.
+ */
+export type SpareKeyBudget = KeyBudgetBand;
 
 /**
  * Content-derived spare-key budget, or null when the base binds no physical key
  * at all (empty/opaque-only) so the caller falls through to the fallback. Never
  * throws.
+ *
+ * Delegates the measurement to `measureKeyBudget`; this function's remaining job
+ * is the `Categorization` wrapper the facet index expects.
  */
 export function classifySpareKeyBudget(ir: KeyboardIR, def: FacetDefinition): Categorization | null {
   void def; // every emitted value is one of the three members, within limits by construction.
 
-  const keys = stockKeys();
-  const n = keys.size;
-  if (n === 0) return null; // no pinned key set — nothing to measure.
-
-  const shiftBound = new Set<string>();
-  const altgrBound = new Set<string>();
-  let sawStockKey = false;
-
-  for (const { rule } of eachRule(ir)) {
-    const key = ruleKey(rule);
-    if (key === undefined || key.kind !== "vkey" || !keys.has(key.name)) continue;
-    // A stock physical key is pressed here — the base HAS a physical-key surface
-    // to measure, even if this particular rule is a reserved (Ctrl/Alt) chord we
-    // exclude from the budget.
-    sawStockKey = true;
-    const plane = planeOf(key);
-    if (plane === null) continue; // reserved system chord — not an available slot.
-    if (plane === "shift") shiftBound.add(key.name);
-    else if (plane === "altgr") altgrBound.add(key.name);
-  }
-
-  if (!sawStockKey) return null; // no physical-key rules — fall through.
-
-  const half = n / 2;
-  const shiftSaturated = shiftBound.size >= half;
-  const altgrSaturated = altgrBound.size >= half;
-
-  let value: SpareKeyBudget;
-  if (!shiftSaturated) value = "many";
-  else if (!altgrSaturated) value = "ralt-only";
-  else value = "fully-booked";
+  const budget = measureKeyBudget(ir);
+  if (budget === null) return null; // no pinned key set, or no physical-key rules.
 
   return {
-    value,
+    value: budget.band,
     confidence: null,
     confidenceClass: "confident",
     provenanceTier: "content-derived",
-    evidenceSize: shiftBound.size + altgrBound.size,
+    // Distinct keys bound in the two measured planes — the evidence behind the
+    // band, read off the canonical measurement's own plane counts (unchanged
+    // from what this classifier reported before the measurement moved).
+    evidenceSize: budget.planes.shiftBound + budget.planes.altgrBound,
     analyzedCoverage: computeAnalyzedCoverage(ir),
     analysisOutcome: ir.raw.length > 0 ? "partially" : "fully",
     consistency: 1, // a single keyboard-level budget determination
-    notes: `${shiftBound.size}/${n} shift-plane and ${altgrBound.size}/${n} AltGr-plane keys bound over stock ${DEFAULT_BASELAYOUT}`,
+    notes: budget.notes,
   };
 }
 

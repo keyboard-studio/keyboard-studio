@@ -114,37 +114,37 @@ Written first, failing. The engine tests pin the contract's behavioural guarante
 
 ### Tests
 
-- [ ] **T022** [US3] Key-budget tests: the band → A7 mapping is **total and bijective** on the three bands (FR-016); a base binding no stock physical key yields `null` (never a false `many`); `spareKeys >= 0` for every corpus keyboard; the three intermediate-band rows (`sil_euro_latin`, `armenian_mnemonic_r`, `russian_mnemonic_r`) stay at `"RAlt only"` so decision rule 10 remains dormant · `packages/contracts/src/keyBudget.test.ts`
-- [ ] **T023** [US3] Station budget tests: a fully-booked base makes promotion **unavailable with a plain-language reason** (`promotion-unavailable-reason-<classId>` present, US3 AC1, SC-007); an ample base offers it (US3 AC2); `composed` remains selectable at every band so at least one option is always available (FR-017, US3 AC3); exhausted budget **and** high productivity still completes the station (edge case) · `packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx`
+- [x] **T022** [US3] Key-budget tests: the band → A7 mapping is **total and bijective** on the three bands (FR-016); a base binding no stock physical key yields `null` (never a false `many`); `spareKeys >= 0` for every corpus keyboard; the three intermediate-band rows (`sil_euro_latin`, `armenian_mnemonic_r`, `russian_mnemonic_r`) stay at `"RAlt only"` so decision rule 10 remains dormant · `packages/contracts/src/keyBudget.test.ts`
+- [x] **T023** [US3] Station budget tests: a fully-booked base makes promotion **unavailable with a plain-language reason** (`promotion-unavailable-reason-<classId>` present, US3 AC1, SC-007); an ample base offers it (US3 AC2); `composed` remains selectable at every band so at least one option is always available (FR-017, US3 AC3); exhausted budget **and** high productivity still completes the station (edge case) · `packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx`
 
 **⟶ Wait for the tests, then:**
 
 ### Implementation
 
-- [ ] **T024** [US3] Relocate the pinned stock-key table, preserving its pin semantics and provenance note verbatim · `utilities/facet-index/data/base-layouts.json` → `packages/contracts/data/base-layouts.json`
+- [x] **T024** [US3] Relocate the pinned stock-key table, preserving its pin semantics and provenance note verbatim · `utilities/facet-index/data/base-layouts.json` → `packages/contracts/data/base-layouts.json`
 
 **⟶ Wait for T024, then:**
 
-- [ ] **T025** [US3] Create the canonical determination: `KeyBudgetBand` (`"many" | "ralt-only" | "fully-booked"`), `KeyBudget { band, spareKeys, notes }`, `measureKeyBudget(ir): KeyBudget | null`, and the total projection `keyBudgetToSpareKeyAvailability(band)`. Port the existing algorithm **unchanged** — stock `kbdus` universe, base plane excluded, reserved Ctrl/Alt chords excluded, distinct bound keys counted per plane, half-of-N boundary. Reads the base's typed `KeyboardIR`; never parses `.kmn` text; counts `RawKmnFragment` nodes as unmeasured coverage rather than dropping them · `packages/contracts/src/keyBudget.ts`
+- [x] **T025** [US3] Create the canonical determination: `KeyBudgetBand` (`"many" | "ralt-only" | "fully-booked"`), `KeyBudget { band, spareKeys, notes }`, `measureKeyBudget(ir): KeyBudget | null`, and the total projection `keyBudgetToSpareKeyAvailability(band)`. Port the existing algorithm **unchanged** — stock `kbdus` universe, base plane excluded, reserved Ctrl/Alt chords excluded, distinct bound keys counted per plane, half-of-N boundary. Reads the base's typed `KeyboardIR`; never parses `.kmn` text; counts `RawKmnFragment` nodes as unmeasured coverage rather than dropping them · `packages/contracts/src/keyBudget.ts`
 
 **⟶ Wait for T025, then:**
 
 **Wave 4 — independent (different files):**
 
-- [ ] **T026** [P] [US3] Add the `KeyBudget` zod mirror and its compile-time drift guard alongside the existing mirrors · `packages/contracts/src/schemas.ts`
-- [ ] **T027** [P] [US3] Document A7 `spareKeyAvailability` as a **projection** of `keyBudget.ts`, pointing at the mapping table, and restate that its display-string values remain unsafe as map keys — project first · `packages/contracts/src/axes.ts`
-- [ ] **T028** [P] [US3] Export the new module from the contracts barrel · `packages/contracts/src/index.ts`
-- [ ] **T029** [P] [US3] Make the facet classifier a thin delegate to `measureKeyBudget`, leaving its `Categorization` wrapper (confidence, provenance tier, analysed coverage, `undetermined` fallback) untouched so shipped values do not move · `utilities/facet-index/spare-key-budget-classifier.ts`
-- [ ] **T030** [P] [US3] Read the relocated table from `@keyboard-studio/contracts` instead of the tool-local path · `utilities/facet-index/base-layout.ts`
+- [x] **T026** [P] [US3] Add the `KeyBudget` zod mirror and its compile-time drift guard alongside the existing mirrors · `packages/contracts/src/schemas.ts`
+- [x] **T027** [P] [US3] Document A7 `spareKeyAvailability` as a **projection** of `keyBudget.ts`, pointing at the mapping table, and restate that its display-string values remain unsafe as map keys — project first · `packages/contracts/src/axes.ts`
+- [x] **T028** [P] [US3] Export the new module from the contracts barrel · `packages/contracts/src/index.ts`
+- [x] **T029** [P] [US3] Make the facet classifier a thin delegate to `measureKeyBudget`, leaving its `Categorization` wrapper (confidence, provenance tier, analysed coverage, `undetermined` fallback) untouched so shipped values do not move · `utilities/facet-index/spare-key-budget-classifier.ts`
+- [x] **T030** [P] [US3] Read the relocated table from `@keyboard-studio/contracts` instead of the tool-local path · `utilities/facet-index/base-layout.ts`
 
 **⟶ Wait for Wave 4 to finish, then:**
 
-- [ ] **T031** [US3] Wire the real budget through the prefill: replace T005's stub with `measureKeyBudget(baseIr)`, computing `signals.promotionAffordable` and `signals.unaffordableReason` from `spareKeys`, and budget-filtering `promotionProposal`. The budget gates **promotion only, never treatment** (FR-017) · `packages/engine/src/marks/treatment-prefill.ts`
-- [ ] **T032** [US3] Call the prefill with `{ baseIr, keyBudget }` instead of today's `{ baseIr }` and thread the budget to the station's promotion gate · `packages/studio/src/survey/marks/MarksSeriesStep.tsx`
+- [x] **T031** [US3] Wire the real budget through the prefill: replace T005's stub with `measureKeyBudget(baseIr)`, computing `signals.promotionAffordable` and `signals.unaffordableReason` from `spareKeys`, and budget-filtering `promotionProposal`. The budget gates **promotion only, never treatment** (FR-017) · `packages/engine/src/marks/treatment-prefill.ts`
+- [x] **T032** [US3] Call the prefill with `{ baseIr, keyBudget }` instead of today's `{ baseIr }` and thread the budget to the station's promotion gate · `packages/studio/src/survey/marks/MarksSeriesStep.tsx`
 
 **⟶ Wait for T031/T032, then:**
 
-- [ ] **T033** [US3] Re-run the facet index over the `../keyboards` corpus and **diff the artifact — expect no change**; record the result. A non-empty diff means the relocation altered the measurement and must be fixed, not accepted · `docs/keyboard-facet-index.json`
+- [x] **T033** [US3] Re-run the facet index over the `../keyboards` corpus and **diff the artifact — expect no change**; record the result. A non-empty diff means the relocation altered the measurement and must be fixed, not accepted · `docs/keyboard-facet-index.json`
 
 **Checkpoint**: US3 is independently functional. One measurement, read by the marks station and the facet index, with A7 defined as its projection and **not** newly seeded into `session.axes` (research D2). All reports of key availability agree (SC-008).
 

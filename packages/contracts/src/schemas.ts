@@ -35,6 +35,7 @@ import type {
 } from "./confirmedAlphabet";
 import type { Scale, ScriptClass } from "./axes";
 import type { StrategyId } from "./strategy";
+import type { KeyBudget, KeyBudgetBand } from "./keyBudget";
 
 // ---------------------------------------------------------------------------
 // Leaf enums — mirror the string-literal unions in the contract types.
@@ -530,6 +531,22 @@ export const PlacementWorklistSchema = z.object({
 // SurveyPhaseResult/SurveySession as `marksOutputForm`.
 export const OutputFormSchema = z.enum(["ready-made", "base-plus-mark"]);
 
+// The single authoritative key-budget determination (spec 052, keyBudget.ts).
+// The band ids are the PROGRAMMATIC form — axis A7's display strings are a
+// projection of these, never the other way round.
+export const KeyBudgetBandSchema = z.enum(["many", "ralt-only", "fully-booked"]);
+
+export const KeyBudgetSchema = z.object({
+  band: KeyBudgetBandSchema,
+  spareKeys: z.number().int().min(0),
+  notes: z.string(),
+  planes: z.object({
+    shiftBound: z.number().int().min(0),
+    altgrBound: z.number().int().min(0),
+    stockKeys: z.number().int().min(0),
+  }),
+});
+
 // ---------------------------------------------------------------------------
 // Compile-time drift guards.
 //
@@ -608,6 +625,13 @@ type _PlacementWorklistGuard = Expect<
   AssignableTo<z.infer<typeof PlacementWorklistSchema>, PlacementWorklist>
 >;
 type _OutputFormGuard = Expect<AssignableTo<z.infer<typeof OutputFormSchema>, OutputForm>>;
+// KeyBudget (spec 052 FR-016) — the single key-budget determination. Its band
+// set is load-bearing: the A7 projection is total and bijective on exactly
+// these three members, so adding or renaming one without updating the schema
+// (and the projection) would silently change which keyboards decision rule 10
+// fires on.
+type _KeyBudgetBandGuard = Expect<AssignableTo<z.infer<typeof KeyBudgetBandSchema>, KeyBudgetBand>>;
+type _KeyBudgetGuard = Expect<AssignableTo<z.infer<typeof KeyBudgetSchema>, KeyBudget>>;
 type _TouchKeyIRGuard = Expect<AssignableTo<z.infer<typeof TouchKeyIRSchema>, TouchKeyIR>>;
 // TouchLayoutIR is guarded on its `platforms` slice (the touch-key + provenance
 // payload — the spec-014 durability target). `nodeIds` is intentionally not run

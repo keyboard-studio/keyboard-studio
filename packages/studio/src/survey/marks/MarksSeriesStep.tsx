@@ -34,6 +34,7 @@ import {
   confirmedAlphabetKey,
   makeConfirmedAlphabet,
   makeEmptyPlacementWorklist,
+  measureKeyBudget,
   stackKey,
 } from "@keyboard-studio/contracts";
 import {
@@ -218,17 +219,25 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     [gate.alphabet, attachmentChecked, bcp47],
   );
 
+  // The single authoritative key-budget determination (spec 052 FR-016). Null
+  // when there is no base, or when the base binds no stock physical key at all —
+  // an unmeasured budget, which does not gate promotion (see the prefill's
+  // options JSDoc). Every other report of key availability in the product is a
+  // projection of this same measurement (SC-008).
+  const keyBudget = useMemo(
+    () => (baseIr != null ? measureKeyBudget(baseIr) : null),
+    [baseIr],
+  );
+
   const treatmentPrefills = useMemo(
     () =>
       computeMarkTreatmentPrefills(gate.alphabet, classes, proposals, {
         baseIr,
-        // US3 (T031) replaces this with the real measurement; until then the
-        // budget is explicitly unmeasured rather than implicitly infinite.
-        keyBudget: null,
+        keyBudget,
         attachments: expandedAttachments,
         ...(bcp47 !== undefined ? { bcp47 } : {}),
       }),
-    [gate.alphabet, classes, proposals, baseIr, expandedAttachments, bcp47],
+    [gate.alphabet, classes, proposals, baseIr, keyBudget, expandedAttachments, bcp47],
   );
 
   // What each class could promote — offered on lowercase/caseless bases only.

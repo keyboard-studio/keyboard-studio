@@ -79,12 +79,10 @@ export function detectBaseMarkMechanism(ir: KeyboardIR): BaseMarkMechanism | nul
 /**
  * How much room the base keyboard has for additional dedicated keys.
  *
- * Structurally identical to `@keyboard-studio/contracts`' `KeyBudget`, declared
- * here as the shape this module CONSUMES so the prefill has no import-direction
- * dependency on how the measurement is made. US3 supplies the real thing
- * (`measureKeyBudget(baseIr)`); `null` means unmeasured, and an unmeasured
- * budget deliberately does NOT become "affordable" by omission — see
- * {@link MarkTreatmentPrefillOptions.keyBudget}.
+ * The structural slice of `@keyboard-studio/contracts`' `KeyBudget` this module
+ * consumes, so the prefill depends on the *number* rather than on how the
+ * measurement is made. Callers pass the canonical determination itself —
+ * `measureKeyBudget(baseIr)`, which satisfies this shape.
  */
 export interface KeyBudgetSignal {
   spareKeys: number;
@@ -95,12 +93,16 @@ export interface MarkTreatmentPrefillOptions {
   baseIr?: KeyboardIR | null;
   /**
    * The measured key budget, or `null` when it could not be measured (an empty
-   * or opaque-only base). `undefined` and `null` are treated alike: the budget
-   * is unknown, so promotion is not gated on it and the recommendation falls
-   * back to the productivity/mechanism signals. This is the ALWAYS-AFFORDABLE
-   * behaviour the module ships with today, and it is named and typed here
-   * rather than hidden inside a `null` check, so US3's replacement is a change
-   * of caller, not an archaeology exercise.
+   * or opaque-only base — `measureKeyBudget` returns `null` there rather than
+   * silently reporting "many").
+   *
+   * `undefined` and `null` are treated alike: the budget is unknown, so
+   * promotion is not gated on it. That is the honest reading — an unmeasured
+   * base is not evidence of no room — and it is why the parameter is explicit
+   * rather than hidden inside a `null` check. What it must never again be is
+   * *unsupplied by every caller*, which is the defect spec 052 US3 fixes: the
+   * old prefill took a `spareKeys` parameter the studio never passed, so a
+   * fully-booked base was always reported affordable.
    */
   keyBudget?: KeyBudgetSignal | null;
   /**
