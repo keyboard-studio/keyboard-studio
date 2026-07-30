@@ -42,7 +42,7 @@
 // the shared selector; VFS/assignment plumbing stays in the calling gallery.
 
 import { useEffect, useMemo, useRef } from "react";
-import { useLingui } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { MechanismAssignment, Modality } from "@keyboard-studio/contracts";
 import { toUPlusNotation, toHex4 } from "@keyboard-studio/contracts";
@@ -58,6 +58,12 @@ import {
 import { ERROR_RED } from "../../../ui/theme.ts";
 
 const WHEEL_SCROLL_FACTOR = 0.6; // dampen wheel delta so the strip pans a bit slower than the raw device delta
+
+// See the `visibleChars` useMemo below for the full rationale. 300 comfortably
+// covers a full scrollable browse of any script's base alphabet/diacritic set
+// while staying well clear of the thousands-of-chips freeze a full tonal-
+// syllable inventory triggered.
+export const MAX_VISIBLE_CHIPS = 300;
 
 export interface CharScrollStripProps {
   /** All characters in this gallery's own walk order (lettersToAdd for MechanismGallery, inventory for TouchGallery). */
@@ -181,12 +187,45 @@ export function CharScrollStrip({
     }
   }, [currentChar]);
 
+  // Rendering safety net for very large `chars` lists (e.g. a tonal-syllable
+  // romanization inventory of several thousand characters — Hakka's confirmed
+  // inventory runs to ~3k): mounting one <button> chip (each with its own
+  // ref callback, i18n-resolved aria-label, and nested glyph/badge spans) per
+  // character froze the tab on entry to the gallery — the DOM/reconciliation
+  // cost of thousands of chips, not any engine-side compute, which stays
+  // cheap and bounded. This caps what's actually mounted at once to a WINDOW
+  // around `currentChar`, so the selected/grown chip is always inside the
+  // rendered slice — never a fixed head-of-list truncation that could hide
+  // the very character the gallery is walking. Unlike CharacterMapPane's
+  // MAX_CELLS_PER_GROUP cap (survey/CharacterMapPane.tsx), which has a
+  // search/raw-codepoint escape hatch to reach a capped-out character, this
+  // strip has none, so it must follow the selection instead of a static
+  // prefix. Only how many chips THIS strip mounts is bounded — `chars` itself
+  // (and therefore each gallery's own Back/Next/Skip walk over lettersToAdd)
+  // is untouched. A `useMemo` (not a stateful window) is enough: while
+  // `currentChar` doesn't change, its cached result doesn't move, so a manual
+  // horizontal scroll inside the current window is never reset by an
+  // unrelated re-render elsewhere in the gallery — it only re-centers when
+  // navigation actually moves `currentChar` outside the previous window.
+  const visibleChars = useMemo(() => {
+    if (chars.length <= MAX_VISIBLE_CHIPS) return chars;
+    const idx = currentChar !== null ? chars.indexOf(currentChar) : -1;
+    const half = Math.floor(MAX_VISIBLE_CHIPS / 2);
+    const start =
+      idx === -1
+        ? 0
+        : Math.max(0, Math.min(idx - half, chars.length - MAX_VISIBLE_CHIPS));
+    return chars.slice(start, start + MAX_VISIBLE_CHIPS);
+  }, [chars, currentChar]);
+
   // Per-character produces count (Part 2 badge) — the shared selector, not a
   // re-derived count, so this can never disagree with each gallery's own
-  // bottom "uses" list about what counts as a producer.
+  // bottom "uses" list about what counts as a producer. Scoped to
+  // `visibleChars` (not `chars`) — no point badging chips this render never
+  // mounts.
   const producesCountByChar = useMemo(() => {
     const map = new Map<string, number>();
-    for (const c of chars) {
+    for (const c of visibleChars) {
       map.set(
         c,
         getCharMechanisms(c, assignments, modality, inheritedChars)
@@ -194,7 +233,7 @@ export function CharScrollStrip({
       );
     }
     return map;
-  }, [chars, assignments, modality, inheritedChars]);
+  }, [visibleChars, assignments, modality, inheritedChars]);
 
   if (chars.length === 0) return null;
 
@@ -263,7 +302,7 @@ export function CharScrollStrip({
           scrollbarWidth: "auto",
         }}
       >
-        {chars.map((c) => {
+        {visibleChars.map((c) => {
           const hex = charHex(c);
           const isSelected = c === currentChar;
           const count = producesCountByChar.get(c) ?? 0;
@@ -359,6 +398,14 @@ export function CharScrollStrip({
           );
         })}
       </div>
+      {visibleChars.length < chars.length && (
+        <div style={{ fontSize: 11, color: TEXT_DIM, fontFamily: FONT, marginTop: -4 }}>
+          <Trans id="editor.assignLoop.charScroll.truncatedNote">
+            Showing {visibleChars.length} of {chars.length} characters — navigate to
+            a character to bring it into view.
+          </Trans>
+        </div>
+      )}
     </>
   );
 }

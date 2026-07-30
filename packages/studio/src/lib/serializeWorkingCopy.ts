@@ -91,7 +91,7 @@ export interface ProjectWorkingCopyForOutputResult {
  *
  * Projection order matches {@link projectWorkingCopyVfs} exactly:
  *   0. Touch layout (Phase E touchLayoutJson → .keyman-touch-layout)
- *   1. Carve deletions
+ *   1. Carve deletions (+ 1.5 carve keycaps, 1.6 touch method deletions)
  *   2. Assignments (physical only)
  *   3. Identity (&NAME)
  *
@@ -106,7 +106,7 @@ export interface ProjectWorkingCopyForOutputResult {
 export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyForOutputResult | null> {
   // 1. Read current working-copy store state.
   const state = useWorkingCopyStore.getState();
-  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, phaseResults, identity, touchLayoutJson, instantiationMode } = state;
+  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode } = state;
 
   // Not-instantiated guard.
   if (baseVfs === null || baseIr === null || baseKeyboard === null) {
@@ -252,6 +252,7 @@ export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyF
     baseIr,
     deletedNodeIds,
     deletedItemIds,
+    deletedTouchKeyIds,
     assignments: sessionAssignments,
     getPattern: (id) => patternCache.get(id),
     identity: identityForProjection,
