@@ -116,6 +116,7 @@ import {
   type BulkAccentGroup,
 } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { collate } from "../../survey/collation.ts";
 import {
   promoteOnManualEdit,
   casePairTouchLayer,
@@ -1369,7 +1370,22 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const restoreTouchKey = useWorkingCopyStore((s) => s.restoreTouchKey);
 
   // Character inventory — same source MechanismGallery uses.
-  const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  const rawInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+
+  // Collated display/walk order (spec 047 FR-007's default-ICU comparator,
+  // reused — not reinvented; see survey/collation.ts and MechanismGallery's
+  // matching `inventory` derivation): puts a lowercase letter immediately
+  // before its uppercase counterpart and keeps accented forms adjacent to
+  // their base. Feeds BOTH the CharScrollStrip (`chars=`) and
+  // usePositionalCharNav (`list:`) below, plus this gallery's other
+  // order-independent `inventory` reads (membership/length/coverage checks)
+  // — none of those depend on order, so sorting the single shared variable
+  // is safe. The canonical `confirmedInventory` (rawInventory) is left
+  // untouched; only this display-local derivation is sorted.
+  const inventory = useMemo(
+    () => collate(rawInventory),
+    [rawInventory],
+  );
 
   // Draft persistence — read on mount; write on every charTouch change.
   const touchDraft = useWorkingCopyStore((s) => s.touchDraft);

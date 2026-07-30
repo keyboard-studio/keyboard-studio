@@ -4,11 +4,23 @@
 // now-removed ui/Dropdown.tsx):
 // native <select> popups do not open in the VS Code Simple Browser /
 // Electron webview — clicking the control does nothing visible. SelectMenu
-// renders its option list as an ordinary absolutely-positioned <ul>, which
-// the webview paints fine, while keeping the same collapsed-trigger UX and
-// listbox a11y semantics a real dropdown menu should have.
+// renders its option list as an ordinary <ul>, which the webview paints
+// fine, while keeping the same collapsed-trigger UX and listbox a11y
+// semantics a real dropdown menu should have.
+//
+// WHY the open list is a portal, not an absolutely-positioned in-place <ul>:
+// some call sites (the assign-loop galleries' scrolling left pane, see
+// AssignLoopShell.tsx) nest this component inside an `overflow: auto`
+// ancestor that itself sits inside an `overflow: hidden` two-pane row.
+// `position: fixed` alone does NOT escape that — a `fixed` descendant is
+// still clipped by an ancestor's `overflow: hidden`/`auto` as long as it
+// stays inside that ancestor's DOM subtree (a common CSS surprise). The only
+// way to truly escape ancestor clipping is to physically move the DOM node
+// out of that subtree, hence `createPortal(..., document.body)` combined
+// with `position: fixed` positioned from the trigger's `getBoundingClientRect()`.
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { BG_PAGE, BORDER, TEXT_MAIN, ACCENT, FONT } from "./theme.ts";
 import { mergeClassNames } from "./classNames.ts";
 
@@ -92,22 +104,64 @@ const TRIGGER_STYLE: React.CSSProperties = {
   textAlign: "left",
 };
 
+// Gap between the trigger and the list, and the list's own internal scroll
+// cap — kept as named constants since MenuPosition math (below) needs the
+// same numbers to decide whether there's room to open downward.
+const MENU_GAP = 4;
+const MENU_MAX_HEIGHT = 240;
+
+// Portalled to document.body (see file header), so this is no longer
+// positioned relative to the trigger via a `position: relative` ancestor —
+// `top`/`left`/`bottom`/`width` are computed per-open from the trigger's
+// getBoundingClientRect() and merged on at render time (see MenuPosition).
+// zIndex is deliberately high: once in document.body the list is a
+// top-level sibling of the whole app, past every in-app stacking context
+// (the highest in-app value at time of writing is 200 — AccountControl.tsx).
 const LIST_STYLE: React.CSSProperties = {
-  position: "absolute",
-  top: "100%",
-  left: 0,
-  right: 0,
-  zIndex: 20,
-  margin: "4px 0 0 0",
+  position: "fixed",
+  zIndex: 1000,
+  margin: 0,
   padding: 4,
   listStyle: "none",
   background: BG_PAGE,
   border: `1px solid ${BORDER}`,
   borderRadius: 6,
   boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
-  maxHeight: 240,
+  maxHeight: MENU_MAX_HEIGHT,
   overflowY: "auto",
 };
+
+/** Fixed-position coordinates for the portalled list, derived from the
+ * trigger's bounding rect. Either `top` (opens downward, the common case) or
+ * `bottom` (flipped upward — not enough room below the trigger) is set, never
+ * both. */
+interface MenuPosition {
+  top?: number;
+  bottom?: number;
+  left: number;
+  width: number;
+}
+
+function computeMenuPosition(triggerRect: DOMRect): MenuPosition {
+  const spaceBelow = window.innerHeight - triggerRect.bottom;
+  const spaceAbove = triggerRect.top;
+  // Flip upward only when there's genuinely less room below than above —
+  // avoids flipping a merely-short-but-adequate space below into an
+  // even-shorter space above.
+  const shouldFlipUp = spaceBelow < MENU_MAX_HEIGHT && spaceAbove > spaceBelow;
+  if (shouldFlipUp) {
+    return {
+      bottom: window.innerHeight - triggerRect.top + MENU_GAP,
+      left: triggerRect.left,
+      width: triggerRect.width,
+    };
+  }
+  return {
+    top: triggerRect.bottom + MENU_GAP,
+    left: triggerRect.left,
+    width: triggerRect.width,
+  };
+}
 
 const OPTION_ROW_STYLE: React.CSSProperties = {
   display: "block",
@@ -148,21 +202,41 @@ const OPTION_ROW_CLASSNAME = "ks-hit-target";
 
 /**
  * Custom single-select dropdown menu. Trigger is a collapsed button; the
- * option list is a DOM-rendered `<ul role="listbox">` positioned under it —
- * no native `<select>` popup involved (see file header for why that matters).
+ * option list is a DOM-rendered `<ul role="listbox">`, portalled to
+ * `document.body` and fixed-positioned under the trigger — no native
+ * `<select>` popup involved (see file header for why that matters, both for
+ * the DOM-rendered list generally and for the portal specifically).
  *
  * Open/close: `open` is local React state toggled by the trigger (click, or
  * Enter/Space which toggle it symmetrically) and by option selection. A
  * `mousedown` listener on `document` closes the menu when the click target
- * falls outside `containerRef` (click-outside-to-close); a container-level
- * `onBlur` closes it when focus leaves the component entirely (tabbing
- * away); `Escape` closes it. All of these return focus to the trigger.
+ * falls outside BOTH `containerRef` and `listRef` (click-outside-to-close;
+ * the list check matters because it now lives outside `containerRef` in the
+ * DOM, in its `document.body` portal); a container-level `onBlur` closes it
+ * when focus leaves the component entirely (tabbing away) — likewise
+ * checked against both refs, since focus moving into the portalled list must
+ * not be treated as focus leaving; `Escape` closes it. All of these return
+ * focus to the trigger.
+ *
+ * Positioning: while open, the list's `position: fixed` coordinates are
+ * (re)computed from the trigger's `getBoundingClientRect()` — on open, and
+ * on every `scroll` (capture-phase, so it also catches an ancestor scroll
+ * container's scroll, which does not bubble to `window`) and `resize` while
+ * still open. Reposition-on-scroll was chosen over close-on-scroll: it's a
+ * few more lines but keeps the menu usable while the author scrolls the
+ * pane it's anchored to, rather than punishing that with a surprise close.
+ * Flips to open upward (`bottom` instead of `top`) when there's more room
+ * above the trigger than below (see `computeMenuPosition`).
  *
  * Keyboard focus: opening the menu moves DOM focus onto the `<ul>` itself
  * (it carries `tabIndex={-1}` so it's programmatically focusable but not in
- * the Tab order) so `handleListKeyDown`'s arrow/Enter/Escape handling
- * actually receives key events — without this the list's onKeyDown is dead
- * code, since focus never leaves the trigger button.
+ * the Tab order), done via a callback ref (`attachListRef`) that fires
+ * exactly once per mount rather than a `useEffect` keyed on position updates
+ * — the list only exists in the DOM once `menuPosition` is computed, and a
+ * position-keyed effect would refire (and re-steal focus) on every
+ * scroll-driven reposition. `handleListKeyDown`'s arrow/Enter/Escape
+ * handling depends on this focus hand-off — without it the list's
+ * onKeyDown is dead code, since focus never leaves the trigger button.
  *
  * Active-option announcement: arrow keys commit the selection immediately
  * (selection-follows-focus, see handleListKeyDown), so the `<ul>` carries
@@ -183,9 +257,18 @@ export function SelectMenu({
   resolveKeyToValue,
 }: SelectMenuProps): React.ReactElement {
   const [open, setOpen] = useState(false);
+  // null until the first position computation after opening (see the
+  // layout effect below) — the portalled list only renders once this is
+  // non-null, so there's never a frame painted at (0, 0) before its real
+  // coordinates are known.
+  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
+  // Typed `HTMLUListElement | null` (not just `HTMLUListElement`) so this is
+  // a MutableRefObject, not a RefObject — attachListRef (below) needs to
+  // write `.current` itself, since it's the callback ref supplied to the
+  // portalled `<ul>` rather than a plain `ref={listRef}`.
+  const listRef = useRef<HTMLUListElement | null>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
   const listId = id !== undefined ? `${id}-listbox` : undefined;
@@ -212,7 +295,14 @@ export function SelectMenu({
   useEffect(() => {
     if (!open) return;
     const handleMouseDown = (e: MouseEvent): void => {
-      if (!containerRef.current?.contains(e.target as Node)) {
+      const target = e.target as Node;
+      // The list is portalled to document.body (see file header), so a
+      // click inside it is NOT inside containerRef in the DOM — it must be
+      // checked separately, or every option click would count as
+      // "outside" and close the menu before the option's own onClick fires.
+      const insideContainer = containerRef.current?.contains(target) ?? false;
+      const insideList = listRef.current?.contains(target) ?? false;
+      if (!insideContainer && !insideList) {
         closeAndRefocusTrigger();
       }
     };
@@ -222,15 +312,65 @@ export function SelectMenu({
     };
   }, [open, closeAndRefocusTrigger]);
 
-  // P0 fix: move focus onto the listbox when it opens, so arrow-key /
-  // Enter / Escape handling on the <ul> (handleListKeyDown) actually fires.
-  // Without this, focus stays on the trigger button and the list's
-  // onKeyDown never receives an event.
-  useEffect(() => {
-    if (open) {
-      listRef.current?.focus();
+  // Computes/recomputes the portalled list's fixed-position coordinates
+  // from the trigger's current bounding rect. Guarded against a momentarily
+  // null trigger ref (e.g. an unmount race) — simply skips the update
+  // rather than throwing.
+  const updateMenuPosition = useCallback(() => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect !== undefined) {
+      setMenuPosition(computeMenuPosition(rect));
     }
-  }, [open]);
+  }, []);
+
+  // Computes the initial position on open (and clears it on close, so a
+  // stale position from a previous open never flashes before the next
+  // open's real coordinates land). Runs as a layout effect so the position
+  // is known before the browser paints the newly-opened list.
+  useLayoutEffect(() => {
+    if (open) {
+      updateMenuPosition();
+    } else {
+      setMenuPosition(null);
+    }
+  }, [open, updateMenuPosition]);
+
+  // Keeps the list anchored to the trigger while scrolling/resizing.
+  // Reposition-on-scroll (rather than close-on-scroll) is the chosen
+  // trade-off — see the class doc comment above for why. Capture-phase is
+  // required for the scroll listener: the assign-loop galleries' scrolling
+  // left pane (AssignLoopShell.tsx) is an `overflow: auto` element whose
+  // own `scroll` events do not bubble to `window` — only capture-phase
+  // listeners on an ancestor observe them.
+  useEffect(() => {
+    if (!open) return;
+    window.addEventListener("scroll", updateMenuPosition, true);
+    window.addEventListener("resize", updateMenuPosition);
+    return () => {
+      window.removeEventListener("scroll", updateMenuPosition, true);
+      window.removeEventListener("resize", updateMenuPosition);
+    };
+  }, [open, updateMenuPosition]);
+
+  // P0 fix (pre-portal): move focus onto the listbox when it mounts, so
+  // arrow-key / Enter / Escape handling on the <ul> (handleListKeyDown)
+  // actually fires — without this, focus stays on the trigger button and
+  // the list's onKeyDown never receives an event.
+  //
+  // A callback ref rather than a `useEffect([open])`: the list (now
+  // portalled) only mounts once `menuPosition` is non-null, one render
+  // after `open` flips true, and `menuPosition` keeps changing afterward on
+  // every scroll-driven reposition. An effect keyed on either `open` or
+  // `menuPosition` would either miss the mount (wrong dependency) or
+  // re-steal focus on every reposition (right dependency, wrong frequency).
+  // A callback ref fires exactly once per actual mount/unmount of the DOM
+  // node, which is exactly the "list just appeared" moment this needs.
+  const attachListRef = useCallback((node: HTMLUListElement | null) => {
+    listRef.current = node;
+    if (node !== null) {
+      node.focus();
+    }
+  }, []);
 
   const selectOption = (opt: SelectMenuOption): void => {
     onChange(opt.value);
@@ -254,9 +394,11 @@ export function SelectMenu({
 
   // P1 fix: close the menu when focus leaves the component altogether
   // (e.g. Tab away while open), not just on Escape / click-outside.
-  // Checked against the *container* (not the trigger) so focus moving from
-  // the trigger into the listbox on open (see the effect above) does not
-  // itself trigger a close.
+  // Checked against the *container* AND the *list* (not just the trigger)
+  // so focus moving from the trigger into the listbox on open (see
+  // attachListRef above) does not itself trigger a close — the list check
+  // is required post-portal since it's no longer a DOM descendant of
+  // containerRef.
   const handleContainerBlur = (e: React.FocusEvent<HTMLDivElement>): void => {
     if (!open) return;
     const nextTarget = e.relatedTarget as Node | null;
@@ -266,7 +408,10 @@ export function SelectMenu({
     // programmatic hand-off to the listbox above. Since we can't tell those
     // apart, don't close on a null relatedTarget; only close when we can
     // positively confirm the new focus target is outside the container.
-    if (nextTarget !== null && !containerRef.current?.contains(nextTarget)) {
+    if (nextTarget === null) return;
+    const insideContainer = containerRef.current?.contains(nextTarget) ?? false;
+    const insideList = listRef.current?.contains(nextTarget) ?? false;
+    if (!insideContainer && !insideList) {
       close();
     }
   };
@@ -274,6 +419,24 @@ export function SelectMenu({
   const handleListKeyDown = (e: React.KeyboardEvent<HTMLUListElement>): void => {
     if (e.key === "Escape") {
       e.preventDefault();
+      closeAndRefocusTrigger();
+      return;
+    }
+    // P2 fix (portal-Tab regression): the open <ul> is portalled to the end
+    // of document.body (see file header), so it sits AFTER every other
+    // focusable element in DOM order — a real Tab/Shift+Tab press while it's
+    // focused would move focus to whatever follows document.body's last
+    // child (or precedes it, for Shift+Tab), not to whatever visually/
+    // logically follows the trigger button. That's an unpredictable jump for
+    // a keyboard user. Rather than fighting the browser's native tab order
+    // (e.g. trying to trap focus inside the list, which creates its own
+    // surprises), close the menu and return focus to the trigger — the same
+    // hand-off Escape/click-outside/option-select already use — so the
+    // user's NEXT Tab press continues from a stable, expected place. Not
+    // calling preventDefault(): the browser's default Tab still runs against
+    // the (now-refocused) trigger, so the user ends up exactly where they'd
+    // expect if this were a non-portalled, in-place dropdown.
+    if (e.key === "Tab") {
       closeAndRefocusTrigger();
       return;
     }
@@ -347,50 +510,53 @@ export function SelectMenu({
         <span>{selectedOption !== undefined ? renderOptionLabel(selectedOption) : ""}</span>
         <span aria-hidden="true">&#9662;</span>
       </button>
-      {open && (
-        <ul
-          ref={listRef}
-          id={listId}
-          role="listbox"
-          tabIndex={-1}
-          aria-activedescendant={activeDescendantId}
-          style={LIST_STYLE}
-          onKeyDown={handleListKeyDown}
-        >
-          {options.map((opt) => {
-            const optionId = id !== undefined ? `${id}-option-${opt.value}` : undefined;
-            const isSelected = opt.value === value;
-            return (
-              <li
-                key={opt.value}
-                role="option"
-                id={optionId}
-                aria-selected={isSelected}
-                // Not read by the component itself — a stable, value-based
-                // test hook so specs can select an option without depending
-                // on exact label text/formatting (mirrors how tests used to
-                // query a native <option value="...">).
-                data-value={opt.value}
-                className={OPTION_ROW_CLASSNAME}
-                onClick={() => selectOption(opt)}
-                style={{
-                  ...OPTION_ROW_STYLE,
-                  borderLeftColor: isSelected ? ACCENT : "transparent",
-                  color: isSelected ? ACCENT : TEXT_MAIN,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = OPTION_HOVER_BG;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent";
-                }}
-              >
-                {renderOptionLabel(opt)}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      {open &&
+        menuPosition !== null &&
+        createPortal(
+          <ul
+            ref={attachListRef}
+            id={listId}
+            role="listbox"
+            tabIndex={-1}
+            aria-activedescendant={activeDescendantId}
+            style={{ ...LIST_STYLE, ...menuPosition }}
+            onKeyDown={handleListKeyDown}
+          >
+            {options.map((opt) => {
+              const optionId = id !== undefined ? `${id}-option-${opt.value}` : undefined;
+              const isSelected = opt.value === value;
+              return (
+                <li
+                  key={opt.value}
+                  role="option"
+                  id={optionId}
+                  aria-selected={isSelected}
+                  // Not read by the component itself — a stable, value-based
+                  // test hook so specs can select an option without depending
+                  // on exact label text/formatting (mirrors how tests used to
+                  // query a native <option value="...">).
+                  data-value={opt.value}
+                  className={OPTION_ROW_CLASSNAME}
+                  onClick={() => selectOption(opt)}
+                  style={{
+                    ...OPTION_ROW_STYLE,
+                    borderLeftColor: isSelected ? ACCENT : "transparent",
+                    color: isSelected ? ACCENT : TEXT_MAIN,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = OPTION_HOVER_BG;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  {renderOptionLabel(opt)}
+                </li>
+              );
+            })}
+          </ul>,
+          document.body,
+        )}
     </div>
   );
 }
