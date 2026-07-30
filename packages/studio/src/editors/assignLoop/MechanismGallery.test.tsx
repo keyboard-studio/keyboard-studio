@@ -3154,6 +3154,95 @@ describe("MechanismGallery — OSK key-tap selects the RAlt base key", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Physical-key type-to-select while a KeyPickerField dropdown is open
+// (SelectMenu's opt-in resolveKeyToValue, wired by KeyPickerField via
+// keyOptions.ts's charToVkey) — the physical-keyboard companion to the OSK
+// tap-to-select coverage above.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — physical-key type-to-select in an open key picker", () => {
+  it("pressing M while the Assign-to-a-key picker is open selects K_M and Apply uses it", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    const trigger = screen.getByLabelText(/Physical key for Assign to a key/i);
+    fireEvent.click(trigger);
+    await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
+
+    // Physical keydown on the open listbox — not a click on an <li> option.
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "m" });
+
+    expect(selectMenuValue(trigger)).toBe("K_M");
+    expect(screen.queryByRole("listbox")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      "+ [K_M] > U+00E1",
+    );
+  });
+
+  it("a modifier-held keydown (Ctrl+M) is ignored — does not select K_M", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    const trigger = screen.getByLabelText(/Physical key for Assign to a key/i);
+    fireEvent.click(trigger);
+    await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
+
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "m", ctrlKey: true });
+
+    // Still open, still unselected — the keydown was ignored, not consumed.
+    expect(screen.getByRole("listbox")).toBeDefined();
+    expect(selectMenuValue(trigger)).toBe("");
+  });
+
+  it("a modifier-held keydown (Alt+M) is ignored — does not select K_M", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    const trigger = screen.getByLabelText(/Physical key for Assign to a key/i);
+    fireEvent.click(trigger);
+    await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
+
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "m", altKey: true });
+
+    // Still open, still unselected — the keydown was ignored, not consumed.
+    expect(screen.getByRole("listbox")).toBeDefined();
+    expect(selectMenuValue(trigger)).toBe("");
+  });
+
+  it("a modifier-held keydown (Meta+M) is ignored — does not select K_M", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    const trigger = screen.getByLabelText(/Physical key for Assign to a key/i);
+    fireEvent.click(trigger);
+    await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
+
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "m", metaKey: true });
+
+    // Still open, still unselected — the keydown was ignored, not consumed.
+    expect(screen.getByRole("listbox")).toBeDefined();
+    expect(selectMenuValue(trigger)).toBe("");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Case-pair companion proposal (propose-then-confirm, spec v1.3.1 §3c)
 // ---------------------------------------------------------------------------
 

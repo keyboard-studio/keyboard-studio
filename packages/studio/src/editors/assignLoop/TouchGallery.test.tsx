@@ -1217,6 +1217,34 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
 });
 
 // ---------------------------------------------------------------------------
+// Physical-key type-to-select in an open key picker (SelectMenu's opt-in
+// resolveKeyToValue, wired by KeyPickerField via keyOptions.ts's
+// charToVkey) — same mechanism MechanismGallery covers, exercised here
+// against TouchGallery's long-press host-key picker.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — physical-key type-to-select in an open key picker", () => {
+  it("pressing A while the long-press host-key picker is open selects K_A", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // Suggestion kind "none" for "中" (no desktop assignment / touch layout /
+    // decomposable form) — the method chooser is already showing, defaulted
+    // to "Long-press on a key".
+    const trigger = screen.getByLabelText(/Host key for long-press/i);
+    fireEvent.click(trigger);
+    await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
+
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "a" });
+
+    expect(selectMenuValue(trigger)).toBe("K_A");
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Leave-warning modal (the same ConfirmDialog contract MechanismGallery uses,
 // see MechanismGallery.test.tsx's own "leave-warning modal open/closed state"
 // suite) — TouchGallery's version fires from the SAME handleContinue gate as

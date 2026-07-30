@@ -222,6 +222,60 @@ describe("SelectMenu", () => {
     expect(screen.queryAllByRole("option")).toHaveLength(0);
   });
 
+  describe("resolveKeyToValue (opt-in physical-key type-to-select)", () => {
+    it("selects the resolved option and closes the list when the resolver returns one of `options`", () => {
+      const onChange = vi.fn();
+      render(
+        <SelectMenu
+          options={OPTIONS}
+          value="a"
+          onChange={onChange}
+          resolveKeyToValue={(e) => (e.key === "b" ? "b" : null)}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button"));
+      const listbox = screen.getByRole("listbox");
+      fireEvent.keyDown(listbox, { key: "b" });
+      expect(onChange).toHaveBeenCalledWith("b");
+      expect(screen.queryByRole("listbox")).toBeNull();
+    });
+
+    it("ignores a resolved value that isn't in `options` (belt-and-suspenders re-validation)", () => {
+      const onChange = vi.fn();
+      render(
+        <SelectMenu
+          options={OPTIONS}
+          value="a"
+          onChange={onChange}
+          resolveKeyToValue={() => "not-a-real-option"}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button"));
+      const listbox = screen.getByRole("listbox");
+      fireEvent.keyDown(listbox, { key: "z" });
+      expect(onChange).not.toHaveBeenCalled();
+      expect(screen.getByRole("listbox")).toBeDefined();
+    });
+
+    it("a resolver returning null falls through to ordinary Arrow-key handling", () => {
+      const onChangeSpy = vi.fn();
+      render(
+        <ControlledSelectMenu
+          id="resolver-fallthrough"
+          options={OPTIONS}
+          initialValue="a"
+          onChangeSpy={onChangeSpy}
+        />,
+      );
+      // No resolveKeyToValue supplied here at all — confirms the prop is
+      // fully opt-in and Arrow navigation is unaffected when it's absent.
+      fireEvent.click(screen.getByRole("button"));
+      const listbox = screen.getByRole("listbox");
+      fireEvent.keyDown(listbox, { key: "ArrowDown" });
+      expect(onChangeSpy).toHaveBeenCalledWith("b");
+    });
+  });
+
   it("ArrowDown/ArrowUp wrap around the ends of the option list (selection-follows-focus)", () => {
     const onChangeSpy = vi.fn();
     render(

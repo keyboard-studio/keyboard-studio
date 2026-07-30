@@ -55,6 +55,22 @@ export interface SelectMenuProps {
    * display.
    */
   renderOptionLabel?: (opt: SelectMenuOption) => React.ReactNode;
+  /**
+   * Opt-in "type a physical key to select it" hook — deliberately NOT a
+   * built-in behavior of this generic component. Only KeyPickerField
+   * (physical/touch key pickers) supplies this, using keyOptions.ts's
+   * `charToVkey`; flick-direction, layer-token, and font SelectMenus leave
+   * it unset. Called from `handleListKeyDown` (i.e. only while the list is
+   * open — see the class doc comment below) for any keydown that isn't
+   * already claimed by Escape/ArrowUp/ArrowDown/Enter. Return the matching
+   * option's `value`, or `null` to fall through as an ordinary (ignored)
+   * keydown. The caller is responsible for checking modifier keys
+   * (Ctrl/Alt/Meta) and multi-char `event.key` values (e.g. "Tab",
+   * "ArrowLeft") itself — this component does not second-guess what the
+   * resolver returns, but see handleListKeyDown for the belt-and-suspenders
+   * `options` membership check.
+   */
+  resolveKeyToValue?: (event: React.KeyboardEvent) => string | null;
 }
 
 const TRIGGER_STYLE: React.CSSProperties = {
@@ -164,6 +180,7 @@ export function SelectMenu({
   ariaLabel,
   style,
   renderOptionLabel = defaultRenderLabel,
+  resolveKeyToValue,
 }: SelectMenuProps): React.ReactElement {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -259,6 +276,34 @@ export function SelectMenu({
       e.preventDefault();
       closeAndRefocusTrigger();
       return;
+    }
+    // Type-to-select (opt-in — see resolveKeyToValue's doc comment above).
+    // Checked before Arrow/Enter handling below since neither branch there
+    // can match a resolver's return anyway (Arrow*/Enter/Escape are all
+    // multi-char `event.key` values, never a single typed character), but
+    // ordering it first keeps the "claimed keys" list easy to scan top to
+    // bottom. Re-validated against `options` here (not just trusted from the
+    // caller) so a resolver bug can never select a value this dropdown
+    // doesn't actually offer.
+    if (resolveKeyToValue !== undefined) {
+      // P2 fix: while a type-to-select list is open, an unmodified single
+      // printable keydown (e.g. Space) is claimed by the menu even when the
+      // resolver doesn't map it to an in-`options` value — otherwise the
+      // still-focused `<ul>` falls through to default browser behavior
+      // (Space scrolling the page being the motivating case).
+      const isUnmodifiedPrintableChar =
+        e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey;
+      if (isUnmodifiedPrintableChar) {
+        e.preventDefault();
+      }
+      const resolvedValue = resolveKeyToValue(e);
+      if (resolvedValue !== null) {
+        const matched = options.find((opt) => opt.value === resolvedValue);
+        if (matched !== undefined) {
+          selectOption(matched);
+          return;
+        }
+      }
     }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
