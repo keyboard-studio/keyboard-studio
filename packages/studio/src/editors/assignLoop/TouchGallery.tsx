@@ -83,6 +83,7 @@ import {
   parseTouchLayout,
   touchCoverage,
   resolveTouchLayerId,
+  touchLayerForChar,
   enumerateTouchMethodsForChar,
   applyTouchKeycapRemovalsToLayout,
   applyTouchKeycapRemovalsToRawJson,
