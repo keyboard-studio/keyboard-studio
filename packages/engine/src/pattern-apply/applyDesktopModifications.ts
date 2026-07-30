@@ -339,6 +339,25 @@ function applyPlacements(
       continue;
     }
 
+    // The host's own primary production is already this char (common on a
+    // shift-layer seed) — nothing to place; never hand a key itself as its own
+    // longpress alternate.
+    //
+    // This precedes the hand-set check deliberately: "there is nothing to
+    // place" is a stronger claim than "do not clobber". A hand-set host that
+    // already produces this char needs no placement at all, and routing it to
+    // the hand-set fallback appended a SECOND key with the same production
+    // (plus a warning about overwriting an author edit that was not happening).
+    // That input is routine now that placements target the case-derived layer:
+    // promoteOnManualEdit (spec-014 FR-014) marks the very key an author edits
+    // as hand-set, and the case-pair flow puts uppercase chars on the shift
+    // key, so a reseed replays a placement onto a hand-set key that already
+    // carries the char. A key with no production at all fails this predicate,
+    // so the empty-host branch below still owns that case.
+    if (isTouchKeyPrimaryProduction(existing, char)) {
+      continue;
+    }
+
     // Never overwrite a hand-set key (no-clobber — spec-014's provenance
     // axis, reused here per R6/R9): fall back instead so the placement is
     // not silently lost.
@@ -361,13 +380,6 @@ function applyPlacements(
         provenance: "physical-suggested",
       };
       setWorkingKey(state, hostKey, updated);
-      continue;
-    }
-
-    // The host's own primary production is already this char (common on a
-    // shift-layer seed) — nothing to place; never hand a key itself as its own
-    // longpress alternate.
-    if (isTouchKeyPrimaryProduction(existing, char)) {
       continue;
     }
 

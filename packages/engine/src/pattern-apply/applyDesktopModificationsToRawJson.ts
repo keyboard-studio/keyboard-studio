@@ -275,6 +275,15 @@ function applyPlacementsToRawLayout(
       continue;
     }
 
+    // The host's own primary production is already this char (common on a
+    // shift-layer seed) — nothing to place; never hand a key itself as its own
+    // longpress alternate. Same guard, same position as the IR applier: raw
+    // JSON carries no provenance so there is no hand-set branch to order
+    // against here, but keeping the two loops in the same sequence is what
+    // stops them drifting. A key with no production fails this predicate, so
+    // the empty-host branch below still owns that case.
+    if (isTouchKeyPrimaryProduction(key, char)) continue;
+
     const hostIsEmpty = key.text === undefined && key.output === undefined;
     if (hostIsEmpty) {
       key.id = charToUnicodeKeyId(char);
@@ -282,11 +291,6 @@ function applyPlacementsToRawLayout(
       delete key.output;
       continue;
     }
-
-    // The host's own primary production is already this char (common on a
-    // shift-layer seed) — nothing to place; never hand a key itself as its own
-    // longpress alternate. Same guard as the IR applier.
-    if (isTouchKeyPrimaryProduction(key, char)) continue;
 
     // Host already produces another char — add as a longpress alternate.
     if (!Array.isArray(key.sk)) key.sk = [];
