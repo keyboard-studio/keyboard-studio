@@ -41,7 +41,7 @@
 // per-char produces count) — no assignment-shape knowledge beyond calling
 // the shared selector; VFS/assignment plumbing stays in the calling gallery.
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { MechanismAssignment, Modality } from "@keyboard-studio/contracts";
@@ -105,6 +105,21 @@ export function CharScrollStrip({
   const { t } = useLingui();
   const chipRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const stripRef = useRef<HTMLDivElement | null>(null);
+  // Tracks the in-flight focus-the-newly-selected-chip rAF (scheduled at the
+  // bottom of handleKeyDown below) so it can be cancelled — either on
+  // unmount, or if a second arrow keydown fires before the first frame runs
+  // (rapid key-repeat), which would otherwise leave two scheduled frames
+  // racing to focus two different chips.
+  const focusRafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (focusRafRef.current !== null) {
+        cancelAnimationFrame(focusRafRef.current);
+        focusRafRef.current = null;
+      }
+    };
+  }, []);
 
   // Mouse-wheel / horizontal-trackpad panning, scoped to the strip: a plain
   // `useEffect` + `addEventListener("wheel", ..., { passive: false })` rather
@@ -169,6 +184,58 @@ export function CharScrollStrip({
     return () => stripEl.removeEventListener("wheel", handleWheel);
   }, []);
 
+  // ArrowLeft/ArrowRight cycle selection through the FULL `chars` list (not
+  // `visibleChars` — the windowed slice below), wrapping at both ends. Left/
+  // Right is the ARIA-correct axis for a horizontal listbox-like strip;
+  // ArrowUp/ArrowDown are deliberately not bound (no meaning here, and they'd
+  // fight the page's own vertical scroll). Selection itself is delegated to
+  // the caller's `onSelectChar` — same call the chip's onClick makes — so
+  // this never reimplements or duplicates usePositionalCharNav's walk logic,
+  // it just picks the adjacent (wrapped) character out of `chars`.
+  function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    if (chars.length === 0) return;
+    e.preventDefault();
+
+    // `currentChar !== null` but not found in `chars` (a stale-prop case —
+    // the caller passed a currentChar that no longer belongs to this chars
+    // list) yields indexOf === -1, same as the "no selection yet" case, and
+    // intentionally falls through to the same first/last-character default
+    // below rather than being special-cased.
+    const currentIdx = currentChar !== null ? chars.indexOf(currentChar) : -1;
+    let nextIdx: number;
+    if (e.key === "ArrowRight") {
+      nextIdx = currentIdx === -1 ? 0 : (currentIdx + 1) % chars.length;
+    } else {
+      nextIdx =
+        currentIdx === -1
+          ? chars.length - 1
+          : (currentIdx - 1 + chars.length) % chars.length;
+    }
+    const nextChar = chars[nextIdx];
+    if (nextChar === undefined) return;
+    onSelectChar(nextChar);
+
+    // Roving-tabindex: move DOM focus to the newly selected chip so
+    // keyboard navigation stays inside the strip rather than left behind on
+    // the now-stale previously-focused chip. The chip may not exist yet this
+    // render (it can be outside the current `visibleChars` window right
+    // after a wrap) — the `visibleChars` useMemo below re-centers on
+    // `currentChar` on the next render once `onSelectChar` above flows back
+    // through as a prop update, so the ref lookup + scrollIntoView effect
+    // (both keyed off `currentChar`) pick it up then.
+    // Cancel a still-pending frame from a previous keydown (rapid key-repeat
+    // before the browser has painted the last selection change) so it can't
+    // fire after this one and focus a stale, no-longer-selected chip.
+    if (focusRafRef.current !== null) {
+      cancelAnimationFrame(focusRafRef.current);
+    }
+    focusRafRef.current = requestAnimationFrame(() => {
+      focusRafRef.current = null;
+      chipRefs.current.get(nextChar)?.focus();
+    });
+  }
+
   // Auto-scroll the current chip into view (horizontally only — inline
   // "nearest" never triggers a vertical/page scroll) whenever the selected
   // character changes.
@@ -218,6 +285,14 @@ export function CharScrollStrip({
     return chars.slice(start, start + MAX_VISIBLE_CHIPS);
   }, [chars, currentChar]);
 
+  // Whether the selected character is inside the currently-rendered window —
+  // see the roving-tabindex comment at the chip map below for why this
+  // matters (the tab-reachability fallback when nothing in view is selected).
+  const hasSelectedVisible = useMemo(
+    () => visibleChars.some((c) => c === currentChar),
+    [visibleChars, currentChar],
+  );
+
   // Per-character produces count (Part 2 badge) — the shared selector, not a
   // re-derived count, so this can never disagree with each gallery's own
   // bottom "uses" list about what counts as a producer. Scoped to
@@ -257,6 +332,7 @@ export function CharScrollStrip({
         ref={stripRef}
         className="ks-char-scroll-strip"
         data-testid="char-scroll-strip"
+        onKeyDown={handleKeyDown}
         aria-label={t({
           id: "editor.assignLoop.charScroll.stripAriaLabel",
           message: "Characters",
@@ -302,9 +378,20 @@ export function CharScrollStrip({
           scrollbarWidth: "auto",
         }}
       >
-        {visibleChars.map((c) => {
+        {/* Roving tabindex: exactly one chip is a Tab stop at a time (the
+            rest are -1, reachable only via the ArrowLeft/ArrowRight handler
+            above) so Tab moves past the whole strip in one hop instead of
+            stopping at up to MAX_VISIBLE_CHIPS individual chips. Fallback:
+            when `currentChar` is null/stale (not present in the visible
+            set), no chip is `isSelected`, which on its own would make every
+            chip tabIndex=-1 and strand the strip outside the Tab order
+            entirely — `hasSelectedVisible` (computed above) guards that by
+            making the FIRST visible chip the tab stop whenever nothing else
+            is selected. */}
+        {visibleChars.map((c, index) => {
           const hex = charHex(c);
           const isSelected = c === currentChar;
+          const isTabbable = isSelected || (!hasSelectedVisible && index === 0);
           const count = producesCountByChar.get(c) ?? 0;
           const badgeGood = count >= 1;
           return (
@@ -316,6 +403,7 @@ export function CharScrollStrip({
                 else chipRefs.current.delete(c);
               }}
               data-testid={`char-scroll-chip-${hex}`}
+              tabIndex={isTabbable ? 0 : -1}
               aria-pressed={isSelected}
               aria-label={t({
                 id: "editor.assignLoop.charScroll.chipAriaLabel",
