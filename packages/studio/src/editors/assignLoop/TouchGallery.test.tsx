@@ -3640,6 +3640,44 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
     expect(touchMechanismsFor("à")).toHaveLength(0);
   });
+
+  it("shows only the bulk box for the current character's family, not other families' boxes", async () => {
+    // Two persisted groups on different host keys (a-family and e-family).
+    // Index 0 of the inventory is an e-accent, so the gallery opens on it.
+    seedStore({ withInventory: ["è", "à"] });
+    const lp = (
+      char: string,
+      hostKey: string,
+      layer: string,
+    ): MechanismAssignment => ({
+      scope: "individual",
+      target: char,
+      modality: "touch",
+      mechanisms: [
+        { patternId: "longpress_alternates", slotValues: { hostKey, char, layer } },
+      ],
+      source: "user",
+    });
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [
+        ["ê", lp("ê", "K_E", "default")],
+        ["â", lp("â", "K_A", "default")],
+      ],
+      suggestionResolvedChars: [],
+      bulkAccentGroups: [
+        { id: "é:K_E", hostKey: "K_E", baseChar: "é", members: ["ê"] },
+        { id: "á:K_A", hostKey: "K_A", baseChar: "á", members: ["â"] },
+      ],
+    });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // Current char "è" is in the e-family (host key K_E): only the e box shows.
+    expect(screen.getByText(/to e as long-press/i)).toBeTruthy();
+    expect(screen.queryByText(/to a as long-press/i)).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
