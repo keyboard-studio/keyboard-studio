@@ -171,6 +171,34 @@ describe("useInventoryDiff — NFC normalization", () => {
 });
 
 // ---------------------------------------------------------------------------
+// 10. Composability: precomposed char available from separately-produced parts
+// ---------------------------------------------------------------------------
+
+describe("useInventoryDiff — composability", () => {
+  it("a precomposed inventory char lands in alreadyProduced when its base + combining mark are both produced", async () => {
+    const { useInventoryDiff } = await import("./useInventoryDiff.ts");
+    // Base produces "U" and the bare combining circumflex accent (U+0302)
+    // separately, but never the precomposed "Û" (U+00DB) directly.
+    seedBaseWithChars(["U", "̂"]);
+    setInventory(["Û", "ŋ"]); // Û (precomposed), ŋ
+    const { result } = renderHook(() => useInventoryDiff());
+    expect(result.current.alreadyProduced).toContain("Û");
+    expect(result.current.lettersToAdd).not.toContain("Û");
+    expect(result.current.lettersToAdd).toContain("ŋ");
+  });
+
+  it("a precomposed inventory char stays in lettersToAdd when only the base letter is produced", async () => {
+    const { useInventoryDiff } = await import("./useInventoryDiff.ts");
+    // Base produces "U" only — no combining circumflex anywhere.
+    seedBaseWithChars(["U"]);
+    setInventory(["Û"]); // Û
+    const { result } = renderHook(() => useInventoryDiff());
+    expect(result.current.lettersToAdd).toContain("Û");
+    expect(result.current.alreadyProduced).not.toContain("Û");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 6-8. Memoization stability
 // ---------------------------------------------------------------------------
 

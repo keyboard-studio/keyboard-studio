@@ -76,18 +76,24 @@ import {
   toUPlusNotation,
   isDecomposableAccented,
   formatUncoveredTouchMessage,
+  computeTouchCoverage,
 } from "@keyboard-studio/contracts";
 import type { DesktopModifications, ModifierToken } from "@keyboard-studio/engine";
 import {
   parseTouchLayout,
   touchCoverage,
   resolveTouchLayerId,
+  enumerateTouchMethodsForChar,
+  applyTouchKeycapRemovalsToLayout,
+  applyTouchKeycapRemovalsToRawJson,
+  collectCompositionMethod,
   collectLayerCombosInUse,
   comboToTouchLayerId,
   canonicalizeCombo,
   addableTouchLayerTokens,
   optionsForTouchLayerSlot,
 } from "@keyboard-studio/engine";
+import type { TouchMethodDescriptor } from "@keyboard-studio/engine";
 import {
   buildTouchLayoutJson,
   deriveSeedLayout,
@@ -115,6 +121,13 @@ import {
 import { useCasePairCompanion } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
 import { displayChar } from "../../lib/irToCarveNodes.ts";
+import {
+  appendNotDeletableSuffix,
+  composeTouchMethodLabel,
+  touchMethodNonDeletableReason,
+  composeContributorLabel,
+  compositionTooltip,
+} from "./existingMethodLabels.ts";
 import { isMutateSeamEnabled } from "../../flags/mutateFlag.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type {
@@ -129,7 +142,11 @@ import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
-import { RemovableChipRow } from "./parts/RemovableChipRow.tsx";
+import {
+  RemovableChipRow,
+  HoverDangerChip,
+  NonDeletableMethodChip,
+} from "./parts/RemovableChipRow.tsx";
 import { SelectMenu, type SelectMenuOption } from "../../ui/SelectMenu.tsx";
 import { KEY_OPTIONS, VALID_HOST_KEYS } from "../../lib/keyOptions.ts";
 import {
@@ -1319,6 +1336,17 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const touchSeedSourceStored = useSurveySessionStore((s) => s.touchSeedSource);
 
+  // "Existing methods" section — pre-existing touch methods (from the base
+  // keyboard's own touch layout) that already produce currentChar, mirroring
+  // MechanismGallery's desktop "Existing methods" section. deletedTouchKeyIds
+  // is read directly (not just via isTouchKeyDeleted) so the existingTouchMethods
+  // memo below re-runs when the set changes — same pattern as
+  // MechanismGallery's isItemDeleted/deletedItemIds pairing.
+  const deletedTouchKeyIds = useWorkingCopyStore((s) => s.deletedTouchKeyIds);
+  const isTouchKeyDeleted = useWorkingCopyStore((s) => s.isTouchKeyDeleted);
+  const deleteTouchKey = useWorkingCopyStore((s) => s.deleteTouchKey);
+  const restoreTouchKey = useWorkingCopyStore((s) => s.restoreTouchKey);
+
   // Character inventory — same source MechanismGallery uses.
   const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
 
@@ -1453,33 +1481,46 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       resolvedSeedSource === "reseed-from-desktop"
         ? undefined
         : resolveBaseTouchJson(baseVfs);
-    // NOTE: `.warnings` (e.g. a genuine "no phone or tablet platform found"
-    // guard from applyTouchAssignments/applyDesktopModifications) is
-    // intentionally discarded here — this useMemo only surfaces `.json`, and
-    // there is no UI surface wired to show engine warnings yet. Not expanding
-    // scope to wire that up in this change; tracked as a follow-up rather
-    // than silently dropped-and-forgotten.
-    return buildTouchLayoutJson(baseIr, appliedEdits, {
+    // NOTE: `.warnings` from buildTouchLayoutJson (e.g. a "no phone or tablet
+    // platform found" guard) is intentionally discarded — this useMemo only
+    // surfaces `.json`, and no UI surface shows engine warnings yet (tracked
+    // as a follow-up). We capture `built` (not a direct return) because touch
+    // method deletions are applied on top before returning; see below.
+    const built = buildTouchLayoutJson(baseIr, appliedEdits, {
       ...(baseTouchJson !== undefined ? { baseTouchJson } : {}),
       mods,
       seedSource: resolvedSeedSource,
     }).json;
+    if (built === null) return null;
+    // Touch method deletions (workingCopyStore.deletedTouchKeyIds) apply on
+    // top of desktop mods + Phase E edits, mirroring projectWorkingCopyVfs's
+    // step order (1.5 carve keycaps, then 1.6 touch deletions) — so the live
+    // vfsTransform/OSK preview never shows a method the author deleted here
+    // in the gallery, not just the final serialized output.
+    return applyTouchKeycapRemovalsToRawJson(built, deletedTouchKeyIds).json;
     // touchKey drives re-evaluation when charTouch changes (Map identity is
     // not stable; the key is). baseIr is a stable snapshot post-lockDesktop.
     // baseVfs is stable after instantiation but included for correctness.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseIr, touchKey, baseVfs, mods, resolvedSeedSource]);
+  }, [baseIr, touchKey, baseVfs, mods, resolvedSeedSource, deletedTouchKeyIds]);
 
-  // The seed layout for the chosen seed source, with desktop mods (spec 035
-  // R3) replayed but NO Phase E edits — via `deriveSeedLayout`
-  // (buildTouchLayoutJson.ts), the shared seed-derivation implementation
-  // also used by buildTouchLayoutJson's own Case A branch; do not duplicate
-  // the Case A/B branching inline here. Depends only on
-  // baseIr/baseVfs/mods/resolvedSeedSource (NOT touchKey/charTouch — the
-  // author's own edits are deliberately excluded, per spec 035
-  // simplification.md: "already in layout" means already in the SEED). null
-  // only when baseIr has not loaded yet.
-  const detectionSeedLayout = useMemo<TouchLayoutIR | null>(() => {
+  // Raw (undeleted) seed — desktop mods (spec 035 R3) replayed, but NO Phase
+  // E edits — via `deriveSeedLayout` (buildTouchLayoutJson.ts), the shared
+  // seed-derivation implementation also used by buildTouchLayoutJson's own
+  // Case A branch; do not duplicate the Case A/B branching inline here.
+  // Depends only on baseIr/baseVfs/mods/resolvedSeedSource (NOT
+  // touchKey/charTouch — the author's own edits are deliberately excluded,
+  // per spec 035 simplification.md: "already in layout" means already in the
+  // SEED), and — deliberately — NOT deletedTouchKeyIds either (see below).
+  // null only when baseIr has not loaded yet.
+  //
+  // The author's touch-method DELETION overlay (`deletedTouchKeyIds`) is NOT
+  // applied here. Kept as its own memo purely so the restore affordance below
+  // (`deletedExistingTouchMethods`) can still enumerate a method the author
+  // has since deleted — once removed from `detectionSeedLayout` (below), that
+  // method no longer produces the character at all, so there'd be nothing
+  // left to name/restore if this were the only seed layout kept around.
+  const rawDetectionSeedLayout = useMemo<TouchLayoutIR | null>(() => {
     if (baseIr === null) return null;
     try {
       const baseTouchJson =
@@ -1493,19 +1534,41 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       }).layout;
     } catch (err) {
       devLog.error(
-        "[TouchGallery] detectionSeedLayout derivation failed:",
+        "[TouchGallery] rawDetectionSeedLayout derivation failed:",
         err,
       );
       return null;
     }
   }, [baseIr, baseVfs, mods, resolvedSeedSource]);
 
+  // The seed layout for the chosen seed source, with desktop mods (spec 035
+  // R3) AND the author's touch-method deletions both replayed — mirroring
+  // projectWorkingCopyVfs's step order (carve keycaps first via `mods`
+  // baked into rawDetectionSeedLayout, then touch deletions on top). This is
+  // the layout `detectedChars` (the CharScrollStrip badge source) and
+  // `existingTouchMethods` (via enumerateTouchMethodsForChar) both see, so
+  // deleting the sole producer of a character actually uncounts it here in
+  // the gallery, not just at final VirtualFS projection.
+  const detectionSeedLayout = useMemo<TouchLayoutIR | null>(() => {
+    if (rawDetectionSeedLayout === null) return null;
+    return applyTouchKeycapRemovalsToLayout(
+      rawDetectionSeedLayout,
+      deletedTouchKeyIds,
+    ).layout;
+  }, [rawDetectionSeedLayout, deletedTouchKeyIds]);
+
   // The layout the lint (18.6 touch-coverage guard) and the stage-completion
   // gate (FR-008) both audit: the derived layout INCLUDING current Phase E
   // edits when touchLayoutJson is non-null (the R11 matrix decided to emit),
   // else the effective seed (detectionSeedLayout) — a truly-untouched
   // import-adapt with a shipped layout still has a real layout to check
-  // coverage against even though nothing is emitted yet.
+  // coverage against even though nothing is emitted yet. Both source memos
+  // already have `deletedTouchKeyIds` baked in (touchLayoutJson via
+  // applyTouchKeycapRemovalsToRawJson, detectionSeedLayout via
+  // applyTouchKeycapRemovalsToLayout), so this memo inherits the deletion
+  // overlay transitively — deleting the sole producer of an inventory char
+  // makes touchCoverage/handleContinue see it as uncovered, not just the
+  // final serialized VFS.
   const layoutForLintAndGate = useMemo<TouchLayoutIR | null>(() => {
     if (touchLayoutJson !== null) {
       try {
@@ -1718,6 +1781,191 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // above, before this memo) — same precedent as touchKey/modsDepsKey.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detectionSeedLayout, inventoryKey]);
+
+  // The BASE (pre-augmentWithComposable) touch-covered set — the direct-
+  // reachability half of touchCoverage's own two-step traversal
+  // (computeTouchCoverage, then augmentWithComposable — see engine's
+  // touchCoverage.ts), computed directly against the SAME detectionSeedLayout
+  // `detectedChars` above already uses. Feeds collectCompositionMethod below:
+  // composition must stay strictly ONE level, so it needs the un-augmented
+  // set, never `detectedChars` itself (which IS already augmented).
+  const baseTouchCoveredSet = useMemo<Set<string>>(() => {
+    if (detectionSeedLayout === null) return new Set<string>();
+    try {
+      const { uncovered } = computeTouchCoverage(detectionSeedLayout, inventory);
+      const uncoveredSet = new Set(uncovered);
+      return new Set(
+        inventory
+          .filter((c) => !uncoveredSet.has(c))
+          .map((c) => c.normalize("NFC")),
+      );
+    } catch (err) {
+      devLog.error("[TouchGallery] baseTouchCoveredSet coverage failed", err);
+      return new Set<string>();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detectionSeedLayout, inventoryKey]);
+
+  // "Existing methods" for currentChar — every pre-existing touch method
+  // (main key / longpress / multitap / flick) in the BASE touch layout that
+  // STILL produces currentChar, mirroring MechanismGallery's desktop
+  // "Existing methods" section. Sourced from detectionSeedLayout (the same
+  // seed-source-aware, mods-replayed, author-edits-EXCLUDED layout that
+  // powers detectedChars above) rather than the author's own Phase E edits —
+  // deleting a pre-existing method is a base-keyboard edit, not a new
+  // assignment. detectionSeedLayout now has the deletion overlay baked in
+  // (applyTouchKeycapRemovalsToLayout, see that memo above), so a method
+  // deleted this session no longer appears in enumerateTouchMethodsForChar's
+  // output at all — the `isTouchKeyDeleted` filter below is therefore
+  // belt-and-suspenders, not load-bearing, but kept rather than stripped so a
+  // future change to detectionSeedLayout's derivation doesn't silently
+  // resurrect a deleted method here.
+  const existingTouchMethods = useMemo<TouchMethodDescriptor[]>(() => {
+    if (detectionSeedLayout === null || currentChar === null) return [];
+    return enumerateTouchMethodsForChar(detectionSeedLayout, currentChar).filter(
+      (m) => !isTouchKeyDeleted(m.id),
+    );
+    // deletedTouchKeyIds is an intentional dep even though only
+    // isTouchKeyDeleted is called in the body — same store-selector
+    // precedent as MechanismGallery's existingMethods memo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detectionSeedLayout, currentChar, isTouchKeyDeleted, deletedTouchKeyIds]);
+
+  // Deleted pre-existing touch methods for currentChar — the restore
+  // affordance's data source (FIX: deletions were previously one-way in the
+  // UI). Sourced from rawDetectionSeedLayout (the UNDELETED seed) rather than
+  // detectionSeedLayout: once a method is stripped out of the latter, it no
+  // longer produces currentChar at all, so there would be nothing left to
+  // name here. Scoped to `deletable` methods only — a non-deletable
+  // (desktop-backed) row is never in deletedTouchKeyIds in the first place.
+  const deletedExistingTouchMethods = useMemo<TouchMethodDescriptor[]>(() => {
+    if (rawDetectionSeedLayout === null || currentChar === null) return [];
+    return enumerateTouchMethodsForChar(
+      rawDetectionSeedLayout,
+      currentChar,
+    ).filter((m) => m.deletable && isTouchKeyDeleted(m.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawDetectionSeedLayout, currentChar, isTouchKeyDeleted, deletedTouchKeyIds]);
+
+  // The FULL, unfiltered enumeration of touch methods for currentChar —
+  // sourced from rawDetectionSeedLayout (the UNDELETED seed, same source as
+  // deletedExistingTouchMethods above) so it is a superset of both
+  // existingTouchMethods and deletedExistingTouchMethods. Fed to
+  // composeTouchMethodLabel's `allMethodsForChar` argument so the "(platform,
+  // layer)" disambiguation-suffix decision (existingMethodLabels.ts) is
+  // identical whether a given method is currently shown in "Existing
+  // methods" or in the "Deleted methods" restore list — neither of those two
+  // already-filtered arrays alone is a safe stand-in for "every method this
+  // char has".
+  const allTouchMethodsForChar = useMemo<TouchMethodDescriptor[]>(() => {
+    if (rawDetectionSeedLayout === null || currentChar === null) return [];
+    return enumerateTouchMethodsForChar(rawDetectionSeedLayout, currentChar);
+  }, [rawDetectionSeedLayout, currentChar]);
+
+  // Unified "Existing methods" row list (SHOW-ALL, spec follow-up — mirrors
+  // MechanismGallery's desktop `existingMethods`): every real touch method
+  // above ("touch" kind), PLUS a synthesized composition row when currentChar
+  // isn't directly reachable but IS composable from characters the base
+  // layout directly reaches, PLUS a floor row when currentChar is green
+  // (detectedChars — the augmented set the badge uses) yet still has zero
+  // rows after all of the above. One array so the section's visibility guard
+  // and rendering both key off ONE list rather than three independent
+  // conditions.
+  interface ExistingTouchMethodRow {
+    id: string;
+    label: string;
+    deletable: boolean;
+    kind: "touch" | "composition" | "unattributed";
+    reason?: string;
+  }
+
+  const existingMethodRows = useMemo<ExistingTouchMethodRow[]>(() => {
+    const rows: ExistingTouchMethodRow[] = existingTouchMethods.map(
+      (method) => {
+        const nonDeletableReason = touchMethodNonDeletableReason(method, i18n);
+        const touchBaseLabel = composeTouchMethodLabel(
+          method,
+          allTouchMethodsForChar,
+          i18n,
+        );
+        return {
+          id: method.id,
+          label: method.deletable
+            ? touchBaseLabel
+            : appendNotDeletableSuffix(touchBaseLabel, i18n),
+          deletable: method.deletable,
+          kind: "touch",
+          ...(nonDeletableReason !== undefined
+            ? { reason: nonDeletableReason }
+            : {}),
+        };
+      },
+    );
+
+    // SHOW-ALL composition row — baseTouchCoveredSet is the PRE-augmentation
+    // set (see its own doc comment above): composition stays strictly one
+    // level, never chained off an already-composable char.
+    if (currentChar !== null) {
+      const compositionDescriptor = collectCompositionMethod(
+        baseTouchCoveredSet,
+        currentChar,
+      );
+      if (compositionDescriptor !== undefined) {
+        rows.push({
+          id: `composition:${currentChar}`,
+          label: appendNotDeletableSuffix(
+            composeContributorLabel(compositionDescriptor, i18n),
+            i18n,
+          ),
+          deletable: false,
+          kind: "composition",
+          reason: compositionTooltip(compositionDescriptor, i18n),
+        });
+      }
+    }
+
+    // SHOW-ALL floor — currentChar is GREEN (detectedChars, the augmented set
+    // the CharScrollStrip badge uses) but still has zero rows after
+    // everything above.
+    if (
+      currentChar !== null &&
+      rows.length === 0 &&
+      detectedChars.has(currentChar)
+    ) {
+      rows.push({
+        id: `unattributed:${currentChar}`,
+        label: appendNotDeletableSuffix(
+          composeContributorLabel(
+            { kind: "unattributed", producedChar: currentChar, producedRole: "produced" },
+            i18n,
+          ),
+          i18n,
+        ),
+        deletable: false,
+        kind: "unattributed",
+      });
+    }
+
+    return rows;
+  }, [
+    existingTouchMethods,
+    allTouchMethodsForChar,
+    i18n,
+    currentChar,
+    baseTouchCoveredSet,
+    detectedChars,
+  ]);
+
+  // Restore affordance (FIX: deleteTouchKey was previously one-way in the UI
+  // — the store's restoreTouchKey/isTouchKeyDeleted pair existed but nothing
+  // called restoreTouchKey). Reverses a single deletion from
+  // deletedExistingTouchMethods above.
+  const handleRestoreExistingTouchMethod = useCallback(
+    (method: TouchMethodDescriptor) => {
+      restoreTouchKey(method.id);
+    },
+    [restoreTouchKey],
+  );
 
   // ---------------------------------------------------------------------------
   // Per-character suggestion computation
@@ -2804,6 +3052,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
           chipPadding="4px 10px"
           chipFontSize={12}
           chipWhiteSpaceNowrap
+          hoverDanger
           items={[...charTouch.entries()].flatMap(([c, assignment]) =>
             assignment.mechanisms.map((m, i) => ({
               key: `${c}-${i}`,
@@ -2824,6 +3073,176 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             })),
           )}
         />
+      )}
+
+      {/* Existing methods — the BASE keyboard's own touch-layout producers
+            for currentChar (mirrors MechanismGallery's desktop "Existing
+            methods" section), PLUS the SHOW-ALL composition/floor rows (spec
+            follow-up). COLOR tracks PRODUCED vs. USED; deletability is a
+            SEPARATE signal (which branch below a row takes), not color:
+              - row.deletable       -> green HoverDangerChip: "×" +
+                red-on-hover + click-to-delete, calling deleteTouchKey(row.id)
+                directly (only "touch"-kind rows are ever deletable — an
+                explicit `output`, a `U_<HEX>` id, or any longpress/multitap/
+                flick sub-entry).
+              - !deletable          -> GREEN NonDeletableMethodChip, static:
+                a layer-switch main key (still PRODUCES the char — it just
+                also switches layers, so it can't be removed here), AND the
+                composition/unattributed SHOW-ALL rows. Touch method
+                descriptors carry no "used" concept at all (unlike desktop's
+                storeSlot rows) — every non-deletable touch row produces the
+                char, so every one is green, never blue. See
+                existingMethodRows above for how rows are built. */}
+      {currentChar !== null && existingMethodRows.length > 0 && (
+        <div>
+          <p
+            style={{
+              margin: "0 0 6px",
+              fontSize: 11,
+              color: TEXT_DIM,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+            }}
+          >
+            <Trans id="editor.assignLoop.touch.existingMethodsHeading">
+              Existing methods
+            </Trans>
+          </p>
+          <div
+            role="group"
+            aria-label={t({
+              id: "editor.assignLoop.touch.existingMethodsGroupAriaLabel",
+              message: "Existing touch methods from the base keyboard",
+            })}
+            style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
+          >
+            {existingMethodRows.map((row) =>
+              row.deletable ? (
+                <HoverDangerChip
+                  key={row.id}
+                  onClick={() => deleteTouchKey(row.id)}
+                  ariaLabel={t({
+                    id: "editor.assignLoop.touch.removeExistingMethodAriaLabel",
+                    message: `Remove existing touch method ${{ label: row.label }} for ${{ notation: toUPlusNotation(currentChar) }}`,
+                  })}
+                  title={t({
+                    id: "editor.assignLoop.clickToRemove",
+                    message: "click to remove",
+                  })}
+                  baseStyle={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "3px 8px",
+                    background: "#0d2218",
+                    border: "1px solid #238636",
+                    borderRadius: 12,
+                    color: "#56d364",
+                    fontSize: 11,
+                    fontFamily:
+                      "ui-monospace, 'Cascadia Code', Consolas, monospace",
+                    cursor: "pointer",
+                  }}
+                >
+                  {row.label}
+                  <span
+                    aria-hidden="true"
+                    style={{ fontSize: 10, color: "inherit", opacity: 0.7 }}
+                  >
+                    {" ×"}
+                  </span>
+                </HoverDangerChip>
+              ) : (
+                // GREEN, static — every non-deletable touch row (layer-switch
+                // main keys AND composition/unattributed) PRODUCES the
+                // character; there is simply no single key/sub-entry to
+                // surgically remove. See NonDeletableMethodChip's doc comment
+                // (parts/RemovableChipRow.tsx) for the shared palette.
+                <NonDeletableMethodChip
+                  key={row.id}
+                  variant="green"
+                  {...(row.reason !== undefined ? { reason: row.reason } : {})}
+                >
+                  {row.label}
+                </NonDeletableMethodChip>
+              ),
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Restore affordance for deleted pre-existing touch methods (FIX:
+            deleteTouchKey was previously one-way in this gallery — the
+            store's restoreTouchKey/isTouchKeyDeleted pair existed but nothing
+            in the UI called restoreTouchKey). Rendered as greyed, struck-
+            through "click to restore" chips — a minimal inline second surface
+            rather than a whole new panel, consistent with the "Existing
+            methods" section's styling above. See deletedExistingTouchMethods/
+            handleRestoreExistingTouchMethod above. */}
+      {currentChar !== null && deletedExistingTouchMethods.length > 0 && (
+        <div>
+          <p
+            style={{
+              margin: "0 0 6px",
+              fontSize: 11,
+              color: TEXT_DIM,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+            }}
+          >
+            <Trans id="editor.assignLoop.touch.existingMethods.deletedHeading">
+              Deleted methods
+            </Trans>
+          </p>
+          <div
+            role="group"
+            aria-label={t({
+              id: "editor.assignLoop.touch.existingMethods.deletedGroupAriaLabel",
+              message: "Deleted touch methods — click to restore",
+            })}
+            style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
+          >
+            {deletedExistingTouchMethods.map((method) => {
+              const label = composeTouchMethodLabel(
+                method,
+                allTouchMethodsForChar,
+                i18n,
+              );
+              return (
+                <HoverDangerChip
+                  key={method.id}
+                  onClick={() => handleRestoreExistingTouchMethod(method)}
+                  hoverDanger={false}
+                  ariaLabel={t({
+                    id: "editor.assignLoop.touch.existingMethods.restoreAriaLabel",
+                    message: `Restore deleted touch method ${{ label }} for ${{ notation: toUPlusNotation(currentChar) }}`,
+                  })}
+                  title={t({
+                    id: "editor.assignLoop.touch.existingMethods.clickToRestore",
+                    message: "deleted — click to restore",
+                  })}
+                  baseStyle={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "3px 8px",
+                    background: "#161b22",
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: 12,
+                    color: TEXT_DIM,
+                    fontSize: 11,
+                    fontFamily:
+                      "ui-monospace, 'Cascadia Code', Consolas, monospace",
+                    cursor: "pointer",
+                    textDecoration: "line-through",
+                  }}
+                >
+                  {label}
+                </HoverDangerChip>
+              );
+            })}
+          </div>
+        </div>
       )}
 
     </div>

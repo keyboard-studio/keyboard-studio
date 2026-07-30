@@ -59,15 +59,18 @@ import type {
   MechanismRef,
   PlacementMap,
   PlacementWorklist,
+  RemovalCapability,
 } from "@keyboard-studio/contracts";
 import {
   toUPlusNotation,
   isDecomposableAccented,
+  buildProducedSet,
 } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
 import { getPatternLibraryService } from "../../lib/services.ts";
 import { displayChar } from "../../lib/irToCarveNodes.ts";
+import { capabilityHint } from "./parts/InfoView.tsx";
 import type { AxisFill, DiscoveryAxisVector } from "@keyboard-studio/contracts";
 import {
   defaultFillAxes,
@@ -80,7 +83,10 @@ import {
   canonicalizeCombo,
   comboToKeySpec,
   collectModifierTokensInUse,
+  collectCharContributors,
+  collectCompositionMethod,
   type ModifierToken,
+  type CharContributors,
 } from "@keyboard-studio/engine";
 import {
   useKeyboardArtifact,
@@ -111,6 +117,11 @@ import {
   type CasePairProposal,
 } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
+import {
+  appendNotDeletableSuffix,
+  composeContributorLabel,
+  compositionTooltip,
+} from "./existingMethodLabels.ts";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
@@ -119,7 +130,11 @@ import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
-import { RemovableChipRow } from "./parts/RemovableChipRow.tsx";
+import {
+  RemovableChipRow,
+  HoverDangerChip,
+  NonDeletableMethodChip,
+} from "./parts/RemovableChipRow.tsx";
 import { ConfirmDialog } from "./parts/ConfirmDialog.tsx";
 import {
   unimplementedDesktopChars,
@@ -1379,6 +1394,25 @@ export function MechanismGallery({
   );
   const setAxisFills = useWorkingCopyStore((s) => s.setAxisFills);
 
+  // -- "Existing methods" (base keyboard producers for currentChar) --------
+  // baseIr is the source of truth projectWorkingCopyVfs itself projects
+  // from (never mutated by carve/output projection) — the same source
+  // useInventoryDiff() reads for the lettersToAdd/alreadyProduced diff below.
+  // removalCapabilities/deletedItemIds/isItemDeleted/cascadeDelete are the
+  // EXISTING carve overlay (workingCopyStore.ts) — no new store state is
+  // introduced here; a deletion recorded from this gallery is undone by the
+  // same Undo the carve gallery uses, and is projected at output by the
+  // existing carve-deletion projection step.
+  const baseIr = useWorkingCopyStore((s) => s.baseIr);
+  const removalCapabilities = useWorkingCopyStore((s) => s.removalCapabilities);
+  // deletedItemIds is selected (even though only isItemDeleted is called
+  // below) purely so this component re-renders when the overlay changes —
+  // isItemDeleted itself is a stable store-action reference and calling it
+  // does not, on its own, subscribe this component to deletedItemIds.
+  const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const isItemDeleted = useWorkingCopyStore((s) => s.isItemDeleted);
+  const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
+
   // One-time intro splash — read the seen flag on mount; mark it on "Get started".
   const mechIntroSeen = useWorkingCopyStore(
     (s) => s.galleryIntrosSeen.mechanism,
@@ -1387,7 +1421,40 @@ export function MechanismGallery({
     (s) => s.markGalleryIntroSeen,
   );
 
-  const { lettersToAdd: inventoryLettersToAdd } = useInventoryDiff();
+  const { lettersToAdd: inventoryLettersToAdd, alreadyProduced } =
+    useInventoryDiff();
+
+  // Display-only set for CharScrollStrip's badge (criterion 18.6 SHOW-ALL):
+  // characters the base keyboard already produces render the green
+  // produces->=1 badge via CharScrollStrip's `inheritedChars` (same contract
+  // TouchGallery's `detectedChars` already uses) even though they carry no
+  // MechanismAssignment of their own. lettersToAdd itself (the coverage/gate
+  // denominator, criterion 18.6) is NEVER widened — see the locked constraint
+  // on lettersToAdd above.
+  const alreadyProducedSet = useMemo(
+    () => new Set(alreadyProduced),
+    [alreadyProduced],
+  );
+
+  // The BASE (pre-augmentWithComposable) produced set — same derivation
+  // useInventoryDiff() itself starts from before augmenting, NOT
+  // alreadyProducedSet above (which is already augmented — the composable
+  // membership test the badge uses). Feeds collectCompositionMethod below:
+  // composition must stay strictly ONE level, so it needs the un-augmented
+  // set to decide "is this composable from what's DIRECTLY produced", never
+  // "from what's already-composable". `excludeBackspaceCorrections: true` —
+  // SAME option useInventoryDiff() passes — so a char reachable ONLY via a
+  // backspace-correction store rule (e.g. the SIL Cameroon Â shape) is not
+  // wrongly treated as directly produced here either; without this, the
+  // early-out in collectCompositionMethod (`baseProduced.has(targetChar)`)
+  // would suppress the real "A + ◌̂ → Â" composition row.
+  const baseProducedSet = useMemo(
+    () =>
+      baseIr !== null
+        ? buildProducedSet(baseIr, { excludeBackspaceCorrections: true })
+        : new Set<string>(),
+    [baseIr],
+  );
 
   // Spec 046 worklist filter (FR-020): a composed unit whose marks are ALL
   // productive mark keys is reachable via base key + mark key — it needs no
@@ -1755,7 +1822,6 @@ export function MechanismGallery({
     hasAnotherCharAfterCurrent,
     handleNext,
     handleBack,
-    handleSelectChar,
     suggestionResolved,
     markSuggestionResolved,
   } = usePositionalCharNav({
@@ -1765,6 +1831,24 @@ export function MechanismGallery({
     onComplete: handleForwardComplete,
     onBack,
   });
+
+  // Select-by-value for the CharScrollStrip's SHOW-ALL display list
+  // (criterion 18.6): `handleSelectChar` above is gated on `lettersToAdd`
+  // (usePositionalCharNav's own `list`), so clicking an already-produced
+  // chip through it would be a no-op — deliberately, since Back/Next/Skip
+  // must never step onto a char outside lettersToAdd's walk order. This
+  // sibling handler is the one CharScrollStrip actually calls: it jumps to
+  // ANY character in the full `inventory` (in or out of lettersToAdd) purely
+  // for inspection, without touching the positional walk state. A no-op
+  // when `char` isn't in `inventory` at all (defense-in-depth — every chip
+  // CharScrollStrip renders is itself drawn from `inventory`).
+  const handleSelectDisplayChar = useCallback(
+    (char: string) => {
+      if (!inventory.includes(char)) return;
+      setCurrentChar(char);
+    },
+    [inventory, setCurrentChar],
+  );
 
   // Whether the suggestion row must stay hidden for the current character —
   // true once explicitly resolved (Accept/Deny), or once the character is
@@ -2561,6 +2645,262 @@ export function MechanismGallery({
     ],
   );
 
+  // -- "Existing methods" — base keyboard's own producers for currentChar --
+  //
+  // Runs collectCharContributors against baseIr (never the carve working
+  // IR — baseIr is the same source-of-truth projectWorkingCopyVfs itself
+  // projects from) to find every place in the BASE keyboard that already
+  // produces currentChar, then flattens it to one row per method:
+  //   - a ruleNodeId is a whole-rule delete candidate — deletable unless
+  //     removalCapabilities marks it not-removable (context-sensitive /
+  //     opaque / unknown), in which case it's shown muted with a reason.
+  //     CURATION: when the char also has a PRODUCED store-slot row (see
+  //     below), the keystroke row(s) for the SAME char are omitted — the
+  //     store-slot row is the real, always-current method and a duplicate
+  //     "Press X" row alongside it is noise. Only when a keystroke is the
+  //     char's SOLE producer (no produced store-slot exists) is it kept —
+  //     the completeness floor is a last resort, never routinely skipped.
+  //   - a storeSlot is an output/input-store slot drop — deletable exactly
+  //     when its descriptor's `producedRole` is "produced" (a genuine
+  //     producer of the char). A `producedRole: "used"` slot (the char is
+  //     consumed as INPUT there — a deadkey base, or a non-deadkey rule's
+  //     own input-store occurrence — not produced) renders the same blue,
+  //     non-deletable chip as composition/unattributed/blocked: removing it
+  //     wouldn't remove a method that produces this char at all.
+  //   - a `blocked` entry (opaque fragment, or a multi-char literal output
+  //     that can't be split) is always muted, never silently dropped.
+  // A method already removed THIS session (its id already in
+  // deletedItemIds, via the existing carve overlay) is filtered out
+  // entirely — collectCharContributors always reads baseIr, which never
+  // reflects the overlay itself.
+  interface ExistingMethodRow {
+    id: string;
+    label: string;
+    deletable: boolean;
+    /**
+     * True exactly when this row's descriptor is `producedRole: "used"` — the
+     * char is only CONSUMED here (a deadkey base, or a non-deadkey rule's
+     * own any()-consumed input-store occurrence), never produced by it. Only
+     * a "slot" row can ever be `true`; every other kind (rule/blocked/
+     * composition/unattributed) always PRODUCES the char and is `false`.
+     * Drives the color split (blue vs. green) independently of `deletable`
+     * (the delete-affordance signal) — see `NonDeletableMethodChip`'s doc
+     * comment in parts/RemovableChipRow.tsx.
+     */
+    isUsed: boolean;
+    kind: "rule" | "slot" | "blocked" | "composition" | "unattributed";
+    reason?: string;
+  }
+
+  const existingMethodContributors = useMemo<CharContributors | null>(
+    () =>
+      baseIr !== null && currentChar !== null
+        ? collectCharContributors(baseIr, currentChar)
+        : null,
+    [baseIr, currentChar],
+  );
+
+  const existingMethods = useMemo<ExistingMethodRow[]>(() => {
+    if (existingMethodContributors === null || baseIr === null) return [];
+
+    // `descriptors` is INDEX-PARALLEL to ruleNodeIds, then storeSlots, then
+    // blocked, concatenated in that order (see collectCharContributors.ts's
+    // doc comment on `descriptors`) — slice it back into three per-array
+    // views rather than re-deriving a lookup, so each loop below can zip its
+    // own array against the matching descriptor by position.
+    const { descriptors } = existingMethodContributors;
+    const ruleDescriptors = descriptors.slice(
+      0,
+      existingMethodContributors.ruleNodeIds.length,
+    );
+    const storeSlotDescriptors = descriptors.slice(
+      existingMethodContributors.ruleNodeIds.length,
+      existingMethodContributors.ruleNodeIds.length +
+        existingMethodContributors.storeSlots.length,
+    );
+    const blockedDescriptors = descriptors.slice(
+      existingMethodContributors.ruleNodeIds.length +
+        existingMethodContributors.storeSlots.length,
+    );
+
+    const rows: ExistingMethodRow[] = [];
+
+    // Build the store-slot rows FIRST (before the keystroke/rule rows below)
+    // so the keystroke-drop curation can see whether a PRODUCED store-slot
+    // row already exists for this char — pushed into `rows` afterward to
+    // preserve the original rule-then-slot render order.
+    const storeSlotRows: ExistingMethodRow[] = [];
+    let hasProducedStoreSlot = false;
+    existingMethodContributors.storeSlots.forEach((slot, i) => {
+      if (isItemDeleted(slot.slotId)) return;
+      const descriptor = storeSlotDescriptors[i];
+      if (descriptor === undefined) return;
+      // producedRole "used" (a deadkey base, or a non-deadkey rule's own
+      // any()-consumed input-store occurrence — §0 in collectCharContributors)
+      // is not a producer of this char at all; render it exactly like
+      // composition/unattributed/blocked — blue, informational, never
+      // deletable. Absent producedRole (composition/unattributed shapes
+      // never reach this loop) never occurs here — every storeSlots
+      // descriptor is engine-constructed and always carries the field.
+      const isUsed = descriptor.producedRole === "used";
+      // Intentionally `kind === "store-slot"` only — a produced "deadkey" row
+      // (mark+base combination) does NOT count toward `hasProducedStoreSlot`
+      // and so never suppresses the plain-key keystroke row below. A dead-key
+      // combination is a DISTINCT input method, not a redundant restatement
+      // of the plain keystroke the way an alphabet/store fan-out slot is, so
+      // it must not drop the keystroke chip.
+      if (descriptor.kind === "store-slot" && !isUsed) {
+        hasProducedStoreSlot = true;
+      }
+      const baseLabel = composeContributorLabel(descriptor, i18n);
+      storeSlotRows.push({
+        id: slot.slotId,
+        label: isUsed ? appendNotDeletableSuffix(baseLabel, i18n) : baseLabel,
+        deletable: !isUsed,
+        isUsed,
+        kind: "slot",
+      });
+    });
+
+    existingMethodContributors.ruleNodeIds.forEach((nodeId, i) => {
+      if (isItemDeleted(nodeId)) return;
+      const descriptor = ruleDescriptors[i];
+      // Defensive only — the engine's index-parallel invariant guarantees
+      // this is always present; skip rather than mis-attach a label if it
+      // ever isn't.
+      if (descriptor === undefined) return;
+      // Keystroke-drop curation: a produced store-slot row already covers
+      // this char with a real, always-current method — a redundant
+      // "Press X" keystroke row is dropped. Only when NO produced store-slot
+      // exists (the keystroke is the char's sole producer) is this row kept.
+      if (hasProducedStoreSlot) return;
+      const capability: RemovalCapability | undefined =
+        removalCapabilities.get(nodeId);
+      const notRemovable = (capability ?? "").startsWith("not-removable:");
+      const ruleBaseLabel = composeContributorLabel(descriptor, i18n);
+      rows.push({
+        id: nodeId,
+        label: notRemovable
+          ? appendNotDeletableSuffix(ruleBaseLabel, i18n)
+          : ruleBaseLabel,
+        deletable: !notRemovable,
+        isUsed: false,
+        kind: "rule",
+        ...(notRemovable
+          ? {
+              reason: capabilityHint(
+                capability ?? "not-removable:unknown",
+                i18n,
+              ),
+            }
+          : {}),
+      });
+    });
+
+    rows.push(...storeSlotRows);
+
+    existingMethodContributors.blocked.forEach((b, i) => {
+      const descriptor = blockedDescriptors[i];
+      const blockedBaseLabel =
+        descriptor !== undefined
+          ? composeContributorLabel(descriptor, i18n)
+          : b.label;
+      rows.push({
+        id: `blocked:${i}:${b.label}`,
+        label: appendNotDeletableSuffix(blockedBaseLabel, i18n),
+        deletable: false,
+        isUsed: false,
+        kind: "blocked",
+        reason: b.reason,
+      });
+    });
+
+    // SHOW-ALL composition row (spec follow-up): currentChar isn't directly
+    // produced by the base (no real method row above covers it), but IS
+    // composable from characters the base DOES directly produce — synthesize
+    // one blue, non-deletable informational row via the SAME
+    // composeContributorLabel composer every other kind goes through.
+    // baseProducedSet is the PRE-augmentation set (see its own doc comment) —
+    // composition stays strictly one level, never chained off an
+    // already-composable char.
+    if (currentChar !== null) {
+      const compositionDescriptor = collectCompositionMethod(
+        baseProducedSet,
+        currentChar,
+      );
+      if (compositionDescriptor !== undefined) {
+        rows.push({
+          id: `composition:${currentChar}`,
+          label: appendNotDeletableSuffix(
+            composeContributorLabel(compositionDescriptor, i18n),
+            i18n,
+          ),
+          deletable: false,
+          isUsed: false,
+          kind: "composition",
+          reason: compositionTooltip(compositionDescriptor, i18n),
+        });
+      }
+    }
+
+    // SHOW-ALL floor (criterion 18.6-adjacent invariant): currentChar is
+    // GREEN (a member of the augmented alreadyProducedSet the CharScrollStrip
+    // badge uses) but, after everything above, still has zero rows — an
+    // unrecognized-shape producer collectCharContributors couldn't attribute
+    // at all. Append one truthful, no-arrow floor row rather than leave the
+    // section empty under a green badge.
+    if (
+      currentChar !== null &&
+      rows.length === 0 &&
+      alreadyProducedSet.has(currentChar)
+    ) {
+      rows.push({
+        id: `unattributed:${currentChar}`,
+        label: appendNotDeletableSuffix(
+          composeContributorLabel(
+            { kind: "unattributed", producedChar: currentChar, producedRole: "produced" },
+            i18n,
+          ),
+          i18n,
+        ),
+        deletable: false,
+        isUsed: false,
+        kind: "unattributed",
+      });
+    }
+
+    return rows;
+    // deletedItemIds is an intentional dep even though only isItemDeleted is
+    // called in the body — see the store-selector comment above.
+  }, [
+    existingMethodContributors,
+    baseIr,
+    removalCapabilities,
+    isItemDeleted,
+    deletedItemIds,
+    i18n,
+    currentChar,
+    baseProducedSet,
+    alreadyProducedSet,
+  ]);
+
+  const handleRemoveExistingMethod = useCallback(
+    (row: ExistingMethodRow) => {
+      if (!row.deletable) return;
+      // Routes through the SAME cascadeDelete the full carve gallery uses
+      // (CarveGallery.tsx) — a rule nodeId and a store slot id both go
+      // through the item channel there too, so a removal made here is
+      // reversible via the identical Undo stack and is reflected at output
+      // by the existing carve-deletion projection step. No new store state.
+      if (row.kind === "rule") {
+        cascadeDelete([row.id], []);
+      } else if (row.kind === "slot") {
+        cascadeDelete([], [row.id]);
+      }
+    },
+    [cascadeDelete],
+  );
+
   // Edit-after-Done: unlocks the desktop layout so a completed Mechanism
   // Gallery can be revisited and corrected. When a touch layout has already
   // been built from the (now-stale) physical layout, mark the TOUCH step
@@ -2751,7 +3091,16 @@ export function MechanismGallery({
             disabled: false,
             style: forwardBtnStyle,
           }
-        : currentChar !== null
+        : // The per-char Next/Done control is scoped to lettersToAdd's walk
+          // order (Back/Next/Skip/canGoNext all key off it — see the
+          // lettersToAdd-gating comment above). currentChar can now also be
+          // an already-produced character selected via the SHOW-ALL
+          // CharScrollStrip (handleSelectDisplayChar) — HIDE this button
+          // entirely rather than render it disabled in that case: it isn't
+          // a "global Next" separate from this one, so a disabled render
+          // would look like the walk is stuck rather than simply "you're
+          // inspecting a character outside this step's coverage".
+          currentChar !== null && lettersToAdd.includes(currentChar)
           ? {
               label: hasAnotherCharAfterCurrent
                 ? t({
@@ -2965,19 +3314,28 @@ export function MechanismGallery({
           </div>
         )}
 
-        {/* Character scroll strip — horizontal, all of lettersToAdd; click
-              any chip to jump straight to that character (replaces the old
-              "Previous character" button, which only ever stepped back one
-              position). Each chip's badge is the produces-count for that
-              character in THIS gallery's modality (physical) — see
-              charMechanisms.ts. */}
-        {lettersToAdd.length > 0 && (
+        {/* Character scroll strip — horizontal, SHOW-ALL of the confirmed
+              inventory (criterion 18.6), not just lettersToAdd: an author
+              should be able to see and inspect every character, including
+              ones the base keyboard already produces, not only the ones
+              still needing a method. `inheritedChars` feeds alreadyProduced
+              into CharScrollStrip's badge so those chips still show the
+              green produces->=1 badge (mirrors TouchGallery's
+              detectedChars). Selecting a chip goes through
+              handleSelectDisplayChar (not handleSelectChar, which is gated
+              on lettersToAdd) so an already-produced chip is still
+              selectable — see handleSelectDisplayChar's own doc comment and
+              the forwardButton guard below for what changes once such a
+              character is selected. lettersToAdd itself (coverage counter,
+              coverage gate, canGoNext) is never widened. */}
+        {inventory.length > 0 && (
           <CharScrollStrip
-            chars={lettersToAdd}
+            chars={inventory}
             currentChar={currentChar}
-            onSelectChar={handleSelectChar}
+            onSelectChar={handleSelectDisplayChar}
             assignments={sessionAssignments}
             modality="physical"
+            inheritedChars={alreadyProducedSet}
           />
         )}
 
@@ -3221,12 +3579,11 @@ export function MechanismGallery({
                             .map((m) => methodLabel(m, i18n))
                             .join(", ");
                     return (
-                      <button
+                      <HoverDangerChip
                         key={i}
-                        type="button"
                         onClick={() => handleRemoveMechanism(a)}
                         disabled={locked}
-                        aria-label={t({
+                        ariaLabel={t({
                           id: "editor.assignLoop.removeMethodAriaLabel",
                           message: `Remove method ${label} for ${currentChar}`,
                         })}
@@ -3234,7 +3591,7 @@ export function MechanismGallery({
                           id: "editor.assignLoop.clickToRemove",
                           message: "click to remove",
                         })}
-                        style={{
+                        baseStyle={{
                           display: "inline-flex",
                           alignItems: "center",
                           gap: 4,
@@ -3252,15 +3609,116 @@ export function MechanismGallery({
                         {label}
                         <span
                           aria-hidden="true"
-                          style={{ fontSize: 10, opacity: 0.7 }}
+                          style={{ fontSize: 10, color: "inherit", opacity: 0.7 }}
                         >
                           {" ×"}
                         </span>
-                      </button>
+                      </HoverDangerChip>
                     );
                   })}
               </div>
             )}
+
+            {/* Existing methods — the BASE keyboard's own producers for
+                  currentChar (desktop "delete each pre-existing method").
+                  COLOR tracks PRODUCED vs. USED; deletability is a SEPARATE
+                  signal carried by which of the two branches below a row
+                  takes, not by color:
+                    - row.deletable        -> green HoverDangerChip: "×" +
+                      red-on-hover + click-to-delete (real keystroke/store-
+                      slot/deadkey producers removalCapabilities allows).
+                    - !deletable && isUsed  -> BLUE NonDeletableMethodChip: a
+                      "slot" row whose descriptor is producedRole "used" — the
+                      char is only CONSUMED here (a deadkey base, or a
+                      non-deadkey rule's own any()-consumed input-store
+                      occurrence), never produced by this row.
+                    - !deletable && !isUsed -> GREEN NonDeletableMethodChip,
+                      static: composition, unattributed (SHOW-ALL floor),
+                      blocked/opaque/multi-char, and a produced rule
+                      removalCapabilities marked not-removable. All of these
+                      PRODUCE the char but have no single rule/slot to
+                      surgically delete — green-without-"×" is the visual
+                      signal for "produced here, nothing single to delete."
+                  See existingMethods/handleRemoveExistingMethod above for how
+                  rows are built and removed, and NonDeletableMethodChip
+                  (parts/RemovableChipRow.tsx) for the shared static-chip
+                  palette. */}
+            {currentChar !== null && existingMethods.length > 0 && (
+              <div>
+                <p
+                  style={{
+                    margin: "0 0 6px",
+                    fontSize: 11,
+                    color: TEXT_DIM,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  <Trans id="editor.assignLoop.existingMethodsHeading">
+                    Existing methods
+                  </Trans>
+                </p>
+                <div
+                  role="group"
+                  aria-label={t({
+                    id: "editor.assignLoop.existingMethodsGroupAriaLabel",
+                    message: "Existing methods from the base keyboard",
+                  })}
+                  style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
+                >
+                  {existingMethods.map((row) =>
+                    row.deletable ? (
+                      <HoverDangerChip
+                        key={row.id}
+                        onClick={() => handleRemoveExistingMethod(row)}
+                        disabled={locked}
+                        ariaLabel={t({
+                          id: "editor.assignLoop.removeExistingMethodAriaLabel",
+                          message: `Remove existing method ${row.label} for ${currentChar}`,
+                        })}
+                        title={t({
+                          id: "editor.assignLoop.clickToRemove",
+                          message: "click to remove",
+                        })}
+                        baseStyle={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          padding: "3px 8px",
+                          background: "#0d2218",
+                          border: "1px solid #238636",
+                          borderRadius: 12,
+                          color: "#56d364",
+                          fontSize: 11,
+                          fontFamily:
+                            "ui-monospace, 'Cascadia Code', Consolas, monospace",
+                          cursor: locked ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {row.label}
+                        <span
+                          aria-hidden="true"
+                          style={{ fontSize: 10, color: "inherit", opacity: 0.7 }}
+                        >
+                          {" ×"}
+                        </span>
+                      </HoverDangerChip>
+                    ) : (
+                      <NonDeletableMethodChip
+                        key={row.id}
+                        variant={row.isUsed ? "blue" : "green"}
+                        {...(row.reason !== undefined
+                          ? { reason: row.reason }
+                          : {})}
+                      >
+                        {row.label}
+                      </NonDeletableMethodChip>
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
+
             {currentChar !== null &&
               hasSequenceForChar(sessionAssignments, currentChar) && (
                 <div
@@ -3409,6 +3867,7 @@ export function MechanismGallery({
             chipBackground="#0d2218"
             chipBorder="#238636"
             chipColor="#56d364"
+            hoverDanger
             items={[...coveredChars].map((c) => ({
               key: c,
               label: displayChar(c),
@@ -3440,6 +3899,7 @@ export function MechanismGallery({
             chipBackground="#1c2a3a"
             chipBorder="#58a6ff"
             chipColor="#58a6ff"
+            hoverDanger={false}
             items={sequenceRecordedChars.map((c) => ({
               key: c,
               label: displayChar(c),

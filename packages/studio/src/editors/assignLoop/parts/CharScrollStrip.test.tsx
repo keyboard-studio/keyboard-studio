@@ -8,10 +8,16 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { render } from "../../../test/renderWithI18n.tsx";
-import { CharScrollStrip } from "./CharScrollStrip.tsx";
+import { CharScrollStrip, MAX_VISIBLE_CHIPS } from "./CharScrollStrip.tsx";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import { PATTERN_DEADKEY } from "../patternIds.ts";
 import { expectCurrentChar, getCurrentCharChip } from "../../../test/currentCharChip.ts";
+
+/** `count` distinct, collision-free single-codepoint characters (private-use
+ *  area, well away from every other test's ASCII/Latin fixtures in this file). */
+function manyChars(count: number): string[] {
+  return Array.from({ length: count }, (_, i) => String.fromCodePoint(0xe000 + i));
+}
 
 afterEach(() => {
   cleanup();
@@ -46,6 +52,80 @@ describe("CharScrollStrip — chip rendering", () => {
       />,
     );
     expect(container.firstChild).toBeNull();
+  });
+});
+
+describe("CharScrollStrip — large-inventory rendering cap (regression: full-inventory freeze)", () => {
+  // A `chars` list past MAX_VISIBLE_CHIPS mounted one <button> chip per
+  // character — for a real several-thousand-character inventory (e.g.
+  // Hakka's ~3k confirmed romanization inventory) this froze the tab on
+  // entry to the gallery. These lock the fix's actual contract: the DOM node
+  // count stays bounded, AND the currently-selected character is never
+  // truncated out of the rendered slice, however far into the list it is.
+
+  it("mounts at most MAX_VISIBLE_CHIPS chips for a list far larger than that", () => {
+    const chars = manyChars(MAX_VISIBLE_CHIPS + 500);
+    render(
+      <CharScrollStrip
+        chars={chars}
+        currentChar={chars[0] ?? null}
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+
+    expect(screen.getAllByRole("button")).toHaveLength(MAX_VISIBLE_CHIPS);
+  });
+
+  it("keeps the currently-selected chip rendered and aria-pressed even when its index is far past a naive head-of-list truncation", () => {
+    const chars = manyChars(MAX_VISIBLE_CHIPS + 500);
+    const lastChar = chars[chars.length - 1] ?? "";
+    render(
+      <CharScrollStrip
+        chars={chars}
+        currentChar={lastChar}
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+
+    expectCurrentChar(lastChar);
+    expect(getCurrentCharChip().getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("shows the 'Showing N of M' note only when the list is actually truncated", () => {
+    const chars = manyChars(MAX_VISIBLE_CHIPS + 500);
+    render(
+      <CharScrollStrip
+        chars={chars}
+        currentChar={chars[0] ?? null}
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+
+    expect(
+      screen.getByText(new RegExp(`Showing ${MAX_VISIBLE_CHIPS} of ${chars.length}`)),
+    ).toBeTruthy();
+  });
+
+  it("renders every chip with no truncation note when the list is exactly at the cap", () => {
+    const chars = manyChars(MAX_VISIBLE_CHIPS);
+    render(
+      <CharScrollStrip
+        chars={chars}
+        currentChar={chars[0] ?? null}
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+
+    expect(screen.getAllByRole("button")).toHaveLength(MAX_VISIBLE_CHIPS);
+    expect(screen.queryByText(/Showing \d+ of \d+/)).toBeNull();
   });
 });
 
