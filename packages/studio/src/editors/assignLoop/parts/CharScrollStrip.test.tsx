@@ -571,241 +571,65 @@ describe("CharScrollStrip — wheel horizontal scroll", () => {
   });
 });
 
-describe("CharScrollStrip — arrow-key navigation (ArrowLeft/ArrowRight cycle selection)", () => {
-  // The container's onKeyDown handler (handleKeyDown in CharScrollStrip.tsx)
-  // walks the FULL `chars` array (not the windowed `visibleChars` slice),
-  // wrapping at both ends, and delegates the actual selection to the same
-  // `onSelectChar` prop the chip's onClick uses. Fired via a native
-  // KeyboardEvent + el.dispatchEvent (not RTL's fireEvent.keyDown) so the
-  // dispatched event instance can be read back for `.defaultPrevented` —
-  // same rationale as dispatchWheel above: this is a JSX onKeyDown prop, so
-  // React's own root-level delegation still picks up a bubbling native
-  // KeyboardEvent dispatched directly on the strip div.
-  function dispatchKeyDown(el: Element, key: string): KeyboardEvent {
-    const event = new KeyboardEvent("keydown", {
-      key,
-      cancelable: true,
-      bubbles: true,
-    });
-    el.dispatchEvent(event);
-    return event;
-  }
-
-  it("ArrowRight from a middle character selects the NEXT character", () => {
-    const onSelectChar = vi.fn();
-    render(
+describe("CharScrollStrip — focus glue (DOM focus follows the newly selected chip, gated on an already-focused chip)", () => {
+  // ArrowLeft/ArrowRight cycling itself has moved to the PANE level —
+  // useCharCycleKeys.test.ts now owns the wrap-around/guard-key/no-op
+  // coverage that used to live here (see that file). What's left here is
+  // CharScrollStrip's own remaining contract: reacting to a `currentChar`
+  // prop change by (a) scrolling the new chip into view and (b) moving DOM
+  // focus onto it, but ONLY when focus was already resting on one of this
+  // strip's own chips — see the component's own doc comment on the
+  // `[currentChar]` effect for why the gate exists (a Next/Skip button click
+  // elsewhere in the pane must never yank focus onto a distant chip).
+  it("moving currentChar while focus is on a DIFFERENT chip in this strip moves focus to the new chip", () => {
+    const { rerender } = render(
       <CharScrollStrip
         chars={["a", "b", "c"]}
         currentChar="b"
-        onSelectChar={onSelectChar}
+        onSelectChar={vi.fn()}
         assignments={[]}
         modality="physical"
       />,
     );
-    const strip = screen.getByTestId("char-scroll-strip");
+    // Simulate an in-progress roving-focus session: focus already sits on
+    // some chip in the strip (not necessarily the selected one).
+    screen.getByTestId("char-scroll-chip-0062").focus();
+    expect(document.activeElement).toBe(screen.getByTestId("char-scroll-chip-0062"));
 
-    dispatchKeyDown(strip, "ArrowRight");
-
-    expect(onSelectChar).toHaveBeenCalledTimes(1);
-    expect(onSelectChar).toHaveBeenCalledWith("c");
-  });
-
-  it("ArrowRight on the LAST character wraps around to the FIRST character", () => {
-    const onSelectChar = vi.fn();
-    render(
+    rerender(
       <CharScrollStrip
         chars={["a", "b", "c"]}
         currentChar="c"
-        onSelectChar={onSelectChar}
+        onSelectChar={vi.fn()}
         assignments={[]}
         modality="physical"
       />,
     );
-    const strip = screen.getByTestId("char-scroll-strip");
 
-    dispatchKeyDown(strip, "ArrowRight");
-
-    expect(onSelectChar).toHaveBeenCalledTimes(1);
-    expect(onSelectChar).toHaveBeenCalledWith("a");
+    expect(document.activeElement).toBe(screen.getByTestId("char-scroll-chip-0063")); // "c"
   });
 
-  it("ArrowLeft on the FIRST character wraps around to the LAST character", () => {
-    const onSelectChar = vi.fn();
-    render(
-      <CharScrollStrip
-        chars={["a", "b", "c"]}
-        currentChar="a"
-        onSelectChar={onSelectChar}
-        assignments={[]}
-        modality="physical"
-      />,
-    );
-    const strip = screen.getByTestId("char-scroll-strip");
+  it("moving currentChar while focus is OUTSIDE the strip does NOT steal focus onto the new chip (no double-handling / no hijack regression), but still scrolls the new chip into view", () => {
+    // jsdom does not implement scrollIntoView at all — the component
+    // feature-detects it (see CharScrollStrip.tsx's `[currentChar]` effect),
+    // so without a stub the call is silently skipped and this test would
+    // have nothing to assert on. Stub it here and restore afterward so
+    // other tests in this file keep running against the real feature-detect
+    // (undefined) path.
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const scrollSpy = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scrollSpy;
 
-    dispatchKeyDown(strip, "ArrowLeft");
+    try {
+      // A sibling focusable control outside the strip — stands in for e.g. the
+      // gallery's own "Next character"/"Skip" button, which sits in the same
+      // pane but outside CharScrollStrip.
+      const outsideButton = document.createElement("button");
+      document.body.appendChild(outsideButton);
+      outsideButton.focus();
+      expect(document.activeElement).toBe(outsideButton);
 
-    expect(onSelectChar).toHaveBeenCalledTimes(1);
-    expect(onSelectChar).toHaveBeenCalledWith("c");
-  });
-
-  it("ArrowLeft from a middle character selects the PREVIOUS character", () => {
-    const onSelectChar = vi.fn();
-    render(
-      <CharScrollStrip
-        chars={["a", "b", "c"]}
-        currentChar="b"
-        onSelectChar={onSelectChar}
-        assignments={[]}
-        modality="physical"
-      />,
-    );
-    const strip = screen.getByTestId("char-scroll-strip");
-
-    dispatchKeyDown(strip, "ArrowLeft");
-
-    expect(onSelectChar).toHaveBeenCalledTimes(1);
-    expect(onSelectChar).toHaveBeenCalledWith("a");
-  });
-
-  it("ArrowRight with currentChar === null selects the FIRST character", () => {
-    const onSelectChar = vi.fn();
-    render(
-      <CharScrollStrip
-        chars={["a", "b", "c"]}
-        currentChar={null}
-        onSelectChar={onSelectChar}
-        assignments={[]}
-        modality="physical"
-      />,
-    );
-    const strip = screen.getByTestId("char-scroll-strip");
-
-    dispatchKeyDown(strip, "ArrowRight");
-
-    expect(onSelectChar).toHaveBeenCalledTimes(1);
-    expect(onSelectChar).toHaveBeenCalledWith("a");
-  });
-
-  it("ArrowLeft with currentChar === null selects the LAST character", () => {
-    const onSelectChar = vi.fn();
-    render(
-      <CharScrollStrip
-        chars={["a", "b", "c"]}
-        currentChar={null}
-        onSelectChar={onSelectChar}
-        assignments={[]}
-        modality="physical"
-      />,
-    );
-    const strip = screen.getByTestId("char-scroll-strip");
-
-    dispatchKeyDown(strip, "ArrowLeft");
-
-    expect(onSelectChar).toHaveBeenCalledTimes(1);
-    expect(onSelectChar).toHaveBeenCalledWith("c");
-  });
-
-  it("an arrow key on an EMPTY chars list is a no-op — no onSelectChar call, no throw", () => {
-    // CharScrollStrip renders `null` (no strip div at all — see the "renders
-    // null (no strip)" test above) when `chars` is empty, so there is no
-    // container to dispatch a keydown against in the first place; the
-    // no-op guarantee this locks down is really "mounting with an empty
-    // list never throws and never calls onSelectChar", which the render
-    // itself already exercises.
-    const onSelectChar = vi.fn();
-    expect(() =>
-      render(
-        <CharScrollStrip
-          chars={[]}
-          currentChar={null}
-          onSelectChar={onSelectChar}
-          assignments={[]}
-          modality="physical"
-        />,
-      ),
-    ).not.toThrow();
-
-    expect(onSelectChar).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("char-scroll-strip")).toBeNull();
-  });
-
-  it("a non-arrow key (Enter) does NOT call onSelectChar", () => {
-    const onSelectChar = vi.fn();
-    render(
-      <CharScrollStrip
-        chars={["a", "b", "c"]}
-        currentChar="b"
-        onSelectChar={onSelectChar}
-        assignments={[]}
-        modality="physical"
-      />,
-    );
-    const strip = screen.getByTestId("char-scroll-strip");
-
-    dispatchKeyDown(strip, "Enter");
-
-    expect(onSelectChar).not.toHaveBeenCalled();
-  });
-
-  it("a non-arrow key (a plain letter) does NOT call onSelectChar", () => {
-    const onSelectChar = vi.fn();
-    render(
-      <CharScrollStrip
-        chars={["a", "b", "c"]}
-        currentChar="b"
-        onSelectChar={onSelectChar}
-        assignments={[]}
-        modality="physical"
-      />,
-    );
-    const strip = screen.getByTestId("char-scroll-strip");
-
-    dispatchKeyDown(strip, "a");
-
-    expect(onSelectChar).not.toHaveBeenCalled();
-  });
-
-  it("calls preventDefault on a handled ArrowRight, but not on an unhandled key", () => {
-    const onSelectChar = vi.fn();
-    render(
-      <CharScrollStrip
-        chars={["a", "b", "c"]}
-        currentChar="b"
-        onSelectChar={onSelectChar}
-        assignments={[]}
-        modality="physical"
-      />,
-    );
-    const strip = screen.getByTestId("char-scroll-strip");
-
-    const arrowEvent = dispatchKeyDown(strip, "ArrowRight");
-    expect(arrowEvent.defaultPrevented).toBe(true);
-
-    const enterEvent = dispatchKeyDown(strip, "Enter");
-    expect(enterEvent.defaultPrevented).toBe(false);
-  });
-
-  describe("focus glue — DOM focus follows the newly selected chip", () => {
-    // handleKeyDown schedules `chipRefs.current.get(nextChar)?.focus()` inside
-    // a requestAnimationFrame (see the component's roving-tabindex comment) so
-    // it runs after the DOM has settled rather than synchronously mid-handler.
-    // Stubbing requestAnimationFrame to invoke its callback immediately (and
-    // synchronously) lets these tests assert on `document.activeElement`
-    // without depending on jsdom's actual frame-timing behavior — the same
-    // vi.stubGlobal/vi.unstubAllGlobals pattern used elsewhere in this repo's
-    // studio tests (e.g. useGoogleAuth.test.ts, envFlag.test.ts) rather than a
-    // one-off mock.
-    afterEach(() => {
-      vi.unstubAllGlobals();
-    });
-
-    it("ArrowRight moves DOM focus onto the newly selected (next) chip", () => {
-      vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-        cb(0);
-        return 1;
-      });
-
-      render(
+      const { rerender } = render(
         <CharScrollStrip
           chars={["a", "b", "c"]}
           currentChar="b"
@@ -814,34 +638,32 @@ describe("CharScrollStrip — arrow-key navigation (ArrowLeft/ArrowRight cycle s
           modality="physical"
         />,
       );
-      const strip = screen.getByTestId("char-scroll-strip");
+      // Rendering the strip itself must not steal focus from outsideButton.
+      expect(document.activeElement).toBe(outsideButton);
 
-      dispatchKeyDown(strip, "ArrowRight");
+      scrollSpy.mockClear();
 
-      expect(document.activeElement).toBe(screen.getByTestId("char-scroll-chip-0063")); // "c"
-    });
-
-    it("ArrowLeft moves DOM focus onto the newly selected (previous) chip", () => {
-      vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-        cb(0);
-        return 1;
-      });
-
-      render(
+      rerender(
         <CharScrollStrip
           chars={["a", "b", "c"]}
-          currentChar="b"
+          currentChar="c"
           onSelectChar={vi.fn()}
           assignments={[]}
           modality="physical"
         />,
       );
-      const strip = screen.getByTestId("char-scroll-strip");
 
-      dispatchKeyDown(strip, "ArrowLeft");
-
-      expect(document.activeElement).toBe(screen.getByTestId("char-scroll-chip-0061")); // "a"
-    });
+      // Focus stays on outsideButton — the strip does not hijack it just
+      // because currentChar advanced.
+      expect(document.activeElement).toBe(outsideButton);
+      // But scrollIntoView is UNCONDITIONAL (not gated on focus location) —
+      // the newly selected chip must still be brought into view even though
+      // DOM focus never moved.
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+      outsideButton.remove();
+    } finally {
+      HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+    }
   });
 });
 

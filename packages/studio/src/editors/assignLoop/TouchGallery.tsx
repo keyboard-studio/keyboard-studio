@@ -146,6 +146,7 @@ import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
+import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
@@ -1769,6 +1770,20 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     initialSuggestionResolved: touchDraft?.suggestionResolvedChars,
   });
 
+  // ArrowLeft/ArrowRight character cycling, attached at the PANE level (the
+  // leftContent wrapping div below) rather than on CharScrollStrip itself —
+  // this is the actual fix for the touch gallery: selecting a character here
+  // resets a large chooser subtree (method/hostKey/flick/layer state, right
+  // below) that can pull DOM focus off the strip's chip, which silently
+  // killed a chip-scoped keydown handler. See useCharCycleKeys.ts. Reuses
+  // `handleSelectChar` (the SAME handler CharScrollStrip's chip onClick
+  // calls) so there is exactly one selection call site, not two.
+  const handlePaneKeyDown = useCharCycleKeys({
+    chars: inventory,
+    currentChar,
+    onSelectChar: handleSelectChar,
+  });
+
   // Intro splash — shown once when the author first enters the touch gallery so
   // the move from the desktop (physical) gallery to touch is explicit. The
   // store flag persists "seen" across unmount/remount, so the intro shows once
@@ -2928,8 +2943,13 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const currentCharDisplay =
     currentChar !== null ? displayChar(currentChar) : null;
 
+  // onKeyDown lives on this OUTER pane div (not on CharScrollStrip below) so
+  // ArrowLeft/ArrowRight cycles the character no matter which control inside
+  // the pane currently has focus — a plain native keydown bubbles up to here
+  // regardless of the focused descendant. See useCharCycleKeys.ts.
   const leftContent = (
     <div
+      onKeyDown={handlePaneKeyDown}
       style={{
         display: "flex",
         flexDirection: "column",

@@ -130,6 +130,7 @@ import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
+import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
@@ -1750,6 +1751,17 @@ export function MechanismGallery({
     [inventory, setCurrentChar],
   );
 
+  // ArrowLeft/ArrowRight character cycling, attached at the PANE level (the
+  // leftContent wrapping div below) rather than on CharScrollStrip itself —
+  // see useCharCycleKeys.ts for why. Reuses `handleSelectDisplayChar` (the
+  // SAME handler CharScrollStrip's chip onClick calls) so there is exactly
+  // one selection call site, not two.
+  const handlePaneKeyDown = useCharCycleKeys({
+    chars: inventory,
+    currentChar,
+    onSelectChar: handleSelectDisplayChar,
+  });
+
   // Whether the suggestion row must stay hidden for the current character —
   // true once explicitly resolved (Accept/Deny), or once the character is
   // already covered (a configured char never re-prompts). Skipping does not
@@ -3059,8 +3071,13 @@ export function MechanismGallery({
   // Left pane content
   // ---------------------------------------------------------------------------
 
+  // onKeyDown lives on this OUTER pane div (not on CharScrollStrip below) so
+  // ArrowLeft/ArrowRight cycles the character no matter which control inside
+  // the pane currently has focus — a plain native keydown bubbles up to here
+  // regardless of the focused descendant. See useCharCycleKeys.ts.
   const leftContent = (
     <div
+      onKeyDown={handlePaneKeyDown}
       style={{
         display: "flex",
         flexDirection: "column",
