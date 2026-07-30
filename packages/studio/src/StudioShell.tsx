@@ -87,6 +87,7 @@ import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
 import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
 import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
+import { useSurveyBrowserHistorySync } from "./hooks/useSurveyBrowserHistorySync.ts";
 
 // Offer the resume banner only once per page load — on the first SurveyView
 // mount in this JS context, not on same-session route remounts (navigating away
@@ -423,12 +424,30 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // The localStorage draft (lib/draftAutosave.ts) is unaffected either way: it
   // lives in localStorage, not the store — the resume banner below reads it and
   // only applyDraft() (on Resume) hydrates the store.
+  // Flipped to true at the end of the reset/restore effect below — passed to
+  // useSurveyBrowserHistorySync as a live ordering guard (DEV-only): if a
+  // future edit reorders the two calls (or hoists the sync hook above this
+  // effect), that hook's own mount effect finds this still `false` and fails
+  // loud instead of silently tagging the browser entry with a stale
+  // activeStepId. See useSurveyBrowserHistorySync.ts's doc comment on the
+  // param.
+  const resetOrRestoreSettledRef = useRef(false);
   useEffect(() => {
     if (!wasDraftRestoredThisBoot()) {
       useSurveySessionStore.getState().reset();
     }
+    resetOrRestoreSettledRef.current = true;
     // Intentionally empty deps: runs exactly once on mount.
   }, []);
+
+  // F7 fix — browser Back/Forward integration for the survey wizard (see
+  // hooks/useSurveyBrowserHistorySync.ts for the full design + sync
+  // invariant). MUST be called after the reset/restore effect immediately
+  // above: its own mount effect reads the store's activeStepId to tag the
+  // current browser entry, and needs that effect's decision (reset vs.
+  // restored) already settled. resetOrRestoreSettledRef makes that ordering
+  // requirement a live DEV-mode check rather than declaration-order-only.
+  useSurveyBrowserHistorySync(resetOrRestoreSettledRef);
 
   // ---------------------------------------------------------------------------
   // Resume-draft banner + autosave (localStorage draft; lib/draftAutosave.ts).

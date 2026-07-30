@@ -33,7 +33,12 @@
 import type { ReactNode, CSSProperties } from "react";
 import { Trans } from "@lingui/react/macro";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import {
+  useSurveySessionStore,
+  performManifestBack,
+  expectedBackTarget,
+  type ActiveStepId,
+} from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { manifest } from "../steps/manifest.ts";
 import type { EditorStep } from "../steps/types.ts";
@@ -119,9 +124,11 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   // identityResult is read here only for the terminal panels (unsupported stub).
   const identityResult = useSurveySessionStore((s) => s.identityResult);
   const sessionAdvance = useSurveySessionStore((s) => s.advance);
-  const sessionPopHistory = useSurveySessionStore((s) => s.popHistory);
-  // Spec 035 R12 re-entry path — see handleBack's "touch" special case below.
-  const sessionBackToTouchSeedSource = useSurveySessionStore((s) => s.backToTouchSeedSource);
+  // Subscribed (not snapshotted once) so the Back affordance's gating below
+  // stays live across advance/pop/reset — F7 defect 2: a stale "always show
+  // Back" render made the button inert at the first step / right after
+  // Start-over.
+  const history = useSurveySessionStore((s) => s.history);
   const setCharactersSubStage = useSurveySessionStore((s) => s.setCharactersSubStage);
 
   const recordPhase = useWorkingCopyStore((s) => s.recordPhase);
@@ -281,15 +288,27 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   // character must always resurface the touch_seed_source chooser, not follow
   // the generic history pop — which would land on "mechanisms" whenever the
   // fork was skipped this pass (a recorded, non-stale choice routes advance()
-  // straight from mechanisms to touch). See surveySessionStore.backToTouchSeedSource
-  // for how this stays consistent with the chooser's own (generic) Back.
+  // straight from mechanisms to touch). performManifestBack (stores/
+  // surveySessionStore.ts) is the ONE place that encodes this dispatch — the
+  // browser-history popstate bridge (hooks/useSurveyBrowserHistorySync.ts)
+  // calls the exact same function, so in-app Back and browser Back never
+  // diverge (F7 defect 1).
+  // resolvedStep.id is StepBase.id (string), guaranteed a valid ActiveStepId
+  // by the manifest — same cast idiom as handleComplete's advance() call above.
   function handleBack(): void {
-    if (resolvedStep.id === "touch") {
-      sessionBackToTouchSeedSource();
-      return;
-    }
-    sessionPopHistory();
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    performManifestBack(resolvedStep.id as ActiveStepId);
   }
+
+  // F7 defect 2: only offer the Back affordance when it can genuinely do
+  // something. `expectedBackTarget` mirrors performManifestBack's own
+  // decision without mutating — non-null exactly when there's a real target
+  // (a non-empty sanitized history, or "touch"'s always-available
+  // touch_seed_source re-entry). At activeStepId "identity" with history []
+  // (first step, or right after Start-over) this is null, so `onBack` is
+  // omitted below rather than handed down as an inert callback.
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  const canGoBack = expectedBackTarget(resolvedStep.id as ActiveStepId, history) !== null;
 
   // ---------------------------------------------------------------------------
   // Render with chrome by layout (FR-002, R4).
@@ -304,7 +323,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   const content = (
     <Component
       onComplete={handleComplete}
-      onBack={handleBack}
+      {...(canGoBack ? { onBack: handleBack } : {})}
       {...(ctx !== undefined ? { ctx } : {})}
     />
   );
