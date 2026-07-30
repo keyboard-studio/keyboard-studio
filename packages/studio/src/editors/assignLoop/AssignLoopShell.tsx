@@ -16,6 +16,19 @@
 import type { ReactNode } from "react";
 import { BORDER, ACCENT, TEXT_DIM, FONT, galleryPageStyle as pageStyle } from "../../lib/galleryTheme.ts";
 
+/**
+ * The canonical left-pane share of a full-bleed two-pane gallery screen
+ * (MechanismGallery / TouchGallery via this shell) — the right pane (the
+ * live preview) gets the remaining `100 - ASSIGN_LOOP_LEFT_PANE_PCT`. This
+ * is the single source of truth for "how big does the live preview render"
+ * on a full-bleed step (no persistent StudioShell right pane competing for
+ * width): other full-bleed screens with their own inline live-preview
+ * column (e.g. TouchSeedSourcePanel's reseed preview) should reuse this
+ * constant rather than inventing their own split, so every live preview in
+ * the studio occupies the same share of the screen.
+ */
+export const ASSIGN_LOOP_LEFT_PANE_PCT = 45;
+
 export interface AssignLoopShellProps {
   /** Gallery title text, e.g. "Mechanism Gallery" / "Touch Gallery". */
   headingText: string;
@@ -127,7 +140,7 @@ export function AssignLoopShell({
         {/* LEFT pane */}
         <div
           style={{
-            flexBasis: "45%",
+            flexBasis: `${ASSIGN_LOOP_LEFT_PANE_PCT}%`,
             flexShrink: 0,
             borderRight: `1px solid ${BORDER}`,
             overflowY: "auto",

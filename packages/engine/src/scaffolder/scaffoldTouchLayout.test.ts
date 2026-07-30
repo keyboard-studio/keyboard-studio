@@ -105,14 +105,14 @@ function getLayer(result: TouchLayoutIR, layerId: string, platformId = "phone") 
 }
 
 /**
- * Reusable graph-stranding regression lock (see the hasAltgr=false /
- * hasAltgrShift=true bug class): collects every layer id actually emitted on
+ * Reusable graph-stranding regression lock (see the hasRightAlt=false /
+ * hasRightAltShift=true bug class): collects every layer id actually emitted on
  * the phone platform, walks every key on every layer, and asserts
  *   (1) no key's `nextlayer` points to a layer id that isn't emitted, and
  *   (2) every emitted layer reaches "default" within a bounded number of
  *       hops (a BFS over the nextlayer edges, bounded by the layer count so
  *       it can't loop forever on a cycle).
- * Locks the INVARIANT stated in scaffoldTouchLayout.ts's buildAltgrToggleKey
+ * Locks the INVARIANT stated in scaffoldTouchLayout.ts's buildRightAltToggleKey
  * doc comment, not just the one instance the bug report described.
  */
 function assertNoDanglingNextlayer(result: TouchLayoutIR, platformId = "phone"): void {
@@ -571,7 +571,7 @@ describe("scaffoldTouchLayout", () => {
       expect(lbrkt.pad).toBeUndefined();
     });
 
-    it("numeric row 2 last key is K_BKSP at keyIndex 9 with sp:1 and no width (matches default/shift/altgr)", () => {
+    it("numeric row 2 last key is K_BKSP at keyIndex 9 with sp:1 and no width (matches default/shift/rightalt)", () => {
       const ir = makeMinimalIR();
       const result = scaffoldTouchLayout(ir);
       const numLayer = getLayer(result, "numeric")!;
@@ -810,31 +810,31 @@ describe("scaffoldTouchLayout", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // altgr layer
+  // rightalt layer
   // ---------------------------------------------------------------------------
 
-  describe("altgr layer", () => {
-    it("IR with an RALT-modified key produces an altgr layer", () => {
+  describe("rightalt layer", () => {
+    it("IR with an RALT-modified key produces a rightalt layer", () => {
       const rule = makeCharRule("K_A", ["RALT"], "à");
       const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
 
       const result = scaffoldTouchLayout(ir);
-      expect(getLayer(result, "altgr")).toBeDefined();
+      expect(getLayer(result, "rightalt")).toBeDefined();
     });
 
-    it("altgr layer carries the correct output for the RALT key", () => {
+    it("rightalt layer carries the correct output for the RALT key", () => {
       const rule = makeCharRule("K_A", ["RALT"], "à");
       const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
 
       const result = scaffoldTouchLayout(ir);
-      const altgrLayer = getLayer(result, "altgr")!;
-      const allKeys = altgrLayer.rows.flatMap((r) => r.keys);
+      const rightaltLayer = getLayer(result, "rightalt")!;
+      const allKeys = rightaltLayer.rows.flatMap((r) => r.keys);
       const kaKey = allKeys.find((k) => k.id === "K_A");
       expect(kaKey).toBeDefined();
       expect(kaKey?.output).toBe("à");
     });
 
-    it("IR without any RALT keys does NOT produce an altgr layer", () => {
+    it("IR without any RALT keys does NOT produce a rightalt layer", () => {
       const rules = [
         makeCharRule("K_A", [], "a"),
         makeCharRule("K_A", ["SHIFT"], "A"),
@@ -843,100 +843,100 @@ describe("scaffoldTouchLayout", () => {
       const ir = makeMinimalIR({ groups: [makeGroup(rules)] });
 
       const result = scaffoldTouchLayout(ir);
-      expect(getLayer(result, "altgr")).toBeUndefined();
+      expect(getLayer(result, "rightalt")).toBeUndefined();
     });
 
-    it("RALT+SHIFT combination is mapped to a reachable altgr-shift touch layer carrying the uppercase form", () => {
+    it("RALT+SHIFT combination is mapped to a reachable rightalt-shift touch layer carrying the uppercase form", () => {
       const raltShiftRule = makeCharRule("K_A", ["RALT", "SHIFT"], "Ä");
       const ir = makeMinimalIR({ groups: [makeGroup([raltShiftRule])] });
 
       const result = scaffoldTouchLayout(ir);
-      // No plain altgr layer — the fixture has no RALT-only rule. This is
-      // the hasAltgr=false / hasAltgrShift=true graph-stranding case.
-      expect(getLayer(result, "altgr")).toBeUndefined();
+      // No plain rightalt layer — the fixture has no RALT-only rule. This is
+      // the hasRightAlt=false / hasRightAltShift=true graph-stranding case.
+      expect(getLayer(result, "rightalt")).toBeUndefined();
 
-      const altgrShiftLayer = getLayer(result, "altgr-shift");
-      expect(altgrShiftLayer).toBeDefined();
-      const allKeys = altgrShiftLayer!.rows.flatMap((r) => r.keys);
+      const rightaltShiftLayer = getLayer(result, "rightalt-shift");
+      expect(rightaltShiftLayer).toBeDefined();
+      const allKeys = rightaltShiftLayer!.rows.flatMap((r) => r.keys);
       const kaKey = allKeys.find((k) => k.id === "K_A");
       expect(kaKey).toBeDefined();
       expect(kaKey?.output).toBe("Ä");
 
       // REACHABILITY (not just layer/key presence): some emitted key across
-      // ALL layers must actually have nextlayer === "altgr-shift", or the
+      // ALL layers must actually have nextlayer === "rightalt-shift", or the
       // layer above is dead weight in the compiled keyboard.
       const phone = result.platforms.find((p) => p.id === "phone")!;
       const allKeysAllLayers = phone.layers.flatMap((l) => l.rows.flatMap((r) => r.keys));
-      const entryToAltgrShift = allKeysAllLayers.some((k) => k.nextlayer === "altgr-shift");
-      expect(entryToAltgrShift).toBe(true);
+      const entryToRightAltShift = allKeysAllLayers.some((k) => k.nextlayer === "rightalt-shift");
+      expect(entryToRightAltShift).toBe(true);
 
       // No stranding: every nextlayer targets an emitted layer, and every
-      // emitted layer (including altgr-shift) reaches "default".
+      // emitted layer (including rightalt-shift) reaches "default".
       assertNoDanglingNextlayer(result);
     });
 
-    it("altgr layer every row has ≤10 keys", () => {
+    it("rightalt layer every row has ≤10 keys", () => {
       const rule = makeCharRule("K_A", ["RALT"], "à");
       const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
 
       const result = scaffoldTouchLayout(ir);
-      const altgrLayer = getLayer(result, "altgr")!;
-      for (let i = 0; i < altgrLayer.rows.length; i++) {
-        const row = altgrLayer.rows[i]!;
+      const rightaltLayer = getLayer(result, "rightalt")!;
+      for (let i = 0; i < rightaltLayer.rows.length; i++) {
+        const row = rightaltLayer.rows[i]!;
         expect(
           row.keys.length,
-          `altgr row ${i} has ${row.keys.length} keys (max 10)`,
+          `rightalt row ${i} has ${row.keys.length} keys (max 10)`,
         ).toBeLessThanOrEqual(10);
       }
     });
 
     // -------------------------------------------------------------------------
-    // BUG 1 fix: a generated altgr layer must actually be reachable — a
-    // dedicated toggle key (T_ks_altgr_toggle) replaces the row-1 trailing
-    // spacer on default/shift (nextlayer:"altgr") and on altgr itself
-    // (nextlayer:"default"), ONLY when hasAltgr is true; the no-altgr case
+    // BUG 1 fix: a generated rightalt layer must actually be reachable — a
+    // dedicated toggle key (T_ks_rightalt_toggle) replaces the row-1 trailing
+    // spacer on default/shift (nextlayer:"rightalt") and on rightalt itself
+    // (nextlayer:"default"), ONLY when hasRightAlt is true; the no-rightalt case
     // keeps the plain spacer so the row-count tests (ASDF row spacer, above)
     // stay green.
     // -------------------------------------------------------------------------
 
-    it("default layer row 1 trailing key is the altgr toggle (sp:1, nextlayer:'altgr') when hasAltgr", () => {
+    it("default layer row 1 trailing key is the rightalt toggle (sp:1, nextlayer:'rightalt') when hasRightAlt", () => {
       const rule = makeCharRule("K_A", ["RALT"], "à");
       const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
 
       const result = scaffoldTouchLayout(ir);
       const defaultLayer = getLayer(result, "default")!;
       const row1 = defaultLayer.rows[1]!;
-      const toggle = row1.keys.find((k) => k.id === "T_ks_altgr_toggle");
+      const toggle = row1.keys.find((k) => k.id === "T_ks_rightalt_toggle");
 
       expect(toggle).toBeDefined();
       expect(toggle?.text).toBe("*RAlt*");
       expect(toggle?.sp).toBe(1);
-      expect(toggle?.nextlayer).toBe("altgr");
+      expect(toggle?.nextlayer).toBe("rightalt");
       expect(row1.keys).toHaveLength(10);
     });
 
-    it("shift layer row 1 trailing key is also the altgr toggle when hasAltgr", () => {
+    it("shift layer row 1 trailing key is also the rightalt toggle when hasRightAlt", () => {
       const rule = makeCharRule("K_A", ["RALT"], "à");
       const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
 
       const result = scaffoldTouchLayout(ir);
       const shiftLayer = getLayer(result, "shift")!;
       const row1 = shiftLayer.rows[1]!;
-      const toggle = row1.keys.find((k) => k.id === "T_ks_altgr_toggle");
+      const toggle = row1.keys.find((k) => k.id === "T_ks_rightalt_toggle");
 
       expect(toggle).toBeDefined();
       expect(toggle?.sp).toBe(1);
-      expect(toggle?.nextlayer).toBe("altgr");
+      expect(toggle?.nextlayer).toBe("rightalt");
     });
 
-    it("altgr layer row 1 trailing key returns to default (sp:2, nextlayer:'default')", () => {
+    it("rightalt layer row 1 trailing key returns to default (sp:2, nextlayer:'default')", () => {
       const rule = makeCharRule("K_A", ["RALT"], "à");
       const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
 
       const result = scaffoldTouchLayout(ir);
-      const altgrLayer = getLayer(result, "altgr")!;
-      const row1 = altgrLayer.rows[1]!;
-      const toggle = row1.keys.find((k) => k.id === "T_ks_altgr_toggle");
+      const rightaltLayer = getLayer(result, "rightalt")!;
+      const row1 = rightaltLayer.rows[1]!;
+      const toggle = row1.keys.find((k) => k.id === "T_ks_rightalt_toggle");
 
       expect(toggle).toBeDefined();
       expect(toggle?.text).toBe("*RAlt*");
@@ -945,43 +945,43 @@ describe("scaffoldTouchLayout", () => {
       expect(row1.keys).toHaveLength(10);
     });
 
-    it("altgr toggle key is ABSENT (plain spacer instead) when there is no altgr layer", () => {
+    it("rightalt toggle key is ABSENT (plain spacer instead) when there is no rightalt layer", () => {
       const ir = makeMinimalIR();
       const result = scaffoldTouchLayout(ir);
       const defaultLayer = getLayer(result, "default")!;
       const row1 = defaultLayer.rows[1]!;
 
-      expect(row1.keys.find((k) => k.id === "T_ks_altgr_toggle")).toBeUndefined();
+      expect(row1.keys.find((k) => k.id === "T_ks_rightalt_toggle")).toBeUndefined();
       expect(row1.keys.find((k) => k.id === "T_ks_sp_default")).toBeDefined();
     });
   });
 
   // ---------------------------------------------------------------------------
-  // altgr-shift layer — RALT+SHIFT combinations (uppercase special letters)
+  // rightalt-shift layer — RALT+SHIFT combinations (uppercase special letters)
   // ---------------------------------------------------------------------------
 
-  describe("altgr-shift layer", () => {
-    it("IR with an RALT+SHIFT-modified key produces an altgr-shift layer", () => {
+  describe("rightalt-shift layer", () => {
+    it("IR with an RALT+SHIFT-modified key produces a rightalt-shift layer", () => {
       const rule = makeCharRule("K_A", ["RALT", "SHIFT"], "Ä");
       const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
 
       const result = scaffoldTouchLayout(ir);
-      expect(getLayer(result, "altgr-shift")).toBeDefined();
+      expect(getLayer(result, "rightalt-shift")).toBeDefined();
     });
 
-    it("altgr-shift layer carries the correct output for the RALT+SHIFT key", () => {
+    it("rightalt-shift layer carries the correct output for the RALT+SHIFT key", () => {
       const rule = makeCharRule("K_A", ["RALT", "SHIFT"], "Ä");
       const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
 
       const result = scaffoldTouchLayout(ir);
-      const altgrShiftLayer = getLayer(result, "altgr-shift")!;
-      const allKeys = altgrShiftLayer.rows.flatMap((r) => r.keys);
+      const rightaltShiftLayer = getLayer(result, "rightalt-shift")!;
+      const allKeys = rightaltShiftLayer.rows.flatMap((r) => r.keys);
       const kaKey = allKeys.find((k) => k.id === "K_A");
       expect(kaKey).toBeDefined();
       expect(kaKey?.output).toBe("Ä");
     });
 
-    it("IR without any RALT+SHIFT keys does NOT produce an altgr-shift layer", () => {
+    it("IR without any RALT+SHIFT keys does NOT produce a rightalt-shift layer", () => {
       const rules = [
         makeCharRule("K_A", [], "a"),
         makeCharRule("K_A", ["SHIFT"], "A"),
@@ -991,38 +991,38 @@ describe("scaffoldTouchLayout", () => {
       const ir = makeMinimalIR({ groups: [makeGroup(rules)] });
 
       const result = scaffoldTouchLayout(ir);
-      expect(getLayer(result, "altgr-shift")).toBeUndefined();
+      expect(getLayer(result, "rightalt-shift")).toBeUndefined();
     });
 
-    it("altgr-shift layer every row has ≤10 keys", () => {
+    it("rightalt-shift layer every row has ≤10 keys", () => {
       const rule = makeCharRule("K_A", ["RALT", "SHIFT"], "Ä");
       const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
 
       const result = scaffoldTouchLayout(ir);
-      const altgrShiftLayer = getLayer(result, "altgr-shift")!;
-      for (let i = 0; i < altgrShiftLayer.rows.length; i++) {
-        const row = altgrShiftLayer.rows[i]!;
+      const rightaltShiftLayer = getLayer(result, "rightalt-shift")!;
+      for (let i = 0; i < rightaltShiftLayer.rows.length; i++) {
+        const row = rightaltShiftLayer.rows[i]!;
         expect(
           row.keys.length,
-          `altgr-shift row ${i} has ${row.keys.length} keys (max 10)`,
+          `rightalt-shift row ${i} has ${row.keys.length} keys (max 10)`,
         ).toBeLessThanOrEqual(10);
       }
     });
 
     // -------------------------------------------------------------------------
     // Toggle wiring: every layer must reach default within a bounded number of
-    // hops. The *RAlt* toggle stays a strict default<->altgr in/out pair;
-    // altgr-shift is reached from shift (*RAlt* toggle, only when
-    // hasAltgrShift) and from altgr (its own K_SHIFT key), and reaches back to
-    // shift (*RAlt* toggle) and altgr (its own K_SHIFT key) respectively.
+    // hops. The *RAlt* toggle stays a strict default<->rightalt in/out pair;
+    // rightalt-shift is reached from shift (*RAlt* toggle, only when
+    // hasRightAltShift) and from rightalt (its own K_SHIFT key), and reaches back to
+    // shift (*RAlt* toggle) and rightalt (its own K_SHIFT key) respectively.
     // -------------------------------------------------------------------------
 
-    it("shift layer row 1 trailing key targets altgr-shift (sp:1) when hasAltgrShift", () => {
-      // Needs a plain RALT rule too (hasAltgr) — the row-1 trailing spacer on
+    it("shift layer row 1 trailing key targets rightalt-shift (sp:1) when hasRightAltShift", () => {
+      // Needs a plain RALT rule too (hasRightAlt) — the row-1 trailing spacer on
       // default/shift is only replaced by the *RAlt* toggle at all when an
-      // altgr layer will be generated (unchanged guard from the altgr-only
+      // rightalt layer will be generated (unchanged guard from the rightalt-only
       // case); RALT+SHIFT alone is not a realistic keyboard shape (an
-      // uppercase-only altgr key with no lowercase form).
+      // uppercase-only rightalt key with no lowercase form).
       const rules = [
         makeCharRule("K_A", ["RALT"], "à"),
         makeCharRule("K_A", ["RALT", "SHIFT"], "Ä"),
@@ -1032,23 +1032,23 @@ describe("scaffoldTouchLayout", () => {
       const result = scaffoldTouchLayout(ir);
       const shiftLayer = getLayer(result, "shift")!;
       const row1 = shiftLayer.rows[1]!;
-      const toggle = row1.keys.find((k) => k.id === "T_ks_altgr_toggle");
+      const toggle = row1.keys.find((k) => k.id === "T_ks_rightalt_toggle");
 
       expect(toggle).toBeDefined();
       expect(toggle?.text).toBe("*RAlt*");
       expect(toggle?.sp).toBe(1);
-      expect(toggle?.nextlayer).toBe("altgr-shift");
+      expect(toggle?.nextlayer).toBe("rightalt-shift");
       expect(row1.keys).toHaveLength(10);
     });
 
-    it("altgr-shift layer row 1 trailing key returns to shift (sp:2, nextlayer:'shift')", () => {
+    it("rightalt-shift layer row 1 trailing key returns to shift (sp:2, nextlayer:'shift')", () => {
       const rule = makeCharRule("K_A", ["RALT", "SHIFT"], "Ä");
       const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
 
       const result = scaffoldTouchLayout(ir);
-      const altgrShiftLayer = getLayer(result, "altgr-shift")!;
-      const row1 = altgrShiftLayer.rows[1]!;
-      const toggle = row1.keys.find((k) => k.id === "T_ks_altgr_toggle");
+      const rightaltShiftLayer = getLayer(result, "rightalt-shift")!;
+      const row1 = rightaltShiftLayer.rows[1]!;
+      const toggle = row1.keys.find((k) => k.id === "T_ks_rightalt_toggle");
 
       expect(toggle).toBeDefined();
       expect(toggle?.text).toBe("*RAlt*");
@@ -1057,7 +1057,7 @@ describe("scaffoldTouchLayout", () => {
       expect(row1.keys).toHaveLength(10);
     });
 
-    it("altgr layer's K_SHIFT key targets altgr-shift (sp:1) when hasAltgrShift", () => {
+    it("rightalt layer's K_SHIFT key targets rightalt-shift (sp:1) when hasRightAltShift", () => {
       const rules = [
         makeCharRule("K_A", ["RALT"], "à"),
         makeCharRule("K_A", ["RALT", "SHIFT"], "Ä"),
@@ -1065,19 +1065,19 @@ describe("scaffoldTouchLayout", () => {
       const ir = makeMinimalIR({ groups: [makeGroup(rules)] });
 
       const result = scaffoldTouchLayout(ir);
-      const altgrLayer = getLayer(result, "altgr")!;
-      const row2 = altgrLayer.rows[2]!;
+      const rightaltLayer = getLayer(result, "rightalt")!;
+      const row2 = rightaltLayer.rows[2]!;
       const shiftKey = row2.keys.find((k) => k.id === "K_SHIFT");
 
       expect(shiftKey).toBeDefined();
       expect(shiftKey?.sp).toBe(1);
-      expect(shiftKey?.nextlayer).toBe("altgr-shift");
+      expect(shiftKey?.nextlayer).toBe("rightalt-shift");
     });
 
-    it("altgr-shift layer's K_SHIFT key returns to altgr (sp:2, nextlayer:'altgr') when altgr also exists", () => {
-      // Needs a plain RALT rule too (hasAltgr) — see the dedicated
-      // "no plain-RALT" test below for the hasAltgr=false case, where this
-      // key must NOT dangle on a non-emitted "altgr".
+    it("rightalt-shift layer's K_SHIFT key returns to rightalt (sp:2, nextlayer:'rightalt') when rightalt also exists", () => {
+      // Needs a plain RALT rule too (hasRightAlt) — see the dedicated
+      // "no plain-RALT" test below for the hasRightAlt=false case, where this
+      // key must NOT dangle on a non-emitted "rightalt".
       const rules = [
         makeCharRule("K_A", ["RALT"], "à"),
         makeCharRule("K_A", ["RALT", "SHIFT"], "Ä"),
@@ -1085,31 +1085,31 @@ describe("scaffoldTouchLayout", () => {
       const ir = makeMinimalIR({ groups: [makeGroup(rules)] });
 
       const result = scaffoldTouchLayout(ir);
-      const altgrShiftLayer = getLayer(result, "altgr-shift")!;
-      const row2 = altgrShiftLayer.rows[2]!;
+      const rightaltShiftLayer = getLayer(result, "rightalt-shift")!;
+      const row2 = rightaltShiftLayer.rows[2]!;
       const shiftKey = row2.keys.find((k) => k.id === "K_SHIFT");
 
       expect(shiftKey).toBeDefined();
       expect(shiftKey?.sp).toBe(2);
-      expect(shiftKey?.nextlayer).toBe("altgr");
+      expect(shiftKey?.nextlayer).toBe("rightalt");
 
       assertNoDanglingNextlayer(result);
     });
 
-    it("altgr-shift layer's K_SHIFT key returns to default (sp:2, nextlayer:'default') when there is NO plain-altgr layer", () => {
+    it("rightalt-shift layer's K_SHIFT key returns to default (sp:2, nextlayer:'default') when there is NO plain-rightalt layer", () => {
       // The graph-stranding bug case: RALT+SHIFT chars but NO plain-RALT
-      // chars (e.g. uppercase-only special letters) — hasAltgr=false,
-      // hasAltgrShift=true. There is no altgr layer to "return to", so this
+      // chars (e.g. uppercase-only special letters) — hasRightAlt=false,
+      // hasRightAltShift=true. There is no rightalt layer to "return to", so this
       // key must release straight to "default" instead of dangling on a
-      // non-emitted "altgr".
+      // non-emitted "rightalt".
       const rule = makeCharRule("K_A", ["RALT", "SHIFT"], "Ä");
       const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
 
       const result = scaffoldTouchLayout(ir);
-      expect(getLayer(result, "altgr")).toBeUndefined();
+      expect(getLayer(result, "rightalt")).toBeUndefined();
 
-      const altgrShiftLayer = getLayer(result, "altgr-shift")!;
-      const row2 = altgrShiftLayer.rows[2]!;
+      const rightaltShiftLayer = getLayer(result, "rightalt-shift")!;
+      const row2 = rightaltShiftLayer.rows[2]!;
       const shiftKey = row2.keys.find((k) => k.id === "K_SHIFT");
 
       expect(shiftKey).toBeDefined();
@@ -1117,7 +1117,7 @@ describe("scaffoldTouchLayout", () => {
       expect(shiftKey?.nextlayer).toBe("default");
     });
 
-    it("altgr layer's *RAlt* toggle is unchanged (sp:2, nextlayer:'default') when altgr-shift also exists", () => {
+    it("rightalt layer's *RAlt* toggle is unchanged (sp:2, nextlayer:'default') when rightalt-shift also exists", () => {
       const rules = [
         makeCharRule("K_A", ["RALT"], "à"),
         makeCharRule("K_A", ["RALT", "SHIFT"], "Ä"),
@@ -1125,85 +1125,85 @@ describe("scaffoldTouchLayout", () => {
       const ir = makeMinimalIR({ groups: [makeGroup(rules)] });
 
       const result = scaffoldTouchLayout(ir);
-      const altgrLayer = getLayer(result, "altgr")!;
-      const row1 = altgrLayer.rows[1]!;
-      const toggle = row1.keys.find((k) => k.id === "T_ks_altgr_toggle");
+      const rightaltLayer = getLayer(result, "rightalt")!;
+      const row1 = rightaltLayer.rows[1]!;
+      const toggle = row1.keys.find((k) => k.id === "T_ks_rightalt_toggle");
 
       expect(toggle).toBeDefined();
       expect(toggle?.sp).toBe(2);
       expect(toggle?.nextlayer).toBe("default");
     });
 
-    it("altgr-shift toggle key is ABSENT when there is no altgr-shift layer", () => {
+    it("rightalt-shift toggle key is ABSENT when there is no rightalt-shift layer", () => {
       const rule = makeCharRule("K_A", ["RALT"], "à");
       const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
 
       const result = scaffoldTouchLayout(ir);
       const shiftLayer = getLayer(result, "shift")!;
       const row1 = shiftLayer.rows[1]!;
-      const toggle = row1.keys.find((k) => k.id === "T_ks_altgr_toggle");
+      const toggle = row1.keys.find((k) => k.id === "T_ks_rightalt_toggle");
 
       expect(toggle).toBeDefined();
-      expect(toggle?.nextlayer).toBe("altgr");
-      expect(getLayer(result, "altgr-shift")).toBeUndefined();
+      expect(toggle?.nextlayer).toBe("rightalt");
+      expect(getLayer(result, "rightalt-shift")).toBeUndefined();
     });
   });
 
   // ---------------------------------------------------------------------------
-  // Graph-stranding fix: hasAltgr=false && hasAltgrShift=true. A keyboard
+  // Graph-stranding fix: hasRightAlt=false && hasRightAltShift=true. A keyboard
   // with RALT+SHIFT characters but NO plain-RALT characters (e.g. an
   // uppercase-only special letter) — the design bug this whole fix addresses
-  // assumed an altgr layer always exists when altgr-shift does. It doesn't.
+  // assumed a rightalt layer always exists when rightalt-shift does. It doesn't.
   // ---------------------------------------------------------------------------
 
-  describe("hasAltgr=false && hasAltgrShift=true (no plain-RALT rule)", () => {
-    function makeNoPlainAltgrIR(): KeyboardIR {
+  describe("hasRightAlt=false && hasRightAltShift=true (no plain-RALT rule)", () => {
+    function makeNoPlainRightAltIR(): KeyboardIR {
       const rule = makeCharRule("K_A", ["RALT", "SHIFT"], "Ä");
       return makeMinimalIR({ groups: [makeGroup([rule])] });
     }
 
-    it("altgr layer is NOT emitted", () => {
-      const result = scaffoldTouchLayout(makeNoPlainAltgrIR());
-      expect(getLayer(result, "altgr")).toBeUndefined();
-      expect(getLayer(result, "altgr-shift")).toBeDefined();
+    it("rightalt layer is NOT emitted", () => {
+      const result = scaffoldTouchLayout(makeNoPlainRightAltIR());
+      expect(getLayer(result, "rightalt")).toBeUndefined();
+      expect(getLayer(result, "rightalt-shift")).toBeDefined();
     });
 
     it("(a) the *RAlt* entry toggle IS emitted on default AND shift, targeting an emitted layer", () => {
-      const result = scaffoldTouchLayout(makeNoPlainAltgrIR());
+      const result = scaffoldTouchLayout(makeNoPlainRightAltIR());
       const emittedLayerIds = new Set(
         result.platforms.find((p) => p.id === "phone")!.layers.map((l) => l.id),
       );
 
       const defaultLayer = getLayer(result, "default")!;
       const defaultToggle = defaultLayer.rows[1]!.keys.find(
-        (k) => k.id === "T_ks_altgr_toggle",
+        (k) => k.id === "T_ks_rightalt_toggle",
       );
       expect(defaultToggle).toBeDefined();
       expect(defaultToggle?.nextlayer).toBeDefined();
       expect(emittedLayerIds.has(defaultToggle!.nextlayer!)).toBe(true);
-      expect(defaultToggle?.nextlayer).toBe("altgr-shift");
+      expect(defaultToggle?.nextlayer).toBe("rightalt-shift");
 
       const shiftLayer = getLayer(result, "shift")!;
       const shiftToggle = shiftLayer.rows[1]!.keys.find(
-        (k) => k.id === "T_ks_altgr_toggle",
+        (k) => k.id === "T_ks_rightalt_toggle",
       );
       expect(shiftToggle).toBeDefined();
       expect(shiftToggle?.nextlayer).toBeDefined();
       expect(emittedLayerIds.has(shiftToggle!.nextlayer!)).toBe(true);
-      expect(shiftToggle?.nextlayer).toBe("altgr-shift");
+      expect(shiftToggle?.nextlayer).toBe("rightalt-shift");
     });
 
     it("(b) no key anywhere has a nextlayer pointing to a non-emitted layer", () => {
-      const result = scaffoldTouchLayout(makeNoPlainAltgrIR());
+      const result = scaffoldTouchLayout(makeNoPlainRightAltIR());
       assertNoDanglingNextlayer(result);
     });
 
-    it("(c) altgr-shift reaches default", () => {
-      const result = scaffoldTouchLayout(makeNoPlainAltgrIR());
-      const altgrShiftLayer = getLayer(result, "altgr-shift")!;
-      const row2 = altgrShiftLayer.rows[2]!;
+    it("(c) rightalt-shift reaches default", () => {
+      const result = scaffoldTouchLayout(makeNoPlainRightAltIR());
+      const rightaltShiftLayer = getLayer(result, "rightalt-shift")!;
+      const row2 = rightaltShiftLayer.rows[2]!;
       const shiftKey = row2.keys.find((k) => k.id === "K_SHIFT");
-      // Direct single-hop exit to default (no altgr layer exists to route
+      // Direct single-hop exit to default (no rightalt layer exists to route
       // through), plus the general reachability check below.
       expect(shiftKey?.nextlayer).toBe("default");
       assertNoDanglingNextlayer(result);
@@ -1808,7 +1808,7 @@ describe("scaffoldTouchLayout", () => {
   // BUG 3 FINISH — the relatedness filter that already guarded the deadkey-
   // successor path (addSuccessor / isValidSuccessorChar, above) is now also
   // applied to collectOverflowEntries' OVERFLOW_NEAREST_SLOT routing: a
-  // number-row vkey (K_1..K_0, and its shift/AltGr symbol variants) must
+  // number-row vkey (K_1..K_0, and its shift/RAlt symbol variants) must
   // never spill onto a top-row letter's sk[] — only the numeric/symbol layer
   // — even though OVERFLOW_NEAREST_SLOT lists a physical letter neighbor for
   // it. Also covers the QC follow-ups: no-silent-drops diagnostics for a
@@ -2762,7 +2762,7 @@ describe("scaffoldTouchLayout", () => {
 // ---------------------------------------------------------------------------
 // Tablet path (platformStyle:"tablet") — reseed-from-desktop tablet-style
 // derivation. An ewondo-like fixture: base letters, RALT-modified special
-// letters (altgr), an RALT+SHIFT uppercase special (altgr-shift), and an
+// letters (rightalt), an RALT+SHIFT uppercase special (rightalt-shift), and an
 // S-02 deadkey pattern (acute accent) so diacritics still attach as sk[]
 // longpress under their base letter, same mechanism as the phone path.
 // ---------------------------------------------------------------------------
@@ -2854,7 +2854,7 @@ describe("scaffoldTouchLayoutWithDiagnostics — tablet path (platformStyle:\"ta
 
     expect(shiftSpecialsKey).toBeDefined();
     expect(shiftSpecialsKey?.width).toBe(150);
-    // Same nextlayer target logic (hasAltgr ? "altgr" : "altgr-shift") as the
+    // Same nextlayer target logic (hasRightAlt ? "rightalt" : "rightalt-shift") as the
     // default layer's specials key — both hop directly to the same layer.
     const defaultSpecialsKey = defaultRow3.keys.find((k) => k.id === "T_ks_specials");
     expect(shiftSpecialsKey?.nextlayer).toBe(defaultSpecialsKey?.nextlayer);
@@ -2867,22 +2867,22 @@ describe("scaffoldTouchLayoutWithDiagnostics — tablet path (platformStyle:\"ta
     assertNoDanglingNextlayer(result.layout, "tablet");
   });
 
-  it("altgr letter keys carry nextlayer:\"default\" (auto-return after a tap)", () => {
+  it("rightalt letter keys carry nextlayer:\"default\" (auto-return after a tap)", () => {
     const ir = makeEwondoLikeIR();
     const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
-    const altgrLayer = getLayer(result.layout, "altgr", "tablet")!;
-    const oKey = altgrLayer.rows.flatMap((r) => r.keys).find((k) => k.id === "K_O");
+    const rightaltLayer = getLayer(result.layout, "rightalt", "tablet")!;
+    const oKey = rightaltLayer.rows.flatMap((r) => r.keys).find((k) => k.id === "K_O");
 
     expect(oKey).toBeDefined();
     expect(oKey?.output).toBe("ɔ");
     expect(oKey?.nextlayer).toBe("default");
   });
 
-  it("altgr-shift letter keys also carry nextlayer:\"default\"", () => {
+  it("rightalt-shift letter keys also carry nextlayer:\"default\"", () => {
     const ir = makeEwondoLikeIR();
     const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
-    const altgrShiftLayer = getLayer(result.layout, "altgr-shift", "tablet")!;
-    const nKey = altgrShiftLayer.rows.flatMap((r) => r.keys).find((k) => k.id === "K_N");
+    const rightaltShiftLayer = getLayer(result.layout, "rightalt-shift", "tablet")!;
+    const nKey = rightaltShiftLayer.rows.flatMap((r) => r.keys).find((k) => k.id === "K_N");
 
     expect(nKey).toBeDefined();
     expect(nKey?.output).toBe("Ŋ");
@@ -2905,7 +2905,103 @@ describe("scaffoldTouchLayoutWithDiagnostics — tablet path (platformStyle:\"ta
     assertNoDanglingNextlayer(result.layout, "tablet");
   });
 
-  it("unplacedChars is reachability-based: a produced special char reachable via the altgr layer is not reported unplaced", () => {
+  // Geometry parity — the tablet default/shift layers have 5 rows (number
+  // row + 2 QWERTY letter rows + Z-row + functional). The rightalt/rightalt-shift
+  // layers carry the SAME digit row as default/shift (shared via
+  // buildTabletNumberRow/TABLET_NUMBER_ROW_DIGITS), column-identical in both
+  // slot count and content, so the number row is stable across all four tablet
+  // letter layers and toggling into RAlt neither drops the top row nor blanks it.
+  describe("tablet rightalt/rightalt-shift geometry parity with default/shift", () => {
+    it("default and shift layers have 5 rows", () => {
+      const ir = makeEwondoLikeIR();
+      const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+      const defaultLayer = getLayer(result.layout, "default", "tablet")!;
+      const shiftLayer = getLayer(result.layout, "shift", "tablet")!;
+      expect(defaultLayer.rows).toHaveLength(5);
+      expect(shiftLayer.rows).toHaveLength(5);
+    });
+
+    it("rightalt and rightalt-shift layers now also have 5 rows (geometry-consistent with default/shift)", () => {
+      const ir = makeEwondoLikeIR();
+      const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+      const rightaltLayer = getLayer(result.layout, "rightalt", "tablet")!;
+      const rightaltShiftLayer = getLayer(result.layout, "rightalt-shift", "tablet")!;
+      expect(rightaltLayer.rows).toHaveLength(5);
+      expect(rightaltShiftLayer.rows).toHaveLength(5);
+    });
+
+    it("rightalt/rightalt-shift row 0 is the SAME digit row as default/shift: same slot count, same digits, trailing K_BKSP", () => {
+      const ir = makeEwondoLikeIR();
+      const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+      const defaultLayer = getLayer(result.layout, "default", "tablet")!;
+      const rightaltLayer = getLayer(result.layout, "rightalt", "tablet")!;
+      const rightaltShiftLayer = getLayer(result.layout, "rightalt-shift", "tablet")!;
+
+      const defaultRow0 = defaultLayer.rows[0]!;
+      const rightaltRow0 = rightaltLayer.rows[0]!;
+      const rightaltShiftRow0 = rightaltShiftLayer.rows[0]!;
+
+      // Same slot count as the default/shift number row.
+      expect(rightaltRow0.keys.length).toBe(defaultRow0.keys.length);
+      expect(rightaltShiftRow0.keys.length).toBe(defaultRow0.keys.length);
+
+      // Same digit content — column-identical to default/shift's row 0,
+      // reusing TABLET_NUMBER_ROW_DIGITS via buildTabletNumberRow (no forked
+      // digit list). Spot-check the "1" and "0" keys land on both layers.
+      for (const row0 of [rightaltRow0, rightaltShiftRow0]) {
+        const digitTexts = row0.keys.slice(0, -1).map((k) => k.text);
+        expect(digitTexts).toEqual(defaultRow0.keys.slice(0, -1).map((k) => k.text));
+        expect(digitTexts).toContain("1");
+        expect(digitTexts).toContain("0");
+
+        // Each digit key auto-returns to "default" after a tap — consistent
+        // with the rest of the rightalt/rightalt-shift layer's letter keys
+        // (see buildTabletRightAltLetterKey), unlike the default/shift
+        // layers' OWN number row (no nextlayer needed there — those keys
+        // already ARE on "default"/"shift").
+        for (const key of row0.keys.slice(0, -1)) {
+          expect(key.nextlayer).toBe("default");
+        }
+
+        // Trailing key is (a duplicate) K_BKSP, matching the number row shape.
+        // Backspace has no layer semantics — it must NOT auto-return.
+        const trailing = row0.keys[row0.keys.length - 1]!;
+        expect(trailing.id).toBe("K_BKSP");
+        expect(trailing.nextlayer).toBeUndefined();
+      }
+
+      // The default/shift number row itself carries no nextlayer — unchanged.
+      for (const key of defaultRow0.keys.slice(0, -1)) {
+        expect(key.nextlayer).toBeUndefined();
+      }
+    });
+
+    it("rightalt/rightalt-shift keep all their pre-existing letter/K_SHIFT/K_BKSP content after gaining the shared digit row", () => {
+      const ir = makeEwondoLikeIR();
+      const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
+      const rightaltLayer = getLayer(result.layout, "rightalt", "tablet")!;
+      const rightaltShiftLayer = getLayer(result.layout, "rightalt-shift", "tablet")!;
+
+      const rightaltAllKeys = rightaltLayer.rows.flatMap((r) => r.keys);
+      const rightaltShiftAllKeys = rightaltShiftLayer.rows.flatMap((r) => r.keys);
+
+      // Special-char letter keys are still present and reachable.
+      expect(rightaltAllKeys.find((k) => k.id === "K_E")?.output).toBe("ə");
+      expect(rightaltAllKeys.find((k) => k.id === "K_O")?.output).toBe("ɔ");
+      expect(rightaltShiftAllKeys.find((k) => k.id === "K_N")?.output).toBe("Ŋ");
+
+      // Exactly two reachable K_BKSP per layer: the pre-existing one on the
+      // Z-row, plus the duplicate on the digit top row (corpus idiom).
+      expect(rightaltAllKeys.filter((k) => k.id === "K_BKSP").length).toBe(2);
+      expect(rightaltShiftAllKeys.filter((k) => k.id === "K_BKSP").length).toBe(2);
+
+      // K_SHIFT toggles are unaffected — still reachable in both directions.
+      expect(rightaltAllKeys.find((k) => k.id === "K_SHIFT")?.nextlayer).toBe("rightalt-shift");
+      expect(rightaltShiftAllKeys.find((k) => k.id === "K_SHIFT")?.nextlayer).toBe("rightalt");
+    });
+  });
+
+  it("unplacedChars is reachability-based: a produced special char reachable via the rightalt layer is not reported unplaced", () => {
     const ir = makeEwondoLikeIR();
     const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
 
@@ -2915,7 +3011,7 @@ describe("scaffoldTouchLayoutWithDiagnostics — tablet path (platformStyle:\"ta
     expect(result.unplacedChars.length).toBe(0);
   });
 
-  it("an IR with no AltGr mappings at all emits no T_ks_specials key and no altgr/altgr-shift layers", () => {
+  it("an IR with no RAlt mappings at all emits no T_ks_specials key and no rightalt/rightalt-shift layers", () => {
     const ir = makeMinimalIR({
       groups: [makeGroup([makeCharRule("K_A", [], "a")])],
     });

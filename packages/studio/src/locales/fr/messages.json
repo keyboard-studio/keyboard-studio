@@ -43,6 +43,8 @@
   "dashboard.leftover.count": "{0, plural, one {# enregistrée · utilisée par aucun parcours en direct} other {# enregistrées · utilisées par aucun parcours en direct}}",
   "editor.assignLoop.inspector.ruleCount": "{0, plural, one {# règle} other {# règles}}",
   "editor.assignLoop.inspector.groupRuleCount": "{0, plural, one {# règle} other {# règles}}",
+  "editor.assignLoop.touch.applyWarningsHeading": "",
+  "editor.assignLoop.touch.applyWarningsAriaLabel": "",
   "survey.phaseB.buildList.doneButton": "{0, plural, one {Terminé (# caractère)} other {Terminé (# caractères)}}",
   "editor.mechanisms.unimplemented.verb": "",
   "editor.touch.unimplemented.verb": "",
