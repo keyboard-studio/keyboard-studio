@@ -491,3 +491,52 @@ describe("mergePhaseResults() — alphabet + marksWorklist (spec 046)", () => {
     expect(session.marksOutputForm).toBe("base-plus-mark");
   });
 });
+
+describe("mergePhaseResults — retainedConvenienceChars (pre-carve convenience question)", () => {
+  it("is absent when no phase asked the question", () => {
+    const session = mergePhaseResults({}, [
+      { phase: "B", answers: [], confirmedInventory: ["a", "b"] },
+    ]);
+    expect(session.retainedConvenienceChars).toBeUndefined();
+  });
+
+  it("is [] — not absent — when the question was asked and nothing was kept", () => {
+    // "Asked, kept none" is a real answer and must be distinguishable from
+    // "never asked": the former means carve shields nothing on purpose.
+    const session = mergePhaseResults({}, [
+      { phase: "C", answers: [], retainedConvenienceChars: [] },
+    ]);
+    expect(session.retainedConvenienceChars).toEqual([]);
+  });
+
+  it("unions across phases, deduped, first-appearance order", () => {
+    const session = mergePhaseResults({}, [
+      { phase: "C", answers: [], retainedConvenienceChars: ["q", "Q"] },
+      { phase: "C", answers: [], retainedConvenienceChars: ["Q", "x", "X"] },
+    ]);
+    expect(session.retainedConvenienceChars).toEqual(["q", "Q", "x", "X"]);
+  });
+
+  it("keeps retained characters OUT of confirmedInventory", () => {
+    // They are not the language's characters: folding them into the inventory
+    // would put them on the mechanism gallery's placement worklist and inside
+    // the Phase F "every character implemented" gate.
+    const session = mergePhaseResults({}, [
+      { phase: "B", answers: [], confirmedInventory: ["a", "b"] },
+      { phase: "C", answers: [], retainedConvenienceChars: ["q", "Q"] },
+    ]);
+    expect(session.confirmedInventory).toEqual(["a", "b"]);
+    expect(session.retainedConvenienceChars).toEqual(["q", "Q"]);
+  });
+
+  it("does not suppress or get suppressed by an identical confirmedInventory entry", () => {
+    // Separate `seen` sets: a letter can legitimately be both needed by the
+    // orthography and listed as retained by an earlier answer.
+    const session = mergePhaseResults({}, [
+      { phase: "B", answers: [], confirmedInventory: ["q"] },
+      { phase: "C", answers: [], retainedConvenienceChars: ["q"] },
+    ]);
+    expect(session.confirmedInventory).toContain("q");
+    expect(session.retainedConvenienceChars).toEqual(["q"]);
+  });
+});

@@ -36,6 +36,8 @@ flowchart LR
   track["track<br/>copy vs adapt"]
   pname["project_name<br/>(off-spine · copy only)"]
   chars["characters<br/>Phase A/B questions"]
+  marks["marks<br/>spec 046 series<br/>(S0 auto-skip)"]
+  conv["convenience<br/>keep surplus A-Z?<br/>(auto-skip)"]
   carve["carve ◆<br/>Phase D · remove"]:::here
   mech["mechanisms<br/>Phase C · +physical<br/>lock: physical"]
   tseed["touch_seed_source<br/>(off-spine fork)"]
@@ -45,7 +47,7 @@ flowchart LR
 
   identity --> base --> track --> chars
   track -. copy-track .-> pname -. joinTarget .-> chars
-  chars --> carve --> mech --> touch --> help --> pkg
+  chars --> marks --> conv --> carve --> mech --> touch --> help --> pkg
   mech -. seed fork .-> tseed -. joinTarget .-> touch
 
   classDef here fill:#fde68a,stroke:#b45309,stroke-width:2px,color:#000;
@@ -58,6 +60,37 @@ manifest's `onComplete(result)` / `onBack` onto the gallery's bare
 ([registerEditorSteps.ts](../packages/studio/src/steps/registerEditorSteps.ts))
 declares `writes: groups[] / stores[] / raw[]` (`CARVE_WRITES`) and `inputs: []`
 (its overlay reads the same arrays it writes — a self-read, not a producer edge).
+
+### The needed-set, and the two steps that shape it
+
+Carve's removal recommendations are the complement of a **needed-set**: what the
+orthography actually requires. Two immediately-preceding spine steps shape it,
+and both have a computed gate that skips without rendering when they have
+nothing to ask, so the common path is invisible.
+
+- **`marks`** ([spec 046](../specs/046-marks-question-series/)) produces
+  `session.marksWorklist` + `session.marksOutputForm`. The output form decides
+  whether the produced-vs-needed comparison normalizes to NFC or NFD, so it
+  changes what counts as a match.
+- **`convenience`**
+  ([ConvenienceCharsStep.tsx](../packages/studio/src/survey/convenience/ConvenienceCharsStep.tsx))
+  produces `session.retainedConvenienceChars`: the basic-Latin letters the base
+  produces that the orthography does not use, but which the author chose to keep
+  for borrowed words, email addresses, and web addresses. Carve would otherwise
+  propose exactly these for removal, which is right for the language and wrong
+  for the author — so they are unioned into the needed-set and stop being
+  recommended. They are deliberately **not** in `confirmedInventory`: they are
+  not the language's characters and must not reach the mechanism gallery's
+  placement worklist or the Phase F "every character implemented" gate.
+
+The derivation itself lives in **one** place —
+[useCarveNeededSet.ts](../packages/studio/src/hooks/useCarveNeededSet.ts) —
+shared by the gallery and the convenience question. The question needs to offer
+exactly the letters the gallery is about to flag, so a second copy of this logic
+would drift into either noise (asking about letters carve would keep) or silence
+(not asking about letters carve then proposes). The hook deliberately excludes
+`retainedConvenienceChars`: that is the question's own answer, and folding it in
+would make a kept letter vanish from the list the moment it was kept.
 
 ---
 

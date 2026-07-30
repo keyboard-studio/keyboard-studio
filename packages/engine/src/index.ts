@@ -163,6 +163,10 @@ export type { MissingCharSuggestions, CharNormalizationForm } from "./character-
 // Case-pair proposal helper for the shift-layer studio feature (bidirectional;
 // distinct from suggestMissing's isCovered coverage check — see casePair.ts docstring).
 export { caseCounterpart } from "./character-discovery/casePair.js";
+// Pre-carve "keep these for convenience?" candidates: basic-Latin letters the
+// base produces that the orthography does not use (loanwords / email / URLs).
+export { surplusBasicLatinCandidates, candidateChars } from "./character-discovery/convenienceChars.js";
+export type { ConvenienceCandidate, SurplusBasicLatinArgs } from "./character-discovery/convenienceChars.js";
 // Phase B tiered/browsable character-map candidate builder (right pane).
 // Reuses the cldr.ts exemplar-loading path; CHARACTER_MAP_BLOCKS is a
 // SEPARATE, multi-block-per-script table from cldr.ts's calibrated SCRIPT_BLOCKS.
