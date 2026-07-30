@@ -86,21 +86,21 @@ Written first, failing. The engine tests pin the contract's behavioural guarante
 
 ### Tests
 
-- [ ] **T017** [US2] Demo tests: every offered option has a `demo-<classId>-<optionValue>` node (FR-010, SC-005); in the `prefix` demo **every** press leaves either `demo-pending` or a non-empty `demo-output` — no press after which the demo appears to have done nothing (FR-011, SC-006, US2 AC2); in the `postfix` demo the first press shows the bare letter (US2 AC3); operating a demo leaves the selected radio and the working-copy revision unchanged and emits no diagnostic (FR-012, US2 AC1/AC5); demos advance only on author action, never on a timer (FR-013); option controls and demo controls are separately reachable by keyboard and neither traps focus (US2 AC6) · `packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx`
+- [x] **T017** [US2] Demo tests: every offered option has a `demo-<classId>-<optionValue>` node (FR-010, SC-005); in the `prefix` demo **every** press leaves either `demo-pending` or a non-empty `demo-output` — no press after which the demo appears to have done nothing (FR-011, SC-006, US2 AC2); in the `postfix` demo the first press shows the bare letter (US2 AC3); operating a demo leaves the selected radio and the working-copy revision unchanged and emits no diagnostic (FR-012, US2 AC1/AC5); demos advance only on author action, never on a timer (FR-013); option controls and demo controls are separately reachable by keyboard and neither traps focus (US2 AC6) · `packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx`
 
 **⟶ Wait for T017, then:**
 
 ### Implementation
 
-- [ ] **T018** [US2] Build the demonstration widget: two-or-three keys drawn from the author's confirmed letters and marks, producing the exact text that option would produce; `demo-key-<n>`, `demo-output`, `demo-reset` handles; `demo-pending` rendered **only** in the `prefix` intermediate state, carrying `role="status"` `aria-live="polite"` and announcing a mark awaiting a letter (FR-011). No timer, no autoplay; no working-copy write; no diagnostic · `packages/studio/src/survey/marks/MarkDemoWidget.tsx`
+- [x] **T018** [US2] Build the demonstration widget: two-or-three keys drawn from the author's confirmed letters and marks, producing the exact text that option would produce; `demo-key-<n>`, `demo-output`, `demo-reset` handles; `demo-pending` rendered **only** in the `prefix` intermediate state, carrying `role="status"` `aria-live="polite"` and announcing a mark awaiting a letter (FR-011). No timer, no autoplay; no working-copy write; no diagnostic · `packages/studio/src/survey/marks/MarkDemoWidget.tsx`
 
 **⟶ Wait for T018, then:**
 
 **Wave 3 — independent (different files):**
 
-- [ ] **T019** [P] [US2] Mount one demo per **offered** option in the station, keeping selection and demo operation on separate controls · `packages/studio/src/survey/marks/MarkTreatmentStation.tsx`
-- [ ] **T020** [P] [US2] Pin FR-014's load-bearing clause with a derivation test: for **every** `(treatment, order)` combination the author can produce, no `sk[]`-free deadkey reaches a touch layout — the scaffolder resolves deadkey patterns into long-press subkey menus, so "prefix on touch" is unrepresentable rather than warned (research D5) · `packages/engine/src/scaffolder/scaffoldTouchLayout.test.ts`
-- [ ] **T021** [P] [US2] Extract the new demo strings into the catalogs · `packages/studio/src/locales/en/messages.json`, `packages/studio/src/locales/fr/messages.json`
+- [x] **T019** [P] [US2] Mount one demo per **offered** option in the station, keeping selection and demo operation on separate controls · `packages/studio/src/survey/marks/MarkTreatmentStation.tsx`
+- [x] **T020** [P] [US2] Pin FR-014's load-bearing clause with a derivation test: for **every** `(treatment, order)` combination the author can produce, no `sk[]`-free deadkey reaches a touch layout — the scaffolder resolves deadkey patterns into long-press subkey menus, so "prefix on touch" is unrepresentable rather than warned (research D5) · `packages/engine/src/scaffolder/scaffoldTouchLayout.test.ts`
+- [x] **T021** [P] [US2] Extract the new demo strings into the catalogs · `packages/studio/src/locales/en/messages.json`, `packages/studio/src/locales/fr/messages.json`
 
 **Checkpoint**: US2 is independently functional. Every selectable option can be tried before it is selected, and the pending state is legible side by side with the letter-first contrast.
 

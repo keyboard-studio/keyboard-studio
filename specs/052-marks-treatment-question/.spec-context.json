@@ -202,6 +202,46 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-30T02:18:44.589Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:27:14.117Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:27:14.524Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:27:14.892Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:27:15.294Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:27:15.647Z"
     }
   ],
   "decisions": [
@@ -535,7 +575,7 @@
       ]
     }
   },
-  "currentTask": "T016",
+  "currentTask": "T021",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -648,6 +688,43 @@
     "T016": {
       "status": "DONE",
       "did": "Ran lingui extract --clean: 11 new survey.marks.treatment.* ids filled in en, 8 orphaned mentalModel/inputOrder ids removed, fr left untranslated; i18n-catalog-lint green",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Added the demo test suite (and, in the same file, the US3 promotion-gate tests T023 covers): per-option demos, no-inert-press invariant, postfix bare-letter contrast, no-selection-change, no-timer, separate keyboard reachability",
+      "files": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Built MarkDemoWidget: 2-3 keys from the author's own letters/marks, demo-key-N/demo-output/demo-reset handles, demo-pending only in the prefix intermediate state with role=status aria-live=polite; no timer, no working-copy write, no diagnostic",
+      "files": [
+        "packages/studio/src/survey/marks/MarkDemoWidget.tsx"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Mounted one demo per offered option in the station, with the demo outside the option label so selection and demo operation stay separate controls",
+      "files": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Pinned FR-014's load-bearing clause with a derivation test over all four (treatment, order) combinations: no bare waiting mark and no deadkey reference reaches any touch key, the desktop deadkey resolves into a long-press sk[] menu, and both orders derive the same touch layout",
+      "files": [
+        "packages/engine/src/scaffolder/scaffoldTouchLayout.test.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Extracted the four new survey.marks.demo.* strings into en; fr left untranslated; i18n-catalog-lint green",
       "files": [
         "packages/studio/src/locales/en/messages.json",
         "packages/studio/src/locales/fr/messages.json"

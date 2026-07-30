@@ -37,6 +37,7 @@ import { treatmentFor } from "@keyboard-studio/engine";
 import { toUPlusNotation, type MarkInputOrder } from "@keyboard-studio/contracts";
 import { prefixCombiningMark } from "../../lib/irToCarveNodes.ts";
 import { definition as markInputOrderDefinition } from "../questions/reserve/pb_mark_input_order.ts";
+import { MarkDemoWidget } from "./MarkDemoWidget.tsx";
 import {
   BORDER,
   TEXT_DIM,
@@ -52,6 +53,13 @@ export interface MarkTreatmentStationProps {
   answer: MarkTreatmentAnswer;
   /** Per class id: the characters this class could promote (empty = absent). */
   promotable: Record<string, PromotedComposedCharacter[]>;
+  /**
+   * Base letters from the author's own confirmed alphabet, in display order —
+   * what the option demonstrations are built from (FR-010). The first entry is
+   * used; an empty list means no demonstration can be built from the author's
+   * own material, and none is shown rather than one invented from ours.
+   */
+  demoLetters: string[];
   onClassTreatmentChange: (classId: string, next: MarkTreatment) => void;
   onMarkTreatmentChange: (mark: string, next: MarkTreatment) => void;
   onPromotionToggle: (character: PromotedComposedCharacter, next: boolean) => void;
@@ -100,6 +108,7 @@ export function MarkTreatmentStation({
   prefills,
   answer,
   promotable,
+  demoLetters,
   onClassTreatmentChange,
   onMarkTreatmentChange,
   onPromotionToggle,
@@ -147,6 +156,10 @@ export function MarkTreatmentStation({
           const offered = promotable[markClass.id] ?? [];
           const affordable = prefill?.signals.promotionAffordable !== false;
           const reason = prefill?.signals.unaffordableReason;
+          // The demonstration is built from the author's own material: the first
+          // confirmed letter and this class's first mark (FR-010).
+          const demoLetter = demoLetters[0];
+          const demoMark = markClass.marks[0];
 
           return (
             <div key={markClass.id} data-testid={`treatment-${markClass.id}`}>
@@ -167,27 +180,40 @@ export function MarkTreatmentStation({
                 style={{ display: "flex", flexDirection: "column", gap: 6 }}
               >
                 {TREATMENT_VALUES.map((value) => (
-                  <label
-                    key={value}
-                    data-testid={`treatment-option-${markClass.id}-${value}`}
-                    style={optionRow(false)}
-                  >
-                    <input
-                      type="radio"
-                      name={`treatment-${markClass.id}`}
-                      checked={current === value}
-                      onChange={() => onClassTreatmentChange(markClass.id, value)}
-                    />
-                    <span>
-                      {treatmentLabel[value]}
-                      {value === prefill?.recommended && (
-                        <span style={{ color: TEXT_DIM, fontSize: 11 }}>
-                          {" "}
-                          <Trans id="survey.marks.treatment.suggestedTag">(suggested)</Trans>
-                        </span>
-                      )}
-                    </span>
-                  </label>
+                  // Selection and demonstration are separate controls, side by
+                  // side (US2 AC6): operating the demo never selects the option
+                  // (FR-012), so the demo lives OUTSIDE the option's <label>.
+                  <div key={value}>
+                    <label
+                      data-testid={`treatment-option-${markClass.id}-${value}`}
+                      style={optionRow(false)}
+                    >
+                      <input
+                        type="radio"
+                        name={`treatment-${markClass.id}`}
+                        checked={current === value}
+                        onChange={() => onClassTreatmentChange(markClass.id, value)}
+                      />
+                      <span>
+                        {treatmentLabel[value]}
+                        {value === prefill?.recommended && (
+                          <span style={{ color: TEXT_DIM, fontSize: 11 }}>
+                            {" "}
+                            <Trans id="survey.marks.treatment.suggestedTag">(suggested)</Trans>
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                    {demoLetter !== undefined && demoMark !== undefined && (
+                      <MarkDemoWidget
+                        testId={`demo-${markClass.id}-${value}`}
+                        option={value}
+                        inputOrder={answer.inputOrder}
+                        letter={demoLetter}
+                        mark={demoMark}
+                      />
+                    )}
+                  </div>
                 ))}
               </div>
 

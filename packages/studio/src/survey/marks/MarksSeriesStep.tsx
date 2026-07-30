@@ -450,6 +450,7 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
           prefills={treatmentPrefills}
           answer={treatment}
           promotable={promotable}
+          demoLetters={attachmentBases}
           onClassTreatmentChange={(classId, next) =>
             setTreatment((prev) => ({
               ...prev,
