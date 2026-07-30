@@ -402,19 +402,21 @@ describe("propagateDesktopLayersToTouch — real S-08 pattern (any/index store i
 });
 
 // ---------------------------------------------------------------------------
-// Legacy-alias regression — a shipped-corpus `.keyman-touch-layout` (Track 2
-// import-adapt) that still carries the pre-migration RALT-only layer under
-// the id "altgr" rather than "rightalt" (comboToTouchLayerId's id for the
-// same combo). scaffoldTouchLayout.ts's Case A (no shipped touch layout) now
-// emits the canonical "rightalt" id directly — see its rename fixing the
-// reseed-from-desktop touch-apply mismatch — so this scenario can no longer
-// arise from a *fresh* scaffold; LEGACY_TOUCH_LAYER_ID_ALIASES exists purely
-// for keyboards whose shipped layout predates that rename. Propagation must
-// still patch that existing "altgr" layer rather than synthesizing a
-// duplicate "rightalt" one.
+// Legacy-alias regression — a `.keyman-touch-layout` produced by a PRE-rename
+// build of scaffoldTouchLayout.ts (e.g. an in-progress working copy / draft
+// persisted before this migration) that still carries the RALT-only layer
+// under the old id "altgr" rather than "rightalt" (comboToTouchLayerId's id
+// for the same combo). scaffoldTouchLayout.ts's Case A now emits the canonical
+// "rightalt" id directly — see its rename fixing the reseed-from-desktop
+// touch-apply mismatch — so this scenario can no longer arise from a *fresh*
+// scaffold. No shipped corpus keyboard has ever used "altgr", so
+// LEGACY_TOUCH_LAYER_ID_ALIASES exists purely to keep loading those pre-fix
+// Studio-generated drafts. Propagation must still patch that existing "altgr"
+// layer rather than synthesizing a duplicate "rightalt" one.
 // ---------------------------------------------------------------------------
 
-/** A minimal shipped-corpus-shaped phone platform with a legacy "altgr" layer. */
+/** A minimal phone platform with a legacy "altgr" layer, as a pre-rename
+ *  Studio-generated draft would carry (no shipped keyboard uses this id). */
 function makeLegacyAltgrTouchJson(): string {
   return JSON.stringify({
     phone: {
@@ -441,8 +443,8 @@ function makeLegacyAltgrTouchJson(): string {
   });
 }
 
-describe("propagateDesktopLayersToTouch — legacy 'altgr' layer-id alias", () => {
-  it("patches a shipped-corpus 'altgr' layer, no duplicate 'rightalt' layer", () => {
+describe("propagateDesktopLayersToTouch — legacy 'altgr' layer-id alias (pre-rename Studio-generated draft)", () => {
+  it("patches a pre-fix draft's 'altgr' layer, no duplicate 'rightalt' layer", () => {
     const rawTouchJson = makeLegacyAltgrTouchJson();
 
     // The author assigns a second RALT key via the mechanism gallery — the
