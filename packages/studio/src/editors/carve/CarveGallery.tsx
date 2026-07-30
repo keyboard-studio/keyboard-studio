@@ -16,11 +16,10 @@ import { InfoView, capabilityHint } from '../assignLoop/parts/InfoView.tsx';
 import { InfoIcon, resolveMessage } from '../assignLoop/parts/carveShared.tsx';
 import { ConfirmDialog } from '../assignLoop/parts/ConfirmDialog.tsx';
 import { useHoverInfoStore } from '../../stores/hoverInfoStore.ts';
-import { collectCharContributors, analyzeStores, deriveCarveNeededSet, normalizationFormForOutputForm } from '@keyboard-studio/engine';
+import { collectCharContributors, analyzeStores } from '@keyboard-studio/engine';
 import type { CharContributors, StoreAnalysis, CharNormalizationForm } from '@keyboard-studio/engine';
-import { nonAlphabetConfirmedInventory } from '@keyboard-studio/contracts';
 import type { KeyboardIR, RemovalCapability } from '@keyboard-studio/contracts';
-import { neededCharsForLanguage } from '../../lib/services.ts';
+import { useCarveNeededSet } from '../../hooks/useCarveNeededSet.ts';
 
 /** Pending cascade state — set when the user clicks a cross-wired chip. */
 interface PendingCascade {
@@ -354,10 +353,8 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   const removalCapabilities = useWorkingCopyStore((s) => s.removalCapabilities);
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   // #525 FOUNDATION slice — the confirmed Phase B inventory drives removal
-  // recommendations. session.confirmedInventory is a deduped, NFC-normalized
-  // string[] union across survey phases (see contracts/src/surveySession.ts).
-  const confirmedInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
-
+  // recommendations.
+  //
   // #1357 data-derivation prerequisite — carve's needed-set is DERIVED from
   // the marks series' final answers (spec 046 marksWorklist/marksOutputForm),
   // not just the flat confirmedInventory (which unconditionally folds in
@@ -365,66 +362,41 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   // reachability decisions — see deriveConfirmedInventory). The 3-tier
   // classification (deriveCarveNeededSet) replaces ONLY the alphabet-derived
   // slice of confirmedInventory with its refined required/optional split;
-  // any OTHER source of confirmedInventory (manual-flow answers from other
-  // phases, unrelated to the three-store alphabet) is preserved verbatim via
-  // `nonAlphabetConfirmed` below, so nothing that used to count as needed
-  // stops counting except a genuine marks-series BLOCK-CANDIDATE.
-  const alphabet = useWorkingCopyStore((s) => s.session.alphabet);
-  const marksWorklist = useWorkingCopyStore((s) => s.session.marksWorklist);
-  const marksOutputForm = useWorkingCopyStore((s) => s.session.marksOutputForm);
-  // The chosen whole-keyboard output form drives which Unicode normalization
-  // form the carve comparison (produced vs. needed) normalizes BOTH sides
-  // to, so choosing "base-plus-mark" (decomposed) vs. "ready-made"
-  // (precomposed) actually changes what counts as a match — see
-  // normalizationFormForOutputForm's doc. Undefined marksOutputForm (marks
-  // series skipped) degrades to "NFC", byte-identical to pre-existing
-  // behavior.
-  const carveNormalizationForm = useMemo(
-    () => normalizationFormForOutputForm(marksOutputForm),
-    [marksOutputForm],
-  );
-  const carveNeeded = useMemo(
-    () => deriveCarveNeededSet({
-      alphabet,
-      worklist: marksWorklist,
-      ...(marksOutputForm !== undefined ? { outputForm: marksOutputForm } : {}),
-    }),
-    [alphabet, marksWorklist, marksOutputForm],
-  );
-  const nonAlphabetConfirmed = useMemo(
-    () => nonAlphabetConfirmedInventory(confirmedInventory, alphabet),
-    [confirmedInventory, alphabet],
+  // any OTHER source of confirmedInventory is preserved verbatim, so nothing
+  // that used to count as needed stops counting except a genuine marks-series
+  // BLOCK-CANDIDATE.
+  //
+  // #525 items 2/4 — the language-driven surplus signal (CLDR/SLDR exemplars)
+  // resolves ASYNCHRONOUSLY inside the hook and arrives as an already-resolved
+  // Set; the pure annotateRemovalRecommendations() pass below never does I/O.
+  //
+  // Shared with the pre-carve convenience question via useCarveNeededSet so
+  // the two surfaces reason about the same needed-set (see that hook's doc).
+  const {
+    neededSet: orthographyNeededSet,
+    tieredNeededSet: orthographyTiered,
+    neededChars,
+    form: carveNormalizationForm,
+    bcp47: identityBcp47,
+    hasSignal,
+  } = useCarveNeededSet();
+
+  // Base characters the author chose to KEEP at the pre-carve convenience
+  // question — letters their orthography does not use but they still need for
+  // borrowed words, email addresses, and web addresses. They are not part of
+  // the orthography (deliberately absent from confirmedInventory, see
+  // SurveyPhaseResult.retainedConvenienceChars), but for carve's purposes they
+  // are needed: shielding them here is the whole point of having asked.
+  const retainedConvenienceChars = useWorkingCopyStore((s) => s.session.retainedConvenienceChars);
+  const retainedSet = useMemo(
+    () => new Set((retainedConvenienceChars ?? []).map((ch) => ch.normalize(carveNormalizationForm))),
+    [retainedConvenienceChars, carveNormalizationForm],
   );
   const tieredNeededSet = useMemo(
-    () => new Set([...carveNeeded.requiredPrimary, ...carveNeeded.optionalSecondary, ...nonAlphabetConfirmed]),
-    [carveNeeded, nonAlphabetConfirmed],
+    () => (retainedSet.size === 0 ? orthographyTiered : new Set([...orthographyTiered, ...retainedSet])),
+    [orthographyTiered, retainedSet],
   );
 
-  // #525 items 2/4 — language-driven surplus signal. Resolved ASYNCHRONOUSLY
-  // here (CLDR is a network fetch) and passed as an already-resolved Set into
-  // the pure annotateRemovalRecommendations() pass below — that function never
-  // does I/O itself. Null means "not yet resolved" or "CLDR unavailable for
-  // this language" (und/script-only/private-use/un-narrowed macrolang/no CLDR
-  // locale match) — annotateRemovalRecommendations treats null the same as
-  // "not supplied," falling back to inventory-only behavior (item 5's
-  // graceful-fallback requirement).
-  const identityBcp47 = useWorkingCopyStore((s) => s.identity?.bcp47);
-  const [neededChars, setNeededChars] = useState<Set<string> | null>(null);
-  useEffect(() => {
-    // Reset synchronously BEFORE kicking off the new fetch (or bailing when
-    // there's no bcp47) — otherwise, while a fetch for the previous language
-    // is still in flight, neededChars keeps holding that stale language's
-    // set and surplus gets computed against the wrong language until the
-    // new fetch resolves. Degrading to inventory-only for that pending
-    // window is the safe fallback (same contract null already carries).
-    setNeededChars(null);
-    if (!identityBcp47) return;
-    let cancelled = false;
-    neededCharsForLanguage(identityBcp47)
-      .then((result) => { if (!cancelled) setNeededChars(result); })
-      .catch(() => { if (!cancelled) setNeededChars(null); });
-    return () => { cancelled = true; };
-  }, [identityBcp47]);
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const isDeleted = useWorkingCopyStore((s) => s.isDeleted);
@@ -464,10 +436,10 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   // TODO(#525): Track-1 default filtering hooks in here too — a Track 1
   // (new-from-base) author gets different defaults than Track 2 (adapt-existing).
   const recommendedNodes = useMemo(
-    () => (instantiationMode !== null && (tieredNeededSet.size > 0 || neededChars !== null) && ir
+    () => (instantiationMode !== null && hasSignal && ir
       ? annotateRemovalRecommendations(nodes, ir, tieredNeededSet, neededChars, identityBcp47, carveNormalizationForm)
       : nodes),
-    [nodes, ir, instantiationMode, tieredNeededSet, neededChars, identityBcp47, carveNormalizationForm],
+    [nodes, ir, instantiationMode, hasSignal, tieredNeededSet, neededChars, identityBcp47, carveNormalizationForm],
   );
 
   // #525 BANNER slice — character-level companion to recommendedNodes above,
@@ -484,18 +456,20 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   // (base-plus-mark output), which can miss warning about deleting a
   // still-needed decomposed character. Mirrors the renormalize helper in
   // annotateRemovalRecommendations.
+  //
+  // Both members are already normalized to carveNormalizationForm — the hook
+  // normalizes the orthography slice, retainedSet is normalized above.
   const neededSet = useMemo(
-    () => new Set(
-      [...(neededChars ? [...neededChars, ...tieredNeededSet] : tieredNeededSet)]
-        .map((ch) => ch.normalize(carveNormalizationForm)),
-    ),
-    [neededChars, tieredNeededSet, carveNormalizationForm],
+    () => (retainedSet.size === 0
+      ? orthographyNeededSet
+      : new Set([...orthographyNeededSet, ...retainedSet])),
+    [orthographyNeededSet, retainedSet],
   );
   const recommendedChars = useMemo(
-    () => (instantiationMode !== null && (tieredNeededSet.size > 0 || neededChars !== null) && ir
+    () => (instantiationMode !== null && hasSignal && ir
       ? recommendedRemovalChars({ ir, needed: neededSet, bcp47: identityBcp47, form: carveNormalizationForm })
       : []),
-    [ir, instantiationMode, tieredNeededSet, neededChars, neededSet, identityBcp47, carveNormalizationForm],
+    [ir, instantiationMode, hasSignal, neededSet, identityBcp47, carveNormalizationForm],
   );
 
   // Bulk removal from the banner checklist deliberately skips the per-removal

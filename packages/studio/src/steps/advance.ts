@@ -34,6 +34,7 @@ type ActiveStepId =
   | "characters"
   | "carve"
   | "marks"
+  | "convenience"
   | "mechanisms"
   | "touch_seed_source"
   | "touch"
@@ -212,7 +213,14 @@ export function advance(
       return { next: nextSpineStepAfter("characters") }; // marks (spec 046)
 
     case "marks":
-      return { next: nextSpineStepAfter("marks") }; // carve
+      return { next: nextSpineStepAfter("marks") }; // convenience
+
+    case "convenience":
+      // The pre-carve "keep these letters?" question. No reducer side effects —
+      // its SurveyPhaseResult reaches the session through StepHost's generic
+      // recordPhase path, and the carve gallery reads it off the merged
+      // session. Absent from STEPS_WITH_APPLY_COMPLETION for that reason.
+      return { next: nextSpineStepAfter("convenience") }; // carve
 
     case "carve":
       return { next: nextSpineStepAfter("carve") }; // mechanisms

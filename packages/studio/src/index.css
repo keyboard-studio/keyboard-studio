@@ -80,3 +80,22 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
     min-height: 44px;
   }
 }
+
+/* Deletable-chip hover-red affordance (alphabet-gallery overhaul) ----------
+ * Every neon-green "click to remove" chip across the assignment-loop
+ * galleries (MechanismGallery's "Added"/"Existing methods" rows, TouchGallery's
+ * "Configured" row) turns red on hover to signal "click deletes". This is
+ * deliberately NOT a `.ks-deletable-chip:hover` class rule here: each of
+ * those chips already carries an inline `background`/`border`/`color` (the
+ * row's own palette props), and an inline style always wins over a class
+ * selector of equal or lower specificity — a class rule would need
+ * `!important` fighting the inline styles it's laid over, which is fragile
+ * (any inline-style caller that later adds `!important` of its own wins
+ * back). The reliable, `!important`-free path is a per-chip
+ * onMouseEnter/onMouseLeave state swap, implemented once as
+ * `HoverDangerChip` in editors/assignLoop/parts/RemovableChipRow.tsx and
+ * shared by every deletable-chip site (including the standalone "Applied
+ * methods" pills, which bypass RemovableChipRow's `items` shape but still
+ * import HoverDangerChip directly). No CSS class is needed for this
+ * affordance; kept as a comment here so a future attempt at a `:hover` class
+ * doesn't silently lose to the inline styles again. */

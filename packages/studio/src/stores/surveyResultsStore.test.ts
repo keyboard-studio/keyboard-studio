@@ -231,4 +231,75 @@ describe("surveyResultsStore", () => {
     expect(s.session.selectedPatternIds).toContain("deadkey_single_tap");
     expect(s.session.assignments).toHaveLength(1);
   });
+
+  // -------------------------------------------------------------------------
+  // Phase C is shared by more than one spine step (the marks series and the
+  // pre-carve convenience question both report under "C"), so recordPhase
+  // updates a phase entry FIELD-WISE. Whole-result replacement made whichever
+  // of the two completed second erase the other's fields.
+  // -------------------------------------------------------------------------
+
+  const marksPhaseC: SurveyPhaseResult = {
+    phase: "C",
+    answers: [],
+    marksWorklist: { ownLetterUnits: [], markUnits: [], blockedCombinations: [] },
+    marksOutputForm: "base-plus-mark",
+  };
+
+  it("a second Phase C step's fields land alongside the first's, not over them", () => {
+    useWorkingCopyStore.getState().recordPhase(marksPhaseC);
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      retainedConvenienceChars: ["q", "Q"],
+    });
+    const s = useWorkingCopyStore.getState();
+    expect(s.phaseResults).toHaveLength(1);
+    // The convenience question's answer is recorded...
+    expect(s.session.retainedConvenienceChars).toEqual(["q", "Q"]);
+    // ...and the marks series' normalization signal — which carve's needed-set
+    // derivation reads off the merged session — survived it.
+    expect(s.session.marksOutputForm).toBe("base-plus-mark");
+    expect(s.session.marksWorklist).toEqual(marksPhaseC.marksWorklist);
+  });
+
+  it("re-recording a Phase C step still overwrites the fields it re-emits", () => {
+    useWorkingCopyStore.getState().recordPhase(marksPhaseC);
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      retainedConvenienceChars: ["q", "Q"],
+    });
+    // The author walked back to the convenience question and kept nothing.
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      retainedConvenienceChars: [],
+    });
+    const s = useWorkingCopyStore.getState();
+    expect(s.session.retainedConvenienceChars).toEqual([]);
+    expect(s.session.marksOutputForm).toBe("base-plus-mark");
+  });
+
+  it("recordAssignments preserves the other Phase C steps' fields", () => {
+    useWorkingCopyStore.getState().recordPhase(marksPhaseC);
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      retainedConvenienceChars: ["q", "Q"],
+    });
+    // TouchGallery records assignments onto the same phase entry.
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "keyboard-default" as const,
+        target: "",
+        modality: "touch" as const,
+        mechanisms: [{ patternId: "deadkey_single_tap" }],
+      },
+    ]);
+    const s = useWorkingCopyStore.getState();
+    expect(s.session.assignments).toHaveLength(1);
+    expect(s.session.retainedConvenienceChars).toEqual(["q", "Q"]);
+    expect(s.session.marksOutputForm).toBe("base-plus-mark");
+  });
 });

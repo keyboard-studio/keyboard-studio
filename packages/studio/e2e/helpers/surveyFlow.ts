@@ -322,6 +322,30 @@ export async function buildOneCharacterList(
   // BEFORE carve — a mark-bearing charToAdd (e.g. "é") makes it render here.
   // A marks-free alphabet auto-skips it (S0 gate) and this is a no-op.
   await driveMarksSeries(page);
+
+  // The convenience question sits between marks and carve. A one-character
+  // alphabet on a Latin base leaves almost all of a-z surplus, so this one
+  // DOES render on the standard walks.
+  await driveConvenienceStep(page);
+}
+
+/**
+ * Convenience-letters step — sits between the marks series and carve: which
+ * basic-Latin letters the orthography does not use should be kept anyway, for
+ * borrowed words, email addresses, and web addresses.
+ *
+ * Like the marks series, its gate is computed and never rendered: a base with
+ * no surplus basic-Latin letters (or an unconfirmed alphabet) skips the step
+ * entirely and this helper returns immediately. When it does render every
+ * letter is pre-checked, so clicking Continue accepts the proposal — which is
+ * what the walks want, since a kept letter is simply shielded from carve's
+ * removal recommendations rather than changing the flow.
+ */
+export async function driveConvenienceStep(page: Page): Promise<void> {
+  const continueBtn = page.getByTestId("convenience-continue");
+  const visible = await continueBtn.isVisible({ timeout: 5_000 }).catch(() => false);
+  if (!visible) return; // gate skipped the question
+  await continueBtn.click();
 }
 
 /**

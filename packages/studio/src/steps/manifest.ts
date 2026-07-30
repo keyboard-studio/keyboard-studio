@@ -7,7 +7,8 @@
 //
 // SPINE ORDER (FR-012, M2):
 //   Identity → choose base → Track → [project_name (spine:false)] →
-//   Characters (Phase A/B questions) → Marks → Carve → Mechanisms → [lock: "physical"] →
+//   Characters (Phase A/B questions) → Marks → Convenience → Carve →
+//   Mechanisms → [lock: "physical"] →
 //   touch_seed_source (spine:false) → touch →
 //   [lock: "touch"] → Help → Package (reserved)
 //
@@ -26,6 +27,7 @@ import { irPath } from "@keyboard-studio/contracts";
 import type { Step } from "./types.ts";
 import { CharactersStep } from "../survey/CharactersStep.tsx";
 import { MarksSeriesStep } from "../survey/marks/MarksSeriesStep.tsx";
+import { ConvenienceCharsStep } from "../survey/convenience/ConvenienceCharsStep.tsx";
 import {
   identityStep,
   chooseBaseStep,
@@ -85,7 +87,7 @@ const charactersStep: Step = {
 //
 // Rules encoded here:
 //   M2 — spine order: Identity → choose_base → track → Characters → Marks →
-//         Carve → Mechanisms → (lock physical) → touch →
+//         Convenience → Carve → Mechanisms → (lock physical) → touch →
 //         (lock touch) → Help → Package
 //   M3 — exactly one lock:"physical" and one lock:"touch", in that order.
 //   M4 — touch_seed_source is spine:false with joinTarget resolving to "touch".
@@ -129,6 +131,25 @@ export const manifest: readonly Step[] = [
     inputs: [],
     writes: [],
     component: MarksSeriesStep,
+  } satisfies Step,
+
+  // --- Convenience characters (pre-carve keep question) ---
+  // Runs immediately before carve: the gallery is about to propose removing
+  // every base character the orthography does not use, so the "but I still
+  // need A-Z for borrowed words, email addresses, and web addresses" answer
+  // has to exist BEFORE the recommendations are computed. Like the marks
+  // series' S0, the gate is computed INSIDE the step component: a base with no
+  // surplus basic-Latin letters completes immediately (no render), so the spine
+  // hop is invisible whenever there is nothing to ask. Emits the retained list
+  // the carve gallery shields (session.retainedConvenienceChars).
+  {
+    kind: "editor-step",
+    id: "convenience",
+    title: "Convenience letters",
+    spine: true,
+    inputs: [],
+    writes: [],
+    component: ConvenienceCharsStep,
   } satisfies Step,
 
   // --- Carve (Phase D: remove unwanted base keys) ---
@@ -179,7 +200,7 @@ export function validateManifestShape(): void {
   // M2 — spine order.
   const expectedSpine = [
     "identity", "choose_base", "track", "characters",
-    "marks", "carve", "mechanisms", "touch", "help", "package",
+    "marks", "convenience", "carve", "mechanisms", "touch", "help", "package",
   ];
   for (let i = 0; i < expectedSpine.length; i++) {
     const expected = expectedSpine[i];
