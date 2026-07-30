@@ -59,6 +59,7 @@ import { formatUncoveredCharsList } from "../../lib/unimplementedInventory.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec, VfsTransform } from "../../hooks/useKeyboardArtifact.ts";
 import { OSKFrame } from "../../components/OSKFrame.tsx";
+import { ASSIGN_LOOP_LEFT_PANE_PCT } from "../assignLoop/AssignLoopShell.tsx";
 import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
 } from "../../lib/galleryTheme.ts";
@@ -155,26 +156,29 @@ const previewCardStyle: CSSProperties = {
 };
 
 /**
- * Two-column grid: choices left (minmax(320px,420px), a comfortably readable
- * fixed-ish width), sticky live OSK preview right (1fr — takes the rest of
- * the available width). Collapses to a single column (choices first, preview
+ * Two-column grid: choices left, sticky live OSK preview right — sharing the
+ * SAME split as every other live preview in the studio, `AssignLoopShell`'s
+ * `ASSIGN_LOOP_LEFT_PANE_PCT` (45% left / 55% right), rather than a locally
+ * invented ratio. Collapses to a single column (choices first, preview
  * below) at <=768px via the scoped `.ks-touch-seed-grid` media-query rule
  * below — inline styles can't express a media query, so this is a class hook
  * only; every actual value still comes from tokens/consts here, not from CSS.
  *
  * This step is a full-layout screen (StudioShell early-returns; there is no
- * persistent right pane competing for width), so the preview column is meant
- * to use the whole remaining page width, the same way the main mobile OSK
- * preview does (TouchGallery -> AssignLoopShell's flexGrow:1 right pane).
- * Previously the outer wrapper capped total content width at 1100px, which
- * squeezed the 1fr preview column down to ~600px — visibly smaller than the
- * ~700px+ the main preview renders at. The outer wrapper's maxWidth cap has
- * since been removed (see its render site below) so this column is free to
- * grow with the viewport instead.
+ * persistent right pane competing for width) — the same context
+ * MechanismGallery/TouchGallery render `AssignLoopShell` in — so reusing its
+ * 45/55 split here means the reseed preview renders at the SAME size (both
+ * absolute and relative to the viewport) as the main mobile/desktop OSK
+ * preview, instead of stretching to (near) the full remaining width. That
+ * full-bleed stretch was the bug this fixes: an unbounded `1fr` right column
+ * paired with a capped `minmax(320px, 420px)` left column let the preview
+ * grow far past its share of the screen on wide viewports. `minmax(320px,
+ * ...)` keeps the left column from getting uncomfortably narrow on medium
+ * viewports just above the 768px collapse breakpoint.
  */
 const gridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "minmax(320px, 420px) 1fr",
+  gridTemplateColumns: `minmax(320px, ${ASSIGN_LOOP_LEFT_PANE_PCT}%) 1fr`,
   gap: 32,
   alignItems: "start",
 };

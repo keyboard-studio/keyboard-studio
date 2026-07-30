@@ -21,7 +21,7 @@
 //     - contains at least one UNTOUCHED language-specific base character (proof
 //       this is not a bare QWERTY scaffold — the character survives because it
 //       is still produced by an un-carved desktop rule, landing in the phone
-//       projection's "altgr" layer — see below),
+//       projection's "rightalt" layer — see below),
 //     - and the keyboard compiles (the emit-download gate, same compile-clean
 //       signal carve.spec.ts / copy-edit.spec.ts / touch-derivation-us1.spec.ts
 //       rely on).
@@ -114,10 +114,10 @@ import {
 //     cascade confirm dialog in-app (see carveCharacters below) — the
 //     rule-body simplicity that makes the .kmn codec-clean does not predict
 //     cascade-free carving.
-//   - Its RALT-modified rules land in scaffoldTouchLayout's "altgr" layer
-//     (classifyModifiers: RALT-alone -> "altgr"), which is emitted as a FOURTH
-//     layer alongside default/shift/numeric whenever at least one key has an
-//     altgr mapping (`hasAltgr` in buildCanonicalPhoneLayers) — this is what
+//   - Its RALT-modified rules land in scaffoldTouchLayout's "rightalt" layer
+//     (classifyModifiers: RALT-alone -> "rightalt"), which is emitted as a FOURTH
+//     layer alongside default/shift/numeric whenever at least one key has a
+//     rightalt mapping (`hasRightAlt` in buildCanonicalPhoneLayers) — this is what
 //     lets the untouched survivor character below land somewhere assertable in
 //     the compact projection at all, since pid_piaroa never touches the plain
 //     (unmodified) a/o/u/n keys.
@@ -131,12 +131,12 @@ const PIAROA_BASE_ID = "pid_piaroa";
  *  rules into a recognized S-01 "Simple swap" pattern with an output store, so
  *  clicking their glyph chip opens a "Remove everywhere?" cascade confirm
  *  dialog (handled in carveCharacters below), not a plain toggle. Carving
- *  these also removes K_A/K_O's "altgr" keyMap entries, so the derived touch
- *  layout's altgr layer must lose both characters too (asserted below). */
+ *  these also removes K_A/K_O's "rightalt" keyMap entries, so the derived touch
+ *  layout's rightalt layer must lose both characters too (asserted below). */
 const PIAROA_CARVED_CHARS = ["ä", "ö"] as const;
 
 /** The untouched, language-specific survivor — `+ [RALT K_N] > 'ñ'` is never
- *  carved. Its "altgr" keyMap entry survives into the reseeded phone
+ *  carved. Its "rightalt" keyMap entry survives into the reseeded phone
  *  projection, giving a concrete "not merely QWERTY" marker (SC-002). */
 const PIAROA_SURVIVOR_CHAR = "ñ";
 
@@ -411,7 +411,7 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     const touchJson = JSON.parse(touchText) as PhoneTouchJson;
 
     // Compact phone projection: default + shift + numeric layers present
-    // (an "altgr" fourth layer is also expected here — pid_piaroa's surviving
+    // (a "rightalt" fourth layer is also expected here — pid_piaroa's surviving
     // RALT-modified rule puts it there, see the fixture-choice rationale
     // above — its presence does not contradict SC-002's "default + shift +
     // numeric" wording, which describes the always-present trio, not an

@@ -89,7 +89,15 @@ function collectKeyNextLayers(key: TouchKeyIR, out: Set<string>): void {
   }
 }
 
-/** Recursively add every char produced by a key and its sk/multitap/flick sub-keys. */
+/**
+ * Recursively add every char produced by a key and its sk/multitap/flick
+ * sub-keys. It builds the full covered set once per layout, then tests every
+ * inventory char against it (see `computeTouchCoverage` below); inverting
+ * that into "for each inventory char, ask every key" would trade one O(keys)
+ * pass for an O(inventory * keys) one for no behavioral gain. Per-key match
+ * semantics: a non-empty, non-`*`-prefixed `text`/`output`, or a decoded
+ * `U_<HEX>[_<HEX>]*` id, all NFC-normalized.
+ */
 function collectKeyChars(key: TouchKeyIR, covered: Set<string>): void {
   // Spacer keys (sp:8/sp:10) are never char producers.
   if (isSpacerKeyClass(key.sp)) return;

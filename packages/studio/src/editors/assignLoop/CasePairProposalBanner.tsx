@@ -11,10 +11,16 @@
 // No third button and no "apply to all": each proposal is an independent
 // per-placement confirm (spec Out of scope — bulk actions).
 //
+// The shell (role="note", the green card, the Accept/Decline button pair) is
+// the shared parts/ProposalBanner.tsx — lifted out because this banner and
+// SiblingAccentProposalBanner.tsx were byte-identical copies of it, differing
+// only in message content and button labels/handlers. Markup, styling, and
+// every i18n id below are unchanged by that extraction.
+//
 // @see specs/051-uppercase-counterpart-suggestion/contracts/case-pair-proposal.md
 
 import { Trans, useLingui } from "@lingui/react/macro";
-import { BORDER, TEXT_DIM, FONT } from "../../lib/galleryTheme.ts";
+import { ProposalBanner } from "./parts/ProposalBanner.tsx";
 import type { CasePairProposal } from "./casePairCompanion.ts";
 
 export interface CasePairProposalBannerProps {
@@ -31,31 +37,13 @@ export function CasePairProposalBanner({
   const { t } = useLingui();
 
   return (
-    <div
-      role="note"
-      aria-label={t({
+    <ProposalBanner
+      ariaLabel={t({
         id: "editor.assignLoop.companion.ariaLabel",
         message: "Case-pair companion proposal",
       })}
-      style={{
-        background: "#0d2218",
-        border: "1px solid #238636",
-        borderRadius: 8,
-        padding: "10px 14px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-      }}
-    >
-      <p
-        style={{
-          margin: 0,
-          fontSize: 12,
-          color: "#56d364",
-          fontFamily: FONT,
-        }}
-      >
-        {proposal.mechanism === "combo" ? (
+      message={
+        proposal.mechanism === "combo" ? (
           <Trans id="editor.assignLoop.companion.prompt.combo">
             {proposal.originalChar} has an uppercase form,{" "}
             {proposal.counterpart}. Add the uppercase combo for{" "}
@@ -73,54 +61,27 @@ export function CasePairProposalBanner({
             {proposal.counterpart}. Map {proposal.counterpart} to the shift
             layer of the same key as well?
           </Trans>
-        )}
-      </p>
-      <div style={{ display: "flex", gap: 8 }}>
-        <button
-          type="button"
-          onClick={onConfirm}
-          aria-label={t({
-            id: "editor.assignLoop.companion.confirmAriaLabel",
-            message: `Map ${proposal.counterpart} to the shift layer of ${confirmTargetLabel(proposal)}`,
-          })}
-          style={{
-            padding: "5px 14px",
-            background: "#238636",
-            border: "none",
-            borderRadius: 5,
-            color: "#e6edf3",
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: "pointer",
-            fontFamily: FONT,
-          }}
-        >
-          <Trans id="editor.assignLoop.companion.confirmButton">Map it</Trans>
-        </button>
-        <button
-          type="button"
-          onClick={onDismiss}
-          aria-label={t({
-            id: "editor.assignLoop.companion.declineAriaLabel",
-            message: `Do not map ${proposal.counterpart} to the shift layer`,
-          })}
-          style={{
-            padding: "5px 14px",
-            background: "transparent",
-            border: `1px solid ${BORDER}`,
-            borderRadius: 5,
-            color: TEXT_DIM,
-            fontSize: 12,
-            cursor: "pointer",
-            fontFamily: FONT,
-          }}
-        >
-          <Trans id="editor.assignLoop.companion.declineButton">
-            No thanks
-          </Trans>
-        </button>
-      </div>
-    </div>
+        )
+      }
+      confirmLabel={
+        <Trans id="editor.assignLoop.companion.confirmButton">Map it</Trans>
+      }
+      confirmAriaLabel={t({
+        id: "editor.assignLoop.companion.confirmAriaLabel",
+        message: `Map ${proposal.counterpart} to the shift layer of ${confirmTargetLabel(proposal)}`,
+      })}
+      onConfirm={onConfirm}
+      declineLabel={
+        <Trans id="editor.assignLoop.companion.declineButton">
+          No thanks
+        </Trans>
+      }
+      declineAriaLabel={t({
+        id: "editor.assignLoop.companion.declineAriaLabel",
+        message: `Do not map ${proposal.counterpart} to the shift layer`,
+      })}
+      onDismiss={onDismiss}
+    />
   );
 }
 

@@ -25,6 +25,7 @@ import type { TouchAssignment, IRGroup, IRRule, KeyboardIR, Pattern, VirtualFS }
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { deriveSeedLayout } from "../../lib/buildTouchLayoutJson.ts";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
+import { ASSIGN_LOOP_LEFT_PANE_PCT } from "../assignLoop/AssignLoopShell.tsx";
 
 // ---------------------------------------------------------------------------
 // deriveSeedLayout mock — wraps the REAL implementation by default (every
@@ -425,6 +426,26 @@ describe("TouchSeedSourcePanel — live preview (R4a)", () => {
     expect(screen.getByTestId("seed-source-reseed-preview-error")).toBeTruthy();
     // No baseIr -> no artifact to build -> the OSK is never mounted.
     expect(screen.queryByTestId("osk-frame")).toBeNull();
+  });
+
+  it("sizes the preview column the same as every other live preview — the shared AssignLoopShell 45/55 split, not an unbounded full-width column", () => {
+    // Fresh store -> default selection is Reseed, so this exercises the
+    // reseed preview's column specifically (the regression this guards
+    // against: the reseed preview stretching to ~full page width).
+    const { container } = render(
+      <TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />,
+    );
+
+    const grid = container.querySelector(".ks-touch-seed-grid");
+    expect(grid).toBeTruthy();
+    // The left (choices) column is capped at ASSIGN_LOOP_LEFT_PANE_PCT — the
+    // SAME left-pane share AssignLoopShell gives MechanismGallery/
+    // TouchGallery's live preview — so the right (preview) column always
+    // gets the matching ~`100 - ASSIGN_LOOP_LEFT_PANE_PCT`% share, never an
+    // unbounded `1fr` of the whole remaining page width.
+    expect((grid as HTMLElement).style.gridTemplateColumns).toBe(
+      `minmax(320px, ${ASSIGN_LOOP_LEFT_PANE_PCT}%) 1fr`,
+    );
   });
 });
 
