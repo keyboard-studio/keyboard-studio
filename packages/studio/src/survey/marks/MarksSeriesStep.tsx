@@ -47,12 +47,14 @@ import {
   buildPlacementWorklist,
   expandCaseCounterpartAttachments,
   expandCaseCounterpartPromotions,
+  deriveMarksComputedAxes,
   promotableCharacters,
   prunePromotions,
   pruneMarkOverrides,
   treatmentFor,
   type AttachmentProposal,
   type MarkClass,
+  type MarksComputedAxes,
   type MarkTreatment,
   type MarkTreatmentAnswer,
   type OutputForm,
@@ -159,12 +161,25 @@ export function classNeedsTreatmentScreen(
 function seriesResult(
   worklist = makeEmptyPlacementWorklist(),
   outputForm?: OutputForm,
+  computedAxes?: MarksComputedAxes,
 ): SurveyPhaseResult {
   return {
     phase: "C",
     answers: [],
     marksWorklist: worklist,
     ...(outputForm !== undefined ? { marksOutputForm: outputForm } : {}),
+    // spec 052 US4: the recorded treatment finally reaches strategy selection.
+    // `computedAxes` is an existing additive optional field merged into
+    // session.axes by mergePhaseResults — its OMISSION here was the defect, so
+    // this needs no contract change, only a producer.
+    ...(computedAxes !== undefined
+      ? {
+          computedAxes: {
+            diacriticBehavior: computedAxes.diacriticBehavior,
+            markInputOrder: computedAxes.markInputOrder,
+          },
+        }
+      : {}),
   };
 }
 
@@ -398,7 +413,17 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
         promoted: expandCaseCounterpartPromotions(gate.alphabet, treatment.promoted, bcp47),
       },
     });
-    onComplete(seriesResult(worklist, outputForm));
+    // US4: project the recorded treatment onto A4/A3a so strategy selection can
+    // see the answer. Without this the survey builds a keyboard on two premises
+    // at once — the author's recorded treatment and an independently-derived
+    // diacritic-behaviour axis — with nothing detecting the contradiction.
+    const computedAxes = deriveMarksComputedAxes({
+      alphabet: gate.alphabet,
+      classes,
+      prefills: treatmentPrefills,
+      treatment,
+    });
+    onComplete(seriesResult(worklist, outputForm, computedAxes));
   }
 
   function handleContinue(): void {

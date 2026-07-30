@@ -198,6 +198,8 @@ export type { MarkTreatment, MarkTreatmentAnswer, PromotedComposedCharacter } fr
 export { promotableCharacters, expandCaseCounterpartPromotions, prunePromotions } from "./marks/promotion.js";
 export { computeMarkTreatmentPrefills, detectBaseMarkMechanism, unaffordableReasonFor, PRODUCTIVITY_SPREAD_THRESHOLD } from "./marks/treatment-prefill.js";
 export type { MarkTreatmentPrefill, MarkTreatmentPrefillOptions, KeyBudgetSignal, BaseMarkMechanism } from "./marks/treatment-prefill.js";
+export { deriveMarksComputedAxes, surfaceStrategyDisagreement } from "./marks/strategy-reconcile.js";
+export type { MarksComputedAxes, MarksReconcileInputs, DisagreementInputs } from "./marks/strategy-reconcile.js";
 export { buildPlacementWorklist, verifyWorklistCoverage } from "./marks/worklist.js";
 export type { WorklistInputs } from "./marks/worklist.js";
 export { expandCaseCounterpartAttachments } from "./marks/case-fold.js";

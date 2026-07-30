@@ -158,24 +158,24 @@ Written first, failing. The engine tests pin the contract's behavioural guarante
 
 ### Tests
 
-- [ ] **T034** [US4] Reconciliation tests: a recorded treatment giving composed characters their own keys, against an independently-indicated compose-as-you-type A4, is resolved by precedence or surfaced — never silently built (US4 AC1, SC-011); changing the recorded treatment changes the subsequent selection (FR-027, US4 AC3); an internally-mixed class contributes its **dominant** treatment to the class-level axis and the mix is surfaced (edge case); a base whose own behaviour the author knowingly overrode is a legitimate override and does **not** fire the FR-024 surface — the check runs on the **selected strategy**, after `selectStrategy`, not on the raw axis (edge case) · `packages/engine/src/marks/strategy-reconcile.test.ts`
+- [x] **T034** [US4] Reconciliation tests: a recorded treatment giving composed characters their own keys, against an independently-indicated compose-as-you-type A4, is resolved by precedence or surfaced — never silently built (US4 AC1, SC-011); changing the recorded treatment changes the subsequent selection (FR-027, US4 AC3); an internally-mixed class contributes its **dominant** treatment to the class-level axis and the mix is surfaced (edge case); a base whose own behaviour the author knowingly overrode is a legitimate override and does **not** fire the FR-024 surface — the check runs on the **selected strategy**, after `selectStrategy`, not on the raw axis (edge case) · `packages/engine/src/marks/strategy-reconcile.test.ts`
 
 **⟶ Wait for T034, then:**
 
 ### Implementation
 
-- [ ] **T035** [US4] Build the projection: derive `diacriticBehavior` (A4) from the recorded treatments — ≥1 `own-key` with two or more distinct mark families → `"multi-family"`; one family of stacking marks → `"stacking-combining"`; every mark `composed` → `"none"`; **never** derive `"replacing-cycling"`, which this station does not elicit — plus `markInputOrder` (A3a) verbatim. Add the post-`selectStrategy` disagreement surface (FR-024) · `packages/engine/src/marks/strategy-reconcile.ts`
+- [x] **T035** [US4] Build the projection: derive `diacriticBehavior` (A4) from the recorded treatments — ≥1 `own-key` with two or more distinct mark families → `"multi-family"`; one family of stacking marks → `"stacking-combining"`; every mark `composed` → `"none"`; **never** derive `"replacing-cycling"`, which this station does not elicit — plus `markInputOrder` (A3a) verbatim. Add the post-`selectStrategy` disagreement surface (FR-024) · `packages/engine/src/marks/strategy-reconcile.ts`
 
 **⟶ Wait for T035, then:**
 
 **Wave 5 — independent (different files):**
 
-- [ ] **T036** [P] [US4] Emit `computedAxes: { diacriticBehavior, markInputOrder }` on the marks phase result. No contract change — `SurveyPhaseResult.computedAxes` already exists as an additive optional field merged by `mergePhaseResults`; its omission today *is* the defect · `packages/studio/src/survey/marks/MarksSeriesStep.tsx`
-- [ ] **T037** [P] [US4] Amend §7.2 with the stated precedence (FR-025): a recorded mark treatment wins over a default-filled or prior-derived A4, and `defaultFillAxes` never overwrites an axis already present — stated, not left implicit in behaviour · `specs/007-strategy-selection/spec.md`
+- [x] **T036** [P] [US4] Emit `computedAxes: { diacriticBehavior, markInputOrder }` on the marks phase result. No contract change — `SurveyPhaseResult.computedAxes` already exists as an additive optional field merged by `mergePhaseResults`; its omission today *is* the defect · `packages/studio/src/survey/marks/MarksSeriesStep.tsx`
+- [x] **T037** [P] [US4] Amend §7.2 with the stated precedence (FR-025): a recorded mark treatment wins over a default-filled or prior-derived A4, and `defaultFillAxes` never overwrites an axis already present — stated, not left implicit in behaviour · `specs/007-strategy-selection/spec.md`
 
 **⟶ Wait for Wave 5 to finish, then:**
 
-- [ ] **T038** [US4] Re-run the §7.5 self-consistency suite and reconcile the table: every covered keyboard selects what it selected before, or the row is amended **in this same change** with a recorded reason (FR-026, SC-012, US4 AC2). Restate the EuroLatin multi-family row as **open with its reason unchanged** — MML-as-target is out of scope for v1, so closing it would need evidence this feature does not produce (research D7, US4 AC4) · `specs/007-strategy-selection/spec.md`
+- [x] **T038** [US4] Re-run the §7.5 self-consistency suite and reconcile the table: every covered keyboard selects what it selected before, or the row is amended **in this same change** with a recorded reason (FR-026, SC-012, US4 AC2). Restate the EuroLatin multi-family row as **open with its reason unchanged** — MML-as-target is out of scope for v1, so closing it would need evidence this feature does not produce (research D7, US4 AC4) · `specs/007-strategy-selection/spec.md`
 
 **Checkpoint**: US4 is independently functional. The recorded answer and the selected strategy can no longer disagree silently, and the self-consistency table is green with every changed row reasoned.
 

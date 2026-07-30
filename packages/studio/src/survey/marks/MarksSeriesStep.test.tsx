@@ -479,6 +479,27 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
     });
   }
 
+  /** One productive above-marks class (spread >= 3) — marks earn their own keys. */
+  function seedTonalAlphabetForAxes(): void {
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "B",
+      answers: [],
+      alphabet: {
+        bases: ["a", "e", "i"],
+        marks: [ACUTE, GRAVE],
+        attestedStacks: [
+          { base: "a", marks: [ACUTE] },
+          { base: "e", marks: [ACUTE] },
+          { base: "i", marks: [ACUTE] },
+          { base: "a", marks: [GRAVE] },
+          { base: "e", marks: [GRAVE] },
+          { base: "i", marks: [GRAVE] },
+        ],
+        declaredRoles: {},
+      },
+    });
+  }
+
   function reachTreatment(): HTMLElement | null {
     for (let i = 0; i < 6 && screen.queryByTestId("marks-treatment") === null; i++) {
       fireEvent.click(screen.getByTestId("marks-continue"));
@@ -578,6 +599,25 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
     // still reached the worklist (no mark unit here, so it is inert but recorded).
     expect(worklist?.ownLetterUnits).toContain("é");
     expect(worklist?.markUnits).toEqual([]);
+  });
+
+  it("US4/FR-027: the phase result carries computedAxes so strategy selection can see the answer", () => {
+    // The omission of this field WAS the defect: the marks series produced the
+    // richest statement the survey has about mark behaviour and sent none of it
+    // to selectStrategy.
+    seedTonalAlphabetForAxes();
+    const onComplete = vi.fn();
+    act(() => {
+      render(<MarksSeriesStep onComplete={onComplete} />);
+    });
+    for (let i = 0; i < 6 && onComplete.mock.calls.length === 0; i++) {
+      fireEvent.click(screen.getByTestId("marks-continue"));
+    }
+    const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
+    expect(result.computedAxes).toBeDefined();
+    // A productive above-marks class → the marks earn their own keys, one family.
+    expect(result.computedAxes?.diacriticBehavior).toBe("stacking-combining");
+    expect(["prefix", "postfix"]).toContain(result.computedAxes?.markInputOrder);
   });
 
   it("FR-020/US1 AC7: an alphabet edit re-proposes and returns to the first station", () => {
