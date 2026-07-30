@@ -15,11 +15,21 @@
 // this picker's custom mode is active, the caller sets `value` back to that
 // key id directly (see handleKeyTap in both galleries) — that alone exits
 // custom mode, since custom mode is purely `value === CUSTOM_KEY_OPTION_VALUE`.
+//
+// Physical-key type-to-select: while THIS field's dropdown is open, pressing
+// the corresponding physical key selects it, the same way OSK tap does —
+// `value` is set directly to the resolved vkey id, which likewise exits
+// custom mode for free. Wired via SelectMenu's opt-in `resolveKeyToValue`
+// prop (see that prop's doc comment in ui/SelectMenu.tsx) rather than a
+// second keydown listener here, so there is exactly one place a keydown on
+// the open list is interpreted. Scoped to KEY pickers only — this resolver
+// is supplied ONLY by this component, never by the generic SelectMenu
+// itself, so flick-direction/layer-token/font SelectMenus are unaffected.
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, KeyboardEvent } from "react";
 import { Trans } from "@lingui/react/macro";
 import { SelectMenu, type SelectMenuOption } from "../../ui/SelectMenu.tsx";
-import { CUSTOM_KEY_OPTION, CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
+import { CUSTOM_KEY_OPTION, CUSTOM_KEY_OPTION_VALUE, charToVkey } from "../../lib/keyOptions.ts";
 import {
   resolveKeyPickerSelection,
   reflectCharInput,
@@ -86,6 +96,23 @@ export function KeyPickerField({
     { value: CUSTOM_KEY_OPTION_VALUE, label: CUSTOM_KEY_OPTION.label },
   ];
 
+  // Physical-key type-to-select (see the file-header comment). Ignores
+  // modifier combos (Ctrl/Alt/Meta — those are shortcuts, not a character to
+  // map) and any non-single-character `event.key` (ArrowDown, Enter, Tab,
+  // etc. — already meaningful to SelectMenu itself, or just not a key we
+  // pick from). `charToVkey` is case-insensitive for letters and returns
+  // null for anything unmapped; the `options.some` guard additionally means
+  // this field only ever resolves to one of ITS OWN base options — never to
+  // CUSTOM_KEY_OPTION_VALUE (charToVkey can't produce that sentinel) and
+  // never to a vkey some other field's narrower option list excludes.
+  const resolveKeyToValue = (e: KeyboardEvent): string | null => {
+    if (e.ctrlKey || e.altKey || e.metaKey) return null;
+    if (e.key.length !== 1) return null;
+    const vkey = charToVkey(e.key);
+    if (vkey === null) return null;
+    return options.some((opt) => opt.value === vkey) ? vkey : null;
+  };
+
   return (
     <span style={{ display: "inline-flex", flexDirection: "column", gap: 4 }}>
       <SelectMenu
@@ -94,6 +121,7 @@ export function KeyPickerField({
         ariaLabel={selectAriaLabel}
         options={selectMenuOptions}
         style={selectStyle}
+        resolveKeyToValue={resolveKeyToValue}
       />
       {isCustom && (
         <span style={{ display: "inline-flex", flexDirection: "column", gap: 2 }}>
