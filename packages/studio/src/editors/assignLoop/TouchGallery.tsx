@@ -2909,6 +2909,69 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             </ErrorText>
           )}
 
+          {/* Sibling-accent bulk summary boxes — one green box per accelerator
+              batch, at the TOP alongside the single-character suggestion card.
+              Scoped to the current character's family (matched by host key) so
+              the author sees only the box for the letter they are looking at,
+              not every group in the draft. Each box summarizes the batch and
+              removes it all in one click. */}
+          {bulkAccentGroups
+            .filter((group) => group.hostKey === currentCharHostKey)
+            .map((group) => {
+              const hostLabel = hostKeyShortLabel(group.hostKey, "default");
+              const memberList = group.members
+                .map((c) => displayChar(c))
+                .join(" ");
+              return (
+                <div
+                  key={group.id}
+                  role="note"
+                  aria-label={t({
+                    id: "editor.assignLoop.touch.bulkAccents.ariaLabel",
+                    message: "Bulk-added accent family",
+                  })}
+                  style={{
+                    background: "#0d2218",
+                    border: "1px solid #238636",
+                    borderRadius: 8,
+                    padding: "10px 14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  <p style={suggestionMessageStyle}>
+                    <Trans id="editor.assignLoop.touch.bulkAccents.summary">
+                      Added {memberList} to {hostLabel} as long-press.
+                    </Trans>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveBulkGroup(group)}
+                    aria-label={t({
+                      id: "editor.assignLoop.touch.bulkAccents.removeAllAriaLabel",
+                      message: `Remove all letters added to ${{ hostLabel }}`,
+                    })}
+                    style={{
+                      alignSelf: "flex-start",
+                      padding: "4px 12px",
+                      background: "transparent",
+                      border: "1px solid #238636",
+                      borderRadius: 6,
+                      color: "#56d364",
+                      fontSize: 12,
+                      cursor: "pointer",
+                      fontFamily: FONT,
+                    }}
+                  >
+                    <Trans id="editor.assignLoop.touch.bulkAccents.removeAll">
+                      Remove all
+                    </Trans>
+                  </button>
+                </div>
+              );
+            })}
+
           {/* Suggestion card (shown until accepted/dismissed; skipped entirely
               when there is no suggestion to offer) */}
           {!showChooser && (
@@ -3207,68 +3270,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
           )}
         />
       )}
-
-      {/* Sibling-accent bulk summary boxes — one green box per accelerator
-          batch, BELOW the Configured row. Scoped to the current character's
-          family (matched by host key) so the author sees only the box for the
-          letter they are looking at, not every group in the draft. Each box
-          summarizes the batch and removes it all in one click. */}
-      {bulkAccentGroups
-        .filter((group) => group.hostKey === currentCharHostKey)
-        .map((group) => {
-          const hostLabel = hostKeyShortLabel(group.hostKey, "default");
-          const memberList = group.members
-            .map((c) => displayChar(c))
-            .join(" ");
-          return (
-            <div
-              key={group.id}
-              role="note"
-              aria-label={t({
-                id: "editor.assignLoop.touch.bulkAccents.ariaLabel",
-                message: "Bulk-added accent family",
-              })}
-              style={{
-                background: "#0d2218",
-                border: "1px solid #238636",
-                borderRadius: 8,
-                padding: "10px 14px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-              }}
-            >
-              <p style={suggestionMessageStyle}>
-                <Trans id="editor.assignLoop.touch.bulkAccents.summary">
-                  Added {memberList} to {hostLabel} as long-press.
-                </Trans>
-              </p>
-              <button
-                type="button"
-                onClick={() => handleRemoveBulkGroup(group)}
-                aria-label={t({
-                  id: "editor.assignLoop.touch.bulkAccents.removeAllAriaLabel",
-                  message: `Remove all letters added to ${{ hostLabel }}`,
-                })}
-                style={{
-                  alignSelf: "flex-start",
-                  padding: "4px 12px",
-                  background: "transparent",
-                  border: "1px solid #238636",
-                  borderRadius: 6,
-                  color: "#56d364",
-                  fontSize: 12,
-                  cursor: "pointer",
-                  fontFamily: FONT,
-                }}
-              >
-                <Trans id="editor.assignLoop.touch.bulkAccents.removeAll">
-                  Remove all
-                </Trans>
-              </button>
-            </div>
-          );
-        })}
 
     </div>
   );
