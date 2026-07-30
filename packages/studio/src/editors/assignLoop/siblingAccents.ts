@@ -26,6 +26,7 @@
 // here.
 
 import { isDecomposableAccented } from "@keyboard-studio/contracts";
+import { isUppercaseLetter } from "../../lib/caseOrder.ts";
 
 export type SiblingAccentLayer = "default" | "shift";
 
@@ -105,7 +106,7 @@ export function siblingAccentPlacements(
     if (!isDecomposableAccented(x)) continue;
     if (baseLetterOf(x) !== baseLower) continue;
     const mark = [...x.normalize("NFD")][1] ?? "";
-    const bucket = /^\p{Lu}$/u.test(x) ? upper : lower;
+    const bucket = isUppercaseLetter(x) ? upper : lower;
     bucket.push({ char: x, mark });
   }
 

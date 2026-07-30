@@ -12,6 +12,9 @@ export * from "./confirmedAlphabet";
 export * from "./criteria";
 export * from "./keyboard-ir";
 export * from "./keyboardId";
+// The single authoritative key-budget determination (spec 052 FR-016); axis A7
+// in ./axes is its projection, never an independent measurement.
+export * from "./keyBudget";
 export * from "./keyboardIdentity";
 export * from "./linguistInventory";
 export * from "./lintFinding";

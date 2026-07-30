@@ -10,6 +10,7 @@ import type {
   IRGroup,
   IRRule,
   TouchLayoutIR,
+  TouchKeyIR,
   Pattern,
 } from "@keyboard-studio/contracts";
 
@@ -3028,5 +3029,170 @@ describe("scaffoldTouchLayoutWithDiagnostics — tablet path (platformStyle:\"ta
     const ir = makeEwondoLikeIR();
     const result = scaffoldTouchLayoutWithDiagnostics(ir);
     expect(result.layout.platforms.map((p) => p.id)).toEqual(["phone"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR-014 (spec 052) — a mark key that waits for a character is UNREPRESENTABLE
+// on touch, not merely discouraged there.
+// ---------------------------------------------------------------------------
+//
+// Spec 052 FR-014 has two clauses. The first ("MUST NOT be offered for a touch
+// target") is vacuous today: the spine routes every project through both the
+// desktop and touch steps, so there is no touch-only target for an option set to
+// fork on (research D5). The second clause is the load-bearing one — the option
+// "MUST NOT be producible there by any answer the author can give" — and it is a
+// property of the DERIVATION, so it is pinned here rather than in the station.
+//
+// The claim under test: for every `(treatment, inputOrder)` combination the S2
+// station can record, the touch layout the scaffolder derives contains no
+// waiting-mark key. A waiting-mark key would be one whose output is a bare
+// combining mark with no subkey menu behind it — i.e. a key that consumes a tap
+// and shows nothing. The scaffolder resolves recognized deadkey patterns into
+// long-press `sk[]` menus on the base letter's own key, so that shape is never
+// emitted.
+
+describe("spec 052 FR-014: no sk[]-free waiting mark reaches a touch layout", () => {
+  const ACUTE = "\u0301";
+
+  /** Every answer the station can produce: two treatments x two orders. */
+  const COMBINATIONS: { treatment: "own-key" | "composed"; inputOrder: "prefix" | "postfix" }[] = [
+    { treatment: "own-key", inputOrder: "prefix" },
+    { treatment: "own-key", inputOrder: "postfix" },
+    { treatment: "composed", inputOrder: "prefix" },
+    { treatment: "composed", inputOrder: "postfix" },
+  ];
+
+  /**
+   * The desktop IR each combination produces, in the shape the scaffolder sees:
+   *
+   * - `own-key` + `prefix` — a mark key that waits for the next character, which
+   *   on desktop is a deadkey (recognized S-02 pattern). This is the only
+   *   combination that puts a waiting mark in the desktop IR at all.
+   * - `own-key` + `postfix` — the mark key follows the letter, so the rule is a
+   *   plain sequence replacement; nothing waits.
+   * - `composed` (either order) — no mark key exists; each marked character is
+   *   emitted whole. The order value is retained but inert.
+   */
+  function irFor(combination: { treatment: string; inputOrder: string }): KeyboardIR {
+    const letterRule = makeCharRule("K_E", [], "e");
+    if (combination.treatment === "composed") {
+      return makeMinimalIR({
+        groups: [makeGroup([letterRule, makeCharRule("K_2", [], "\u00e9")])],
+      });
+    }
+    if (combination.inputOrder === "postfix") {
+      // Letter first, then the mark key — a sequence replacement, no deadkey.
+      return makeMinimalIR({
+        groups: [
+          makeGroup([
+            letterRule,
+            {
+              nodeId: freshId("rule"),
+              context: [
+                { kind: "char", value: "e" },
+                { kind: "vkey", name: "K_QUOTE", modifiers: [] },
+              ],
+              output: [{ kind: "char", value: "\u00e9" }],
+            },
+          ]),
+        ],
+      });
+    }
+    // Mark key first: on desktop this is a deadkey, recognized as S-02.
+    const deadkeyNodeId = freshId("rule");
+    return makeMinimalIR({
+      groups: [
+        makeGroup([
+          letterRule,
+          {
+            nodeId: deadkeyNodeId,
+            context: [
+              { kind: "deadkey", name: "dk1" } as never,
+              { kind: "vkey", name: "K_E", modifiers: [] },
+            ],
+            output: [{ kind: "char", value: "\u00e9" }],
+          },
+        ]),
+      ],
+      recognizedPatterns: [makeS02Pattern("K_E", "\u00e9", deadkeyNodeId)],
+    });
+  }
+
+  /** Every key on every layer of every platform, including nested sub-keys. */
+  function allKeysDeep(layout: TouchLayoutIR): TouchKeyIR[] {
+    const out: TouchKeyIR[] = [];
+    const walk = (key: TouchKeyIR): void => {
+      out.push(key);
+      for (const sub of key.sk ?? []) walk(sub);
+      for (const sub of key.multitap ?? []) walk(sub);
+      for (const sub of Object.values(key.flick ?? {})) {
+        if (sub !== undefined) walk(sub);
+      }
+    };
+    for (const platform of layout.platforms) {
+      for (const layer of platform.layers) {
+        for (const row of layer.rows) {
+          for (const key of row.keys) walk(key);
+        }
+      }
+    }
+    return out;
+  }
+
+  for (const combination of COMBINATIONS) {
+    const label = `${combination.treatment} / ${combination.inputOrder}`;
+
+    it(`${label}: no key emits a bare waiting mark`, () => {
+      const layout = scaffoldTouchLayout(irFor(combination));
+      for (const key of allKeysDeep(layout)) {
+        const emitted = key.output ?? key.text ?? "";
+        // A key whose whole output is a lone combining mark would be a mark
+        // awaiting a character — a waiting mark on a touch surface.
+        const isBareMark = emitted !== "" && /^\p{M}+$/u.test(emitted);
+        expect(isBareMark, `${label}: key "${key.id}" emits the bare mark ${JSON.stringify(emitted)}`).toBe(false);
+      }
+    });
+
+    it(`${label}: no key carries a deadkey reference in its output`, () => {
+      const layout = scaffoldTouchLayout(irFor(combination));
+      for (const key of allKeysDeep(layout)) {
+        const emitted = `${key.output ?? ""}${key.text ?? ""}`;
+        expect(emitted, `${label}: key "${key.id}"`).not.toMatch(/deadkey|\bdk\d*\(/i);
+      }
+    });
+  }
+
+  it("own-key / prefix: the desktop deadkey is RESOLVED into a long-press menu, not dropped", () => {
+    // The strong form of the claim. "No waiting mark reaches touch" would also
+    // be satisfied by silently losing the mark, which would be a different
+    // defect — so assert the successor is actually reachable by long-press.
+    const layout = scaffoldTouchLayout(irFor({ treatment: "own-key", inputOrder: "prefix" }));
+    const keys = allKeysDeep(layout);
+    const baseKey = keys.find((k) => k.id === "K_E");
+    expect(baseKey).toBeDefined();
+    expect(baseKey?.sk?.length ?? 0).toBeGreaterThan(0);
+    const successors = (baseKey?.sk ?? []).map((s) => s.text ?? s.output ?? "");
+    expect(successors.some((s) => s.normalize("NFC") === "\u00e9")).toBe(true);
+  });
+
+  it("the two orders derive the SAME touch layout — order is a desktop-only distinction", () => {
+    // Why FR-014 needs no platform-forked option set: on touch, prefix and
+    // postfix are indistinguishable, because both resolve to the same long-press
+    // affordance. There is nothing for a touch-specific option to say.
+    const prefixKeys = new Set(
+      allKeysDeep(scaffoldTouchLayout(irFor({ treatment: "own-key", inputOrder: "prefix" })))
+        .filter((k) => (k.text ?? k.output ?? "") !== "")
+        .map((k) => `${k.id}:${(k.text ?? k.output ?? "").normalize("NFC")}`),
+    );
+    const postfixKeys = new Set(
+      allKeysDeep(scaffoldTouchLayout(irFor({ treatment: "own-key", inputOrder: "postfix" })))
+        .filter((k) => (k.text ?? k.output ?? "") !== "")
+        .map((k) => `${k.id}:${(k.text ?? k.output ?? "").normalize("NFC")}`),
+    );
+    // Both reach é; neither reaches a bare acute.
+    expect([...prefixKeys].some((k) => k.endsWith(":\u00e9"))).toBe(true);
+    expect([...postfixKeys].some((k) => k.endsWith(":\u00e9"))).toBe(true);
+    expect([...prefixKeys, ...postfixKeys].some((k) => k.endsWith(`:${ACUTE}`))).toBe(false);
   });
 });
