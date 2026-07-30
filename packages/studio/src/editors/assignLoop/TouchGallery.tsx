@@ -107,7 +107,7 @@ import {
 } from "../../lib/modifierTokenLabel.ts";
 import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
 import { extractMechanismHostKey } from "../../lib/extractMechanismHostKey.ts";
-import { isUppercaseLetter, lowercaseFirst } from "../../lib/caseOrder.ts";
+import { lowercaseFirst } from "../../lib/caseOrder.ts";
 import {
   shouldEmitTouchLayout,
   resolveTouchSeedSource,
@@ -119,6 +119,7 @@ import {
   type BulkAccentGroup,
 } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { collate } from "../../survey/collation.ts";
 import {
   promoteOnManualEdit,
   casePairTouchLayer,
@@ -318,20 +319,6 @@ export type TouchMethod =
 // buildMechanismRef closure and handleApply below, which mirror
 // MechanismGallery's `if (resolvedSwapVkey === null) return;` style).
 // ---------------------------------------------------------------------------
-
-/**
- * The touch layer a placement of `char` belongs on, derived from the letter's
- * case (FR-006). Before this existed, case was simply UNREPRESENTABLE in a
- * touch placement — both appliers hardcoded the phone `default` layer — so an
- * accented uppercase letter landed on the lowercase layer.
- *
- * This reads the character's case; it does NOT change it. The one
- * `.toUpperCase()` left on the touch path builds a vkey NAME (`K_A`), not a
- * letter, and is unrelated.
- */
-function touchLayerForChar(char: string): TouchLayerId {
-  return isUppercaseLetter(char) ? "shift" : "default";
-}
 
 /**
  * Seed the touch layer builder's slot state for `char` (requirement 6,
@@ -1378,11 +1365,22 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const restoreTouchKey = useWorkingCopyStore((s) => s.restoreTouchKey);
 
   // Character inventory — same source MechanismGallery uses.
-  const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
-  // Stable primitive proxy for `inventory` — moved up here (from its old
-  // position beside the currentChar-sync effect) so detectedChars/
-  // touchLettersToAdd below, which now need it too, can be declared before
-  // that effect.
+  const rawInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+
+  // Collated display/walk order (spec 047 FR-007's default-ICU comparator,
+  // reused — not reinvented; see survey/collation.ts and MechanismGallery's
+  // matching `inventory` derivation): puts a lowercase letter immediately
+  // before its uppercase counterpart and keeps accented forms adjacent to
+  // their base. Feeds BOTH the CharScrollStrip (`chars=`) and
+  // usePositionalCharNav (`list:`) below, plus this gallery's other
+  // order-independent `inventory` reads (membership/length/coverage checks)
+  // — none of those depend on order, so sorting the single shared variable
+  // is safe. The canonical `confirmedInventory` (rawInventory) is left
+  // untouched; only this display-local derivation is sorted.
+  const inventory = useMemo(() => collate(rawInventory), [rawInventory]);
+  // Stable primitive proxy for `inventory` — declared up here (rather than
+  // beside the currentChar-sync effect) so detectedChars/touchLettersToAdd
+  // below, which also need it, can be declared before that effect.
   const inventoryKey = inventory.join("\0");
 
   // Draft persistence — read on mount; write on every charTouch change.

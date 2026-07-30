@@ -1662,6 +1662,36 @@ describe("MechanismGallery — character-scroll-strip navigation", () => {
     expect(screen.getByTestId("char-scroll-chip-00ED")).toBeTruthy();
   });
 
+  it("orders a lowercase letter immediately before its uppercase counterpart, not in first-appearance order (spec 047 collateCompare reuse)", async () => {
+    // Seeded UPPERCASE-first (the old first-appearance order the gallery
+    // used to render in) — the collated display/walk order must not follow
+    // it: "a" must render before "A", and "e" before "E".
+    seedInventory(["A", "a", "E", "e"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    const chipOrder = within(strip)
+      .getAllByRole("button")
+      .map((btn) => btn.getAttribute("data-testid"));
+
+    const lowerAIdx = chipOrder.indexOf("char-scroll-chip-0061"); // "a"
+    const upperAIdx = chipOrder.indexOf("char-scroll-chip-0041"); // "A"
+    const lowerEIdx = chipOrder.indexOf("char-scroll-chip-0065"); // "e"
+    const upperEIdx = chipOrder.indexOf("char-scroll-chip-0045"); // "E"
+    expect(lowerAIdx).toBeGreaterThanOrEqual(0);
+    expect(upperAIdx).toBeGreaterThanOrEqual(0);
+    expect(lowerEIdx).toBeGreaterThanOrEqual(0);
+    expect(upperEIdx).toBeGreaterThanOrEqual(0);
+    expect(lowerAIdx).toBeLessThan(upperAIdx);
+    expect(lowerEIdx).toBeLessThan(upperEIdx);
+
+    // The Back/Next walk (usePositionalCharNav) reflects the same collated
+    // order: mount lands on the first character in that order, "a".
+    expectCurrentChar("a");
+  });
+
   it("clicking an earlier character's chip moves back to it, ungated by intermediate implementation status", async () => {
     const onBack = vi.fn();
     seedInventory(["á", "é", "í"]);
@@ -2058,7 +2088,10 @@ describe("MechanismGallery — Back after skipping the only character", () => {
 describe("MechanismGallery — kbgen suggestion persistence across Back navigation", () => {
   it("an accepted suggestion row does not reappear after navigating forward and back", async () => {
     // corpusBackedQwerty proposes RALT+K_E for U+00E9 (é) and RALT+K_A for
-    // U+00E0 (à) — both S-08 (modifier_as_layer_switch) candidates.
+    // U+00E0 (à) — both S-08 (modifier_as_layer_switch) candidates. The
+    // gallery's walk is collated (spec 047's collateCompare): "à" sorts
+    // before "é" (a < e), so "à" is the first character regardless of the
+    // seed array's own order.
     const onBack = vi.fn();
     seedInventory(["é", "à"]);
     await act(async () => {
@@ -2071,41 +2104,41 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
       );
     });
 
-    // Suggestion row shows for "é".
-    expect(screen.getByText(/Suggested: Right Alt \+ E for é/i)).toBeTruthy();
+    // Suggestion row shows for "à".
+    expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
 
     // Accept it — records the S-08 assignment and dismisses the row (the
     // dismissal is also implied by coveredChars once accepted).
     fireEvent.click(
-      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_E for é/i }),
+      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_A for à/i }),
     );
     await waitFor(() => {
-      expect(screen.queryByText(/Suggested: Right Alt \+ E for é/i)).toBeNull();
+      expect(screen.queryByText(/Suggested: Right Alt \+ A for à/i)).toBeNull();
     });
 
-    // Advance to "à" — its own (not-yet-resolved) suggestion row shows.
+    // Advance to "é" — its own (not-yet-resolved) suggestion row shows.
     await waitFor(() => {
       const nextBtn = screen.getByRole("button", { name: /Next character/i });
       expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
       fireEvent.click(nextBtn);
     });
     await waitFor(() => {
-      expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
+      expect(screen.getByText(/Suggested: Right Alt \+ E for é/i)).toBeTruthy();
     });
 
-    // Navigate back to "é" without resolving à's suggestion. Scoped via
-    // expectCurrentChar to the CharScrollStrip's selected chip: "é" is
-    // covered (accepted above), so an "Added" chip ("Remove U+00E9 é") also
-    // carries "U+00E9" in its own aria-label — an unscoped query would be
+    // Navigate back to "à" without resolving é's suggestion. Scoped via
+    // expectCurrentChar to the CharScrollStrip's selected chip: "à" is
+    // covered (accepted above), so an "Added" chip ("Remove U+00E0 à") also
+    // carries "U+00E0" in its own aria-label — an unscoped query would be
     // ambiguous.
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     expect(onBack).not.toHaveBeenCalled();
     await waitFor(() => {
-      expectCurrentChar("é");
+      expectCurrentChar("à");
     });
 
-    // The already-accepted suggestion for "é" must NOT re-render its card.
-    expect(screen.queryByText(/Suggested: Right Alt \+ E for é/i)).toBeNull();
+    // The already-accepted suggestion for "à" must NOT re-render its card.
+    expect(screen.queryByText(/Suggested: Right Alt \+ A for à/i)).toBeNull();
   });
 
   it("a suggestion row REAPPEARS after Skip (unlike Accept/Deny) — Skip resolves nothing", async () => {
@@ -2113,6 +2146,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // character is SKIPPED rather than accepted/denied. Skip is pure
     // positional navigation and must not add the character to
     // suggestionResolved, so returning to it must show the suggestion again.
+    // "à" is the first character in the collated walk (a < e).
     seedInventory(["é", "à"]);
     await act(async () => {
       render(
@@ -2123,25 +2157,25 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
       );
     });
 
-    // Suggestion row shows for "é".
-    expect(screen.getByText(/Suggested: Right Alt \+ E for é/i)).toBeTruthy();
+    // Suggestion row shows for "à".
+    expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
 
     // Skip it — no accept/deny, no assignment recorded.
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     await waitFor(() => {
-      expectCurrentChar("à");
-    });
-
-    // Navigate back to "é" without ever resolving its suggestion.
-    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
-    await waitFor(() => {
       expectCurrentChar("é");
     });
 
-    // Unlike the accept/deny case above, the suggestion row for "é" MUST
+    // Navigate back to "à" without ever resolving its suggestion.
+    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    await waitFor(() => {
+      expectCurrentChar("à");
+    });
+
+    // Unlike the accept/deny case above, the suggestion row for "à" MUST
     // reappear — Skip resolved nothing. (If `skippedChars` were reintroduced
     // to suppress the row, this assertion would fail.)
-    expect(screen.getByText(/Suggested: Right Alt \+ E for é/i)).toBeTruthy();
+    expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
   });
 });
 
@@ -2856,7 +2890,12 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     ) as HTMLElement;
     fireEvent.click(firstLayerSelect);
     await waitFor(() => expect(firstLayerSelect.getAttribute("aria-expanded")).toBe("true"));
-    const raltOption = firstLayerSelect.parentElement?.querySelector('li[data-value="RALT"]');
+    // The open option list is portalled to document.body (SelectMenu), so it is
+    // no longer a DOM descendant of the trigger's parent — query it via the open
+    // listbox rather than the trigger's subtree.
+    const raltOption = screen
+      .getByRole("listbox")
+      .querySelector('li[data-value="RALT"]');
     expect(raltOption?.textContent).toBe("RALT (in use)");
   });
 
@@ -3150,6 +3189,95 @@ describe("MechanismGallery — OSK key-tap selects the RAlt base key", () => {
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
       "[SHIFT RALT K_E]",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Physical-key type-to-select while a KeyPickerField dropdown is open
+// (SelectMenu's opt-in resolveKeyToValue, wired by KeyPickerField via
+// keyOptions.ts's charToVkey) — the physical-keyboard companion to the OSK
+// tap-to-select coverage above.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — physical-key type-to-select in an open key picker", () => {
+  it("pressing M while the Assign-to-a-key picker is open selects K_M and Apply uses it", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    const trigger = screen.getByLabelText(/Physical key for Assign to a key/i);
+    fireEvent.click(trigger);
+    await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
+
+    // Physical keydown on the open listbox — not a click on an <li> option.
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "m" });
+
+    expect(selectMenuValue(trigger)).toBe("K_M");
+    expect(screen.queryByRole("listbox")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      "+ [K_M] > U+00E1",
+    );
+  });
+
+  it("a modifier-held keydown (Ctrl+M) is ignored — does not select K_M", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    const trigger = screen.getByLabelText(/Physical key for Assign to a key/i);
+    fireEvent.click(trigger);
+    await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
+
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "m", ctrlKey: true });
+
+    // Still open, still unselected — the keydown was ignored, not consumed.
+    expect(screen.getByRole("listbox")).toBeDefined();
+    expect(selectMenuValue(trigger)).toBe("");
+  });
+
+  it("a modifier-held keydown (Alt+M) is ignored — does not select K_M", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    const trigger = screen.getByLabelText(/Physical key for Assign to a key/i);
+    fireEvent.click(trigger);
+    await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
+
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "m", altKey: true });
+
+    // Still open, still unselected — the keydown was ignored, not consumed.
+    expect(screen.getByRole("listbox")).toBeDefined();
+    expect(selectMenuValue(trigger)).toBe("");
+  });
+
+  it("a modifier-held keydown (Meta+M) is ignored — does not select K_M", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    const trigger = screen.getByLabelText(/Physical key for Assign to a key/i);
+    fireEvent.click(trigger);
+    await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
+
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "m", metaKey: true });
+
+    // Still open, still unselected — the keydown was ignored, not consumed.
+    expect(screen.getByRole("listbox")).toBeDefined();
+    expect(selectMenuValue(trigger)).toBe("");
   });
 });
 
