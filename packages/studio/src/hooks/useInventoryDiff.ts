@@ -30,6 +30,20 @@
 //     level, no recursion — see that helper's doc comment). This both greens
 //     the badge and removes the char from lettersToAdd, so the completion
 //     gate no longer nags for a char the keyboard can already type.
+//   - Lowercase-first ordering: lettersToAdd is stable-sorted so every
+//     lowercase letter (`\p{Ll}`) walks before any uppercase letter
+//     (`\p{Lu}`) — Array.prototype.sort is spec-stable (ES2019+), so ties
+//     (same rank — two lowercase letters, two uppercase letters, or any
+//     non-letter entry) keep their original confirmedInventory order. This is
+//     purely a walk-order concern: it is NOT a second casing-derivation path
+//     (the engine's `caseCounterpart` is untouched — this only asks "is this
+//     one \p{Lu}?", never derives a counterpart) and does not change set
+//     membership. It exists so that when a lowercase letter and its uppercase
+//     counterpart are both in lettersToAdd, the lowercase is always
+//     implemented first — the precondition the case-pair companion
+//     (casePairCompanion.ts) needs to have something to propose a shift-layer
+//     placement for (see that module's doc; the companion only ever proposes
+//     lower->upper, never the reverse).
 //
 // baseIr-null fallback: when baseIr is null (working copy not yet instantiated),
 // lettersToAdd === inventory (full alphabet) and alreadyProduced === [] — the
@@ -38,9 +52,15 @@
 import { useMemo } from "react";
 import { augmentWithComposable, buildProducedSet } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { lowercaseFirst } from "../lib/caseOrder.ts";
 
 export interface InventoryDiff {
-  /** Characters still needing mechanism assignment (coverage measured over these). */
+  /**
+   * Characters still needing mechanism assignment (coverage measured over
+   * these) — stable-sorted lowercase-before-uppercase (see module doc and
+   * lib/caseOrder.ts); the relative order of two entries of the same case (or
+   * any non-letter entry) is unchanged from confirmedInventory.
+   */
   lettersToAdd: string[];
   /** Characters already produced by the base (informational display only). */
   alreadyProduced: string[];
@@ -75,7 +95,7 @@ export function useInventoryDiff(): InventoryDiff {
 
   return useMemo<InventoryDiff>(() => {
     if (baseIr === null) {
-      return { lettersToAdd: inventory, alreadyProduced: [] };
+      return { lettersToAdd: lowercaseFirst(inventory), alreadyProduced: [] };
     }
 
     const lettersToAdd: string[] = [];
@@ -96,6 +116,6 @@ export function useInventoryDiff(): InventoryDiff {
       }
     }
 
-    return { lettersToAdd, alreadyProduced };
+    return { lettersToAdd: lowercaseFirst(lettersToAdd), alreadyProduced };
   }, [baseIr, producedSet, inventory]);
 }

@@ -92,6 +92,7 @@ import {
   canonicalizeCombo,
   addableTouchLayerTokens,
   optionsForTouchLayerSlot,
+  caseCounterpart,
 } from "@keyboard-studio/engine";
 import type { TouchMethodDescriptor } from "@keyboard-studio/engine";
 import {
@@ -105,6 +106,7 @@ import {
 } from "../../lib/modifierTokenLabel.ts";
 import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
 import { extractMechanismHostKey } from "../../lib/extractMechanismHostKey.ts";
+import { isUppercaseLetter, lowercaseFirst } from "../../lib/caseOrder.ts";
 import {
   shouldEmitTouchLayout,
   resolveTouchSeedSource,
@@ -121,9 +123,15 @@ import {
   casePairTouchLayer,
   type TouchLayerId,
 } from "./touchBehavior.ts";
-import { useCasePairCompanion } from "./casePairCompanion.ts";
+import {
+  useCasePairCompanion,
+  type CasePairProposalInput,
+} from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
-import { siblingAccentPlacements } from "./siblingAccents.ts";
+import {
+  siblingAccentPlacements,
+  type SiblingAccentPlacement,
+} from "./siblingAccents.ts";
 import {
   SiblingAccentProposalBanner,
   type SiblingAccentProposal,
@@ -321,7 +329,7 @@ export type TouchMethod =
  * letter, and is unrelated.
  */
 function touchLayerForChar(char: string): TouchLayerId {
-  return /^\p{Lu}$/u.test(char) ? "shift" : "default";
+  return isUppercaseLetter(char) ? "shift" : "default";
 }
 
 /**
@@ -1370,6 +1378,11 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
   // Character inventory — same source MechanismGallery uses.
   const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  // Stable primitive proxy for `inventory` — moved up here (from its old
+  // position beside the currentChar-sync effect) so detectedChars/
+  // touchLettersToAdd below, which now need it too, can be declared before
+  // that effect.
+  const inventoryKey = inventory.join("\0");
 
   // Draft persistence — read on mount; write on every charTouch change.
   const touchDraft = useWorkingCopyStore((s) => s.touchDraft);
@@ -1654,25 +1667,134 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     vfsTransform,
   );
 
-  // Current character index — synced with inventory. Declared here (moved up
-  // from its later position) so both handleContinue and usePositionalCharNav
-  // below can reference it; this state is otherwise independent of the
-  // intervening code, so the reorder carries no behavior change.
+  // ---------------------------------------------------------------------------
+  // Phase C desktop assignments — moved up from its old position (further
+  // down, alongside the "existing methods" section) because
+  // desktopSuggestionTargets/touchLettersToAdd below need it before either of
+  // those can be declared. Only depends on phaseResults (read near the top of
+  // the component alongside the other spec 035 R3 mods inputs), so the reorder
+  // carries no behavior change.
+  // ---------------------------------------------------------------------------
+  const desktopAssignments = useMemo(
+    () =>
+      (phaseResults.find((p) => p.phase === "C")?.assignments ?? []).filter(
+        (a) => a.modality === "physical" && a.scope === "individual",
+      ),
+    [phaseResults],
+  );
+
+  // ---------------------------------------------------------------------------
+  // detectedChars + touchLettersToAdd — entry-parity fix (mirrors
+  // MechanismGallery's lettersToAdd/alreadyProduced split via useInventoryDiff)
+  // ---------------------------------------------------------------------------
+  //
+  // detectedChars ("already in touch layout" — powers the read-only
+  // existing-implementation display; nothing is recorded for a detected
+  // character) is derived from detectionSeedLayout (the chosen seed source +
+  // replayed desktop mods, see the `detectionSeedLayout` memo above) via the
+  // shared engine touchCoverage traversal, rather than an inline
+  // scaffoldTouchLayout(baseIr) walk — see spec 035
+  // contracts/simplification.md. touchCoverage's `uncovered` set is inverted
+  // against `inventory` (touchCoverage only ever answers "is this inventory
+  // char reachable", so a covered-set derived this way is a faithful
+  // replacement for the old any-char scaffold-walk set: the suggestion logic
+  // below only ever queries inventory chars).
+  //
+  // Declared here (moved up from its old position further down) — earlier
+  // than currentChar/usePositionalCharNav below — because touchLettersToAdd
+  // (the walk list) needs it before either of those can be declared.
+  const detectedChars = useMemo<Set<string>>(() => {
+    if (detectionSeedLayout === null) return new Set<string>();
+    try {
+      const { uncovered } = touchCoverage(detectionSeedLayout, inventory);
+      const uncoveredSet = new Set(uncovered);
+      return new Set(inventory.filter((c) => !uncoveredSet.has(c)));
+    } catch (err) {
+      devLog.error("[TouchGallery] detectedChars coverage failed", err);
+      return new Set<string>();
+    }
+    // inventoryKey is the stable primitive proxy for `inventory` (declared
+    // above, before this memo) — same precedent as touchKey/modsDepsKey.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detectionSeedLayout, inventoryKey]);
+
+  // Characters with an ACTIONABLE Phase C desktop suggestion — a Phase C
+  // physical assignment whose mechanism extractMechanismHostKey can turn into
+  // a concrete longpress/replace suggestion (mirrors the `suggestion` memo's
+  // own first branch below, which checks desktopAssignments BEFORE
+  // detectedChars and always raises a card for these regardless of detection
+  // status). Needed so touchLettersToAdd (below) does not exclude a character
+  // that is only trivially "detected" via its own Phase C mod being replayed
+  // onto the seed layout (a naive default key mapping) but still has a real
+  // suggestion the author hasn't reviewed yet — excluding those would hide
+  // the longpress/replace suggestion card entirely, not just skip an inert
+  // walk stop.
+  const desktopSuggestionTargets = useMemo(() => {
+    const targets = new Set<string>();
+    for (const a of desktopAssignments) {
+      const m = a.mechanisms[0];
+      if (m !== undefined && extractMechanismHostKey(m) !== undefined) {
+        targets.add(a.target);
+      }
+    }
+    return targets;
+  }, [desktopAssignments]);
+
+  // The walk list — inventory MINUS the characters that are BOTH detected
+  // (reachable on the seed touch layout) AND have no actionable suggestion
+  // left to review, mirroring MechanismGallery's lettersToAdd (which excludes
+  // alreadyProduced from the walk entirely rather than stepping through it
+  // read-only). This is the entry-parity fix: a character with nothing left
+  // to configure is never a Back/Next/Skip stop, so the author lands on the
+  // first actionable suggestion on entry instead of paging past inherited
+  // content — while a character that IS detected but still carries an
+  // unreviewed Phase C suggestion (desktopSuggestionTargets) stays a walk
+  // stop, since that suggestion card is exactly how the author reviews/
+  // upgrades the naive default mapping. `inventory` itself (the full SHOW-ALL
+  // list) still feeds CharScrollStrip for display/inspection — only the walk
+  // narrows.
+  // lowercaseFirst (lib/caseOrder.ts) — same stable lowercase-before-uppercase
+  // walk-order helper MechanismGallery's lettersToAdd uses (via
+  // useInventoryDiff.ts), so the case-pair companion's precondition (the
+  // lowercase implemented before its uppercase counterpart is even reached)
+  // holds in both galleries, not just the desktop one.
+  const touchLettersToAdd = useMemo(
+    () =>
+      lowercaseFirst(
+        inventory.filter(
+          (c) => !detectedChars.has(c) || desktopSuggestionTargets.has(c),
+        ),
+      ),
+    // inventoryKey is the stable primitive proxy for `inventory` — same
+    // precedent as detectedChars above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [detectedChars, desktopSuggestionTargets, inventoryKey],
+  );
+  const touchLettersToAddKey = touchLettersToAdd.join("\0");
+
+  // Current character index — synced with touchLettersToAdd (the walk list,
+  // NOT the full inventory — see above). Declared here (moved up from its
+  // later position) so both handleContinue and usePositionalCharNav below
+  // can reference it; this state is otherwise independent of the intervening
+  // code, so the reorder carries no behavior change.
   const [currentChar, setCurrentChar] = useState<string | null>(null);
 
-  // Sync currentChar when inventory loads or changes.
-  const inventoryKey = inventory.join("\0");
+  // Sync currentChar when the walk list loads or changes.
   useEffect(() => {
     setCurrentChar((prev) => {
-      if (inventory.length === 0) return null;
-      // Keep current char if it's still in the list.
-      if (prev !== null && inventory.includes(prev)) return prev;
+      if (touchLettersToAdd.length === 0) return null;
+      // Keep current char if it's still in the walk list.
+      if (prev !== null && touchLettersToAdd.includes(prev)) return prev;
       // Pick the first unconfigured char.
-      return inventory.find((c) => !charTouch.has(c)) ?? inventory[0] ?? null;
+      return (
+        touchLettersToAdd.find((c) => !charTouch.has(c)) ??
+        touchLettersToAdd[0] ??
+        null
+      );
     });
-    // Only re-run when the inventory list itself changes.
+    // Only re-run when the walk list itself changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inventoryKey]);
+  }, [touchLettersToAddKey]);
 
   // FR-008 completion gate: names of chars with no reachable touch mechanism
   // on the final layout, formatted for display near the completion control.
@@ -1748,26 +1870,46 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // Positional Back/Next/Skip/Previous navigation + suggestion-dismissal
   // tracking — shared with MechanismGallery via usePositionalCharNav so the
   // two galleries cannot drift (see that hook for the Back/Next/Previous
-  // rationale, including the idx === -1 defense-in-depth guard).
-  // initialSuggestionResolved rehydrates the resolved set from the store
-  // draft on mount (mirrors charTouch) so a resolved suggestion never
-  // reappears after back-navigation + unmount/remount.
+  // rationale, including the idx === -1 defense-in-depth guard). `list` is
+  // touchLettersToAdd (NOT the full inventory) — mirrors MechanismGallery's
+  // `list: lettersToAdd`, the entry-parity fix: a detected/already-covered
+  // character is never a walk stop. initialSuggestionResolved rehydrates the
+  // resolved set from the store draft on mount (mirrors charTouch) so a
+  // resolved suggestion never reappears after back-navigation + unmount/
+  // remount.
   const {
     currentIdx,
     hasAnotherCharAfterCurrent,
     handleNext,
     handleBack,
-    handleSelectChar,
     suggestionResolved,
     markSuggestionResolved,
   } = usePositionalCharNav({
-    list: inventory,
+    list: touchLettersToAdd,
     currentChar,
     setCurrentChar,
     onComplete: handleContinue,
     onBack,
     initialSuggestionResolved: touchDraft?.suggestionResolvedChars,
   });
+
+  // Select-by-value for the CharScrollStrip's SHOW-ALL display list —
+  // mirrors MechanismGallery's handleSelectDisplayChar. usePositionalCharNav's
+  // own handleSelectChar is gated on `list` (touchLettersToAdd), so clicking
+  // an already-detected chip through it would be a no-op — deliberately,
+  // since Back/Next/Skip must never step onto a char outside the walk order.
+  // This sibling handler jumps to ANY character in the full `inventory` (in
+  // or out of touchLettersToAdd) purely for inspection, without touching the
+  // positional walk state. A no-op when `char` isn't in `inventory` at all
+  // (defense-in-depth — every chip CharScrollStrip renders is itself drawn
+  // from `inventory`).
+  const handleSelectDisplayChar = useCallback(
+    (char: string) => {
+      if (!inventory.includes(char)) return;
+      setCurrentChar(char);
+    },
+    [inventory, setCurrentChar],
+  );
 
   // Intro splash — shown once when the author first enters the touch gallery so
   // the move from the desktop (physical) gallery to touch is explicit. The
@@ -1790,46 +1932,9 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [charTouch, suggestionResolved, bulkAccentGroups]);
 
-  // ---------------------------------------------------------------------------
-  // Phase C desktop assignments + detected-chars from the seed-source derivation
-  // ---------------------------------------------------------------------------
-  // (phaseResults is read near the top of the component alongside the other
-  // spec 035 R3 mods inputs — deletedNodeIds/deletedItemIds/touchSeedSource.)
-  //
-  // detectedChars ("already in touch layout" — powers the read-only
-  // existing-implementation display; nothing is recorded for a detected
-  // character) is derived from detectionSeedLayout (the chosen
-  // seed source + replayed desktop mods, see the `detectionSeedLayout` memo
-  // above) via the shared engine touchCoverage traversal, rather than an
-  // inline scaffoldTouchLayout(baseIr) walk — see spec 035
-  // contracts/simplification.md. touchCoverage's `uncovered` set is inverted
-  // against `inventory` (touchCoverage only ever answers "is this inventory
-  // char reachable", so a covered-set derived this way is a faithful
-  // replacement for the old any-char scaffold-walk set: the suggestion logic
-  // below only ever queries inventory chars).
-
-  const desktopAssignments = useMemo(
-    () =>
-      (phaseResults.find((p) => p.phase === "C")?.assignments ?? []).filter(
-        (a) => a.modality === "physical" && a.scope === "individual",
-      ),
-    [phaseResults],
-  );
-
-  const detectedChars = useMemo<Set<string>>(() => {
-    if (detectionSeedLayout === null) return new Set<string>();
-    try {
-      const { uncovered } = touchCoverage(detectionSeedLayout, inventory);
-      const uncoveredSet = new Set(uncovered);
-      return new Set(inventory.filter((c) => !uncoveredSet.has(c)));
-    } catch (err) {
-      devLog.error("[TouchGallery] detectedChars coverage failed", err);
-      return new Set<string>();
-    }
-    // inventoryKey is the stable primitive proxy for `inventory` (declared
-    // above, before this memo) — same precedent as touchKey/modsDepsKey.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detectionSeedLayout, inventoryKey]);
+  // desktopAssignments/detectedChars/touchLettersToAdd now live earlier in
+  // the component (before the currentChar-sync effect) — see those sections'
+  // doc comments.
 
   // The BASE (pre-augmentWithComposable) touch-covered set — the direct-
   // reachability half of touchCoverage's own two-step traversal
@@ -2266,21 +2371,49 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     clear: clearCompanion,
   } = useCasePairCompanion();
 
+  // Normalize "" -> undefined, same as useCasePairCompanion's own identity
+  // read — needed here (not just inside that hook) for the touch-only
+  // precedence check below (does the bulk sibling-accent proposal already
+  // include currentChar's uppercase counterpart?), which must use the SAME
+  // locale the simple companion itself would use.
+  const identityBcp47 =
+    identity?.bcp47 !== undefined && identity.bcp47 !== ""
+      ? identity.bcp47
+      : undefined;
+
   // ---------------------------------------------------------------------------
   // Sibling-accent proposal — the longpress accelerator (spec: "accept ù on u
   // -> offer the rest of u's diacritic family in one click"). Independent of
-  // `casePairProposal` above: this one is multi-character and both-case, and
-  // is raised only from accepting a longpress SUGGESTION card
-  // (`handleUseSuggestion` below) — never from the manual chooser's Apply,
-  // which is `casePairProposal`'s own trigger. Kept as its own state/banner
-  // rather than folded into `useCasePairCompanion` so neither proposal has
-  // to disambiguate a shared "one proposal at a time" slot. The two proposals
-  // CAN render simultaneously (distinct state, independent confirm/dismiss
-  // paths) — that is safe, not something this split is trying to prevent.
+  // `casePairProposal` above: this one is multi-character and both-case.
+  // Kept as its own state/banner rather than folded into `useCasePairCompanion`
+  // so neither proposal has to disambiguate a shared "one proposal at a time"
+  // slot.
+  //
+  // Touch-only precedence (both raised from the SAME accepted suggestion, in
+  // `handleUseSuggestion` below): when the bulk proposal's placements already
+  // include currentChar's uppercase counterpart, the bulk proposal takes
+  // priority and the simple companion is DEFERRED (held in
+  // `deferredCompanionInput`, not raised) rather than shown alongside it —
+  // showing both would prompt the author to place the same uppercase
+  // character twice. If the author DENIES the bulk proposal
+  // (`handleSiblingAccentDismiss`), the deferred simple companion is raised
+  // then, as the fallback. If the author CONFIRMS it
+  // (`handleSiblingAccentConfirm`), the uppercase is already placed via the
+  // bulk action, so the deferred input is discarded, never raised. When the
+  // bulk proposal does NOT include the uppercase (or there is no bulk
+  // proposal at all — e.g. a "replace" suggestion, or a longpress suggestion
+  // with no siblings to offer), the simple companion is raised immediately,
+  // exactly as `handleApply`'s own (unconditional) companion call already
+  // does for the manual chooser. This precedence is TOUCH ONLY —
+  // MechanismGallery has no sibling-accent bulk path.
   // ---------------------------------------------------------------------------
 
   const [siblingAccentProposal, setSiblingAccentProposal] =
     useState<SiblingAccentProposal | null>(null);
+  const [deferredCompanionInput, setDeferredCompanionInput] =
+    useState<Extract<CasePairProposalInput, { mechanism: "touch" }> | null>(
+      null,
+    );
 
   useEffect(() => {
     setMethod("longpress_alternates");
@@ -2293,7 +2426,17 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // so an author who never touches the builder sees byte-identical behavior.
     setLayerTokens(seedLayerTokensForChar(currentChar));
     clearCompanion();
+    // Navigating away (currentChar changing) from a char with an OPEN,
+    // UNDECIDED bulk sibling-accent banner intentionally abandons BOTH the
+    // bulk proposal AND its deferred simple-uppercase companion fallback
+    // (see the "Touch-only precedence" note above `siblingAccentProposal`'s
+    // declaration) — the author confirmed neither the bulk proposal nor,
+    // therefore, the fallback it would otherwise unlock via
+    // `handleSiblingAccentDismiss`. This is deliberate, not a dropped-state
+    // bug: no nav-gating is added to keep the bulk banner open, so an
+    // undecided banner simply does not survive a character change.
     setSiblingAccentProposal(null);
+    setDeferredCompanionInput(null);
   }, [currentChar, clearCompanion]);
 
   // ---------------------------------------------------------------------------
@@ -2524,12 +2667,26 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       });
     }
 
+    // CHANGE 4 precedence: the bulk proposal just placed (or already had)
+    // every sibling it offered — if a simple companion was deferred behind
+    // it (because those siblings included currentChar's uppercase
+    // counterpart), that uppercase is now placed, so the deferred companion
+    // is discarded rather than raised.
+    setDeferredCompanionInput(null);
     setSiblingAccentProposal(null);
   }, [siblingAccentProposal, charTouch]);
 
   const handleSiblingAccentDismiss = useCallback(() => {
+    // CHANGE 4 precedence fallback: the bulk proposal is denied, so if a
+    // simple companion was deferred behind it, raise it now — the author
+    // still gets offered the uppercase counterpart, just via the simple
+    // (single-character) path instead of the bulk one.
+    if (deferredCompanionInput !== null) {
+      proposeCompanion(deferredCompanionInput);
+      setDeferredCompanionInput(null);
+    }
     setSiblingAccentProposal(null);
-  }, []);
+  }, [deferredCompanionInput, proposeCompanion]);
 
   // ---------------------------------------------------------------------------
   // Suggestion card handlers
@@ -2581,22 +2738,78 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     setCharTouch((prev) => appendMechanismToChar(prev, currentChar, ref));
     markSuggestionResolved(currentChar);
 
+    // Case-pair companion (CHANGE 3: the companion must fire whenever a
+    // lowercase letter is implemented, not only via the manual chooser's
+    // Apply — handleApply below raises the same shape). Built here
+    // regardless of the bulk sibling-accent path below, since a "replace"
+    // suggestion (desktop simple_swap) or a longpress with no siblings to
+    // offer still deserves the simple companion.
+    const targetLayer = casePairTouchLayer(editingLayer);
+    const companionInput:
+      | Extract<CasePairProposalInput, { mechanism: "touch" }>
+      | null =
+      targetLayer !== null
+        ? {
+            mechanism: "touch",
+            originalChar: currentChar,
+            hostKey: hk,
+            targetLayer,
+            baseRef: ref,
+            alreadyProduced: (counterpart) =>
+              (charTouch.get(counterpart)?.mechanisms ?? []).some((m) => {
+                const slots = normalizeTouchSlots(m.slotValues);
+                return slots["hostKey"] === hk && slots["layer"] === targetLayer;
+              }),
+          }
+        : null;
+
+    let bulkPlacements: SiblingAccentPlacement[] = [];
     if (suggestion.kind === "longpress" && isDecomposableAccented(currentChar)) {
       // Inventory-driven: only siblings the author's language actually uses
       // (never a Unicode-derived family) are offered — see siblingAccents.ts.
-      const placements = siblingAccentPlacements(currentChar, hk, inventory);
-      if (placements.length > 0) {
-        setSiblingAccentProposal({
-          acceptedChar: currentChar,
-          hostKey: hk,
-          placements,
-        });
+      bulkPlacements = siblingAccentPlacements(currentChar, hk, inventory);
+    }
+
+    if (bulkPlacements.length > 0) {
+      // CHANGE 4 (touch only): does the bulk proposal already include
+      // currentChar's uppercase counterpart? Uses the SAME engine primitive
+      // casePairCompanion.ts's propose() uses (FR-002) — a read-only
+      // comparison here, not a second casing-derivation path.
+      const pair = caseCounterpart(currentChar, identityBcp47);
+      const bulkIncludesUppercase =
+        pair !== null &&
+        pair.direction === "toUpper" &&
+        bulkPlacements.some((p) => p.char === pair.counterpart);
+
+      setSiblingAccentProposal({
+        acceptedChar: currentChar,
+        hostKey: hk,
+        placements: bulkPlacements,
+      });
+
+      if (bulkIncludesUppercase) {
+        // Defer the simple companion — the bulk proposal takes precedence;
+        // raised only if the author denies it (handleSiblingAccentDismiss).
+        setDeferredCompanionInput(companionInput);
+      } else if (companionInput !== null) {
+        proposeCompanion(companionInput);
       }
+    } else if (companionInput !== null) {
+      proposeCompanion(companionInput);
     }
     // inventoryKey is the stable primitive proxy for `inventory` (same
     // precedent as detectedChars/touchKey above).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggestion, currentChar, markSuggestionResolved, inventoryKey]);
+  }, [
+    suggestion,
+    currentChar,
+    markSuggestionResolved,
+    inventoryKey,
+    editingLayer,
+    charTouch,
+    identityBcp47,
+    proposeCompanion,
+  ]);
 
   const handleSuggestionChange = useCallback(() => {
     if (currentChar !== null) markSuggestionResolved(currentChar);
@@ -2832,7 +3045,13 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // Shared styles — defined before guards so they can be referenced in guard renders
   // ---------------------------------------------------------------------------
 
-  const totalChars = inventory.length;
+  // Denominates over touchLettersToAdd (the walk list), NOT the full
+  // inventory — mirrors MechanismGallery's lettersToAdd.length coverage
+  // denominator (excludes already-detected chars from the count, same as
+  // they're excluded from the walk). currentIdx (usePositionalCharNav) also
+  // indexes into touchLettersToAdd, so the "Character N of total" counter
+  // below stays consistent with N.
+  const totalChars = touchLettersToAdd.length;
 
   // When there is no suggestion to offer for the current character, skip the
   // suggestion card entirely and show the method chooser directly. Otherwise the
@@ -2940,20 +3159,126 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
         height: "100%",
       }}
     >
-      {/* Coverage line */}
-      <p
-        role="status"
-        aria-live="polite"
-        aria-label={t({
-          id: "editor.assignLoop.touch.coverageAriaLabel",
-          message: `${{ configured: charTouch.size }} of ${{ total: totalChars }} characters configured`,
-        })}
-        style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
-      >
-        <Trans id="editor.assignLoop.touch.coverageLine">
-          {charTouch.size} of {totalChars} configured
-        </Trans>
-      </p>
+      {/* Coverage line — hidden once totalChars (touchLettersToAdd.length) is
+          zero, mirroring MechanismGallery's `{lettersToAdd.length > 0 && ...}`
+          guard, rather than showing a meaningless "0 of 0". */}
+      {totalChars > 0 && (
+        <p
+          role="status"
+          aria-live="polite"
+          aria-label={t({
+            id: "editor.assignLoop.touch.coverageAriaLabel",
+            message: `${{ configured: charTouch.size }} of ${{ total: totalChars }} characters configured`,
+          })}
+          style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
+        >
+          <Trans id="editor.assignLoop.touch.coverageLine">
+            {charTouch.size} of {totalChars} configured
+          </Trans>
+        </p>
+      )}
+
+      {/* Character scroll strip — horizontal, SHOW-ALL of inventory. Rendered
+          here, near the top of the pane (right after the coverage line,
+          before both the all-caught-up panel and the per-char block below),
+          matching MechanismGallery's real placement — that gallery renders
+          its CharScrollStrip above its per-char/empty-diff content too,
+          right after its own coverage line + shared top toolbar row. It is
+          still a sibling of the per-char block, NOT nested inside it, so it
+          stays visible even when currentChar is null — e.g. the all-caught-up
+          state below, where every inventory character is walk-excluded but
+          the author can still select one for inspection. Not just
+          touchLettersToAdd, so the author can still see and inspect every
+          character, including ones already reachable on the seed layout, not
+          only the ones still needing a method. Click any chip to jump
+          straight to that character (replaces the old "Previous character"
+          button, which only ever stepped back one position) via
+          handleSelectDisplayChar (NOT the walk's own handleSelectChar, which
+          is gated on touchLettersToAdd) — an already-detected chip is still
+          selectable for inspection, it is just never a walk stop. Each
+          chip's badge is the produces-count for that character in THIS
+          gallery's modality (touch) — see charMechanisms.ts.
+          `inheritedChars` feeds the seed-reachable set into that count so a
+          character this gallery reports as "already in the touch layout"
+          badges as produced (>=1) rather than red 0 — both before and after
+          its suggestion is accepted (the accepted touch_inherited
+          placeholder is still not counted, so accepting cannot double-count
+          it). */}
+      {inventory.length > 0 && (
+        <CharScrollStrip
+          chars={inventory}
+          currentChar={currentChar}
+          onSelectChar={handleSelectDisplayChar}
+          assignments={charTouchAssignments}
+          modality="touch"
+          inheritedChars={detectedChars}
+        />
+      )}
+
+      {/* All-caught-up state — every inventory character is already reachable
+          on the seed touch layout (touchLettersToAdd is empty), so the walk
+          has nothing to step through and currentChar stays null. Mirrors
+          MechanismGallery's "No new characters to add" empty-diff panel, but
+          (unlike that gallery) still needs its OWN Back/Done row here: the
+          per-char block's toolbar below never renders while currentChar is
+          null, and handleBack/handleNext are gated on `list.includes` (empty
+          touchLettersToAdd), so this panel calls onBack/handleContinue
+          directly rather than going through those. */}
+      {totalChars === 0 && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              width: "100%",
+            }}
+          >
+            <button
+              type="button"
+              onClick={onBack}
+              aria-label={t({
+                id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel",
+                message: "Back to mechanisms (Phase C)",
+              })}
+              style={ghostBtn}
+            >
+              <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
+            </button>
+            <div style={{ marginLeft: "auto" }}>
+              <button
+                type="button"
+                data-testid="touch-continue"
+                onClick={handleContinue}
+                style={{
+                  padding: "9px 20px",
+                  background: "#238636",
+                  border: "none",
+                  borderRadius: 6,
+                  color: "#e6edf3",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: FONT,
+                }}
+              >
+                {t({ id: "editor.assignLoop.doneButton", message: "Done" })}
+              </button>
+            </div>
+          </div>
+          <p style={{ margin: 0, fontSize: 14, color: TEXT_DIM }}>
+            <Trans id="editor.assignLoop.noNewCharacters">
+              No new characters to add.
+            </Trans>
+          </p>
+        </div>
+      )}
 
       {/* Per-char UI */}
       {currentChar !== null && (
@@ -2992,24 +3317,33 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               width: "100%",
             }}
           >
-            <button
-              type="button"
-              onClick={handleBack}
-              aria-label={
-                currentIdx <= 0
-                  ? t({
-                      id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel",
-                      message: "Back to mechanisms (Phase C)",
-                    })
-                  : t({
-                      id: "editor.assignLoop.touch.backToPreviousCharacterAriaLabel",
-                      message: "Back to previous character",
-                    })
-              }
-              style={ghostBtn}
-            >
-              <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
-            </button>
+            {/* HIDE this button entirely (rather than render it disabled)
+                when currentChar is outside touchLettersToAdd — mirrors the
+                forward button's gating a few lines below. usePositionalCharNav's
+                handleBack is a no-op when currentIdx === -1, which is exactly
+                the state a detected/already-covered character selected via the
+                SHOW-ALL CharScrollStrip (handleSelectDisplayChar) produces: a
+                visible-but-dead Back button would look live but do nothing. */}
+            {currentChar !== null && touchLettersToAdd.includes(currentChar) && (
+              <button
+                type="button"
+                onClick={handleBack}
+                aria-label={
+                  currentIdx <= 0
+                    ? t({
+                        id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel",
+                        message: "Back to mechanisms (Phase C)",
+                      })
+                    : t({
+                        id: "editor.assignLoop.touch.backToPreviousCharacterAriaLabel",
+                        message: "Back to previous character",
+                      })
+                }
+                style={ghostBtn}
+              >
+                <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
+              </button>
+            )}
             <div
               style={{
                 marginLeft: "auto",
@@ -3018,60 +3352,54 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 gap: 8,
               }}
             >
-              <button
-                type="button"
-                data-testid="touch-continue"
-                onClick={handleNext}
-                disabled={!canGoNext}
-                aria-label={
-                  hasAnotherCharAfterCurrent
+              {/* HIDE this button entirely (rather than render it disabled)
+                  when currentChar is outside touchLettersToAdd — mirrors
+                  MechanismGallery's forwardButton gating: currentChar can now
+                  be a detected/already-covered character selected via the
+                  SHOW-ALL CharScrollStrip (handleSelectDisplayChar), and the
+                  walk's own Next/Done isn't a "global Next" for that
+                  inspection — a disabled render would look like the walk is
+                  stuck rather than simply "you're inspecting a character
+                  outside this step's coverage". */}
+              {currentChar !== null && touchLettersToAdd.includes(currentChar) && (
+                <button
+                  type="button"
+                  data-testid="touch-continue"
+                  onClick={handleNext}
+                  disabled={!canGoNext}
+                  aria-label={
+                    hasAnotherCharAfterCurrent
+                      ? t({
+                          id: "editor.assignLoop.nextCharacterAriaLabel",
+                          message: "Next character",
+                        })
+                      : t({
+                          id: "editor.assignLoop.doneButton",
+                          message: "Done",
+                        })
+                  }
+                  style={{
+                    padding: "9px 20px",
+                    background: canGoNext ? "#238636" : "#21262d",
+                    border: "none",
+                    borderRadius: 6,
+                    color: canGoNext ? "#e6edf3" : TEXT_DIM,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: canGoNext ? "pointer" : "not-allowed",
+                    fontFamily: FONT,
+                  }}
+                >
+                  {hasAnotherCharAfterCurrent
                     ? t({
-                        id: "editor.assignLoop.nextCharacterAriaLabel",
-                        message: "Next character",
+                        id: "editor.assignLoop.nextCharacterButton",
+                        message: "Next character →",
                       })
-                    : t({ id: "editor.assignLoop.doneButton", message: "Done" })
-                }
-                style={{
-                  padding: "9px 20px",
-                  background: canGoNext ? "#238636" : "#21262d",
-                  border: "none",
-                  borderRadius: 6,
-                  color: canGoNext ? "#e6edf3" : TEXT_DIM,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: canGoNext ? "pointer" : "not-allowed",
-                  fontFamily: FONT,
-                }}
-              >
-                {hasAnotherCharAfterCurrent
-                  ? t({
-                      id: "editor.assignLoop.nextCharacterButton",
-                      message: "Next character →",
-                    })
-                  : t({ id: "editor.assignLoop.doneButton", message: "Done" })}
-              </button>
+                    : t({ id: "editor.assignLoop.doneButton", message: "Done" })}
+                </button>
+              )}
             </div>
           </div>
-
-          {/* Character scroll strip — horizontal, all of inventory; click
-              any chip to jump straight to that character (replaces the old
-              "Previous character" button, which only ever stepped back one
-              position). Each chip's badge is the produces-count for that
-              character in THIS gallery's modality (touch) — see
-              charMechanisms.ts. `inheritedChars` feeds the seed-reachable
-              set into that count so a character this gallery reports as
-              "already in the touch layout" badges as produced (>=1) rather
-              than red 0 — both before and after its suggestion is accepted
-              (the accepted touch_inherited placeholder is still not counted,
-              so accepting cannot double-count it). */}
-          <CharScrollStrip
-            chars={inventory}
-            currentChar={currentChar}
-            onSelectChar={handleSelectChar}
-            assignments={charTouchAssignments}
-            modality="touch"
-            inheritedChars={detectedChars}
-          />
 
           {/* FR-008 completion gate message — set by handleContinue when
               touchCoverage finds an inventory char with no reachable touch
@@ -3138,6 +3466,31 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 </ProposalCard>
               );
             })}
+
+          {/* Sibling-accent PROPOSAL — the longpress accelerator
+              (propose-then-confirm, spec v1.3.1 §3c). CHANGE 5: rendered here,
+              at the TOP alongside the bulk summary boxes above (not lower down
+              near the Configured chip row), so the proposal occupies the SAME
+              location its accepted, removable green summary box will occupy
+              once confirmed — one consistent spot for "this bulk batch" across
+              propose -> confirm. Independent of the case-pair proposal above —
+              see SiblingAccentProposalBanner.tsx's module doc for why the two
+              never collide for the SAME accept action on the SAME character
+              (CHANGE 4's precedence is unaffected by this relocation: which
+              proposal is raised, and in what order, is still decided entirely
+              by handleUseSuggestion/handleSiblingAccentConfirm/
+              handleSiblingAccentDismiss above — this only moves WHERE the
+              banner renders). That non-collision is scoped to one accept
+              action on one character; it says nothing about navigating away
+              mid-decision — see the `currentChar`-keyed reset effect above,
+              which abandons both proposals together on nav. */}
+          {siblingAccentProposal !== null && (
+            <SiblingAccentProposalBanner
+              proposal={siblingAccentProposal}
+              onConfirm={handleSiblingAccentConfirm}
+              onDismiss={handleSiblingAccentDismiss}
+            />
+          )}
 
           {/* Suggestion card (shown until accepted/dismissed; skipped entirely
               when there is no suggestion to offer) */}
@@ -3381,18 +3734,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
           proposal={casePairProposal}
           onConfirm={handleCasePairConfirm}
           onDismiss={dismissCompanion}
-        />
-      )}
-
-      {/* Sibling-accent proposal — the longpress accelerator (propose-then-
-          confirm, spec v1.3.1 §3c). Independent of the case-pair proposal
-          above — see SiblingAccentProposalBanner.tsx's module doc for why
-          the two never collide. */}
-      {siblingAccentProposal !== null && (
-        <SiblingAccentProposalBanner
-          proposal={siblingAccentProposal}
-          onConfirm={handleSiblingAccentConfirm}
-          onDismiss={handleSiblingAccentDismiss}
         />
       )}
 
