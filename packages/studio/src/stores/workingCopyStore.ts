@@ -369,13 +369,36 @@ export interface WorkingCopyState {
 
   // -- Actions (surveyResultsStore) --------------------------------------------
   /**
-   * Record a phase result and re-derive the session. Re-running a phase
-   * replaces its earlier result (keyed by phase) so back-navigation works.
+   * Record a phase result and re-derive the session. The entry for that phase
+   * is updated FIELD-WISE (`{...prior, ...result}`), not replaced wholesale.
+   *
+   * Field-wise, because a phase id is not a step id: more than one spine step
+   * can legitimately report under the same phase (the marks series and the
+   * pre-carve convenience question are both Phase C), and each owns a
+   * different slice of the result. Wholesale replacement made the second step
+   * to complete silently erase the first one's fields — e.g. the convenience
+   * question dropping `marksWorklist`/`marksOutputForm`, the normalization
+   * signal carve's needed-set derivation depends on.
+   *
+   * The consequence for callers: **re-running a step CLEARS only the fields it
+   * re-emits.** A step that must reset a field it previously set has to emit a
+   * value for it rather than omitting it. Required fields (`answers`) always
+   * overwrite, so back-navigation still re-answers a phase rather than
+   * accumulating; so do the optional fields every emitter always sets
+   * (`marksWorklist`, `retainedConvenienceChars`). The one field that can now
+   * outlive its writer is `marksOutputForm`, which the marks series omits on
+   * its S0 skip: an alphabet edited down to zero marks leaves the earlier form
+   * choice in place. Harmless today — carve normalizes BOTH the produced and
+   * needed sides with that one form, so a stale value shifts which grapheme
+   * representation is compared but never desyncs the comparison. Emitting it
+   * unconditionally instead would change the reducer's skip-path default
+   * (`?? "base-plus-mark"`, steps/reducer.ts), which is a separate decision.
    */
   recordPhase: (result: SurveyPhaseResult) => void;
   /**
    * Record a Phase C result carrying the given assignments, replacing any
-   * prior Phase C assignments (last-wins semantics). Call with [] to clear.
+   * prior Phase C assignments (last-wins semantics) and preserving every other
+   * field on the Phase C entry. Call with [] to clear.
    */
   recordAssignments: (assignments: MechanismAssignment[]) => void;
   /** Update the IR-derived axis baseline and re-derive the session. */
@@ -844,7 +867,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     const next =
       idx === -1
         ? [...prev, result]
-        : prev.map((p, i) => (i === idx ? result : p));
+        : prev.map((p, i) => (i === idx ? { ...p, ...result } : p));
     set(remerge(get().irAxes, next));
   },
 
@@ -852,11 +875,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     const prev = get().phaseResults;
     const existingC = prev.find((p) => p.phase === "C");
     const next: SurveyPhaseResult = {
+      ...existingC,
       phase: "C",
       answers: existingC?.answers ?? [],
-      ...(existingC?.selectedPatternIds !== undefined
-        ? { selectedPatternIds: existingC.selectedPatternIds }
-        : {}),
       assignments,
     };
     const idx = prev.findIndex((p) => p.phase === "C");
