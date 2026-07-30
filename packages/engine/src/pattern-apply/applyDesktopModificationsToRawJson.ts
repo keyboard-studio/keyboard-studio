@@ -15,11 +15,15 @@
  * The contract (mirrors {@link applyDesktopModifications}, the Case A/IR
  * sibling). Placements are spliced BEFORE removals — the same chronological
  * order as the desktop decisions being replayed (Phase C precedes Phase D):
- *   - Placements — phone platform's "default" layer only: as the host key's
- *     own production when the host is empty, or as an sk[] longpress
- *     alternate when the host already produces something else. Absent/
- *     not-found hostKey: warn and place via a sensible fallback (appended to
- *     the last row) so the char stays reachable.
+ *   - Placements — phone platform layer selected by the placement char's case
+ *     (see `touchLayerForChar` in touchLayer.ts: an uppercase char targets
+ *     "shift", everything else targets "default"): as the host key's own
+ *     production when the host is empty, or as an sk[] longpress alternate
+ *     when the host already produces something else. Absent/not-found
+ *     hostKey: warn and place via a sensible fallback (appended to the last
+ *     row of the target layer) so the char stays reachable. A
+ *     "shift"-targeted placement falls back to "default" (with a warning)
+ *     when the phone platform has no shift layer.
  *   - Removals — walk EVERY platform/layer/row/key. Drop matching sk[]/
  *     flick{}/multitap[] entries. A key whose primary production (text/
  *     output/U_-id) is carved is never deleted — it becomes an inert
@@ -44,11 +48,13 @@
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import {
   buildRemovalSet,
+  isTouchKeyPrimaryProduction,
   isTouchSubKeyDuplicate,
   keyMatchesRemovalSet,
 } from "./touch-mechanism-shared.js";
-import type { RawKey, RawPlatform, RawRow } from "./touch-layout-wire-format.js";
+import type { RawKey, RawLayer, RawPlatform, RawRow } from "./touch-layout-wire-format.js";
 import type { DesktopModifications } from "./applyDesktopModifications.js";
+import { DEFAULT_TOUCH_LAYER, touchLayerForChar } from "./touchLayer.js";
 
 /** The top-level raw .keyman-touch-layout JSON object. */
 type RawTouchLayout = Record<string, unknown>;
@@ -152,8 +158,15 @@ function stripRemovedFromRawKey(
 }
 
 // ---------------------------------------------------------------------------
-// Pass 2 — placements (phone platform's "default" layer only)
+// Pass 2 — placements (phone platform, layer selected by touchLayerForChar)
 // ---------------------------------------------------------------------------
+
+/** Mutable per-layer working state, created lazily the first time a
+ *  placement targets that layer. */
+interface LayerWorkState {
+  layer: RawLayer;
+  keyMap: Map<string, RawKey>;
+}
 
 function applyPlacementsToRawLayout(
   layout: RawTouchLayout,
@@ -170,28 +183,63 @@ function applyPlacementsToRawLayout(
     return;
   }
   const phonePlatform = phone as RawPlatform;
-  const defaultLayer = phonePlatform.layer.find((l) => l.id === "default");
-  if (!defaultLayer || !Array.isArray(defaultLayer.row)) {
+
+  const layerStates = new Map<string, LayerWorkState>();
+
+  function resolveLayerState(layerId: string): LayerWorkState | undefined {
+    const existing = layerStates.get(layerId);
+    if (existing) return existing;
+
+    const layer = phonePlatform.layer.find((l) => l.id === layerId);
+    if (!layer || !Array.isArray(layer.row)) return undefined;
+
+    const keyMap = new Map<string, RawKey>();
+    for (const row of layer.row) {
+      if (!Array.isArray(row.key)) continue;
+      for (const key of row.key) {
+        if (key.id) keyMap.set(key.id, key);
+      }
+    }
+
+    const state: LayerWorkState = { layer, keyMap };
+    layerStates.set(layerId, state);
+    return state;
+  }
+
+  // The default layer must exist up front — a "shift"-targeted placement
+  // falls back to it (see resolveTargetLayer below), and a layout with no
+  // default layer at all skips every placement, same as before this change.
+  if (!resolveLayerState(DEFAULT_TOUCH_LAYER)) {
     warnings.push(
       "[desktop-modifications-raw] phone platform has no default layer — all placements skipped",
     );
     return;
   }
 
-  const keyMap = new Map<string, RawKey>();
-  for (const row of defaultLayer.row) {
-    if (!Array.isArray(row.key)) continue;
-    for (const key of row.key) {
-      if (key.id) keyMap.set(key.id, key);
-    }
+  /**
+   * Resolve the layer a placement's char targets (via touchLayerForChar).
+   * Falls back to the default layer — with a warning — when the case rule
+   * picks a layer (e.g. "shift") the phone platform doesn't have, so the
+   * char stays reachable rather than silently dropped.
+   */
+  function resolveTargetLayer(char: string): { state: LayerWorkState; layerId: string } {
+    const desiredLayerId = touchLayerForChar(char);
+    const desiredState = resolveLayerState(desiredLayerId);
+    if (desiredState) return { state: desiredState, layerId: desiredLayerId };
+
+    warnings.push(
+      `[desktop-modifications-raw] phone platform has no "${desiredLayerId}" layer — "${char}" placed on the default layer instead`,
+    );
+    // Guaranteed present — checked above.
+    return { state: resolveLayerState(DEFAULT_TOUCH_LAYER)!, layerId: DEFAULT_TOUCH_LAYER };
   }
 
-  // Sensible fallback position: append a new letter key onto the last row
-  // (or a fresh row if the layer is empty) so the character stays reachable
-  // even with no obvious host position.
-  function placeFallback(char: string): void {
+  // Sensible fallback position: append a new letter key onto the last row of
+  // the target layer (or a fresh row if the layer is empty) so the character
+  // stays reachable even with no obvious host position.
+  function placeFallback(state: LayerWorkState, char: string): void {
     const fallbackKey: RawKey = { id: charToUnicodeKeyId(char), text: char };
-    const rows: RawRow[] = defaultLayer!.row;
+    const rows: RawRow[] = state.layer.row;
     if (rows.length === 0) {
       rows.push({ id: 1, key: [fallbackKey] });
     } else {
@@ -199,30 +247,42 @@ function applyPlacementsToRawLayout(
       if (!Array.isArray(lastRow.key)) lastRow.key = [];
       lastRow.key.push(fallbackKey);
     }
-    keyMap.set(fallbackKey.id, fallbackKey);
+    state.keyMap.set(fallbackKey.id, fallbackKey);
   }
 
   for (const rawPlacement of placements) {
     const { hostKey } = rawPlacement;
     // Normalize once so `text` and `id` (charToUnicodeKeyId NFC-normalizes
-    // internally) always agree, even for an NFD-form placement char.
+    // internally) always agree, even for an NFD-form placement char — and so
+    // touchLayerForChar sees a single precomposed code point for its case test.
     const char = rawPlacement.char.normalize("NFC");
+    const { state, layerId } = resolveTargetLayer(char);
+
     if (!hostKey) {
       warnings.push(
         `[desktop-modifications-raw] placement for "${char}" has no hostKey — placed via fallback`,
       );
-      placeFallback(char);
+      placeFallback(state, char);
       continue;
     }
 
-    const key = keyMap.get(hostKey);
+    const key = state.keyMap.get(hostKey);
     if (!key) {
       warnings.push(
-        `[desktop-modifications-raw] host key "${hostKey}" not found in phone default layer — "${char}" placed via fallback`,
+        `[desktop-modifications-raw] host key "${hostKey}" not found in phone "${layerId}" layer — "${char}" placed via fallback`,
       );
-      placeFallback(char);
+      placeFallback(state, char);
       continue;
     }
+
+    // The host's own primary production is already this char (common on a
+    // shift-layer seed) — nothing to place; never hand a key itself as its own
+    // longpress alternate. Same guard, same position as the IR applier: raw
+    // JSON carries no provenance so there is no hand-set branch to order
+    // against here, but keeping the two loops in the same sequence is what
+    // stops them drifting. A key with no production fails this predicate, so
+    // the empty-host branch below still owns that case.
+    if (isTouchKeyPrimaryProduction(key, char)) continue;
 
     const hostIsEmpty = key.text === undefined && key.output === undefined;
     if (hostIsEmpty) {
