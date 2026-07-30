@@ -50,17 +50,22 @@ interface OutputFormPolicyRow {
 export interface OutputFormInputs {
   /** True when at least one attested/accepted pair has NO ready-made form. */
   anyPairLacksReadyMade: boolean;
-  /** True when at least one mark-class was confirmed as letter-plus-mark. */
-  hasLetterPlusMarkClass: boolean;
+  /**
+   * True when at least one mark resolves to `own-key` at S2 (spec 052) — i.e.
+   * the keyboard will carry a productive mark key. Replaces the retired
+   * `hasLetterPlusMarkClass`, which asked the same question of an answer type
+   * that no longer exists.
+   */
+  hasOwnKeyMark: boolean;
 }
 
 /**
  * The ordered policy. Row 1 (FR-014): any pair without a ready-made form
  * forces base-plus-mark for the WHOLE keyboard, as a notice. Row 2 (FR-016):
- * everything composes but the community treats a mark as productive — both
+ * everything composes but at least one mark earns a key of its own — both
  * forms are viable, so the decision renders as an open choice with
  * base-plus-mark recommended first. Row 3 (FR-015, default): everything
- * composes and every marked letter is its own letter — ready-made, as a notice.
+ * composes and no mark has a key of its own — ready-made, as a notice.
  */
 const OUTPUT_FORM_POLICY: readonly OutputFormPolicyRow[] = [
   {
@@ -79,7 +84,7 @@ const OUTPUT_FORM_POLICY: readonly OutputFormPolicyRow[] = [
   },
   {
     order: 2,
-    matches: (i) => i.hasLetterPlusMarkClass,
+    matches: (i) => i.hasOwnKeyMark,
     result: {
       form: "base-plus-mark",
       presentedAs: "open-choice",
@@ -99,7 +104,7 @@ const OUTPUT_FORM_POLICY: readonly OutputFormPolicyRow[] = [
       presentedAs: "notice",
       explanation:
         "Every accented letter in your alphabet has a single ready-made " +
-        "character, and your community treats each one as its own letter — so " +
+        "character, and no mark on your keyboard gets a key of its own — so " +
         "your keyboard will produce those ready-made characters. Backspace " +
         "removes a whole accented letter in one step.",
     },
@@ -108,17 +113,22 @@ const OUTPUT_FORM_POLICY: readonly OutputFormPolicyRow[] = [
 ];
 
 /**
- * Resolve the whole-keyboard output-form proposal from the posture table and
- * the mental-model outcome. First-match-wins over the ordered rows; the table
- * ends in a mandatory default, so this always returns.
+ * Resolve the whole-keyboard output-form proposal from the posture table and the
+ * S2 treatment outcome. First-match-wins over the ordered rows; the table ends
+ * in a mandatory default, so this always returns.
+ *
+ * The output-form decision stays a SEPARATE whole-keyboard question (spec 052
+ * FR-022) and keeps deriving its proposal from the marks station's answers —
+ * only the signal it reads has changed, from the retired mental-model enum to
+ * "at least one mark resolves to `own-key`".
  */
 export function resolveOutputFormProposal(
   posture: PosturePair[],
-  hasLetterPlusMarkClass: boolean,
+  hasOwnKeyMark: boolean,
 ): OutputFormProposal {
   const inputs: OutputFormInputs = {
     anyPairLacksReadyMade: posture.some((p) => !p.hasReadyMadeForm),
-    hasLetterPlusMarkClass,
+    hasOwnKeyMark,
   };
   for (const row of OUTPUT_FORM_POLICY) {
     if (row.matches(inputs)) return row.result;

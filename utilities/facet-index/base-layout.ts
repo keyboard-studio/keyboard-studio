@@ -19,11 +19,19 @@
  *  - "Named" (and therefore non-leaking) = some base-layer rule context names
  *    the vkey. This covers remaps, `> nul` blocks, guarded, and group-routed
  *    rules uniformly: any rule that names the vkey removes it from fall-through.
- *  - The table is tool-owned pinned data, not an import of the engine's
+ *  - The table is pinned reference data, not an import of the engine's
  *    `US_UNSHIFTED` map: the leak-source table must be a checked-in,
  *    sha256-pinnable reference-data file (recorded in the index manifest's
  *    `referencePins` for deterministic freshness auditing), and a TS constant
  *    imported from the engine cannot serve as pinned reference data.
+ *
+ *    **Relocated by spec 052 (FR-016)** from `utilities/facet-index/data/` to
+ *    `packages/contracts/data/base-layouts.json`, so this tool and the single
+ *    authoritative key-budget determination (`packages/contracts/src/keyBudget.ts`)
+ *    read the SAME bytes rather than two tables that can drift. The file is
+ *    byte-identical, its sha256 pin is unchanged, and it is still recorded in
+ *    the manifest's `referencePins` — only its home moved, because a utility may
+ *    not be depended upon by a package.
  *
  * No IR/codec/`buildProducedSet` change: this reads existing IR context signals
  * (vkey + baselayout context elements) only.
@@ -34,14 +42,29 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { DEFAULT_BASELAYOUT, STOCK_BASE_LAYOUTS } from "@keyboard-studio/contracts";
 
 import { isBaseLayer } from "../../packages/engine/src/placement/filters.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const BASE_LAYOUTS_PATH = resolve(HERE, "data", "base-layouts.json");
+/**
+ * Where the pinned table lives on disk — used only to resolve the manifest's
+ * `referencePins` sha256 and by the `loadBaseLayoutTable(path)` test hook. The
+ * default (no-arg) load reads {@link STOCK_BASE_LAYOUTS} from contracts, so the
+ * tool and `measureKeyBudget` cannot diverge (spec 052 FR-016).
+ */
+export const BASE_LAYOUTS_PATH = resolve(
+  HERE,
+  "..",
+  "..",
+  "packages",
+  "contracts",
+  "data",
+  "base-layouts.json",
+);
 
 /** The host-environment default base layout — the only leak source in v1. */
-export const DEFAULT_BASELAYOUT = "kbdus";
+export { DEFAULT_BASELAYOUT };
 
 // ---------------------------------------------------------------------------
 // Pinned-table loader
@@ -68,22 +91,28 @@ function isValidBaseLayoutChar(value: string): boolean {
 }
 
 /**
- * Load and validate the pinned `data/base-layouts.json` into a
+ * Load and validate the pinned base-layout table into a
  * `Map<family, Map<vkey, char>>`. Cached after the first read (pure data, no
  * environment dependency). Throws on any non-BMP/control/space value.
  *
+ * The default (no-arg) load takes the table from `@keyboard-studio/contracts`
+ * ({@link STOCK_BASE_LAYOUTS}) rather than reading the file itself, so this tool
+ * and `measureKeyBudget` are provably measuring over the same key set (spec 052
+ * FR-016). The fail-loud validation below is kept and still runs over it: the
+ * relocation moved the data's home, not the tool's guarantees.
+ *
  * `path`, when provided, bypasses the module cache and loads/validates that
- * file directly instead of the pinned `base-layouts.json` — a test hook for
- * exercising the fail-loud validation path against a fixture file. Default
- * (no-arg) behavior is unchanged.
+ * file directly — a test hook for exercising the fail-loud validation path
+ * against a fixture file. Default (no-arg) behavior is otherwise unchanged.
  */
 export function loadBaseLayoutTable(path?: string): BaseLayoutTable {
   if (path === undefined && cachedTable !== undefined) return cachedTable;
 
-  const raw = JSON.parse(readFileSync(path ?? BASE_LAYOUTS_PATH, "utf8")) as Record<
-    string,
-    Record<string, string>
-  >;
+  const raw = (
+    path === undefined
+      ? (STOCK_BASE_LAYOUTS as Record<string, Record<string, string>>)
+      : (JSON.parse(readFileSync(path, "utf8")) as Record<string, Record<string, string>>)
+  ) as Record<string, Record<string, string>>;
 
   const table: BaseLayoutTable = new Map();
   for (const [family, vkeyMap] of Object.entries(raw)) {

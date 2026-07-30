@@ -34,6 +34,7 @@ import {
   confirmedAlphabetKey,
   makeConfirmedAlphabet,
   makeEmptyPlacementWorklist,
+  measureKeyBudget,
   stackKey,
 } from "@keyboard-studio/contracts";
 import {
@@ -42,21 +43,30 @@ import {
   nfcPostureOfInventory,
   resolveOutputFormProposal,
   hasDecidablePairs,
-  computeMentalModelPrefills,
+  computeMarkTreatmentPrefills,
   buildPlacementWorklist,
   expandCaseCounterpartAttachments,
+  expandCaseCounterpartPromotions,
+  deriveMarksComputedAxes,
+  promotableCharacters,
+  prunePromotions,
+  pruneMarkOverrides,
+  treatmentFor,
   type AttachmentProposal,
   type MarkClass,
-  type MentalModelAnswer,
+  type MarksComputedAxes,
+  type MarkTreatment,
+  type MarkTreatmentAnswer,
   type OutputForm,
+  type PromotedComposedCharacter,
 } from "@keyboard-studio/engine";
+import type { MarkInputOrder } from "@keyboard-studio/contracts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { lowercaseBaseView, casedBaseCount } from "../charNormUtils.ts";
 import { AttachmentStation } from "./AttachmentStation.tsx";
-import { MentalModelStation } from "./MentalModelStation.tsx";
-import { InputOrderStation, type MarkInputOrder } from "./InputOrderStation.tsx";
+import { MarkTreatmentStation } from "./MarkTreatmentStation.tsx";
 import { OutputFormStation } from "./OutputFormStation.tsx";
 import { StackingStation } from "./StackingStation.tsx";
 import {
@@ -94,10 +104,14 @@ export function computeMarksGate(alphabet: ConfirmedAlphabet | undefined): Marks
 // Station sequencing — the pinned station ids, in series order.
 // ---------------------------------------------------------------------------
 
+/**
+ * The rendered stations, in series order. FOUR, down from five (spec 052
+ * FR-018/SC-003): the mark input-order question is folded into
+ * `marks_treatment` rather than occupying a station of its own.
+ */
 export type MarksStationId =
   | "marks_attachment"
-  | "marks_mental_model"
-  | "marks_input_order"
+  | "marks_treatment"
   | "marks_output_form"
   | "marks_stacking";
 
@@ -121,10 +135,11 @@ export function initialAttachmentChecked(proposals: AttachmentProposal[]): Attac
  * A class needs an on-screen S2 confirmation only when there is a genuine
  * decision: more than one mark in the class, or any of its marks reaching
  * more than one base (attested or plausible). A trivially single-pair class
- * takes its recorded answer from the prefill without a screen (SC-002: the
- * simple orthography stays at two screens).
+ * takes EVERY one of its answers from the proposal — treatment, promotion, and
+ * order — without a screen (spec 052 FR-019; SC-002: the simple orthography
+ * stays at two screens).
  */
-export function classNeedsMentalModelScreen(
+export function classNeedsTreatmentScreen(
   markClass: MarkClass,
   proposals: AttachmentProposal[],
 ): boolean {
@@ -146,12 +161,25 @@ export function classNeedsMentalModelScreen(
 function seriesResult(
   worklist = makeEmptyPlacementWorklist(),
   outputForm?: OutputForm,
+  computedAxes?: MarksComputedAxes,
 ): SurveyPhaseResult {
   return {
     phase: "C",
     answers: [],
     marksWorklist: worklist,
     ...(outputForm !== undefined ? { marksOutputForm: outputForm } : {}),
+    // spec 052 US4: the recorded treatment finally reaches strategy selection.
+    // `computedAxes` is an existing additive optional field merged into
+    // session.axes by mergePhaseResults — its OMISSION here was the defect, so
+    // this needs no contract change, only a producer.
+    ...(computedAxes !== undefined
+      ? {
+          computedAxes: {
+            diacriticBehavior: computedAxes.diacriticBehavior,
+            markInputOrder: computedAxes.markInputOrder,
+          },
+        }
+      : {}),
   };
 }
 
@@ -188,12 +216,8 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     [gate.alphabet, bcp47],
   );
   const posture = useMemo(() => nfcPostureOfInventory(gate.alphabet), [gate.alphabet]);
-  const mentalModelPrefills = useMemo(
-    () => computeMentalModelPrefills(gate.alphabet, classes, proposals, { baseIr }),
-    [gate.alphabet, classes, proposals, baseIr],
-  );
 
-  // --- answers (each re-seeded when its evidence changes — FR-023) ---
+  // --- answers (each re-seeded when its evidence changes — FR-023/FR-020) ---
 
   const [attachmentChecked, setAttachmentChecked] = useState<AttachmentChecked>(() =>
     initialAttachmentChecked(proposals),
@@ -202,25 +226,99 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     setAttachmentChecked(initialAttachmentChecked(proposals));
   }, [proposals]);
 
-  const [mentalModel, setMentalModel] = useState<Record<string, MentalModelAnswer>>({});
-  useEffect(() => {
-    const seeded: Record<string, MentalModelAnswer> = {};
-    for (const prefill of mentalModelPrefills) seeded[prefill.classId] = prefill.recommended;
-    setMentalModel(seeded);
-  }, [mentalModelPrefills]);
+  // The case-expanded attachment map is what "reachable" means downstream: US1
+  // asked only about lowercase bases, so every checked cased base additively
+  // checks its uppercase counterpart (spec 049 US2 / FR-002).
+  const expandedAttachments = useMemo(
+    () => expandCaseCounterpartAttachments(gate.alphabet, attachmentChecked, bcp47),
+    [gate.alphabet, attachmentChecked, bcp47],
+  );
 
-  const hasLetterPlusMarkClass = Object.values(mentalModel).includes("letter-plus-mark");
+  // The single authoritative key-budget determination (spec 052 FR-016). Null
+  // when there is no base, or when the base binds no stock physical key at all —
+  // an unmeasured budget, which does not gate promotion (see the prefill's
+  // options JSDoc). Every other report of key availability in the product is a
+  // projection of this same measurement (SC-008).
+  const keyBudget = useMemo(
+    () => (baseIr != null ? measureKeyBudget(baseIr) : null),
+    [baseIr],
+  );
 
-  // S3 — prefilled from the base keyboard's own behavior when available
-  // (detectMarkInputOrderFromImport seeds session.axes.markInputOrder).
+  const treatmentPrefills = useMemo(
+    () =>
+      computeMarkTreatmentPrefills(gate.alphabet, classes, proposals, {
+        baseIr,
+        keyBudget,
+        attachments: expandedAttachments,
+        ...(bcp47 !== undefined ? { bcp47 } : {}),
+      }),
+    [gate.alphabet, classes, proposals, baseIr, keyBudget, expandedAttachments, bcp47],
+  );
+
+  // What each class could promote — offered on lowercase/caseless bases only.
+  // An empty list means promotion is ABSENT for that class (nothing to decide),
+  // which the station renders as no group at all.
+  const promotable = useMemo(() => {
+    const out: Record<string, PromotedComposedCharacter[]> = {};
+    for (const markClass of classes) {
+      out[markClass.id] = promotableCharacters(
+        gate.alphabet,
+        markClass,
+        expandedAttachments,
+        bcp47,
+      );
+    }
+    return out;
+  }, [gate.alphabet, classes, expandedAttachments, bcp47]);
+
+  // S2 — the three-part answer (spec 052). Input order is prefilled from the
+  // base keyboard's own behavior when available (detectMarkInputOrderFromImport
+  // seeds session.axes.markInputOrder).
   const prefilledFromImport = importedOrder === "prefix" || importedOrder === "postfix";
-  const [inputOrder, setInputOrder] = useState<MarkInputOrder>(
-    prefilledFromImport ? (importedOrder as MarkInputOrder) : "postfix",
+  const seededOrder: MarkInputOrder = prefilledFromImport
+    ? (importedOrder as MarkInputOrder)
+    : "postfix";
+  const [orderExplicitlySet, setOrderExplicitlySet] = useState(false);
+  const [treatment, setTreatment] = useState<MarkTreatmentAnswer>(() => ({
+    classTreatment: {},
+    markTreatment: {},
+    promoted: [],
+    inputOrder: seededOrder,
+  }));
+
+  // FR-020: an alphabet edit re-proposes ALL THREE answers — treatment re-seeded
+  // from the fresh prefills, per-mark overrides pruned to surviving marks, and
+  // promotions pruned to still-reachable pairs. The order answer is re-seeded
+  // from the base prefill ONLY when the author had not set it explicitly.
+  useEffect(() => {
+    setTreatment((prev) => {
+      const classTreatment: Record<string, MarkTreatment> = {};
+      for (const prefill of treatmentPrefills) {
+        classTreatment[prefill.classId] = prefill.recommended;
+      }
+      return {
+        classTreatment,
+        markTreatment: pruneMarkOverrides(prev.markTreatment, gate.alphabet.marks),
+        promoted: prunePromotions(gate.alphabet, prev.promoted, expandedAttachments),
+        inputOrder: orderExplicitlySet ? prev.inputOrder : seededOrder,
+      };
+    });
+    // `orderExplicitlySet` and `seededOrder` are read, not tracked: re-seeding is
+    // driven by the evidence changing, not by the author toggling the order.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [treatmentPrefills, gate.alphabet, expandedAttachments]);
+
+  const hasOwnKeyMark = useMemo(
+    () =>
+      gate.alphabet.marks.some(
+        (mark) => treatmentFor(mark, treatment, classes, treatmentPrefills) === "own-key",
+      ),
+    [gate.alphabet.marks, treatment, classes, treatmentPrefills],
   );
 
   const outputFormProposal = useMemo(
-    () => resolveOutputFormProposal(posture, hasLetterPlusMarkClass),
-    [posture, hasLetterPlusMarkClass],
+    () => resolveOutputFormProposal(posture, hasOwnKeyMark),
+    [posture, hasOwnKeyMark],
   );
   const [outputForm, setOutputForm] = useState<OutputForm>(outputFormProposal.form);
   useEffect(() => {
@@ -257,24 +355,22 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     setStacksConfirmed(seeded);
   }, [multiMarkStacks]);
 
-  // --- visible stations, in series order ---
-  const needsMentalModelScreen = classes.some((c) => classNeedsMentalModelScreen(c, proposals));
+  // --- visible stations, in series order (at most FOUR — FR-018/SC-003) ---
+  const needsTreatmentScreen = classes.some((c) => classNeedsTreatmentScreen(c, proposals));
   const visibleStations: MarksStationId[] = useMemo(() => {
     const stations: MarksStationId[] = [];
     if (proposals.length > 0) stations.push("marks_attachment");
-    if (needsMentalModelScreen) stations.push("marks_mental_model");
-    if (hasLetterPlusMarkClass) stations.push("marks_input_order");
+    if (needsTreatmentScreen) stations.push("marks_treatment");
     if (hasDecidablePairs(posture)) stations.push("marks_output_form");
     if (stackingEvidence) stations.push("marks_stacking");
     return stations;
-  }, [proposals, needsMentalModelScreen, hasLetterPlusMarkClass, posture, stackingEvidence]);
+  }, [proposals, needsTreatmentScreen, posture, stackingEvidence]);
 
   const [stationIndex, setStationIndex] = useState(0);
   // FR-023: evidence changed → back to the first station; the affected
   // (re-seeded) decisions must be walked again before completing.
   useEffect(() => {
     setStationIndex(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alphabetKey]);
   const currentStation = visibleStations[Math.min(stationIndex, visibleStations.length - 1)];
 
@@ -300,24 +396,33 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     if (completedRef.current) return;
     completedRef.current = true;
     // Assemble the FR-020 handoff. The stacking answer constrains the stack
-    // list downstream; the worklist's three groups cover every base and mark
-    // (SC-007, verified in engine tests).
-    // US1 asked only about lowercase bases; expand each checked cased base to
-    // its uppercase counterpart so the worklist still covers accented capitals
-    // (spec 049, US2 / FR-002). Additive — never clears an existing check.
-    const expandedAttachments = expandCaseCounterpartAttachments(
-      gate.alphabet,
-      attachmentChecked,
-      bcp47,
-    );
+    // list downstream; the worklist's three groups cover every base and mark at
+    // least once with nothing unclassified (spec 052 SC-009, verified in engine
+    // tests). The attachment map is already case-expanded (spec 049 US2), and
+    // the promotion set gets the same additive treatment: promoting a lowercase
+    // marked character derives its uppercase counterpart rather than asking
+    // about it separately (spec 052 FR-023).
     const worklist = buildPlacementWorklist({
       alphabet: gate.alphabet,
       classes,
       attachments: expandedAttachments,
-      mentalModel,
-      inputOrder,
+      prefills: treatmentPrefills,
+      treatment: {
+        ...treatment,
+        promoted: expandCaseCounterpartPromotions(gate.alphabet, treatment.promoted, bcp47),
+      },
     });
-    onComplete(seriesResult(worklist, outputForm));
+    // US4: project the recorded treatment onto A4/A3a so strategy selection can
+    // see the answer. Without this the survey builds a keyboard on two premises
+    // at once — the author's recorded treatment and an independently-derived
+    // diacritic-behaviour axis — with nothing detecting the contradiction.
+    const computedAxes = deriveMarksComputedAxes({
+      alphabet: gate.alphabet,
+      classes,
+      prefills: treatmentPrefills,
+      treatment,
+    });
+    onComplete(seriesResult(worklist, outputForm, computedAxes));
   }
 
   function handleContinue(): void {
@@ -372,22 +477,37 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
         />
       )}
 
-      {currentStation === "marks_mental_model" && (
-        <MentalModelStation
+      {currentStation === "marks_treatment" && (
+        <MarkTreatmentStation
           classes={classes}
-          prefills={mentalModelPrefills}
-          answers={mentalModel}
-          onChange={(classId, answer) =>
-            setMentalModel((prev) => ({ ...prev, [classId]: answer }))
+          prefills={treatmentPrefills}
+          answer={treatment}
+          promotable={promotable}
+          demoLetters={attachmentBases}
+          onClassTreatmentChange={(classId, next) =>
+            setTreatment((prev) => ({
+              ...prev,
+              classTreatment: { ...prev.classTreatment, [classId]: next },
+            }))
           }
-        />
-      )}
-
-      {currentStation === "marks_input_order" && (
-        <InputOrderStation
-          value={inputOrder}
-          onChange={setInputOrder}
-          prefilledFromImport={prefilledFromImport}
+          onMarkTreatmentChange={(mark, next) =>
+            setTreatment((prev) => ({
+              ...prev,
+              markTreatment: { ...prev.markTreatment, [mark]: next },
+            }))
+          }
+          onPromotionToggle={(character, next) =>
+            setTreatment((prev) => {
+              const nfc = character.normalize("NFC");
+              const without = prev.promoted.filter((c) => c.normalize("NFC") !== nfc);
+              return { ...prev, promoted: next ? [...without, nfc] : without };
+            })
+          }
+          onInputOrderChange={(next) => {
+            setOrderExplicitlySet(true);
+            setTreatment((prev) => ({ ...prev, inputOrder: next }));
+          }}
+          orderPrefilledFromImport={prefilledFromImport && !orderExplicitlySet}
         />
       )}
 

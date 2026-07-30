@@ -64,6 +64,34 @@ function makePhoneOnlyJson(
   });
 }
 
+/** Build a raw touch layout JSON string with an explicit shift layer keyset
+ *  (for case-derived layer targeting tests). */
+function makePhoneWithShiftJson(
+  defaultKeys: Array<{ id: string; text?: string; output?: string; sk?: unknown[] }>,
+  shiftKeys: Array<{ id: string; text?: string; output?: string; sk?: unknown[] }>,
+): string {
+  return JSON.stringify({
+    phone: {
+      layer: [
+        { id: "default", row: [{ id: 1, key: defaultKeys }] },
+        { id: "shift", row: [{ id: 1, key: shiftKeys }] },
+      ],
+    },
+  });
+}
+
+/** Build a raw touch layout JSON string with NO shift layer at all (for the
+ *  absent-target-layer fallback test). */
+function makePhoneNoShiftJson(
+  defaultKeys: Array<{ id: string; text?: string; output?: string }>,
+): string {
+  return JSON.stringify({
+    phone: {
+      layer: [{ id: "default", row: [{ id: 1, key: defaultKeys }] }],
+    },
+  });
+}
+
 /** Build a minimal raw touch layout JSON string with both tablet and phone platforms. */
 function makeTabletPhoneJson(
   tabletDefaultKeys: Array<{ id: string; text?: string; sk?: unknown[] }>,
@@ -369,6 +397,228 @@ describe("applyDesktopModificationsToRawJson — placements", () => {
     const placed = defLayer.row.flatMap((r) => r.key).find((k) => k["id"] === "U_00F1")!;
     expect(placed).toBeDefined();
     expect(placed["text"]).toBe("ñ");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5b. Placements — case-derived layer targeting
+// ---------------------------------------------------------------------------
+
+describe("applyDesktopModificationsToRawJson — placements target the case-derived layer", () => {
+  it("lands an uppercase char on the shift layer's host key (empty host -> primary)", () => {
+    const json = makePhoneWithShiftJson(
+      [{ id: "K_A", text: "a" }],
+      [{ id: "K_A" }], // empty shift-layer host
+    );
+    const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }], // "Á" = "A" with acute (upper)
+    });
+    expect(warnings).toHaveLength(0);
+
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }> };
+    };
+    const shiftLayer = parsed.phone.layer.find((l) => l.id === "shift")!;
+    const placed = shiftLayer.row.flatMap((r) => r.key).find((k) => k["id"] === "U_00C1")!;
+    expect(placed).toBeDefined();
+    expect(placed["text"]).toBe("Á");
+
+    // Default layer's K_A is unchanged.
+    const defLayer = parsed.phone.layer.find((l) => l.id === "default")!;
+    const defKa = defLayer.row.flatMap((r) => r.key).find((k) => k["id"] === "K_A")!;
+    expect(defKa["text"]).toBe("a");
+    expect(defKa["sk"] ?? []).toHaveLength(0);
+  });
+
+  it("lands an uppercase char on the shift layer's host key as an sk[] alternate when the shift host is occupied", () => {
+    const json = makePhoneWithShiftJson(
+      [{ id: "K_A", text: "a" }],
+      // Occupied shift-layer host producing a DIFFERENT char than the
+      // placement — the realistic shift seed, where "K_A" already gives "A".
+      [{ id: "K_A", text: "A" }],
+    );
+    const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+    expect(warnings).toHaveLength(0);
+
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string; text?: string; sk?: Array<{ text?: string }> }> }> }> };
+    };
+    const shiftLayer = parsed.phone.layer.find((l) => l.id === "shift")!;
+    const shiftKa = shiftLayer.row.flatMap((r) => r.key).find((k) => k.id === "K_A")!;
+    expect(shiftKa.text).toBe("A"); // primary production kept
+    expect(shiftKa.sk).toHaveLength(1);
+    expect(shiftKa.sk![0]!.text).toBe("Á");
+
+    const defLayer = parsed.phone.layer.find((l) => l.id === "default")!;
+    const defKa = defLayer.row.flatMap((r) => r.key).find((k) => k.id === "K_A")!;
+    expect(defKa.sk ?? []).toHaveLength(0);
+  });
+
+  it("is a no-op when the shift host already produces the placed char (no self-referential sk[])", () => {
+    // Mirror of the IR applier's guard: a shift-layer seed that already carries
+    // the uppercase form must not gain itself as its own longpress alternate.
+    const json = makePhoneWithShiftJson(
+      [{ id: "K_A", text: "a" }],
+      [{ id: "K_A", text: "Á" }],
+    );
+    const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+    expect(warnings).toHaveLength(0);
+
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string; text?: string; sk?: Array<{ text?: string }> }> }> }> };
+    };
+    const shiftLayer = parsed.phone.layer.find((l) => l.id === "shift")!;
+    const shiftKa = shiftLayer.row.flatMap((r) => r.key).find((k) => k.id === "K_A")!;
+    expect(shiftKa.text).toBe("Á");
+    expect(shiftKa.sk ?? []).toHaveLength(0);
+  });
+
+  it("is a no-op when the shift host produces the placed char in a different normalization form", () => {
+    // Host text is NFD ("A" + combining acute); the placement is NFC "Á".
+    // `isTouchKeyPrimaryProduction` is shared with the IR applier, but this
+    // path writes straight to the VFS with no IR round-trip, so it needs its
+    // own regression coverage for the normalization-mismatch case.
+    const nfdUpperAAcute = "A" + String.fromCodePoint(0x0301);
+    const json = makePhoneWithShiftJson(
+      [{ id: "K_A", text: "a" }],
+      [{ id: "K_A", text: nfdUpperAAcute }],
+    );
+    const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+    expect(warnings).toHaveLength(0);
+
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string; text?: string; sk?: Array<{ text?: string }> }> }> }> };
+    };
+    const shiftLayer = parsed.phone.layer.find((l) => l.id === "shift")!;
+    const shiftKa = shiftLayer.row.flatMap((r) => r.key).find((k) => k.id === "K_A")!;
+    expect(shiftKa.text).toBe(nfdUpperAAcute); // host production untouched
+    expect(shiftKa.sk ?? []).toHaveLength(0);
+  });
+
+  it("still lands a lowercase char on the default layer (regression guard)", () => {
+    const json = makePhoneWithShiftJson(
+      [{ id: "K_A", text: "a" }],
+      [{ id: "K_A", text: "Á" }],
+    );
+    const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
+      removals: [],
+      placements: [{ char: "á", hostKey: "K_A" }], // "á" = "a" with acute (lower)
+    });
+    expect(warnings).toHaveLength(0);
+
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string; sk?: Array<{ text?: string }>; text?: string }> }> }> };
+    };
+    const defLayer = parsed.phone.layer.find((l) => l.id === "default")!;
+    const defKa = defLayer.row.flatMap((r) => r.key).find((k) => k.id === "K_A")!;
+    expect(defKa.sk).toHaveLength(1);
+    expect(defKa.sk![0]!.text).toBe("á");
+
+    // Shift layer untouched.
+    const shiftLayer = parsed.phone.layer.find((l) => l.id === "shift")!;
+    const shiftKa = shiftLayer.row.flatMap((r) => r.key).find((k) => k.id === "K_A")!;
+    expect(shiftKa.text).toBe("Á");
+    expect(shiftKa.sk ?? []).toHaveLength(0);
+  });
+
+  it("falls back to the default layer (with a warning) when no shift layer exists", () => {
+    const json = makePhoneNoShiftJson([{ id: "K_A", text: "a" }]); // no shift layer at all
+    const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/shift/);
+
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string; sk?: Array<{ text?: string }> }> }> }> };
+    };
+    const defLayer = parsed.phone.layer.find((l) => l.id === "default")!;
+    const defKa = defLayer.row.flatMap((r) => r.key).find((k) => k.id === "K_A")!;
+    expect(defKa.sk).toHaveLength(1);
+    expect(defKa.sk![0]!.text).toBe("Á");
+  });
+
+  it("routes each placement of a MIXED-CASE batch to its own layer in one call", () => {
+    // The per-layer working-state map is the machinery this change introduced;
+    // single-placement tests never exercise two layers accumulating
+    // concurrently. This path writes straight to the VFS with no IR round-trip,
+    // so it needs its own coverage rather than inheriting the IR applier's.
+    const json = makePhoneWithShiftJson(
+      [{ id: "K_A", text: "a" }],
+      [{ id: "K_A", text: "A" }],
+    );
+    const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
+      removals: [],
+      placements: [
+        { char: "á", hostKey: "K_A" },
+        { char: "Á", hostKey: "K_A" },
+      ],
+    });
+    expect(warnings).toHaveLength(0);
+
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string; text?: string; sk?: Array<{ text?: string }> }> }> }> };
+    };
+    const defKa = parsed.phone.layer
+      .find((l) => l.id === "default")!
+      .row.flatMap((r) => r.key)
+      .find((k) => k.id === "K_A")!;
+    expect(defKa.text).toBe("a");
+    expect(defKa.sk).toHaveLength(1);
+    expect(defKa.sk![0]!.text).toBe("á");
+
+    const shiftKa = parsed.phone.layer
+      .find((l) => l.id === "shift")!
+      .row.flatMap((r) => r.key)
+      .find((k) => k.id === "K_A")!;
+    expect(shiftKa.text).toBe("A");
+    expect(shiftKa.sk).toHaveLength(1);
+    expect(shiftKa.sk![0]!.text).toBe("Á");
+  });
+
+  it("appends the fallback to the SHIFT layer when the host key is absent from it", () => {
+    // Shift layers are routinely sparser than default. The fallback must land
+    // on the layer the case rule chose — not the default layer — and the
+    // warning must name that layer.
+    const json = makePhoneWithShiftJson(
+      [{ id: "K_A", text: "a" }],
+      [{ id: "K_Q", text: "Q" }], // no K_A here
+    );
+    const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/not found/);
+    expect(warnings[0]).toMatch(/"shift" layer/);
+
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string; text?: string; sk?: Array<{ text?: string }> }> }> }> };
+    };
+    const shiftKeys = parsed.phone.layer
+      .find((l) => l.id === "shift")!
+      .row.flatMap((r) => r.key);
+    const placed = shiftKeys.find((k) => k.id === "U_00C1")!;
+    expect(placed).toBeDefined();
+    expect(placed.text).toBe("Á");
+
+    // Default layer got nothing — the fallback did not leak across layers.
+    const defKeys = parsed.phone.layer
+      .find((l) => l.id === "default")!
+      .row.flatMap((r) => r.key);
+    expect(defKeys.some((k) => k.id === "U_00C1")).toBe(false);
+    expect(defKeys.find((k) => k.id === "K_A")!.sk ?? []).toHaveLength(0);
   });
 });
 
