@@ -150,6 +150,7 @@ import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
+import { ProposalCard } from "./parts/ProposalCard.tsx";
 import {
   RemovableChipRow,
   HoverDangerChip,
@@ -3081,28 +3082,18 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 .map((c) => displayChar(c))
                 .join(" ");
               return (
-                <div
+                <ProposalCard
                   key={group.id}
-                  role="note"
-                  aria-label={t({
+                  ariaLabel={t({
                     id: "editor.assignLoop.touch.bulkAccents.ariaLabel",
                     message: "Bulk-added accent family",
                   })}
-                  style={{
-                    background: "#0d2218",
-                    border: "1px solid #238636",
-                    borderRadius: 8,
-                    padding: "10px 14px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                  }}
-                >
-                  <p style={suggestionMessageStyle}>
+                  message={
                     <Trans id="editor.assignLoop.touch.bulkAccents.summary">
                       Added {memberList} to {hostLabel} as long-press.
                     </Trans>
-                  </p>
+                  }
+                >
                   <button
                     type="button"
                     onClick={() => handleRemoveBulkGroup(group)}
@@ -3126,7 +3117,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                       Remove all
                     </Trans>
                   </button>
-                </div>
+                </ProposalCard>
               );
             })}
 

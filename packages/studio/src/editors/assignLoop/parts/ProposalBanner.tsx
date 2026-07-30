@@ -16,6 +16,7 @@
 
 import type { ReactNode } from "react";
 import { BORDER, TEXT_DIM, FONT } from "../../../lib/galleryTheme.ts";
+import { ProposalCard } from "./ProposalCard.tsx";
 
 export interface ProposalBannerProps {
   /** Accessible name for the outer `role="note"` region. */
@@ -46,29 +47,7 @@ export function ProposalBanner({
   onDismiss,
 }: ProposalBannerProps) {
   return (
-    <div
-      role="note"
-      aria-label={ariaLabel}
-      style={{
-        background: "#0d2218",
-        border: "1px solid #238636",
-        borderRadius: 8,
-        padding: "10px 14px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-      }}
-    >
-      <p
-        style={{
-          margin: 0,
-          fontSize: 12,
-          color: "#56d364",
-          fontFamily: FONT,
-        }}
-      >
-        {message}
-      </p>
+    <ProposalCard ariaLabel={ariaLabel} message={message}>
       <div style={{ display: "flex", gap: 8 }}>
         <button
           type="button"
@@ -106,6 +85,6 @@ export function ProposalBanner({
           {declineLabel}
         </button>
       </div>
-    </div>
+    </ProposalCard>
   );
 }

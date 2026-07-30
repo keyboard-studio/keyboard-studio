@@ -45,17 +45,17 @@ export interface SiblingAccentPlacement {
  * precedes it (including a comment dash) and is easy to mis-copy.
  */
 const DIACRITIC_PRIORITY: readonly string[] = [
-  "̀", // grave
-  "́", // acute
-  "̂", // circumflex
-  "̈", // diaeresis
-  "̃", // tilde
-  "̊", // ring above
-  "̧", // cedilla
-  "̨", // ogonek
-  "̌", // caron
-  "̄", // macron
-  "̇", // dot above
+  "\u0300", // grave
+  "\u0301", // acute
+  "\u0302", // circumflex
+  "\u0308", // diaeresis
+  "\u0303", // tilde
+  "\u030A", // ring above
+  "\u0327", // cedilla
+  "\u0328", // ogonek
+  "\u030C", // caron
+  "\u0304", // macron
+  "\u0307", // dot above
 ];
 
 /** The case-folded base letter of `char` (the starter of its canonical
