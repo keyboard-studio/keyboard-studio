@@ -3317,24 +3317,33 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               width: "100%",
             }}
           >
-            <button
-              type="button"
-              onClick={handleBack}
-              aria-label={
-                currentIdx <= 0
-                  ? t({
-                      id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel",
-                      message: "Back to mechanisms (Phase C)",
-                    })
-                  : t({
-                      id: "editor.assignLoop.touch.backToPreviousCharacterAriaLabel",
-                      message: "Back to previous character",
-                    })
-              }
-              style={ghostBtn}
-            >
-              <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
-            </button>
+            {/* HIDE this button entirely (rather than render it disabled)
+                when currentChar is outside touchLettersToAdd — mirrors the
+                forward button's gating a few lines below. usePositionalCharNav's
+                handleBack is a no-op when currentIdx === -1, which is exactly
+                the state a detected/already-covered character selected via the
+                SHOW-ALL CharScrollStrip (handleSelectDisplayChar) produces: a
+                visible-but-dead Back button would look live but do nothing. */}
+            {currentChar !== null && touchLettersToAdd.includes(currentChar) && (
+              <button
+                type="button"
+                onClick={handleBack}
+                aria-label={
+                  currentIdx <= 0
+                    ? t({
+                        id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel",
+                        message: "Back to mechanisms (Phase C)",
+                      })
+                    : t({
+                        id: "editor.assignLoop.touch.backToPreviousCharacterAriaLabel",
+                        message: "Back to previous character",
+                      })
+                }
+                style={ghostBtn}
+              >
+                <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
+              </button>
+            )}
             <div
               style={{
                 marginLeft: "auto",

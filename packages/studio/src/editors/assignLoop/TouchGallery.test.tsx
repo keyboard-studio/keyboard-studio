@@ -402,6 +402,33 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     expect(screen.queryByTestId("touch-continue")).toBeNull();
   });
 
+  it("entry-parity: the Back button is likewise HIDDEN (not just dead) when inspecting a detected out-of-walk character via its chip — usePositionalCharNav's handleBack is a no-op at currentIdx === -1, so a visible Back would look live but do nothing", async () => {
+    // Same fixture/setup as the forward-hidden test above: "a" is detected
+    // (excluded from the walk), "中" is the walk's only member and entry point.
+    seedStore({ withInventory: ["a", "中"] });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expectCurrentChar("中");
+
+    // On the walk's own entry point, Back is present (it's currentIdx 0 of
+    // the walk, so Back still resolves to "back to mechanisms" / onBack).
+    const backBtnsOnWalk = screen.queryAllByRole("button", { name: /back/i });
+    expect(backBtnsOnWalk.find((b) => b.textContent?.includes("Back"))).not.toBeUndefined();
+
+    // Inspect "a" via its CharScrollStrip chip — outside touchLettersToAdd,
+    // so currentIdx becomes -1 in usePositionalCharNav and handleBack is a
+    // no-op. The Back button must be hidden entirely here, not merely dead.
+    fireEvent.click(screen.getByTestId("char-scroll-chip-0061"));
+    await waitFor(() => {
+      expectCurrentChar("a");
+    });
+    const backBtnsInspecting = screen.queryAllByRole("button", { name: /back/i });
+    expect(backBtnsInspecting.find((b) => b.textContent?.includes("Back"))).toBeUndefined();
+  });
+
   it("DOES set source/<id>.keyman-touch-layout with sk JSON after a longpress edit", async () => {
     seedStore({ withInventory: ["ä"] });
 
