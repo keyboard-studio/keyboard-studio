@@ -2548,6 +2548,18 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     return keys;
   }, [bulkAccentGroups]);
 
+  // Keys for each group's accepted BASE char (which shows as its own Configured
+  // chip, unlike the siblings). Used to scope that chip to the group's family
+  // so it does not linger on unrelated letters (e.g. the "a" base must not show
+  // while editing "B") — mirrors how the bulk box itself is scoped below.
+  const bulkBaseKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const group of bulkAccentGroups) {
+      keys.add(bulkMemberKey(group.baseChar, group.hostKey));
+    }
+    return keys;
+  }, [bulkAccentGroups]);
+
   // The host key the CURRENT character's accent family lives on — used to scope
   // which bulk summary boxes are shown so the author sees only the family they
   // are looking at (e.g. viewing an e-accent shows the e box, not the a box),
@@ -2565,57 +2577,37 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // "remove the whole configured character" handler into this one, since a
   // char with exactly one mechanism behaves identically either way.
   //
-  // P2 fix (stale proposal on base removal): if an open sibling-accent
-  // proposal was raised for `char` (the just-placed base longpress) and the
-  // author removes that char's chip via this Configured-row control while
-  // the banner is still open, the proposal's own placements (which share
-  // `char`'s host key) would be orphaned — sibling longpress entries with no
-  // base longpress underneath them. Clear the proposal here rather than
-  // leaving it to dangle; `handleSiblingAccentConfirm` below also re-checks
-  // existence defensively (belt-and-suspenders, same posture as
-  // `handleCasePairConfirm`'s stale-base guard).
+  // It removes EXACTLY the one mechanism, never a bulk batch — deleting the
+  // accepted base char does not cascade into its sibling-accent group (those
+  // are independent long-press alternates). Only the bulk box's "Remove all"
+  // clears a batch. An OPEN (pre-confirm) sibling proposal for `char` is
+  // cleared, since its pending placements would target a removed base.
   const handleRemoveMechanism = useCallback(
     (char: string, idx: number) => {
-      // If the mechanism being removed is a bulk group's BASE longpress,
-      // removing it would orphan that group's siblings (longpress entries with
-      // no base underneath). Remove those siblings and the group too.
-      const removed = charTouch.get(char)?.mechanisms[idx];
-      const removedHostKey =
-        removed !== undefined
-          ? normalizeTouchSlots(removed.slotValues)["hostKey"]
-          : undefined;
-      const orphanedGroups =
-        removed !== undefined
-          ? bulkAccentGroups.filter(
-              (g) => g.baseChar === char && g.hostKey === removedHostKey,
-            )
-          : [];
-
       setCharTouch((prev) => {
         const existing = prev.get(char);
         if (existing === undefined) return prev;
         const nextMechanisms = existing.mechanisms.filter((_, i) => i !== idx);
-        let next = new Map(prev);
+        const next = new Map(prev);
         if (nextMechanisms.length === 0) {
           next.delete(char);
         } else {
           next.set(char, { ...existing, mechanisms: nextMechanisms });
         }
-        for (const g of orphanedGroups) {
-          next = stripBulkMembers(next, g.members, g.hostKey);
-        }
         return next;
       });
-      if (orphanedGroups.length > 0) {
-        setBulkAccentGroups((prev) =>
-          prev.filter((g) => !orphanedGroups.some((o) => o.id === g.id)),
-        );
-      }
+      // Clear an OPEN (not-yet-confirmed) sibling-accent proposal if its base
+      // char was just removed — its pending placements would target a base
+      // that no longer exists. A CONFIRMED group is deliberately NOT touched:
+      // each accented sibling is an independent long-press alternate of the
+      // same key, so removing the accepted base does NOT orphan them. Deleting
+      // one rule removes only that rule; the bulk box's "Remove all" is the
+      // only control that clears the whole batch.
       setSiblingAccentProposal((prev) =>
         prev !== null && prev.acceptedChar === char ? null : prev,
       );
     },
-    [charTouch, bulkAccentGroups, stripBulkMembers],
+    [],
   );
 
   // Tap-to-select routing: when a valid host-key-capable method is active and
@@ -3181,10 +3173,17 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             // removes by index, so filtering must not renumber.
             assignment.mechanisms.flatMap((m, i) => {
               const slots = normalizeTouchSlots(m.slotValues);
-              const isBulkMember =
-                m.patternId === "longpress_alternates" &&
-                bulkMemberKeys.has(bulkMemberKey(c, slots["hostKey"] ?? ""));
-              if (isBulkMember) return [];
+              const hostKey = slots["hostKey"] ?? "";
+              if (m.patternId === "longpress_alternates") {
+                const key = bulkMemberKey(c, hostKey);
+                // Siblings live in the bulk box, never as their own chip.
+                if (bulkMemberKeys.has(key)) return [];
+                // The accepted base char's chip is scoped to its family, like
+                // the box: shown while editing that family, hidden elsewhere.
+                if (bulkBaseKeys.has(key) && hostKey !== currentCharHostKey) {
+                  return [];
+                }
+              }
               return [
                 {
                   key: `${c}-${i}`,

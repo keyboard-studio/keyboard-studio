@@ -3593,7 +3593,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     expect(bulkGroups()[0]?.members).toEqual(["á"]);
   });
 
-  it("removing the base chip after confirm removes the orphaned bulk group and its siblings", async () => {
+  it("removing the base chip after confirm removes ONLY the base, not the whole batch", async () => {
     seedStore({ withInventory: ["ă", "à", "À"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
@@ -3602,6 +3602,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     await acceptSuggestion();
     await confirmBanner();
 
+    expect(touchMechanismsFor("ă")).toHaveLength(1);
     expect(touchMechanismsFor("à")).toHaveLength(1);
     expect(bulkGroups()).toHaveLength(1);
 
@@ -3612,12 +3613,15 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
       fireEvent.click(removeBase!);
     });
 
-    // The base is gone, and its orphaned siblings + group go with it.
+    // Only the base is gone. The siblings are independent long-press alternates
+    // of the same key and stay put — deleting one rule must not delete the
+    // batch (that is what "Remove all" is for).
     expect(touchMechanismsFor("ă")).toHaveLength(0);
-    expect(touchMechanismsFor("à")).toHaveLength(0);
-    expect(touchMechanismsFor("À")).toHaveLength(0);
-    expect(bulkGroups()).toHaveLength(0);
-    expect(screen.queryByText(/Added .* as long-press/i)).toBeNull();
+    expect(touchMechanismsFor("à")).toHaveLength(1);
+    expect(touchMechanismsFor("À")).toHaveLength(1);
+    expect(bulkGroups()).toHaveLength(1);
+    // The bulk box still shows (current char "ă" is still in the a-family).
+    expect(screen.getByText(/Added .* as long-press/i)).toBeTruthy();
   });
 
   it("clears an OPEN proposal when the base chip is removed before confirming", async () => {
@@ -3660,8 +3664,10 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     });
     useWorkingCopyStore.getState().setTouchDraft({
       charTouchEntries: [
-        ["ê", lp("ê", "K_E", "default")],
-        ["â", lp("â", "K_A", "default")],
+        ["é", lp("é", "K_E", "default")], // e-family base chip
+        ["ê", lp("ê", "K_E", "default")], // e-family sibling (in box)
+        ["á", lp("á", "K_A", "default")], // a-family base chip
+        ["â", lp("â", "K_A", "default")], // a-family sibling (in box)
       ],
       suggestionResolvedChars: [],
       bulkAccentGroups: [
@@ -3677,6 +3683,10 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     // Current char "è" is in the e-family (host key K_E): only the e box shows.
     expect(screen.getByText(/to e as long-press/i)).toBeTruthy();
     expect(screen.queryByText(/to a as long-press/i)).toBeNull();
+    // The a-family base chip is also hidden while editing an e-family char;
+    // the e-family base chip is shown. (Siblings ê/â are always in the box.)
+    expect(individualChipFor("á")).toBeUndefined();
+    expect(individualChipFor("é")).toBeTruthy();
   });
 });
 
