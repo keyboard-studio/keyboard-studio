@@ -376,28 +376,60 @@ combination.
   base+mark combinations have an uppercase/lowercase counterpart pair from
   the confirmed alphabet's case data, superseding any separate
   capitals-and-marks question.
-- **FR-010**: The system MUST group marks into mark-classes (sets of marks
-  that behave alike, such as "quality accents" versus "tone marks") using
-  attachment-set similarity and the marks' own linguistic function, and
-  MUST present the mental-model confirmation (Story 4's "own-letter" versus
-  "letter-plus-mark" choice) once per class rather than once per individual
-  mark, while still allowing a designer to split an individual mark or pair
-  out of its class's answer.
-- **FR-011**: The mental-model confirmation for each mark-class MUST be
-  pre-filled with a recommended answer derived from: how many different
-  base letters the mark actually attaches to in the confirmed alphabet
-  (widely attached suggests letter-plus-mark), whether the base keyboard
-  this keyboard derives from already treats the mark as a single dedicated
-  key or as a keystroke that combines with a following letter, and whether
-  the number of attested/plausible combinations exceeds the number of
-  physical key positions available for dedicated letter units (if it does,
-  the own-letter option MUST be presented as unaffordable with the reason
-  stated).
-- **FR-012**: The system MUST present the mark input-order question
-  (attach-before-letter versus attach-after-letter) only when at least one
-  mark-class was confirmed as letter-plus-mark, and MUST pre-fill it from
-  the corresponding behavior of the keyboard this one derives from, when
-  that information is available.
+- **FR-010** *(amended by [specs/052-marks-treatment-question](../052-marks-treatment-question/spec.md))*:
+  The system MUST group marks into mark-classes (sets of marks that behave
+  alike, such as "quality accents" versus "tone marks") using attachment-set
+  similarity and the marks' own linguistic function, and MUST present the
+  station's confirmation once per class rather than once per individual mark,
+  while still allowing a designer to split an individual mark or pair out of its
+  class's answer.
+
+  **Amendment (spec 052).** The single mutually-exclusive per-class confirmation
+  this requirement originally described — Story 4's "own-letter" versus
+  "letter-plus-mark" choice — is **replaced outright** by a three-part answer
+  recorded at the same station: per-mark **treatment** (does this mark receive a
+  key of its own), a set of **promoted composed characters** placed on dedicated
+  keys, and the **input order** folded in from the retired station FR-012
+  described. The three parts are independently settable; choosing a dedicated key
+  for a mark does not prevent promoting composed characters, and vice versa. The
+  original wording could not state what a Cameroonian tone orthography actually
+  wants, and its vocabulary asserted orthographic unithood — a category error for
+  Devanagari dependent vowel signs, Arabic ḥarakāt, and Hebrew niqqud, all of
+  which reach this station. Per-class grouping and the per-mark split-out, the
+  parts of this requirement spec 052 keeps, are unchanged.
+- **FR-011** *(amended by [specs/052-marks-treatment-question](../052-marks-treatment-question/spec.md))*:
+  The station's confirmation for each mark-class MUST be pre-filled with a
+  recommended answer derived from: how many different base letters the mark
+  actually attaches to in the confirmed alphabet (widely attached suggests the
+  mark is productive and earns a key of its own), whether the base keyboard this
+  keyboard derives from already treats the mark as a single dedicated key or as a
+  keystroke that combines with a following letter, and **the base keyboard's key
+  budget** — when the budget cannot seat the additional dedicated keys,
+  promotion MUST be presented as unavailable with the reason stated.
+
+  **Amendment (spec 052).** The signal list gains the key budget as a real,
+  supplied input. Previously the third signal was a numeric spare-key count that
+  had **no producer**: the parameter existed, the studio never passed it, and the
+  affordability test therefore always returned affordable — so a fully-booked
+  base actively reported the wrong answer. Spec 052 US3 supplies the single
+  authoritative key-budget determination, and the signal now gates **promotion
+  only, never treatment**, so at least one option remains selectable at every
+  band.
+- **FR-012** *(amended by [specs/052-marks-treatment-question](../052-marks-treatment-question/spec.md))*:
+  The system MUST record whether a mark is typed before or after its base
+  letter, and MUST pre-fill it from the corresponding behavior of the keyboard
+  this one derives from, when that information is available.
+
+  **Amendment (spec 052).** Mark input order is **no longer its own station**. It
+  is recorded as part of the same station-S2 answer as treatment and promotion,
+  which is what reduces the series from five rendered stations to four (see the
+  SC-006 amendment below). The retired station's content is relocated, not
+  duplicated: `survey/questions/reserve/pb_mark_input_order.ts` remains the
+  content source and the folded question reads its prompt, help text, and options
+  from that module. The original "only when at least one mark-class was confirmed
+  as letter-plus-mark" render gate no longer applies, because there is no separate
+  screen to gate; the value is retained but inert when every mark is `composed`
+  (it describes a mark key that does not exist).
 - **FR-013**: The system MUST determine the output form (a single
   ready-made character versus a base-plus-mark sequence) for every
   mark-bearing letter in the keyboard as one decision that applies
@@ -555,15 +587,30 @@ combination.
   keyboard.
 - **SC-005**: 0% of designer-facing prompt text in the output-form station
   contains the words "Unicode" or "normalization".
-- **SC-006**: In a review of representative orthographies spanning the
-  four scenario shapes in Stories 1-4, no orthography requires more than
-  five marks-series screens (one per station that can ever be shown to a
-  designer, excluding the always-invisible gate check) to complete, and
-  the majority require two or fewer.
-- **SC-007**: For every keyboard produced by this feature, the mechanism
-  gallery step's placement worklist accounts for every base letter and
-  every mark in the confirmed alphabet exactly once, with zero units left
-  unclassified.
+- **SC-006** *(superseded by [specs/052-marks-treatment-question](../052-marks-treatment-question/spec.md) SC-003)*:
+  In a review of representative orthographies spanning the four scenario shapes
+  in Stories 1-4, no orthography requires more than **four** marks-series screens
+  (one per station that can ever be shown to a designer, excluding the
+  always-invisible gate check) to complete, and the majority require two or fewer.
+
+  **Amendment (spec 052).** The literal ceiling was **five**. Folding the mark
+  input-order question into station S2 retires a whole station, so the ceiling is
+  now four (`marks_attachment`, `marks_treatment`, `marks_output_form`,
+  `marks_stacking`). Spec 052's SC-003 is the live figure; this row records the
+  supersession so the two do not read as contradicting each other.
+- **SC-007** *(amended by [specs/052-marks-treatment-question](../052-marks-treatment-question/spec.md))*:
+  For every keyboard produced by this feature, the mechanism gallery step's
+  placement worklist accounts for every base letter and every mark in the
+  confirmed alphabet **at least once**, with zero units left unclassified.
+
+  **Amendment (spec 052).** The original wording required **exactly once**. Spec
+  052 FR-006 makes dual reachability an *intended* outcome: a mark may have its
+  own key while some of its composed characters also sit on dedicated keys, so a
+  mark legitimately appears both as a mark unit and inside a keyed unit. The
+  "exactly once" clause therefore became false, not merely inconvenient. The
+  corresponding `verifyWorklistCoverage` "classified twice" assertion is
+  **deleted**, not suppressed or worked around. Totality — nothing unclassified —
+  is what downstream placement actually needs; uniqueness never was.
 
 ## Assumptions
 
