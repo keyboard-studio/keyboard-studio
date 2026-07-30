@@ -934,6 +934,25 @@ describe("TouchGallery — character-scroll-strip navigation", () => {
     expect(screen.getByTestId("char-scroll-chip-6708")).toBeTruthy();
   });
 
+  it("renders the char-scroll-strip ABOVE the per-char editing block, matching MechanismGallery's real placement (regression guard)", async () => {
+    seedStore({ withInventory: ["中", "日", "月"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    // "Touch mapping" is the eyebrow label unique to the per-char editing
+    // block. DOCUMENT_POSITION_FOLLOWING (4): the per-char block comes AFTER
+    // the strip in DOM order — i.e. the strip renders near the top of the
+    // pane, above the per-char block, not after it (the CHANGE-1 regression
+    // this test guards against).
+    const perCharEyebrow = screen.getByText("Touch mapping");
+    expect(
+      strip.compareDocumentPosition(perCharEyebrow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("clicking an earlier character's chip moves back to it, ungated by intermediate configuration status", async () => {
     const onBack = vi.fn();
     seedStore({ withInventory: ["中", "日", "月"] });

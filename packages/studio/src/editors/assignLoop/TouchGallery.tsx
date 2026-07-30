@@ -3178,6 +3178,43 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
         </p>
       )}
 
+      {/* Character scroll strip — horizontal, SHOW-ALL of inventory. Rendered
+          here, near the top of the pane (right after the coverage line,
+          before both the all-caught-up panel and the per-char block below),
+          matching MechanismGallery's real placement — that gallery renders
+          its CharScrollStrip above its per-char/empty-diff content too,
+          right after its own coverage line + shared top toolbar row. It is
+          still a sibling of the per-char block, NOT nested inside it, so it
+          stays visible even when currentChar is null — e.g. the all-caught-up
+          state below, where every inventory character is walk-excluded but
+          the author can still select one for inspection. Not just
+          touchLettersToAdd, so the author can still see and inspect every
+          character, including ones already reachable on the seed layout, not
+          only the ones still needing a method. Click any chip to jump
+          straight to that character (replaces the old "Previous character"
+          button, which only ever stepped back one position) via
+          handleSelectDisplayChar (NOT the walk's own handleSelectChar, which
+          is gated on touchLettersToAdd) — an already-detected chip is still
+          selectable for inspection, it is just never a walk stop. Each
+          chip's badge is the produces-count for that character in THIS
+          gallery's modality (touch) — see charMechanisms.ts.
+          `inheritedChars` feeds the seed-reachable set into that count so a
+          character this gallery reports as "already in the touch layout"
+          badges as produced (>=1) rather than red 0 — both before and after
+          its suggestion is accepted (the accepted touch_inherited
+          placeholder is still not counted, so accepting cannot double-count
+          it). */}
+      {inventory.length > 0 && (
+        <CharScrollStrip
+          chars={inventory}
+          currentChar={currentChar}
+          onSelectChar={handleSelectDisplayChar}
+          assignments={charTouchAssignments}
+          modality="touch"
+          inheritedChars={detectedChars}
+        />
+      )}
+
       {/* All-caught-up state — every inventory character is already reachable
           on the seed touch layout (touchLettersToAdd is empty), so the walk
           has nothing to step through and currentChar stays null. Mirrors
@@ -3678,38 +3715,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             </div>
           )}
         </>
-      )}
-
-      {/* Character scroll strip — horizontal, SHOW-ALL of inventory (mirrors
-          MechanismGallery's CharScrollStrip placement: a sibling of the
-          per-char block, NOT nested inside it, so it stays visible even when
-          currentChar is null — e.g. the all-caught-up state above, where
-          every inventory character is walk-excluded but the author can still
-          select one for inspection). Not just touchLettersToAdd, so the
-          author can still see and inspect every character, including ones
-          already reachable on the seed layout, not only the ones still
-          needing a method. Click any chip to jump straight to that character
-          (replaces the old "Previous character" button, which only ever
-          stepped back one position) via handleSelectDisplayChar (NOT the
-          walk's own handleSelectChar, which is gated on touchLettersToAdd) —
-          an already-detected chip is still selectable for inspection, it is
-          just never a walk stop. Each chip's badge is the produces-count for
-          that character in THIS gallery's modality (touch) — see
-          charMechanisms.ts. `inheritedChars` feeds the seed-reachable set
-          into that count so a character this gallery reports as "already in
-          the touch layout" badges as produced (>=1) rather than red 0 — both
-          before and after its suggestion is accepted (the accepted
-          touch_inherited placeholder is still not counted, so accepting
-          cannot double-count it). */}
-      {inventory.length > 0 && (
-        <CharScrollStrip
-          chars={inventory}
-          currentChar={currentChar}
-          onSelectChar={handleSelectDisplayChar}
-          assignments={charTouchAssignments}
-          modality="touch"
-          inheritedChars={detectedChars}
-        />
       )}
 
       {/* Case-pair proposal — propose-then-confirm, never apply silently
