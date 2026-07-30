@@ -191,8 +191,15 @@ export { proposeAttachments, deriveCaseCounterparts } from "./marks/attachment-p
 export type { AttachmentProposal, ProposedAttachmentState } from "./marks/attachment-proposals.js";
 export { resolveOutputFormProposal, hasDecidablePairs, normalizationFormForOutputForm } from "./marks/output-form-policy.js";
 export type { OutputForm, OutputFormProposal } from "./marks/output-form-policy.js";
-export { computeMentalModelPrefills, detectBaseMarkMechanism, PRODUCTIVITY_SPREAD_THRESHOLD } from "./marks/mental-model-prefill.js";
-export type { MentalModelPrefill, MentalModelAnswer, BaseMarkMechanism } from "./marks/mental-model-prefill.js";
+// The S2 answer (spec 052): treatment + promotion + input order, replacing the
+// single "own letter of the alphabet" enum. See specs/052-marks-treatment-question.
+export { treatmentFor, makeMarkTreatmentAnswer, pruneMarkOverrides, dominantTreatment, isClassMixed } from "./marks/treatment.js";
+export type { MarkTreatment, MarkTreatmentAnswer, PromotedComposedCharacter } from "./marks/treatment.js";
+export { promotableCharacters, expandCaseCounterpartPromotions, prunePromotions } from "./marks/promotion.js";
+export { computeMarkTreatmentPrefills, detectBaseMarkMechanism, unaffordableReasonFor, PRODUCTIVITY_SPREAD_THRESHOLD } from "./marks/treatment-prefill.js";
+export type { MarkTreatmentPrefill, MarkTreatmentPrefillOptions, KeyBudgetSignal, BaseMarkMechanism } from "./marks/treatment-prefill.js";
+export { deriveMarksComputedAxes, surfaceStrategyDisagreement } from "./marks/strategy-reconcile.js";
+export type { MarksComputedAxes, MarksReconcileInputs, DisagreementInputs } from "./marks/strategy-reconcile.js";
 export { buildPlacementWorklist, verifyWorklistCoverage } from "./marks/worklist.js";
 export type { WorklistInputs } from "./marks/worklist.js";
 export { expandCaseCounterpartAttachments } from "./marks/case-fold.js";

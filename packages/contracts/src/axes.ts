@@ -23,11 +23,30 @@ export type ConstraintEnforcement = "none" | "soft" | "loud";
 
 /**
  * A7 — physical-keyboard spare-key availability.
+ *
+ * **A7 is a PROJECTION, not a measurement** (spec 052 FR-016). The single
+ * authoritative key-budget determination lives in `keyBudget.ts`; this axis is
+ * derived from its `KeyBudgetBand` through `keyBudgetToSpareKeyAvailability`,
+ * which is total and bijective on the three bands:
+ *
+ * | `KeyBudgetBand` | `SpareKeyAvailability` |
+ * |---|---|
+ * | `many`          | `"many"` |
+ * | `ralt-only`     | `"RAlt only"` |
+ * | `fully-booked`  | `"fully booked"` |
+ *
+ * Because the mapping is bijective, §7.2 decision rule 10 (`A7 = "fully booked"`
+ * → append S-08) fires on exactly the set of inputs it fires on today. Never
+ * compute key availability independently of `measureKeyBudget` — SC-008 requires
+ * every report of it in the product to agree.
+ *
  * Literal values are spec §7.1 prose strings verbatim — DISPLAY strings, not
- * programmatic identifiers. Do not use them as object/map keys, URL query
- * params, or YAML keys without quoting; downstream code that needs a
- * normalized key form should map: "many" -> "many", "RAlt only" -> "ralt-only",
- * "fully booked" -> "fully-booked" (or similar) at the boundary.
+ * programmatic identifiers. **They remain unsafe as map keys**: do not use them
+ * as object/map keys, URL query params, or YAML keys without quoting. Code that
+ * needs a normalized key form should use the `KeyBudgetBand` ids directly —
+ * project first, and only at the boundary where the display string is wanted.
+ *
+ * @see packages/contracts/src/keyBudget.ts
  */
 export type SpareKeyAvailability = "many" | "RAlt only" | "fully booked";
 

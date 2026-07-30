@@ -15,19 +15,19 @@ describe("resolveOutputFormProposal (FR-013..FR-016)", () => {
     expect(proposal.presentedAs).toBe("notice");
   });
 
-  it("FR-014 wins even when a letter-plus-mark class exists (row order)", () => {
+  it("FR-014 wins even when an own-key mark exists (row order)", () => {
     const proposal = resolveOutputFormProposal([pair(false)], true);
     expect(proposal.form).toBe("base-plus-mark");
     expect(proposal.presentedAs).toBe("notice");
   });
 
-  it("FR-015: all pairs compose + no letter-plus-mark class → ready-made as a NOTICE", () => {
+  it("FR-015: all pairs compose + no own-key mark → ready-made as a NOTICE", () => {
     const proposal = resolveOutputFormProposal([pair(true)], false);
     expect(proposal.form).toBe("ready-made");
     expect(proposal.presentedAs).toBe("notice");
   });
 
-  it("FR-016: all pairs compose + a letter-plus-mark class → OPEN CHOICE, base-plus-mark recommended", () => {
+  it("FR-016: all pairs compose + an own-key mark → OPEN CHOICE, base-plus-mark recommended", () => {
     const proposal = resolveOutputFormProposal([pair(true)], true);
     expect(proposal.presentedAs).toBe("open-choice");
     expect(proposal.form).toBe("base-plus-mark");

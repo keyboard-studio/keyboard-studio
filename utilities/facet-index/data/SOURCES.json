@@ -22,8 +22,10 @@
       "sha256": "cc89684338c2afd95668e33b3f813387d4f026e4a1d695cdc06055a35b7682f6"
     },
     {
-      "file": "utilities/facet-index/data/base-layouts.json",
-      "sha256": "6fa7ef55dc950b8395421acecdf70ed3631ea2adf6fab5414a1f1ba26b25000f"
+      "file": "packages/contracts/data/base-layouts.json",
+      "sha256": "6fa7ef55dc950b8395421acecdf70ed3631ea2adf6fab5414a1f1ba26b25000f",
+      "relocatedFrom": "utilities/facet-index/data/base-layouts.json",
+      "relocationNote": "Relocated by spec 052 (FR-016) so the single authoritative key-budget determination in packages/contracts/src/keyBudget.ts and this tool read the SAME pinned table; the file is byte-identical (same sha256) and its pin semantics are unchanged. It is still tool-pinned reference data — only its home moved, because a utility may not be depended upon by a package."
     },
     {
       "file": "utilities/facet-index/data/cldr-exemplars.json",
