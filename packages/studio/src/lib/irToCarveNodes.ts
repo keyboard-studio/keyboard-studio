@@ -395,7 +395,7 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
     const faithfulBaseLabel = inputItem && inputItem.kind === 'char'
       ? displayChar(inputItem.value)
       : inputItem && inputItem.kind === 'vkey'
-        ? (vkeyLabel(inputItem.name) ?? inputItem.name)
+        ? desktopVkeyLabel(inputItem.name)
         : undefined;
     const keySteps: string[] | undefined = faithfulBaseLabel === undefined
       ? undefined
@@ -1171,6 +1171,31 @@ export function vkeyLabel(name: string): string | undefined {
   return stripped || undefined;
 }
 
+/**
+ * True for a Keyman virtual-key name that only exists on the on-screen touch
+ * layout (the `T_xxxx` custom-VK namespace a `.kmn` can bind rules against
+ * directly, e.g. `+ [T_003B] > U+003B`) — it has no physical desktop key
+ * behind it. "How it's typed" is a DESKTOP keystroke reconstruction; a touch
+ * key id is a different input modality and must never be presented as one of
+ * its steps (#1399 follow-on).
+ */
+export function isTouchOnlyVkeyName(name: string): boolean {
+  return /^T_/i.test(name);
+}
+
+/**
+ * Desktop-safe vkey label: same resolution as `vkeyLabel`, but returns
+ * `undefined` (rather than falling back to the raw name) for a touch-only
+ * vkey — the one case where "just show the raw name" would leak a
+ * non-physical key id into a desktop keystroke step. Every call site that
+ * previously did `vkeyLabel(name) ?? name` for a context/store-item vkey
+ * feeding a rendered "how it's typed" step or floor uses this instead.
+ */
+function desktopVkeyLabel(name: string): string | undefined {
+  if (isTouchOnlyVkeyName(name)) return undefined;
+  return vkeyLabel(name) ?? name;
+}
+
 // ---------------------------------------------------------------------------
 // triggerKeyLabel — extract the human-readable trigger from a rule's context
 // ---------------------------------------------------------------------------
@@ -1195,7 +1220,7 @@ export function triggerKeyLabel(context: ContextElement[], ir?: KeyboardIR): str
   const triggerEl = context[plusIdx + 1];
   if (!triggerEl) return undefined;
   switch (triggerEl.kind) {
-    case 'vkey':    return vkeyLabel(triggerEl.name) ?? triggerEl.name;
+    case 'vkey':    return desktopVkeyLabel(triggerEl.name);
     case 'char':    return `"${displayChar(triggerEl.value)}"`;
     case 'deadkey': return `deadkey ${triggerEl.id}`;
     // TOTAL FLOOR (#1399 follow-on): a store-triggered rule (any()/notany())
@@ -1247,7 +1272,8 @@ function bareTriggerLabel(context: ContextElement[]): string | undefined {
  */
 function primaryChordLabel(el: ContextElement, owningRule: IRRule): string | undefined {
   if (el.kind === 'vkey') {
-    const base = vkeyLabel(el.name) ?? el.name;
+    const base = desktopVkeyLabel(el.name);
+    if (base === undefined) return undefined;
     const mod = modifierLabel(owningRule);
     return mod ? `${mod} + ${base}` : base;
   }
@@ -1258,20 +1284,24 @@ function primaryChordLabel(el: ContextElement, owningRule: IRRule): string | und
 /**
  * Find the rule that enters deadkey `dkId` — mirrors the shape check in the
  * engine's s02-deadkey-single-tap.ts buildTriggerIndex/isTrigger (a rule
- * whose OUTPUT is a single deadkey, whose CONTEXT is a single vkey or char
- * element), but — unlike that recognizer-matching pass — does NOT skip
- * rules already claimed by a pattern (ownedByPattern set): by the time this
- * runs, the trigger rule for an already-recognized S-02 pattern is normally
- * owned by that very pattern, so skipping owned rules would make its own
- * trigger unfindable. Display-only; never mutates ownership.
+ * whose OUTPUT is a single deadkey, whose EFFECTIVE context — i.e. with the
+ * codec's synthetic '+' keystroke-boundary separator stripped out, so the
+ * common `+ [K_X] > dk(id)` form matches exactly like the rarer bare
+ * `[K_X] > dk(id)` form — is a single vkey or char element), but — unlike
+ * that recognizer-matching pass — does NOT skip rules already claimed by a
+ * pattern (ownedByPattern set): by the time this runs, the trigger rule for
+ * an already-recognized S-02 pattern is normally owned by that very
+ * pattern, so skipping owned rules would make its own trigger unfindable.
+ * Display-only; never mutates ownership.
  */
 function findDeadkeyTrigger(ir: KeyboardIR, dkId: number): { el: ContextElement; rule: IRRule } | undefined {
   const candidates: { el: ContextElement; rule: IRRule }[] = [];
   for (const group of ir.groups) {
     if (group.name === 'deadkeys') continue;
     for (const rule of group.rules) {
-      if (rule.context.length !== 1 || rule.output.length !== 1) continue;
-      const el = rule.context[0];
+      const effCtx = rule.context.filter((c) => !isPlusSeparator(c));
+      if (effCtx.length !== 1 || rule.output.length !== 1) continue;
+      const el = effCtx[0];
       const out = rule.output[0];
       if (el === undefined || (el.kind !== 'vkey' && el.kind !== 'char')) continue;
       if (out === undefined || out.kind !== 'deadkey' || out.id !== dkId) continue;
@@ -1377,16 +1407,20 @@ export function keySequenceLabel(
   }
 
   // Deadkey-combination rule (#1399 follow-on): the effective context — ctx
-  // with the '+' keystroke-boundary separator stripped out — is composed
-  // ENTIRELY of deadkey elements, and the rule composes them into a literal
-  // char (e.g. `dk(1) dk(2) > 'e'`, or `dk(1) + dk(2) > 'e'` where the
-  // active keystroke is itself a deadkey). This is the gap the NON_KEY_
-  // PRECEDING_KINDS branch above deliberately excludes rather than resolves.
-  // Each deadkey's own trigger rule is resolved via findDeadkeyTrigger and
-  // rendered as one ordered chord step; if ANY deadkey's trigger can't be
-  // found, the whole sequence is unresolvable — return undefined rather than
-  // fabricating a step.
-  const effCtx = ctx.filter((el) => !isPlusSeparator(el));
+  // with the '+' keystroke-boundary separator AND any bare `raw` guard
+  // elements stripped out (e.g. a `platform('hardware')` precondition the
+  // codec preserves verbatim as `{kind:"raw"}` — see parseContextElements'
+  // "unknown -> raw" fallback; it names a build target, never a keystroke,
+  // so it can never itself be a step) — is composed ENTIRELY of deadkey
+  // elements, and the rule composes them into a literal char (e.g.
+  // `dk(1) dk(2) > 'e'`, `platform('hardware') dk(1) dk(1) > 'e'`, or
+  // `dk(1) + dk(2) > 'e'` where the active keystroke is itself a deadkey).
+  // This is the gap the NON_KEY_PRECEDING_KINDS branch above deliberately
+  // excludes rather than resolves. Each deadkey's own trigger rule is
+  // resolved via findDeadkeyTrigger and rendered as one ordered chord step;
+  // if ANY deadkey's trigger can't be found, the whole sequence is
+  // unresolvable — return undefined rather than fabricating a step.
+  const effCtx = ctx.filter((el) => el.kind !== 'raw');
   if (effCtx.length > 0 && effCtx.every((el) => el.kind === 'deadkey')) {
     const steps: string[] = [];
     for (const el of effCtx) {
@@ -1519,7 +1553,7 @@ function storeConditionOutcome(storeRef: string, ir: KeyboardIR, negate: boolean
 function slotItemLabel(item: StoreItem | undefined): string | undefined {
   if (item === undefined) return undefined;
   if (item.kind === 'char') return displayChar(item.value);
-  if (item.kind === 'vkey') return vkeyLabel(item.name) ?? item.name;
+  if (item.kind === 'vkey') return desktopVkeyLabel(item.name);
   return undefined;
 }
 
@@ -1579,21 +1613,44 @@ function isDeadkeyTriggerRule(rule: IRRule): boolean {
 const NON_TYPING_TRIGGER_VKEYS = new Set(['K_BKSP', 'K_DEL']);
 
 /**
- * True when `rule`'s trigger vkey (the element right of the last `+`, or the
- * sole context element for an S-01 bare single-vkey shape) is an
- * erase/undo-composition key rather than a forward-typing one — i.e. the rule
- * is editing behavior (e.g. `any(composed) + [K_BKSP] > index(base, 1)`), not
- * a faithful "way to type" the character it happens to output. General,
- * keyboard-agnostic rule-shape predicate — no store names, ids, or language.
+ * The rule's own trigger vkey element — the element right of the last `+`, or
+ * the sole context element for an S-01 bare single-vkey shape — or undefined
+ * when the rule's trigger isn't a single nameable vkey. Shared shape-check
+ * used by both `isNotAForwardTypingPath` and `isTouchOnlyTriggerRule` below.
  */
-function isNotAForwardTypingPath(rule: IRRule): boolean {
+function ruleTriggerVkey(rule: IRRule): Extract<ContextElement, { kind: 'vkey' }> | undefined {
   const ctx = rule.context;
   const plusIdx = ctx.findIndex(isPlusSeparator);
   const triggerEl = plusIdx === -1
     ? (ctx.length === 1 ? ctx[0] : undefined)   // S-01 bare single-vkey shape
     : ctx[plusIdx + 1];                           // element right of '+'
-  if (triggerEl === undefined || triggerEl.kind !== 'vkey') return false;
-  return NON_TYPING_TRIGGER_VKEYS.has(triggerEl.name.toUpperCase());
+  return triggerEl !== undefined && triggerEl.kind === 'vkey' ? triggerEl : undefined;
+}
+
+/**
+ * True when `rule`'s trigger vkey is an erase/undo-composition key rather
+ * than a forward-typing one — i.e. the rule is editing behavior (e.g.
+ * `any(composed) + [K_BKSP] > index(base, 1)`), not a faithful "way to type"
+ * the character it happens to output. General, keyboard-agnostic rule-shape
+ * predicate — no store names, ids, or language.
+ */
+export function isNotAForwardTypingPath(rule: IRRule): boolean {
+  const triggerEl = ruleTriggerVkey(rule);
+  return triggerEl !== undefined && NON_TYPING_TRIGGER_VKEYS.has(triggerEl.name.toUpperCase());
+}
+
+/**
+ * True when `rule`'s trigger vkey is touch-only (`T_xxxx`, see
+ * `isTouchOnlyVkeyName`) — the rule's ONLY resolvable "how it's typed" step
+ * would be a touch key id, which is a different input modality from the
+ * desktop keystrokes this view reconstructs (#1399 follow-on). Such a
+ * producer is dropped entirely by `charProducers` rather than rendered with
+ * a leaked touch id, or floored/banned — the character may still have other,
+ * real desktop producers.
+ */
+function isTouchOnlyTriggerRule(rule: IRRule): boolean {
+  const triggerEl = ruleTriggerVkey(rule);
+  return triggerEl !== undefined && isTouchOnlyVkeyName(triggerEl.name);
 }
 
 /**
@@ -1653,59 +1710,79 @@ export function charProducers(ir: KeyboardIR, ch: string): CharProducer[] {
     producers.push(conditionOutcome.kind === 'text' ? { steps, condition: conditionOutcome.text } : { steps });
   };
 
+  // (a) Store-produced match: the character is emitted through index()/outs()
+  // over a store — one entry per matching slot in that store. Returns true
+  // when at least one slot matched (and was pushed via `push`, subject to
+  // its own dedup/floor rules).
+  const tryProduceStoreMatch = (rule: IRRule): boolean => {
+    let matchedViaStore = false;
+    const effCtx = rule.context.filter((c) => !isPlusSeparator(c));
+    for (const el of rule.output) {
+      if ((el.kind !== 'index' && el.kind !== 'outs') || el.storeRef === undefined) continue;
+
+      // Self-permutation (reorder) guard: an index() output pointing back
+      // at the SAME store it matched as input is a REORDER, not a way to
+      // type — skip this element entirely. Proven non-overlapping with
+      // genuine production shapes (a translation table's input/output
+      // stores are always distinct); keep the existing Backspace/K_DEL
+      // exclusion (isNotAForwardTypingPath) as well.
+      const targetEl = el.kind === 'index' ? effCtx[el.offset - 1] : undefined;
+      if (el.kind === 'index' && targetEl?.kind === 'any' && targetEl.storeRef === el.storeRef) continue;
+
+      const outStore = storeMap.get(el.storeRef);
+      if (outStore === undefined) continue;
+      outStore.items.forEach((item, i) => {
+        if (item.kind !== 'char' || item.value.normalize('NFC') !== target) return;
+        matchedViaStore = true;
+        push(rule, () => resolveStoreSlotSteps(rule, ir, el, i, storeMap), `${rule.nodeId}#${i}`, false);
+      });
+    }
+    return matchedViaStore;
+  };
+
+  // (b) Literal-output match: the character is written out directly. NEVER
+  // run for an editing-only rule (see below) — a bare `[K_DEL] > 'x'` with no
+  // preceding store match isn't a "repair" of anything, it's just a Delete
+  // key re-emitting a literal char, which stays excluded unconditionally.
+  const tryProduceLiteralMatch = (rule: IRRule): boolean => {
+    const charEls = rule.output.filter((el): el is Extract<OutputElement, { kind: 'char' }> => el.kind === 'char');
+    if (charEls.length === 0) return false;
+    const onlyCharOutput = charEls.length === rule.output.length;
+    const wholeOutput = charEls.map((el) => el.value).join('').normalize('NFC');
+
+    if (onlyCharOutput && wholeOutput === target) {
+      // Condition is computed normally here (S-01 bare vkey chord's
+      // preceding is empty by construction; S-05's own preceding literal
+      // char(s) DO get a condition even though `steps[0]` already names
+      // the first one — a little reinforcement, not misleading, unlike
+      // the store-slot case above where a multi-item store would be
+      // actively wrong for a single specific character).
+      push(rule, () => keySequenceLabel(rule, ir), rule.nodeId, true);
+      return true;
+    }
+    // A rule whose literal output merely CONTAINS `target` as part of a
+    // longer cluster (wholeOutput.includes(target) && wholeOutput !==
+    // target) is not a way to type the single character — it's excluded
+    // entirely rather than pushed as an unrenderable producer (#1399
+    // follow-on). collectCharContributors' separate "blocked" handling
+    // (removal-safety) is untouched — a different concern from "ways to
+    // type it".
+    return false;
+  };
+
+  // Editing-only rules (Backspace/Delete-triggered) are excluded entirely —
+  // they're not how a character is deliberately typed, they're how a
+  // mis-composed one is corrected (isNotAForwardTypingPath's own doc). A
+  // character whose only producer is such a rule simply has no producer here
+  // (empty waysToType) — that is the correct, honest state; it is never
+  // backfilled with a "press Backspace" step.
   for (const group of ir.groups) {
     for (const rule of group.rules) {
       if (isDeadkeyTriggerRule(rule)) continue;
+      if (isTouchOnlyTriggerRule(rule)) continue;
       if (isNotAForwardTypingPath(rule)) continue;
-
-      // (a) Store-produced: the character is emitted through index()/outs()
-      // over a store — one entry per matching slot in that store.
-      let matchedViaStore = false;
-      const effCtx = rule.context.filter((c) => !isPlusSeparator(c));
-      for (const el of rule.output) {
-        if ((el.kind !== 'index' && el.kind !== 'outs') || el.storeRef === undefined) continue;
-
-        // Self-permutation (reorder) guard: an index() output pointing back
-        // at the SAME store it matched as input is a REORDER, not a way to
-        // type — skip this element entirely. Proven non-overlapping with
-        // genuine production shapes (a translation table's input/output
-        // stores are always distinct); keep the existing Backspace/K_DEL
-        // exclusion (isNotAForwardTypingPath) as well.
-        const targetEl = el.kind === 'index' ? effCtx[el.offset - 1] : undefined;
-        if (el.kind === 'index' && targetEl?.kind === 'any' && targetEl.storeRef === el.storeRef) continue;
-
-        const outStore = storeMap.get(el.storeRef);
-        if (outStore === undefined) continue;
-        outStore.items.forEach((item, i) => {
-          if (item.kind !== 'char' || item.value.normalize('NFC') !== target) return;
-          matchedViaStore = true;
-          push(rule, () => resolveStoreSlotSteps(rule, ir, el, i, storeMap), `${rule.nodeId}#${i}`, false);
-        });
-      }
-      if (matchedViaStore) continue;
-
-      // (b) Literal output: the character is written out directly.
-      const charEls = rule.output.filter((el): el is Extract<OutputElement, { kind: 'char' }> => el.kind === 'char');
-      if (charEls.length === 0) continue;
-      const onlyCharOutput = charEls.length === rule.output.length;
-      const wholeOutput = charEls.map((el) => el.value).join('').normalize('NFC');
-
-      if (onlyCharOutput && wholeOutput === target) {
-        // Condition is computed normally here (S-01 bare vkey chord's
-        // preceding is empty by construction; S-05's own preceding literal
-        // char(s) DO get a condition even though `steps[0]` already names
-        // the first one — a little reinforcement, not misleading, unlike
-        // the store-slot case above where a multi-item store would be
-        // actively wrong for a single specific character).
-        push(rule, () => keySequenceLabel(rule, ir), rule.nodeId, true);
-      }
-      // A rule whose literal output merely CONTAINS `target` as part of a
-      // longer cluster (wholeOutput.includes(target) && wholeOutput !==
-      // target) is not a way to type the single character — it's excluded
-      // entirely rather than pushed as an unrenderable producer (#1399
-      // follow-on). collectCharContributors' separate "blocked" handling
-      // (removal-safety) is untouched — a different concern from "ways to
-      // type it".
+      if (tryProduceStoreMatch(rule)) continue;
+      tryProduceLiteralMatch(rule);
     }
   }
 

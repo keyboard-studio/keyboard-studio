@@ -236,6 +236,32 @@ describe('irToCharacterView — faithful key sequence (#1399)', () => {
     expect(cells.find((c) => c.ch === 'ā')).toMatchObject({ keys: ['a', '='], source: 'deadkey-sequence' });
   });
 
+  it('S-03 sequence shape MATCHED by a backspace-repair rule (any(composed) + [K_BKSP] > index(base,1)): never renders a "press Backspace to type it" footer (#1399 follow-on)', () => {
+    // Same rule SHAPE sequenceShapeCells otherwise resolves (a store-driven
+    // any() immediately followed by a fixed literal trigger whose output is
+    // index(store, offset)) — but the trigger here is K_BKSP, an editing
+    // key, not a forward-typing one. Without the isNotAForwardTypingPath
+    // guard this used to leak keys: [<composed-char-label>, 'Backspace'] —
+    // a misleading "how it's typed" step for a character that is only ever
+    // reached by BACKSPACING to repair a mis-composed sequence, never typed
+    // forward. `ch` here has NO other producer, so the fix must leave its
+    // grid-cell footer empty rather than fabricate one.
+    const composedStore: IRStore = { nodeId: 'store#composed', name: 'composed', items: [{ kind: 'char', value: 'ḉ' }], isSystem: false };
+    const baseStore: IRStore = { nodeId: 'store#base', name: 'base', items: [{ kind: 'char', value: 'ç' }], isSystem: false };
+    const bkspRule: IRRule = {
+      nodeId: 'r-bksp-seq',
+      context: [{ kind: 'any', storeRef: 'composed' }, { kind: 'raw', text: '+' }, { kind: 'vkey', name: 'K_BKSP', modifiers: [] }],
+      output: [{ kind: 'index', storeRef: 'base', offset: 1 }],
+    };
+    const ir = makeIR({ groups: [makeGroup([bkspRule])], stores: [composedStore, baseStore] });
+
+    const cells = irToCharacterView(ir, new Map(), new Set(), new Set());
+
+    // 'ç' still appears (via the store-chip fallback for `base`), but with
+    // an honest empty footer — no steps, and definitely no "Backspace".
+    expect(cells.find((c) => c.ch === 'ç')?.keys).toEqual([]);
+  });
+
   it('S-05 mnemonic: literal char THEN literal char, never mapped through vkeyLabel', () => {
     const rule: IRRule = {
       nodeId: 'r-mnemonic',

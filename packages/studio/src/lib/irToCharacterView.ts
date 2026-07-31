@@ -13,7 +13,7 @@ import type { KeyboardIR, RemovalCapability, StoreItem } from '@keyboard-studio/
 import { buildProducedSet } from '@keyboard-studio/contracts';
 import { collectCharContributors, isParallelIndexFanOut, isPlusSeparator } from '@keyboard-studio/engine';
 import type { CharContributors } from '@keyboard-studio/engine';
-import { toRailNodes, invisibleCharLabel, keySequenceLabel, vkeyLabel, displayChar, charProducers } from './irToCarveNodes.ts';
+import { toRailNodes, invisibleCharLabel, keySequenceLabel, vkeyLabel, isTouchOnlyVkeyName, displayChar, charProducers, isNotAForwardTypingPath } from './irToCarveNodes.ts';
 import type { CharProducer } from './irToCarveNodes.ts';
 
 // ---------------------------------------------------------------------------
@@ -306,13 +306,18 @@ function sequenceShapeCells(ir: KeyboardIR): { ch: string; keys: string[] }[] {
   const baseSlotLabel = (item: StoreItem | undefined): string | undefined => {
     if (item === undefined) return undefined;
     if (item.kind === 'char') return displayChar(item.value);
-    if (item.kind === 'vkey') return vkeyLabel(item.name) ?? item.name;
+    // Touch-only vkey id (T_xxxx): no physical desktop key behind it — never
+    // render it as a desktop step (#1399 follow-on; mirrors irToCarveNodes.ts's
+    // desktopVkeyLabel, kept as a small local duplicate per this function's own
+    // doc comment above).
+    if (item.kind === 'vkey') return isTouchOnlyVkeyName(item.name) ? undefined : (vkeyLabel(item.name) ?? item.name);
     return undefined;
   };
 
   for (const group of ir.groups) {
     for (const rule of group.rules) {
       if (isParallelIndexFanOut(rule)) continue; // already covered by expandParallelStoreRule
+      if (isNotAForwardTypingPath(rule)) continue; // editing (K_BKSP/K_DEL) trigger, not a way to type (#1399)
       if (rule.output.length !== 1) continue;
       const outEl = rule.output[0];
       if (outEl === undefined || outEl.kind !== 'index') continue;

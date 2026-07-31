@@ -3304,6 +3304,48 @@ describe('keySequenceLabel — deadkey-combination rule (#1399 follow-on)', () =
 
     expect(keySequenceLabel(bodyRule, ir)).toBeUndefined();
   });
+
+  it('resolves a deadkey-entry trigger written in the "+"-form (context [raw(+), vkey]), not only the bare single-vkey form (#1399 follow-on)', () => {
+    // Deadkey 1's own trigger uses the common `+`-form shape a `.kmn` rule
+    // like `+ [K_X] > dk(1)` round-trips to at the IR level (a leading raw
+    // '+' separator followed by the single vkey) — findDeadkeyTrigger must
+    // resolve this exactly like the bare `[vkey] > dk(1)` shape below.
+    const trigger1: IRRule = {
+      nodeId: 'r-t1-plus',
+      context: [{ kind: 'raw', text: '+' }, { kind: 'vkey', name: 'K_X', modifiers: [] }],
+      output: [{ kind: 'deadkey', id: 1 }],
+    };
+    const trigger2: IRRule = { nodeId: 'r-t2', context: [{ kind: 'vkey', name: 'K_Y', modifiers: [] }], output: [{ kind: 'deadkey', id: 2 }] };
+    const bodyRule: IRRule = {
+      nodeId: 'r-body-plusentry',
+      context: [{ kind: 'deadkey', id: 1 }, { kind: 'deadkey', id: 2 }],
+      output: [{ kind: 'char', value: 'e' }],
+    };
+    const ir = makeIRWithStores(
+      [makeGroup([trigger1, trigger2]), { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false }],
+      [],
+    );
+
+    expect(keySequenceLabel(bodyRule, ir)).toEqual(['X', 'Y']);
+  });
+
+  it('resolves a deadkey-combination rule guarded by a non-plus raw context element (e.g. platform(...)) by stripping it, not just the "+" separator (#1399 follow-on)', () => {
+    const trigger1: IRRule = { nodeId: 'r-t1', context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }], output: [{ kind: 'deadkey', id: 1 }] };
+    // `platform('hardware') dk(1) dk(1) > 'e'` — a guard the codec preserves
+    // verbatim as an opaque {kind:"raw"} context element (not the plus
+    // separator) ahead of an all-deadkey combination.
+    const bodyRule: IRRule = {
+      nodeId: 'r-body-platform-guard',
+      context: [{ kind: 'raw', text: "platform('hardware')" }, { kind: 'deadkey', id: 1 }, { kind: 'deadkey', id: 1 }],
+      output: [{ kind: 'char', value: 'e' }],
+    };
+    const ir = makeIRWithStores(
+      [makeGroup([trigger1]), { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false }],
+      [],
+    );
+
+    expect(keySequenceLabel(bodyRule, ir)).toEqual(['A', 'A']);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -3339,5 +3381,55 @@ describe('charProducers — partial-cluster inclusion is excluded, not a phantom
     const ir = makeIRWithStores([makeGroup([clusterRule])], []);
 
     expect(charProducers(ir, 'b')).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// charProducers — touch-only (T_xxxx) trigger vkeys never surface as a
+// desktop "how it's typed" step (#1399 follow-on)
+// ---------------------------------------------------------------------------
+
+describe('charProducers — a touch-only (T_xxxx) trigger vkey is dropped, never leaked as a step', () => {
+  it('drops a producer whose sole trigger is a touch-only vkey while keeping the real desktop producer', () => {
+    // Mirrors the real sil_cameroon_qwerty shape: `;` is produced both by a
+    // real desktop chord (RAlt + ;) and by a touch-layout-only virtual key
+    // (`+ [T_003B] > ';'`) that has no physical desktop key behind it.
+    const desktopRule: IRRule = {
+      nodeId: 'r-desktop',
+      context: [{ kind: 'vkey', name: 'K_COLON', modifiers: ['RALT'] }],
+      output: [{ kind: 'char', value: ';' }],
+    };
+    const touchRule: IRRule = {
+      nodeId: 'r-touch',
+      context: [{ kind: 'vkey', name: 'T_003B', modifiers: [] }],
+      output: [{ kind: 'char', value: ';' }],
+    };
+    const ir = makeIRWithStores([makeGroup([desktopRule, touchRule])], []);
+
+    expect(charProducers(ir, ';')).toEqual([{ steps: ['AltGr + ;'] }]);
+  });
+
+  it('drops a touch-only-trigger producer entirely (not floored, not banned) when it is the ONLY rule for the char', () => {
+    const touchOnlyRule: IRRule = {
+      nodeId: 'r-touch-only',
+      context: [{ kind: 'vkey', name: 'T_0300', modifiers: [] }],
+      output: [{ kind: 'char', value: '̀' }],
+    };
+    const ir = makeIRWithStores([makeGroup([touchOnlyRule])], []);
+
+    expect(charProducers(ir, '̀')).toEqual([]);
+  });
+
+  it('never resolves a touch-only vkey name to a label via vkeyLabel-based helpers (triggerKeyLabel floor)', () => {
+    // A rule whose trigger is touch-only must not leak "T_0300" as a
+    // TOTAL-FLOOR trigger string either — triggerKeyLabel only resolves a
+    // trigger after a real "+" separator, and even then must not name a
+    // touch-only vkey.
+    const ctx: IRRule['context'] = [
+      { kind: 'any', storeRef: 'diablock' },
+      { kind: 'raw', text: '+' },
+      { kind: 'vkey', name: 'T_0300', modifiers: [] },
+    ];
+    expect(triggerKeyLabel(ctx)).toBeUndefined();
   });
 });
