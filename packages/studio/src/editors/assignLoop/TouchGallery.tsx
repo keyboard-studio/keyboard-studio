@@ -2767,16 +2767,23 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // regardless of the bulk sibling-accent path below, since a "replace"
     // suggestion (desktop simple_swap) or a longpress with no siblings to
     // offer still deserves the simple companion.
-    const targetLayer = casePairTouchLayer(editingLayer);
+    //
+    // Passed the assembled COMBO, not the flattened layer id — same reason
+    // handleApply below is: the flattened id cannot express "this combo plus
+    // SHIFT", which is what the case-pair relation actually is (see
+    // casePairTouchTarget).
+    const target = casePairTouchTarget(assembledLayerCombo, isLayerComboInUse);
+    const targetLayer = target?.layer;
     const companionInput:
       | Extract<CasePairProposalInput, { mechanism: "touch" }>
       | null =
-      targetLayer !== null
+      target !== null
         ? {
             mechanism: "touch",
             originalChar: currentChar,
             hostKey: hk,
-            targetLayer,
+            targetLayer: target.layer,
+            targetLayerLabel: touchLayerComboLabel(target.combo, i18n),
             baseRef: ref,
             alreadyProduced: (counterpart) =>
               (charTouch.get(counterpart)?.mechanisms ?? []).some((m) => {
@@ -2828,10 +2835,12 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     currentChar,
     markSuggestionResolved,
     inventoryKey,
-    editingLayer,
+    assembledLayerCombo,
+    isLayerComboInUse,
     charTouch,
     identityBcp47,
     proposeCompanion,
+    i18n,
   ]);
 
   const handleSuggestionChange = useCallback(() => {

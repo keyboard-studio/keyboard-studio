@@ -3348,7 +3348,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
 // default (spec 051 FR-006) must survive the layer picker: the picker's
 // initial value for an uppercase current char is "shift", not "default", and
 // applying on that default layer must not raise a redundant case-pair
-// proposal (casePairTouchLayer(["SHIFT"], …) === null — there is no "more
+// proposal (casePairTouchTarget(["SHIFT"], …) === null — there is no "more
 // uppercase" layer to pair a SHIFT-bearing combo with). Closes the uppercase-path
 // regression gap: the existing suite above only ever seeds a lowercase
 // current char ("ä"/"θ"/"中").
@@ -3467,7 +3467,7 @@ describe("TouchGallery — uppercase current char (spec 051 FR-006 layer-picker 
 // ---------------------------------------------------------------------------
 // Case-pair proposal on a NON-DEFAULT touch layer.
 //
-// `casePairTouchLayer` used to be keyed on the flattened layer id and mapped
+// `casePairTouchTarget` used to be keyed on the flattened layer id and mapped
 // exactly `"default"` -> `"shift"`, so an author editing any other layer got
 // no case-pair proposal at all — silently, with the companion layer perfectly
 // derivable. Reachable on a base with an AltGr/RAlt layer, which is common
