@@ -3383,8 +3383,14 @@ describe("TouchGallery — case-pair proposal on a non-default touch layer", () 
     // The proposal is raised at all — under the id-keyed rule this banner never
     // appeared for any layer but the base one.
     expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+    // ...and it NAMES the layer the confirm will actually write to. A banner
+    // saying "the shift layer" here would misdescribe the write (it lands on
+    // rightalt-shift), so the label is asserted, not just the presence.
+    expect(screen.getByText(/Map Θ to the Shift\+RAlt layer as well\?/i)).toBeTruthy();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Map Θ to the shift layer of/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map Θ to the Shift\+RAlt layer of K_A/i }),
+      );
     });
 
     // Source placement stays on the layer the author was editing...

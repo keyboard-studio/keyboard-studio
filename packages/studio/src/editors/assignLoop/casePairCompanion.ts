@@ -96,9 +96,16 @@ interface ComboProposalParts {
 interface TouchProposalParts {
   mechanism: "touch";
   hostKey: string;
-  /** Layer the parallel placement targets — always `casePairTouchLayer`'s
+  /** Layer the parallel placement targets — always `casePairTouchTarget`'s
    *  output for the combo being edited (the editing combo plus SHIFT). */
   targetLayer: TouchLayerId;
+  /** Human-readable name for `targetLayer` ("Shift", "Shift+RAlt", …), from
+   *  the same combo the layer id flattens from. Carried on the proposal rather
+   *  than derived in the banner because a flattened layer id cannot be
+   *  labelled back — and because the banner must NAME the target: the touch
+   *  case-pair layer is no longer always the plain shift layer, so a fixed
+   *  "the shift layer" phrase would misdescribe every compound target. */
+  targetLayerLabel: string;
   /** Identity (object reference) of the touch mechanism ref this was raised for. */
   baseRef: MechanismRef;
 }

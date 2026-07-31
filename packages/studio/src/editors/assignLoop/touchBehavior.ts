@@ -30,6 +30,25 @@ import { canonicalizeCombo, comboToTouchLayerId } from "@keyboard-studio/engine"
 export type TouchLayerId = "default" | "shift" | "caps" | (string & {});
 
 /**
+ * Where a case-pair proposal should place the capital: the casing-parallel
+ * layer's flattened id, plus the canonical combo it was derived from.
+ *
+ * The combo is returned alongside the id because the id is not presentable —
+ * `"rightalt-shift"` is a layout key, not a phrase an author reads. The banner
+ * has to name the target layer ("the Shift+RAlt layer"), and the only
+ * non-duplicative way to label it is from the combo the rule already built.
+ * Returning it here keeps "the case-pair layer is this combo plus SHIFT" a
+ * single derivation, rather than one for the id and a second, hand-rolled one
+ * for the label.
+ */
+export interface CasePairTouchTarget {
+  /** Flattened layer id — `comboToTouchLayerId(combo)`. What gets recorded. */
+  layer: TouchLayerId;
+  /** The canonical combo that layer flattens from. What gets labelled. */
+  combo: ModifierToken[];
+}
+
+/**
  * The casing-parallel layer for the layer currently being edited, or null when
  * there is none to pair with. A null return means the caller raises no
  * case-pair proposal.
@@ -48,10 +67,10 @@ export type TouchLayerId = "default" | "shift" | "caps" | (string & {});
  * The relation stated over combos instead: **the case-pair layer is this combo
  * plus SHIFT.**
  *
- *   []                -> "shift"           (base layer's parallel)
- *   ["RALT"]          -> "rightalt-shift"  (when the keyboard uses that combo)
- *   ["SHIFT", …]      -> null              (already an uppercase layer)
- *   ["CAPS", …]       -> null              (likewise)
+ *   []                -> layer "shift"           (base layer's parallel)
+ *   ["RALT"]          -> layer "rightalt-shift"  (when the keyboard uses it)
+ *   ["SHIFT", …]      -> null                    (already an uppercase layer)
+ *   ["CAPS", …]       -> null                    (likewise)
  *
  * `isComboInUse` gates the compound candidates: a layer only exists in the
  * touch layout because some desktop combo produced it, so proposing a
@@ -70,10 +89,10 @@ export type TouchLayerId = "default" | "shift" | "caps" | (string & {});
  *                     combo, pre-flattening).
  * @param isComboInUse Whether a combo is one this keyboard actually defines.
  */
-export function casePairTouchLayer(
+export function casePairTouchTarget(
   editingCombo: readonly ModifierToken[],
   isComboInUse: (combo: readonly ModifierToken[]) => boolean,
-): TouchLayerId | null {
+): CasePairTouchTarget | null {
   // Already an uppercase layer — there is no "more uppercase" layer to pair
   // with. (NCAPS is not special-cased: [NCAPS] + SHIFT is a compound candidate
   // like any other, and the gate below drops it unless the keyboard uses it.)
@@ -86,7 +105,10 @@ export function casePairTouchLayer(
 
   if (editingCombo.length > 0 && !isComboInUse(candidate)) return null;
 
-  return comboToTouchLayerId(candidate);
+  // Non-null for the same reason the TouchGallery call site asserts it:
+  // TOUCH_ID_FRAGMENT covers every ModifierToken, and canonicalizeCombo's
+  // output only ever contains ModifierToken members.
+  return { layer: comboToTouchLayerId(candidate)!, combo: candidate };
 }
 
 /**

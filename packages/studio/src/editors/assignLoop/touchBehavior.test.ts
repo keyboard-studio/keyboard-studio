@@ -1,7 +1,7 @@
 /**
  * Unit tests for touchBehavior.ts.
  *
- * `casePairTouchLayer` is the focus: it used to be keyed on the flattened
+ * `casePairTouchTarget` is the focus: it used to be keyed on the flattened
  * touch-layer ID and mapped exactly one input (`"default"` -> `"shift"`),
  * returning null for every other layer id in `comboToTouchLayerId`'s open,
  * compositional vocabulary. Authors editing any non-default layer therefore
@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from "vitest";
 import type { ModifierToken } from "@keyboard-studio/engine";
-import { casePairTouchLayer, promoteKeyToHandSet } from "./touchBehavior.ts";
+import { casePairTouchTarget, promoteKeyToHandSet } from "./touchBehavior.ts";
 import type { TouchLayoutIR } from "@keyboard-studio/contracts";
 
 /** Availability predicate over an explicit list of combos "in use". */
@@ -23,9 +23,12 @@ function comboPool(...combos: ModifierToken[][]) {
 /** Nothing is in use — proves which candidates skip the availability gate. */
 const nothingInUse = () => false;
 
-describe("casePairTouchLayer", () => {
+describe("casePairTouchTarget", () => {
   it("pairs the base layer with the shift layer", () => {
-    expect(casePairTouchLayer([], comboPool(["SHIFT"]))).toBe("shift");
+    expect(casePairTouchTarget([], comboPool(["SHIFT"]))).toEqual({
+      layer: "shift",
+      combo: ["SHIFT"],
+    });
   });
 
   it("offers the plain shift layer even when the keyboard declares no SHIFT combo", () => {
@@ -34,7 +37,7 @@ describe("casePairTouchLayer", () => {
     // default/shift/altgr buckets mean a shift layer always exists, so gating
     // this candidate would REMOVE proposals that work today on a keyboard with
     // no explicit [SHIFT K_x] rule.
-    expect(casePairTouchLayer([], nothingInUse)).toBe("shift");
+    expect(casePairTouchTarget([], nothingInUse)?.layer).toBe("shift");
   });
 
   it("pairs a compound layer with that combo plus SHIFT", () => {
@@ -46,23 +49,23 @@ describe("casePairTouchLayer", () => {
     // for the chiral RALT vs. the generic CTRL, which is exactly why the layer
     // id must come from `comboToTouchLayerId` and never be assembled locally.
     expect(
-      casePairTouchLayer(["RALT"], comboPool(["SHIFT", "RALT"])),
-    ).toBe("rightalt-shift");
+      casePairTouchTarget(["RALT"], comboPool(["SHIFT", "RALT"])),
+    ).toEqual({ layer: "rightalt-shift", combo: ["SHIFT", "RALT"] });
     expect(
-      casePairTouchLayer(["CTRL"], comboPool(["SHIFT", "CTRL"])),
-    ).toBe("shift-ctrl");
+      casePairTouchTarget(["CTRL"], comboPool(["SHIFT", "CTRL"])),
+    ).toEqual({ layer: "shift-ctrl", combo: ["SHIFT", "CTRL"] });
   });
 
   it("declines a compound candidate the keyboard does not define", () => {
     // No SHIFT+RALT combo in use -> the touch layout has no rightalt-shift
     // layer to place onto, so raise nothing rather than target a missing layer.
-    expect(casePairTouchLayer(["RALT"], comboPool(["RALT"]))).toBeNull();
-    expect(casePairTouchLayer(["RALT"], nothingInUse)).toBeNull();
+    expect(casePairTouchTarget(["RALT"], comboPool(["RALT"]))).toBeNull();
+    expect(casePairTouchTarget(["RALT"], nothingInUse)).toBeNull();
   });
 
   it("returns null for a layer that is already an uppercase layer", () => {
-    expect(casePairTouchLayer(["SHIFT"], comboPool(["SHIFT"]))).toBeNull();
-    expect(casePairTouchLayer(["CAPS"], comboPool(["CAPS"]))).toBeNull();
+    expect(casePairTouchTarget(["SHIFT"], comboPool(["SHIFT"]))).toBeNull();
+    expect(casePairTouchTarget(["CAPS"], comboPool(["CAPS"]))).toBeNull();
   });
 
   it("returns null for a compound layer that already carries SHIFT", () => {
@@ -70,7 +73,7 @@ describe("casePairTouchLayer", () => {
     // id-keyed rule got this right by accident (everything but "default" was
     // null); the combo-keyed rule has to state it.
     expect(
-      casePairTouchLayer(["SHIFT", "RALT"], comboPool(["SHIFT", "RALT"])),
+      casePairTouchTarget(["SHIFT", "RALT"], comboPool(["SHIFT", "RALT"])),
     ).toBeNull();
   });
 
@@ -79,7 +82,7 @@ describe("casePairTouchLayer", () => {
     // whose keys are canonicalizeCombo output — so the combo handed to it must
     // be canonical too, or a valid combo would miss and the proposal vanish.
     const asked: ModifierToken[][] = [];
-    casePairTouchLayer(["RALT"], (combo) => {
+    casePairTouchTarget(["RALT"], (combo) => {
       asked.push([...combo]);
       return false;
     });
