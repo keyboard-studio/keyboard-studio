@@ -39,6 +39,11 @@
   --app-accent-text:   #8fc4f6;
   --app-font:          var(--ui);
   --app-font-mono:     var(--mono);
+  /* Glyph-display font — same 'Lora' serif stack already used ad hoc for
+     character tiles (GlyphCell, RemovalBanner, StatusBar); named here so
+     CarveGalleryV2 can reference one token instead of repeating the stack. */
+  --app-font-glyph:    'Lora', Georgia, serif;
+  --app-danger:        var(--danger);
   --sil-orange:        var(--amber);
   --sil-orange-dark:   var(--amber-text);
   --sil-green:         #509E2F;

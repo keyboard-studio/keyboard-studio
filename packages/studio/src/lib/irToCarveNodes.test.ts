@@ -27,6 +27,8 @@ import {
   displayChar,
   resolveNodeName,
   resolveLocationLabel,
+  keySequenceLabel,
+  charProducers,
 } from './irToCarveNodes.ts';
 import { _setContentCatalogForTesting, _resetContentI18nForTesting } from './contentI18n.ts';
 import { collectCharContributors } from '@keyboard-studio/engine';
@@ -1003,6 +1005,71 @@ describe('triggerKeyLabel', () => {
       { kind: 'raw' as const, text: '+' },
     ];
     expect(triggerKeyLabel(ctx)).toBeUndefined();
+  });
+
+  // -------------------------------------------------------------------------
+  // TOTAL FLOOR (#1399 follow-on) — a store-triggered rule (any()/notany())
+  // must never resolve to undefined when `ir` is supplied.
+  // -------------------------------------------------------------------------
+
+  it('without `ir`, an any()/notany() trigger still returns undefined (backward-compatible default)', () => {
+    const ctx = [
+      { kind: 'char' as const, value: 'x' },
+      { kind: 'raw' as const, text: '+' },
+      { kind: 'any' as const, storeRef: 'trig' },
+    ];
+    expect(triggerKeyLabel(ctx)).toBeUndefined();
+  });
+
+  it('with `ir`, an any()-triggered rule resolves to "one of: <items>" for a short store (<=8 char items)', () => {
+    const trig: IRStore = { nodeId: 'store#trig', name: 'trig', items: ['b', 'c', 'd'].map((v) => ({ kind: 'char', value: v })), isSystem: false };
+    const ctx = [
+      { kind: 'char' as const, value: 'x' },
+      { kind: 'raw' as const, text: '+' },
+      { kind: 'any' as const, storeRef: 'trig' },
+    ];
+    const ir = makeIR({ stores: [trig] });
+    expect(triggerKeyLabel(ctx, ir)).toBe('one of: b c d');
+  });
+
+  it('with `ir`, a notany()-triggered rule resolves the same way (vkey items via slotItemLabel too)', () => {
+    const trig: IRStore = {
+      nodeId: 'store#trig', name: 'trig',
+      items: [{ kind: 'vkey', name: 'K_A' }, { kind: 'vkey', name: 'K_B' }],
+      isSystem: false,
+    };
+    const ctx = [
+      { kind: 'char' as const, value: 'x' },
+      { kind: 'raw' as const, text: '+' },
+      { kind: 'notany' as const, storeRef: 'trig' },
+    ];
+    const ir = makeIR({ stores: [trig] });
+    expect(triggerKeyLabel(ctx, ir)).toBe('one of: A B');
+  });
+
+  it('with `ir`, a long store (>8 items) goes loose ("one of several keys")', () => {
+    const trig: IRStore = {
+      nodeId: 'store#trig', name: 'trig',
+      items: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].map((v) => ({ kind: 'char', value: v })),
+      isSystem: false,
+    };
+    const ctx = [
+      { kind: 'char' as const, value: 'x' },
+      { kind: 'raw' as const, text: '+' },
+      { kind: 'any' as const, storeRef: 'trig' },
+    ];
+    const ir = makeIR({ stores: [trig] });
+    expect(triggerKeyLabel(ctx, ir)).toBe('one of several keys');
+  });
+
+  it('with `ir`, an unresolvable storeRef still returns undefined rather than fabricating a floor', () => {
+    const ctx = [
+      { kind: 'char' as const, value: 'x' },
+      { kind: 'raw' as const, text: '+' },
+      { kind: 'any' as const, storeRef: 'missing' },
+    ];
+    const ir = makeIR({ stores: [] });
+    expect(triggerKeyLabel(ctx, ir)).toBeUndefined();
   });
 });
 
@@ -3177,5 +3244,100 @@ describe('recommendedRemovalChars — shared uppercase retires last (spec 051 FR
 
     expect(result.map((r) => r.ch).sort()).toEqual(['s', 'ſ']);
     expect(result.every((r) => r.caseGroup === undefined)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// keySequenceLabel — deadkey-combination rule (#1399 follow-on)
+//
+// A rule whose effective context (context with the '+' keystroke-boundary
+// separator stripped out) is composed ENTIRELY of deadkey elements, and
+// whose output is a single literal char — "type deadkey A, then deadkey B
+// -> composed character" (Cameroon's real shape for '=' and ';').
+// ---------------------------------------------------------------------------
+
+describe('keySequenceLabel — deadkey-combination rule (#1399 follow-on)', () => {
+  it('resolves an all-deadkey effective context (no "+") to the ordered trigger chords', () => {
+    const trigger1: IRRule = { nodeId: 'r-t1', context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }], output: [{ kind: 'deadkey', id: 1 }] };
+    const trigger2: IRRule = { nodeId: 'r-t2', context: [{ kind: 'vkey', name: 'K_B', modifiers: [] }], output: [{ kind: 'deadkey', id: 2 }] };
+    const bodyRule: IRRule = {
+      nodeId: 'r-body',
+      context: [{ kind: 'deadkey', id: 1 }, { kind: 'deadkey', id: 2 }],
+      output: [{ kind: 'char', value: 'e' }],
+    };
+    const ir = makeIRWithStores(
+      [makeGroup([trigger1, trigger2]), { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false }],
+      [],
+    );
+
+    expect(keySequenceLabel(bodyRule, ir)).toEqual(['A', 'B']);
+  });
+
+  it('resolves an all-deadkey effective context with an embedded "+" the same way', () => {
+    const trigger1: IRRule = { nodeId: 'r-t1', context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }], output: [{ kind: 'deadkey', id: 1 }] };
+    const trigger2: IRRule = { nodeId: 'r-t2', context: [{ kind: 'vkey', name: 'K_B', modifiers: [] }], output: [{ kind: 'deadkey', id: 2 }] };
+    const bodyRule: IRRule = {
+      nodeId: 'r-body-plus',
+      context: [{ kind: 'deadkey', id: 1 }, { kind: 'raw', text: '+' }, { kind: 'deadkey', id: 2 }],
+      output: [{ kind: 'char', value: 'e' }],
+    };
+    const ir = makeIRWithStores(
+      [makeGroup([trigger1, trigger2]), { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false }],
+      [],
+    );
+
+    expect(keySequenceLabel(bodyRule, ir)).toEqual(['A', 'B']);
+  });
+
+  it('returns undefined (never fabricates) when one deadkey\'s trigger cannot be found', () => {
+    const trigger1: IRRule = { nodeId: 'r-t1', context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }], output: [{ kind: 'deadkey', id: 1 }] };
+    // No trigger rule produces deadkey id 2.
+    const bodyRule: IRRule = {
+      nodeId: 'r-body-missing',
+      context: [{ kind: 'deadkey', id: 1 }, { kind: 'deadkey', id: 2 }],
+      output: [{ kind: 'char', value: 'e' }],
+    };
+    const ir = makeIRWithStores(
+      [makeGroup([trigger1]), { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false }],
+      [],
+    );
+
+    expect(keySequenceLabel(bodyRule, ir)).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// charProducers — partial-cluster inclusion is not a "way to type it"
+// (#1399 follow-on)
+// ---------------------------------------------------------------------------
+
+describe('charProducers — partial-cluster inclusion is excluded, not a phantom entry', () => {
+  it('does not list a producer whose literal output only PARTIALLY contains the target char', () => {
+    // A key that outputs a longer literal cluster containing 'a' is not a
+    // way to type 'a' alone — no producer, real or unrenderable, for it.
+    const clusterRule: IRRule = {
+      nodeId: 'r-cluster',
+      context: [{ kind: 'vkey', name: 'K_X', modifiers: [] }],
+      output: [{ kind: 'char', value: 'abcd' }],
+    };
+    const realRule: IRRule = {
+      nodeId: 'r-real',
+      context: [{ kind: 'vkey', name: 'K_A', modifiers: ['SHIFT'] }],
+      output: [{ kind: 'char', value: 'a' }],
+    };
+    const ir = makeIRWithStores([makeGroup([clusterRule, realRule])], []);
+
+    expect(charProducers(ir, 'a')).toEqual([{ steps: ['Shift + A'] }]);
+  });
+
+  it('returns an empty list when the only rule mentioning the char is a partial-cluster inclusion', () => {
+    const clusterRule: IRRule = {
+      nodeId: 'r-cluster-only',
+      context: [{ kind: 'vkey', name: 'K_X', modifiers: [] }],
+      output: [{ kind: 'char', value: 'abcd' }],
+    };
+    const ir = makeIRWithStores([makeGroup([clusterRule])], []);
+
+    expect(charProducers(ir, 'b')).toEqual([]);
   });
 });

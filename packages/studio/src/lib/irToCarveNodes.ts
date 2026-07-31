@@ -226,6 +226,21 @@ export interface CarveGlyph {
   modifierLabel: string;
   capability: RemovalCapability;
   owners?: GlyphOwner[];
+  /**
+   * Faithful, ordered "how it's typed" step sequence (#1399) — deliberately
+   * SEPARATE from `keys` (the simplified display string `contextToKeys`
+   * builds, which the old rule/node Rail view — `CarveGallery.tsx` — reads
+   * and must keep reading unchanged). Consumed only by the character-first
+   * view (`irToCharacterView.ts` -> `CarveGalleryV2.tsx`).
+   *
+   * Semantics: a single entry is one fully-composed CHORD (e.g. "Shift + A",
+   * already including any modifier prefix) — simultaneous keys. Multiple
+   * entries are ordered STEPS typed one after another (e.g. a deadkey
+   * trigger then a base letter) — render joined by "then", never "+".
+   * `undefined` means the shape could not be resolved faithfully (never a
+   * fabricated key) — the caller falls back to a "not shown" message.
+   */
+  keySteps?: string[] | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -370,6 +385,24 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
     // Bare shape (Bamum): physical key only, no deadkey marker.
     const keys = hasDeadkey ? ['‹dk›', inputLabel] : [inputLabel];
 
+    // Faithful (#1399) per-slot base label — SEPARATE from `inputLabel` above
+    // (which feeds the untouched `keys` field): a vkey base is run through
+    // vkeyLabel() so it reads as "A" rather than raw "K_A". Deadkey shape
+    // (S-02/S-06): two faithful steps — the deadkey's real trigger key, then
+    // this base label — via keySequenceLabel. Bare shape (no deadkey, e.g.
+    // Bamum bare transliteration): a single direct keypress, no trigger to
+    // reconstruct.
+    const faithfulBaseLabel = inputItem && inputItem.kind === 'char'
+      ? displayChar(inputItem.value)
+      : inputItem && inputItem.kind === 'vkey'
+        ? (vkeyLabel(inputItem.name) ?? inputItem.name)
+        : undefined;
+    const keySteps: string[] | undefined = faithfulBaseLabel === undefined
+      ? undefined
+      : hasDeadkey
+        ? keySequenceLabel(rule, ir, faithfulBaseLabel)
+        : [faithfulBaseLabel];
+
     const gid = `${outputStore.nodeId}#${i}`;
     if (seen.has(gid)) continue;  // dedup: same store+index appearing in multiple rules
     seen.add(gid);
@@ -377,6 +410,7 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
     glyphs.push({
       gid, keys, ch, modifierLayer: modLayer, modifierLabel: modLabel, capability: slotCapability,
       ...(slotOwners.length > 0 ? { owners: slotOwners } : {}),
+      ...(keySteps !== undefined ? { keySteps } : {}),
     });
   }
 
@@ -541,6 +575,9 @@ function ruleToGlyphs(rule: IRRule, ir: KeyboardIR, capabilities: Map<string, Re
   const ch = outputToChar(rule.output);
   if (ch === '?' || ch === '‹dk›') return [];
   const owners = ruleStoreOwners(rule, ir);
+  // Faithful (#1399) step sequence for this rule — S-01 (bare vkey chord) or
+  // S-05 (mnemonic char+char); undefined for every other shape (fallback).
+  const keySteps = keySequenceLabel(rule, ir);
   return [{
     gid: rule.nodeId,
     keys,
@@ -549,6 +586,7 @@ function ruleToGlyphs(rule: IRRule, ir: KeyboardIR, capabilities: Map<string, Re
     modifierLabel: modifierLabel(rule),
     capability: capabilities.get(rule.nodeId) ?? 'not-removable:unknown',
     ...(owners.length > 0 ? { owners } : {}),
+    ...(keySteps !== undefined ? { keySteps } : {}),
   }];
 }
 
@@ -1143,9 +1181,15 @@ export function vkeyLabel(name: string): string | undefined {
  *   any(storeA) + [K_BKSP] > index(storeB, 1)
  * the trigger is the vkey element after raw('+').
  *
+ * `ir` is optional and needed only to resolve a STORE-based trigger
+ * (`any()`/`notany()`) into its floor description (see
+ * `storeTriggerFloorLabel` below) — callers that never see a store trigger
+ * (or that don't have an `ir` handy) can omit it; that arm then returns
+ * undefined exactly as it did before this floor existed.
+ *
  * Returns a human-readable string or undefined when no trigger is present.
  */
-export function triggerKeyLabel(context: ContextElement[]): string | undefined {
+export function triggerKeyLabel(context: ContextElement[], ir?: KeyboardIR): string | undefined {
   const plusIdx = context.findIndex(isPlusSeparator);
   if (plusIdx === -1) return undefined;
   const triggerEl = context[plusIdx + 1];
@@ -1154,8 +1198,518 @@ export function triggerKeyLabel(context: ContextElement[]): string | undefined {
     case 'vkey':    return vkeyLabel(triggerEl.name) ?? triggerEl.name;
     case 'char':    return `"${displayChar(triggerEl.value)}"`;
     case 'deadkey': return `deadkey ${triggerEl.id}`;
+    // TOTAL FLOOR (#1399 follow-on): a store-triggered rule (any()/notany())
+    // must never resolve to undefined — describe the store's own items
+    // instead of naming a single (nonexistent) key.
+    case 'any':
+    case 'notany':
+      return ir !== undefined ? storeTriggerFloorLabel(triggerEl.storeRef, ir) : undefined;
     default:        return undefined;
   }
+}
+
+/**
+ * Floor description for a store-based trigger element — "one of: b c d" when
+ * the store has <=8 items with a nameable label (char OR vkey, via
+ * slotItemLabel), else the loose "one of several keys". Returns undefined
+ * only when the store can't be resolved at all or has zero nameable items.
+ */
+function storeTriggerFloorLabel(storeRef: string, ir: KeyboardIR): string | undefined {
+  const store = ir.stores.find((s) => s.name === storeRef);
+  if (store === undefined) return undefined;
+  const labels = store.items
+    .map((item) => slotItemLabel(item))
+    .filter((label): label is string => label !== undefined);
+  if (labels.length === 0) return undefined;
+  if (labels.length <= 8) return `one of: ${labels.join(' ')}`;
+  return 'one of several keys';
+}
+
+/**
+ * Bare (unquoted) trigger label — same resolution as triggerKeyLabel, but the
+ * char case is returned without surrounding quotes (used for the faithful
+ * "how it's typed" step display, where a literal key is shown as a KeyCap
+ * chip, not inline prose — see keySequenceLabel below).
+ */
+function bareTriggerLabel(context: ContextElement[]): string | undefined {
+  const label = triggerKeyLabel(context);
+  if (label === undefined) return undefined;
+  if (label.length >= 2 && label.startsWith('"') && label.endsWith('"')) return label.slice(1, -1);
+  return label;
+}
+
+/**
+ * Compose a single fully-resolved CHORD label for one context element that is
+ * itself the "primary" key of a rule (S-01's own vkey element, or a resolved
+ * deadkey-trigger rule's own single context element) — vkeyLabel() + the
+ * OWNING rule's modifierLabel(), or the bare literal for a char element.
+ * Never fabricates a vkey name for a char element.
+ */
+function primaryChordLabel(el: ContextElement, owningRule: IRRule): string | undefined {
+  if (el.kind === 'vkey') {
+    const base = vkeyLabel(el.name) ?? el.name;
+    const mod = modifierLabel(owningRule);
+    return mod ? `${mod} + ${base}` : base;
+  }
+  if (el.kind === 'char') return el.value;
+  return undefined;
+}
+
+/**
+ * Find the rule that enters deadkey `dkId` — mirrors the shape check in the
+ * engine's s02-deadkey-single-tap.ts buildTriggerIndex/isTrigger (a rule
+ * whose OUTPUT is a single deadkey, whose CONTEXT is a single vkey or char
+ * element), but — unlike that recognizer-matching pass — does NOT skip
+ * rules already claimed by a pattern (ownedByPattern set): by the time this
+ * runs, the trigger rule for an already-recognized S-02 pattern is normally
+ * owned by that very pattern, so skipping owned rules would make its own
+ * trigger unfindable. Display-only; never mutates ownership.
+ */
+function findDeadkeyTrigger(ir: KeyboardIR, dkId: number): { el: ContextElement; rule: IRRule } | undefined {
+  const candidates: { el: ContextElement; rule: IRRule }[] = [];
+  for (const group of ir.groups) {
+    if (group.name === 'deadkeys') continue;
+    for (const rule of group.rules) {
+      if (rule.context.length !== 1 || rule.output.length !== 1) continue;
+      const el = rule.context[0];
+      const out = rule.output[0];
+      if (el === undefined || (el.kind !== 'vkey' && el.kind !== 'char')) continue;
+      if (out === undefined || out.kind !== 'deadkey' || out.id !== dkId) continue;
+      candidates.push({ el, rule });
+    }
+  }
+  if (candidates.length === 0) return undefined;
+  // Prefer the unshifted vkey trigger (mirrors s02's pickPrimaryTrigger).
+  const unshifted = candidates.find((c) => c.el.kind === 'vkey' && c.el.modifiers.length === 0);
+  return unshifted ?? candidates[0];
+}
+
+// ---------------------------------------------------------------------------
+// keySequenceLabel — faithful, ordered "how it's typed" step sequence
+// (#1399), reconstructed from the RULE that actually produces a glyph,
+// never invented. Returns undefined when the shape can't be resolved
+// faithfully — callers fall back to a "not shown" message rather than
+// guessing.
+//
+// Shapes covered:
+//   S-01 (bare vkey rule, char output): single composed chord, e.g. "Shift + A".
+//   S-02/S-06 (deadkey body, parallel fan-out slot): two steps — the resolved
+//     TRIGGER key for the deadkey, then the caller-supplied per-slot base
+//     label (reusing expandParallelStoreRule's own per-slot resolution,
+//     never re-derived here).
+//   S-03 (sequence: any() at a NON-terminal context position, followed by a
+//     fixed literal trigger, output index()'d at the any's own 1-based
+//     context position): two steps — the caller-supplied per-slot base
+//     label, then the literal trigger.
+//   S-05 (mnemonic: char, '+', char — no store, no fan-out): two steps, both
+//     literal characters, quoted-literal only (never mapped through vkeyLabel).
+//
+// `resolvedBaseLabel` — when supplied, this call is for ONE SLOT of a
+// parallel-store fan-out glyph (S-02/S-03); the label for that slot's base
+// store item is the caller's job (expandParallelStoreRule already computes
+// it), not this function's.
+// ---------------------------------------------------------------------------
+
+export function keySequenceLabel(
+  rule: IRRule,
+  ir: KeyboardIR,
+  resolvedBaseLabel?: string,
+): string[] | undefined {
+  const ctx = rule.context;
+
+  if (resolvedBaseLabel !== undefined) {
+    const dkEl = ctx.find((el) => el.kind === 'deadkey');
+    if (dkEl !== undefined && dkEl.kind === 'deadkey') {
+      // S-02/S-06 deadkey body: trigger THEN base.
+      const trigger = findDeadkeyTrigger(ir, dkEl.id);
+      if (trigger === undefined) return undefined;
+      const triggerLabel = primaryChordLabel(trigger.el, trigger.rule);
+      return triggerLabel !== undefined ? [triggerLabel, resolvedBaseLabel] : undefined;
+    }
+    // S-03 sequence: base (any(), non-terminal) THEN the fixed literal trigger.
+    const triggerLabel = bareTriggerLabel(ctx);
+    return triggerLabel !== undefined ? [resolvedBaseLabel, triggerLabel] : undefined;
+  }
+
+  // S-01: a single bare vkey rule (no '+', no store).
+  if (ctx.length === 1 && ctx[0] !== undefined && ctx[0].kind === 'vkey') {
+    const label = primaryChordLabel(ctx[0], rule);
+    return label !== undefined ? [label] : undefined;
+  }
+
+  // S-05 mnemonic: literal char, '+', literal char — no store, no fan-out.
+  // Emits the FULL ordered preceding literal run (not just ctx[0]) so a
+  // multi-literal-char rule (e.g. "n" "n" + "n" > ŋ) shows a COMPLETE
+  // N-step sequence rather than a 2-step one truncated at the first char.
+  // N=1 (the common single-preceding-char case) degenerates to the same
+  // two-step result as before. A MIXED preceding run (a vkey/deadkey/any
+  // among the literals) never fires this branch — falls through to the
+  // honest `undefined` below rather than fabricating a step.
+  if (ctx[0] !== undefined && ctx[0].kind === 'char') {
+    const plusIdx = ctx.findIndex(isPlusSeparator);
+    if (plusIdx > 0) {
+      const preceding = ctx.slice(0, plusIdx);
+      const allLiteral = preceding.every(
+        (el): el is Extract<ContextElement, { kind: 'char' }> => el.kind === 'char',
+      );
+      if (allLiteral) {
+        const triggerLabel = bareTriggerLabel(ctx);
+        if (triggerLabel !== undefined) return [...preceding.map((el) => el.value), triggerLabel];
+      }
+    }
+  }
+
+  // "Ways to type it" (#1399) additive branch: the preceding context is a
+  // NON-literal marker — a store match (any/notany), a context() back-
+  // reference, a baselayout() guard, or an index() back-reference — none of
+  // which is a single nameable key. The actual DISTINGUISHING keystroke is
+  // just the TRIGGER after '+'; the precondition itself is surfaced
+  // separately by charProducers' condition builder below, never fabricated
+  // here as a key. Deliberately excludes 'deadkey' preceding (a rarer hybrid
+  // shape this pass doesn't resolve faithfully — falls through to the
+  // honest `undefined` below rather than under-reporting a step).
+  if (ctx[0] !== undefined && NON_KEY_PRECEDING_KINDS.has(ctx[0].kind)) {
+    const plusIdx = ctx.findIndex(isPlusSeparator);
+    if (plusIdx > 0) {
+      const triggerLabel = bareTriggerLabel(ctx);
+      if (triggerLabel !== undefined) return [triggerLabel];
+    }
+  }
+
+  // Deadkey-combination rule (#1399 follow-on): the effective context — ctx
+  // with the '+' keystroke-boundary separator stripped out — is composed
+  // ENTIRELY of deadkey elements, and the rule composes them into a literal
+  // char (e.g. `dk(1) dk(2) > 'e'`, or `dk(1) + dk(2) > 'e'` where the
+  // active keystroke is itself a deadkey). This is the gap the NON_KEY_
+  // PRECEDING_KINDS branch above deliberately excludes rather than resolves.
+  // Each deadkey's own trigger rule is resolved via findDeadkeyTrigger and
+  // rendered as one ordered chord step; if ANY deadkey's trigger can't be
+  // found, the whole sequence is unresolvable — return undefined rather than
+  // fabricating a step.
+  const effCtx = ctx.filter((el) => !isPlusSeparator(el));
+  if (effCtx.length > 0 && effCtx.every((el) => el.kind === 'deadkey')) {
+    const steps: string[] = [];
+    for (const el of effCtx) {
+      if (el.kind !== 'deadkey') continue; // narrows for TS; guaranteed by the `every` above
+      const trigger = findDeadkeyTrigger(ir, el.id);
+      if (trigger === undefined) return undefined;
+      const label = primaryChordLabel(trigger.el, trigger.rule);
+      if (label === undefined) return undefined;
+      steps.push(label);
+    }
+    return steps;
+  }
+
+  return undefined;
+}
+
+const NON_KEY_PRECEDING_KINDS = new Set(['any', 'notany', 'context', 'baselayout', 'index', 'raw']);
+
+// ---------------------------------------------------------------------------
+// charProducers — "ways to type it" producer enumeration (#1399)
+//
+// Every RULE that produces a given character, as a faithful keystroke
+// sequence plus a plain-language CONDITION describing when that rule
+// applies. Mirrors the rule-matching loop in the engine's
+// collectCharContributors (store-output match, then literal-char-output
+// match) but — unlike that function, which only returns ids for cascade-
+// delete — captures enough of each matching {rule, group} to render a
+// human-readable entry. Most characters have exactly one producer; a
+// character reachable via more than one rule (e.g. a duplicate S-08 RAlt
+// binding, or a base letter reachable both directly and via a deadkey)
+// gets one entry per producing rule.
+//
+// A single producer's `condition` is built from `rule.context.slice(0,
+// plusIdx)` — the preceding, ALREADY-TYPED buffer match, everything before
+// the codec's synthetic '+' keystroke-boundary token (isPlusSeparator). No
+// '+' present means no preceding match to describe — unconditional.
+//
+// Honest-fallback contract: whenever EITHER the keystroke steps OR the
+// condition can't be faithfully derived, the WHOLE entry falls back to
+// `{ steps: [] }` (the same convention CharacterCell.keys already uses),
+// plus — whenever resolvable — a `triggerFloor` (TOTAL FLOOR, #1399
+// follow-on) so the panel can still say "Typed with <floor>" instead of a
+// placeholder phrase — never a fabricated step or a guessed condition.
+// ---------------------------------------------------------------------------
+
+/** One faithful "way to type" a character: an ordered keystroke sequence plus an optional plain-language condition. Empty `steps` is the honest-fallback convention (mirrors CharacterCell.keys). */
+export interface CharProducer {
+  steps: string[];
+  condition?: string;
+  /**
+   * TOTAL FLOOR (#1399 follow-on): a human-readable trigger-key description
+   * for the producing rule — e.g. "Backspace" or "one of: b c d" — computed
+   * whenever `steps` couldn't be resolved faithfully (`steps: []`). Lets the
+   * panel cascade to "Typed with <triggerFloor>" instead of ever rendering a
+   * placeholder phrase. Only undefined when the rule has no '+'-separated
+   * trigger element to describe at all.
+   */
+  triggerFloor?: string;
+}
+
+type ConditionOutcome =
+  | { kind: 'none' }
+  | { kind: 'text'; text: string }
+  | { kind: 'unrenderable' };
+
+/**
+ * Plain-language condition builder over a rule's PRECEDING context elements
+ * (the slice before the '+' keystroke boundary — see charProducers' doc).
+ * Table (km-keyman spec, #1399):
+ *   none                      -> unconditional (kind: 'none')
+ *   one literal char x        -> "when it follows x"
+ *   several literal chars xy  -> "when it follows xy" (NFC-joined)
+ *   any(store), <=8 items     -> "when it follows one of: a e i o u"
+ *   any(store), >8 items      -> "when it follows certain letters"
+ *   notany(store)             -> same two tiers, "doesn't follow"
+ *   deadkey marker present    -> unconditional (kind: 'none') — already
+ *                                 expressed by the rule's own two-step
+ *                                 keySteps; never duplicated here
+ *   context() (offset 1 only  -> "after any typed character"
+ *     — context(N>1) never reaches here; it's parsed as a RawKmnFragment)
+ *   baselayout(value)         -> "only on the '<value>' keyboard layout"
+ *   index() back-ref, or any  -> unrenderable — the whole producer entry
+ *     other/mixed shape          falls back (see charProducers)
+ */
+function buildCondition(preceding: readonly ContextElement[], ir: KeyboardIR): ConditionOutcome {
+  if (preceding.length === 0) return { kind: 'none' };
+  if (preceding.some((el) => el.kind === 'deadkey')) return { kind: 'none' };
+
+  if (preceding.length === 1) {
+    const el = preceding[0]!;
+    switch (el.kind) {
+      case 'char':
+        return { kind: 'text', text: `when it follows ${el.value}` };
+      case 'any':
+        return storeConditionOutcome(el.storeRef, ir, false);
+      case 'notany':
+        return storeConditionOutcome(el.storeRef, ir, true);
+      case 'context':
+        return { kind: 'text', text: 'after any typed character' };
+      case 'baselayout':
+        return { kind: 'text', text: `only on the '${el.value}' keyboard layout` };
+      default:
+        return { kind: 'unrenderable' };
+    }
+  }
+
+  // Several literal chars in a row (e.g. a two-char mnemonic prefix).
+  if (preceding.every((el) => el.kind === 'char')) {
+    const text = preceding.map((el) => (el as { kind: 'char'; value: string }).value).join('').normalize('NFC');
+    return { kind: 'text', text: `when it follows ${text}` };
+  }
+
+  return { kind: 'unrenderable' };
+}
+
+/** Shared `any(store)`/`notany(store)` condition tier (<=8 items lists them; >8 goes loose). */
+function storeConditionOutcome(storeRef: string, ir: KeyboardIR, negate: boolean): ConditionOutcome {
+  const store = ir.stores.find((s) => s.name === storeRef);
+  if (store === undefined) return { kind: 'unrenderable' };
+  const chars = store.items
+    .filter((it): it is Extract<StoreItem, { kind: 'char' }> => it.kind === 'char')
+    .map((it) => displayChar(it.value));
+  if (chars.length === 0) return { kind: 'unrenderable' };
+  const verb = negate ? "doesn't follow" : 'follows';
+  if (chars.length <= 8) return { kind: 'text', text: `when it ${verb} one of: ${chars.join(' ')}` };
+  return { kind: 'text', text: `when it ${verb} certain letters` };
+}
+
+/** Shared per-slot base label (mirrors expandParallelStoreRule's faithfulBaseLabel / irToCharacterView's sequenceShapeCells baseSlotLabel — small, intentional duplication rather than a cross-file refactor of either, per #1399 scope). */
+function slotItemLabel(item: StoreItem | undefined): string | undefined {
+  if (item === undefined) return undefined;
+  if (item.kind === 'char') return displayChar(item.value);
+  if (item.kind === 'vkey') return vkeyLabel(item.name) ?? item.name;
+  return undefined;
+}
+
+/**
+ * Resolve the faithful keystroke steps for ONE producing store slot of ONE
+ * SPECIFIC output element `el` (parallel index fan-out — S-02/S-06 deadkey
+ * body or bare transliteration — or a general index()-over-a-store shape,
+ * including multi-`index()` cross-store tables where each output element
+ * resolves its base at its OWN context offset). Returns undefined when the
+ * slot's base item can't be labelled or keySequenceLabel can't resolve the
+ * shape.
+ *
+ * Takes the specific `el` the caller (charProducers) matched rather than
+ * assuming `rule.output[0]` — a rule may emit several `index()` elements
+ * over DIFFERENT stores (e.g. `any(A) any(B) + any(K) > index(A,1)
+ * index(B,2) index(mods,3)`), and each must resolve against its own offset,
+ * not the first output element's.
+ */
+function resolveStoreSlotSteps(
+  rule: IRRule,
+  ir: KeyboardIR,
+  el: OutputElement,
+  slotIndex: number,
+  storeMap: ReadonlyMap<string, IRStore>,
+): string[] | undefined {
+  if (isParallelIndexFanOut(rule)) {
+    const inputAnyEl = rule.context.find((c) => c.kind === 'any');
+    const inputStore = inputAnyEl && inputAnyEl.kind === 'any' ? storeMap.get(inputAnyEl.storeRef) : undefined;
+    const baseLabel = slotItemLabel(inputStore?.items[slotIndex]);
+    if (baseLabel === undefined) return undefined;
+    const hasDeadkey = rule.context.some((c) => c.kind === 'deadkey');
+    return hasDeadkey ? keySequenceLabel(rule, ir, baseLabel) : [baseLabel];
+  }
+
+  if (el.kind === 'index') {
+    const effectiveCtx = rule.context.filter((c) => !isPlusSeparator(c));
+    const baseEl = effectiveCtx[el.offset - 1];
+    if (baseEl !== undefined && baseEl.kind === 'any') {
+      const baseStore = storeMap.get(baseEl.storeRef);
+      const baseLabel = slotItemLabel(baseStore?.items[slotIndex]);
+      if (baseLabel !== undefined) return keySequenceLabel(rule, ir, baseLabel);
+    }
+  }
+
+  return undefined;
+}
+
+/** True when a rule's ENTIRE output is exactly one `{kind:"deadkey"}` element (an S-02 trigger rule — never itself a character producer; mirrors the engine's isDeadkeyOnlyOutput, inlined here to avoid depending on an unexported engine module path). */
+function isDeadkeyTriggerRule(rule: IRRule): boolean {
+  return rule.output.length === 1 && rule.output[0]?.kind === 'deadkey';
+}
+
+// Trigger vkeys whose role in the Keyman VK namespace is "erase/undo a level
+// of composition," not "compose new content" — a backspace/forward-delete
+// rule that re-emits a character is editing behavior, not a way to TYPE it.
+// This is a fixed VK-namespace set, NOT derived from any keyboard's stores/id/language.
+const NON_TYPING_TRIGGER_VKEYS = new Set(['K_BKSP', 'K_DEL']);
+
+/**
+ * True when `rule`'s trigger vkey (the element right of the last `+`, or the
+ * sole context element for an S-01 bare single-vkey shape) is an
+ * erase/undo-composition key rather than a forward-typing one — i.e. the rule
+ * is editing behavior (e.g. `any(composed) + [K_BKSP] > index(base, 1)`), not
+ * a faithful "way to type" the character it happens to output. General,
+ * keyboard-agnostic rule-shape predicate — no store names, ids, or language.
+ */
+function isNotAForwardTypingPath(rule: IRRule): boolean {
+  const ctx = rule.context;
+  const plusIdx = ctx.findIndex(isPlusSeparator);
+  const triggerEl = plusIdx === -1
+    ? (ctx.length === 1 ? ctx[0] : undefined)   // S-01 bare single-vkey shape
+    : ctx[plusIdx + 1];                           // element right of '+'
+  if (triggerEl === undefined || triggerEl.kind !== 'vkey') return false;
+  return NON_TYPING_TRIGGER_VKEYS.has(triggerEl.name.toUpperCase());
+}
+
+/**
+ * Enumerate every faithful "way to type" `ch` across the whole IR — one
+ * `CharProducer` per producing rule (or producing store slot, for a
+ * parallel-fan-out / sequence rule). See the module-doc block above this
+ * section for the full contract.
+ */
+export function charProducers(ir: KeyboardIR, ch: string): CharProducer[] {
+  const target = ch.normalize('NFC');
+  const storeMap = new Map(ir.stores.map((s) => [s.name, s]));
+  const producers: CharProducer[] = [];
+  const seenKeys = new Set<string>();
+
+  // `computeCondition: false` for store-slot producers (parallel fan-out /
+  // S-03 sequence): by construction of those two shapes (isParallelIndexFanOut's
+  // pre-terminal-all-deadkey requirement; the S-03 baseEl-at-offset match), the
+  // ENTIRE preceding context is exactly the one store item already resolved as
+  // the producer's OWN first step — a generic store-wide "when it follows one
+  // of: a e i o u" would be both redundant with that step AND actively
+  // misleading for a multi-item store (it would wrongly imply every store item
+  // produces THIS SAME character). Generalizes the explicit deadkey carve-out
+  // in buildCondition to the other shape where the precondition is already
+  // faithfully expressed via keySteps.
+  // TOTAL FLOOR (#1399 follow-on): whenever a producer's faithful steps
+  // can't be resolved, attach the rule's own trigger-key floor (see
+  // triggerKeyLabel) instead of leaving the entry bare — the panel then
+  // cascades to "Typed with <floor>" rather than ever rendering a
+  // placeholder phrase. `triggerKeyLabel` itself only returns undefined when
+  // the rule has no '+'-separated trigger element to describe at all (e.g.
+  // a mixed/unresolvable preceding shape with no trigger boundary).
+  const unresolvedProducer = (rule: IRRule): CharProducer => {
+    const floor = triggerKeyLabel(rule.context, ir);
+    return floor !== undefined ? { steps: [], triggerFloor: floor } : { steps: [] };
+  };
+
+  const push = (rule: IRRule, resolveSteps: () => string[] | undefined, dedupeKey: string, computeCondition: boolean) => {
+    if (seenKeys.has(dedupeKey)) return;
+    seenKeys.add(dedupeKey);
+
+    let conditionOutcome: ConditionOutcome = { kind: 'none' };
+    if (computeCondition) {
+      const plusIdx = rule.context.findIndex(isPlusSeparator);
+      const preceding = plusIdx === -1 ? [] : rule.context.slice(0, plusIdx);
+      conditionOutcome = buildCondition(preceding, ir);
+      if (conditionOutcome.kind === 'unrenderable') {
+        producers.push(unresolvedProducer(rule));
+        return;
+      }
+    }
+
+    const steps = resolveSteps();
+    if (steps === undefined) {
+      producers.push(unresolvedProducer(rule));
+      return;
+    }
+    producers.push(conditionOutcome.kind === 'text' ? { steps, condition: conditionOutcome.text } : { steps });
+  };
+
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      if (isDeadkeyTriggerRule(rule)) continue;
+      if (isNotAForwardTypingPath(rule)) continue;
+
+      // (a) Store-produced: the character is emitted through index()/outs()
+      // over a store — one entry per matching slot in that store.
+      let matchedViaStore = false;
+      const effCtx = rule.context.filter((c) => !isPlusSeparator(c));
+      for (const el of rule.output) {
+        if ((el.kind !== 'index' && el.kind !== 'outs') || el.storeRef === undefined) continue;
+
+        // Self-permutation (reorder) guard: an index() output pointing back
+        // at the SAME store it matched as input is a REORDER, not a way to
+        // type — skip this element entirely. Proven non-overlapping with
+        // genuine production shapes (a translation table's input/output
+        // stores are always distinct); keep the existing Backspace/K_DEL
+        // exclusion (isNotAForwardTypingPath) as well.
+        const targetEl = el.kind === 'index' ? effCtx[el.offset - 1] : undefined;
+        if (el.kind === 'index' && targetEl?.kind === 'any' && targetEl.storeRef === el.storeRef) continue;
+
+        const outStore = storeMap.get(el.storeRef);
+        if (outStore === undefined) continue;
+        outStore.items.forEach((item, i) => {
+          if (item.kind !== 'char' || item.value.normalize('NFC') !== target) return;
+          matchedViaStore = true;
+          push(rule, () => resolveStoreSlotSteps(rule, ir, el, i, storeMap), `${rule.nodeId}#${i}`, false);
+        });
+      }
+      if (matchedViaStore) continue;
+
+      // (b) Literal output: the character is written out directly.
+      const charEls = rule.output.filter((el): el is Extract<OutputElement, { kind: 'char' }> => el.kind === 'char');
+      if (charEls.length === 0) continue;
+      const onlyCharOutput = charEls.length === rule.output.length;
+      const wholeOutput = charEls.map((el) => el.value).join('').normalize('NFC');
+
+      if (onlyCharOutput && wholeOutput === target) {
+        // Condition is computed normally here (S-01 bare vkey chord's
+        // preceding is empty by construction; S-05's own preceding literal
+        // char(s) DO get a condition even though `steps[0]` already names
+        // the first one — a little reinforcement, not misleading, unlike
+        // the store-slot case above where a multi-item store would be
+        // actively wrong for a single specific character).
+        push(rule, () => keySequenceLabel(rule, ir), rule.nodeId, true);
+      }
+      // A rule whose literal output merely CONTAINS `target` as part of a
+      // longer cluster (wholeOutput.includes(target) && wholeOutput !==
+      // target) is not a way to type the single character — it's excluded
+      // entirely rather than pushed as an unrenderable producer (#1399
+      // follow-on). collectCharContributors' separate "blocked" handling
+      // (removal-safety) is untouched — a different concern from "ways to
+      // type it".
+    }
+  }
+
+  return producers;
 }
 
 // ---------------------------------------------------------------------------
