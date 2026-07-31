@@ -1412,6 +1412,42 @@ describe("draftPersistence", () => {
       teardown();
     });
 
+    // Pending-slot veto (review finding 1): the reserved pending slot is the
+    // local-only holding pen for pre-instantiation progress. It is excluded
+    // from the local "My keyboards" index, and must be excluded from the cloud
+    // push for the same reason — a pushed pending record comes back through
+    // listServerDrafts() and merges into the list as a phantom "Untitled
+    // keyboard" card. Only promotion to a real project key makes a draft
+    // cloud-eligible.
+    it("pending-slot veto: never pushes the PENDING_PROJECT_KEY record, even for a signed-in author with meaningful pre-instantiation progress", () => {
+      vi.useFakeTimers();
+      useSurveySessionStore.getState().advance("choose_base");
+      useSurveySessionStore.setState({
+        identityResult: { english: "Test", autonym: "Test", bcp47: "und", prefill: { script: "Latn" } } as never,
+      });
+      saveDraft(PENDING_PROJECT_KEY);
+      // The local record exists and the active pointer is pinned to it — the
+      // exact state F6's mount-time autosave install produces.
+      expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).not.toBeNull();
+      expect(resolveActiveProjectKey()).toBe(PENDING_PROJECT_KEY);
+
+      const teardown = startCloudSync(() => "token-abc");
+      expect(mockedSaveServerDraft).not.toHaveBeenCalled(); // install-time flush vetoed
+
+      useSurveySessionStore.getState().advance("choose_base");
+      saveDraft(PENDING_PROJECT_KEY);
+      vi.advanceTimersByTime(CLOUD_SYNC_DEBOUNCE_MS);
+      expect(mockedSaveServerDraft).not.toHaveBeenCalled();
+
+      // Neither checkpoint flush leaks it either.
+      document.dispatchEvent(new Event("visibilitychange"));
+      window.dispatchEvent(new Event("beforeunload"));
+      expect(mockedSaveServerDraft).not.toHaveBeenCalled();
+      expect(mockedSaveServerDraftBeacon).not.toHaveBeenCalled();
+
+      teardown();
+    });
+
     it("teardown unsubscribes both listeners and cancels the pending timer — no push fires afterward", () => {
       vi.useFakeTimers();
       const pk = "cloud-teardown";

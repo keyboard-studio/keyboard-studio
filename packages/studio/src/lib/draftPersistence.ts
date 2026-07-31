@@ -1073,6 +1073,14 @@ export function startCloudSync(getToken: () => string | null): () => void {
 
     const projectKey = resolveActiveProjectKey();
     if (projectKey === null || isProjectFrozen(projectKey)) return;
+    // The reserved pending slot is a LOCAL-ONLY holding pen for
+    // pre-instantiation progress (see PENDING_PROJECT_KEY / hasPendingProgress
+    // above). It is deliberately excluded from the local project index, and it
+    // must be excluded from the cloud push for the same reason: a pushed
+    // pending record comes back through listServerDrafts() and merges into "My
+    // keyboards" as a phantom "Untitled keyboard" card. Promotion to the real
+    // project key (promotePendingAutosave) is what makes a draft cloud-eligible.
+    if (projectKey === PENDING_PROJECT_KEY) return;
 
     let raw: string | null;
     try {
