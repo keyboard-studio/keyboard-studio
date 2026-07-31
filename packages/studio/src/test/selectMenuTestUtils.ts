@@ -7,6 +7,20 @@
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { expect } from "vitest";
 
+/** Locates the open listbox for a given trigger. SelectMenu.tsx portals its
+ * open `<ul>` to `document.body` (so it escapes ancestor `overflow`
+ * clipping — see that file's header) — it is no longer a DOM descendant of
+ * `trigger.parentElement`, so it can't be found by querying the trigger's
+ * own subtree. Prefer `aria-controls` -> matching `id` for an exact match;
+ * fall back to "the currently open listbox" for the (rare) id-less
+ * SelectMenu, since only one can be open at a time (opening one closes any
+ * other via click-outside). */
+function findOpenListbox(trigger: HTMLElement): Element | null {
+  const listboxId = trigger.getAttribute("aria-controls");
+  const byId = listboxId !== null ? document.getElementById(listboxId) : null;
+  return byId ?? document.querySelector('[role="listbox"]');
+}
+
 /** Opens a SelectMenu trigger and clicks the option with the given value —
  * the button+listbox equivalent of `fireEvent.change(select, { target: { value } })`.
  * Awaits the listbox actually opening before looking for the option: under a
@@ -15,7 +29,8 @@ import { expect } from "vitest";
 export async function changeSelectMenu(trigger: HTMLElement, value: string): Promise<void> {
   fireEvent.click(trigger);
   await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
-  const option = trigger.parentElement?.querySelector(`li[data-value="${value}"]`);
+  const listbox = findOpenListbox(trigger);
+  const option = listbox?.querySelector(`li[data-value="${value}"]`);
   if (option === null || option === undefined) {
     throw new Error(`SelectMenu option not found for value "${value}"`);
   }
@@ -33,9 +48,10 @@ export function selectMenuValue(trigger: HTMLElement): string {
 export async function selectMenuOptionValues(trigger: HTMLElement): Promise<string[]> {
   fireEvent.click(trigger);
   await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
-  const values = Array.from(
-    trigger.parentElement?.querySelectorAll("li[data-value]") ?? [],
-  ).map((el) => el.getAttribute("data-value") ?? "");
+  const listbox = findOpenListbox(trigger);
+  const values = Array.from(listbox?.querySelectorAll("li[data-value]") ?? []).map(
+    (el) => el.getAttribute("data-value") ?? "",
+  );
   fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
   return values;
 }

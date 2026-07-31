@@ -71,6 +71,7 @@ import {
   buildProducedSet,
 } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { collate } from "../../survey/collation.ts";
 import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
 import { getPatternLibraryService } from "../../lib/services.ts";
 import { displayChar } from "../../lib/irToCarveNodes.ts";
@@ -130,6 +131,7 @@ import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
+import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
@@ -1288,7 +1290,7 @@ export function MechanismGallery({
   const unflagCharForSequence = useWorkingCopyStore(
     (s) => s.unflagCharForSequence,
   );
-  const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  const rawInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const axes = useWorkingCopyStore(
     useShallow((s) => s.session.axes as Partial<DiscoveryAxisVector>),
@@ -1337,6 +1339,20 @@ export function MechanismGallery({
     [alreadyProduced],
   );
 
+  // Collated display order (spec 047 FR-007's default-ICU comparator, reused
+  // — not reinvented; see survey/collation.ts): puts a lowercase letter
+  // immediately before its uppercase counterpart (`"a".localeCompare("A")"`
+  // === -1 under the root collation) and keeps accented forms adjacent to
+  // their base. `inventory` feeds the SHOW-ALL CharScrollStrip below plus
+  // the empty-inventory guard and handleSelectDisplayChar's membership
+  // check — both order-independent, so reordering here is safe. The
+  // canonical `confirmedInventory` (rawInventory) is left untouched; only
+  // this display-local derivation is sorted.
+  const inventory = useMemo(
+    () => collate(rawInventory),
+    [rawInventory],
+  );
+
   // The BASE (pre-augmentWithComposable) produced set — same derivation
   // useInventoryDiff() itself starts from before augmenting, NOT
   // alreadyProducedSet above (which is already augmented — the composable
@@ -1362,17 +1378,26 @@ export function MechanismGallery({
   // whole-unit placement of its own, so it leaves the walk. Everything else
   // (plain bases, own-letter units, the productive marks themselves) keeps its
   // flat-inventory walk entry. No worklist (or an empty one) ⇒ identity.
+  //
+  // The worklist-filtered result is then collated (same `collate` helper as
+  // `inventory` above) before being returned — this is the list
+  // usePositionalCharNav's `list` walks and the "first uncovered" default
+  // below reads, so sorting it puts a lowercase letter immediately before
+  // its uppercase counterpart in the Back/Next walk too. The SET of
+  // characters (the coverage/gate denominator, criterion 18.6) is never
+  // widened or narrowed by this — only its order changes.
   const lettersToAdd = useMemo(() => {
-    if (worklist === undefined || worklist.markUnits.length === 0) {
-      return inventoryLettersToAdd;
+    let filtered = inventoryLettersToAdd;
+    if (worklist !== undefined && worklist.markUnits.length > 0) {
+      const productiveMarks = new Set(worklist.markUnits.map((u) => u.mark));
+      filtered = inventoryLettersToAdd.filter((c) => {
+        const units = [...c.normalize("NFD")];
+        if (units.length < 2) return true;
+        const marks = units.slice(1);
+        return !marks.every((m) => productiveMarks.has(m));
+      });
     }
-    const productiveMarks = new Set(worklist.markUnits.map((u) => u.mark));
-    return inventoryLettersToAdd.filter((c) => {
-      const units = [...c.normalize("NFD")];
-      if (units.length < 2) return true;
-      const marks = units.slice(1);
-      return !marks.every((m) => productiveMarks.has(m));
-    });
+    return collate(filtered);
   }, [inventoryLettersToAdd, worklist]);
 
   // Read Phase C assignments directly (not the merged session.assignments view)
@@ -1749,6 +1774,17 @@ export function MechanismGallery({
     },
     [inventory, setCurrentChar],
   );
+
+  // ArrowLeft/ArrowRight character cycling, attached at the PANE level (the
+  // leftContent wrapping div below) rather than on CharScrollStrip itself —
+  // see useCharCycleKeys.ts for why. Reuses `handleSelectDisplayChar` (the
+  // SAME handler CharScrollStrip's chip onClick calls) so there is exactly
+  // one selection call site, not two.
+  const handlePaneKeyDown = useCharCycleKeys({
+    chars: inventory,
+    currentChar,
+    onSelectChar: handleSelectDisplayChar,
+  });
 
   // Whether the suggestion row must stay hidden for the current character —
   // true once explicitly resolved (Accept/Deny), or once the character is
@@ -3059,8 +3095,13 @@ export function MechanismGallery({
   // Left pane content
   // ---------------------------------------------------------------------------
 
+  // onKeyDown lives on this OUTER pane div (not on CharScrollStrip below) so
+  // ArrowLeft/ArrowRight cycles the character no matter which control inside
+  // the pane currently has focus — a plain native keydown bubbles up to here
+  // regardless of the focused descendant. See useCharCycleKeys.ts.
   const leftContent = (
     <div
+      onKeyDown={handlePaneKeyDown}
       style={{
         display: "flex",
         flexDirection: "column",

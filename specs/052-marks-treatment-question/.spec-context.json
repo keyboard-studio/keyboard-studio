@@ -1,0 +1,1246 @@
+{
+  "workflow": "speckit",
+  "specName": "Marks treatment question",
+  "branch": "052-marks-treatment-question",
+  "currentStep": "implement",
+  "status": "implemented",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-29T19:52:56.138Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-29T22:07:26.338Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-29T22:07:26.352Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-29T22:25:09.568Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-29T22:28:02.203Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-29T22:30:10.324Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T01:32:16.133Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T01:34:41.829Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-30T01:35:14.395Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-30T01:53:16.004Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T01:58:20.204Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T01:58:20.482Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:00:32.094Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:00:32.361Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:01:56.557Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:01:56.796Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:05:40.764Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:05:41.019Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:05:41.297Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:18:42.280Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:18:42.645Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:18:42.994Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:18:43.349Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:18:43.794Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:18:44.121Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:18:44.589Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:27:14.117Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:27:14.524Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:27:14.892Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:27:15.294Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:27:15.647Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:32.735Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:32.995Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:33.253Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:33.520Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:33.779Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:34.045Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:34.296Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:34.549Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:34.838Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:35.100Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:35.378Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:49:35.761Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:59:59.541Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T02:59:59.962Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T03:00:00.357Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T03:00:00.792Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T03:00:01.195Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T03:06:37.625Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T03:06:37.875Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T03:06:38.122Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T03:30:48.059Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-30T03:30:48.378Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-30T03:30:48.772Z"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Station S3 (input order) folds into S2; the option set encodes prefix/postfix order. Marks series goes from 5 stations to 4."
+    },
+    {
+      "decision": "Prominence is derived from attestation + productivity spread only. No frequency signal; spec 050-text-sample-prefill could supply one and is deliberately not used."
+    },
+    {
+      "decision": "Work split in two: this spec is the question; regional-incumbent prefill (region -> likely-used keyboards -> diacritic-mechanism facet -> proposal) is a follow-up spec and explicitly out of scope here."
+    },
+    {
+      "decision": "Platform-specific option sets reduce to ONE answer: (treatment, order) + promoted combos. Touch 'layer-then-single-key' is a placement variant of single-key; desktop 'deadkey-then-letter' is an order variant of mark-key. Deadkey-on-touch becomes unrepresentable rather than warned. THIS IS THE ONE JUDGEMENT MADE ON THE OWNER'S BEHALF - confirm at plan review."
+    },
+    {
+      "decision": "Issue #1433 ABSORBED into this spec as User Story 4 (P4), reversing the earlier decision to defer it. Rationale: the strategy audit found that US1 triples the S2 answer surface while leaving it disconnected from strategy selection, which widens the contradiction rather than inheriting it. Adds FR-024..FR-027, SC-011, SC-012, two edge cases, and amendments to the strategy decision tree and its self-consistency table. #1433 is now CLOSED by this feature, not refs."
+    },
+    {
+      "decision": "Team-boundary constraint WAIVED by the product owner for this feature: engine and content sides are being authored together. Constitution Article VI is unchanged and still applies to other features; the plan's Constitution Check must RECORD THE WAIVER rather than assert single-team compliance."
+    },
+    {
+      "decision": "Promote utilities/facet-index/spare-key-budget-classifier.ts measurement to packages/contracts/src/keyBudget.ts as the single authoritative key-budget determination; axis A7 becomes a total, bijective projection of its three bands; base-layouts.json relocates to packages/contracts/data/.",
+      "why": "It is the only one of the three competing determinations that actually computes anything - the numeric spareKeys parameter and axis A7 both have NO producer anywhere outside tests. Contracts (not engine) is the home because utilities/facet-index must keep reading it and a utility may not be depended upon by a package. Bijective banding keeps rule 10s fully-booked predicate firing on exactly todays input set, so the three RAlt-only rows in the 7.5 table are unmoved.",
+      "rejected": "Making A7 canonical (would canonicalise an absence, and its display-string values are documented as unsafe map keys); making the numeric spareKeys canonical (a raw count cannot express ralt-only, which is about WHICH plane has room); injecting the key set and leaving the table tool-local (makes the function single but the data still tool-local, so the divergence returns)."
+    },
+    {
+      "decision": "FR-016 is satisfied by DEFINING A7 as a projection, not by newly seeding A7 into the live session.axes.",
+      "why": "A7 has no live producer, so seeding it would be a first-time activation rather than a preservation: MechanismGallerys fullAxes completeness check would start passing (turning on axis-based pattern ranking for the first time) and rule 10 would start appending S-08 to real selections. Both are far outside this features scope. SC-008 still holds, and holds more strongly - one measurement, no live A7 report to disagree with anything.",
+      "rejected": "Seeding A7 live in this feature (a strategy-selection and gallery-ranking change wearing a key-budget costume); skipping the projection entirely (leaves FR-016 unmet and SC-008 unverifiable)."
+    },
+    {
+      "decision": "CONFIRMED the owner-flagged platform-collapse judgement: one (treatment, order) answer plus promotions covers both platforms; the option set is NOT platform-forked; deadkey-on-touch is unrepresentable rather than warned.",
+      "why": "The codebase settles it. packages/studio/src/steps/advance.ts routes EVERY project through both the mechanisms and touch spine steps, so there is no touch-only target for a forked option set to key on. And the unrepresentable claim is already true: scaffoldTouchLayout.ts resolves recognized deadkey patterns into long-press sk[] subkey menus, so no answer the author can give produces a deadkey on touch. FR-014s second clause is therefore the load-bearing half and is pinned with a derivation test.",
+      "rejected": "Adding a target-platform question so the option set can fork (adds a screen to a series whose FR-018 forbids gaining one, to serve a distinction the product does not make); warning on deadkey-on-touch (a warning about a state the derivation cannot produce)."
+    },
+    {
+      "decision": "US4 derives A4/A3a FROM the recorded treatment via SurveyPhaseResult.computedAxes; the FR-024 disagreement check runs on the SELECTED STRATEGY after selectStrategy, not on the raw axis.",
+      "why": "computedAxes already exists as an additive optional field merged by mergePhaseResults into session.axes - so US4 needs NO contract change, only a producer; its absence IS issue #1433. defaultFillAxes structurally never overwrites an axis already present, so the recorded answer wins over the prior for free. Checking the selection rather than the axis honours the specs own edge case: a base whose behaviour the author knowingly overrode is a legitimate override, not a disagreement.",
+      "rejected": "Deriving treatment FROM A4 (A4 is coarser - four values - and cannot express per-mark treatment or promotions, so the derivation would lose information); detect-and-surface only, deriving nothing (FR-027 requires a treatment change to be reflected in subsequent selection)."
+    },
+    {
+      "decision": "The 7.5 EuroLatin multi-family gap is RESTATED AS OPEN with its reason unchanged, not closed. PlacementWorklists shape is left unchanged (ownLetterUnits keeps its now-misleading name); only verifyWorklistCoverages classified-twice assertion is deleted.",
+      "why": "The EuroLatin rows reason is that MML-as-target is out of scope for v1; nothing in this feature changes MML scope, so closing it would need evidence this feature does not produce. Restating unchanged is what FR-026/US4-AC4 permit and what is honest. Leaving the worklist shape alone keeps the spec assumption that drafts load without migration (FR-021/SC-010) and avoids touching the reducer, carves needed-set derivation, and the mechanism gallery for no behavioural gain.",
+      "rejected": "Renaming ownLetterUnits to keyedUnits for honesty - breaks the worklist-shape-unchanged assumption and touches every downstream consumer; worth a separate maint(contracts) change."
+    },
+    {
+      "decision": "MarkTreatmentPrefill and BaseMarkMechanism are declared in treatment.ts (the vocabulary module), not in treatment-prefill.ts (the computing module), and re-exported from the latter.",
+      "why": "treatmentFor resolves THROUGH the prefill, so the vocabulary module needs its type; declaring it in the computing module produced a real depcruise no-circular violation (treatment-prefill -> promotion -> treatment -> treatment-prefill). The contract doc already documents the prefill as part of the answer contract, so this placement matches it.",
+      "rejected": "Suppressing the depcruise rule for a type-only cycle, or inlining a structural duplicate of the prefill shape in treatment.ts."
+    },
+    {
+      "decision": "KeyBudget carries a fourth field, planes: { shiftBound, altgrBound, stockKeys }, beyond the three the contract doc pins.",
+      "why": "The facet classifier reports the total bound-key count as its evidenceSize. Without machine-readable plane counts the only options were re-deriving the plane analysis inside the tool - the exact duplication FR-016 exists to remove - or regex-parsing the counts back out of the notes prose, which makes a prose string load-bearing.",
+      "rejected": "Parsing the counts out of KeyBudget.notes (implemented first, then removed as fragile); dropping evidenceSize, which would have moved a shipped facet-index value."
+    },
+    {
+      "decision": "The FR-024 disagreement check runs after selectStrategy, on the selection, and fires only when every mark is composed while the selected primary is a compose-as-you-type strategy.",
+      "why": "Research D6 and the spec edge case: a base whose mechanism the author knowingly overrode is a legitimate override, not a disagreement. Only a contradiction with the SELECTED strategy counts. The check is also not redundant with the A4 derivation - rule 5 fires on A3/A1 alone, so a composing primary can still be selected when the derived A4 is none.",
+      "rejected": "Checking the raw axis vector, which would fire on every deliberate override of a base-derived signal."
+    },
+    {
+      "decision": "@keyboard-studio/contracts bumped 0.16.0 -> 0.17.0 alongside the engine 0.1.0 -> 0.2.0 that tasks.md specified.",
+      "why": "US3 adds a new locked surface to contracts (keyBudget.ts, its zod mirrors and Art. I drift guards, and the relocated pinned table). The package bumps its 0ver minor for every locked-surface change (0.11.0 IRPath, 0.12.0 TouchKeyIR.provenance, 0.13.0 touch schemas); leaving it unbumped would break that convention silently.",
+      "rejected": "Leaving contracts at 0.16.0 because tasks.md did not name a contracts bump."
+    },
+    {
+      "decision": "promotableCharacters does not require a promoted character to have a single-codepoint precomposed form.",
+      "why": "The data model defines a promotion as a reachable base+mark pair placed on a dedicated key; a key can emit a two-codepoint sequence just as well as one. Filtering to precomposed-only would silently exclude exactly the orthographies (Cameroonian tone among them) this feature exists to serve.",
+      "rejected": "Restricting promotion to pairs with a precomposed NFC form."
+    }
+  ],
+  "concerns": [
+    {
+      "note": "The station's answer type is a locked engine contract: this needs a major version bump of the owning package plus a joint engine+content session per spec 18. It is NOT the Pattern schema, so Constitution Article I stop-and-escalate does not fire, but the 18 process still applies."
+    },
+    {
+      "note": "Three governing-spec amendments must land in the SAME change as the behaviour: 046-marks-question-series FR-010, FR-011, FR-012, and SC-007. SC-007 changes from 'exactly once' to 'at least once / nothing unclassified' because non-exclusivity makes dual reachability intended; the corresponding 'classified twice' assertion in the worklist must be deleted, not worked around."
+    },
+    {
+      "note": "OPEN PLAN-TIME DECISION: which of three competing key-budget determinations becomes canonical (a numeric prefill parameter with no producer, categorical axis A7, or the offline facet-index classifier). US3/FR-016 depends on it."
+    },
+    {
+      "note": "Issue #1433 (this station's answer and the diacritic-behaviour axis A4 can silently disagree, with nothing in the strategy decision tree or its self-check table detecting it) is adjacent and NOT closed by this feature. The follow-up regional-prefill spec touches the same seam and should settle it."
+    },
+    {
+      "note": "Constitution Article VI declares team ownership in the SINGULAR, but this feature is genuinely split: engine owns the answer type, worklist mapping and key budget; content owns the designer-facing wording. Must be confirmed at the plan Constitution Check rather than assumed to pass."
+    },
+    {
+      "note": "km-strategy judges that deferring issue #1433 makes it MATERIALLY WORSE: this feature triples the S2 answer surface (treatment + promotion + order, independently settable) while leaving it entirely disconnected from strategy selection, so there are more ways for the axis-driven decision tree to recommend a strategy the author's answers contradict. Escalated to the product owner as a scope decision."
+    },
+    {
+      "note": "Corpus hygiene, not fixed: NINE duplicated spec NNN prefixes (010, 012, 023, 030, 036, 046, 047, 050, 051). The 046 collision already caused a real misattribution during this feature's review. No convention in CLAUDE.md or the constitution enforces uniqueness, and spec-trace keys units by full directory name so the collisions are invisible to it."
+    },
+    {
+      "note": "RESOLVED at plan time (was OPEN): the three-way key-budget contest is settled - the facet-index measurement is canonical, promoted to packages/contracts/src/keyBudget.ts, with A7 as a bijective projection. Residual risk is narrow: the relocation must emit byte-identical facet-index values (re-run facet-index and diff docs/keyboard-facet-index.json, expect no change) and base-layouts.json moves out of a deliberately tool-local spec 040 location."
+    },
+    {
+      "note": "US2 acceptance scenario 4 (Given a touch target, the mark-before-letter option is not offered) is satisfiable only VACUOUSLY - no touch-only target exists in the spine. The plan reads FR-014s second clause as load-bearing and pins it with a touch-derivation test instead. If the product later gains a real target-platform notion, that AC becomes live and needs re-examination."
+    },
+    {
+      "note": "Engine is at 0.1.0, so the 18 major-version-bump lands as 0.1.0 -> 0.2.0 under pre-1.0 semver (the minor is the breaking signal). Intent is satisfied but the literal wording of 18 says major - confirm at the required joint engine+content session rather than assuming."
+    },
+    {
+      "note": "FR-014 clause 1 (the mark-before-character option MUST NOT be OFFERED for a touch target) is satisfied only vacuously: the spine routes every project through both the desktop and touch steps, so there is no touch-only target to withhold an option from. Only clause 2 (not PRODUCIBLE there) is actually verified. This matches research D5 and was a deliberate plan decision, but it means US2 AC4 has no non-vacuous test and would need revisiting if a touch-only target is ever introduced.",
+      "step": "implement"
+    },
+    {
+      "note": "T033 asked for a zero-line facet-index diff and got a one-line one: manifest.referencePins[].file records the relocated path of base-layouts.json. The sha256 is unchanged and zero Categorization values moved, so the MEASUREMENT is provably identical - but a reviewer scanning for a clean diff should know the one line is expected and why.",
+      "step": "implement"
+    },
+    {
+      "note": "eslint-plugin-lingui was declared in the root package.json but absent from node_modules, so pnpm lint could not run at all until pnpm install --frozen-lockfile restored it. Pre-existing local install drift, not caused by this feature, but it means the lint gate had not been runnable in this working copy.",
+      "step": "implement"
+    },
+    {
+      "note": "The station renders each mark as its glyph plus U+XXXX notation (inherited verbatim from the retired MentalModelStation and the sibling attachment station). U+ notation is arguably the character-encoding jargon FR-008 bans, but it is outside the five regexes contracts/station-ui.md pins as the assertion surface, and changing it would diverge this station from its siblings. Flagged for the content reviewer rather than changed unilaterally.",
+      "step": "implement"
+    }
+  ],
+  "context": [
+    "Multi-phase feature (3 user stories): the constitution's one-conversation-per-phase policy applies. Pipeline halts after specify; /clear and resume in a fresh conversation to plan and build P1.",
+    "Scope grew after the sync audit: four user stories now, not three. US4 (strategy consistency) carries the widest regression surface - it amends spec 007-strategy-selection's decision tree and self-consistency table, and every keyboard that table covers needs revalidation. The open multi-family gap documented there is directly implicated and must be either closed with evidence or restated as open with its reason unchanged."
+  ],
+  "verified": [
+    {
+      "what": "Sync audit (km-doc): Constitution Articles I, IV, VII, VIII PASS. Verified the changed type is an engine type, not the locked Pattern schema, so Article I stop-and-escalate does not fire. Demonstration widget correctly outside D3. No-deadkey-on-touch is platform-correct derivation, not forbidden touch-first authoring. km-phase-break sentinels intact in speckit.companion.specify.md and .implement.md, so this multi-phase feature halts after specify. CLAUDE.md gains no stale content."
+    },
+    {
+      "what": "Sync audit (km-strategy): no S-01..S-12 strategy card assumes a single production route, so FR-006 dual reachability needs no catalog change. A3a input-order prefill still has a home after the S3 fold-in; nothing orphaned. Spec 049 additive-expansion guarantee not broken. Spec 050 genuinely could supply a frequency signal, so this spec's 'deliberately not used' claim is honest."
+    },
+    {
+      "what": "Three spec defects found by audit and FIXED in-spec: (1) amendment list undercounted, dropping FR-010 from the Assumptions enumeration; (2) SC-006's literal five-screen ceiling was missing from the amendment list though SC-003 supersedes it with four; (3) case derivation for promoted composed characters was unspecified against spec 049 - added as FR-023 plus an edge case."
+    },
+    {
+      "what": "Constitution Check: Articles I-V, VII, VIII PASS; VI recorded as owner-waived. Article I verified by inspection, not assumption - MentalModelAnswer is declared in packages/engine/src/marks/mental-model-prefill.ts, is absent from packages/contracts/src/pattern.ts, and has no zod mirror or drift guard in schemas.ts, so the stop-and-escalate does not fire. Article IV verified against the D3 scope note: the demonstration widget emits no diagnostics, so it is outside the debounce cycle."
+    },
+    {
+      "what": "Axis A7 spareKeyAvailability has NO producer anywhere outside tests/fixtures/mocks - exhaustive grep across packages/, content/, utilities/ returns only the type declaration (axes.ts:99), decision rule 10 (rules.ts:241), and MechanismGallerys completeness check (line 1547). Decision rule 10 is A7s ONLY consumer; rule 8 keys on A7a remapPosture, correctly out of scope."
+    },
+    {
+      "what": "SurveyPhaseResult.computedAxes already exists as an additive optional Partial<DiscoveryAxisVector> (surveyPhaseResult.ts:51) merged into session.axes by mergePhaseResults - so US4 needs NO contract change. Confirmed the marks series today emits {phase:C, answers:[], marksWorklist, marksOutputForm} and omits computedAxes; that omission is issue #1433."
+    },
+    {
+      "what": "The key-budget defect reproduces exactly as the spec claims: computeMentalModelPrefills accepts spareKeys (mental-model-prefill.ts:78) and gates on spareKeys === null || unitCount <= spareKeys (line 99), but MarksSeriesStep.tsx:192 passes only { baseIr } - so ownLetterAffordable is unconditionally true and a fully-booked base is reported as affordable."
+    },
+    {
+      "what": "FR-014s load-bearing half already holds structurally: scaffoldTouchLayout.ts resolves recognized deadkey patterns into long-press sk[] subkey menus, so no answer produces a deadkey on touch. And advance.ts routes every project through BOTH mechanisms and touch, so no touch-only target exists - which is the evidence confirming the owner-flagged platform-collapse assumption."
+    },
+    {
+      "what": "Full monorepo typecheck",
+      "command": "pnpm typecheck",
+      "result": "PASS - 7 projects, 0 errors",
+      "warnings": []
+    },
+    {
+      "what": "Full test suite",
+      "command": "pnpm -r test",
+      "result": "PASS - 7574 tests passed, 2 skipped, 0 failed (contracts 487, engine 2248, studio 4548, keyboard-lint 82, glottolog 42, llm 9, oauth-backend 160)",
+      "warnings": [
+        "jsdom HTMLCanvasElement.getContext not-implemented noise in fontSupport tests and a useLingui-without-provider probe in AppRoot.test.tsx - both pre-existing, both inside passing tests"
+      ]
+    },
+    {
+      "what": "Full lint gate incl. depcruise and the five plain-node linters",
+      "command": "pnpm lint",
+      "result": "PASS - 0 errors; depcruise clean (869 modules), facet-index-lint/i18n-catalog-lint/content-i18n-lint/test-antipattern-lint all GREEN",
+      "warnings": [
+        "120 pre-existing lingui/no-unlocalized-strings warnings across the studio, none in files this feature added"
+      ]
+    },
+    {
+      "what": "Facet-index corpus re-run and artifact diff (T033, FR-016/SC-008)",
+      "command": "npx tsx utilities/facet-index/cli.ts --classified-only over 927 corpus keyboards, then a structural leaf diff against the committed artifact",
+      "result": "PASS - exactly ONE differing leaf: manifest.referencePins[].file, the recorded path of the relocated base-layouts.json. Its sha256 is unchanged, proving byte-identical data. Zero Categorization values moved, so the measurement did not change",
+      "warnings": [
+        "T033 says expect no change; the one-line path rename is accepted and recorded as a deviation rather than treated as a measurement change"
+      ]
+    },
+    {
+      "what": "Strategy self-consistency suite (T038, FR-026/SC-012)",
+      "command": "pnpm --filter @keyboard-studio/engine test src/strategy-selector",
+      "result": "PASS - all 13 covered keyboards select exactly what they selected before; zero rows changed, so no row required amendment",
+      "warnings": []
+    },
+    {
+      "what": "Engine package builds after the import-cycle fix",
+      "command": "pnpm --filter @keyboard-studio/engine build && pnpm run depcruise",
+      "result": "PASS - no dependency violations (869 modules, 2832 dependencies cruised)",
+      "warnings": []
+    }
+  ],
+  "telemetryInstanceId": "a28a87a4-2fbe-4296-a91b-6e1e6a97c053",
+  "approach": "Replace S2's single mutually-exclusive answer with a MarkTreatmentAnswer record (per-mark treatment, an independent promoted-composed-character set, and the input order folded in from the retired S3), reducing the series from five rendered stations to four. Promote the facet-index spare-key measurement into packages/contracts as the single authoritative key-budget determination, with axis A7 redefined as a boundary-preserving projection of it. Close the strategy seam by having the marks series emit computedAxes (an existing additive optional field), so the recorded treatment reaches selectStrategy instead of being invisible to it.",
+  "step_summaries": {
+    "plan": {
+      "summary": "Plan + research + data-model + three contracts written; Constitution Check passes with Article VI recorded as owner-waived and three Complexity Tracking rows; all four open plan-time questions resolved.",
+      "key_finding": "Axis A7 spareKeyAvailability has no producer anywhere outside tests - so FR-016s preserve-todays-results clause is trivially satisfiable, and the real risk was never preservation but first-time ACTIVATION. Scoping FR-016 to define-the-projection rather than seed-the-axis keeps this feature out of the gallery-ranking regression surface entirely."
+    },
+    "tasks": {
+      "summary": "43 tasks across 7 phases: Setup (2, S18 gate + version bump), Foundational (4, answer type + promotion + prefill + barrel), US1 P1 (10), US2 P2 (5), US3 P3 (12), US4 P4 (5), Polish (5). Laid out as 18 waves with explicit join points; largest independent waves are US1 wave 2 (4 files) and US3 wave 4 (5 files)."
+    },
+    "implement": {
+      "summary": "Replaced the marks-series unithood question with a three-part answer (per-mark treatment + promoted composed characters + folded input order), added operable per-option demonstrations, made the key budget a single authoritative determination read by both the station and the facet index, and projected the recorded answer onto A4/A3a so strategy selection can finally see it."
+    }
+  },
+  "coverage": {
+    "FR-001": {
+      "title": "Record per-mark treatment, seeded from a per-class default an individual mark may override",
+      "tasks": [
+        "T003",
+        "T005",
+        "T008",
+        "T011",
+        "T014"
+      ],
+      "tests": [
+        "packages/engine/src/marks/marks-foundations.test.ts::resolves override > class > prefill",
+        "packages/engine/src/marks/marks-foundations.test.ts::US1 AC3"
+      ]
+    },
+    "FR-002": {
+      "title": "Separately record which specific composed characters are promoted to dedicated keys",
+      "tasks": [
+        "T004",
+        "T011",
+        "T014"
+      ],
+      "tests": [
+        "packages/engine/src/marks/marks-foundations.test.ts::promotableCharacters",
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::promotion is a set of CHECKBOXES"
+      ]
+    },
+    "FR-003": {
+      "title": "Treatment and promotion MUST be independently settable",
+      "tasks": [
+        "T004",
+        "T010",
+        "T011",
+        "T007"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::toggling a promotion reports the character",
+        "packages/engine/src/marks/worklist-and-prefill.test.ts::US1 AC1"
+      ]
+    },
+    "FR-004": {
+      "title": "Record whether a mark is typed before or after its base, as part of the same answer",
+      "tasks": [
+        "T003",
+        "T011",
+        "T014"
+      ]
+    },
+    "FR-005": {
+      "title": "Produce placement units for both bare mark and each promoted character; nothing unaccounted",
+      "tasks": [
+        "T010",
+        "T007"
+      ],
+      "tests": [
+        "packages/engine/src/marks/worklist-and-prefill.test.ts::US1 AC1 / FR-005+FR-006"
+      ]
+    },
+    "FR-006": {
+      "title": "A composed character reachable by more than one route MUST be permitted",
+      "tasks": [
+        "T010",
+        "T007",
+        "T012"
+      ],
+      "tests": [
+        "packages/engine/src/marks/worklist-and-prefill.test.ts::the 'classified twice' problem no longer exists at all",
+        "packages/engine/src/marks/worklist-and-prefill.test.ts::SC-009"
+      ]
+    },
+    "FR-007": {
+      "title": "No designer-facing text may assert or deny that a marked form is a letter of an alphabet",
+      "tasks": [
+        "T009",
+        "T011",
+        "T016"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::FR-007/SC-004/US1 AC4"
+      ]
+    },
+    "FR-008": {
+      "title": "No designer-facing text may use production jargon (deadkey, encoding, normalisation)",
+      "tasks": [
+        "T009",
+        "T011",
+        "T016"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::FR-008/SC-004"
+      ]
+    },
+    "FR-009": {
+      "title": "Every option presented as a proposal with a recommendation already selected",
+      "tasks": [
+        "T003",
+        "T005",
+        "T011"
+      ]
+    },
+    "FR-010": {
+      "title": "Each offered option has an operable two-or-three-key demonstration from the author's own letters",
+      "tasks": [
+        "T017",
+        "T018",
+        "T019"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::FR-010/SC-005"
+      ]
+    },
+    "FR-011": {
+      "title": "The mark-before-letter demo shows the pending state on screen and announces it to AT",
+      "tasks": [
+        "T017",
+        "T018"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::FR-011/SC-006/US2 AC2",
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::the pending state announces itself"
+      ]
+    },
+    "FR-012": {
+      "title": "Operating a demo must not change selection, mutate the working copy, or emit a diagnostic",
+      "tasks": [
+        "T017",
+        "T018",
+        "T019"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::FR-012/US2 AC1",
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::FR-012/US2 AC5"
+      ]
+    },
+    "FR-013": {
+      "title": "Demonstrations advance only on author action - no timed or automatic playback",
+      "tasks": [
+        "T017",
+        "T018"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::FR-013"
+      ]
+    },
+    "FR-014": {
+      "title": "Mark-before-letter is not offered on touch and is not producible there by any answer",
+      "tasks": [
+        "T020"
+      ],
+      "tests": [
+        "packages/engine/src/scaffolder/scaffoldTouchLayout.test.ts::spec 052 FR-014"
+      ]
+    },
+    "FR-015": {
+      "title": "Promotion offered only when the base has room; otherwise unavailable with a plain-language reason",
+      "tasks": [
+        "T023",
+        "T031",
+        "T032",
+        "T011"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::US3 AC1/SC-007",
+        "packages/engine/src/marks/worklist-and-prefill.test.ts::an over-budget promotion is UNAVAILABLE"
+      ]
+    },
+    "FR-016": {
+      "title": "A single authoritative key-budget determination; all other representations derived, boundary preserved",
+      "tasks": [
+        "T024",
+        "T025",
+        "T027",
+        "T029",
+        "T030",
+        "T022",
+        "T033"
+      ],
+      "tests": [
+        "packages/contracts/src/keyBudget.test.ts::keyBudgetToSpareKeyAvailability",
+        "packages/contracts/src/keyBudget.test.ts::rule 10's predicate fires on exactly one band"
+      ]
+    },
+    "FR-017": {
+      "title": "At least one option remains selectable regardless of budget",
+      "tasks": [
+        "T023",
+        "T031"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx::FR-017/US3 AC3",
+        "packages/engine/src/marks/worklist-and-prefill.test.ts::FR-017"
+      ]
+    },
+    "FR-018": {
+      "title": "The marks series must not gain a station; folding order in reduces the rendered count",
+      "tasks": [
+        "T009",
+        "T014",
+        "T012"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::FR-018/SC-003"
+      ]
+    },
+    "FR-019": {
+      "title": "A class with nothing to decide renders no screen and takes every answer from the proposal",
+      "tasks": [
+        "T009",
+        "T014"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::FR-019/US1 AC6"
+      ]
+    },
+    "FR-020": {
+      "title": "An alphabet change re-proposes all affected answers and requires reconfirmation",
+      "tasks": [
+        "T009",
+        "T014",
+        "T008"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::FR-020/US1 AC7",
+        "packages/engine/src/marks/marks-foundations.test.ts::prunePromotions"
+      ]
+    },
+    "FR-021": {
+      "title": "Previously saved drafts remain loadable without migration",
+      "tasks": [
+        "T040",
+        "T010"
+      ],
+      "tests": [
+        "packages/studio/src/lib/draftPersistence.test.ts::spec 052 FR-021/SC-010"
+      ]
+    },
+    "FR-022": {
+      "title": "The output-form decision remains a separate whole-keyboard question deriving from this station",
+      "tasks": [
+        "T013",
+        "T014"
+      ],
+      "tests": [
+        "packages/engine/src/marks/output-form-policy.test.ts::FR-016: all pairs compose + an own-key mark"
+      ]
+    },
+    "FR-023": {
+      "title": "Promoting a composed character derives its uppercase counterpart, additively, never withdrawing",
+      "tasks": [
+        "T004",
+        "T008"
+      ],
+      "tests": [
+        "packages/engine/src/marks/marks-foundations.test.ts::expandCaseCounterpartPromotions"
+      ]
+    },
+    "FR-024": {
+      "title": "Recorded treatment and the diacritic-behaviour axis must not disagree silently",
+      "tasks": [
+        "T034",
+        "T035",
+        "T036"
+      ],
+      "tests": [
+        "packages/engine/src/marks/strategy-reconcile.test.ts::surfaceStrategyDisagreement"
+      ]
+    },
+    "FR-025": {
+      "title": "Where reconciled by precedence, that precedence is stated in the governing strategy spec",
+      "tasks": [
+        "T037"
+      ]
+    },
+    "FR-026": {
+      "title": "Strategy selection produces the same result for every table-covered keyboard, or the row is amended with a reason",
+      "tasks": [
+        "T038",
+        "T022"
+      ],
+      "tests": [
+        "packages/engine/src/strategy-selector/index.test.ts::7.5 seed fixtures"
+      ]
+    },
+    "FR-027": {
+      "title": "A change to the recorded treatment is reflected in subsequent strategy selection",
+      "tasks": [
+        "T034",
+        "T035",
+        "T036"
+      ],
+      "tests": [
+        "packages/engine/src/marks/strategy-reconcile.test.ts::FR-027"
+      ]
+    }
+  },
+  "currentTask": "T043",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Recorded the §18 joint engine+content session for MentalModelAnswer -> MarkTreatmentAnswer, with the 0.1.0->0.2.0 pre-1.0 semver bump rationale and the Article VI waiver",
+      "files": [
+        "docs/spec-signoff.md"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Bumped @keyboard-studio/engine 0.1.0 -> 0.2.0 per the §18 change record",
+      "files": [
+        "packages/engine/package.json"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Created the MarkTreatment answer type module: MarkTreatment/PromotedComposedCharacter/MarkTreatmentAnswer plus treatmentFor, pruneMarkOverrides, dominantTreatment, isClassMixed; reuses MarkInputOrder from contracts",
+      "files": [
+        "packages/engine/src/marks/treatment.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Created the promotion module: promotableCharacters (lowercase/caseless reachable pairs), additive expandCaseCounterpartPromotions, prunePromotions; reuses the caseCounterpart primitive",
+      "files": [
+        "packages/engine/src/marks/promotion.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Replaced mental-model-prefill with treatment-prefill: MarkTreatmentPrefill (promotionProposal + promotionAffordable/unaffordableReason) and computeMarkTreatmentPrefills behind an explicit typed keyBudget input; deleted the superseded module",
+      "files": [
+        "packages/engine/src/marks/treatment-prefill.ts",
+        "packages/engine/src/marks/mental-model-prefill.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Updated engine barrel: exports treatment/promotion/treatment-prefill; removed MentalModelAnswer, MentalModelPrefill, computeMentalModelPrefills",
+      "files": [
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Rewrote worklist/prefill tests for the new answer shape: dual reachability produces both units, NFC dedup, SC-009 at-least-once coverage, and the classified-twice problem asserted gone",
+      "files": [
+        "packages/engine/src/marks/worklist-and-prefill.test.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Added treatment/promotion foundation tests: override>class>prefill resolution, mixed classes, override pruning, lowercase-only promotable set, additive case-counterpart derivation incl. the no-single-uppercase edge case",
+      "files": [
+        "packages/engine/src/marks/marks-foundations.test.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Added station tests over the five-script fixture matrix: FR-007/FR-008 wording assertions, four-station ceiling, two-screen simple case, skip, nothing-to-decide, and alphabet-edit re-proposal",
+      "files": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Reshaped WorklistInputs to treatment+prefills, implemented the production-rules table incl. promoted-character units regardless of treatment, and DELETED verifyWorklistCoverage's classified-twice problem (invariant restated as at-least-once/nothing-unclassified)",
+      "files": [
+        "packages/engine/src/marks/worklist.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Built MarkTreatmentStation: per-class treatment radiogroup with (suggested) tag, per-mark override details, independent checkbox promotion group with absent-vs-disabled-with-reason states, and the folded input-order group reading pb_mark_input_order",
+      "files": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.tsx"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Amended spec 046 in the same change: FR-010 (three-part answer), FR-011 (key budget signal), FR-012 (order no longer its own station), SC-006 (five->four, superseded by 052 SC-003), SC-007 (exactly once -> at least once)",
+      "files": [
+        "specs/046-marks-question-series/spec.md"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Output-form proposal input hasLetterPlusMarkClass -> hasOwnKeyMark; the decision stays a separate whole-keyboard question still derived from this station",
+      "files": [
+        "packages/engine/src/marks/output-form-policy.ts",
+        "packages/engine/src/marks/output-form-policy.test.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Rewired MarksSeriesStep: four station ids, MarkTreatmentStation rendered, computeMarkTreatmentPrefills called, reshaped WorklistInputs passed, and re-proposal extended to re-seed treatment, prune promotions/overrides, and re-seed order only when not explicitly set",
+      "files": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Deleted the superseded MentalModelStation and InputOrderStation components",
+      "files": [
+        "packages/studio/src/survey/marks/MentalModelStation.tsx",
+        "packages/studio/src/survey/marks/InputOrderStation.tsx"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Ran lingui extract --clean: 11 new survey.marks.treatment.* ids filled in en, 8 orphaned mentalModel/inputOrder ids removed, fr left untranslated; i18n-catalog-lint green",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Added the demo test suite (and, in the same file, the US3 promotion-gate tests T023 covers): per-option demos, no-inert-press invariant, postfix bare-letter contrast, no-selection-change, no-timer, separate keyboard reachability",
+      "files": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Built MarkDemoWidget: 2-3 keys from the author's own letters/marks, demo-key-N/demo-output/demo-reset handles, demo-pending only in the prefix intermediate state with role=status aria-live=polite; no timer, no working-copy write, no diagnostic",
+      "files": [
+        "packages/studio/src/survey/marks/MarkDemoWidget.tsx"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Mounted one demo per offered option in the station, with the demo outside the option label so selection and demo operation stay separate controls",
+      "files": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Pinned FR-014's load-bearing clause with a derivation test over all four (treatment, order) combinations: no bare waiting mark and no deadkey reference reaches any touch key, the desktop deadkey resolves into a long-press sk[] menu, and both orders derive the same touch layout",
+      "files": [
+        "packages/engine/src/scaffolder/scaffoldTouchLayout.test.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Extracted the four new survey.marks.demo.* strings into en; fr left untranslated; i18n-catalog-lint green",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Added key-budget tests: total+bijective band->A7 projection, rule-10 fires on exactly one band, the intermediate band stays 'RAlt only', null for a base binding no stock key, spareKeys never negative and 0 when fully booked, schema-valid output, determinism",
+      "files": [
+        "packages/contracts/src/keyBudget.test.ts"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Station budget tests (authored in the same file as T017): fully-booked -> unavailable-with-reason, ample -> offered, absent vs unavailable distinction, composed selectable at every band, exhausted-budget+high-productivity still completable",
+      "files": [
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "git mv'd base-layouts.json to packages/contracts/data/ byte-identically (sha256 unchanged) and updated the SOURCES.json pin with a relocatedFrom/relocationNote provenance record",
+      "files": [
+        "packages/contracts/data/base-layouts.json",
+        "utilities/facet-index/data/SOURCES.json"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Created packages/contracts/src/keyBudget.ts: KeyBudgetBand/KeyBudget/measureKeyBudget/keyBudgetToSpareKeyAvailability, algorithm ported unchanged (stock kbdus universe, base plane and reserved chords excluded, distinct bound keys per plane, half-of-N boundary), IR-only, null rather than a false 'many'",
+      "files": [
+        "packages/contracts/src/keyBudget.ts"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Added KeyBudgetBandSchema/KeyBudgetSchema zod mirrors and their compile-time drift guards alongside the existing mirrors",
+      "files": [
+        "packages/contracts/src/schemas.ts"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Documented A7 spareKeyAvailability as a projection of keyBudget.ts with the mapping table, restating that its display-string values stay unsafe as map keys",
+      "files": [
+        "packages/contracts/src/axes.ts"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Exported ./keyBudget from the contracts barrel",
+      "files": [
+        "packages/contracts/src/index.ts"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Made spare-key-budget-classifier a thin delegate to measureKeyBudget, leaving the Categorization wrapper (confidence, provenance tier, analysed coverage, undetermined fallback) untouched; evidenceSize now reads the measurement's machine-readable plane counts",
+      "files": [
+        "utilities/facet-index/spare-key-budget-classifier.ts"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "base-layout.ts now takes the default table from @keyboard-studio/contracts STOCK_BASE_LAYOUTS (fail-loud validation retained), keeping the fixture-path test hook",
+      "files": [
+        "utilities/facet-index/base-layout.ts"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Replaced the stub with the real budget in the prefill: promotionAffordable/unaffordableReason and the budget-filtered promotionProposal derive from spareKeys, gating promotion only and never treatment",
+      "files": [
+        "packages/engine/src/marks/treatment-prefill.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "MarksSeriesStep now calls measureKeyBudget(baseIr) and passes { baseIr, keyBudget } to the prefill, threading the budget to the station's promotion gate",
+      "files": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Re-ran facet-index over 927 corpus keyboards: structural diff shows exactly ONE differing leaf, manifest.referencePins[5].file (path rename), sha256 unchanged; zero Categorization values moved, facet-index-lint green",
+      "files": [
+        "docs/keyboard-facet-index.json"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Added reconciliation tests: A4/A3a derivation incl. never-replacing-cycling, mixed-class dominant treatment surfaced, FR-027 selection change, FR-024 surfacing, and the legitimate base-override edge case that must stay silent",
+      "files": [
+        "packages/engine/src/marks/strategy-reconcile.test.ts"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Built strategy-reconcile: deriveMarksComputedAxes (A4 from own-key marks across mark families, A3a verbatim, replacing-cycling never derived) plus the post-selectStrategy FR-024 disagreement surface",
+      "files": [
+        "packages/engine/src/marks/strategy-reconcile.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "MarksSeriesStep now emits computedAxes { diacriticBehavior, markInputOrder } on its phase result (no contract change - the field already existed; its omission was the defect), with a series test asserting it reaches the result",
+      "files": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Amended §7.2 with the stated axis precedence (recorded > base-derived fill > script-class prior), noting defaultFillAxes never overwrites a present axis and that the FR-024 check runs post-selectStrategy",
+      "files": [
+        "specs/007-strategy-selection/spec.md"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "Re-ran the §7.5 suite: all 13 covered keyboards select what they selected before, zero rows changed, so none needed amendment; recorded the revalidation and restated the EuroLatin multi-family row as OPEN with its MML-out-of-scope reason unchanged",
+      "files": [
+        "specs/007-strategy-selection/spec.md"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "Updated the stale design note: S2 rewritten as the three-part treatment/promotion/order station with the retired unithood wording explained, S3 marked retired-and-folded, exit state restated for dual reachability",
+      "files": [
+        "docs/design-notes/mark-composition-model.md"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Verified FR-021/SC-010 with two draft round-trip tests: a pre-052-shaped marks phase result loads unmigrated with no computedAxes invented, and the new dual-reachability worklist persists through the same path",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.test.ts"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Walked all 27 FRs and 12 SCs against shipped behaviour with the proving check named for each, plus three recorded deviations (KeyBudget.planes, contracts 0.17.0 bump, one-line facet-index path diff)",
+      "files": [
+        "specs/052-marks-treatment-question/checklists/requirements.md"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Ran the full gate green: pnpm typecheck (7 projects), pnpm -r test (7574 passed, 2 skipped), pnpm lint (0 errors incl. depcruise, facet-index-lint, i18n-catalog-lint, content-i18n-lint, test-antipattern-lint). Fixed two lint findings in-place: an unused test import and a real depcruise import cycle",
+      "files": [
+        "packages/engine/src/marks/treatment.ts",
+        "packages/engine/src/marks/treatment-prefill.ts",
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx",
+        "packages/studio/src/survey/marks/MarkTreatmentStation.test.tsx"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "Acknowledged spec-corpus drift for the three changed sections (007-strategy-selection, 046-marks-question-series, 052-marks-treatment-question); spec-trace check now clean across 82 sections",
+      "files": [
+        "docs/spec-trace.json"
+      ]
+    }
+  },
+  "last_action": "all 43 tasks done - typecheck/lint clean, 7574 tests pass, facet-index corpus re-run shows zero measurement change, §7.5 suite unchanged across all 13 rows"
+}

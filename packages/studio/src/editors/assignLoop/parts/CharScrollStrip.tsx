@@ -169,12 +169,32 @@ export function CharScrollStrip({
     return () => stripEl.removeEventListener("wheel", handleWheel);
   }, []);
 
+  // ArrowLeft/ArrowRight cycling has moved to the PANE level — see
+  // useCharCycleKeys.ts's file header for why (TouchGallery's method-chooser
+  // subtree can pull DOM focus off a chip, which silently killed a
+  // chip-scoped keydown handler). This component no longer listens for
+  // keydown at all; it only reflects the caller's `currentChar` — see the
+  // two effects below.
+
   // Auto-scroll the current chip into view (horizontally only — inline
-  // "nearest" never triggers a vertical/page scroll) whenever the selected
+  // "nearest" never triggers a vertical/page scroll), and, if keyboard focus
+  // was already resting on one of THIS strip's own chips (an in-progress
+  // roving-focus session — i.e. the author was already navigating the strip
+  // via the keyboard), move focus onto the newly selected chip too, so
+  // keyboard navigation stays inside the strip rather than left behind on
+  // the now-stale previously-focused chip. Both run whenever the selected
   // character changes.
+  //
+  // The focus-follow is deliberately gated on "focus is already inside this
+  // strip" rather than firing unconditionally on every `currentChar` change:
+  // `currentChar` also changes from causes that have nothing to do with
+  // keyboard chip-to-chip navigation — clicking "Next character"/"Skip",
+  // accepting a suggestion, etc. — and none of those should yank focus away
+  // from the control the author just activated onto a distant chip.
   useEffect(() => {
     if (currentChar === null) return;
     const el = chipRefs.current.get(currentChar);
+
     // jsdom (the test environment) does not implement scrollIntoView at all —
     // feature-detect rather than assuming its presence, so component tests
     // that mount this strip don't need to polyfill a browser-only API.
@@ -184,6 +204,15 @@ export function CharScrollStrip({
         inline: "nearest",
         block: "nearest",
       });
+    }
+
+    const activeEl = document.activeElement;
+    const focusAlreadyInStrip =
+      activeEl instanceof HTMLElement &&
+      stripRef.current !== null &&
+      stripRef.current.contains(activeEl);
+    if (focusAlreadyInStrip) {
+      el?.focus();
     }
   }, [currentChar]);
 
@@ -217,6 +246,14 @@ export function CharScrollStrip({
         : Math.max(0, Math.min(idx - half, chars.length - MAX_VISIBLE_CHIPS));
     return chars.slice(start, start + MAX_VISIBLE_CHIPS);
   }, [chars, currentChar]);
+
+  // Whether the selected character is inside the currently-rendered window —
+  // see the roving-tabindex comment at the chip map below for why this
+  // matters (the tab-reachability fallback when nothing in view is selected).
+  const hasSelectedVisible = useMemo(
+    () => visibleChars.some((c) => c === currentChar),
+    [visibleChars, currentChar],
+  );
 
   // Per-character produces count (Part 2 badge) — the shared selector, not a
   // re-derived count, so this can never disagree with each gallery's own
@@ -302,9 +339,21 @@ export function CharScrollStrip({
           scrollbarWidth: "auto",
         }}
       >
-        {visibleChars.map((c) => {
+        {/* Roving tabindex: exactly one chip is a Tab stop at a time (the
+            rest are -1, reachable only via the pane-level ArrowLeft/
+            ArrowRight handler — see useCharCycleKeys.ts) so Tab moves past
+            the whole strip in one hop instead of
+            stopping at up to MAX_VISIBLE_CHIPS individual chips. Fallback:
+            when `currentChar` is null/stale (not present in the visible
+            set), no chip is `isSelected`, which on its own would make every
+            chip tabIndex=-1 and strand the strip outside the Tab order
+            entirely — `hasSelectedVisible` (computed above) guards that by
+            making the FIRST visible chip the tab stop whenever nothing else
+            is selected. */}
+        {visibleChars.map((c, index) => {
           const hex = charHex(c);
           const isSelected = c === currentChar;
+          const isTabbable = isSelected || (!hasSelectedVisible && index === 0);
           const count = producesCountByChar.get(c) ?? 0;
           const badgeGood = count >= 1;
           return (
@@ -316,6 +365,7 @@ export function CharScrollStrip({
                 else chipRefs.current.delete(c);
               }}
               data-testid={`char-scroll-chip-${hex}`}
+              tabIndex={isTabbable ? 0 : -1}
               aria-pressed={isSelected}
               aria-label={t({
                 id: "editor.assignLoop.charScroll.chipAriaLabel",

@@ -368,30 +368,65 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("P1 regression: canGoNext folds in the detected-char gate — 'Next character' is enabled with no click for an already-detected char, and stays disabled for a genuinely unresolved one", async () => {
-    // "a" (idx 0) is present in the default touch layout (K_A) — detected,
-    // no click needed. "中" (idx 1, last) has suggestion kind "none" (not in
-    // the default layout, not a decomposable accented letter — same fixture
-    // precedent as the "Next advances positionally" test above) — genuinely
-    // unresolved, so it must NOT be affected by the detected-char gate.
+  it("entry-parity: an already-detected character is excluded from the walk entirely — the author lands directly on the genuinely unresolved one, and the forward button is HIDDEN (not just enabled) when inspecting the detected one via its chip", async () => {
+    // "a" (idx 0 in confirmedInventory) is present in the default touch
+    // layout (K_A) — detected, with no Phase C suggestion of its own — so it
+    // is excluded from the walk (touchLettersToAdd) entirely: the author
+    // never lands on it or steps through it via Back/Next/Skip. "中" has
+    // suggestion kind "none" too (not in the default layout, not a
+    // decomposable accented letter — same fixture precedent as the "Next
+    // advances positionally" test above) but is NOT detected, so it is the
+    // walk's only member and the entry point.
     seedStore({ withInventory: ["a", "中"] });
 
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    expectCurrentChar("a");
-    const nextBtn = screen.getByRole("button", { name: /Next character/i });
-    expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
-    fireEvent.click(nextBtn);
-
-    await waitFor(() => {
-      expectCurrentChar("中");
-    });
-    // "中" is neither detected nor configured — Done must stay disabled, so
-    // the detected-char gate never over-fires for an unresolved character.
+    // Entry parity with MechanismGallery: land directly on the one
+    // actionable character, not on the detected one first.
+    expectCurrentChar("中");
+    expect(screen.getByText("Character 1 of 1")).toBeTruthy();
     const doneBtn = screen.getByRole("button", { name: "Done" });
     expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
+
+    // "a" is still inspectable via its CharScrollStrip chip (SHOW-ALL
+    // display, mirrors MechanismGallery's handleSelectDisplayChar) — but once
+    // selected this way, the forward Next/Done button is HIDDEN entirely
+    // (not rendered disabled), since it is outside the walk and this isn't a
+    // "global Next" for it.
+    fireEvent.click(screen.getByTestId("char-scroll-chip-0061"));
+    await waitFor(() => {
+      expectCurrentChar("a");
+    });
+    expect(screen.queryByTestId("touch-continue")).toBeNull();
+  });
+
+  it("entry-parity: the Back button is likewise HIDDEN (not just dead) when inspecting a detected out-of-walk character via its chip — usePositionalCharNav's handleBack is a no-op at currentIdx === -1, so a visible Back would look live but do nothing", async () => {
+    // Same fixture/setup as the forward-hidden test above: "a" is detected
+    // (excluded from the walk), "中" is the walk's only member and entry point.
+    seedStore({ withInventory: ["a", "中"] });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expectCurrentChar("中");
+
+    // On the walk's own entry point, Back is present (it's currentIdx 0 of
+    // the walk, so Back still resolves to "back to mechanisms" / onBack).
+    const backBtnsOnWalk = screen.queryAllByRole("button", { name: /back/i });
+    expect(backBtnsOnWalk.find((b) => b.textContent?.includes("Back"))).not.toBeUndefined();
+
+    // Inspect "a" via its CharScrollStrip chip — outside touchLettersToAdd,
+    // so currentIdx becomes -1 in usePositionalCharNav and handleBack is a
+    // no-op. The Back button must be hidden entirely here, not merely dead.
+    fireEvent.click(screen.getByTestId("char-scroll-chip-0061"));
+    await waitFor(() => {
+      expectCurrentChar("a");
+    });
+    const backBtnsInspecting = screen.queryAllByRole("button", { name: /back/i });
+    expect(backBtnsInspecting.find((b) => b.textContent?.includes("Back"))).toBeUndefined();
   });
 
   it("DOES set source/<id>.keyman-touch-layout with sk JSON after a longpress edit", async () => {
@@ -621,10 +656,18 @@ describe("TouchGallery — seed-source-aware detection reads the shipped layout 
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    // Inventory is ["x", "€"] — "x" (idx 0) carries the Phase C swap
-    // assignment ("replace" suggestion). Skip is pure positional navigation
-    // (records nothing) and works regardless of that suggestion's state.
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    // Inventory is ["x", "€"] — collated for display (spec 047's
+    // collateCompare puts "€" before the letter "x"), but only "x" carries a
+    // Phase C swap assignment ("replace" suggestion), so it is the walk's
+    // entry point regardless of display order (an actionable suggestion, even
+    // for a detected char, is never excluded — see touchLettersToAdd's
+    // desktopSuggestionTargets carve-out). "€" is detected ONLY via the
+    // shipped layout, with no Phase C suggestion of its own, so it is
+    // excluded from the walk entirely (entry-parity fix) — it is still
+    // reachable for inspection via its CharScrollStrip chip
+    // (handleSelectDisplayChar), not via Skip/Next.
+    expectCurrentChar("x");
+    fireEvent.click(screen.getByTestId("char-scroll-chip-20AC"));
     await waitFor(() => {
       expectCurrentChar("€");
     });
@@ -920,6 +963,58 @@ describe("TouchGallery — character-scroll-strip navigation", () => {
     expect(screen.getByTestId("char-scroll-chip-6708")).toBeTruthy();
   });
 
+  it("renders the char-scroll-strip ABOVE the per-char editing block, matching MechanismGallery's real placement (regression guard)", async () => {
+    seedStore({ withInventory: ["中", "日", "月"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    // "Touch mapping" is the eyebrow label unique to the per-char editing
+    // block. DOCUMENT_POSITION_FOLLOWING (4): the per-char block comes AFTER
+    // the strip in DOM order — i.e. the strip renders near the top of the
+    // pane, above the per-char block, not after it (the CHANGE-1 regression
+    // this test guards against).
+    const perCharEyebrow = screen.getByText("Touch mapping");
+    expect(
+      strip.compareDocumentPosition(perCharEyebrow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("orders a lowercase letter immediately before its uppercase counterpart, not in first-appearance order (spec 047 collateCompare reuse)", async () => {
+    // Seeded UPPERCASE-first (the old first-appearance order the gallery
+    // used to render in) — the collated display order must not follow it:
+    // "a" must render before "A", and "e" before "E".
+    seedStore({ withInventory: ["A", "a", "E", "e"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    const chipOrder = within(strip)
+      .getAllByRole("button")
+      .map((btn) => btn.getAttribute("data-testid"));
+
+    const lowerAIdx = chipOrder.indexOf("char-scroll-chip-0061"); // "a"
+    const upperAIdx = chipOrder.indexOf("char-scroll-chip-0041"); // "A"
+    const lowerEIdx = chipOrder.indexOf("char-scroll-chip-0065"); // "e"
+    const upperEIdx = chipOrder.indexOf("char-scroll-chip-0045"); // "E"
+    expect(lowerAIdx).toBeGreaterThanOrEqual(0);
+    expect(upperAIdx).toBeGreaterThanOrEqual(0);
+    expect(lowerEIdx).toBeGreaterThanOrEqual(0);
+    expect(upperEIdx).toBeGreaterThanOrEqual(0);
+    expect(lowerAIdx).toBeLessThan(upperAIdx);
+    expect(lowerEIdx).toBeLessThan(upperEIdx);
+
+    // No current-character assertion here: a/A/e/E are all reachable on the
+    // seed QWERTY layout and carry no Phase C suggestion, so the entry-parity
+    // walk list (touchLettersToAdd) excludes all four and there is no selected
+    // chip. The walk consumes this same collated order when it is non-empty —
+    // it is the `inventory` derivation both the strip and usePositionalCharNav
+    // read; the display order asserted above is the observable half.
+  });
+
   it("clicking an earlier character's chip moves back to it, ungated by intermediate configuration status", async () => {
     const onBack = vi.fn();
     seedStore({ withInventory: ["中", "日", "月"] });
@@ -1062,7 +1157,15 @@ describe("TouchGallery — UsesSequencesCard (integration)", () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    expectCurrentChar("n");
+    // "n" is a plain Latin letter — detected via the OS-default physical
+    // fall-through (spec 040) — and the sequence assignment above targets
+    // "ŋ", not "n" itself, so "n" carries no suggestion of its own and is
+    // excluded from the walk (entry-parity fix). It is still reachable for
+    // inspection via its CharScrollStrip chip.
+    fireEvent.click(screen.getByTestId("char-scroll-chip-006E"));
+    await waitFor(() => {
+      expectCurrentChar("n");
+    });
     const card = await screen.findByTestId("uses-sequences-card");
     const row = within(card).getByTestId("uses-sequences-row-0");
     // The row names the sequence's own input pair and its produced char —
@@ -1134,19 +1237,20 @@ describe("TouchGallery — skip character", () => {
     expect((nextBtn as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("skipping the only (last) character completes the phase via onComplete", async () => {
-    // "a" (not "中") — the FR-008 completion gate (T016b) re-runs touchCoverage
-    // on the final layout before calling onComplete, so the char left
-    // unconfigured by Skip must be one the underlying seed already covers
-    // (present in the default QWERTY scaffold) for the gate to pass. This
-    // still exercises the regression this test guards: Skip records no
-    // assignment yet completion still fires.
+  it("completes via Done with no Skip needed when the only inventory char is already covered (entry-parity fix)", async () => {
+    // "a" is present in the default QWERTY scaffold, so it is excluded from
+    // the walk entirely (entry-parity fix) — touchLettersToAdd is empty and
+    // the gallery lands directly on the all-caught-up panel with its own
+    // Done control, rather than requiring a Skip click to reach a completable
+    // state. The FR-008 completion gate (T016b) re-runs touchCoverage on the
+    // final layout before calling onComplete, which "a" (already covered)
+    // passes.
     const onComplete = vi.fn();
     seedStore({ withInventory: ["a"] });
     await act(async () => {
       render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
     });
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    fireEvent.click(screen.getByTestId("touch-continue"));
     expect(onComplete).toHaveBeenCalledOnce();
   });
 });
@@ -1217,6 +1321,34 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
 });
 
 // ---------------------------------------------------------------------------
+// Physical-key type-to-select in an open key picker (SelectMenu's opt-in
+// resolveKeyToValue, wired by KeyPickerField via keyOptions.ts's
+// charToVkey) — same mechanism MechanismGallery covers, exercised here
+// against TouchGallery's long-press host-key picker.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — physical-key type-to-select in an open key picker", () => {
+  it("pressing A while the long-press host-key picker is open selects K_A", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // Suggestion kind "none" for "中" (no desktop assignment / touch layout /
+    // decomposable form) — the method chooser is already showing, defaulted
+    // to "Long-press on a key".
+    const trigger = screen.getByLabelText(/Host key for long-press/i);
+    fireEvent.click(trigger);
+    await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
+
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "a" });
+
+    expect(selectMenuValue(trigger)).toBe("K_A");
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Leave-warning modal (the same ConfirmDialog contract MechanismGallery uses,
 // see MechanismGallery.test.tsx's own "leave-warning modal open/closed state"
 // suite) — TouchGallery's version fires from the SAME handleContinue gate as
@@ -1230,11 +1362,14 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
 describe("TouchGallery — leave-warning modal open/closed state", () => {
   it("does NOT open the dialog when completion succeeds with every character covered", async () => {
     const onComplete = vi.fn();
-    seedStore({ withInventory: ["a"] }); // "a" is already covered by the default scaffold.
+    // "a" is already covered by the default scaffold, so it is excluded from
+    // the walk (entry-parity fix) and the gallery lands on the all-caught-up
+    // panel's own Done control directly — no Skip needed.
+    seedStore({ withInventory: ["a"] });
     const { container } = await act(async () =>
       render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />),
     );
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    fireEvent.click(screen.getByTestId("touch-continue"));
     expect(onComplete).toHaveBeenCalledOnce();
     expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
   });
@@ -1694,8 +1829,13 @@ describe("TouchGallery — suggestion card variants", () => {
 
   it("a suggestion card REAPPEARS after Skip (unlike Accept/Deny) — Skip resolves nothing", async () => {
     // Same longpress-suggestion fixture as above, plus a second inventory
-    // character ("x", no desktop assignment → suggestion kind "none") so
-    // there is somewhere to Skip forward to and Back from. Skip is pure
+    // character ("中", no desktop assignment, not in the default scaffold, not
+    // decomposable-accented → suggestion kind "none" AND not detected — same
+    // fixture precedent used throughout this file for a genuinely unresolved
+    // character) so there is somewhere to Skip forward to and Back from
+    // WITHOUT that second character being excluded from the walk itself
+    // (entry-parity fix — a plain Latin letter like "x" would be detected via
+    // the OS-default physical fall-through and excluded). Skip is pure
     // positional navigation and must not add "á" to suggestionResolved, so
     // returning to it must show the suggestion card again.
     const deadkeyAssignment: MechanismAssignment = {
@@ -1717,7 +1857,7 @@ describe("TouchGallery — suggestion card variants", () => {
       ],
       source: "user",
     };
-    seedWithDesktopAssignment("á", deadkeyAssignment, ["x"]);
+    seedWithDesktopAssignment("á", deadkeyAssignment, ["中"]);
 
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
@@ -1729,7 +1869,7 @@ describe("TouchGallery — suggestion card variants", () => {
     // Skip it — no accept/deny, no assignment recorded.
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     await waitFor(() => {
-      expectCurrentChar("x");
+      expectCurrentChar("中");
     });
 
     // Navigate back to "á" without ever resolving its suggestion.
@@ -1907,11 +2047,14 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
   });
 
   it("dedupes a mechanism whose existing slotValues has a different key order (mechanismRefEquals must be order-independent)", async () => {
-    // Two-character inventory: "y" is left unconfigured so the sync effect
-    // lands the initial currentChar there (not on the preconfigured "中",
-    // idx 0). Back is purely positional (idx 1 -> idx 0), so no history needs
-    // seeding to land back on "中" — mirroring how a real session would have
-    // visited "中" earlier, then moved on.
+    // Two-character inventory. The gallery's walk is collated (spec 047's
+    // collateCompare): the Latin letter "y" sorts before the CJK "中" under
+    // the default ICU collation, so "y" is idx 0 and "中" is idx 1
+    // regardless of the seed array's own order. "y" is left unconfigured so
+    // the sync effect lands the initial currentChar there too. Next is
+    // purely positional (idx 0 -> idx 1), so no history needs seeding to
+    // land on "中" — mirroring how a real session would have visited "y"
+    // first, then moved on.
     seedStore({ withInventory: ["中", "y"] });
 
     // Seed an existing mechanism for "中" whose slotValues key order is
@@ -1941,15 +2084,11 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    // Mount lands on "y" (first unconfigured char, idx 1). Back moves one
-    // position back (idx 1 -> idx 0), landing on the preconfigured
+    // Mount lands on "y" (first unconfigured char, idx 0). Skip moves one
+    // position forward (idx 0 -> idx 1), landing on the preconfigured
     // character — "中" has no suggestion, so the chooser (not a suggestion
     // card) shows directly.
-    const backBtn = screen.queryAllByRole("button", { name: /back/i }).find(
-      (b) => b.textContent?.includes("Back"),
-    ) ?? null;
-    expect(backBtn).not.toBeNull();
-    await act(async () => { fireEvent.click(backBtn!); });
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
 
     // Apply the same method+hostKey via the chooser (default method is
     // already "longpress_alternates" — matches buildMechanismRef's key order).
@@ -1999,6 +2138,15 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
     });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // "a" is excluded from the walk (entry-parity fix — detected, no Phase C
+    // suggestion of its own), so currentChar starts null; select it via its
+    // CharScrollStrip chip to reach the chooser (mirrors MechanismGallery's
+    // handleSelectDisplayChar precedent).
+    fireEvent.click(screen.getByTestId("char-scroll-chip-0061"));
+    await waitFor(() => {
+      expectCurrentChar("a");
     });
 
     let draft = useWorkingCopyStore.getState().touchDraft;
@@ -3579,6 +3727,20 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
   function bulkGroups() {
     return useWorkingCopyStore.getState().touchDraft?.bulkAccentGroups ?? [];
   }
+  /** Jump the gallery's positional walk directly to `char` via its
+   *  CharScrollStrip chip (ungated by covered/configured status — see
+   *  usePositionalCharNav's handleSelectChar) — the gallery's walk is now
+   *  collated (spec 047's collateCompare), so a breve letter like "ă" sorts
+   *  AFTER its grave/acute-accented siblings and is no longer reliably the
+   *  first (idx 0) character these fixtures used to land on by construction.
+   *  Single-codepoint BMP chars only (matches CharScrollStrip.tsx's charHex). */
+  function gotoChar(char: string) {
+    const hex = (char.codePointAt(0) ?? 0)
+      .toString(16)
+      .toUpperCase()
+      .padStart(4, "0");
+    fireEvent.click(screen.getByTestId(`char-scroll-chip-${hex}`));
+  }
   async function acceptSuggestion() {
     const acceptBtn =
       screen
@@ -3619,6 +3781,9 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
+    // "ă" (breve) sorts after à/á/À/Á under the collated walk — jump to it
+    // directly rather than relying on mount's first-uncovered default.
+    gotoChar("ă");
 
     await acceptSuggestion();
 
@@ -3629,6 +3794,37 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     // Nothing is placed yet — propose-then-confirm, never a silent auto-insert.
     expect(touchMechanismsFor("à")).toHaveLength(0);
     expect(touchMechanismsFor("À")).toHaveLength(0);
+  });
+
+  it("CHANGE 5: the proposal banner renders at the TOP — before the Configured chip row, in the same region the accepted bulk box later occupies", async () => {
+    seedStore({ withInventory: ["ă", "à", "á", "À", "Á"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await acceptSuggestion();
+    const proposalBanner = screen.getByRole("note", {
+      name: /Related accented letters suggestion/i,
+    });
+    const configuredHeading = screen.getByText("Configured");
+    // DOCUMENT_POSITION_FOLLOWING (4): configuredHeading comes AFTER the
+    // banner — i.e. the banner renders above/before the Configured chip row,
+    // not lower down near it (the pre-CHANGE-5 position).
+    expect(
+      proposalBanner.compareDocumentPosition(configuredHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    // Confirm the bulk proposal — its accepted, removable summary box now
+    // occupies the SAME region the proposal banner just did, still above the
+    // Configured chip row.
+    await confirmBanner();
+    const summaryBox = screen.getByText(/Added .* as long-press/i);
+    const configuredHeadingAfter = screen.getByText("Configured");
+    expect(
+      summaryBox.compareDocumentPosition(configuredHeadingAfter) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("Accept places only INVENTORY siblings — lowercase on default, uppercase on shift — in one click", async () => {
@@ -3673,6 +3869,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
+    gotoChar("ă");
 
     await acceptSuggestion();
     await confirmBanner();
@@ -3744,6 +3941,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
+    gotoChar("ă");
 
     await acceptSuggestion();
     await act(async () => {
@@ -3786,6 +3984,144 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
   });
 
+  it("CHANGE 3: a 'replace' suggestion accept (no bulk possible) still raises the simple case-pair companion — not just the manual chooser's Apply", async () => {
+    const swapAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "ă",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "simple_swap",
+          strategyId: "S-01",
+          slotValues: { kmnRules: "+ [K_A] > U+0103" },
+        },
+      ],
+      source: "user",
+    };
+    seedWithDesktopAssignment("ă", swapAssignment);
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    await acceptSuggestion();
+
+    // No bulk banner (a "replace" suggestion is never a bulk trigger), but
+    // the simple companion DOES fire — this is the CHANGE 3 fix: previously
+    // only the manual chooser's Apply (handleApply) raised it.
+    expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
+    expect(screen.getByText(/has an uppercase form, Ă/i)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map Ă to the shift layer of/i }),
+      );
+    });
+    expect(touchMechanismsFor("Ă")[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "Ă",
+      layer: "shift",
+    });
+  });
+
+  it("CHANGE 4: a bulk proposal that includes the accepted char's OWN uppercase counterpart pre-empts the simple companion — denying the bulk then falls back to it", async () => {
+    // "à"'s own uppercase counterpart is "À", which IS among "à"'s inventory
+    // siblings here — so the bulk proposal (offering á/À) already covers it.
+    seedStore({ withInventory: ["à", "á", "À"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    // The collated walk puts "á" (acute) ahead of "à" (grave), so jump to "à"
+    // rather than relying on mount's first-uncovered default — "à" is the char
+    // whose own uppercase counterpart is among the bulk siblings.
+    gotoChar("à");
+
+    await acceptSuggestion();
+
+    // Bulk banner shown; simple companion DEFERRED (not shown alongside it —
+    // showing both would prompt placing À twice).
+    expect(screen.getByText(/is part of a family of accented letters/i)).toBeTruthy();
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+
+    // Deny the bulk proposal — the deferred simple companion is raised now,
+    // as the fallback.
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /Do not add the related accented letters/i,
+        }),
+      );
+    });
+    expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
+    expect(screen.getByText(/has an uppercase form, À/i)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map À to the shift layer of/i }),
+      );
+    });
+    // "À" was placed via the SIMPLE companion path, not the bulk one — no
+    // bulk group was ever recorded (the bulk was denied).
+    expect(bulkGroups()).toHaveLength(0);
+    expect(touchMechanismsFor("À")).toHaveLength(1);
+    expect(touchMechanismsFor("À")[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "À",
+      layer: "shift",
+    });
+  });
+
+  it("CHANGE 4: confirming the bulk proposal (which already placed the uppercase) never subsequently raises the simple companion", async () => {
+    seedStore({ withInventory: ["à", "á", "À"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    // Collated walk order puts "á" first — see the deny/fallback test above.
+    gotoChar("à");
+
+    await acceptSuggestion();
+    await confirmBanner();
+
+    // The uppercase was placed via the bulk group — the deferred simple
+    // companion is discarded, never shown.
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+    expect(bulkGroups()).toHaveLength(1);
+    expect(bulkGroups()[0]?.members).toEqual(["á", "À"]);
+  });
+
+  it("navigating away with an OPEN, UNDECIDED bulk proposal abandons BOTH the bulk proposal and its deferred simple companion — neither resurfaces on the new char", async () => {
+    // Same setup as the CHANGE 4 deny/confirm tests above: "à"'s own
+    // uppercase counterpart "À" is among the bulk siblings, so accepting the
+    // suggestion defers the simple companion behind the (still open) bulk
+    // banner.
+    seedStore({ withInventory: ["à", "á", "À"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    // Collated walk order puts "á" first — see the deny/fallback test above.
+    gotoChar("à");
+
+    await acceptSuggestion();
+    expect(screen.getByText(/is part of a family of accented letters/i)).toBeTruthy();
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+
+    // Navigate away WITHOUT confirming or dismissing the bulk banner ("à"
+    // already has its own directly-accepted mechanism, so the Next control
+    // is enabled here).
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-continue"));
+    });
+
+    // Both proposals are abandoned, not carried forward or silently
+    // resolved: no bulk banner, no deferred-companion fallback banner, and
+    // no bulk group was ever recorded.
+    expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+    expect(bulkGroups()).toHaveLength(0);
+    // Neither sibling was placed by the abandoned bulk proposal.
+    expect(touchMechanismsFor("á")).toHaveLength(0);
+    expect(touchMechanismsFor("À")).toHaveLength(0);
+  });
+
   it("skips a sibling already produced on that host key's layer (not counted in the bulk group)", async () => {
     // "à" is pre-seeded as already configured on K_A's default layer. Accepting
     // "ă" must dedupe against it rather than double-placing — and since it was
@@ -3811,6 +4147,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
+    gotoChar("ă");
 
     await acceptSuggestion();
     await confirmBanner();
@@ -3827,6 +4164,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
+    gotoChar("ă");
 
     await acceptSuggestion();
     await confirmBanner();
@@ -3858,6 +4196,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
+    gotoChar("ă");
 
     await acceptSuggestion();
     expect(touchMechanismsFor("ă")).toHaveLength(1);
@@ -3876,7 +4215,9 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
 
   it("shows only the bulk box for the current character's family, not other families' boxes", async () => {
     // Two persisted groups on different host keys (a-family and e-family).
-    // Index 0 of the inventory is an e-accent, so the gallery opens on it.
+    // The gallery's walk is collated (spec 047's collateCompare), so "à"
+    // (not "è") is the first (idx 0) character regardless of the seed
+    // array's own order — jump to "è" explicitly via its chip.
     seedStore({ withInventory: ["è", "à"] });
     const lp = (
       char: string,
@@ -3908,6 +4249,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
+    gotoChar("è");
 
     // Current char "è" is in the e-family (host key K_E): only the e box shows.
     expect(screen.getByText(/to e as long-press/i)).toBeTruthy();
