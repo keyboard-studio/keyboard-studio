@@ -48,7 +48,7 @@ export type {
 
 // Issues #46/#47 — output service (zip download + GitHub OAuth fork+PR).
 export { createOutputService, toZip, serializeToZip, createGitHubOutputService } from "./output/index.js";
-export type { GitHubOutputConfig, GitHubFetchFn } from "./output/index.js";
+export type { GitHubOutputConfig, GitHubFetchFn, ToZipOptions } from "./output/index.js";
 
 // Option B (org-mediated PR) output service.
 export { createManagedPROutputService } from "./output/index.js";
@@ -64,6 +64,29 @@ export type { ImportAttributionInput } from "./output/index.js";
 
 // Track 2 adapt-staging helpers (output-only; not used in the OSK preview path).
 export { bumpKeyboardVersion, stageAdaptHistory } from "./output/index.js";
+
+// Per-keyboard decision audit (specs/053-decision-audit) — the pure differ,
+// serializer, tolerant reader, save-budget shed pass, and the two evidence
+// surfaces the record ships through (the pull-request block and the packaged
+// `.studio/` sidecar). The recording seam itself is a studio concern
+// (packages/studio/src/decisions/).
+export {
+  addDecisionRecordSidecar,
+  buildDecisionSummaryBlock,
+  DECISION_RECORD_VFS_PATH,
+  diffLines,
+  diffMagnitude,
+  parseDecisionRecord,
+  PR_SUMMARY_MAX_ENTRIES,
+  serializeDecisionRecord,
+  serializedRecordBytes,
+  shedDecisionDetail,
+  STUDIO_METADATA_PREFIX,
+} from "./decision-audit/index.js";
+export type {
+  DecisionSummaryOptions,
+  ParseDecisionRecordResult,
+} from "./decision-audit/index.js";
 
 // Issue #183 — headless simulate() API is exposed via the `./simulator`
 // subpath export, NOT from this main entry. The vendored Keyman engine

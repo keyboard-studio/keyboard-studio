@@ -20,6 +20,7 @@ import type {
   SourcedCharacter,
   SourcedInventory,
   ExemplarTier,
+  ToZipOptions,
 } from "@keyboard-studio/engine";
 import { charactersInTier } from "@keyboard-studio/engine";
 import { mockBaseBrowser, mockOutputService, mockPatternLibrary, mockScaffolder } from "@keyboard-studio/contracts/mocks";
@@ -92,12 +93,17 @@ export async function getCharacterDiscoveryService(): Promise<CharacterDiscovery
 // OutputService (zip path only): when USE_REAL is false returns the mock zip
 // serializer. When real, lazily imports toZip from the engine.
 // The GitHub OAuth publishPR path is separate (createGitHubOutputService).
-let toZipCache: ((vfs: VirtualFS) => Promise<Uint8Array>) | null = null;
-export async function getToZip(): Promise<(vfs: VirtualFS) => Promise<Uint8Array>> {
+// The options argument carries the decision record for the packaged
+// `.studio/` sidecar (specs/053-decision-audit FR-020). It is optional on both
+// sides: the mock ignores it, and a session that recorded nothing produces the
+// archive it produced before the feature existed.
+type ToZipFn = (vfs: VirtualFS, opts?: ToZipOptions) => Promise<Uint8Array>;
+let toZipCache: ToZipFn | null = null;
+export async function getToZip(): Promise<ToZipFn> {
   if (!USE_REAL) return mockOutputService.toZip.bind(mockOutputService);
   if (toZipCache !== null) return toZipCache;
   const { toZip } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
-  toZipCache = toZip as (vfs: VirtualFS) => Promise<Uint8Array>;
+  toZipCache = toZip as ToZipFn;
   return toZipCache;
 }
 

@@ -11,6 +11,11 @@ export type RouteId =
   | 'preview'
   | 'output'
   | 'flowmap'
+  // The decision trail (specs/053-decision-audit). Unconditionally valid, unlike
+  // 'flowmap': FR-017 makes it a PRODUCTION surface — an author reviewing what
+  // their own decisions did to their keyboard is the feature, not a developer aid
+  // — so it must never sit behind the dev gate in StudioShell's VALID_ROUTES.
+  | 'trail'
   | 'profile';
 
 export function navigateTo(route: RouteId): void {

@@ -1,0 +1,224 @@
+// prSummary — the bounded markdown decision block for the pull-request body
+// (specs/053-decision-audit FR-018, FR-022).
+//
+// Mirrors buildImportAttributionBlock in ../output/import-attribution.ts: a pure
+// function returning markdown, English and unlocalized. That is deliberate and
+// is the established precedent for engine-built PR blocks — the audience is a
+// reviewer reading a pull request on github.com, not the author in their own
+// locale. The author-facing rendering of the same record is composed in the
+// studio from message catalogues (FR-016); this is the other half of that split,
+// not a duplicate of it.
+//
+// Two editorial choices are load-bearing for SC-004 ("a reviewer with no access
+// to the studio can identify which decisions produced a given characteristic"):
+//
+//   1. Every row pairs a decision with its CONSEQUENCE. A list of decisions with
+//      no effects column would be a transcript, not evidence, and a reviewer
+//      could not work backwards from a characteristic of the keyboard.
+//
+//   2. Superseded decisions are summarised as a count, not listed. A decision
+//      that was later revised did not produce anything in the keyboard being
+//      reviewed, so listing it competes for the entry budget with decisions that
+//      did. The complete history stays in the packaged record, and the block
+//      says so rather than letting the omission be silent.
+//
+// @see specs/053-decision-audit/contracts/decision-record.contract.md §2, §6
+
+import type {
+  DecisionEntry,
+  DecisionImpact,
+  DecisionRecord,
+  EditorActionSummary,
+  EditorActionType,
+} from "@keyboard-studio/contracts";
+import { DECISION_RECORD_VFS_PATH } from "./sidecar.js";
+
+/** Contract §6: the description stays readable, so the block is bounded. */
+export const PR_SUMMARY_MAX_ENTRIES = 25 as const;
+
+export interface DecisionSummaryOptions {
+  /** Rows to render before pointing at the packaged record. Default 25. */
+  maxEntries?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Cell formatting
+// ---------------------------------------------------------------------------
+
+/**
+ * Make a value safe to put in a markdown table cell.
+ *
+ * A recorded answer is author-supplied text and can contain a `|`, which would
+ * silently split the row into extra columns, or a newline, which would end the
+ * row entirely. Escaping here rather than at each call site means a new column
+ * cannot reintroduce the hole.
+ */
+function cell(text: string): string {
+  return text.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
+
+function formatValue(value: string | readonly string[] | boolean): string {
+  if (typeof value === "boolean") return value ? "yes" : "no";
+  if (typeof value === "string") return value === "" ? "(blank)" : value;
+  return value.length === 0 ? "(none)" : value.join(" ");
+}
+
+const EDITOR_LABEL: Record<EditorActionType, string> = {
+  gallery_edit: "Edited the character gallery",
+  mechanism_edit: "Assigned key mechanisms",
+  touch_edit: "Edited the touch layout",
+};
+
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+/**
+ * Describe an editor step by its non-zero counts.
+ *
+ * Counts only — a step that removed three hundred keys says so in one clause
+ * rather than listing them (contract §6). Zero-valued categories are dropped so
+ * a gallery edit does not report "0 touch keys affected" as though touch had
+ * been considered and left alone.
+ */
+function formatEditorSummary(summary: EditorActionSummary): string {
+  const parts: string[] = [];
+  if (summary.keysRemoved > 0) parts.push(plural(summary.keysRemoved, "key removed", "keys removed"));
+  if (summary.keysAdded > 0) parts.push(plural(summary.keysAdded, "key added", "keys added"));
+  if (summary.mechanismsAssigned > 0) {
+    parts.push(plural(summary.mechanismsAssigned, "mechanism assigned", "mechanisms assigned"));
+  }
+  if (summary.touchKeysAffected > 0) {
+    parts.push(plural(summary.touchKeysAffected, "touch key affected", "touch keys affected"));
+  }
+  return parts.length === 0 ? "no net change" : parts.join(", ");
+}
+
+/** The decision itself, as one English clause. */
+function formatDecision(entry: DecisionEntry): string {
+  const { payload, provenance } = entry;
+
+  if (payload.kind === "editor-action") {
+    return `${EDITOR_LABEL[payload.actionType]} (${formatEditorSummary(payload.summary)})`;
+  }
+
+  const value = `"${formatValue(payload.value)}"`;
+  const question = `\`${payload.questionId}\``;
+
+  switch (provenance.agency) {
+    case "tool-proposed":
+      // A proposal always has a source in practice; the type allows it to be
+      // absent, and the sentence must still be true if it is.
+      return provenance.source === undefined
+        ? `Accepted suggested ${value} for ${question}`
+        : `Accepted suggested ${value} for ${question} (from ${provenance.source})`;
+    case "base-derived":
+      return `Kept ${value} for ${question} (from the base keyboard)`;
+    case "hand-set":
+      return `Chose ${value} for ${question}`;
+    default: {
+      const _exhaustive: never = provenance.agency;
+      return `Set ${value} for ${question} (${String(_exhaustive)})`;
+    }
+  }
+}
+
+/**
+ * The consequence, as one English clause.
+ *
+ * Every state is a positive statement. "no source change" is a finding, not an
+ * absence — rendering it as a blank cell would read as a gap in the audit rather
+ * than as the decision genuinely having changed nothing (FR-011's reasoning,
+ * carried into the reviewer-facing surface).
+ */
+function formatEffect(impact: DecisionImpact | null | undefined): string {
+  if (impact === undefined) return "not captured";
+  if (impact === null) return "detail dropped to fit the save budget";
+
+  switch (impact.state) {
+    case "captured":
+      return `+${impact.magnitude.added} / -${impact.magnitude.removed} lines in \`${impact.path}\``;
+    case "none":
+      return "no source change";
+    case "unavailable":
+      return impact.reason === "lock-gate-dependency"
+        ? "not separately attributable (behind a passed lock gate)"
+        : "not separately attributable (no re-derivable write path)";
+    default: {
+      const _exhaustive: never = impact;
+      return String(_exhaustive);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Block assembly
+// ---------------------------------------------------------------------------
+
+/**
+ * Assemble the markdown "Authoring decisions" block for the pull-request body.
+ *
+ * Generated from the record as it stands at submission time — not maintained
+ * incrementally — so it cannot drift from what shipped.
+ *
+ * Pure function: no I/O, safe to unit-test without network mocks.
+ */
+export function buildDecisionSummaryBlock(
+  record: DecisionRecord,
+  opts: DecisionSummaryOptions = {},
+): string {
+  const maxEntries = opts.maxEntries ?? PR_SUMMARY_MAX_ENTRIES;
+  const lines: string[] = ["## Authoring decisions"];
+
+  // An entry is superseded when a LATER entry names it. Collected up front so
+  // the effective set is one pass rather than a scan per row.
+  const supersededIds = new Set<string>();
+  for (const entry of record.entries) {
+    if (entry.supersedes !== null) supersededIds.add(entry.supersedes);
+  }
+  const effective = record.entries.filter((e) => !supersededIds.has(e.entryId));
+
+  if (effective.length === 0) {
+    lines.push("", "No decisions were recorded for this keyboard.");
+    return lines.join("\n");
+  }
+
+  const shown = effective.slice(0, Math.max(0, maxEntries));
+  lines.push(
+    "",
+    `${plural(effective.length, "decision", "decisions")} shaped this keyboard, in the order they were made.`,
+    "",
+    "| # | Step | Decision | Effect on source |",
+    "|---|---|---|---|",
+  );
+
+  shown.forEach((entry, index) => {
+    lines.push(
+      `| ${index + 1} | \`${cell(entry.stepId)}\` | ${cell(formatDecision(entry))} | ${cell(formatEffect(entry.impact))} |`,
+    );
+  });
+
+  // Every bound states itself when it bites (contract §6) — an omission a
+  // reviewer cannot see is the failure mode these three notes exist to prevent.
+  const notes: string[] = [];
+  if (effective.length > shown.length) {
+    notes.push(
+      `Showing the first ${shown.length} of ${effective.length} decisions. Complete detail is in \`${DECISION_RECORD_VFS_PATH}\` in the downloaded package.`,
+    );
+  }
+  const revisedCount = record.entries.length - effective.length;
+  if (revisedCount > 0) {
+    notes.push(
+      `${plural(revisedCount, "earlier decision was", "earlier decisions were")} later revised; the full history is in \`${DECISION_RECORD_VFS_PATH}\`.`,
+    );
+  }
+  if (record.truncated !== null) {
+    notes.push(
+      `Change detail for ${plural(record.truncated.shedCount, "decision", "decisions")} was dropped to fit the save budget.`,
+    );
+  }
+
+  if (notes.length > 0) lines.push("", ...notes);
+
+  return lines.join("\n");
+}

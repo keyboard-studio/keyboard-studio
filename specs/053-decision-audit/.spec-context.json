@@ -1,0 +1,817 @@
+{
+  "workflow": "speckit",
+  "specName": "Per-keyboard decision audit (CYOA Phase 1 — record and review)",
+  "branch": "053-decision-audit",
+  "currentStep": "implement",
+  "status": "implemented",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-31T17:12:14.023Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T17:36:30.765Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-31T17:36:30.770Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-31T17:59:03.501Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-31T18:04:58.698Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-31T18:05:42.363Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-31T18:13:38.575Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-31T18:20:13.025Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-31T18:20:13.928Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-31T19:59:25.336Z"
+    },
+    {
+      "step": "implement",
+      "substep": "run-tests",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-31T21:01:29.000Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T21:37:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T23:32:08.857Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T23:32:08.858Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T23:32:08.858Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T23:32:08.858Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T23:32:08.858Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T23:32:08.858Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T23:32:08.858Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T23:32:08.858Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T23:32:08.858Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T23:32:08.858Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T23:32:08.858Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-31T23:32:08.858Z"
+    }
+  ],
+  "telemetryInstanceId": "e345f576-766b-453a-9307-e48c4e66a9a1",
+  "approach": "Record every survey answer and every editor-step net effect as an append-only per-keyboard decision record, hung off applyStepCompletion via an injected dep so no step component learns about auditing. Impact is a line diff over the emitted .kmn text that projectWorkingCopyVfs already produces for the live preview, so the audit and the shipped artifact cannot disagree. Evidence ships via a bounded PR-body block plus a studio-metadata sidecar that the existing isSidecarPath/isSourceFile filter keeps out of the committed tree.",
+  "decisions": [
+    {
+      "decision": "Capture a decision impact from projectWorkingCopyVfs, the shared projection the live OSK preview already runs every cycle, and store the net line diff",
+      "why": "FR-009/SC-005 require the attributed change to come from the same process that produces the shipped keyboard; that helper is the single one both the preview and the zip/PR paths delegate to, so snapshotting is a read of an existing computation rather than a new pipeline",
+      "rejected": "Emitting directly from the working IR with the codec emitter - not byte-equal to the shipped .kmn because projection additionally applies touch layout, carve keycaps, assignments and the identity overlay, so it would violate SC-005 by construction"
+    },
+    {
+      "decision": "Survey-decision counterfactuals ride the existing mutate() seam and report the FR-011 reason when it is off; direct per-step capture applies to every step as the floor",
+      "why": "The mutate seam is the declared write path, so re-running a pure mutate() is the same process in FR-009 sense - but mutateFlag.ts documents it as off by default and roughly half-complete, so in a default build most survey counterfactuals are genuinely unavailable and must say so",
+      "rejected": "Making counterfactual derivation the only impact source for survey answers - with the seam off it would leave most entries showing nothing, which the spec Edge Cases forbid; and building a second audit-only re-derivation path would be a competing write path"
+    },
+    {
+      "decision": "Packaged record reuses the existing zip-included / PR-excluded sidecar lifecycle at a studio-metadata prefix (.studio/decision-record.json); positional nesting of the keyboard under <id>/ is deferred to the Keyman team",
+      "why": "FR-019/SC-008 concern the committed tree and isSidecarPath + isSourceFile already make that exclusion machine-enforced. FR-020 beside-not-inside cannot be satisfied positionally today - the archive root IS the keyboard directory content and NEXT_STEPS.md already sits there with the same property",
+      "rejected": "Restructuring the archive so the keyboard nests under <id>/ - deferred not rejected; it makes the separation structural and fixes the NEXT_STEPS wart, but changes an already-shipped artifact shape and is a Keyman-team-facing call"
+    },
+    {
+      "decision": "Provenance carries an agency literal (base-derived | tool-proposed | hand-set) plus an optional separate source label; SurveyAnswer is not extended",
+      "why": "Two of the three agency literals are reused verbatim from TouchKeyProvenance and the source labels are lifted from specs/002-defaults-engine, so no new vocabulary is invented for either axis; keeping agency and source separate is what lets a headline distinguish Accepted suggested X from langtags versus Chose X",
+      "rejected": "Extending the locked SurveyAnswer union with a provenance field, and reusing TouchKeyProvenance directly - its physical-suggested member is touch-propagation-specific and overloading it would make the touch semantics ambiguous"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Plan complete: plan.md (Constitution Check green across Articles I-VIII), research.md (12 decisions), data-model.md, and two contracts - decision-record and trail-ui",
+      "key_finding": "Two load-bearing codebase facts shaped the design: projectWorkingCopyVfs is the single projection both the live preview and the zip/PR paths delegate to (so impact capture is a read of a computation that already runs, satisfying SC-005 by construction), and specs/032-journey-corpus is unimplemented, making this feature the first implementer of its two-event vocabulary"
+    },
+    "tasks": {
+      "summary": "50 tasks across 6 phases (Setup 1, Foundational 19, US1 12, US2 7, US3 6, Polish 5), laid out as explicit waves with join points; all 28 functional requirements mapped to covering tasks",
+      "key_finding": "Recording plumbing (store, persistence, reducer injection, the three recording modules) lands in Foundational rather than US1, which makes US2 and US3 depend only on the record existing and not on the trail UI - so each story is a genuinely independent increment. The single cross-story dependency is T045 reusing impact.ts from T023."
+    },
+    "implement": {
+      "summary": "Delivered Phase 1 (Setup) + Phase 2 (Foundational) + US1 (T001-T032): the contracts types with their zod mirror and drift guards, the engine differ/serializer/tolerant-reader/shed pass, the append-only decision log with persistence, the three recorders wired through an injected ReducerDeps callback, and the author-facing trail on a production route.",
+      "key_finding": "Two design points had to depart from the plan text to satisfy the FRs. (1) D-02/T018 puts recording on applyStepCompletion, but StepHost gates that on a six-step effect table and choose_base fires it from an async callback - hanging the audit there would silently miss every question step, i.e. most of FR-001. Recording therefore got its own reducer-layer entry point (recordStepCompletion) called unconditionally from the host completion path; D-02 requirements are intact (injected dep, no component learns about auditing). (2) Impact capture is async because the output projection is, so the log gained one narrow write-once attachImpact rather than a strictly-immutable entry; the decision fields stay frozen. Also stated plainly: no per-question proposal register exists in the studio today (IdentityLite keeps its langtags seeds in a component ref), so provenance derivation is a tested seam whose shipped wiring records hand-set for most answers."
+    }
+  },
+  "coverage": {
+    "FR-001": {
+      "title": "Record every survey answer as an individual decision entry with its provenance",
+      "tasks": [
+        "T002",
+        "T013",
+        "T019",
+        "T020"
+      ],
+      "tests": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts",
+        "packages/studio/src/decisions/decisionLogStore.test.ts"
+      ]
+    },
+    "FR-002": {
+      "title": "Record editor activity aggregated per step; a return visit supersedes the step's earlier entry",
+      "tasks": [
+        "T014",
+        "T019",
+        "T020"
+      ],
+      "tests": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
+      ]
+    },
+    "FR-003": {
+      "title": "The decision record MUST be append-only; revisiting adds a superseding entry",
+      "tasks": [
+        "T008",
+        "T012"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/decisionLogStore.test.ts"
+      ]
+    },
+    "FR-004": {
+      "title": "Record decisions from session start including pre-identity work, carried forward on identity assignment",
+      "tasks": [
+        "T002",
+        "T019"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/decisionLogStore.test.ts",
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
+      ]
+    },
+    "FR-005": {
+      "title": "The decision record MUST persist across studio restarts as part of saved state",
+      "tasks": [
+        "T009",
+        "T017",
+        "T048"
+      ],
+      "tests": [
+        "packages/engine/src/decision-audit/record.test.ts"
+      ]
+    },
+    "FR-006": {
+      "title": "Recording MUST NOT alter the keyboard artifact",
+      "tasks": [
+        "T020",
+        "T046"
+      ],
+      "tests": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
+      ]
+    },
+    "FR-007": {
+      "title": "Event vocabulary MUST align with specs/032-journey-corpus and not fork it",
+      "tasks": [
+        "T002"
+      ],
+      "tests": [
+        "packages/contracts/src/decisionRecord.ts"
+      ]
+    },
+    "FR-008": {
+      "title": "Produce the concrete source change attributable to each decision",
+      "tasks": [
+        "T015",
+        "T023",
+        "T047"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/impact.test.ts",
+        "packages/engine/src/decision-audit/lineDiff.test.ts"
+      ]
+    },
+    "FR-009": {
+      "title": "The attributed change MUST derive from the same process that produces the shipped keyboard",
+      "tasks": [
+        "T015",
+        "T047"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/snapshotSource.ts"
+      ]
+    },
+    "FR-010": {
+      "title": "Impact computed only when requested for a specific decision, never eagerly",
+      "tasks": [
+        "T023",
+        "T029",
+        "T030"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/impact.test.ts",
+        "packages/studio/src/decisions/DecisionTrailView.test.tsx"
+      ]
+    },
+    "FR-011": {
+      "title": "Where isolated impact cannot be derived, report a summary plus the reason, never a misleading empty change",
+      "tasks": [
+        "T023",
+        "T029",
+        "T022"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/impact.test.ts",
+        "packages/studio/src/decisions/DecisionEntryRow.test.tsx"
+      ]
+    },
+    "FR-012": {
+      "title": "Authors MUST be able to view an ordered trail of their decisions",
+      "tasks": [
+        "T030",
+        "T021",
+        "T031"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/DecisionTrailView.test.tsx"
+      ]
+    },
+    "FR-013": {
+      "title": "Each entry shows a plain-language headline distinguishing accepted default from author-set value",
+      "tasks": [
+        "T024",
+        "T028",
+        "T027"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/headline.test.ts",
+        "packages/studio/src/decisions/DecisionTrailView.test.tsx"
+      ]
+    },
+    "FR-014": {
+      "title": "Each entry MUST be expandable to reveal its attributed source change",
+      "tasks": [
+        "T027",
+        "T021"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/DecisionTrailView.test.tsx"
+      ]
+    },
+    "FR-015": {
+      "title": "Superseded entries remain visible as history and are clearly marked as replaced",
+      "tasks": [
+        "T027",
+        "T030",
+        "T021"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/DecisionTrailView.test.tsx"
+      ]
+    },
+    "FR-016": {
+      "title": "All author-facing text MUST be localisable under the existing message-catalogue conventions",
+      "tasks": [
+        "T024",
+        "T026",
+        "T050"
+      ],
+      "tests": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "FR-017": {
+      "title": "The trail MUST be available in production builds",
+      "tasks": [
+        "T025",
+        "T031"
+      ],
+      "tests": [
+        "packages/studio/src/lib/navigate.ts"
+      ]
+    },
+    "FR-018": {
+      "title": "Render a human-readable decision summary into the pull-request description",
+      "tasks": [
+        "T034",
+        "T039",
+        "T037"
+      ]
+    },
+    "FR-019": {
+      "title": "MUST NOT add any file to the committed keyboard source tree",
+      "tasks": [
+        "T035",
+        "T033"
+      ]
+    },
+    "FR-020": {
+      "title": "The downloadable package MUST contain a machine-readable record as a clearly-named studio-metadata sidecar",
+      "tasks": [
+        "T036",
+        "T038",
+        "T033"
+      ]
+    },
+    "FR-021": {
+      "title": "The machine-readable record MUST use the completed-instance format extended for editor activity",
+      "tasks": [
+        "T036",
+        "T002"
+      ]
+    },
+    "FR-022": {
+      "title": "The pull-request summary MUST be bounded, pointing to the package for full detail",
+      "tasks": [
+        "T034",
+        "T037"
+      ]
+    },
+    "FR-023": {
+      "title": "The flow map MUST highlight the path a selected keyboard took",
+      "tasks": [
+        "T041",
+        "T042",
+        "T043"
+      ]
+    },
+    "FR-024": {
+      "title": "With no keyboard selected, the flow map behaves exactly as it does today",
+      "tasks": [
+        "T040",
+        "T042"
+      ]
+    },
+    "FR-025": {
+      "title": "The flow map and its overlay remain absent from production builds",
+      "tasks": [
+        "T044"
+      ]
+    },
+    "FR-026": {
+      "title": "At a single inspected decision, produce on request the outcome a different answer would have produced",
+      "tasks": [
+        "T045",
+        "T023"
+      ]
+    },
+    "FR-027": {
+      "title": "MUST NOT compute outcomes for untaken branches other than the one explicitly requested",
+      "tasks": [
+        "T042",
+        "T045"
+      ]
+    },
+    "FR-028": {
+      "title": "Where an alternative cannot be derived, show structural information plus an explanation, not a failure",
+      "tasks": [
+        "T045",
+        "T023"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "repo-wide typecheck across all 7 workspace projects",
+      "command": "pnpm typecheck",
+      "result": "PASS - contracts, engine, studio, glottolog, keyboard-lint, llm, oauth-backend all clean; contracts zod drift guards satisfied"
+    },
+    {
+      "what": "full monorepo test suite",
+      "command": "pnpm -r test",
+      "result": "PASS - engine 2426 (+32 new decision-audit), contracts 507, studio 4795 (+62 new decisions + 18 recording-spine), keyboard-lint 82, glottolog 42, llm 9, oauth-backend 160. One load-sensitive pre-existing flake in src/hooks/useValidator.test.ts appeared in 1 of 3 full runs; passes in isolation on both a clean and modified tree"
+    },
+    {
+      "what": "lint gate: eslint + depcruise + crew-lint + facet lints + both i18n catalogue lints + test-antipattern lint",
+      "command": "pnpm lint",
+      "result": "PASS exit 0 - depcruise 913 modules 0 violations (steps/ still imports no stores/lib/components); i18n-catalog-lint in sync with 21 new trail. ids in en and fr; no new eslint findings (the 6 warnings on StudioShell/StepHost are byte-identical pre-existing)"
+    }
+  ],
+  "currentTask": "T050"
+}

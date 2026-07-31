@@ -10,6 +10,10 @@ export * from "./baseKeyboard";
 export * from "./compileResult";
 export * from "./confirmedAlphabet";
 export * from "./criteria";
+// The append-only per-keyboard decision audit (specs/053-decision-audit). Sits
+// alongside the survey/IR types it derives from rather than under a subpath —
+// engine, studio, and the packaged sidecar all read the same shapes.
+export * from "./decisionRecord";
 export * from "./keyboard-ir";
 export * from "./keyboardId";
 // The single authoritative key-budget determination (spec 052 FR-016); axis A7

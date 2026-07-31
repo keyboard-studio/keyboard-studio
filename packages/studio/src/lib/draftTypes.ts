@@ -27,6 +27,7 @@
 import type { ActiveStepId, TraversalSnapshot, SurveySessionSnapshot } from "../stores/surveySessionStore.ts";
 import type { WorkingCopySnapshot } from "./persistWorkingCopy.ts";
 import type { PhaseBDraftSnapshot } from "../stores/phaseBDraftStore.ts";
+import type { DecisionRecordSnapshot } from "../decisions/decisionLogStore.ts";
 
 /**
  * Dev-engine draft envelope (draftAutosave.ts / serverDraftStore callers).
@@ -132,4 +133,18 @@ export interface DurableDraft {
   traversal: TraversalSnapshot;
   /** The Phase B build-list draft alphabet — see the doc comment above. */
   phaseBDraft?: PhaseBDraftSnapshot;
+  /**
+   * The append-only per-keyboard decision record (specs/053-decision-audit,
+   * FR-005), so the trail survives a reload rather than starting empty every
+   * boot.
+   *
+   * Optional and additive with NO `DRAFT_VERSION` bump, following the
+   * `phaseBDraft` precedent directly above: a record written before this field
+   * existed simply has no `decisionRecord`, and `loadDraft` reads that as "no
+   * decisions recorded yet" rather than discarding an otherwise-good draft. A
+   * version bump would do the opposite — it would throw away every existing
+   * author's in-progress keyboard to add an audit log, which is the wrong trade
+   * by a wide margin (research D-08, SC-009).
+   */
+  decisionRecord?: DecisionRecordSnapshot;
 }
