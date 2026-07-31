@@ -593,7 +593,15 @@ import { markVisited } from "./lib/firstVisit.ts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { instantiateFromBaseIfConfirmed, confirmRebaseTo } from "./lib/confirmRebase.ts";
-import { saveDraft, loadDraft, deriveProjectKeyFromWorkingCopy } from "./lib/draftPersistence.ts";
+import {
+  saveDraft,
+  loadDraft,
+  deriveProjectKeyFromWorkingCopy,
+  draftKey,
+  PENDING_PROJECT_KEY,
+  AUTOSAVE_DEBOUNCE_MS,
+  type DurableDraft,
+} from "./lib/draftPersistence.ts";
 
 const instantiateSpy = instantiateFromBaseIfConfirmed as ReturnType<typeof vi.fn>;
 const confirmRebaseToSpy = confirmRebaseTo as ReturnType<typeof vi.fn>;
@@ -1296,6 +1304,284 @@ describe("StudioShell — resume draft banner", () => {
 
     expect(instantiateSpy).not.toHaveBeenCalled();
     expect(confirmRebaseToSpy).not.toHaveBeenCalled();
+  });
+
+  // F5 regression (docs/design-notes/switch-base-popup-behavior-log.md):
+  // draftPersistence's silent, boot-time restore (main.tsx's loadDraft(),
+  // mirrored explicitly below since main.tsx itself isn't imported by this
+  // test file) must not be followed by a SECOND, competing "Resume" offer
+  // from the OTHER draft engine (lib/draftAutosave.ts, `ks.studio.*`) whose
+  // coarser 1000ms debounce can legitimately lag behind and hold a STALER
+  // step. Before the fix, that second banner rendered unconditionally and,
+  // if resumed, silently regressed the wizard from the freshly-restored
+  // "characters" step back to the OTHER engine's stale "track" snapshot —
+  // exactly the observed F5 symptom (refresh lands 1-2 steps earlier).
+  it("F5: no competing resume-draft-banner — and no step regression — when draftPersistence already silently restored this boot", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+
+    // Reach an L4-equivalent position (base confirmed, track chosen, on the
+    // characters/prefill step) via the top-level (pre-resetModules) stores.
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+      vfs: createVirtualFS([]),
+      ir: makeTestIR([]),
+    });
+    // identityResult must be non-null in the snapshot: the restored
+    // CharactersStep renders null (its prefill guard) without it, which would
+    // fail this test for a reason unrelated to F5.
+    useSurveySessionStore.getState().setIdentityResult({
+      autonym: "English",
+      english: "English",
+      languageSubtag: "en",
+      targetScriptRaw: "Latn",
+      bcp47: "en-Latn",
+      supported: true,
+      prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
+    });
+    useSurveySessionStore.getState().setLocalBase(basicKbdus);
+    useSurveySessionStore.getState().setBaseConfirmed(true);
+    useSurveySessionStore.getState().advance("choose_base");
+    useSurveySessionStore.getState().advance("track");
+    useSurveySessionStore.getState().advance("characters");
+
+    const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    expect(projectKey).not.toBeNull();
+    // The FRESH snapshot, via draftPersistence — this is what main.tsx's
+    // silent boot restore will apply.
+    saveDraft(projectKey!);
+
+    // Seed a STALER record under the OTHER (draftAutosave) engine's OWN
+    // storage scheme, simulating its coarser debounce never having caught up
+    // past "track" (the exact "stuck one step behind" symptom from the
+    // exploration log).
+    localStorage.setItem("ks.studio.activeProject", projectKey!);
+    localStorage.setItem(
+      `ks.studio.project.${projectKey}`,
+      JSON.stringify({
+        version: 1,
+        savedAt: Date.now(),
+        survey: {
+          activeStepId: "track",
+          identityResult: null,
+          scaffoldSpec: null,
+          history: ["identity", "choose_base"],
+        },
+        workingCopy: null,
+      }),
+    );
+    localStorage.setItem(
+      "ks.studio.projects.index",
+      JSON.stringify([
+        {
+          projectKey,
+          savedAt: Date.now(),
+          activeStepId: "track",
+          label: null,
+          langTag: null,
+          status: "draft",
+          prUrl: null,
+        },
+      ]),
+    );
+
+    // Top-level stores are no longer needed for this test and must not leak
+    // into later tests in this file.
+    useWorkingCopyStore.getState().reset();
+    useSurveySessionStore.getState().reset();
+
+    vi.resetModules();
+    const mod = await import("./StudioShell.tsx");
+    const draftPersistence = await import("./lib/draftPersistence.ts");
+
+    // Mirror main.tsx's pre-mount silent restore EXACTLY.
+    const activeKey = draftPersistence.resolveActiveProjectKey();
+    expect(activeKey).toBe(projectKey);
+    expect(draftPersistence.loadDraft(activeKey!)).toBe(true);
+
+    await act(async () => {
+      render(<mod.StudioShell />);
+    });
+
+    // No competing banner — the state was already silently restored.
+    expect(screen.queryByTestId("resume-draft-banner")).toBeNull();
+    // The correctly-restored step (characters/prefill) is on screen, NOT the
+    // other engine's stale "track" step.
+    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    expect(screen.queryByTestId("stage-track")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F6 wiring regression (docs/design-notes/switch-base-popup-behavior-log.md):
+// `promotePendingAutosave` (private to SurveyView) is exercised here through
+// its three real call sites — doCommit (base confirm), the self-promote edge
+// case, and handleStartOver's re-arm — rather than unit-tested directly,
+// since it is not exported. Drives the real `installDraftAutosave`/
+// `saveDraft`/`clearDraft` machinery in `lib/draftPersistence.ts` (NOT
+// mocked in this file) against real localStorage, mirroring the F5 test
+// above.
+// ---------------------------------------------------------------------------
+describe("F6 wiring: promotePendingAutosave", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("(a) confirming a base promotes the pending autosave: the pending record is cleared and the real project key's record is written", async () => {
+    localStorage.clear();
+
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    // L1 progress: identity-complete gives hasPendingProgress() a true reading
+    // (identityResult !== null / activeStepId !== "identity").
+    fireEvent.click(screen.getByTestId("identity-complete"));
+
+    // Seed a REAL pending-slot record (as the mount-time autosave's own
+    // debounced write would eventually do) so its removal below is an
+    // observable state change, not a no-op on an absent key.
+    saveDraft(PENDING_PROJECT_KEY);
+    expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).not.toBeNull();
+
+    // Preview the (mocked) base — sets localBase, arming the commit button.
+    fireEvent.click(screen.getByTestId("base-preview"));
+
+    // Drive the compile pipeline settle for that SAME base id ("basic_kbdus",
+    // the mock's fakeBase — matches basicKbdus.id) and manually instantiate
+    // the working copy, since `instantiateFromBaseIfConfirmed` is mocked to a
+    // no-op for every test in this file (see the module-level vi.mock above) —
+    // doCommit's own body does not depend on that mock actually instantiating;
+    // it only needs a real working copy in place to derive a real project key.
+    act(() => {
+      useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+        vfs: createVirtualFS([]),
+        ir: makeTestIR([]),
+      });
+      artifactHoisted.onInstantiateRef.current?.(basicKbdus, {
+        vfs: createVirtualFS([]),
+        ir: makeTestIR([]),
+        removalCapabilities: new Map(),
+      });
+      for (const setStage of artifactHoisted.stageSetters) {
+        setStage({
+          kind: "ready",
+          compileResult: {},
+          jsBlobUrl: "blob:test",
+          vfs: createVirtualFS([]),
+          scaffoldWarnings: [],
+          keyboardId: basicKbdus.id,
+        } as unknown as Stage);
+      }
+    });
+
+    // Commit — fires doCommit → promotePendingAutosave.
+    fireEvent.click(screen.getByTestId("base-confirm"));
+
+    const realKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    expect(realKey).toBe(basicKbdus.id);
+
+    // The pending record is gone (item 1's index gating is orthogonal — this
+    // is the RECORD, not the index row).
+    expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).toBeNull();
+    // installDraftAutosave's own synchronous install-time save (P1 fix) means
+    // a record for the real key exists immediately, with no debounce wait.
+    const stored = localStorage.getItem(draftKey(realKey!));
+    expect(stored).not.toBeNull();
+    expect((JSON.parse(stored!) as DurableDraft).projectKey).toBe(realKey);
+  });
+
+  it("(b) self-promote: when the derived project key IS the pending key, the pending record survives (clearDraft is not reached)", async () => {
+    localStorage.clear();
+    // A base whose id is literally the reserved sentinel — a synthetic
+    // edge case (never true of a real keyboard id) constructed purely to
+    // force `deriveProjectKeyFromWorkingCopy` to resolve to the pending key
+    // at the moment doCommit runs, so the `projectKey !== PENDING_PROJECT_KEY`
+    // guard's FALSE branch is the one under test.
+    const pendingIdBase = { ...basicKbdus, id: PENDING_PROJECT_KEY };
+
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    fireEvent.click(screen.getByTestId("identity-complete"));
+    saveDraft(PENDING_PROJECT_KEY);
+    expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).not.toBeNull();
+
+    act(() => {
+      // Bypasses the mock BaseResolution's hardcoded fakeBase id (fixed at
+      // "basic_kbdus") — setLocalBase directly, matching the real
+      // BaseResolutionAdapter.onPreview effect.
+      useSurveySessionStore.getState().setLocalBase(pendingIdBase);
+      useWorkingCopyStore.getState().instantiateFromBase(pendingIdBase, {
+        vfs: createVirtualFS([]),
+        ir: makeTestIR([]),
+      });
+      artifactHoisted.onInstantiateRef.current?.(pendingIdBase, {
+        vfs: createVirtualFS([]),
+        ir: makeTestIR([]),
+        removalCapabilities: new Map(),
+      });
+      for (const setStage of artifactHoisted.stageSetters) {
+        setStage({
+          kind: "ready",
+          compileResult: {},
+          jsBlobUrl: "blob:test",
+          vfs: createVirtualFS([]),
+          scaffoldWarnings: [],
+          keyboardId: pendingIdBase.id,
+        } as unknown as Stage);
+      }
+    });
+
+    fireEvent.click(screen.getByTestId("base-confirm"));
+
+    const realKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    expect(realKey).toBe(PENDING_PROJECT_KEY);
+
+    // Self-promote: installDraftAutosave(PENDING_PROJECT_KEY) re-runs (its own
+    // synchronous save rewrites the SAME record), but `clearPersistenceDraft`
+    // must never fire for this branch — the record is present, not removed.
+    expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).not.toBeNull();
+  });
+
+  it("(c) start-over re-arms the pending autosave: new L1 progress after reset is persisted under the pending key again", async () => {
+    localStorage.clear();
+    vi.useFakeTimers();
+
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    fireEvent.click(screen.getByTestId("identity-complete"));
+    act(() => {
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS);
+    });
+    expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).not.toBeNull();
+
+    // Start over: arm + confirm the corner reset control (real component,
+    // not mocked — visible on every survey step).
+    fireEvent.click(screen.getByTestId("survey-reset-arm"));
+    fireEvent.click(screen.getByTestId("survey-reset-yes"));
+
+    // handleStartOver's discardActiveDraft() removes the just-abandoned
+    // pending record synchronously.
+    expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).toBeNull();
+    expect(screen.getByTestId("stage-identity")).toBeTruthy();
+
+    // New L1 progress in this SAME mount, after the reset — only possible if
+    // handleStartOver actually re-armed the pending-slot autosave
+    // subscription (autosaveTeardownRef.current =
+    // installDraftAutosave(DRAFT_PERSISTENCE_PENDING_KEY)); without that
+    // re-arm this subscription would still be torn down from the reset and
+    // this progress would go unpersisted until the NEXT base confirm.
+    fireEvent.click(screen.getByTestId("identity-complete"));
+    act(() => {
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS);
+    });
+
+    const stored = localStorage.getItem(draftKey(PENDING_PROJECT_KEY));
+    expect(stored).not.toBeNull();
+    expect((JSON.parse(stored!) as DurableDraft).traversal.activeStepId).toBe("choose_base");
   });
 });
 

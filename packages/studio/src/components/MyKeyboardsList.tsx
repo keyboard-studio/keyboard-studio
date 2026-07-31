@@ -76,6 +76,11 @@ export function mergeProjectEntries(
     // A row with no draftId can't be keyed, resumed, or deleted by this list —
     // skip it rather than guessing a key (see module docstring).
     if (projectKey === undefined || projectKey === "") continue;
+    // Defense-in-depth against a phantom "Untitled keyboard" card: the
+    // reserved pending slot is pre-instantiation progress, never a project.
+    // startCloudSync already refuses to push it, so a pending row here would
+    // mean some other write path leaked one — don't render it either way.
+    if (projectKey === PENDING_PROJECT_KEY) continue;
 
     const existing = byKey.get(projectKey);
     const cloudEntry: ProjectIndexEntry = {
