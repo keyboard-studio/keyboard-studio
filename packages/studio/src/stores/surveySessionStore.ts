@@ -634,6 +634,54 @@ export function snapshotTraversal(): TraversalSnapshot {
   };
 }
 
+// ---------------------------------------------------------------------------
+// performManifestBack / expectedBackTarget (F7 — browser Back integration)
+//
+// The ONE manifest-level back dispatch, shared by StepHost's in-app Back
+// button AND the browser-history popstate bridge
+// (hooks/useSurveyBrowserHistorySync.ts) — so the two triggers never
+// diverge into separate back logic. Mirrors what StepHost.handleBack did
+// inline before this fix: the "touch" step always resurfaces the
+// touch_seed_source chooser (spec 035 R12); every other step follows the
+// generic walked-history pop.
+// ---------------------------------------------------------------------------
+
+/**
+ * Perform the manifest-level Back action for `stepId`. No-ops exactly when
+ * `expectedBackTarget(stepId, history)` would return null (nothing to pop).
+ */
+export function performManifestBack(stepId: ActiveStepId): void {
+  const { backToTouchSeedSource, popHistory } = useSurveySessionStore.getState();
+  if (stepId === "touch") {
+    backToTouchSeedSource();
+    return;
+  }
+  popHistory();
+}
+
+/**
+ * Pure prediction (no mutation) of where `performManifestBack(stepId)` would
+ * land, given `history`. Returns null when there is no genuine back target
+ * (mirrors popHistory's own empty-history no-op) — used by:
+ *   - StepHost to gate the Back affordance itself (only render/pass `onBack`
+ *     when this is non-null — F7 defect 2).
+ *   - the browser-history bridge to sanity-check an incoming popstate's
+ *     `ksStep` before trusting it (never mutate the store off an unverified
+ *     guess — F7 defect 1).
+ *
+ * "touch" always has a target (the touch_seed_source chooser — see
+ * backToTouchSeedSource's own docstring: it always lands somewhere, it never
+ * no-ops), so this returns non-null unconditionally for that step.
+ */
+export function expectedBackTarget(
+  stepId: ActiveStepId,
+  history: readonly ActiveStepId[],
+): ActiveStepId | null {
+  if (stepId === "touch") return "touch_seed_source";
+  const popped = popValidHistoryEntry(stepId, history);
+  return popped?.prev ?? null;
+}
+
 /**
  * Patch a `TraversalSnapshot` directly into the survey-session store.
  * `TraversalSnapshot` is exactly the non-action slice of `SurveySessionState`,

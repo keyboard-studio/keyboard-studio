@@ -112,6 +112,52 @@ describe("MarksSeriesStep — series runs when marks exist", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Station Back affordance gating (F7 sweep: an always-rendered Back button
+// whose handler can silently no-op at the first station when StepHost omits
+// onBack — same defect shape as the sibling gallery/panel sites). Predicate:
+// render when stationIndex > 0 || onBack !== undefined (Back WITHIN the
+// series must keep working even when the host has nothing to pop into).
+// ---------------------------------------------------------------------------
+
+describe("MarksSeriesStep — station Back affordance gating", () => {
+  it("first station + no onBack: renders no Back button", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    expect(screen.getByTestId("marks-attachment")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+  });
+
+  it("first station + onBack: Back is visible and calls onBack", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    const onBack = vi.fn();
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} onBack={onBack} />);
+    });
+    const backButton = screen.getByRole("button", { name: "Back" });
+    fireEvent.click(backButton);
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("station > 0 + no onBack: Back is visible and steps the station back", () => {
+    // Two marks attested on the SAME base cluster into one mark class
+    // (jaccard similarity 1.0), so the class needs an on-screen mental-model
+    // confirmation (marks.length > 1) — a second station beyond attachment.
+    seedAlphabet([ACUTE, "̀"], ["e"]);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    expect(screen.getByTestId("marks-attachment")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    expect(screen.getByTestId("marks-mental-model")).toBeTruthy();
+    const backButton = screen.getByRole("button", { name: "Back" });
+    fireEvent.click(backButton);
+    expect(screen.getByTestId("marks-attachment")).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // S1 attachment station (US2, FR-006/007/008)
 // ---------------------------------------------------------------------------
 

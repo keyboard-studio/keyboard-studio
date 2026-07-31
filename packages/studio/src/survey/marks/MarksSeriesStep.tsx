@@ -341,9 +341,11 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
       data-testid="marks-series"
       style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 640, fontFamily: FONT, color: TEXT_MAIN, padding: 16, overflow: "auto" }}
     >
-      <button type="button" onClick={handleStationBack} style={{ alignSelf: "flex-start", ...secondaryButton }}>
-        <Trans id="survey.marks.series.backButton">Back</Trans>
-      </button>
+      {(stationIndex > 0 || onBack !== undefined) && (
+        <button type="button" onClick={handleStationBack} style={{ alignSelf: "flex-start", ...secondaryButton }}>
+          <Trans id="survey.marks.series.backButton">Back</Trans>
+        </button>
+      )}
       <h2 style={{ ...phaseHeadingFlush, color: ACCENT }}>
         <Trans id="survey.marks.series.heading">Accents &amp; marks</Trans>
       </h2>
