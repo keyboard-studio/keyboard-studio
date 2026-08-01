@@ -34,6 +34,11 @@ import {
   usePhaseBDraftStore,
 } from "../stores/phaseBDraftStore.ts";
 import { DEFAULT_PHASE_B_FONT, isPhaseBFontValue } from "../survey/surveyStyles.ts";
+import {
+  applyDecisionRecordSnapshot,
+  snapshotDecisionRecord,
+} from "../decisions/decisionLogStore.ts";
+import { parseDecisionRecord, shedDecisionDetail } from "@keyboard-studio/engine";
 // Re-exported (not just imported) so existing external consumers of this
 // module (draftPersistence.test.ts, StudioShell.tsx, etc.) keep importing
 // `DurableDraft`/`ProjectIndexEntry`/`DraftMeta` from here unchanged, even
@@ -448,6 +453,12 @@ export function saveDraft(projectKey: string): void {
     workingCopy: snapshotWorkingCopyData(),
     traversal: snapshotTraversal(),
     phaseBDraft: snapshotPhaseBDraft(),
+    // spec 053 FR-005: the decision trail survives a reload. Written unshed —
+    // localStorage has room, and the author's own machine should keep the full
+    // detail. The cloud-size shed happens on the sync path only (see the flush
+    // in startCloudSync), so a large record degrades what SYNCS, never what is
+    // saved locally.
+    decisionRecord: snapshotDecisionRecord(),
   };
 
   try {
@@ -602,6 +613,24 @@ export function loadDraft(projectKey: string): boolean {
       selectedFont: restoredFont,
     });
 
+    // decisionRecord (spec 053 FR-005): optional/additive, restored the same
+    // tolerant way as phaseBDraft above — a record written before the field
+    // existed, or one written by a build whose entry shape this build does not
+    // recognise, restores as far as it validates and never discards an otherwise
+    // good draft (SC-009).
+    //
+    // Routed through the engine's `parseDecisionRecord` rather than a second
+    // validator written here: that function is the one place the contract's
+    // version-tolerance table is implemented, and it takes text, so the stored
+    // object is re-stringified to reach it. One tolerant reader for both the
+    // draft path and the packaged-sidecar path is worth a JSON round-trip.
+    if (envelope.decisionRecord !== undefined) {
+      const decisions = parseDecisionRecord(JSON.stringify(envelope.decisionRecord));
+      if (!decisions.unreadable) {
+        applyDecisionRecordSnapshot(decisions.record, decisions.droppedCount);
+      }
+    }
+
     _draftRestoredThisBoot = true;
     return true;
   } catch {
@@ -609,6 +638,40 @@ export function loadDraft(projectKey: string): boolean {
     // prepareWorkingCopySnapshot BEFORE any store was touched) — remove and
     // treat as absent so it doesn't loop or crash boot.
     discardCorruptDraft(projectKey);
+    return false;
+  }
+}
+
+/**
+ * Load ONE project's decision record into the decision log, without restoring
+ * anything else about that project (spec 053 US1, T032).
+ *
+ * This is why the trail is reachable from "My keyboards" for a `submitted` project
+ * too: the record is read-only after submission, and reading it must not resume,
+ * repoint, or otherwise disturb the project. Nothing here touches the working-copy
+ * store, the traversal, or the active-project pointer — the ONLY state it writes
+ * is the decision log.
+ *
+ * Returns false when the project has no record to show (never written, or written
+ * before the field existed), so the caller can leave the author where they are
+ * rather than navigating to an empty trail.
+ */
+export function loadDecisionRecordForProject(projectKey: string): boolean {
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(draftKey(projectKey));
+  } catch {
+    return false;
+  }
+  if (raw === null) return false;
+  try {
+    const envelope = JSON.parse(raw) as DurableDraft;
+    if (envelope.decisionRecord === undefined) return false;
+    const parsed = parseDecisionRecord(JSON.stringify(envelope.decisionRecord));
+    if (parsed.unreadable) return false;
+    applyDecisionRecordSnapshot(parsed.record, parsed.droppedCount);
+    return true;
+  } catch {
     return false;
   }
 }
@@ -988,6 +1051,37 @@ function simpleHash(s: string): string {
   return (h >>> 0).toString(36); // >>> 0 -> unsigned; base36 keeps it short.
 }
 
+/**
+ * Return `raw` with its decision-record detail shed to fit
+ * {@link MAX_CLOUD_DRAFT_BYTES}, or `raw` unchanged when it already fits or
+ * carries no record (spec 053, research D-09).
+ *
+ * Budgets the WHOLE envelope, not the record alone: the working copy is the bulk
+ * of a draft, so the record's allowance is whatever is left over — which is the
+ * only budget that actually determines whether the push succeeds.
+ *
+ * Never throws. A malformed local record is left exactly as found; `loadDraft`
+ * and `discardCorruptDraft` own that cleanup, and this function's one job is size.
+ */
+function shedDraftDecisionDetail(raw: string): string {
+  if (new TextEncoder().encode(raw).length <= MAX_CLOUD_DRAFT_BYTES) return raw;
+  try {
+    const envelope = JSON.parse(raw) as DurableDraft;
+    if (envelope.decisionRecord === undefined) return raw;
+    // Bytes the rest of the envelope already spends. Serializing the envelope
+    // without the record gives the real remainder rather than a guess.
+    const { decisionRecord: _omitted, ...withoutRecord } = envelope;
+    const overhead = new TextEncoder().encode(JSON.stringify(withoutRecord)).length;
+    const budget = MAX_CLOUD_DRAFT_BYTES - overhead;
+    if (budget <= 0) return raw; // The working copy alone is over — nothing to shed for.
+    const shed = shedDecisionDetail(envelope.decisionRecord, budget);
+    if (shed === envelope.decisionRecord) return raw;
+    return JSON.stringify({ ...envelope, decisionRecord: shed });
+  } catch {
+    return raw;
+  }
+}
+
 export function startCloudSync(getToken: () => string | null): () => void {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let lastPushedHash: string | null = null;
@@ -1007,6 +1101,19 @@ export function startCloudSync(getToken: () => string | null): () => void {
       return;
     }
     if (raw === null) return;
+
+    // spec 053 research D-09: shed decision DETAIL before the size check below,
+    // so an oversized record degrades the sync to "less detail" instead of
+    // failing it to "no sync at all". Only diff payloads are given up — never an
+    // entry, never a decision — and the shed record states its own truncation, so
+    // the trail says detail was dropped rather than presenting a thinned record
+    // as complete.
+    //
+    // Deliberately shedding a COPY for the push only: the local record keeps its
+    // full detail (see saveDraft), so the author's own trail is unaffected by
+    // whatever the server will accept. No new timer — this runs inside the
+    // existing cloud-sync flush (Constitution Article IV).
+    raw = shedDraftDecisionDetail(raw);
 
     if (new TextEncoder().encode(raw).length > MAX_CLOUD_DRAFT_BYTES) {
       // Kept in localStorage by the sibling autosave; skip the server push

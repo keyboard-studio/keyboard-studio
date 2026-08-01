@@ -37,7 +37,12 @@ import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { manifest } from "../steps/manifest.ts";
 import type { EditorStep } from "../steps/types.ts";
-import { applyStepCompletion, routeAnswersThroughMutate, type ReducerDeps } from "../steps/reducer.ts";
+import {
+  applyStepCompletion,
+  recordStepCompletion,
+  routeAnswersThroughMutate,
+  type ReducerDeps,
+} from "../steps/reducer.ts";
 import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
@@ -238,6 +243,14 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     if (STEPS_WITH_APPLY_COMPLETION.has(resolvedStep.id)) {
       applyStepCompletion(resolvedStep.id, result, reducerDeps);
     }
+
+    // 2b. Decision audit (spec 053). AFTER the reducer, so an editor step's
+    //     summary reads the working-copy state the step's own side effects just
+    //     produced. Called for every step — unlike step 2 this is deliberately
+    //     NOT gated on the effect table, because FR-001 records every survey
+    //     answer, and most question steps have no reducer side effect at all.
+    //     A no-op when no recorder is injected (see ReducerDeps.recordDecision).
+    recordStepCompletion(resolvedStep.id, result, reducerDeps);
 
     // 3. Pure advance policy → next step + optional signals.
     //    Read selectedTrack and identityResult from getState() — NOT from the

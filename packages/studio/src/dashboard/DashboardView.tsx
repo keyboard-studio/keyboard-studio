@@ -36,7 +36,8 @@ import { StrategyTreeView } from "./StrategyTreeView.tsx";
 import { ScriptRoutingView } from "./ScriptRoutingView.tsx";
 import { MONO, SANS } from "./tokens.tsx";
 import type { CompletenessReport } from "./completeness.ts";
-import type { AxisFill } from "@keyboard-studio/contracts";
+import type { PathOverlay } from "./pathOverlay.ts";
+import type { AxisFill, DecisionImpact } from "@keyboard-studio/contracts";
 
 type Section = "flow" | "routing" | "strategy" | "completeness";
 
@@ -403,9 +404,30 @@ export interface FlowMapViewProps {
    * `useWorkingCopyStore((s) => s.axisFills)` and passes it in here.
    */
   axisFills?: AxisFill[];
+  /**
+   * The walked path of the selected keyboard (spec 053, FR-023), forwarded to the
+   * manifest-spine graph — the one graph on this page whose node ids ARE step ids.
+   *
+   * Same boundary rationale as `completeness` again: `StudioShell` projects
+   * `useDecisionLogStore`'s record through `buildPathOverlay` and passes the result
+   * in. Absent means no keyboard is selected, and the map renders exactly as it
+   * always has (FR-024).
+   */
+  pathOverlay?: PathOverlay;
+  /**
+   * Derive the alternative outcome at one inspected step, on request (spec 053,
+   * FR-026). Forwarded to the manifest spine with `pathOverlay`; absent in any host
+   * that does not supply it, which removes the affordance entirely.
+   */
+  resolveAlternative?: (stepId: string, alternativeValue: string) => DecisionImpact | null;
 }
 
-export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
+export function FlowMapView({
+  completeness,
+  axisFills,
+  pathOverlay,
+  resolveAlternative,
+}: FlowMapViewProps) {
   const { t } = useLingui();
   const [section, setSection] = useState<Section>("flow");
   const flows = useMemo(() => buildFlowSources(), []);
@@ -512,7 +534,19 @@ export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
                 {manifestSpine.flowId} · {manifestSpine.nodes.length} steps · {manifestSpine.edges.length} edges
               </span>
             </div>
-            <FlowGraphView graph={manifestSpine} />
+            {/* Spec 053 (FR-023): the walked-path overlay goes ONLY here. The
+                manifest spine is the one graph on this page whose node ids are step
+                ids, which is what a decision record records; the drill-down,
+                Library, and Leftover graphs are question-level and would match
+                nothing. Passing it to them would be harmless but misleading. */}
+            {/* Conditional spread, not `prop={maybeUndefined}` — the repo runs
+                `exactOptionalPropertyTypes`, so an absent prop and an explicitly
+                undefined one are different types (same shape as `axisFills` below). */}
+            <FlowGraphView
+              graph={manifestSpine}
+              {...(pathOverlay !== undefined ? { pathOverlay } : {})}
+              {...(resolveAlternative !== undefined ? { resolveAlternative } : {})}
+            />
           </section>
 
           {/* Spec 015 (FR-004): per-phase modular graphs as registry-keyed drill-downs

@@ -14,7 +14,7 @@ import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import { ResizeHandle } from "./components/ResizeHandle.tsx";
-import type { BaseKeyboard, Pattern, VirtualFS, KeyboardIR, RemovalCapability } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, DecisionEntry, Pattern, VirtualFS, KeyboardIR, RemovalCapability } from "@keyboard-studio/contracts";
 import { buildTouchLayoutJson } from "./lib/buildTouchLayoutJson.ts";
 import { shouldEmitTouchLayout, resolveTouchSeedSource } from "./lib/touchEmission.ts";
 import { useWorkingCopyStore, bindManifest } from "./stores/workingCopyStore.ts";
@@ -58,6 +58,14 @@ import { AccountControl } from "./components/AccountControl.tsx";
 import { hasVisited } from "./lib/firstVisit.ts";
 import { manifest, validateManifestShape } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
+import { createDecisionRecorder } from "./decisions/createDecisionRecorder.ts";
+import { createSourceSnapshotter } from "./decisions/snapshotSource.ts";
+import { useDecisionLogStore } from "./decisions/decisionLogStore.ts";
+import { DecisionTrailView } from "./decisions/DecisionTrailView.tsx";
+import { resolveImpact } from "./decisions/impact.ts";
+import { buildPathOverlay } from "./dashboard/pathOverlay.ts";
+import { projectWorkingCopyForOutput } from "./lib/serializeWorkingCopy.ts";
+import { readVfsText } from "./lib/vfsText.ts";
 import { StepHost } from "./components/StepHost.tsx";
 import { ResumeDraftBanner } from "./components/ResumeDraftBanner.tsx";
 import { SurveyResetButton } from "./components/SurveyResetButton.tsx";
@@ -118,7 +126,10 @@ const SHOW_FLOWMAP =
   import.meta.env.DEV || import.meta.env.VITE_SHOW_FLOWMAP === "1";
 
 const VALID_ROUTES = new Set<RouteId>(
-  (["welcome", "survey", "preview", "output", "flowmap", "profile"] as const).filter(
+  // "trail" is NOT filtered: the decision trail is a production surface (spec 053
+  // FR-017), unlike the flow map beside it. The filter below is only ever about
+  // `flowmap`.
+  (["welcome", "survey", "preview", "output", "flowmap", "trail", "profile"] as const).filter(
     (r) => r !== "flowmap" || SHOW_FLOWMAP,
   ),
 );
@@ -198,6 +209,9 @@ const NAV_ITEMS: NavItem[] = [
   { id: "survey", label: msg({ id: "nav.studio", message: "Studio" }) },
   { id: "preview", label: msg({ id: "nav.preview", message: "Preview" }) },
   { id: "output", label: msg({ id: "nav.output", message: "Output" }) },
+  // Spec 053 FR-017: unconditional, alongside Output and Preview rather than
+  // beside the dev-gated Flow Map below.
+  { id: "trail", label: msg({ id: "nav.decisionTrail", message: "Decisions" }) },
   ...(SHOW_FLOWMAP
     ? [{ id: "flowmap" as const, label: msg({ id: "nav.flowMap", message: "Flow Map" }) }]
     : []),
@@ -590,6 +604,62 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }, [cloudSyncAccessToken]);
 
   // ---------------------------------------------------------------------------
+  // Decision audit (spec 053) — the `recordDecision` dep, composed here for the
+  // same reason as every other ReducerDeps member: the recorder needs stores/ and
+  // lib/, and steps/ may import neither.
+  //
+  // `readProjectedKmn` delegates to `projectWorkingCopyForOutput` — the SAME
+  // function the download zip and the pull-request path use. That is not an
+  // implementation convenience, it is FR-009/SC-005: the text the audit diffs must
+  // be the text that ships, and this is the one function that produces it. Do not
+  // "optimise" this into a codec emit from the working IR; that text is not what
+  // ships (see snapshotSource.ts's header).
+  //
+  // Held in a ref rather than a memo because the snapshotter is STATEFUL — it
+  // carries the previous boundary's text. A re-memo mid-session would drop that
+  // baseline and make the next diff span two boundaries.
+  // ---------------------------------------------------------------------------
+  const snapshotterRef = useRef(
+    createSourceSnapshotter({
+      readProjectedKmn: async () => {
+        const projected = await projectWorkingCopyForOutput();
+        if (projected === null) return null;
+        const path = findKmnPath(projected.vfs);
+        if (path === undefined) return null;
+        const text = readVfsText(projected.vfs, path);
+        return text === undefined ? null : { path, text };
+      },
+    }),
+  );
+
+  const recordDecision = useMemo(
+    () =>
+      createDecisionRecorder({
+        snapshotter: snapshotterRef.current,
+        getDeletionCounts: () => {
+          const wc = useWorkingCopyStore.getState();
+          return {
+            nodes: wc.deletedNodeIds.size,
+            items: wc.deletedItemIds.size,
+            touchKeys: wc.deletedTouchKeyIds.size,
+          };
+        },
+        getDeletedIds: () => {
+          const wc = useWorkingCopyStore.getState();
+          return [...wc.deletedNodeIds, ...wc.deletedItemIds, ...wc.deletedTouchKeyIds];
+        },
+        // The keyboard's own id once the author has set one, else the base's —
+        // matching how `deriveProjectKeyFromWorkingCopy` keys a project, so the
+        // record and the draft agree on which keyboard this is.
+        getKeyboardId: () => {
+          const wc = useWorkingCopyStore.getState();
+          return wc.identity?.keyboardId ?? wc.baseKeyboard?.id ?? null;
+        },
+      }),
+    [],
+  );
+
+  // ---------------------------------------------------------------------------
   // ReducerDeps — injected into applyStepCompletion (steps/reducer.ts).
   // All store actions and lib helpers are injected here; the reducer itself has
   // no static imports from stores/ or lib/ (boundary compliance).
@@ -647,9 +717,12 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // when base-plus-mark output is chosen over a ready-made-form base.
       setMarksMigrationNeeded: (needed) =>
         useSurveySessionStore.getState().setMarksMigrationNeeded(needed),
+      // Spec 053 FR-001/FR-002: record every step's decisions. Injected like
+      // everything else here; the reducer knows only that it has a callback.
+      recordDecision,
     }),
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
-    [lockDesktop, clearStale, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting, setTouchSeedSource],
+    [lockDesktop, clearStale, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting, setTouchSeedSource, recordDecision],
   );
 
   // Keep reducerDepsRef current so the async onInstantiate callback always
@@ -867,6 +940,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
     sessionReset();
     resetSurvey();
+    // Spec 053: start-over is an explicit "throw it away", and that includes the
+    // decision trail — carrying the abandoned keyboard's decisions into the next
+    // one would attribute them to a keyboard that never made them. The source
+    // baseline goes too, so the first boundary of the new session establishes a
+    // fresh one instead of diffing against the abandoned keyboard's text.
+    useDecisionLogStore.getState().reset();
+    snapshotterRef.current.reset();
     instantiatedRef.current = false;
     pendingArtifactRef.current = null;
     // sessionReset() calls reset() which already clears charactersSubStage to
@@ -1232,6 +1312,68 @@ export function StudioShell() {
   // ---------------------------------------------------------------------------
   const outputNavBlocked = useInventoryCoverageGate().blocked;
 
+  // ---------------------------------------------------------------------------
+  // Decision trail (spec 053 US1). Same arrangement as completenessReport above:
+  // read the stores here, pass plain values down, so decisions/ needs no store
+  // import and the trail is renderable against a fixture record.
+  //
+  // `resolveEntryImpact` is passed as a FUNCTION, not as resolved impacts — that
+  // is what makes FR-010 structural: mounting the list resolves nothing, and
+  // expanding one row resolves exactly that row.
+  // ---------------------------------------------------------------------------
+  const decisionRecord = useDecisionLogStore((s) => s.record);
+  const decisionDroppedCount = useDecisionLogStore((s) => s.droppedCount);
+  const impactDeps = useMemo(
+    () => ({
+      getWorkingIR: () => useWorkingCopyStore.getState().ir,
+      isDesktopLocked: () => useWorkingCopyStore.getState().desktopLocked,
+      // The touch lock's observable is a built touch layout — the same signal
+      // runCompleteness reads above, rather than a second notion of "locked".
+      isTouchLocked: () => useWorkingCopyStore.getState().touchLayoutJson !== null,
+    }),
+    [],
+  );
+  const resolveEntryImpact = useCallback(
+    (entry: DecisionEntry) => resolveImpact(entry, impactDeps),
+    [impactDeps],
+  );
+
+  // ---------------------------------------------------------------------------
+  // Flow-map walked path (spec 053 US3, FR-023/FR-026). Projected HERE, where the
+  // record is reachable, and passed into FlowMapView as a prop — `dashboard/` has
+  // no `stores/` import (the depcruise `dashboard-layer` rule), exactly as
+  // completenessReport and axisFills above.
+  //
+  // The overlay is passed only while a keyboard identity exists. With no keyboard
+  // selected the prop is `undefined` and the map renders as it always has, which is
+  // FR-024's identity rather than an empty-set decoration that renders the same.
+  // ---------------------------------------------------------------------------
+  const pathOverlay = useMemo(
+    () => (decisionRecord.keyboardId === null ? undefined : buildPathOverlay(decisionRecord)),
+    [decisionRecord],
+  );
+  // FR-026: the alternative at ONE inspected node. `resolveImpact` is reused with an
+  // explicit `requestedValue`, so "what would this other answer have produced?" runs
+  // the same derivation as "what did this decision do?" — a second code path could
+  // disagree with the trail about the same question. Returns `null` when this step
+  // recorded no survey decision to vary, which the map reports as a reason rather
+  // than a failure (FR-028).
+  const resolveStepAlternative = useCallback(
+    (stepId: string, alternativeValue: string) => {
+      const entries = useDecisionLogStore.getState().record.entries;
+      // The LIVE decision for the step: scan backwards, so a revisited step is asked
+      // about the answer that currently stands rather than one it superseded.
+      for (let i = entries.length - 1; i >= 0; i--) {
+        const entry = entries[i]!;
+        if (entry.stepId === stepId && entry.payload.kind === "survey-answer") {
+          return resolveImpact(entry, impactDeps, alternativeValue);
+        }
+      }
+      return null;
+    },
+    [impactDeps],
+  );
+
   let content: ReactNode;
   switch (route) {
     case "welcome":
@@ -1247,7 +1389,26 @@ export function StudioShell() {
       content = <OutputScreen />;
       break;
     case "flowmap":
-      content = <FlowMapView completeness={completenessReport} axisFills={axisFills} />;
+      content = (
+        <FlowMapView
+          completeness={completenessReport}
+          axisFills={axisFills}
+          {...(pathOverlay !== undefined ? { pathOverlay } : {})}
+          resolveAlternative={resolveStepAlternative}
+        />
+      );
+      break;
+    case "trail":
+      // Spec 053 US1. The record and the impact resolver are both computed here,
+      // where the stores are reachable, and passed down — DecisionTrailView reads
+      // no store of its own, so it can be rendered against a fixture in tests.
+      content = (
+        <DecisionTrailView
+          record={decisionRecord}
+          droppedCount={decisionDroppedCount}
+          resolveImpact={resolveEntryImpact}
+        />
+      );
       break;
     case "profile":
       content = <ProfileScreen />;

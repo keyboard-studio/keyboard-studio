@@ -14,6 +14,7 @@ export { ErrorText } from "./ErrorText.tsx";
 export { Notice } from "./Notice.tsx";
 export { Field } from "./Field.tsx";
 export { Badge } from "./Badge.tsx";
+export { DiffHunkList } from "./DiffHunkList.tsx";
 export * as theme from "./theme.ts";
 
 // Type-only re-exports so call sites need not import from primitive source files.

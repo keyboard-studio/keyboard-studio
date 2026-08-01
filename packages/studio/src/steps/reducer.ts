@@ -237,6 +237,23 @@ export interface ReducerDeps {
    * re-propagation is attempted (P4b behavior).
    */
   getStaleSteps?: () => ReadonlySet<string>;
+
+  // --- decision audit (spec 053 FR-001/FR-002, research D-02) ---
+  /**
+   * Record the decisions a completed step represents.
+   *
+   * INJECTED, not imported, for the same boundary reason as every dep above:
+   * `steps/` may not import `stores/`, `lib/`, or `components/`, and the
+   * recorder needs all three. The injected implementation (StudioShell) composes
+   * `recordSurveyAnswers` + `recordEditorStep` + the source snapshot over the
+   * decision log.
+   *
+   * Optional, and a no-op when absent. That is load-bearing for FR-006: a session
+   * run with this dep omitted must produce a byte-identical keyboard, so
+   * recording has to be something the pipeline can be missing entirely rather
+   * than something it merely skips internally.
+   */
+  recordDecision?: (event: { stepId: string; result: unknown }) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -479,6 +496,42 @@ export function applyStepCompletion(
 // mutate flag (off ⇒ no-op, byte-identical to P4b), so this is safe to call
 // unconditionally. A module without `mutate`/with empty `writes` is skipped.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// recordStepCompletion — the decision-audit seam (spec 053, research D-02).
+//
+// Separate from applyStepCompletion on purpose, and this is the one place the
+// implementation departs from the letter of the plan, so it is worth stating why.
+//
+// D-02 puts recording on applyStepCompletion because that is described as "called
+// every time a step completes". It no longer is: StepHost gates it on
+// STEPS_WITH_APPLY_COMPLETION (six steps), and choose_base fires it from an async
+// instantiation callback instead. Hanging the audit there would silently miss
+// every question step — identity, track, project_name, sequences, convenience —
+// which is most of FR-001's subject matter.
+//
+// So recording gets its own entry point, called unconditionally from the host's
+// generic completion path. D-02's actual requirements are preserved intact: the
+// recorder is an INJECTED dep (this file still imports nothing from stores/, lib/,
+// or components/), and no step component or gallery learns that auditing exists —
+// the host passes the same opaque `result` it already has, and `reducerDeps`
+// carries the behaviour.
+// ---------------------------------------------------------------------------
+
+/**
+ * Report a completed step to the decision audit.
+ *
+ * A pure hand-off: no side effect of its own, and a no-op when no recorder is
+ * injected. Called for EVERY completed step, including steps with no reducer
+ * side effects — the effect table gates side effects, not auditing.
+ */
+export function recordStepCompletion(
+  stepId: string,
+  result: unknown,
+  deps: ReducerDeps,
+): void {
+  deps.recordDecision?.({ stepId, result });
+}
 
 export function routeAnswersThroughMutate(
   result: SurveyPhaseResult,
