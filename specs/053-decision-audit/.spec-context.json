@@ -3,7 +3,7 @@
   "specName": "Per-keyboard decision audit (CYOA Phase 1 — record and review)",
   "branch": "053-decision-audit",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -488,6 +488,13 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-07-31T23:32:08.858Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-01T00:48:29.830Z"
     }
   ],
   "telemetryInstanceId": "e345f576-766b-453a-9307-e48c4e66a9a1",
@@ -520,6 +527,10 @@
     {
       "decision": "FR-020 deferral (positional nesting under <id>/) is the RIGHT CALL, with a concrete upstream recommendation attached",
       "why": "km-author (upstream voice) agrees the archive root already doubles as the keyboard directory, so beside-not-inside has no honest home without changing every prior archive shape. What to put to the Keyman team: nest keyboard content under <id>/ at the zip root (mirroring the eventual release/<letter>/<id>/ destination) and make NEXT_STEPS.md + the metadata directory true siblings outside it, so the submit instruction becomes structural (drop the <id>/ folder into release/<letter>/) rather than a warning label to remember. Ship as a v2 zip layout, not a silent change now. Parity score 6/10."
+    },
+    {
+      "decision": "APPROVED for merge review: PR #1455 opened against main, not merged",
+      "why": "Six review lenses returned APPROVE-class with no P0; all eight findings were fixed and the gate re-verified independently by the lead. CI and human review live on the open PR by design -- the crew never merges. No tracked issue with acceptance criteria governs this spec, so no closing keyword applies."
     }
   ],
   "step_summaries": {
