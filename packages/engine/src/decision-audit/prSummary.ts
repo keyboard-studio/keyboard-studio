@@ -133,7 +133,7 @@ function formatDecision(entry: DecisionEntry): string {
  */
 function formatEffect(impact: DecisionImpact | null | undefined): string {
   if (impact === undefined) return "not captured";
-  if (impact === null) return "detail dropped to fit the save budget";
+  if (impact === null) return "omitted to keep the record within size limits";
 
   switch (impact.state) {
     case "captured":
@@ -142,8 +142,8 @@ function formatEffect(impact: DecisionImpact | null | undefined): string {
       return "no source change";
     case "unavailable":
       return impact.reason === "lock-gate-dependency"
-        ? "not separately attributable (behind a passed lock gate)"
-        : "not separately attributable (no re-derivable write path)";
+        ? "not tracked separately (part of a combined change confirmed together)"
+        : "not tracked separately (no way to isolate its exact change)";
     default: {
       const _exhaustive: never = impact;
       return String(_exhaustive);
@@ -203,18 +203,18 @@ export function buildDecisionSummaryBlock(
   const notes: string[] = [];
   if (effective.length > shown.length) {
     notes.push(
-      `Showing the first ${shown.length} of ${effective.length} decisions. Complete detail is in \`${DECISION_RECORD_VFS_PATH}\` in the downloaded package.`,
+      `Showing the first ${shown.length} of ${effective.length} decisions. The author's package includes the complete detail in \`${DECISION_RECORD_VFS_PATH}\` and can supply it on request.`,
     );
   }
   const revisedCount = record.entries.length - effective.length;
   if (revisedCount > 0) {
     notes.push(
-      `${plural(revisedCount, "earlier decision was", "earlier decisions were")} later revised; the full history is in \`${DECISION_RECORD_VFS_PATH}\`.`,
+      `${plural(revisedCount, "earlier decision was", "earlier decisions were")} later revised; the full history is in the author's \`${DECISION_RECORD_VFS_PATH}\`.`,
     );
   }
   if (record.truncated !== null) {
     notes.push(
-      `Change detail for ${plural(record.truncated.shedCount, "decision", "decisions")} was dropped to fit the save budget.`,
+      `Change detail for ${plural(record.truncated.shedCount, "decision", "decisions")} was omitted to keep the author's record within size limits.`,
     );
   }
 

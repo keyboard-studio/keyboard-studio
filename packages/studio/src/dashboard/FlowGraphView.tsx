@@ -4,7 +4,7 @@
 // reads at a glance; nodes are badged by role (entry, gate, engine-resolved,
 // terminal). Pure presentation — all data comes from layoutFlowGraph().
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { DecisionImpact } from "@keyboard-studio/contracts";
 import { DiffHunkList } from "../ui/DiffHunkList.tsx";
@@ -196,6 +196,16 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
   );
   const inspectable = resolveAlternative !== undefined;
 
+  // The panel sits after the whole node-card list in DOM order, so a keyboard
+  // or AT user opening it from an early node would otherwise have to tab past
+  // every remaining card to reach it. Moving focus to the panel heading on
+  // open (spec 053 FR-026 follow-up) lands them there directly; the heading
+  // itself is not otherwise focusable, hence tabIndex={-1} below.
+  const panelHeadingRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (inspectedId !== null) panelHeadingRef.current?.focus();
+  }, [inspectedId]);
+
   // Localized badge text per BadgeKind. Defined here (not inside nodeRole)
   // so the `t()` calls stay in the same lexical scope as the `useLingui()`
   // binding above — see the BadgeKind comment for why that matters to the
@@ -381,6 +391,10 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
 
         {/* Node cards */}
         {laid.nodes.map((n) => {
+          // A local, not `n.id` inline in the aria-label below, so the Lingui
+          // macro derives a NAMED placeholder rather than a positional `{0}`
+          // (same reasoning as `stepId` above).
+          const nodeId = n.id;
           const role = nodeRole(n);
           const badge = badgeLabel(role.badgeKind);
           const cardStyle: CSSProperties = {
@@ -447,6 +461,10 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                     type="button"
                     data-testid="flowmap-alternative-open"
                     data-step-id={n.id}
+                    aria-label={t({
+                      id: "dashboard.flowGraph.alternative.openAriaLabel",
+                      message: `What if ${nodeId} had a different answer?`,
+                    })}
                     onClick={() => {
                       setInspectedId(n.id);
                       setAlternativeValue("");
@@ -595,7 +613,11 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
       {inspectable && inspectedNode !== undefined && (
         <div data-testid="flowmap-alternative" style={panelStyle}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-            <strong style={{ fontFamily: SANS, fontSize: 12.5, color: "#e6edf3", flex: 1 }}>
+            <strong
+              ref={panelHeadingRef}
+              tabIndex={-1}
+              style={{ fontFamily: SANS, fontSize: 12.5, color: "#e6edf3", flex: 1 }}
+            >
               {t({
                 id: "dashboard.flowGraph.alternative.title",
                 message: `Alternative at ${stepId}`,
@@ -691,7 +713,11 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
             })}
           </button>
 
-          <div data-testid="flowmap-alternative-outcome" style={{ marginTop: 6 }}>
+          <div
+            data-testid="flowmap-alternative-outcome"
+            aria-live="polite"
+            style={{ marginTop: 6 }}
+          >
             {outcome === null || outcome.stepId !== inspectedNode.id ? (
               // FR-027, said out loud: an untaken branch shows structure and nothing
               // more until someone asks about it.

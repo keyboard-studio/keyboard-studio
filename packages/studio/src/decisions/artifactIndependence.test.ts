@@ -222,15 +222,20 @@ async function runSession(
   for (const step of SESSION) {
     step.mutate();
     recordStepCompletion(step.stepId, step.result, deps);
-    // Drain between steps, and this is not incidental. The boundary captures are
-    // fire-and-forget by design (createDecisionRecorder: a step transition must
-    // never wait on a diff) and each awaits the shared async projection. A
-    // synchronous loop would start all five captures before any resolved, so every
-    // one would read the SAME final working copy and see no change — a test artifact
-    // that would silently measure a recording run which recorded no diffs at all.
-    // An author's steps are seconds apart; the drain is what models that.
-    await drainTasks(2);
+    // No drain here. `projectWorkingCopyForOutput` reads the working-copy
+    // store's state SYNCHRONOUSLY at call time, before its first `await` — so
+    // each boundary's fire-and-forget capture (createDecisionRecorder) reads
+    // the state as it stood at ITS step, not whatever the store holds by the
+    // time the promise settles. Resolution order does not change what was
+    // read. (Verified: removing this drain does not change which entries end
+    // up captured.) What DOES make this comparison meaningful is `makeIr`
+    // parsing the fixture through the real codec instead of a hand-built IR
+    // cast — a hand-rolled cast IR made the carve projection silently
+    // re-emit nothing, which is what a missing diff here would actually be
+    // testing for.
   }
+  // This drain IS load-bearing: it lets every step's fire-and-forget capture
+  // settle and attach its impact before the assertions below read the log.
   await drainTasks();
 
   const projected = await projectWorkingCopyForOutput();

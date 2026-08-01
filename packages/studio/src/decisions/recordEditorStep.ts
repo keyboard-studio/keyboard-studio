@@ -139,7 +139,11 @@ export function observeEditorStep(
       return {
         actionType,
         keysRemoved: 0,
-        keysAdded: targets.length,
+        // A mechanism edit assigns mechanisms to keys that already exist; it
+        // adds none, so this must stay 0 (unlike mechanismsAssigned below) or
+        // the headline reads "N added, N mechanisms assigned" for a step that
+        // added no keys.
+        keysAdded: 0,
         mechanismsAssigned: targets.length,
         touchKeysAffected: 0,
         affected: targets,

@@ -512,6 +512,14 @@
       "decision": "Provenance carries an agency literal (base-derived | tool-proposed | hand-set) plus an optional separate source label; SurveyAnswer is not extended",
       "why": "Two of the three agency literals are reused verbatim from TouchKeyProvenance and the source labels are lifted from specs/002-defaults-engine, so no new vocabulary is invented for either axis; keeping agency and source separate is what lets a headline distinguish Accepted suggested X from langtags versus Chose X",
       "rejected": "Extending the locked SurveyAnswer union with a provenance field, and reusing TouchKeyProvenance directly - its physical-suggested member is touch-propagation-specific and overloading it would make the touch semantics ambiguous"
+    },
+    {
+      "decision": "Constitution Article III: SIGN OFF WITH CONDITION for the snapshotSource retention seam",
+      "why": "Article III's \"serialized only at output\" guards the ARTIFACT against a divergent second emitter or premature disk/network egress, not every in-memory recomputation of projected text -- the OSK live preview already recomputes it on every relevant change and is uncontested. Retaining a diff-only derivative of that existing computation creates no second working copy and touches no disk. CONDITION: the retained boundary text must stay (a) in the in-memory closure only, never persisted verbatim, and (b) sourced from no function other than projectWorkingCopyForOutput. Persisting the raw retained text into the draft or the zip would cross into a second serialization surface and needs fresh review."
+    },
+    {
+      "decision": "FR-020 deferral (positional nesting under <id>/) is the RIGHT CALL, with a concrete upstream recommendation attached",
+      "why": "km-author (upstream voice) agrees the archive root already doubles as the keyboard directory, so beside-not-inside has no honest home without changing every prior archive shape. What to put to the Keyman team: nest keyboard content under <id>/ at the zip root (mirroring the eventual release/<letter>/<id>/ destination) and make NEXT_STEPS.md + the metadata directory true siblings outside it, so the submit instruction becomes structural (drop the <id>/ folder into release/<letter>/) rather than a warning label to remember. Ship as a v2 zip layout, not a silent change now. Parity score 6/10."
     }
   ],
   "step_summaries": {
@@ -811,6 +819,86 @@
       "what": "lint gate: eslint + depcruise + crew-lint + facet lints + both i18n catalogue lints + test-antipattern lint",
       "command": "pnpm lint",
       "result": "PASS exit 0 - depcruise 913 modules 0 violations (steps/ still imports no stores/lib/components); i18n-catalog-lint in sync with 21 new trail. ids in en and fr; no new eslint findings (the 6 warnings on StudioShell/StepHost are byte-identical pre-existing)"
+    },
+    {
+      "what": "ADR-0001 (flow map derived from one source) is UPHELD by the path overlay",
+      "result": "UPHELD. pathOverlay.ts contributes no node, edge, or ordering to buildStepGraph output; FlowGraphView intersects walkedEdges against laid.edges it already has (FlowGraphView.tsx:309-314), so a dangling walked id resolves to nothing and never synthesizes an edge. Deriving edges from append order rather than from the graph edge list is correct, not a second source: the overlay is evidence AGAINST the one true graph, and deriving it from that graph would be circular.",
+      "command": "read docs/adr/0001, pathOverlay.ts, FlowGraphView.tsx"
+    },
+    {
+      "what": "No duplication or reinvented types introduced by the record contract",
+      "result": "CONFIRMED. AnswerType is imported not redeclared (decisionRecord.ts:29); DecisionAgency reuses the base-derived/hand-set literals verbatim from TouchKeyProvenance (keyboard-ir.ts:96-99); SurveyAnswerValueFor derives via Extract<SurveyAnswer,...> rather than forking a value union (167-170); lineDiff.ts is genuinely engine-local -- no diff/jsdiff dependency exists in any package.json and no other LCS implementation exists in engine/src.",
+      "command": "cross-read contracts + engine/src, grep package.jsons for diff deps"
+    },
+    {
+      "what": "The DiffHunkList extraction landed in the right home and left nothing behind",
+      "result": "CONFIRMED. ui/ is the documented dependency leaf (.dependency-cruiser.cjs:53-60); both DecisionEntryRow.tsx:168 and FlowGraphView.tsx:713 now consume the single implementation, and DecisionEntryRow retains no copy.",
+      "command": "read ui/DiffHunkList.tsx and both consumers"
+    },
+    {
+      "what": "The injected recordDecision dep is a genuine boundary, not a dodge",
+      "result": "CONFIRMED. steps/reducer.ts takes only the generic injected callback; the recording composition is wired in StudioShell where the stores are reachable, matching the axisFills/completenessReport arrangement (StudioShell.tsx:1289-1354).",
+      "command": "read steps/reducer.ts + StudioShell.tsx injection site"
+    },
+    {
+      "what": "Append-only invariant of the decision log holds",
+      "result": "CONFIRMED. attachImpact is the only mutator and is genuinely write-once; chain-not-tree is enforced structurally by supersede() always resolving chainTip first; no other path mutates an existing entry.",
+      "command": "read decisionLogStore.ts + its tests"
+    },
+    {
+      "what": "lineDiff LCS correctness: tie-break, oversize fallback, prefix/suffix trim, oldLines===0 convention",
+      "result": "CONFIRMED correct and consistently reasoned; the MAX_LCS_CELLS fallback emits deletions-then-insertions, matching the LCS path tie-break so both code paths agree on ordering.",
+      "command": "read lineDiff.ts + lineDiff.test.ts"
+    },
+    {
+      "what": "Swallowed errors in the recording path are narrow and justified",
+      "result": "CONFIRMED. A projection failure or capture rejection loses only the attributed diff, never the decision entry; both paths are exercised by reducer.decisionRecording.test.ts.",
+      "command": "read snapshotSource.ts, createDecisionRecorder.ts + reducer.decisionRecording.test.ts"
+    },
+    {
+      "what": "FR-024 no-overlay identity: every overlay-era render addition is gated",
+      "result": "HOLDS WITH CAVEAT. Every addition (the flowmap-path-overlay svg at :302, the what-if button at :445, close/derive at :607/:680, the whole panel at :595) is gated behind pathOverlay!==undefined or inspectable=resolveAlternative!==undefined. The only unconditional additions are three useState calls (no markup effect) and the inspectable const; no existing cardStyle, edge colour, or badge logic was touched. CAVEAT: React synthetic event handlers are not serialized as HTML attributes, so an onClick slipped onto an existing unconditional element would NOT appear in an innerHTML diff -- verified clean by manual review, not by the test. The pinned fixture is also only a 3-node linear chain with no lock/alsoLive/non-entry badge variants.",
+      "command": "read FlowGraphView.tsx end to end + git diff"
+    },
+    {
+      "what": "Laziness is structural, not an optimisation (SC-007/FR-010)",
+      "result": "CONFIRMED. DecisionTrailView mounts computing no impact; DecisionEntryRow is handed a resolver function rather than resolved impacts.",
+      "command": "read DecisionTrailView.tsx + DecisionEntryRow.tsx"
+    },
+    {
+      "what": "Constitution Article IV and the dashboard store boundary are intact; i18n placeholders are named",
+      "result": "CONFIRMED. No new setTimeout/debounce outside the pre-existing startCloudSync timer; dashboard/ has zero stores/ imports (grep); every new message id uses named placeholders ({value},{question},{stepId},{name}) with no positional {0}. Wide hunk content scrolls inside its own box (DiffHunkList.tsx:25-35, overflowX auto + whiteSpace pre) with no sideways page scroll.",
+      "command": "grep for timers and stores imports; read DiffHunkList.tsx"
+    },
+    {
+      "what": "SC-005 audit-vs-artifact agreement is genuinely proven, and its oracle can fail",
+      "result": "TRUE. The test oracle (applyHunks) imports only snapshotSource.ts and contracts types, never lineDiff.ts, so it is independent. MUTATION: shifting oldStart off by one in lineDiff.ts (oldSkipped+2) made 7 of 11 tests fail with \"context mismatch at line N\" raised by the oracle own verification logic; reverted and green again. The EOL normalisation is benign as documented -- it affects display hunks only, the emitted .kmn bytes are untouched, and both sides of every assertion normalise identically.",
+      "command": "mutate lineDiff.ts oldStart, rebuild engine, rerun snapshotSource.test.ts, revert"
+    },
+    {
+      "what": "FR-024 flow-map identity holds EMPIRICALLY against the pre-feature component, not just self-consistently",
+      "result": "TRUE, stronger than claimed. The snapshot file is new-in-commit so the \"generated before the overlay existed\" provenance is unverifiable from git alone. So the pre-053 FlowGraphView.tsx from main and the current one were rendered side by side with no overlay props: newHtml === oldHtml passed, byte-identical innerHTML. The diff is also purely additive, every new block gated. Scratch probe files deleted.",
+      "command": "render main pre-053 component vs current in a scratch test, compare innerHTML"
+    },
+    {
+      "what": "SC-009 draft compatibility is real and not overclaimed",
+      "result": "TRUE. DRAFT_VERSION = 1 as const (draftPersistence.ts:74), confirmed untouched by git diff main...HEAD. The this-build-to-older-build direction is honestly framed in the test as structural (additivity + unchanged version) rather than an actual old-build round trip, matching what the assertions do.",
+      "command": "git diff main...HEAD on draftPersistence.ts + read the test"
+    },
+    {
+      "what": "SC-006 artifact independence: the load-bearing fix is the parsed-IR fixture",
+      "result": "TRUE with a caveat. MUTATION A: replacing the parsed IR with a hand-rolled cast made the captured-impact guard assertion fail exactly as documented -- the carve projection silently re-emits nothing on a malformed IR, so that fixture change is genuinely load-bearing. MUTATION B: removing the inter-step drain left the test PASSING (impact states [undefined,undefined,none,captured,none]) because projectWorkingCopyForOutput reads store state synchronously before its first await -- so the drain rationale in the comment did not reproduce.",
+      "command": "two independent mutations of artifactIndependence.test.ts, each reverted"
+    },
+    {
+      "what": "docs/github_flow.md delivery-option Status table updated for spec 053 (mandatory per CLAUDE.md)",
+      "result": "DONE. Option C gains a Decision-record sidecar row (Done) covering .studio/decision-record.json, the isSidecarPath exclusion, and the FR-020 deferred-nesting note. Option B gains a PR-body decision summary row (Done), explicitly noting the PR carries only the bounded summary text, never the JSON sidecar. The VirtualFS serialisation prerequisite row gains a note that the sidecar write reuses the same VFS with no second serialisation path. Progress-bar percentages deliberately unchanged -- this feature adds evidence to the delivery surfaces, it does not complete a delivery option.",
+      "command": "edit docs/github_flow.md Status section"
+    },
+    {
+      "what": "FR-018 (PR-body decision summary) is satisfied for every channel a user can actually reach today",
+      "result": "CONFIRMED with a scope refinement. Only ManagedPRSubmitPanel (Option B) calls buildDecisionSummaryBlock; engine/src/output/github.ts (Option A publishPR) has no reference to it. But no studio component calls publishPR at all today -- Option A is opt-in and undeployed -- so no reachable submission path is missing the summary. km-doc marked Option A \"Contract-compatible, not wired\" rather than Done, which is the accurate reading.",
+      "command": "grep for publishPR and buildDecisionSummaryBlock call sites"
     }
   ],
   "currentTask": "T050"

@@ -92,6 +92,21 @@ module.exports = {
       to:   { path: '^packages/studio/src/(editors|stores)/' },
     },
     {
+      name: 'decisions-layer',
+      comment:
+        'decisions/ is the studio half of the per-keyboard decision audit (spec 053). It ' +
+        'reads the step manifest, question registry, and mutate-seam flag to attribute a ' +
+        'boundary diff to a decision, and renders the author-facing trail. It may depend on ' +
+        'steps/, survey/questions/, contracts, ui/, and flags/. ' +
+        'Forbidden: decisions/ -> dashboard/, editors/, stores/, components/ ' +
+        '(the trail components read no store — the record is passed down from StudioShell, ' +
+        'same as completenessReport; recording reaches the reducer via an injected ' +
+        'ReducerDeps.recordDecision, not by reaching into stores/ or editors/ directly).',
+      severity: 'error',
+      from: { path: '^packages/studio/src/decisions/' },
+      to:   { path: '^packages/studio/src/(dashboard|editors|stores|components)/' },
+    },
+    {
       name: 'question-modules-no-bypass-mutate-seam',
       comment:
         'survey/questions/ modules must be PURE descriptors: they declare ' +

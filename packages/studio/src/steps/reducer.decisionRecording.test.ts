@@ -167,6 +167,9 @@ describe("FR-002 — an editor step", () => {
     if (payload.kind !== "editor-action") throw new Error("expected an editor action");
     expect(payload.actionType).toBe("mechanism_edit");
     expect(payload.summary.mechanismsAssigned).toBe(2);
+    // A mechanism edit assigns mechanisms to keys that already exist — it adds
+    // none, so this must stay 0 rather than duplicating mechanismsAssigned.
+    expect(payload.summary.keysAdded).toBe(0);
     expect(payload.summary.sample).toEqual(["ɓ", "ɗ"]);
   });
 

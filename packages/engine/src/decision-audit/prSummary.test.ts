@@ -141,8 +141,10 @@ describe("buildDecisionSummaryBlock — decision to consequence (SC-004)", () =>
       recordOf([answer({ impact: { state: "unavailable", reason: "no-rederivable-write-path" } })]),
     );
 
-    expect(gated).toContain("behind a passed lock gate");
-    expect(noPath).toContain("no re-derivable write path");
+    expect(gated).toContain("not tracked separately");
+    expect(gated).toContain("confirmed together");
+    expect(noPath).toContain("not tracked separately");
+    expect(noPath).toContain("isolate its exact change");
   });
 
   it("distinguishes never-captured from shed detail", () => {
@@ -150,7 +152,7 @@ describe("buildDecisionSummaryBlock — decision to consequence (SC-004)", () =>
       "not captured",
     );
     expect(buildDecisionSummaryBlock(recordOf([answer({ impact: null })]))).toContain(
-      "dropped to fit the save budget",
+      "omitted to keep the record within size limits",
     );
   });
 });
@@ -306,6 +308,6 @@ describe("buildDecisionSummaryBlock — bounds", () => {
       truncated: { shedCount: 7 },
     });
 
-    expect(block).toContain("Change detail for 7 decisions was dropped");
+    expect(block).toContain("Change detail for 7 decisions was omitted");
   });
 });

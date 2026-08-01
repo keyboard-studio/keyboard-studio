@@ -46,7 +46,13 @@ export function shedDecisionDetail(record: DecisionRecord, maxBytes: number): De
 
   const candidates: Candidate[] = [];
   entries.forEach((entry, index) => {
+    // Only a "captured" impact carries diff detail worth shedding. "none" and
+    // "unavailable" already say everything they have to say in a few bytes;
+    // setting them to `impact: null` would relabel "nothing to shed" as
+    // "detail was dropped", which both DecisionEntryRow and prSummary read as
+    // a lossy save when nothing was lost.
     if (entry.impact === undefined || entry.impact === null) return;
+    if (entry.impact.state !== "captured") return;
     candidates.push({
       index,
       cost: new TextEncoder().encode(JSON.stringify(entry.impact)).length,

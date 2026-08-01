@@ -77,6 +77,51 @@ function overlay(): PathOverlay {
   };
 }
 
+/**
+ * A graph exercising branches the three-node linear `chainGraph` above does
+ * not: a `lock` gate, a `kind:"stub"` node, and `writePaths`/`inputPaths`
+ * metadata. `chainGraph` alone only pins the entry/terminal/no-metadata path,
+ * so a regression in these other branches would not be caught by the
+ * `toMatchSnapshot` above (km-frontend FR-024 caveat).
+ */
+function metadataGraph(): FlowGraph {
+  const nodes: GraphNode[] = [
+    node("m0", {
+      isEntry: true,
+      kind: "stub",
+      region: "not-yet-ordered",
+      stepKind: "editor-step",
+      writePaths: ["ir.chars"],
+      inputPaths: [],
+    }),
+    node("m1", {
+      stepKind: "question-step",
+      writePaths: ["ir.layers.touch"],
+      inputPaths: ["ir.chars"],
+      lock: "physical",
+    }),
+    node("m2", {
+      isTerminal: true,
+      stepKind: "editor-step",
+      writePaths: [],
+      inputPaths: ["ir.layers.touch"],
+    }),
+  ];
+  const edges: GraphEdge[] = [
+    { from: "m0", to: "m1", kind: "linear", dangling: false },
+    { from: "m1", to: "m2", kind: "linear", dangling: false },
+  ];
+  return {
+    flowId: "overlay_flow",
+    phase: "B",
+    title: "Metadata coverage flow",
+    nodes,
+    edges,
+    entryId: "m0",
+    danglingTargets: [],
+  };
+}
+
 describe("FR-024 — no overlay means no change at all", () => {
   it("renders no overlay layer when the prop is absent", () => {
     render(<FlowGraphView graph={chainGraph()} />);
@@ -87,6 +132,14 @@ describe("FR-024 — no overlay means no change at all", () => {
     const { container } = render(<FlowGraphView graph={chainGraph()} />);
     // Pinned against the pre-feature component — see the module header before
     // reaching for `vitest -u`.
+    expect(container.innerHTML).toMatchSnapshot();
+  });
+
+  it("renders markup identical to the pre-overlay build for lock/stub/metadata nodes", () => {
+    // A SEPARATE snapshot, not a re-generation of the one above: that snapshot
+    // stays evidence of the pre-overlay render for the plain linear case, and
+    // this one extends coverage to the branches it never exercised.
+    const { container } = render(<FlowGraphView graph={metadataGraph()} />);
     expect(container.innerHTML).toMatchSnapshot();
   });
 

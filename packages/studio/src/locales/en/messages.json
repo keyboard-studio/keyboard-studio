@@ -1065,6 +1065,7 @@
   "editor.assignLoop.intro.title": "Welcome to the Mechanism Gallery",
   "editor.assignLoop.touch.intro.title": "Welcome to the Touch Gallery",
   "survey.marks.outputForm.backspacePreviewIntro": "What backspace does, one press at a time:",
+  "dashboard.flowGraph.alternative.openAriaLabel": "What if {nodeId} had a different answer?",
   "dashboard.flowGraph.alternative.open": "what if?",
   "editor.assignLoop.inspector.ruleDetail.contextOutput": "when this character is already in the buffer, then the keyboard replaces it with its matching output",
   "editor.assignLoop.inspector.ruleDetail.contextOnly": "when this character is already in the buffer, used as context to trigger the rule",

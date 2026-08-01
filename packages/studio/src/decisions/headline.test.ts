@@ -49,13 +49,17 @@ describe("headlineOf — the three agency literals over one value", () => {
 
 describe("headlineOf — editor steps interpolate counts", () => {
   it("carries all four counts and the editor", () => {
+    // keysAdded: 0 alongside mechanismsAssigned: 7 — a mechanism edit assigns
+    // mechanisms to keys that already exist and adds none of its own (a real
+    // production shape, not an arbitrary fixture: recordEditorStep.ts always
+    // reports mechanism_edit this way).
     const spec = headlineOf(
       {
         kind: "editor-action",
         actionType: "mechanism_edit",
         summary: {
           keysRemoved: 0,
-          keysAdded: 7,
+          keysAdded: 0,
           mechanismsAssigned: 7,
           touchKeysAffected: 0,
           sample: ["a", "b"],
@@ -68,7 +72,7 @@ describe("headlineOf — editor steps interpolate counts", () => {
       id: "editorStep",
       editor: "mechanism_edit",
       keysRemoved: 0,
-      keysAdded: 7,
+      keysAdded: 0,
       mechanismsAssigned: 7,
       touchKeysAffected: 0,
     });

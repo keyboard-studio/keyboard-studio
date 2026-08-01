@@ -1065,6 +1065,7 @@
   "editor.assignLoop.intro.title": "Bienvenue dans la Galerie des mécanismes",
   "editor.assignLoop.touch.intro.title": "Bienvenue dans la Galerie tactile",
   "survey.marks.outputForm.backspacePreviewIntro": "Ce que fait le retour arrière, une pression à la fois :",
+  "dashboard.flowGraph.alternative.openAriaLabel": "Et si {nodeId} avait une réponse différente ?",
   "dashboard.flowGraph.alternative.open": "et si ?",
   "editor.assignLoop.inspector.ruleDetail.contextOutput": "quand ce caractère est déjà dans le tampon, le clavier le remplace par sa sortie correspondante",
   "editor.assignLoop.inspector.ruleDetail.contextOnly": "quand ce caractère est déjà dans le tampon, utilisé comme contexte pour déclencher la règle",

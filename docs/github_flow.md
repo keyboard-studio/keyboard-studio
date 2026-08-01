@@ -133,7 +133,7 @@ exactly.
 
 > Keep this section up to date as work lands. Update it whenever a delivery
 > option moves from "not started" to "in progress" or "done".
-> Last updated: 2026-06-26
+> Last updated: 2026-07-31
 
 ### Pipeline prerequisites (must exist before any delivery option works)
 
@@ -145,7 +145,7 @@ exactly.
 | Compiler service | **Done** | Issue #17 — `packages/engine/src/compiler/` |
 | Source loader (VFS hydration) | **Done** | Issue #39 — `packages/engine/src/loader/fetchKeyboardSourceToVfs.ts` |
 | Scaffolder (`ScaffolderService`) | **Done** | Issue #32 — `packages/engine/src/scaffolder/`; `createScaffolderService().scaffold()` wired into studio UI via `ScaffoldForm`; codec fixes (`&VERSION` 1.0→14.0, `&CasedKeys` casing) proved by `scaffold-compile.integration.test.ts` (2 artifacts, 0 diagnostics) |
-| VirtualFS serialisation | **Done** | Delivered as part of issue #46 — `toZip` walks the VirtualFS |
+| VirtualFS serialisation | **Done** | Delivered as part of issue #46 — `toZip` walks the VirtualFS; unchanged in shape by spec 053 — the decision-record sidecar is written onto the same VirtualFS before serialisation (`addDecisionRecordSidecar`), not a second serialisation path (see [specs/053-decision-audit/spec.md](../specs/053-decision-audit/spec.md)) |
 
 ### Option C — ZIP download
 
@@ -156,6 +156,7 @@ exactly.
 | `serializeToZip` alias | **Done** | Exported from `packages/engine/src/output/zip.ts` |
 | `createOutputService()` factory | **Done** | `packages/engine/src/output/index.ts` — zip wired; GitHub path throws "not implemented" until issue #47 |
 | Studio UI — "Download ZIP" button | **Done** | Issue #32 — `PreviewShell` calls `getToZip()(stage.vfs)`, wraps result in `Blob`, triggers anchor click; button label "Download .zip"; `USE_REAL` flag respected (mock fallback in CI) |
+| Decision-record sidecar (spec 053) | **Done** | `.studio/decision-record.json` written by `addDecisionRecordSidecar` (`packages/engine/src/decision-audit/sidecar.ts`) into the same VirtualFS `toZip` walks; `NEXT_STEPS.md` names it as not-to-be-copied. `isSidecarPath` keeps it out of the Option A/B commit tree, so the keyboard's own directory stays byte-identical to a hand-authored submission (SC-008). This is evidence added to the download, not new delivery-option coverage — it does not move Option C's completion. The sidecar sits at the archive root beside the keyboard's own files rather than nested under `<id>/`, because the archive root already *is* the keyboard's directory (no existing "beside, not inside" position exists to reuse); true positional nesting is deferred as a Keyman-team-facing call — see [specs/053-decision-audit/spec.md](../specs/053-decision-audit/spec.md) FR-020 and `specs/053-decision-audit/research.md` D-07 |
 
 ### Option A — User-fork, app-managed
 
@@ -170,6 +171,7 @@ exactly.
 | OAuth token-exchange backend | **Done (code) — co-located on Vercel; deploy pending** | Core in `utilities/oauth-backend/` (Fastify v5 + 30 specs); co-located as Vercel functions in `api/oauth/{exchange,refresh,health}.ts` + `api/oauth/google/exchange.ts` (issue #550) reusing the tested core — served same-origin via root `vercel.json` rewrites. Remaining: switch Vercel Root Directory → repo root, register OAuth App, set env (see DEPLOY.md) |
 | Studio UI — OAuth authorise flow | **Done** | Issue #148 — `packages/studio/src/lib/githubOAuth.ts` (PKCE + sessionStorage token store), `lib/handleOAuthCallback.ts`, `hooks/useGitHubAuth.ts`; engine `verifyToken` consumed via `services.ts` `getGitHubOutputService()`; copyright-attestation gate per spec §12/Scenario E. Reused by the decoupled sign-up panel |
 | Studio UI — sign-up vs. submit | **Decoupled (§1a)** | The coupled "Connect GitHub + Submit PR" panel (`GitHubSubmitPanel`) was **removed** from the Output screen and replaced by a decoupled sign-up identity panel (`components/SignUpPanel.tsx`, renamed from `GitHubSignUpPanel.tsx`; now surfaces both "Sign up with GitHub" and "Sign up with Google" buttons — identity only, no fork/branch/PR exposed (docs/github-integration.md §1a). Google OAuth (PKCE, S256) ships in `src/lib/googleOAuth.ts` + `hooks/useGoogleAuth.ts`; `IdentitySession` discriminated union (`provider:"github"\|"google"`) in `src/lib/identity.ts` is the routing key. The Google exchange route is now deployed as the Vercel function `api/oauth/google/exchange.ts` (rewrite `/oauth/google/exchange`), opt-in on `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (503 when unset) — previously only the standalone Fastify server served it, so the button 404'd in production. The submit/publish *action* now defaults to **Option B** (org-mediated); `publishPR` engine code is retained for the opt-in self-fork path |
+| PR-body decision summary (spec 053) | **Contract-compatible, not wired** | `PublishPROptions.prBody` could carry the same `buildDecisionSummaryBlock()` output used by Option B, but no studio call site invokes `publishPR` today (the self-fork path is opt-in and undeployed per the row above), so Option A does not surface the block in practice. Not ticked for that reason — see [specs/053-decision-audit/spec.md](../specs/053-decision-audit/spec.md) |
 
 ### Option B — Org-mediated, abstracted
 
@@ -186,11 +188,12 @@ exactly.
 | Branch-collision suffix (§5 Q1) | **Done** | `buildManagedBranchName()` — `add/<keyboardId>-<short7sha>`; content-unique, no `Date`/random |
 | Org bot identity + deploy (§5 Q3) | **Provisioned / prod env fix pending** | GitHub App registered and installed org-wide on `keyboard-studio` (`contents:write` + `pull_requests:write`); pipeline validated end-to-end with the real App credentials against the staging repo. Any of the four `GITHUB_APP_*`/`GITHUB_ORG_LOGIN` vars absent → route returns `503`. Remaining: the production `GITHUB_APP_PRIVATE_KEY` value in the deploy target is malformed (must be base64 of the *whole* PEM, header/footer included, Production-scoped) — the deployed route returns `502 submission_unavailable` until it is re-set and redeployed (tracked with #550 deploy) |
 | Studio UI — attribution form + submit | **Done** | `packages/studio/src/components/ManagedPRSubmitPanel.tsx` wired into `OutputScreen` as primary submit action; attribution form (displayName/email) + copyright-attestation gate + result/error states; prefill from `IdentitySession` |
+| PR-body decision summary (spec 053) | **Done** | `ManagedPRSubmitPanel` appends `buildDecisionSummaryBlock(decisionRecord)` (`packages/engine/src/decision-audit/prSummary.ts`) to `prBody` when the record has entries — an ordered, 25-row-capped decision→consequence table generated fresh at submission time. Reviewer-facing evidence only, English/unlocalized by design (reviewer audience, not author); the PR carries the summary text alone — no PR channel attaches or links the machine-readable `.studio/decision-record.json` sidecar itself, which ships only in the Option C download. See [specs/053-decision-audit/spec.md](../specs/053-decision-audit/spec.md) US2/FR-018 |
 
 ### Summary
 
 ```
-Option C  [====================]  100%  engine + studio UI done; full end-to-end zip download wired (#32)
-Option A  [===================-]   95%  engine + studio sign-up (identity) UI done; backend co-located on Vercel (#550); submit action deferred to Option B (§1a); OAuth App registration + deploy remaining (DEPLOY.md)
-Option B  [===================-]   95%  DEFAULT submit path (§1a); contract + engine client + backend pipeline/route (Fastify + Vercel) + GitHub-App installation-token minter + studio attribution-form UI done & tested; App provisioned + installed; pipeline validated end-to-end against the staging repo keyboard-studio/keyboards (same-repo PR — see 2026-07-06 note); remaining: fix the malformed prod GITHUB_APP_PRIVATE_KEY env value + redeploy (§5 Q3, #550)
+Option C  [====================]  100%  engine + studio UI done; full end-to-end zip download wired (#32); now also carries the .studio/decision-record.json sidecar (spec 053) — evidence added, bar unchanged
+Option A  [===================-]   95%  engine + studio sign-up (identity) UI done; backend co-located on Vercel (#550); submit action deferred to Option B (§1a); OAuth App registration + deploy remaining (DEPLOY.md); the spec-053 PR-body decision block is contract-compatible here but not wired, since no studio call site uses this path
+Option B  [===================-]   95%  DEFAULT submit path (§1a); contract + engine client + backend pipeline/route (Fastify + Vercel) + GitHub-App installation-token minter + studio attribution-form UI done & tested; App provisioned + installed; pipeline validated end-to-end against the staging repo keyboard-studio/keyboards (same-repo PR — see 2026-07-06 note); remaining: fix the malformed prod GITHUB_APP_PRIVATE_KEY env value + redeploy (§5 Q3, #550); PR body now also carries a bounded decision-summary block (spec 053) — evidence added, bar unchanged
 ```
