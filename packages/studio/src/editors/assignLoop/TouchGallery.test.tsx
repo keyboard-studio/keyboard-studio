@@ -3602,6 +3602,105 @@ describe("TouchGallery — case-pair proposal on a non-default touch layer", () 
       layer: "shift",
     });
   });
+
+  // -------------------------------------------------------------------------
+  // The SECOND call site — the suggestion-Accept path (handleUseSuggestion).
+  //
+  // It carried the same id-keyed bug (it landed on main after this branch
+  // opened) and now shares `casePairTouchTarget(assembledLayerCombo, …)` with
+  // Apply. What the UI can drive it to is narrower than Apply, by
+  // construction: the suggestion card and the layer builder are mutually
+  // exclusive (`showChooser = suggestionDismissed || suggestion.kind ===
+  // "none"`), and `layerTokens` is re-seeded from
+  // `seedLayerTokensForChar(currentChar)` on every character change. So at the
+  // instant Accept fires, the assembled combo is ALWAYS the case-derived seed
+  // — `[]` (base) or `["SHIFT"]`, the only two values that function returns.
+  // The compound RAlt -> Shift+RAlt case the Apply tests above cover is
+  // therefore not reachable through this path today; the last test in this
+  // block pins the exclusivity that makes that true, so if the builder is ever
+  // rendered alongside the card, this suite fails rather than going quietly
+  // stale on the compound case.
+  // -------------------------------------------------------------------------
+
+  async function acceptSuggestion() {
+    const acceptBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Accept") ?? null;
+    expect(acceptBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(acceptBtn!);
+    });
+  }
+
+  it("Accept offers the plain shift layer even on a keyboard that never uses a bare SHIFT combo", async () => {
+    // The ungated plain-SHIFT candidate, pinned on the Accept path rather than
+    // Apply's. irWithoutShiftCombo's combos-in-use are only [["RALT"],
+    // ["CTRL"]], so gating this candidate through `isLayerComboInUse` — the way
+    // the compound candidates ARE gated — would silently drop the proposal
+    // here. The shift layer always exists (scaffolder's fixed buckets), so the
+    // asymmetry is deliberate and both call sites must honour it.
+    seedStore({ withInventory: ["ă"], ir: irWithoutShiftCombo });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await acceptSuggestion();
+
+    expect(screen.getByText(/has an uppercase form, Ă/i)).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Map Ă to the shift layer of/i }));
+    });
+    expect(touchMechanismsFor("Ă")[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "Ă",
+      layer: "shift",
+    });
+  });
+
+  it("Accept on the case-derived SHIFT seed raises no redundant proposal", async () => {
+    // An uppercase current char seeds the builder with ["SHIFT"], so this is
+    // the one non-default combo the Accept path can actually see. Seeded with
+    // irWithShiftAndRaltLayers, which DOES use bare SHIFT — so what suppresses
+    // the proposal is the already-uppercase arm of the combo rule, not the
+    // availability gate. (The FR-012 suite below pins the recorded layer on the
+    // default IR; the case-pair half is what is asserted here.)
+    seedStore({ withInventory: ["Ă"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await acceptSuggestion();
+
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+    expect(touchMechanismsFor("Ă")[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "Ă",
+      layer: "shift",
+    });
+  });
+
+  it("the suggestion card and the layer builder never coexist, so Accept only ever sees the seeded combo", async () => {
+    // The reachability invariant behind the block comment above. Not a
+    // behavioural assertion about case pairing — a tripwire: the moment an
+    // author can assemble a combo while the suggestion card is still up, the
+    // compound Accept case becomes real and needs its own coverage here.
+    seedStore({ withInventory: ["ă"], ir: irWithRaltAndShiftRalt });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const acceptBtn = () =>
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Accept") ?? null;
+    const addLayerBtn = () =>
+      screen.queryByRole("button", { name: /add another touch layer for long-press/i });
+
+    expect(acceptBtn()).not.toBeNull();
+    expect(addLayerBtn()).toBeNull();
+
+    await denyAnySuggestion();
+
+    expect(addLayerBtn()).not.toBeNull();
+    expect(acceptBtn()).toBeNull();
+  });
 });
 // Spec 051 Phase 7 (T049/T050) — FR-012: the suggestion-Accept path
 // (handleUseSuggestion) must carry an explicit `layer`, derived the same way
