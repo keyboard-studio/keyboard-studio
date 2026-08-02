@@ -48,12 +48,18 @@ A generated flat catalog derived from a content-team record.
 - **Source of truth**: the content record (YAML/`criteria.json`) — the extractor
   reads it; translators never see it.
 - **Contains**: only translatable prose (`title`/`description`/`prompt`/`elicits`/
-  `provenanceLabel`; criteria `description`), keyed by a stable id derived from
-  the record's own id + field path.
+  `provenanceLabel`; criteria `description` + `checklistText`), keyed by a stable
+  id derived from the record's own id + field path.
 - **Excludes**: all control fields (`id`, `answerType`, `default`,
   `firingCondition`, BCP47 tags, `lintRuleId`, category/priority/…).
-- **`criteria.<lang>.json`**: must satisfy `CriterionSchema`; the 148-row count
-  test reads only the canonical English `criteria.json`.
+- **Criteria sidecar**: `content/i18n/{locale}/criteria.json` is a flat
+  `content.criteria.<id>.description` / `.checklistText` map (148 + 10 = 158
+  keys) — **never parsed as a `Criterion[]`**. The canonical English
+  `criteria.json` stays the sole input to `ALL_CRITERIA`; its parse-parity and
+  four-band partition invariants are unchanged, and no test asserts a literal
+  row count. *(Restated 2026-07-30: the original `criteria.<lang>.json` +
+  `CriterionSchema` shape was superseded by the D8 seam decision and never
+  built — see [research.md](research.md) D7/D8.)*
 
 ## Drift signal
 

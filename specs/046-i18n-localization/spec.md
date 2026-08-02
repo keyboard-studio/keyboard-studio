@@ -4,11 +4,20 @@
 
 **Created**: 2026-07-20
 
-**Status**: Draft
+**Status**: **Implemented / shipped, with one parked follow-up** — T001–T028 and
+T030–T042 delivered; Tier A + Tier B catalogs and all three CI gates
+(`i18n-catalog-lint`, `content-i18n-lint`, `content-i18n-freshness`) are live and
+green. **T029 is parked half-done**: the translation half shipped
+(`content/i18n/fr/criteria.json`, 158/158 keys, parity-checked), but the
+render-site wiring half has no target — no code path anywhere reads
+`Criterion.description` or `preSubmitChecklistText` for end-user display, so
+`resolveContentString("criteria", …)` has zero production callers. Re-open that
+half when a criteria-review/checklist UI lands, as its own feature rather than a
+silent addition here (see [research.md](research.md) D9).
 
 **Input**: User description: "Do project-wide localization of Keyboard Studio using TypeScript and Crowdin — efficiently, with stable translation keys that survive slight English drift while still surfacing when the English has changed."
 
-**Governing sections**: [spec.md §12](../../spec.md) (two-team split — engine owns the SPA; content owns survey text, gallery ordering, LLM prompts, criteria triage) is the binding constraint on *where* strings live and *who* owns them. [spec.md §16](../../spec.md) out-of-scope (multi-language `welcome.htm` variants) bounds what localization does **not** cover. Contract touchpoints: the `Criterion` type + `CriterionSchema` and the 148-row count test ([packages/contracts/src/criteria.ts](../../packages/contracts/src/criteria.ts), [schemas.ts](../../packages/contracts/src/schemas.ts)), the `RawPatternSchema` pattern loader boundary, and the working-copy/VirtualFS spine ([docs/architecture.md](../../docs/architecture.md)). Prior art / prototype: [docs/i18n-spike.md](../../docs/i18n-spike.md) and the working spike on branch `km/i18n-lingui-spike` (Lingui v6 wired into the studio; `WelcomeScreen` converted; `crowdin.yml` Tier A drafted).
+**Governing sections**: [spec.md §12](../../spec.md) (two-team split — engine owns the SPA; content owns survey text, gallery ordering, LLM prompts, criteria triage) is the binding constraint on *where* strings live and *who* owns them. [spec.md §16](../../spec.md) out-of-scope (multi-language `welcome.htm` variants) bounds what localization does **not** cover. Contract touchpoints: the `Criterion` type + `CriterionSchema` and the criteria-catalog **parse-parity and band-partition** tests ([packages/contracts/src/criteria.ts](../../packages/contracts/src/criteria.ts), [schemas.ts](../../packages/contracts/src/schemas.ts), [types.test.ts](../../packages/contracts/src/types.test.ts)) — `ALL_CRITERIA.length` pinned to the raw `criteria.json` it parses, and the four bands summing to that length; **no test asserts a literal row count** (148 today is descriptive, not a locked constant), the `RawPatternSchema` pattern loader boundary, and the working-copy/VirtualFS spine ([docs/architecture.md](../../docs/architecture.md)). Prior art / prototype: [docs/i18n-spike.md](../../docs/i18n-spike.md) and the working spike on branch `km/i18n-lingui-spike` (Lingui v6 wired into the studio; `WelcomeScreen` converted; `crowdin.yml` Tier A drafted).
 
 ## Overview
 
@@ -44,7 +53,7 @@ out-of-scope), and does not translate LLM prompts (not user-facing).
 - Q: Catalog format? → A: **Flat minimal JSON** (`{ "<id>": "<text>" }`) via `@lingui/format-json` `style: "minimal"`. It is the one format where id → Crowdin string key and English → fingerprinted value line up with Crowdin's native key-value JSON handling. PO (`msgid` = source) and `style: "lingui"` (nested source) both muddy value-fingerprinting under explicit ids.
 - Q: How are content-team strings (Tier B) wired to Crowdin? → A: **Via a build-time extraction step into flat sidecar catalogs**, NOT by pointing Crowdin at the raw content records. Crowdin's generic JSON/YAML parser translates every string value; the content records interleave translatable prose with control fields (`id`, `answerType`, `default`, `firingCondition`, BCP47 tags, `lintRuleId`) at several nesting levels, so raw mapping would send control fields to translators. Extraction keeps the content team's records as source-of-truth and emits translator-safe catalogs.
 - Q: How does localization respect the §12 team split? → A: UI catalogs live under `packages/studio` (**engine team**); content sidecar catalogs live under `content/` + `packages/contracts` (**content team**). They are **separate Crowdin file mappings**, never merged into one catalog — merging would pull content-owned text into an engine-owned package and blur the boundary `depcruise` enforces.
-- Q: `criteria.json` is zod- and count-test-gated — how is it localized? → A: A localized copy MUST satisfy `CriterionSchema`, and the **148-row count test MUST keep reading the canonical English file**; localized copies are never swept into the count. Localization adds translated `description` values only; ids/bands/lintRuleIds are control fields and stay English.
+- Q: `criteria.json` is zod- and count-test-gated — how is it localized? → A: A localized copy MUST satisfy `CriterionSchema`, and the **row-count test MUST keep reading the canonical English file**; localized copies are never swept into the count. Localization adds translated `description` values only; ids/bands/lintRuleIds are control fields and stay English. → **Superseded 2026-07-23 by D8** ([research.md](research.md) D7 carries the same note): the T026 seam session chose sidecar extraction over a parallel full-record file, so **no `criteria.<lang>.json` was ever built and none is planned**. Criteria prose localizes via `content/i18n/{locale}/criteria.json` — a flat `content.criteria.<id>.description` / `.checklistText` map (148 + 10 = 158 keys) that is never parsed as a `Criterion[]`. The protection this answer wanted therefore holds by construction; the enforcing tests are named in FR-010.
 - Q: Runtime or build-time Crowdin? → A: **Build-time.** Translations are plain committed JSON bundled by Vite; no runtime Crowdin API client (the Studio ships as a static bundle and authors in an in-memory VirtualFS — a runtime client would need a browser token and network on load). The JS API client is reserved for a possible future in-app "suggest a translation" feature only.
 - Q: Where does the `I18nProvider` live? → A: **`StudioShell` owns it** (the app-shell boundary), so the provider covers both the running app and the ~40 direct-render component tests without wrapping each call site.
 - Q: Out of scope? → A: Emitted keyboard `welcome.htm` localization (spec §16); LLM prompts (not user-facing); RTL layout mirroring (a separate, larger effort — string translation only here).
@@ -107,7 +116,7 @@ behavior (firing conditions, answer types, lint rule ids) is unchanged.
 
 1. **Given** an adaptation-question YAML with `elicits`/`provenanceLabel` prose and control fields, **When** extraction runs, **Then** the sidecar catalog contains only the prose, keyed by a stable id derived from the record, and no control field appears.
 2. **Given** a pattern YAML with `title`, `description`, and nested `questions[].prompt`, **When** extraction runs, **Then** all three prose fields are extracted and `default`/`answerType`/`id` are not.
-3. **Given** a localized `criteria.<lang>.json`, **When** it is loaded, **Then** it satisfies `CriterionSchema`, its translated `description`s render, and the 148-row count test still reads and counts the canonical English file only.
+3. **Given** the extracted sidecar `content/i18n/{locale}/criteria.json`, **When** a criteria string is resolved for that locale, **Then** `resolveContentString` returns the translated `description` / `checklistText` (English fallback when the key is absent or empty), the sidecar is never parsed as a `Criterion[]`, and the canonical `criteria.json` remains the sole input to `ALL_CRITERIA` with its parse-parity and band-partition invariants unchanged. *(Restated 2026-07-30 from the superseded `criteria.<lang>.json` shape — see the D7/D8 supersession in Clarifications. Resolution is exercised by [contentI18n.test.ts](../../packages/studio/src/lib/contentI18n.test.ts); a **production** render site does not exist yet — that is T029's parked half, [research.md](research.md) D9.)*
 4. **Given** the extracted content catalogs, **When** `crowdin.yml` is inspected, **Then** the content mapping is a separate file group under `content/`/`packages/contracts` (content team), distinct from the `packages/studio` UI mapping (engine team).
 5. **Given** a content record whose prose changes, **When** extraction re-runs, **Then** the drift gate treats it exactly as P1 treats UI strings (stale-translation review signal fires).
 
@@ -146,7 +155,7 @@ opens a translations PR through the existing merge gate.
 - **Missing whole locale catalog** → fall back to the default (English) locale without a hard error.
 - **Duplicate/renamed id** → a renamed id orphans its translations (the thing stable ids exist to prevent); the id-namespace convention + review must catch renames deliberately.
 - **Region tag with no specific catalog** (`pt-BR` requested, only `pt` present) → resolve to the base language, then English.
-- **Localized `criteria.json` drifts from the canonical row set** (extra/missing id) → must fail loudly (schema + a count/parity check), never silently miscount.
+- **Localized criteria sidecar drifts from the canonical row set** (extra/missing id) → must fail loudly, never silently miscount. Enforced by `utilities/content-i18n-lint`: keys added/removed versus a fresh extraction are hard errors, as is a target-locale key-set mismatch against its English counterpart — *not* by schema-parsing a localized `Criterion[]` (see [research.md](research.md) D10).
 - **Untranslatable interpolation** (proper nouns, `.kmn` tokens like `[NCAPS K_C]`) → must not be extracted as translatable prose.
 - **Node ≥22 local test runs** → `localStorage` shadow requires the `--localstorage-file` flag locally; CI on Node 22 is unaffected (documented, not a code bug).
 
@@ -163,7 +172,7 @@ opens a translations PR through the existing merge gate.
 - **FR-007**: Adding a new locale MUST require catalog files only — **no code change**.
 - **FR-008**: UI catalogs MUST live under `packages/studio` (engine team) and content catalogs under `content/` + `packages/contracts` (content team); the two MUST be separate Crowdin file mappings (§12).
 - **FR-009**: Content-string localization MUST extract translatable prose into flat catalogs; control fields (`id`, `answerType`, `default`, `firingCondition`, BCP47 tags, `lintRuleId`, category/priority/etc.) MUST NOT be exposed to translators.
-- **FR-010**: Localized `criteria.<lang>.json` copies MUST satisfy `CriterionSchema`; the 148-row count test MUST continue to read and count only the canonical English file.
+- **FR-010**: Localized criteria prose MUST live in the extracted sidecar catalog (`content/i18n/{locale}/criteria.json`) and MUST NOT be parsed as a `Criterion[]`; the canonical English `criteria.json` MUST remain the sole input to `ALL_CRITERIA`, with its parse-parity (`ALL_CRITERIA.length` === raw row count) and four-band partition invariants unchanged — both pinned in [types.test.ts](../../packages/contracts/src/types.test.ts), with control-field-leak and fidelity coverage in [extract.test.ts](../../utilities/i18n-content-extract/extract.test.ts). *(Restated 2026-07-30: supersedes the original `criteria.<lang>.json` + `CriterionSchema` wording, which D8 replaced with sidecar extraction and which was never built — see [research.md](research.md) D7/D8. The row count is descriptive (148 today), not a locked constant; no test asserts the literal.)*
 - **FR-011**: Crowdin sync MUST be driven by `crowdin.yml` with credentials sourced from environment variables only (never committed).
 - **FR-012**: Downloaded translations MUST land as committed catalog files reviewed through the existing merge gate (build-time, not runtime).
 - **FR-013**: LLM prompts MUST NOT be localized (not user-facing); the emitted keyboard `welcome.htm` MUST NOT be localized (spec §16 out-of-scope).
@@ -187,7 +196,7 @@ opens a translations PR through the existing merge gate.
 - **SC-003**: An English source edit without re-extraction is blocked by CI 100% of the time.
 - **SC-004**: Adding a new fully-translated locale requires zero code changes (catalog files only).
 - **SC-005**: Translators are exposed to zero control-field values (no `id`/`answerType`/`default`/`.kmn`-token strings appear as translatable in Crowdin).
-- **SC-006**: The 148-row criteria count test and all `CriterionSchema`/`RawPatternSchema` boundaries stay green with localized copies present.
+- **SC-006**: The criteria parse-parity and four-band partition tests, and all `CriterionSchema`/`RawPatternSchema` boundaries, stay green with localized catalogs present.
 
 ## Assumptions
 
@@ -195,6 +204,6 @@ opens a translations PR through the existing merge gate.
 - A Crowdin project and credentials (`CROWDIN_PROJECT_ID`, `CROWDIN_PERSONAL_TOKEN`) will be provisioned and stored as CI secrets.
 - The framework is Lingui v6 with explicit ids and the minimal-JSON formatter (settled in the spike; see [docs/i18n-spike.md](../../docs/i18n-spike.md)).
 - The §12 two-team split is authoritative for string ownership and package placement; `depcruise` boundaries must stay green.
-- Node ≥20 (repo baseline), CI on Node 22; local Node ≥22 needs the `--localstorage-file` flag for storage tests (environmental).
+- **Node ≥22.19.0** — the root `engines` floor and [.nvmrc](../../.nvmrc), a floor *this feature raised*: `@lingui/cli` uses `node:fs.globSync` and gates its CLI entry on `import.meta.main`, so on an older Node every `lingui` subcommand **exits 0 having printed and written nothing**. `messages:extract` then appears to succeed while producing no diff, and `i18n-catalog-lint` misreports every committed catalog as an orphan — a silent failure, so the floor is a correctness prerequisite for the drift gate, not just a build detail. Local Node ≥22 additionally needs the `--localstorage-file` flag for storage tests (environmental, not a code bug).
 - RTL layout mirroring, `welcome.htm` localization, and LLM-prompt localization are explicitly out of scope for this feature.
 - The working-copy/VirtualFS spine and the locked Pattern/Criterion contracts are unchanged — localization adds translated values, it does not alter schemas.
