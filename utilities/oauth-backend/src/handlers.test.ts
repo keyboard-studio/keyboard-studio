@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from "vitest";
 import { exchange, refresh, type HandlerConfig, type OAuthFetchFn } from "./handlers.js";
+import { ExchangeBodySchema } from "./schemas.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -427,5 +428,68 @@ describe("refresh() — client discriminator", () => {
     if (result.ok) throw new Error("unreachable");
     expect(result.status).toBe(500);
     expect(result.error).toBe("server_misconfigured");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ExchangeBodySchema — code_verifier is mandatory (US5 / FR-013)
+//
+// The verifier is enforced by the schema, not by exchange(), so these assert at
+// the schema boundary the HTTP edges validate against. Zod runs before the
+// handler body, which is why "refused before any outbound call" holds by
+// construction rather than by a check inside exchange().
+// ---------------------------------------------------------------------------
+
+describe("ExchangeBodySchema — code_verifier is required", () => {
+  /** A fetch that fails the test if the pipeline ever reaches it. */
+  function countingFetch(): { fn: OAuthFetchFn; calls: () => number } {
+    let calls = 0;
+    const fn: OAuthFetchFn = async () => {
+      calls += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: "gho_x", token_type: "bearer", scope: "" }),
+      };
+    };
+    return { fn, calls: () => calls };
+  }
+
+  it("refuses a body omitting code_verifier, with no outbound call recorded", async () => {
+    const { fn, calls } = countingFetch();
+
+    const parsed = ExchangeBodySchema.safeParse({ code: "gh-code" });
+
+    expect(parsed.success).toBe(false);
+    // The edges map any parse failure to 400 invalid_request; the point here is
+    // that the failure happens before exchange() — and therefore before fetch —
+    // is ever entered.
+    if (!parsed.success) {
+      expect(parsed.error.issues.some((i) => i.path.includes("code_verifier"))).toBe(true);
+    }
+    expect(calls()).toBe(0);
+
+    // Sanity: the same body WITH a verifier parses and does reach the provider,
+    // so the zero-call assertion above is about the refusal, not a dead stub.
+    const ok = ExchangeBodySchema.safeParse({ code: "gh-code", code_verifier: "v" });
+    expect(ok.success).toBe(true);
+    if (ok.success) await exchange(ok.data, makeConfig(fn));
+    expect(calls()).toBe(1);
+  });
+
+  it("refuses an empty-string code_verifier", () => {
+    expect(ExchangeBodySchema.safeParse({ code: "gh-code", code_verifier: "" }).success).toBe(
+      false,
+    );
+  });
+
+  it("still accepts the optional redirect_uri and client fields alongside it", () => {
+    const parsed = ExchangeBodySchema.safeParse({
+      code: "gh-code",
+      code_verifier: "v",
+      redirect_uri: "https://example.test/callback",
+      client: "oauth_app",
+    });
+    expect(parsed.success).toBe(true);
   });
 });

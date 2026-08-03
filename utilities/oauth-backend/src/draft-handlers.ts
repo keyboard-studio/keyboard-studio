@@ -45,14 +45,37 @@ export interface DraftHandlerConfig {
 }
 
 /**
+ * Client ids this deployment issues tokens under, read from env.
+ *
+ * **Both** pairs are included deliberately: `GITHUB_CLIENT_ID` is the GitHub App
+ * user-to-server credential behind sign-in, and `GITHUB_OAUTH_CLIENT_ID` is the
+ * classic OAuth App behind the Option A `public_repo` flow. Returning only the
+ * first would refuse Option A tokens on the draft endpoints.
+ *
+ * Read here rather than threaded through both edges so the provenance check is
+ * on by default in every deployment — the env read follows the precedent in
+ * `installation-token.ts`. An empty result disables the check, which is the
+ * correct behaviour for a deployment that has configured neither id.
+ */
+function allowedClientIdsFromEnv(): readonly string[] {
+  return [process.env["GITHUB_CLIENT_ID"], process.env["GITHUB_OAUTH_CLIENT_ID"]]
+    .map((v) => (v ?? "").trim())
+    .filter((v) => v !== "");
+}
+
+/**
  * Build a {@link DraftHandlerConfig} from a concrete store and a GitHub fetch.
  * The real verifier calls GitHub's `/user`; tests can bypass by constructing the
  * config literal directly with a stub `verifyUser`.
+ *
+ * The verifier is given the configured client ids so a token issued to some
+ * other application is refused even when it is otherwise valid.
  */
 export function buildDraftConfig(store: DraftStore, fetchFn: OAuthFetchFn): DraftHandlerConfig {
+  const allowedClientIds = allowedClientIdsFromEnv();
   return {
     store,
-    verifyUser: (token) => verifyGitHubUser(token, fetchFn),
+    verifyUser: (token) => verifyGitHubUser(token, fetchFn, { allowedClientIds }),
   };
 }
 

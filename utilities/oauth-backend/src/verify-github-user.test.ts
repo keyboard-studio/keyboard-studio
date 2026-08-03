@@ -79,3 +79,80 @@ describe("verifyGitHubUser()", () => {
     expect(seen?.["User-Agent"]).toBeDefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Token provenance — X-OAuth-Client-ID (FR-012, research D-3)
+// ---------------------------------------------------------------------------
+
+/** A valid `/user` response carrying (or omitting) the provenance header. */
+function stubFetchWithClientId(clientId: string | null): OAuthFetchFn {
+  return async () => ({
+    ok: true,
+    status: 200,
+    headers: { get: (name: string) => (/^x-oauth-client-id$/i.test(name) ? clientId : null) },
+    json: async () => ({ id: 7, login: "octocat" }),
+  });
+}
+
+const APP_ID = "Iv23liTHISAPP";
+const OAUTH_APP_ID = "Ov23liTHISAPP";
+const BOTH_IDS = [APP_ID, OAUTH_APP_ID] as const;
+
+describe("verifyGitHubUser() — token provenance", () => {
+  it("refuses a token issued to a foreign client id", async () => {
+    const user = await verifyGitHubUser("gho_foreign", stubFetchWithClientId("Iv23liSOMEONEELSE"), {
+      allowedClientIds: BOTH_IDS,
+    });
+    expect(user).toBeNull();
+  });
+
+  it("accepts BOTH configured ids — the App pair and the classic OAuth App pair", async () => {
+    // Accepting only GITHUB_CLIENT_ID would refuse Option A's public_repo
+    // tokens on the draft endpoints (research D-3).
+    for (const configured of BOTH_IDS) {
+      const user = await verifyGitHubUser("gho_ok", stubFetchWithClientId(configured), {
+        allowedClientIds: BOTH_IDS,
+      });
+      expect(user, `client id ${configured}`).toEqual({ id: 7, login: "octocat" });
+    }
+  });
+
+  it("passes when the header is absent (fail-open, recorded deliberately)", async () => {
+    const user = await verifyGitHubUser("gho_ok", stubFetchWithClientId(null), {
+      allowedClientIds: BOTH_IDS,
+    });
+    expect(user).toEqual({ id: 7, login: "octocat" });
+  });
+
+  it("passes when the adapter surfaces no headers at all", async () => {
+    // stubFetch() returns a bare { ok, status, json } — the pre-FR-012 shape.
+    const user = await verifyGitHubUser("gho_ok", stubFetch({ id: 7, login: "octocat" }), {
+      allowedClientIds: BOTH_IDS,
+    });
+    expect(user).toEqual({ id: 7, login: "octocat" });
+  });
+
+  it("disables the check for an empty or omitted allow-list", async () => {
+    const foreign = stubFetchWithClientId("Iv23liSOMEONEELSE");
+    expect(await verifyGitHubUser("t", foreign, { allowedClientIds: [] })).toEqual({
+      id: 7,
+      login: "octocat",
+    });
+    expect(await verifyGitHubUser("t", foreign, {})).toEqual({ id: 7, login: "octocat" });
+    expect(await verifyGitHubUser("t", foreign)).toEqual({ id: 7, login: "octocat" });
+  });
+
+  it("looks the header up case-insensitively", async () => {
+    // GitHub sends `X-OAuth-Client-ID`; a Web Headers object lowercases names.
+    const lowercased: OAuthFetchFn = async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: (name: string) => (name.toLowerCase() === "x-oauth-client-id" ? APP_ID : null) },
+      json: async () => ({ id: 7, login: "octocat" }),
+    });
+    expect(await verifyGitHubUser("t", lowercased, { allowedClientIds: BOTH_IDS })).toEqual({
+      id: 7,
+      login: "octocat",
+    });
+  });
+});
