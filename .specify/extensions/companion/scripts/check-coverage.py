@@ -171,24 +171,45 @@ def render_human(result: dict) -> str:
         return ""  # opt-in: disabled feature reports nothing in human mode
     if not result["capabilities"]:
         return "no living specs with a spec file to check"
-    lines = ["📊 Coverage report"]
+    # ASCII tags, not emoji: this is a Windows-first repo and the console default
+    # is cp1252, which cannot encode the glyphs this used to print (see the repo
+    # convention in CLAUDE.md). _configure_stdio below makes UTF-8 the norm; these
+    # tags mean the report stays readable even where that can't take effect.
+    lines = ["[COVERAGE] Coverage report"]
     for cap in result["capabilities"]:
         if not cap["hasCoverage"]:
-            lines.append(f"\n📁 {cap['name']} — no .coverage.md (all {cap['total']} requirements uncovered)")
+            lines.append(f"\n[CAP] {cap['name']} - no .coverage.md (all {cap['total']} requirements uncovered)")
         else:
             lines.append(
-                f"\n📁 {cap['name']} — {cap['covered']}/{cap['total']} requirements covered"
+                f"\n[CAP] {cap['name']} - {cap['covered']}/{cap['total']} requirements covered"
             )
         for r in cap["requirements"]:
             if r["covered"]:
-                lines.append(f"   ✓ {r['id']} → {', '.join(r['tests'])}")
+                lines.append(f"   [OK]        {r['id']} -> {', '.join(r['tests'])}")
             else:
-                lines.append(f"   ✗ {r['id']} — uncovered")
+                lines.append(f"   [UNCOVERED] {r['id']}")
     return "\n".join(lines)
 
 
+def _configure_stdio() -> None:
+    """Force UTF-8 on stdout/stderr before anything is printed.
+
+    Capability names and test paths are arbitrary user data, so even an
+    all-ASCII report template can hit a glyph the console default (cp1252 on
+    Windows) cannot encode, raising UnicodeEncodeError mid-report. Kept local
+    rather than shared: these scripts are independent best-effort entry points
+    with no module in common.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass  # not a reconfigurable TextIOWrapper — leave it as-is
+
+
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="Report living-spec requirement→test coverage.")
+    _configure_stdio()
+    ap = argparse.ArgumentParser(description="Report living-spec requirement-to-test coverage.")
     ap.add_argument("--root", default=".", help="repo root (default: cwd)")
     ap.add_argument("--capability", help="restrict to one capability by name")
     ap.add_argument("--json", action="store_true", help="emit the machine-readable object")

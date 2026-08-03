@@ -217,32 +217,73 @@ def resolve(feature_dir: Path) -> dict:
     return resolution
 
 
-def _print_summary(res: dict) -> None:
-    if res.get("empty"):
-        print("Nothing to summarize (no spec files or recorded state found).")
-        print(f"RESOLUTION: {json.dumps(res, ensure_ascii=False)}")
-        return
+def _configure_stdio() -> None:
+    """Force UTF-8 on stdout/stderr before anything is printed.
 
-    print(f"Spec: {res['specName']}   (source: {res['source']})")
-    print(f"Step: {res['currentStep']}   Status: {res['status']}")
+    The summary is non-ASCII by design (the documented `→` / `—` glyphs) and,
+    less avoidably, carries arbitrary user data: a spec name read from
+    .spec-context.json can hold any character. Windows defaults the console to
+    cp1252, which cannot encode either, so `print` raised UnicodeEncodeError
+    part-way through the block — surfacing as a truncated summary, a swallowed
+    `[companion] Warning:`, and no RESOLUTION line at all, which is the one line
+    /speckit.companion.resume actually parses.
+
+    errors="replace" is deliberate belt-and-braces: if a stream still can't take
+    a glyph, it degrades to a placeholder rather than losing the whole line.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass  # not a reconfigurable TextIOWrapper — leave it as-is
+
+
+def _summary_lines(res: dict) -> list[str]:
+    """The human summary as lines, built without printing (see _print_summary)."""
+    if res.get("empty"):
+        return ["Nothing to summarize (no spec files or recorded state found)."]
+
+    lines = [
+        f"Spec: {res['specName']}   (source: {res['source']})",
+        f"Step: {res['currentStep']}   Status: {res['status']}",
+    ]
 
     decisions = res.get("decisions") or []
     if decisions:
-        print("Decisions:")
-        for d in decisions:
-            print(f"  - {d}")
+        lines.append("Decisions:")
+        lines.extend(f"  - {d}" for d in decisions)
     else:
-        print("Decisions: (none recorded)")
+        lines.append("Decisions: (none recorded)")
 
     if res.get("complete"):
-        print("Next: Pipeline complete  →  —")
+        lines.append("Next: Pipeline complete  →  —")
     elif res.get("nextTask"):
-        print(f"Next: {res['nextActionLabel']}  →  dispatching {res['nextCommand']}")
+        lines.append(f"Next: {res['nextActionLabel']}  →  dispatching {res['nextCommand']}")
     else:
         nxt = res.get("nextCommand") or "—"
-        print(f"Next: {res['nextActionLabel']}  →  {nxt}")
+        lines.append(f"Next: {res['nextActionLabel']}  →  {nxt}")
 
-    print(f"RESOLUTION: {json.dumps(res, ensure_ascii=False)}")
+    return lines
+
+
+def _print_summary(res: dict) -> None:
+    """Emit the human summary, then the machine line, as two independent writes.
+
+    Building the block up front means a rendering failure can't leave a
+    half-written summary, and keeping RESOLUTION out of that try means `resume`
+    still gets its input even when the human half fails.
+    """
+    try:
+        print("\n".join(_summary_lines(res)))
+    except Exception as exc:  # noqa: BLE001 - the machine line matters more
+        print(f"[companion] Warning: could not render the summary: {exc}", file=sys.stderr)
+
+    try:
+        print(f"RESOLUTION: {json.dumps(res, ensure_ascii=False)}")
+    except UnicodeEncodeError:
+        # Last resort on a stream that rejected UTF-8: \uXXXX-escaped ASCII is
+        # still JSON and parses back to the identical object.
+        print(f"RESOLUTION: {json.dumps(res, ensure_ascii=True)}")
 
 
 def main() -> int:
@@ -251,6 +292,8 @@ def main() -> int:
     )
     parser.add_argument("--feature-dir", default=None)
     args = parser.parse_args()
+
+    _configure_stdio()
 
     root = wc._repo_root()
     feature_dir = wc.resolve_feature_dir(root, args.feature_dir)
