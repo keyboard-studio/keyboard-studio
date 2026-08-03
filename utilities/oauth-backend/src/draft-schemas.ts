@@ -16,7 +16,13 @@
 import { z } from "zod";
 
 // ---------------------------------------------------------------------------
-// Size ceiling
+// Size and quota ceilings
+//
+// Operational parameters, not contract: these are tunable in response to
+// observed usage without a spec revision (spec 054 Assumptions). They are
+// exported as one block so a deployment adjusts them in a single place, and so
+// the relationship between the per-draft ceiling and the aggregate ones stays
+// visible — MAX_TOTAL_DRAFT_BYTES is a multiple of MAX_DRAFT_BYTES on purpose.
 // ---------------------------------------------------------------------------
 
 /**
@@ -29,6 +35,25 @@ import { z } from "zod";
  * uploading and simply keeps the local draft when it trips.
  */
 export const MAX_DRAFT_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Ceiling on how many drafts one verified user may keep server-side. Well above
+ * a real author's "My keyboards" working set — a handful of keyboards, not
+ * dozens — so this binds on automated abuse rather than on authoring. Over it,
+ * `PUT /drafts` refuses with 409 `draft_quota_exceeded`; existing drafts are
+ * left intact and can still be re-saved (see the FR-009 subtraction in
+ * `draft-handlers.putDraft`).
+ */
+export const MAX_DRAFTS_PER_USER = 25;
+
+/**
+ * Ceiling on one verified user's total stored draft bytes, measured the same way
+ * `size_bytes` is measured per row. 16x {@link MAX_DRAFT_BYTES}, so with typical
+ * draft sizes {@link MAX_DRAFTS_PER_USER} is the limit that binds first and this
+ * one only engages against pathologically large drafts. Over it, `PUT /drafts`
+ * refuses with 409 `draft_quota_exceeded`.
+ */
+export const MAX_TOTAL_DRAFT_BYTES = 64 * 1024 * 1024;
 
 /**
  * The slot a draft occupies when a user has no draftId of their own (an

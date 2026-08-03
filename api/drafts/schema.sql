@@ -81,3 +81,29 @@ BEGIN
     ALTER TABLE drafts ADD PRIMARY KEY (github_user_id, draft_id);
   END IF;
 END $$;
+
+-- Fixed-window rate-limit counters for the unauthenticated endpoints that make
+-- outbound provider calls. Shared state is the point: Vercel gives no reliable
+-- cross-invocation memory, so a per-instance counter would be unenforceable.
+--
+-- bucket_key is a one-way digest of the endpoint plus the client address
+-- (rateLimitKey() in utilities/oauth-backend/src/rate-limit.ts) — this table
+-- therefore stores NO IP addresses, and must not be changed to.
+--
+-- The draft quota needs no migration: it reads size_bytes, which already exists
+-- above and is already populated on every upsert.
+CREATE TABLE IF NOT EXISTS rate_limit_hits (
+  bucket_key    TEXT     NOT NULL,  -- hashed client address + endpoint discriminator
+  window_start  BIGINT   NOT NULL,  -- epoch seconds, floored to the window
+  hits          INTEGER  NOT NULL DEFAULT 0,
+  PRIMARY KEY (bucket_key, window_start)
+);
+
+-- Rows are disposable — a window that has rolled over is dead weight, and there
+-- is no retention requirement. Sweep opportunistically (or from a cron) with:
+--   DELETE FROM rate_limit_hits
+--   WHERE window_start < (EXTRACT(EPOCH FROM now())::bigint - 3600);
+-- Nothing depends on the sweep running: a stale row is only storage, never a
+-- false refusal, because a lookup keys on the current window_start.
+CREATE INDEX IF NOT EXISTS rate_limit_hits_window_start_idx
+  ON rate_limit_hits (window_start);

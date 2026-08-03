@@ -22,6 +22,29 @@ export interface StoredDraft {
   draft: unknown;
 }
 
+/**
+ * Aggregate draft usage for one verified user — the read model the quota checks
+ * against. Not a stored entity: both implementations derive it from what they
+ * already persist (a `count(*)`/`SUM(size_bytes)` over the metadata table, or a
+ * walk of the in-memory map).
+ */
+export interface DraftUsage {
+  /** How many drafts this user currently has stored. */
+  draftCount: number;
+  /** Sum of every stored draft's serialized payload size, in bytes. */
+  totalBytes: number;
+}
+
+/**
+ * Serialized size of one draft payload, measured the one way every implementor
+ * must measure it so the aggregate and the per-draft figure are commensurable:
+ * UTF-8 bytes of `JSON.stringify(draft)`. `VercelDraftStore.putDraft` records
+ * exactly this into `size_bytes`.
+ */
+export function measureDraftBytes(draft: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(draft)).length;
+}
+
 export interface DraftStore {
   /** Fetch the metadata row for a user's draft, or null when none exists. Cheap (no payload). */
   getMeta(userId: number, draftId: string): Promise<DraftMeta | null>;
@@ -33,6 +56,25 @@ export interface DraftStore {
   deleteDraft(userId: number, draftId: string): Promise<void>;
   /** List metadata for every draft the user has. Empty array when none. */
   listMeta(userId: number): Promise<DraftMeta[]>;
+  /**
+   * Aggregate usage for the quota. Adding this member is a deliberate
+   * compile-time break: the two implementors ({@link MemoryDraftStore} and
+   * `VercelDraftStore`) must both satisfy it or the build fails, so no
+   * deployment silently runs unmetered.
+   */
+  getUsage(userId: number): Promise<DraftUsage>;
+  /**
+   * Stored size of one of the user's drafts, or `0` when it does not exist.
+   *
+   * Separate from {@link getUsage} because the quota subtracts the row being
+   * replaced before comparing: `totalBytes - existingBytes + newBytes`. That
+   * subtraction is what makes FR-009 fall out with no special case — a user at
+   * quota can always re-save in-progress work — and it needs the *per-draft*
+   * figure, which a per-user aggregate cannot supply. Returning `0` for an
+   * absent draft also tells the caller the write is an insert, so the count
+   * check needs no second lookup.
+   */
+  getDraftBytes(userId: number, draftId: string): Promise<number>;
 }
 
 /**
@@ -69,5 +111,18 @@ export class MemoryDraftStore implements DraftStore {
     const userDrafts = this.rows.get(userId);
     if (userDrafts === undefined) return Promise.resolve([]);
     return Promise.resolve(Array.from(userDrafts.values(), (row) => row.meta));
+  }
+
+  getUsage(userId: number): Promise<DraftUsage> {
+    const userDrafts = this.rows.get(userId);
+    if (userDrafts === undefined) return Promise.resolve({ draftCount: 0, totalBytes: 0 });
+    let totalBytes = 0;
+    for (const row of userDrafts.values()) totalBytes += measureDraftBytes(row.draft);
+    return Promise.resolve({ draftCount: userDrafts.size, totalBytes });
+  }
+
+  getDraftBytes(userId: number, draftId: string): Promise<number> {
+    const row = this.rows.get(userId)?.get(draftId);
+    return Promise.resolve(row === undefined ? 0 : measureDraftBytes(row.draft));
   }
 }
