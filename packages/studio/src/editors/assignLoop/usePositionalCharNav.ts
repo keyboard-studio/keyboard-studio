@@ -56,7 +56,16 @@ export interface UsePositionalCharNavResult {
    * so Skip and Next/Done can never drift.
    */
   handleNext: () => void;
-  /** Move back one position, or call onBack from the first character. */
+  /**
+   * Move back one position, or call onBack from the first character — or
+   * when there is no current position to step back within at all (currentChar
+   * is null, or no longer present in `list`, e.g. right after mount before
+   * the caller's sync effect settles, or after the inventory changed
+   * underneath it). That last case used to silently return, doing nothing —
+   * a caller-side render gate (see MechanismGallery/TouchGallery) only ever
+   * shows the Back button when either onBack or a genuine previous position
+   * exists, so falling through to onBack here is always safe when reached.
+   */
   handleBack: () => void;
   /**
    * Move back one position, ungated by covered/configured status on the
@@ -135,10 +144,16 @@ export function usePositionalCharNav({
   // character, Back exits to the previous phase via onBack. Always available
   // whenever currentChar !== null and `list` is non-empty — positional, so
   // it survives remount (no history stack to lose).
+  //
+  // currentChar === null or not found in `list` (currentIdx === -1) is folded
+  // into the SAME "nothing to step back within" branch as currentIdx <= 0,
+  // rather than a silent early return (F7 fix): the previous code returned
+  // without calling onBack in that case, which made the Back button visibly
+  // present-but-inert right after mount / after an inventory change moved
+  // currentChar out of `list`. Exiting the phase is the correct fallthrough
+  // here — there is no "previous position" to step to either way.
   const handleBack = useCallback(() => {
-    // See handleNext for the idx === -1 defense-in-depth rationale.
-    if (currentChar === null || currentIdx === -1) return;
-    if (currentIdx <= 0) {
+    if (currentChar === null || currentIdx <= 0) {
       onBack?.();
       return;
     }

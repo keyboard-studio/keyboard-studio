@@ -77,6 +77,18 @@ export interface InstantiateResult {
   removalCapabilities?: Map<string, RemovalCapability>;
   /** Which authoring track the user chose. "adapt" = Track 2; anything else = Track 1. */
   track: string | null;
+  /**
+   * F1 fix: set by StudioShell's doCommit when the caller has ALREADY
+   * resolved the rebase-confirm question synchronously (BaseResolutionAdapter
+   * .onConfirm's confirmRebaseTo call — see editors/adapters/panelAdapters.tsx)
+   * before this step-completion result was even produced. When true, the
+   * Track 1/default branch below passes `{ skipConfirm: true }` through to
+   * `instantiateFromBaseIfConfirmed` so the SAME confirm dialog does not fire
+   * a second time for one user click. Absent/false preserves the original
+   * behavior (the dep runs its own confirmRebaseIfEdited check) for callers
+   * with no upstream synchronous confirm of their own.
+   */
+  skipRebaseConfirm?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -198,11 +210,15 @@ export interface ReducerDeps {
   /**
    * Track 1 instantiation helper that guards against rebase without user
    * confirmation (confirmRebaseIfEdited). Returns true when instantiation
-   * proceeded, false when skipped.
+   * proceeded, false when skipped. The third (optional) `options` param lets
+   * a caller that has ALREADY resolved the confirm question synchronously
+   * (F1 fix — see InstantiateResult.skipRebaseConfirm above) skip the dep's
+   * own internal confirm, so the same dialog cannot fire twice for one click.
    */
   instantiateFromBaseIfConfirmed: (
     base: BaseKeyboard,
     opts: { vfs: VirtualFS | null; ir: KeyboardIR | null; removalCapabilities?: Map<string, RemovalCapability> },
+    options?: { skipConfirm?: boolean },
   ) => boolean;
 
   // --- mutate seam (spec-014 T014) ---
@@ -468,7 +484,15 @@ export function applyStepCompletion(
         // instantiateFromBaseIfConfirmed no-ops (returns false) on a redundant
         // re-fire or a user-cancelled rebase confirm — only clear the fork
         // choice when instantiation actually proceeded.
-        const instantiated = deps.instantiateFromBaseIfConfirmed(base, opts);
+        //
+        // F1 fix: only pass the third `options` argument when the caller has
+        // set skipRebaseConfirm — omitting it entirely (rather than always
+        // passing `{ skipConfirm: false }`) keeps this call's arity identical
+        // to the pre-fix signature for every caller that never sets the flag
+        // (all existing reducer.test.ts fixtures), so this change is additive.
+        const instantiated = payload.skipRebaseConfirm
+          ? deps.instantiateFromBaseIfConfirmed(base, opts, { skipConfirm: true })
+          : deps.instantiateFromBaseIfConfirmed(base, opts);
         if (instantiated) {
           deps.setTouchSeedSource?.(null);
         }

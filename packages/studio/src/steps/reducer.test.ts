@@ -322,6 +322,18 @@ describe("R3 — copy/adapt instantiation routing at choose_base", () => {
     expect(deps.instantiateFromBaseIfConfirmed).toHaveBeenCalledWith(base, { vfs, ir });
   });
 
+  // F1 fix: doCommit (StudioShell.tsx) sets skipRebaseConfirm: true once
+  // BaseResolutionAdapter.onConfirm has already resolved the rebase question
+  // synchronously (confirmRebaseTo) — the reducer must forward that as a
+  // third `{ skipConfirm: true }` argument so instantiateFromBaseIfConfirmed
+  // does not ask a second time. Absent/false (the default, asserted just
+  // above) keeps the original 2-arg call shape for every other caller.
+  it("Track 1 with skipRebaseConfirm: true forwards { skipConfirm: true } as a third arg", () => {
+    const result: InstantiateResult = { base, ir, vfs, track: null, skipRebaseConfirm: true };
+    applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps);
+    expect(deps.instantiateFromBaseIfConfirmed).toHaveBeenCalledWith(base, { vfs, ir }, { skipConfirm: true });
+  });
+
   it("Track 1 (non-adapt string): routes to Track 1 path (default)", () => {
     const result: InstantiateResult = { base, ir, vfs, track: "copy" };
     applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps);

@@ -55,6 +55,7 @@ import {
   installDraftAutosave,
   flushActiveDraft,
   wasDraftRestoredThisBoot,
+  restoredDraftSavedAt,
   AUTOSAVE_DEBOUNCE_MS,
   listDrafts,
   reconcileProjectIndex,
@@ -63,6 +64,7 @@ import {
   startCloudSync,
   CLOUD_SYNC_DEBOUNCE_MS,
   MAX_CLOUD_DRAFT_BYTES,
+  PENDING_PROJECT_KEY,
   type DurableDraft,
 } from "./draftPersistence.ts";
 import { saveServerDraft, saveServerDraftBeacon } from "./serverDraftStore.ts";
@@ -235,6 +237,118 @@ describe("draftPersistence", () => {
       expect(loadDraft(pk)).toBe(false);
       // Unlike VR-1/VR-3, "no real work" is left in place — nothing to migrate away from.
       expect(localStorage.getItem(draftKey(pk))).not.toBeNull();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // F6 regression (docs/design-notes/switch-base-popup-behavior-log.md):
+  // pre-instantiation progress (wizard levels L1/L2 — identity answers, an
+  // un-confirmed base preview) must survive a save/load round-trip under the
+  // reserved PENDING_PROJECT_KEY slot, the SAME way an instantiated project's
+  // draft already does. Before the fix, `saveDraft`'s VR-2 guard refused to
+  // write ANYTHING before instantiation, and `loadDraft` refused to apply a
+  // record with `instantiationMode === null` even if one existed — so this
+  // whole round-trip was previously impossible for any projectKey, pending or
+  // not.
+  // ---------------------------------------------------------------------------
+  describe("F6: pending-slot persistence for pre-instantiation progress", () => {
+    it("saveDraft still no-ops for the pending key when there is no meaningful progress (pristine identity step)", () => {
+      expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
+      expect(useSurveySessionStore.getState().activeStepId).toBe("identity");
+      saveDraft(PENDING_PROJECT_KEY);
+      expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).toBeNull();
+    });
+
+    it("saveDraft persists identity-lite progress (L1) under the pending key even though the working copy is not instantiated", () => {
+      useSurveySessionStore.getState().advance("choose_base");
+      useSurveySessionStore.setState({
+        identityResult: { english: "Test", autonym: "Test", bcp47: "und", prefill: { script: "Latn" } } as never,
+      });
+
+      saveDraft(PENDING_PROJECT_KEY);
+
+      const stored = localStorage.getItem(draftKey(PENDING_PROJECT_KEY));
+      expect(stored).not.toBeNull();
+      const saved = JSON.parse(stored!) as DurableDraft;
+      expect(saved.workingCopy.instantiationMode).toBeNull();
+      expect(saved.traversal.activeStepId).toBe("choose_base");
+      expect(resolveActiveProjectKey()).toBe(PENDING_PROJECT_KEY);
+    });
+
+    it("saveDraft persists an un-confirmed base preview (L2) under the pending key", () => {
+      const base = { id: "preview_only", displayName: "Preview Only", languages: [] } as unknown as BaseKeyboard;
+      useSurveySessionStore.getState().advance("choose_base");
+      useSurveySessionStore.getState().setLocalBase(base);
+      // Explicitly NOT confirmed — the working copy stays uninstantiated.
+      expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
+
+      saveDraft(PENDING_PROJECT_KEY);
+
+      const saved = JSON.parse(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))!) as DurableDraft;
+      expect(saved.workingCopy.instantiationMode).toBeNull();
+      expect(saved.traversal.localBase?.id).toBe("preview_only");
+    });
+
+    it("loadDraft restores pending-slot progress (activeStepId + localBase) even though instantiationMode is null", () => {
+      const base = { id: "preview_only_2", displayName: "Preview Only 2", languages: [] } as unknown as BaseKeyboard;
+      useSurveySessionStore.getState().advance("choose_base");
+      useSurveySessionStore.getState().setLocalBase(base);
+      saveDraft(PENDING_PROJECT_KEY);
+
+      // Cold reset — nothing left to inherit from.
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      expect(useSurveySessionStore.getState().activeStepId).toBe("identity");
+
+      expect(loadDraft(PENDING_PROJECT_KEY)).toBe(true);
+
+      expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
+      const session = useSurveySessionStore.getState();
+      expect(session.activeStepId).toBe("choose_base");
+      expect(session.localBase?.id).toBe("preview_only_2");
+      expect(wasDraftRestoredThisBoot()).toBe(true);
+    });
+
+    it("a NON-pending projectKey is still refused when uninstantiated, even with meaningful survey progress (the relaxation is scoped to PENDING_PROJECT_KEY only)", () => {
+      useSurveySessionStore.getState().advance("choose_base");
+      useSurveySessionStore.setState({
+        identityResult: { english: "Test", autonym: "Test", bcp47: "und", prefill: { script: "Latn" } } as never,
+      });
+
+      saveDraft("some_other_key");
+
+      expect(localStorage.getItem(draftKey("some_other_key"))).toBeNull();
+    });
+
+    // P1 regression (review finding 1): saveDraft's index upsert must never
+    // write a `PENDING_PROJECT_KEY` row. MyKeyboardsList (listDrafts's
+    // exclusive consumer) would otherwise render a phantom "Untitled
+    // keyboard" card for an author who has only answered the identity
+    // question — no keyboard picked yet, nothing to resume into.
+    it("saveDraft under the pending key writes the draft RECORD but leaves the 'My keyboards' index empty — loadDraft still restores it", () => {
+      useSurveySessionStore.getState().advance("choose_base");
+      useSurveySessionStore.setState({
+        identityResult: { english: "Test", autonym: "Test", bcp47: "und", prefill: { script: "Latn" } } as never,
+      });
+
+      saveDraft(PENDING_PROJECT_KEY);
+
+      // The record itself IS written (unchanged from the tests above)...
+      expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).not.toBeNull();
+      // ...but no index row exists for it, under either read path.
+      expect(JSON.parse(localStorage.getItem(DRAFT_INDEX_KEY) ?? "[]")).toEqual([]);
+      expect(listDrafts()).toEqual([]);
+      expect(listDrafts().some((e) => e.projectKey === PENDING_PROJECT_KEY)).toBe(false);
+
+      // Boot-resume is unaffected: it resolves via the ks.draft.active
+      // pointer, never via the index.
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      expect(loadDraft(PENDING_PROJECT_KEY)).toBe(true);
+      expect(useSurveySessionStore.getState().activeStepId).toBe("choose_base");
+
+      // Still no index row after the restore (loadDraft never upserts).
+      expect(listDrafts()).toEqual([]);
     });
   });
 
@@ -629,6 +743,74 @@ describe("draftPersistence", () => {
       expect(session.touchSeedSource).toBe("import-adapt");
 
       expect(wasDraftRestoredThisBoot()).toBe(true);
+    });
+  });
+
+  // P1 regression (review finding 2): StudioShell's cloud-restore offer needs
+  // the RESTORED draft's savedAt to compare against a cloud draft's, without
+  // re-reading localStorage itself. restoredDraftSavedAt() is that accessor —
+  // set alongside wasDraftRestoredThisBoot(), same lifetime, same "before
+  // React mounts" guarantee.
+  describe("restoredDraftSavedAt: the F5 cloud-offer freshness accessor", () => {
+    it("is null before any successful loadDraft this boot (mirrors wasDraftRestoredThisBoot's own initial-state test)", () => {
+      // NOTE: this only holds because no earlier test in this file has yet
+      // performed a successful loadDraft() — same ordering caveat as the
+      // very first test in this file (see the module header note).
+      // Asserted here defensively, not as a claim about global ordering.
+      if (wasDraftRestoredThisBoot()) return;
+      expect(restoredDraftSavedAt()).toBeNull();
+    });
+
+    it("holds the restored envelope's savedAt after a successful loadDraft, distinct from Date.now() at call time", () => {
+      const base: BaseKeyboard = {
+        id: "restored_savedat_project",
+        displayName: "Restored SavedAt",
+        languages: ["en"],
+      } as BaseKeyboard;
+      useWorkingCopyStore.getState().instantiateFromBase(base, {
+        vfs: createVirtualFS([]),
+        ir: makeMinimalIr(),
+      });
+
+      const fixedSavedAt = 1_700_000_000_000; // an arbitrary, recognizable timestamp
+      vi.spyOn(Date, "now").mockReturnValue(fixedSavedAt);
+      saveDraft("restored_savedat_project");
+      vi.restoreAllMocks();
+
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+
+      expect(loadDraft("restored_savedat_project")).toBe(true);
+      expect(restoredDraftSavedAt()).toBe(fixedSavedAt);
+    });
+
+    it("reflects only the MOST RECENT successful loadDraft — a second restore under a different key overwrites it", () => {
+      const olderSavedAt = 1_600_000_000_000;
+      const newerSavedAt = 1_650_000_000_000;
+
+      useWorkingCopyStore.getState().instantiateFromBase(
+        { id: "restored_savedat_a", displayName: "A", languages: ["en"] } as BaseKeyboard,
+        { vfs: createVirtualFS([]), ir: makeMinimalIr() },
+      );
+      vi.spyOn(Date, "now").mockReturnValue(olderSavedAt);
+      saveDraft("restored_savedat_a");
+      vi.restoreAllMocks();
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      expect(loadDraft("restored_savedat_a")).toBe(true);
+      expect(restoredDraftSavedAt()).toBe(olderSavedAt);
+
+      useWorkingCopyStore.getState().instantiateFromBase(
+        { id: "restored_savedat_b", displayName: "B", languages: ["en"] } as BaseKeyboard,
+        { vfs: createVirtualFS([]), ir: makeMinimalIr() },
+      );
+      vi.spyOn(Date, "now").mockReturnValue(newerSavedAt);
+      saveDraft("restored_savedat_b");
+      vi.restoreAllMocks();
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      expect(loadDraft("restored_savedat_b")).toBe(true);
+      expect(restoredDraftSavedAt()).toBe(newerSavedAt);
     });
   });
 
@@ -1226,6 +1408,42 @@ describe("draftPersistence", () => {
       useWorkingCopyStore.getState().lockDesktop();
       vi.advanceTimersByTime(CLOUD_SYNC_DEBOUNCE_MS);
       expect(mockedSaveServerDraft).not.toHaveBeenCalled();
+
+      teardown();
+    });
+
+    // Pending-slot veto (review finding 1): the reserved pending slot is the
+    // local-only holding pen for pre-instantiation progress. It is excluded
+    // from the local "My keyboards" index, and must be excluded from the cloud
+    // push for the same reason — a pushed pending record comes back through
+    // listServerDrafts() and merges into the list as a phantom "Untitled
+    // keyboard" card. Only promotion to a real project key makes a draft
+    // cloud-eligible.
+    it("pending-slot veto: never pushes the PENDING_PROJECT_KEY record, even for a signed-in author with meaningful pre-instantiation progress", () => {
+      vi.useFakeTimers();
+      useSurveySessionStore.getState().advance("choose_base");
+      useSurveySessionStore.setState({
+        identityResult: { english: "Test", autonym: "Test", bcp47: "und", prefill: { script: "Latn" } } as never,
+      });
+      saveDraft(PENDING_PROJECT_KEY);
+      // The local record exists and the active pointer is pinned to it — the
+      // exact state F6's mount-time autosave install produces.
+      expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).not.toBeNull();
+      expect(resolveActiveProjectKey()).toBe(PENDING_PROJECT_KEY);
+
+      const teardown = startCloudSync(() => "token-abc");
+      expect(mockedSaveServerDraft).not.toHaveBeenCalled(); // install-time flush vetoed
+
+      useSurveySessionStore.getState().advance("choose_base");
+      saveDraft(PENDING_PROJECT_KEY);
+      vi.advanceTimersByTime(CLOUD_SYNC_DEBOUNCE_MS);
+      expect(mockedSaveServerDraft).not.toHaveBeenCalled();
+
+      // Neither checkpoint flush leaks it either.
+      document.dispatchEvent(new Event("visibilitychange"));
+      window.dispatchEvent(new Event("beforeunload"));
+      expect(mockedSaveServerDraft).not.toHaveBeenCalled();
+      expect(mockedSaveServerDraftBeacon).not.toHaveBeenCalled();
 
       teardown();
     });

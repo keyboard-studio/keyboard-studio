@@ -58,7 +58,11 @@ const CharactersStep: ComponentType<EditorStepProps> = ({
           resetPhaseBDraft();
           setCharactersSubStage("B");
         }}
-        onBack={() => onBack?.()}
+        // Conditionally spread (not `() => onBack?.()`) — F7 sweep: an
+        // always-truthy wrapper would make Prefill always render its own Back
+        // button (Prefill gates on `onBack !== undefined`) even when StepHost
+        // omitted onBack because there is genuinely nothing to back into.
+        {...(onBack !== undefined ? { onBack } : {})}
       />
     );
   }
