@@ -23,11 +23,22 @@
  *  - On any GitHub auth/scope failure (401/403) the route returns a generic
  *    "submission_unavailable" -- a misconfigured installation token is a server
  *    problem, never surfaced to the SPA as an actionable client error.
+ *  - FR-004: every submitted path is validated (submit-paths.ts) and then
+ *    rewritten under the keyboard's own tree prefix (applyKeyboardPrefix)
+ *    before it reaches a tree entry, so a submission can never land outside
+ *    release/<firstLetter>/<keyboardId>/ -- structurally, not just by check.
+ *    The rejection category, never the offending path, is what a caller sees.
  */
 
 import type { ManagedPRBody } from "./managed-pr-schemas.js";
 import type { OAuthFetchFn } from "./handlers.js";
 import { parseBearer, verifyGitHubUser, type GitHubUser } from "./verify-github-user.js";
+import {
+  applyKeyboardPrefix,
+  deriveKeyboardPrefix,
+  validatePackagePaths,
+  type PathRejectionCategory,
+} from "./submit-paths.js";
 
 // ---------------------------------------------------------------------------
 // Pipeline-local fetch abstraction -- richer than OAuthFetchResponse so we
@@ -119,17 +130,33 @@ export function buildManagedPRConfig(
 //   502 submission_unavailable / upstream_error
 // ---------------------------------------------------------------------------
 
+/**
+ * Fields common to every `ok: false` shape. Both HTTP edges (server.ts,
+ * api/submit/managed-pr.ts) read `branchName` / `retryAfterSeconds` off the
+ * union without narrowing on `error` first, so every failure variant --
+ * including `invalid_path` below -- carries them (as `undefined` where they
+ * don't apply) rather than omitting the keys outright. Omitting a key here
+ * would make property access on the union a compile error at both edges for
+ * a variant they don't (yet) special-case, not just a runtime no-op.
+ */
+type ManagedPRFailureBase = {
+  ok: false;
+  status: number;
+  error: string;
+  /** Surfaced in the 409 body so the engine maps to branch-exists. */
+  branchName?: string;
+  /** Surfaced via Retry-After on 429. */
+  retryAfterSeconds?: number;
+};
+
 export type ManagedPRHandlerResult =
   | { ok: true; data: { prUrl: string; commitSha: string } }
-  | {
-      ok: false;
-      status: number;
-      error: string;
-      /** Surfaced in the 409 body so the engine maps to branch-exists. */
-      branchName?: string;
-      /** Surfaced via Retry-After on 429. */
-      retryAfterSeconds?: number;
-    };
+  | (ManagedPRFailureBase & {
+      status: 400;
+      error: "invalid_path";
+      category: PathRejectionCategory;
+    })
+  | ManagedPRFailureBase;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -256,12 +283,14 @@ function buildHeaders(token: string): Record<string, string> {
  * Returns a discriminated result (never throws) in the same shape handlers.ts
  * uses, so the route can `if (!result.ok) reply.status(result.status)`.
  *
- * Ordering is load-bearing: identity verification completes BEFORE
- * getInstallationToken(), which is itself an outbound call, so a refused
- * request issues zero outbound GitHub calls of any kind.
+ * Ordering is load-bearing: identity verification, then path validation,
+ * both complete BEFORE getInstallationToken(), which is itself the first
+ * outbound call, so a refused request (401 or invalid_path) issues zero
+ * outbound GitHub calls of any kind (SC-001).
  *
  * Error mapping (all token-leak-safe):
  *  - No verified identity          -> 401 unauthorized (before any outbound call)
+ *  - Path outside permitted tree   -> 400 invalid_path (+ category; before any outbound call)
  *  - Network throw                 -> 502 submission_unavailable
  *  - GitHub 401/403 (org token)    -> 502 submission_unavailable (server misconfig)
  *  - GitHub 429                    -> 429 rate_limited (+ retryAfterSeconds from header)
@@ -290,6 +319,21 @@ export async function submitManagedPR(
     user = null;
   }
   if (user === null) return { ok: false, status: 401, error: "unauthorized" };
+
+  // Path authority gate SECOND -- still before getInstallationToken() below, so
+  // a rejected path issues zero outbound GitHub calls (SC-001). The prefix
+  // length here is the TRUE post-prefix length (FR-004's length-after-prefix
+  // rule), not the raw submitted-path length -- see submit-paths.ts's
+  // "LENGTH-AFTER-PREFIX CHOICE". The category is all that survives into the
+  // response; the offending path itself is never returned or logged (FR-015 /
+  // US2 AC4).
+  const pathCheck = validatePackagePaths(
+    body.sourceFiles.map((f) => f.path),
+    deriveKeyboardPrefix(body.keyboardId).length
+  );
+  if (!pathCheck.ok) {
+    return { ok: false, status: 400, error: "invalid_path", category: pathCheck.category };
+  }
 
   const forkBase = `${API_BASE}/repos/${orgLogin}/${UPSTREAM_REPO}`;
   const upstreamBase = `${API_BASE}/repos/${UPSTREAM_OWNER}/${UPSTREAM_REPO}`;
@@ -347,8 +391,21 @@ export async function submitManagedPR(
     const baseTreeSha = parentData.tree.sha;
 
     // 3. Build the tree from the SPA-filtered source files (text content only).
-    const treeEntries = body.sourceFiles.map((f) => ({
-      path: f.path,
+    // Every path is prefixed to the keyboard's own tree location
+    // (release/<firstLetter>/<keyboardId>/<submitted path>) rather than
+    // committed verbatim. Before this, a submission's e.g. "README.md" landed
+    // at the staging repository ROOT, overwriting the repo's own README
+    // (research finding F-2) -- the prefix makes writing outside the
+    // keyboard's own tree structurally impossible rather than merely checked
+    // by validatePackagePaths above.
+    const prefixedPaths = applyKeyboardPrefix(
+      body.keyboardId,
+      body.sourceFiles.map((f) => f.path)
+    );
+    const treeEntries = body.sourceFiles.map((f, i) => ({
+      // applyKeyboardPrefix maps 1:1 over the same source list built above,
+      // so prefixedPaths[i] always exists for every index this map visits.
+      path: prefixedPaths[i]!,
       mode: "100644",
       type: "blob",
       content: f.content,
