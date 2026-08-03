@@ -11,8 +11,10 @@ describe("pf_usage_tip_2 — definition", () => {
   it("is a text question", () => {
     expect(definition.type).toBe("text");
   });
-  it("routes to pf_usage_tip_3", () => {
-    expect(definition.next).toBe("pf_usage_tip_3");
+  // Phase F documentation revision: tips 3-5 are demoted out of the live flow,
+  // so the chain hands off to the depth gate instead of a third fixed tip slot.
+  it("routes to pf_more_detail_gate", () => {
+    expect(definition.next).toBe("pf_more_detail_gate");
   });
 });
 

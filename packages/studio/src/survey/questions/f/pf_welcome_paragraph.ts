@@ -11,10 +11,12 @@ export const definition = {
     "very top of the keyboard's help page, so write it in plain language that " +
     "any user can understand. Avoid technical terms. For example: \"This " +
     "keyboard lets you type Bafut (Fa') on any computer. It includes all the " +
-    "tone marks and special letters used in the Bafut alphabet.\"",
+    "tone marks and special letters used in the Bafut alphabet.\" Keep it short — " +
+    "there are later questions for scope, fonts, and usage details, so you do " +
+    "not need to fit everything in here.",
   type: "text" as const,
   required: true,
-  next: "pf_usage_tip_1",
+  next: "pf_font_guidance",
 } satisfies import("../../types.ts").FlowQuestion;
 
 export function validate(

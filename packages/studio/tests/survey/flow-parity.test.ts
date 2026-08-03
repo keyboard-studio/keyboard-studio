@@ -162,15 +162,65 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
 
   it("expected question IDs in order", () => {
     expect(modular.questions.map((q) => q.id)).toEqual([
+      // core — always asked
+      "pf_doc_language",
       "pf_welcome_paragraph",
+      "pf_font_guidance",
       "pf_usage_tip_1",
       "pf_usage_tip_2",
-      "pf_usage_tip_3",
-      "pf_usage_tip_4",
-      "pf_usage_tip_5",
+      // depth gate — "No" routes straight to pf_credits
+      "pf_more_detail_gate",
+      // optional battery
+      "pf_scope_variety",
+      "pf_provenance_basis",
+      "pf_design_rationale",
+      // non-roman branch only (ctx.routing_group)
+      "pf_canonical_order",
+      "pf_script_glossary",
+      "pf_example_words",
+      "pf_troubleshooting",
+      "pf_related_keyboards",
+      "pf_known_limitations",
+      "pf_further_reading",
+      "pf_project_url",
+      // close — always asked
       "pf_credits",
       "pf_contact_info",
     ]);
+  });
+
+  // Phase F documentation revision: five fixed tip slots fit neither end of the
+  // shipped corpus, so tips 3-5 are demoted out of the live membership. They stay
+  // registered + on disk + test-covered (see phaseFDemotion.test.ts).
+  it("demoted tips 3-5 are absent from the live membership", () => {
+    const ids = modular.questions.map((q) => q.id);
+    expect(ids).not.toContain("pf_usage_tip_3");
+    expect(ids).not.toContain("pf_usage_tip_4");
+    expect(ids).not.toContain("pf_usage_tip_5");
+  });
+
+  it("pf_more_detail_gate and pf_design_rationale are gate questions (conditional next)", () => {
+    for (const id of ["pf_more_detail_gate", "pf_design_rationale"]) {
+      const q = modular.questions.find((q) => q.id === id);
+      expect(q, `${id} missing from Phase F`).toBeDefined();
+      expect(Array.isArray(q?.next), `${id}.next should be conditional rules`).toBe(true);
+    }
+  });
+
+  it("every non-terminal next target resolves inside the flow", () => {
+    const ids = new Set(modular.questions.map((q) => q.id));
+    for (const q of modular.questions) {
+      const targets =
+        typeof q.next === "string"
+          ? [q.next]
+          : Array.isArray(q.next)
+            ? q.next.map((r) => r.goto)
+            : [];
+      for (const t of targets) {
+        if (t === null) continue;
+        expect(ids.has(t), `"${q.id}".next -> "${t}" is not in the Phase F flow`).toBe(true);
+      }
+    }
   });
 
   it("no provenance_questions in Phase F", () => {

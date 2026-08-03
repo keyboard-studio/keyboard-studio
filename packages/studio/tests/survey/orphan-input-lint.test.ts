@@ -97,6 +97,22 @@ const manifestedIds = new Set<string>(
   phaseOrder.flatMap((p) => p.ids),
 );
 
+// Explicit reserve allowlist: modules that are intentionally REGISTERED but not
+// referenced by any manifest. "Demotion is not deletion" — they stay registered,
+// on disk, and test-covered so re-adding an id to a flow YAML revives them with
+// no code change (see src/survey/questions/phaseFDemotion.test.ts).
+//
+// pf_usage_tip_3/4/5 — the Phase F documentation revision replaced five fixed
+// tip slots with pf_more_detail_gate. Five fit neither end of the shipped
+// keyboard corpus: 54% of published help pages are one paragraph plus an
+// auto-rendered layout chart (slots 3-5 sat empty), while complex-script
+// keyboards document 14-30 rule sections (five was also a ceiling).
+const RESERVE_ALLOWLIST = new Set<string>([
+  "pf_usage_tip_3",
+  "pf_usage_tip_4",
+  "pf_usage_tip_5",
+]);
+
 // ---------------------------------------------------------------------------
 // Orphan-input analysis
 //
@@ -215,17 +231,35 @@ describe("orphan-input lint — every manifested input has a prior producer", ()
     expect(reports).toHaveLength(0);
   });
 
-  it("all registry modules are referenced by a manifest (no non-manifested modules today)", () => {
-    // Documents the current state: every registry entry appears in a manifest.
-    // If a library/reserve module is intentionally added without a manifest
-    // entry, move it to an explicit allowlist and update this assertion.
+  it("all registry modules are referenced by a manifest, except the explicit reserve allowlist", () => {
+    // Every registry entry appears in a manifest EXCEPT the deliberately demoted
+    // reserve modules in RESERVE_ALLOWLIST. A module absent from both is a
+    // genuine fault — an unfinished addition, or an accidental drop from a flow.
     const registryIds = Object.keys(questionRegistry);
-    const nonManifested = registryIds.filter((id) => !manifestedIds.has(id));
+    const nonManifested = registryIds.filter(
+      (id) => !manifestedIds.has(id) && !RESERVE_ALLOWLIST.has(id),
+    );
     expect(
       nonManifested,
       `Registry modules not referenced by any manifest: [${nonManifested.join(", ")}]. ` +
-        `Add them to a manifest, or move to an explicit exempt allowlist if intentionally library/reserve.`,
+        `Add them to a manifest, or add to RESERVE_ALLOWLIST if intentionally library/reserve.`,
     ).toHaveLength(0);
+  });
+
+  // Guards the allowlist itself: an allowlisted id must be registered AND
+  // genuinely absent from every manifest. If one is re-added to a flow this
+  // fails and the allowlist entry must be removed — the exemption cannot rot.
+  it("every reserve-allowlisted id is registered and genuinely non-manifested", () => {
+    for (const id of RESERVE_ALLOWLIST) {
+      expect(
+        questionRegistry[id],
+        `Reserve-allowlisted '${id}' is not in the registry — demotion is not deletion.`,
+      ).toBeDefined();
+      expect(
+        manifestedIds.has(id),
+        `Reserve-allowlisted '${id}' IS referenced by a manifest — remove it from RESERVE_ALLOWLIST.`,
+      ).toBe(false);
+    }
   });
 });
 

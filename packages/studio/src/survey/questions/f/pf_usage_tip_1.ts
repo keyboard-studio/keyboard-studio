@@ -9,8 +9,11 @@ export const definition = {
   help_text:
     "Give one short tip, for example how to type a character that is not " +
     "obvious or a key combination for a common accent mark. Keep it to one or " +
-    "two sentences. Screenshots can be added to the keyboard package separately " +
-    "and do not need to be described here.",
+    "two sentences. The keyboard layout diagram and the list of key sequences " +
+    "are generated automatically from your keyboard, so use this space for what " +
+    "a diagram cannot show — the thing users get wrong, or the reason a sequence " +
+    "works the way it does. Screenshots can be added to the keyboard package " +
+    "separately and do not need to be described here.",
   type: "text" as const,
   required: true,
   next: "pf_usage_tip_2",

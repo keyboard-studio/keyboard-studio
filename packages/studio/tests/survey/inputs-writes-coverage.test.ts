@@ -16,8 +16,11 @@ describe("inputs/writes coverage gate — every registered module declares both 
     expect(Object.keys(questionRegistry).length).toBeGreaterThan(0);
   });
 
-  it("registry has exactly 102 modules (floor guard — accidental deletions fail here)", () => {
-    expect(Object.keys(questionRegistry).length).toBe(102);
+  // 102 -> 116: the Phase F documentation revision adds 14 modules (doc language,
+  // font guidance, the depth gate, and the optional documentation battery). The
+  // three demoted usage-tip slots stay registered, so nothing is subtracted.
+  it("registry has exactly 116 modules (floor guard — accidental deletions fail here)", () => {
+    expect(Object.keys(questionRegistry).length).toBe(116);
   });
 
   for (const [id, mod] of Object.entries(questionRegistry)) {
