@@ -700,7 +700,10 @@ describe('CarveGallery — bulk store-toggle collateral guard (P0)', () => {
     // after the setState above, mirroring the existing single-chip
     // collateral tests' "click the card, THEN click the trigger" sequencing.
     fireEvent.click(dkfCard);
-    fireEvent.click(within(dkfCard).getByRole('button', { name: 'Remove' }));
+    // The ToggleBox is a sibling of the card <button> under the row wrapper
+    // (spec 056 Cycle 1 fix — was previously a descendant, but nesting a
+    // real <button> inside a role="button" fires axe nested-interactive).
+    fireEvent.click(within(dkfCard.parentElement!).getByRole('button', { name: 'Remove' }));
 
     // Exactly one dialog, aggregating collateral for BOTH indices.
     expect(screen.getAllByRole('alertdialog')).toHaveLength(1);
@@ -733,7 +736,8 @@ describe('CarveGallery — bulk store-toggle collateral guard (P0)', () => {
     renderGallery(ir);
 
     const card = screen.getByTestId('carve-card-store#s');
-    fireEvent.click(within(card).getByRole('button', { name: 'Remove' }));
+    // ToggleBox is a sibling under the row wrapper (see spec 056 note above).
+    fireEvent.click(within(card.parentElement!).getByRole('button', { name: 'Remove' }));
 
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(useWorkingCopyStore.getState().isItemDeleted('store#s#0')).toBe(true);

@@ -398,6 +398,7 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     );
 
     await page.waitForURL(/#output$/, { timeout: 30_000 });
+    await expectNoSeriousAxeViolations(page, "output screen (US2 piaroa walk)");
 
     const entries = await emitAndUnzip(page);
 
@@ -471,6 +472,7 @@ test.describe("Touch derivation US2-AS4 — explicit reseed discards a shipped t
     await driveHelpPhase(page, "Welcome to the Bambara keyboard.", "Type ɛ, ɔ, and ŋ from the freshly reseeded touch layout.");
 
     await page.waitForURL(/#output$/, { timeout: 30_000 });
+    await expectNoSeriousAxeViolations(page, "output screen (US2-AS4 bambara reseed walk)");
 
     const entries = await emitAndUnzip(page);
 
