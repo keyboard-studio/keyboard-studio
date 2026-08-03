@@ -315,6 +315,118 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-03T23:12:27.759Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:24:59.651Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:24:59.894Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:25:00.149Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:25:00.398Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:25:00.675Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:25:00.930Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:25:01.202Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:25:01.489Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:49:35.884Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T066",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:53:36.724Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T067",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:53:37.294Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T068",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:53:37.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T069",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:53:38.442Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T070",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:53:39.023Z"
     }
   ],
   "telemetryInstanceId": "469b61c6-c778-40d3-b978-3516ec818e69",
@@ -828,7 +940,7 @@
       "what": "{\"check\": \"draftPersistence.ts:477-481 implements FR-041 order verbatim and MyKeyboardsList.tsx:51 imports from draftPersistence, not draftAutosave\", \"how\": \"grep imports + sed the label computation in both engines\", \"result\": \"confirmed - km-doc finding stands; research D-8 blast-radius claim was backwards\"}"
     }
   ],
-  "currentTask": "T029",
+  "currentTask": "T070",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1045,6 +1157,116 @@
         "specs/057-bulletproof-navigation/evidence/gating-red.md",
         "specs/057-bulletproof-navigation/evidence/tab-roundtrip-green.raw.txt"
       ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Created useCompareArtifact: calls useKeyboardArtifact with no onInstantiate, never calls useWorkingCopyTransform, returns no setter into any authoring store; usePreviewArtifact untouched",
+      "files": [
+        "packages/studio/src/hooks/useCompareArtifact.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Retired nav.preview / preview.heading / preview.pane.label and added nav.compare / compare.heading / compare.pane.label in both catalogs; the new fr ids start untranslated because they are different strings about a different thing",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Created CompareScreen: loads and runs a foreign keyboard and shows its source read-only via a new KmnSourceView; no identity panel, no scaffold form, no mode toggle, no editable field",
+      "files": [
+        "packages/studio/src/components/CompareScreen.tsx",
+        "packages/studio/src/components/KmnSourceView.tsx"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Deleted PreviewScreen.tsx and the PreviewShell re-export shim, and rewired the preview route to CompareScreen; the route token stays preview so bookmarks and hash assertions survive",
+      "files": [
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Persisted the loaded keyboard and OSK mode in viewStateStore.compareSelection so the selection survives a tab switch and dies on reload",
+      "files": [
+        "packages/studio/src/hooks/useCompareArtifact.ts",
+        "packages/studio/src/stores/viewStateStore.ts"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Wrote CompareShell.test.tsx asserting the isolation as absences (no onInstantiate argument, no scaffold spec, no transform, no reachable instantiate, byte-identical working copy, no editing controls); split the old shared suite so OutputScreen coverage keeps its home as OutputScreen.test.tsx",
+      "files": [
+        "packages/studio/src/components/CompareShell.test.tsx",
+        "packages/studio/src/components/OutputScreen.test.tsx"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "Swept the rename across routing tests, component prose and hook docstrings; left usePreviewArtifact, basePreviewStatusStore, the Studio tab's live OSK preview and the preview route token deliberately untouched",
+      "files": [
+        "packages/studio/src/**"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Extended the locale spec: the tab reads Compare in English and, in fr, falls back to the new id's source rather than inheriting the retired id's Apercu",
+      "files": [
+        "packages/studio/e2e/locale-switch.spec.ts"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "Ran compare-isolation + locale-switch green (6/6) and appended the passing output beside the recorded red; the accept branch passes without any dialog being raised",
+      "files": [
+        "specs/057-bulletproof-navigation/evidence/gating-red.md",
+        "specs/057-bulletproof-navigation/evidence/compare-green.raw.txt"
+      ]
+    },
+    "T066": {
+      "status": "DONE",
+      "did": "Inserted a mid-walk tab round trip into browser-back.spec.ts so the native Back sequence runs against a PRESERVED position; the browser-Forward-is-a-no-op assertion is untouched per FR-016",
+      "files": [
+        "packages/studio/e2e/browser-back.spec.ts"
+      ]
+    },
+    "T067": {
+      "status": "DONE",
+      "did": "Folded one mid-walk tab round trip into the copy-edit walk via switchTab",
+      "files": [
+        "packages/studio/e2e/copy-edit.spec.ts"
+      ]
+    },
+    "T068": {
+      "status": "DONE",
+      "did": "Folded one mid-walk tab round trip into the touch-derivation US1 walk via switchTab",
+      "files": [
+        "packages/studio/e2e/touch-derivation-us1.spec.ts"
+      ]
+    },
+    "T069": {
+      "status": "DONE",
+      "did": "Folded one mid-walk tab round trip into the touch-derivation US2 walk via switchTab",
+      "files": [
+        "packages/studio/e2e/touch-derivation-us2.spec.ts"
+      ]
+    },
+    "T070": {
+      "status": "DONE",
+      "did": "Updated the CLAUDE.md E2E status paragraph with the new specs and the two shared step drivers, and added a Location spine entry to docs/architecture.md naming the defect it prevents",
+      "files": [
+        "CLAUDE.md",
+        "docs/architecture.md"
+      ]
     }
-  }
+  },
+  "concerns": [
+    {
+      "note": "src/hooks/useValidator.test.ts failed once under the full `pnpm -r test` run (VALIDATOR_ERROR_FINDING injection case) and passed on its own and on an immediate full re-run. Pre-existing flake, not introduced by this feature, but it can turn a clean gate red intermittently.",
+      "step": "implement"
+    }
+  ]
 }

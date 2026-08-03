@@ -78,6 +78,7 @@ import {
   buildOneCharacterList,
   driveHelpPhase,
   seedReturningVisitor,
+  switchTab,
 } from "./helpers/surveyFlow";
 
 // ---------------------------------------------------------------------------
@@ -375,6 +376,14 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     await pickBaseKeyboard(page, PIAROA_BASE_ID);
     await chooseAdaptTrack(page);
     await confirmPrefill(page);
+
+    // Spec 057 FR-072: a mid-walk tab round trip, folded into an existing long
+    // walk so position survival is proven incidentally rather than only by the
+    // dedicated gating spec. Before the D-1 fix this single pair of clicks was
+    // enough to throw the whole walk back to the identity question — every
+    // assertion below it would have failed.
+    await switchTab(page, "preview");
+    await switchTab(page, "survey");
     await addPlacedCharacterToInventory(page, PLACED_CHAR);
 
     // Accessibility gate (spec 056 FR-003): scan the Phase B build-list screen.

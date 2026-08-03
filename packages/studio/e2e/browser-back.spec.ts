@@ -25,7 +25,13 @@
  */
 
 import { test, expect } from "playwright/test";
-import { driveIdentityLite, pickBaseKeyboard, chooseAdaptTrack, seedReturningVisitor } from "./helpers/surveyFlow";
+import {
+  driveIdentityLite,
+  pickBaseKeyboard,
+  chooseAdaptTrack,
+  seedReturningVisitor,
+  switchTab,
+} from "./helpers/surveyFlow";
 
 const FIXTURE = {
   baseKeyboardId: "basic_kbdfr",
@@ -59,6 +65,17 @@ test.describe("browser Back mid-survey (F7)", () => {
     // is ONE entry regardless of the prefill -> B intra-step substage
     // transition (that substage never touches surveySessionStore.history).
     await page.waitForSelector('[data-testid="prefill-confirm"]', { timeout: 20_000 });
+
+    // Spec 057 FR-017 / SC-014: run the native Back sequence below against a
+    // PRESERVED position, not a fresh one. Before the D-1 fix, leaving #survey
+    // and returning reset the traversal store — which emptied `history`, so
+    // `expectedBackTarget` could no longer name any entry still on the browser
+    // stack and every native Back silently degraded to a no-op. The bridge
+    // therefore has to be exercised on the far side of a round trip, or the
+    // case that used to be broken is never covered.
+    await switchTab(page, "preview");
+    await switchTab(page, "survey");
+    await expect(page.getByTestId("prefill-confirm")).toBeVisible({ timeout: 20_000 });
 
     // One physical Back: characters -> track. The track radio choice
     // reappears (its own onComplete re-fires chooseAdaptTrack forward again

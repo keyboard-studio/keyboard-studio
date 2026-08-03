@@ -35,6 +35,7 @@ import {
   navigateToOutput,
   triggerDownload,
   seedReturningVisitor,
+  switchTab,
 } from "./helpers/surveyFlow";
 
 // ---------------------------------------------------------------------------
@@ -296,6 +297,14 @@ async function walkToOutput(page: Page, fx: WalkFixture): Promise<void> {
   await chooseTrackCopy(page);
   await acceptProjectName(page);
   await confirmPrefill(page);
+
+  // Spec 057 FR-072: a mid-walk tab round trip, folded into an existing long
+  // walk so position survival is proven incidentally rather than only by the
+  // dedicated gating spec. Before the D-1 fix this single pair of clicks was
+  // enough to throw the whole walk back to the identity question — every
+  // assertion below it would have failed.
+  await switchTab(page, "preview");
+  await switchTab(page, "survey");
   await completePhaseB(page, fx);
   await navigateToOutput(page);
 }

@@ -121,32 +121,32 @@ Written to encode the *new* contract — these files currently encode the old on
 
 ### Tests
 
-- [ ] **T030** [US2] Rewrite the preview-screen test as a Compare test asserting the shared-store behaviour is *gone*: no `setIdentity` path, no `onInstantiate`, no rebase dialog, no `useWorkingCopyTransform` (FR-021, FR-022, FR-025, FR-072) · `packages/studio/src/components/CompareShell.test.tsx` (replaces `PreviewShell.test.tsx`)
+- [x] **T030** [US2] Rewrite the preview-screen test as a Compare test asserting the shared-store behaviour is *gone*: no `setIdentity` path, no `onInstantiate`, no rebase dialog, no `useWorkingCopyTransform` (FR-021, FR-022, FR-025, FR-072) · `packages/studio/src/components/CompareShell.test.tsx` (replaces `PreviewShell.test.tsx`)
 
 ### Implementation
 
 **⟶ Wait for T030, then — independent (different files):**
 
-- [ ] **T031** [P] [US2] Create the read-only pipeline hook: calls `useKeyboardArtifact` with **no** `onInstantiate`, does **not** call `useWorkingCopyTransform`, and returns no setter that writes `workingCopyStore`, `surveySessionStore`, `phaseBDraftStore` or `decisionLogStore`. `usePreviewArtifact` is neither modified nor renamed (FR-023, FR-026, D-6) · `packages/studio/src/hooks/useCompareArtifact.ts`
-- [ ] **T032** [P] [US2] Retire `nav.preview`, `preview.heading`, `preview.pane.label` and add `nav.compare`, `compare.heading`, `compare.pane.label` in both catalogs; the retired ids must not be left claiming a translation, and the new ids start untranslated in `fr` because they are different strings about a different thing (FR-020, FR-073, D-8) · `packages/studio/src/locales/en/messages.json`, `packages/studio/src/locales/fr/messages.json`
+- [x] **T031** [P] [US2] Create the read-only pipeline hook: calls `useKeyboardArtifact` with **no** `onInstantiate`, does **not** call `useWorkingCopyTransform`, and returns no setter that writes `workingCopyStore`, `surveySessionStore`, `phaseBDraftStore` or `decisionLogStore`. `usePreviewArtifact` is neither modified nor renamed (FR-023, FR-026, D-6) · `packages/studio/src/hooks/useCompareArtifact.ts`
+- [x] **T032** [P] [US2] Retire `nav.preview`, `preview.heading`, `preview.pane.label` and add `nav.compare`, `compare.heading`, `compare.pane.label` in both catalogs; the retired ids must not be left claiming a translation, and the new ids start untranslated in `fr` because they are different strings about a different thing (FR-020, FR-073, D-8) · `packages/studio/src/locales/en/messages.json`, `packages/studio/src/locales/fr/messages.json`
 
 **⟶ Wait for T031 and T032, then:**
 
-- [ ] **T033** [US2] Create the Compare screen: loads and runs a foreign keyboard and shows its source, drops `TrackOneIdentityPanel` and the scaffold-form path entirely, and exposes no editing control at all (FR-023, FR-024) · `packages/studio/src/components/CompareScreen.tsx`
+- [x] **T033** [US2] Create the Compare screen: loads and runs a foreign keyboard and shows its source, drops `TrackOneIdentityPanel` and the scaffold-form path entirely, and exposes no editing control at all (FR-023, FR-024) · `packages/studio/src/components/CompareScreen.tsx`
 
 **⟶ Wait for T033, then — independent (different files):**
 
-- [ ] **T034** [P] [US2] Delete `PreviewScreen.tsx` and rewire the `preview` route to render `CompareScreen`; the route **token** stays `preview` so bookmarks and hash assertions survive (contract §1) · `packages/studio/src/components/PreviewScreen.tsx` (delete), `packages/studio/src/StudioShell.tsx`
-- [ ] **T035** [P] [US2] Persist the loaded keyboard and OSK mode in `viewStateStore.compareSelection` so the selection survives a tab switch and dies on reload (Q5, US2 scenario 3) · `packages/studio/src/components/CompareScreen.tsx`
+- [x] **T034** [P] [US2] Delete `PreviewScreen.tsx` and rewire the `preview` route to render `CompareScreen`; the route **token** stays `preview` so bookmarks and hash assertions survive (contract §1) · `packages/studio/src/components/PreviewScreen.tsx` (delete), `packages/studio/src/StudioShell.tsx`
+- [x] **T035** [P] [US2] Persist the loaded keyboard and OSK mode in `viewStateStore.compareSelection` so the selection survives a tab switch and dies on reload (Q5, US2 scenario 3) · `packages/studio/src/components/CompareScreen.tsx`
 
 **⟶ Wait for T034 and T035, then — independent (different files):**
 
-- [ ] **T036** [P] [US2] Sweep the rename across every surface that names *this tab* — nav labels, aria labels, headings, message ids, unit tests, e2e specs, docs. Leave the unrelated uses untouched: `usePreviewArtifact`, `basePreviewStatusStore`, the Studio tab's live OSK preview, `editor.assignLoop.preview.heading`, and the `preview` route token (FR-026, SC-006) · `packages/studio/src/**`, `docs/**`
-- [ ] **T037** [P] [US2] Extend the locale spec to assert the Compare label in a non-English locale (FR-020, SC-006) · `packages/studio/e2e/locale-switch.spec.ts`
+- [x] **T036** [P] [US2] Sweep the rename across every surface that names *this tab* — nav labels, aria labels, headings, message ids, unit tests, e2e specs, docs. Leave the unrelated uses untouched: `usePreviewArtifact`, `basePreviewStatusStore`, the Studio tab's live OSK preview, `editor.assignLoop.preview.heading`, and the `preview` route token (FR-026, SC-006) · `packages/studio/src/**`, `docs/**`
+- [x] **T037** [P] [US2] Extend the locale spec to assert the Compare label in a non-English locale (FR-020, SC-006) · `packages/studio/e2e/locale-switch.spec.ts`
 
 **⟶ Wait for T036 and T037, then:**
 
-- [ ] **T038** [US2] Restart `pnpm dev`, then run `e2e/compare-isolation.spec.ts` green and append the passing output beside its recorded red run — the accept-branch assertion from T004 must now pass without a dialog ever being raised (SC-005, SC-013) · `specs/057-bulletproof-navigation/evidence/gating-red.md`
+- [x] **T038** [US2] Restart `pnpm dev`, then run `e2e/compare-isolation.spec.ts` green and append the passing output beside its recorded red run — the accept-branch assertion from T004 must now pass without a dialog ever being raised (SC-005, SC-013) · `specs/057-bulletproof-navigation/evidence/gating-red.md`
 
 **Checkpoint**: US2 is independently functional and testable — an adversarial Compare session provably cannot touch the project, and no author-facing surface calls this tab "Preview".
 
@@ -283,11 +283,11 @@ Cross-cutting: fold a tab round trip into the long walks so position survival is
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T066** [P] Insert a tab round trip mid-walk so the native Back sequence runs against a *preserved* position; the existing browser-Forward-is-a-no-op assertion stays as-is per FR-016 (SC-014, FR-017) · `packages/studio/e2e/browser-back.spec.ts`
-- [ ] **T067** [P] Add one mid-walk tab round trip via `switchTab` (FR-072) · `packages/studio/e2e/copy-edit.spec.ts`
-- [ ] **T068** [P] Add one mid-walk tab round trip via `switchTab` (FR-072) · `packages/studio/e2e/touch-derivation-us1.spec.ts`
-- [ ] **T069** [P] Add one mid-walk tab round trip via `switchTab` (FR-072) · `packages/studio/e2e/touch-derivation-us2.spec.ts`
-- [ ] **T070** [P] Update the E2E status paragraph with the four new specs and the `switchTab` helper, and correct any prose that still calls this tab "Preview" · `CLAUDE.md`, `docs/architecture.md`
+- [x] **T066** [P] Insert a tab round trip mid-walk so the native Back sequence runs against a *preserved* position; the existing browser-Forward-is-a-no-op assertion stays as-is per FR-016 (SC-014, FR-017) · `packages/studio/e2e/browser-back.spec.ts`
+- [x] **T067** [P] Add one mid-walk tab round trip via `switchTab` (FR-072) · `packages/studio/e2e/copy-edit.spec.ts`
+- [x] **T068** [P] Add one mid-walk tab round trip via `switchTab` (FR-072) · `packages/studio/e2e/touch-derivation-us1.spec.ts`
+- [x] **T069** [P] Add one mid-walk tab round trip via `switchTab` (FR-072) · `packages/studio/e2e/touch-derivation-us2.spec.ts`
+- [x] **T070** [P] Update the E2E status paragraph with the four new specs and the `switchTab` helper, and correct any prose that still calls this tab "Preview" · `CLAUDE.md`, `docs/architecture.md`
 
 **⟶ Wait for Wave 1 to finish, then — independent (different files):**
 
