@@ -280,13 +280,95 @@ describe("content-i18n-lint English-collapse guard", () => {
     expect(problems).toEqual([]);
   });
 
-  it("does not fire on a catalog too small for the ratio to mean anything", () => {
+  // -------------------------------------------------------------------------
+  // Small catalogs: the exact rule.
+  //
+  // The ratio rule's MIN_KEYS floor used to be the whole story, which left
+  // anything below it unchecked. content/i18n/en/adaptationQuestions.json has 9
+  // keys, so the real Crowdin wipe replaced all 9 French values with English
+  // and sailed through the gate while four larger catalogs were caught. A ratio
+  // genuinely is meaningless at that size -- but an EXACT 100% is not, and that
+  // is the shape a source-text export actually produces.
+  // -------------------------------------------------------------------------
+
+  it("catches a small all-English catalog via the exact rule, below the ratio floor", () => {
+    const dir = tempContentI18nDir();
+    // 9 keys: the adaptationQuestions.json shape the real wipe got through.
+    const en = englishCatalog(9);
+    writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
+    writeFileSync(join(dir, "fr", "flowQuestions.json"), JSON.stringify(en));
+
+    const { problems } = runFlowQuestions(dir);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("collapsed into the English source");
+    // The exact rule states its basis differently from the ratio rule.
+    expect(problems[0]).toContain("every one of its 9 non-empty values");
+  });
+
+  it("does not fire on a small catalog with even one genuine translation", () => {
+    const dir = tempContentI18nDir();
+    const en = englishCatalog(5);
+    writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
+    // 4 of 5 identical is 80% -- over COLLAPSE_THRESHOLD, but the ratio rule
+    // does not apply this far below MIN_KEYS and the exact rule needs ALL of
+    // them. This band is the noise zone the floor exists for: one translated
+    // value is enough to prove the locale is not a source-text export.
+    let kept = 0;
+    writeFileSync(
+      join(dir, "fr", "flowQuestions.json"),
+      JSON.stringify(mapValues(en, (v) => (kept++ < 4 ? v : `Invite ${v}`))),
+    );
+
+    const { problems } = runFlowQuestions(dir);
+    expect(problems).toEqual([]);
+  });
+
+  it("fires at exactly the exact-rule floor (3 comparable values)", () => {
     const dir = tempContentI18nDir();
     const en = englishCatalog(3);
     writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
     writeFileSync(join(dir, "fr", "flowQuestions.json"), JSON.stringify(en));
 
     const { problems } = runFlowQuestions(dir);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("collapsed into the English source");
+  });
+
+  // -------------------------------------------------------------------------
+  // Below the exact-rule floor: unchecked, and it SAYS SO.
+  //
+  // A gate that silently declines to check something reads exactly like a gate
+  // that checked it and found nothing -- the failure mode this whole guard
+  // exists to close, one level up. So a skip warns instead of passing quietly.
+  // -------------------------------------------------------------------------
+
+  it("warns rather than passing silently when a catalog is below the exact-rule floor", () => {
+    const dir = tempContentI18nDir();
+    const en = englishCatalog(2);
+    writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
+    writeFileSync(join(dir, "fr", "flowQuestions.json"), JSON.stringify(en));
+
+    const { problems, warnings } = runFlowQuestions(dir);
+    expect(problems).toEqual([]); // not a failure -- 2 values prove nothing
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("NOT checked for collapse");
+    expect(warnings[0]).toContain("only 2 non-empty value(s)");
+    expect(warnings[0]).toContain("flowQuestions.json");
+  });
+
+  it("does not warn about an all-empty catalog — empty is the intended bootstrap shape", () => {
+    const dir = tempContentI18nDir();
+    const en = englishCatalog(2);
+    writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
+    // Zero comparable values. Warning here would punish the correct way to
+    // start a locale, so the skip warning is scoped to comparable > 0.
+    writeFileSync(
+      join(dir, "fr", "flowQuestions.json"),
+      JSON.stringify(mapValues(en, () => "")),
+    );
+
+    const { problems, warnings } = runFlowQuestions(dir);
     expect(problems).toEqual([]);
+    expect(warnings).toEqual([]);
   });
 });

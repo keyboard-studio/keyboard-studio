@@ -209,7 +209,7 @@ function checkFreshness(problems, warnings, englishDir, name, fresh) {
   }
 }
 
-function checkTargetLocaleParity(problems, contentI18nDir, name, freshEnglish) {
+function checkTargetLocaleParity(problems, warnings, contentI18nDir, name, freshEnglish) {
   if (!existsSync(contentI18nDir)) return;
   const locales = readdirSync(contentI18nDir, { withFileTypes: true })
     .filter((d) => d.isDirectory() && d.name !== SOURCE_LOCALE)
@@ -235,13 +235,16 @@ function checkTargetLocaleParity(problems, contentI18nDir, name, freshEnglish) {
     // Parity above is blind to a catalog that kept every key but lost every
     // translation — a Crowdin export of an untranslated project returns the
     // English source text under each original key. See i18n-collapse-guard.
+    // The guard also reports (as a warning) a catalog too small to check, so a
+    // declined check never looks like a passed one.
     const collapse = checkEnglishCollapse({
       en: freshEnglish,
       target,
       locale,
       catalog: name,
     });
-    if (collapse) problems.push(collapse);
+    if (collapse.problem) problems.push(collapse.problem);
+    if (collapse.warning) warnings.push(collapse.warning);
   }
 }
 
@@ -260,7 +263,7 @@ function lint({ contentI18nDir, freshCatalogs, parityOnlyFiles }) {
 
   for (const name of CATALOG_FILES) {
     checkFreshness(problems, warnings, englishDir, name, freshCatalogs[name]);
-    checkTargetLocaleParity(problems, contentI18nDir, name, freshCatalogs[name]);
+    checkTargetLocaleParity(problems, warnings, contentI18nDir, name, freshCatalogs[name]);
   }
 
   for (const name of parityOnlyFiles) {
@@ -269,7 +272,7 @@ function lint({ contentI18nDir, freshCatalogs, parityOnlyFiles }) {
       problems.push(`[en/${name}] committed catalog is missing entirely — run the extractor.`);
       continue;
     }
-    checkTargetLocaleParity(problems, contentI18nDir, name, committedEnglish);
+    checkTargetLocaleParity(problems, warnings, contentI18nDir, name, committedEnglish);
   }
 
   return { problems, warnings };

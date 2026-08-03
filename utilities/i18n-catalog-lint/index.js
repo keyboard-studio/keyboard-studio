@@ -161,7 +161,10 @@ try {
           locale,
           catalog: CATALOG_FILE,
         });
-        if (collapse) problems.push(collapse);
+        if (collapse.problem) problems.push(collapse.problem);
+        // A catalog too small to check reports as a warning rather than passing
+        // silently — see i18n-collapse-guard's "a skip is reported" note.
+        if (collapse.warning) warnings.push(collapse.warning);
       }
     }
   }
