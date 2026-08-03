@@ -134,10 +134,16 @@ function measureCollapse(en, target) {
  * @param {object}  args.target   target-locale catalog
  * @param {string}  args.locale   e.g. "fr"
  * @param {string}  args.catalog  display name, e.g. "messages.json"
- * @returns {{problem: string|null, warning: string|null}}
- *   `problem` is a hard failure (the catalog collapsed). `warning` is a
- *   non-blocking note that the catalog was too small to check at all. At most
- *   one of the two is ever non-null.
+ * @returns {{problem: string|null, note: string|null}}
+ *   `problem` is a hard failure (the catalog collapsed). `note` is a
+ *   non-blocking advisory that the catalog was too small to check at all. At
+ *   most one of the two is ever non-null.
+ *
+ *   `note`, not `warning`, on purpose: the callers keep those in separate
+ *   channels. Their `warnings` array means "stale — re-run the extractor", and
+ *   it prints that remediation. A note has no remediation, because nothing is
+ *   wrong and there is nothing to run. Feeding one into the other's channel
+ *   prints an instruction that does not apply.
  */
 function checkEnglishCollapse({ en, target, locale, catalog }) {
   const m = measureCollapse(en, target);
@@ -158,26 +164,26 @@ function checkEnglishCollapse({ en, target, locale, catalog }) {
         `'${locale}' (and that the download read the same branch the translations live on) ` +
         `before regenerating. To bootstrap a genuinely new locale, commit EMPTY values, ` +
         `not English ones.`,
-      warning: null,
+      note: null,
     };
   }
 
   // Too small for either rule. Not a failure, but say so rather than passing in
   // silence. An all-empty target (comparable === 0) is the intended "not
   // translated yet" shape, and a target with no overlapping keys at all is
-  // already reported by the key-set parity check — neither needs a warning.
+  // already reported by the key-set parity check — neither needs a note.
   if (m.skipped && m.comparable > 0) {
     return {
       problem: null,
-      warning:
+      note:
         `[${locale}] ${catalog} has only ${m.comparable} non-empty value(s) — below the ` +
         `English-collapse floor of ${MIN_KEYS_EXACT}, so it was NOT checked for collapse. ` +
         `Too few values for "all of them are English" to mean anything. If this catalog ` +
-        `grows, the guard starts covering it automatically.`,
+        `grows, the guard starts covering it automatically. No action needed.`,
     };
   }
 
-  return { problem: null, warning: null };
+  return { problem: null, note: null };
 }
 
 module.exports = {

@@ -42,7 +42,13 @@ const SOURCE_LOCALE = "en";
 const CATALOG_FILE = "messages.json";
 
 const problems = [];
+// `warnings` means "the English moved, re-run messages:extract" — the print
+// block at the bottom prints exactly that remediation. `notes` is a separate
+// channel for "the collapse guard could not check this catalog", which is not
+// staleness and has no remediation. One array for both would print the extract
+// instruction at someone whose only signal needs no action.
 const warnings = [];
+const notes = [];
 
 function readCatalog(file) {
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : null;
@@ -162,9 +168,11 @@ try {
           catalog: CATALOG_FILE,
         });
         if (collapse.problem) problems.push(collapse.problem);
-        // A catalog too small to check reports as a warning rather than passing
-        // silently — see i18n-collapse-guard's "a skip is reported" note.
-        if (collapse.warning) warnings.push(collapse.warning);
+        // A catalog too small to check is reported rather than passing silently
+        // — see i18n-collapse-guard's "a skip is reported" note. It goes to
+        // `notes`, not `warnings`: nothing is stale, so the extract remediation
+        // does not apply.
+        if (collapse.note) notes.push(collapse.note);
       }
     }
   }
@@ -193,6 +201,14 @@ if (warnings.length > 0) {
   console.warn(
     "\nRun pnpm --filter @keyboard-studio/studio messages:extract to pick these up (not required to pass).",
   );
+}
+
+// Separate header, and no remediation line: a note means a check was declined
+// for being unmeasurable, not that anything is out of date. Printing the
+// extract instruction here would send someone to fix a non-problem.
+if (notes.length > 0) {
+  console.warn("[NOTE] i18n-catalog-lint: collapse guard did not cover every catalog.");
+  for (const n of notes) console.warn("  - " + n);
 }
 
 if (extractionProducedNothing) {

@@ -4,6 +4,9 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 // index.js is CommonJS (plain-node lint tool); vitest resolves the interop.
 import { lint } from "./index.js";
+// The shared guard, tested directly at the bottom of this file: i18n-catalog-lint
+// consumes the same contract but is a bare script with nothing to import.
+import { checkEnglishCollapse, measureCollapse } from "../i18n-collapse-guard/index.js";
 
 const dirs: string[] = [];
 function tempContentI18nDir(): string {
@@ -342,33 +345,104 @@ describe("content-i18n-lint English-collapse guard", () => {
   // exists to close, one level up. So a skip warns instead of passing quietly.
   // -------------------------------------------------------------------------
 
-  it("warns rather than passing silently when a catalog is below the exact-rule floor", () => {
+  it("reports rather than passing silently when a catalog is below the exact-rule floor", () => {
     const dir = tempContentI18nDir();
     const en = englishCatalog(2);
     writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
     writeFileSync(join(dir, "fr", "flowQuestions.json"), JSON.stringify(en));
 
-    const { problems, warnings } = runFlowQuestions(dir);
+    const { problems, notes } = runFlowQuestions(dir);
     expect(problems).toEqual([]); // not a failure -- 2 values prove nothing
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain("NOT checked for collapse");
-    expect(warnings[0]).toContain("only 2 non-empty value(s)");
-    expect(warnings[0]).toContain("flowQuestions.json");
+    expect(notes).toHaveLength(1);
+    expect(notes[0]).toContain("NOT checked for collapse");
+    expect(notes[0]).toContain("only 2 non-empty value(s)");
+    expect(notes[0]).toContain("flowQuestions.json");
   });
 
-  it("does not warn about an all-empty catalog — empty is the intended bootstrap shape", () => {
+  it("keeps the skip advisory OUT of the warnings channel", () => {
+    // The two channels print different headers and different remediation. The
+    // warnings header says the English moved and tells you to re-run the
+    // extractor; that advice is nonsense for a catalog that is merely too small
+    // to measure. Routing a note into `warnings` is exactly the bug this
+    // asserts against.
     const dir = tempContentI18nDir();
     const en = englishCatalog(2);
     writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
-    // Zero comparable values. Warning here would punish the correct way to
-    // start a locale, so the skip warning is scoped to comparable > 0.
+    writeFileSync(join(dir, "fr", "flowQuestions.json"), JSON.stringify(en));
+
+    const { warnings, notes } = runFlowQuestions(dir);
+    expect(notes).toHaveLength(1);
+    expect(warnings).toEqual([]);
+  });
+
+  it("does not report an all-empty catalog — empty is the intended bootstrap shape", () => {
+    const dir = tempContentI18nDir();
+    const en = englishCatalog(2);
+    writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
+    // Zero comparable values. A note here would punish the correct way to start
+    // a locale, so the skip advisory is scoped to comparable > 0.
     writeFileSync(
       join(dir, "fr", "flowQuestions.json"),
       JSON.stringify(mapValues(en, () => "")),
     );
 
-    const { problems, warnings } = runFlowQuestions(dir);
+    const { problems, warnings, notes } = runFlowQuestions(dir);
     expect(problems).toEqual([]);
     expect(warnings).toEqual([]);
+    expect(notes).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The guard's own API, tested directly.
+//
+// Everything above reaches the guard through content-i18n-lint's harness. But
+// i18n-catalog-lint — the tool guarding the real messages.json catalogs — is a
+// top-level script with no exported entry point, so its use of the guard is
+// never exercised by any test. These cover the contract BOTH consumers depend
+// on, so a change to the return shape fails here rather than silently breaking
+// the Tier A path that has no test of its own.
+// ---------------------------------------------------------------------------
+
+describe("i18n-collapse-guard contract (shared by both lints)", () => {
+  const catalog = (n: number, f: (i: number) => string) =>
+    Object.fromEntries(Array.from({ length: n }, (_, i) => [`k${i}`, f(i)]));
+
+  it("returns a problem and no note when a large catalog collapsed (ratio rule)", () => {
+    const en = catalog(30, (i) => `English ${i}`);
+    const r = checkEnglishCollapse({ en, target: en, locale: "fr", catalog: "messages.json" });
+    expect(r.problem).toContain("collapsed into the English source");
+    expect(r.note).toBeNull();
+  });
+
+  it("returns a problem and no note when a small catalog collapsed (exact rule)", () => {
+    const en = catalog(9, (i) => `English ${i}`);
+    const r = checkEnglishCollapse({ en, target: en, locale: "fr", catalog: "messages.json" });
+    expect(r.problem).toContain("every one of its 9 non-empty values");
+    expect(r.note).toBeNull();
+  });
+
+  it("returns a note and no problem below the exact-rule floor", () => {
+    const en = catalog(2, (i) => `English ${i}`);
+    const r = checkEnglishCollapse({ en, target: en, locale: "fr", catalog: "messages.json" });
+    expect(r.problem).toBeNull();
+    expect(r.note).toContain("NOT checked for collapse");
+  });
+
+  it("returns neither for a genuinely translated catalog", () => {
+    const en = catalog(30, (i) => `English ${i}`);
+    const fr = catalog(30, (i) => `Francais ${i}`);
+    const r = checkEnglishCollapse({ en, target: fr, locale: "fr", catalog: "messages.json" });
+    expect(r.problem).toBeNull();
+    expect(r.note).toBeNull();
+  });
+
+  it("names which rule fired, so a caller can tell total from majority collapse", () => {
+    const big = catalog(30, (i) => `English ${i}`);
+    expect(measureCollapse(big, big).rule).toBe("ratio");
+    const small = catalog(9, (i) => `English ${i}`);
+    expect(measureCollapse(small, small).rule).toBe("exact");
+    const fr = catalog(30, (i) => `Francais ${i}`);
+    expect(measureCollapse(big, fr).rule).toBeNull();
   });
 });

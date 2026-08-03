@@ -209,7 +209,7 @@ function checkFreshness(problems, warnings, englishDir, name, fresh) {
   }
 }
 
-function checkTargetLocaleParity(problems, warnings, contentI18nDir, name, freshEnglish) {
+function checkTargetLocaleParity(problems, notes, contentI18nDir, name, freshEnglish) {
   if (!existsSync(contentI18nDir)) return;
   const locales = readdirSync(contentI18nDir, { withFileTypes: true })
     .filter((d) => d.isDirectory() && d.name !== SOURCE_LOCALE)
@@ -235,8 +235,10 @@ function checkTargetLocaleParity(problems, warnings, contentI18nDir, name, fresh
     // Parity above is blind to a catalog that kept every key but lost every
     // translation — a Crowdin export of an untranslated project returns the
     // English source text under each original key. See i18n-collapse-guard.
-    // The guard also reports (as a warning) a catalog too small to check, so a
-    // declined check never looks like a passed one.
+    // The guard also reports a catalog too small to check, so a declined check
+    // never looks like a passed one. That goes to `notes`, not `warnings`: the
+    // warnings channel means "stale, re-run the extractor" and prints that
+    // remediation, which would be nonsense advice for a too-small catalog.
     const collapse = checkEnglishCollapse({
       en: freshEnglish,
       target,
@@ -244,7 +246,7 @@ function checkTargetLocaleParity(problems, warnings, contentI18nDir, name, fresh
       catalog: name,
     });
     if (collapse.problem) problems.push(collapse.problem);
-    if (collapse.warning) warnings.push(collapse.warning);
+    if (collapse.note) notes.push(collapse.note);
   }
 }
 
@@ -258,12 +260,19 @@ function checkTargetLocaleParity(problems, warnings, contentI18nDir, name, fresh
  */
 function lint({ contentI18nDir, freshCatalogs, parityOnlyFiles }) {
   const problems = [];
+  // Two non-blocking channels, deliberately NOT one array. `warnings` means
+  // "the English moved, re-run the extractor" and main() prints exactly that
+  // remediation. `notes` means "this catalog is too small for the collapse
+  // guard to check" — nothing is stale and there is nothing to run, so it gets
+  // its own header and no remediation line. Merging them would print the
+  // extractor instruction at someone whose only signal needs no action.
   const warnings = [];
+  const notes = [];
   const englishDir = path.join(contentI18nDir, SOURCE_LOCALE);
 
   for (const name of CATALOG_FILES) {
     checkFreshness(problems, warnings, englishDir, name, freshCatalogs[name]);
-    checkTargetLocaleParity(problems, warnings, contentI18nDir, name, freshCatalogs[name]);
+    checkTargetLocaleParity(problems, notes, contentI18nDir, name, freshCatalogs[name]);
   }
 
   for (const name of parityOnlyFiles) {
@@ -272,10 +281,10 @@ function lint({ contentI18nDir, freshCatalogs, parityOnlyFiles }) {
       problems.push(`[en/${name}] committed catalog is missing entirely — run the extractor.`);
       continue;
     }
-    checkTargetLocaleParity(problems, warnings, contentI18nDir, name, committedEnglish);
+    checkTargetLocaleParity(problems, notes, contentI18nDir, name, committedEnglish);
   }
 
-  return { problems, warnings };
+  return { problems, warnings, notes };
 }
 
 function main() {
@@ -285,7 +294,7 @@ function main() {
     "criteria.json": extractCriteriaStrings(),
   };
 
-  const { problems, warnings } = lint({
+  const { problems, warnings, notes } = lint({
     contentI18nDir: CONTENT_I18N_DIR,
     freshCatalogs,
     parityOnlyFiles: PARITY_ONLY_FILES,
@@ -297,6 +306,14 @@ function main() {
     console.warn(
       "\nRun npx tsx utilities/i18n-content-extract/cli.ts to pick these up (not required to pass).",
     );
+  }
+
+  // Separate header, and no remediation line: a note means a check was declined
+  // for being unmeasurable, not that anything is out of date. Printing the
+  // extractor instruction here would send someone to fix a non-problem.
+  if (notes.length > 0) {
+    console.warn("[NOTE] content-i18n-lint: collapse guard did not cover every catalog.");
+    for (const n of notes) console.warn("  - " + n);
   }
 
   if (problems.length > 0) {
