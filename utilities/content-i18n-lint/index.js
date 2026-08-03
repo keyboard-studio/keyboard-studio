@@ -36,6 +36,7 @@
 const { readFileSync, readdirSync, existsSync } = require("node:fs");
 const path = require("node:path");
 const { parse: parseYaml } = require("yaml");
+const { checkEnglishCollapse } = require("../i18n-collapse-guard/index.js");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const CONTENT_I18N_DIR = path.join(REPO_ROOT, "content", "i18n");
@@ -218,6 +219,17 @@ function checkTargetLocaleParity(problems, contentI18nDir, name, freshEnglish) {
           (extra.length ? ` — stale/extra: ${extra.join(", ")}` : ""),
       );
     }
+
+    // Parity above is blind to a catalog that kept every key but lost every
+    // translation — a Crowdin export of an untranslated project returns the
+    // English source text under each original key. See i18n-collapse-guard.
+    const collapse = checkEnglishCollapse({
+      en: freshEnglish,
+      target,
+      locale,
+      catalog: name,
+    });
+    if (collapse) problems.push(collapse);
   }
 }
 
