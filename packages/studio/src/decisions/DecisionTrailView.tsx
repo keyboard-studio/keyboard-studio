@@ -251,8 +251,14 @@ export function DecisionTrailView({
       }
       case "editor-summary": {
         const stage = stageActionLabel(rollUp.actionType);
-        const dimensions = rollUp.dimensions.map(dimensionLabel).join(", ");
-        return t({ id: "trail.stage.rollUp.composed", message: `${stage} (${dimensions})` });
+        // `detail` is a GENERIC placeholder (mirrors
+        // trail.entry.headline.baseContribution.withDetail's pattern): this id
+        // means "stage name, then a pre-formatted parenthetical", one meaning
+        // shared by all three "composed" roll-up kinds below. The dimension
+        // list itself is already localized/pluralized by `dimensionLabel`
+        // before it ever reaches this placeholder.
+        const detail = rollUp.dimensions.map(dimensionLabel).join(", ");
+        return t({ id: "trail.stage.rollUp.composed", message: `${stage} (${detail})` });
       }
       case "editor-no-change": {
         const stage = stageActionLabel(rollUp.actionType);
@@ -271,25 +277,25 @@ export function DecisionTrailView({
           return t({ id: "trail.stage.rollUp.unmeasured", message: `${stage} (not measured)` });
         }
         const count = rollUp.startingKeyCount;
-        const startingKeyCount = t({
+        const detail = t({
           id: "trail.stage.rollUp.baseContribution.startingKeyCount",
           message: plural(count, { one: "started with # key", other: "started with # keys" }),
         });
         return t({
           id: "trail.stage.rollUp.composed",
-          message: `${stage} (${startingKeyCount})`,
+          message: `${stage} (${detail})`,
         });
       }
       case "survey-summary": {
         const stage = stepStageLabel(group.stepId);
         const count = rollUp.answerCount;
-        const answerCount = t({
+        const detail = t({
           id: "trail.stage.rollUp.surveySummary.answerCount",
           message: plural(count, { one: "# answer recorded", other: "# answers recorded" }),
         });
         return t({
           id: "trail.stage.rollUp.composed",
-          message: `${stage} (${answerCount})`,
+          message: `${stage} (${detail})`,
         });
       }
       default: {

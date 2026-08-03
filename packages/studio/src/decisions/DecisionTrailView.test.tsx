@@ -382,30 +382,28 @@ describe("FR-023 — a stage's one-line account, available without expanding", (
   });
 
   // -------------------------------------------------------------------------
-  // KNOWN PRODUCTION DEFECT — reported, deliberately not fixed here (T038 is a
-  // test task; the fix belongs to DecisionTrailView.tsx's own task).
+  // FIXED PRODUCTION DEFECT (was: `stageRollUpText` reused ONE message id,
+  // `trail.stage.rollUp.composed`, for three different messages — an editor
+  // stage's dimension list, the base's starting-key clause, and the survey's
+  // answer-count clause. Lingui extraction keeps one string per id, so the
+  // shipped `en` catalog held only the editor-stage wording and the other two
+  // branches rendered an EMPTY parenthesis, e.g. "Keyboard identity ()".
   //
-  // `stageRollUpText` reuses ONE message id, `trail.stage.rollUp.composed`, for
-  // three different messages: "{stage} ({dimensions})" for an editor stage,
-  // "{stage} ({startingKeyCount})" for the base, and "{stage} ({answerCount})"
-  // for a survey stage. An id is a handle for one string, so extraction keeps a
-  // single message — "{stage} ({dimensions})" — and the two branches that do
-  // not supply a `dimensions` value render an EMPTY parenthesis: the shipped
-  // `en` catalog turns a survey stage into "Keyboard identity ()". FR-023 is
-  // therefore unmet for the survey and base roll-ups, and only for those.
-  //
-  // `it.fails` inverts the verdict: these report as FAILURES the moment the ids
-  // are split, which is the signal to delete the markers and fold the
-  // assertions into the test above.
+  // Fix: `trail.stage.rollUp.composed` now carries a single, genuinely GENERIC
+  // meaning — "{stage} ({detail})" — mirroring
+  // `trail.entry.headline.baseContribution.withDetail`'s established pattern.
+  // Each branch pre-formats its own already-pluralized clause (via its own
+  // distinct id) before handing it to `detail`, so one id can honestly serve
+  // all three without merging distinct meanings.
   // -------------------------------------------------------------------------
 
-  it.fails("FR-023 defect: a survey stage's roll-up drops its effective answer count", () => {
+  it("names a survey stage's roll-up with its effective answer count", () => {
     renderTrail(walkedRecord());
     // i1 was revised by i2, so the identity stage produced one answer, not two.
     expect(summaryTextFor("identity")).toContain("1 answer recorded");
   });
 
-  it.fails("FR-023 defect: a base stage's roll-up drops its starting key count", () => {
+  it("names a base stage's roll-up with its starting key count", () => {
     renderTrail(walkedRecord());
     expect(summaryTextFor("choose_base")).toContain("started with 220 keys");
   });

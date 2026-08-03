@@ -1191,6 +1191,25 @@ describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
     expect(entries[1]!.supersedes).toBe(first.entryId);
     expect(entries[1]!.payload.startingKeyCount).toBe(railGlyphGids(otherIr).length);
   });
+
+  it("does not append a second entry when choose_base is revisited with no change", () => {
+    // Production shape: the author walks back into choose_base and re-confirms
+    // the SAME base. `instantiateFromBaseIfConfirmed` no-ops on that redundant
+    // re-fire (the store's baseKeyboard/baseIr/instantiationMode are untouched),
+    // so the recorder reads the identical baseline a second time. That must not
+    // read as a second decision (SC-002) — only a genuine base SWAP may
+    // supersede (the sibling test above).
+    const deps = depsWith(realRecorder());
+    const ir = instantiate();
+    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
+    const first = onlyBaseContribution();
+
+    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
+
+    const entries = baseContributions();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toEqual(first);
+  });
 });
 
 describe("FR-034 — a stage's counts are interpretable against the baseline", () => {

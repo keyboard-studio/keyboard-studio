@@ -1141,7 +1141,7 @@
   "survey.characterMapPane.zoom.zoomIn": "Zoom in",
   "survey.characterMapPane.zoom.zoomOut": "Zoom out",
   "survey.characterMapPane.zoom.groupAriaLabel": "Zoom the character map",
-  "trail.stage.rollUp.composed": "{stage} ({dimensions})",
+  "trail.stage.rollUp.composed": "{stage} ({detail})",
   "trail.stage.rollUp.noChange": "{stage} (changed nothing)",
   "trail.stage.rollUp.unmeasured": "{stage} (not measured)",
   "trail.stage.rollUp.notRecorded": "{stage} (no decisions recorded)",

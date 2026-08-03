@@ -162,6 +162,31 @@ export function payloadsEqual(a: DecisionPayload, b: DecisionPayload): boolean {
       x.sample.every((v, i) => v === y.sample[i])
     );
   }
+  if (a.kind === "base-contribution" && b.kind === "base-contribution") {
+    // `startingKeyCount` is optional (absent means "not measured", never a
+    // fabricated `0` — FR-005a). Plain `===` already tells `undefined` apart
+    // from `0`, so no coalescing belongs here.
+    if (
+      a.baseId !== b.baseId ||
+      a.baseDisplayName !== b.baseDisplayName ||
+      a.startingKeyCount !== b.startingKeyCount ||
+      a.instantiationMode !== b.instantiationMode
+    ) {
+      return false;
+    }
+    if (
+      a.derivedAxes.length !== b.derivedAxes.length ||
+      !a.derivedAxes.every((v, i) => v === b.derivedAxes[i])
+    ) {
+      return false;
+    }
+    return (
+      a.inheritedMetadata.length === b.inheritedMetadata.length &&
+      a.inheritedMetadata.every(
+        (m, i) => m.field === b.inheritedMetadata[i]?.field && m.value === b.inheritedMetadata[i]?.value,
+      )
+    );
+  }
   return false;
 }
 

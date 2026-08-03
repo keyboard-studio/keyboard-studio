@@ -96,9 +96,18 @@ function formatCount(count: number | undefined, one: string, many: string): stri
  * Counts only — a step that removed three hundred keys says so in one clause
  * rather than listing them (contract §6). Zero-valued categories are dropped so
  * a gallery edit does not report "0 touch keys affected" as though touch had
- * been considered and left alone. An unmeasured category is dropped the same
- * way (never reported as a number), so "no net change" also covers "nothing
- * measured" rather than misstating either as the other.
+ * been considered and left alone.
+ *
+ * When no category contributes a clause, the sentence still must not lump two
+ * different findings together (FR-005a): "no net change" means every category
+ * was measured and came back zero, which is itself evidence the step ran and
+ * genuinely changed nothing; "not measured" means the record has no count for
+ * at least one category, so there is nothing to report either way. Coercing
+ * `undefined` to falsy alongside `0` is exactly the mistake FR-005a forbids, so
+ * the two are distinguished explicitly rather than by relying on
+ * `parts.length === 0` alone. This mirrors, without importing, the trail's own
+ * three-way split into `editorStep` / `editorStepNoChange` /
+ * `editorStepUnmeasured` (headline-spec.contract.md §3, §5).
  */
 function formatEditorSummary(summary: EditorActionSummary): string {
   const parts = [
@@ -107,7 +116,15 @@ function formatEditorSummary(summary: EditorActionSummary): string {
     formatCount(summary.mechanismsAssigned, "mechanism assigned", "mechanisms assigned"),
     formatCount(summary.touchKeysAffected, "touch key affected", "touch keys affected"),
   ].filter((part): part is string => part !== undefined);
-  return parts.length === 0 ? "no net change" : parts.join(", ");
+  if (parts.length > 0) return parts.join(", ");
+
+  const allMeasured =
+    summary.keysRemoved !== undefined &&
+    summary.keysAdded !== undefined &&
+    summary.mechanismsAssigned !== undefined &&
+    summary.touchKeysAffected !== undefined;
+
+  return allMeasured ? "no net change" : "not measured";
 }
 
 /** The decision itself, as one English clause. */

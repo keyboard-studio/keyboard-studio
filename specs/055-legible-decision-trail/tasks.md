@@ -200,7 +200,7 @@ This phase is presentation over an unchanged record — cuttable without touchin
 **Wave 3 — independent (different files):**
 
 - [x] **T038** [P] Grouping tests: stages in walked order (FR-022), a collapsed roll-up line per group (FR-023), every flat-trail entry still reachable (FR-024), an untouched stage never presented as changed (FR-025), and a revisit visible as history inside its stage (FR-026) · `packages/studio/src/decisions/DecisionTrailView.test.tsx`
-- [ ] **T039** [P] Rendering a stage roll-up resolves **no** entry's impact, and expanding one entry resolves only that one (FR-021, SC-009) · `packages/studio/src/decisions/impact.test.ts`
+- [x] **T039** [P] Rendering a stage roll-up resolves **no** entry's impact, and expanding one entry resolves only that one (FR-021, SC-009) · `packages/studio/src/decisions/impact.test.ts`
 
 **Checkpoint**: US5 is independently functional — a long trail is scannable and grouping hides nothing.
 

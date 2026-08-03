@@ -382,6 +382,8 @@ const DIMENSION_MESSAGE_ID: Record<CountKind, string> = {
 
 /** The engine's own wording when nothing measured changed — engine-local text. */
 const PR_NO_MEASURED_CHANGE = "no net change";
+/** The engine's own wording when at least one category was never measured — engine-local text. */
+const PR_NOT_MEASURED = "not measured";
 
 const CATALOG_PATH = fileURLToPath(
   new URL("../../../studio/src/locales/en/messages.json", import.meta.url),
@@ -636,25 +638,24 @@ describe("absent counts are not zero (FR-005a, SC-011)", () => {
     expect(unchanged).not.toMatch(/\d/);
   });
 
-  // KNOWN DEFECT, not a test bug. `formatEditorSummary` drops an absent count
-  // and a present `0` alike and then says "no net change" for both, so the
-  // reviewer-facing surface still lumps "not measured" in with "measured, and
+  // Was a KNOWN DEFECT: `formatEditorSummary` used to drop an absent count and
+  // a present `0` alike and then say "no net change" for both, so the
+  // reviewer-facing surface lumped "not measured" in with "measured, and
   // nothing changed" — the one thing FR-005a forbids, and a disagreement with
-  // the trail, which does distinguish them (the test above).
-  // headline-spec.contract.md §5 requires the engine side to "say 'not measured'
-  // when all four are absent"; that branch was never written. Reported rather
-  // than fixed here (T040 is a test task). `it.fails` keeps this executable and
-  // turns RED the moment the branch lands — flip it to `it` in the same commit.
-  it.fails(
-    "[KNOWN DEFECT] the PR summary should distinguish not-measured from no-change, and does not",
-    () => {
-      expect(prHeadline("gallery_edit", ABSENT)).not.toBe(prHeadline("gallery_edit", MEASURED_ZERO));
-    },
-  );
+  // the trail, which already distinguished them (the test above). Fixed per
+  // headline-spec.contract.md §5: the engine side now says "not measured" when
+  // at least one count is absent, distinct from "no net change" when all four
+  // are present and zero.
+  it("says something different for not-measured than for measured-and-unchanged, on the PR summary too", () => {
+    expect(prHeadline("gallery_edit", ABSENT)).not.toBe(prHeadline("gallery_edit", MEASURED_ZERO));
+  });
 
-  it("today says the same thing for both, which is what the defect above pins", () => {
-    const both = `Edited the character gallery (${PR_NO_MEASURED_CHANGE})`;
-    expect(prHeadline("gallery_edit", ABSENT)).toBe(both);
-    expect(prHeadline("gallery_edit", MEASURED_ZERO)).toBe(both);
+  it("uses its own engine-local wording for each outcome, agreeing in substance (not text) with the trail", () => {
+    expect(prHeadline("gallery_edit", ABSENT)).toBe(
+      `Edited the character gallery (${PR_NOT_MEASURED})`,
+    );
+    expect(prHeadline("gallery_edit", MEASURED_ZERO)).toBe(
+      `Edited the character gallery (${PR_NO_MEASURED_CHANGE})`,
+    );
   });
 });
