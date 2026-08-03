@@ -1,0 +1,462 @@
+{
+  "workflow": "speckit",
+  "specName": "055-legible-decision-trail",
+  "branch": "055-legible-decision-trail",
+  "selectedAt": "2026-08-03T01:28:29.950Z",
+  "currentStep": "implement",
+  "status": "implementing",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-03T01:37:07.037Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T02:21:43.992Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T02:24:25.134Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T02:26:31.873Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-03T02:27:38.355Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-03T02:29:04.225Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-03T02:29:04.230Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T02:38:21.008Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T02:38:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-03T02:43:17.808Z"
+    }
+  ],
+  "coverage": {
+    "FR-001": {
+      "title": "Every editor stage in which the author made a change MUST report that change in the record, in every dimension the record defines that the stage can affect.",
+      "tasks": [
+        "T010",
+        "T011",
+        "T012"
+      ]
+    },
+    "FR-002": {
+      "title": "The mechanisms stage MUST report the mechanisms it assigned, derived from the same assignment state the rest of the studio reads.",
+      "tasks": [
+        "T010",
+        "T011"
+      ]
+    },
+    "FR-003": {
+      "title": "A stage that places characters onto keys that previously carried none MUST report those keys as added.",
+      "tasks": [
+        "T009",
+        "T010"
+      ]
+    },
+    "FR-004": {
+      "title": "A reporting dimension defined in the record MUST have at least one production code path that can make it non-zero.",
+      "tasks": [
+        "T009",
+        "T010",
+        "T012"
+      ]
+    },
+    "FR-005": {
+      "title": "Unmeasured MUST be distinguished from zero and represented by the absence of that dimension's value.",
+      "tasks": [
+        "T004",
+        "T006",
+        "T010"
+      ]
+    },
+    "FR-006": {
+      "title": "Reporting MUST derive from state the studio already holds; no second source of truth and no editor component reporting its own activity.",
+      "tasks": [
+        "T010",
+        "T011",
+        "T020"
+      ]
+    },
+    "FR-007": {
+      "title": "This feature MUST NOT alter the keyboard artifact.",
+      "tasks": [
+        "T041"
+      ]
+    },
+    "FR-030": {
+      "title": "Choosing a base keyboard MUST be recorded as a decision, naming the base chosen.",
+      "tasks": [
+        "T020",
+        "T023"
+      ]
+    },
+    "FR-031": {
+      "title": "That entry MUST state what the base contributed: starting key count, derived properties, and inherited metadata.",
+      "tasks": [
+        "T020",
+        "T024"
+      ]
+    },
+    "FR-032": {
+      "title": "A value carried from the base MUST be recorded with base-derived provenance and presented as carried, not author-set.",
+      "tasks": [
+        "T025",
+        "T026"
+      ]
+    },
+    "FR-033": {
+      "title": "Where the author later replaces a base-supplied value, both MUST remain visible under supersede semantics.",
+      "tasks": [
+        "T025",
+        "T026"
+      ]
+    },
+    "FR-034": {
+      "title": "A stage's counts MUST be interpretable against the recorded starting inventory.",
+      "tasks": [
+        "T020"
+      ]
+    },
+    "FR-035": {
+      "title": "Recording the base's contribution MUST derive from the working copy as instantiated, not from a re-read of the base source.",
+      "tasks": [
+        "T020",
+        "T023"
+      ]
+    },
+    "FR-008": {
+      "title": "No author-facing text this feature renders may contain an internal identifier.",
+      "tasks": [
+        "T013",
+        "T017",
+        "T019",
+        "T022",
+        "T024"
+      ]
+    },
+    "FR-009": {
+      "title": "A survey decision's headline MUST name its question from the existing flow-question catalog, preferring an optional audit label over the prompt.",
+      "tasks": [
+        "T013",
+        "T015",
+        "T016"
+      ]
+    },
+    "FR-010": {
+      "title": "An editor decision's headline MUST name its stage for what the stage does.",
+      "tasks": [
+        "T013",
+        "T014",
+        "T017"
+      ]
+    },
+    "FR-011": {
+      "title": "An editor decision's headline MUST mention only the dimensions in which something happened.",
+      "tasks": [
+        "T013",
+        "T017",
+        "T018"
+      ]
+    },
+    "FR-012": {
+      "title": "Counts in author-facing text MUST agree in number with their nouns.",
+      "tasks": [
+        "T014",
+        "T018"
+      ]
+    },
+    "FR-013": {
+      "title": "All new text MUST be localisable, and headline message selection MUST remain testable without rendering.",
+      "tasks": [
+        "T013",
+        "T018"
+      ]
+    },
+    "FR-014": {
+      "title": "Where an author-facing name is unavailable the headline MUST degrade to readable prose, never an identifier or a blank.",
+      "tasks": [
+        "T013",
+        "T015",
+        "T018"
+      ]
+    },
+    "FR-015": {
+      "title": "The author-facing trail and the reviewer-facing PR summary MUST describe the same decision consistently.",
+      "tasks": [
+        "T014",
+        "T031",
+        "T040"
+      ]
+    },
+    "FR-016": {
+      "title": "A decision's attributed change MUST span every text file the projection produces, derived from what the projection emitted.",
+      "tasks": [
+        "T027"
+      ]
+    },
+    "FR-017": {
+      "title": "A decision that changes only package metadata MUST have its change shown, with each affected file identified.",
+      "tasks": [
+        "T027",
+        "T030"
+      ]
+    },
+    "FR-017a": {
+      "title": "Content that changes on every projection independently of any decision MUST NOT be attributed to a decision.",
+      "tasks": [
+        "T028"
+      ]
+    },
+    "FR-018": {
+      "title": "Every file compared MUST come from the same projection that produces the shipped keyboard.",
+      "tasks": [
+        "T027"
+      ]
+    },
+    "FR-019": {
+      "title": "A change shared by several decisions MUST be attributed jointly, each entry naming its co-decisions.",
+      "tasks": [
+        "T029",
+        "T030"
+      ]
+    },
+    "FR-019a": {
+      "title": "Joint attribution MUST NOT require more than one comparison per stage boundary.",
+      "tasks": [
+        "T029"
+      ]
+    },
+    "FR-020": {
+      "title": "The two unavailability reasons MUST remain distinguishable from each other and from 'changed nothing'.",
+      "tasks": [
+        "T007",
+        "T030"
+      ]
+    },
+    "FR-021": {
+      "title": "Impact MUST be computed only on request for a specific decision; expanding one entry MUST NOT compute impact for any other.",
+      "tasks": [
+        "T039"
+      ]
+    },
+    "FR-022": {
+      "title": "The trail MUST group decisions by the stage they were made in, in the order the author walked those stages.",
+      "tasks": [
+        "T035",
+        "T037"
+      ]
+    },
+    "FR-023": {
+      "title": "Each stage group MUST show a one-line account of what that stage produced, available without expanding it.",
+      "tasks": [
+        "T035",
+        "T037"
+      ]
+    },
+    "FR-024": {
+      "title": "Every entry reachable in the current flat trail MUST remain reachable after grouping.",
+      "tasks": [
+        "T035",
+        "T038"
+      ]
+    },
+    "FR-025": {
+      "title": "A stage in which nothing was recorded MUST NOT be presented as a stage that made changes.",
+      "tasks": [
+        "T035",
+        "T037"
+      ]
+    },
+    "FR-026": {
+      "title": "Revisits MUST remain visible as history within their stage.",
+      "tasks": [
+        "T035",
+        "T038"
+      ]
+    },
+    "FR-027": {
+      "title": "Tests asserting what the record contains for a step MUST drive the production completion path for that step.",
+      "tasks": [
+        "T012"
+      ]
+    },
+    "FR-028": {
+      "title": "The absence of an internal identifier from author-facing trail text MUST be enforced mechanically, not by review.",
+      "tasks": [
+        "T019"
+      ]
+    },
+    "FR-029": {
+      "title": "Every reporting dimension MUST have a test that drives it to a non-zero value through the production path.",
+      "tasks": [
+        "T012"
+      ]
+    },
+    "FR-005a": {
+      "title": "Every consumer of a stage's counts MUST handle an absent value explicitly and MUST NOT coerce it to zero.",
+      "tasks": [
+        "T004",
+        "T007",
+        "T013",
+        "T031",
+        "T035"
+      ]
+    }
+  },
+  "size": "oversized",
+  "classification": {
+    "projectedFiles": 22,
+    "projectedTasks": 40,
+    "scopeSignal": "larger",
+    "verdict": "oversized"
+  },
+  "context": [
+    "governing spec: 053-decision-audit (FR-001..FR-028 stand unchanged; this closes the gap to the shipped build)",
+    "governing spec: 032-journey-corpus (gallery_edit / mechanism_edit / touch_edit vocabulary, not to be forked)",
+    "governing spec: 050-flow-question-i18n + 046 catalog-format (content.flowQuestion.<id>.<field>; ids are permanent handles)",
+    "area: packages/studio/src/decisions (recordEditorStep.ts, headline.ts, impact.ts, recordSurveyAnswers.ts)",
+    "area: packages/contracts/src/decisionRecord.ts + schemas.ts (EditorActionSummary, DecisionImpact; drift-guarded pair)",
+    "area: packages/engine/src/decision-audit/prSummary.ts (the already-correct reviewer surface to agree with, not reuse)",
+    "area: content/i18n/en/flowQuestions.json (optional audit_label; content-i18n-lint parity must treat it as optional)",
+    "audit basis: main at 2f35a50e, 2026-08-02; defects D-1..D-7 traced to file:line",
+    "constraint: Constitution Article IV - no new validation timer; recording stays on step-completion events",
+    "constraint: 053 FR-016 - engine ships codes and counts, studio ships the localized sentence",
+    "constraint: 053 FR-006/SC-006 - the keyboard artifact must be byte-unchanged by this feature",
+    "constraint: CLAUDE.md contract chain - a contracts type change lands with its zod mirror in the same commit"
+  ],
+  "intent": "Make every authoring stage report what it actually did, in the author's own language, against a recorded starting baseline - so the decision trail spec 053 specified is the one the build delivers.",
+  "expectations": [
+    "Revising a decision from the trail, and staleness-driven re-derivation (053 Phase 2)",
+    "Character-class decisions (053 Phase 3)",
+    "Finer-grained editor decisions - the aggregate becomes truthful, it is not subdivided into per-key decisions",
+    "Enabling the mutate() seam (spec 014 F2 rollout decision, not this feature's)",
+    "Implementing mutate() for the identity questions (spec 014's work)",
+    "Retroactively enriching records written by earlier builds - they are read as-is",
+    "Changing the journey-corpus event vocabulary, the flow map's structural-projection status (ADR-0001), or the sidecar's placement (053 FR-020)",
+    "Any new validation timer (Constitution Article IV)"
+  ],
+  "decisions": [
+    {
+      "decision": "keysAdded gets a producer rather than being removed: the mechanisms stage counts keys it newly occupied (no character before the stage, one after). Field, zod mirror and PR-summary formatting are retained."
+    },
+    {
+      "decision": "Question headlines reuse the flow question's existing prompt by default, with an optional audit_label override in the same catalog. No second per-question label store; the override is optional in every locale."
+    },
+    {
+      "decision": "Where one stage change is shared by several decisions, state the sharing: one capture per boundary, attributed jointly, each entry naming its co-decisions. 053's one-diff-per-boundary model is preserved."
+    },
+    {
+      "decision": "The base keyboard's contribution is recorded at base selection - the base chosen, its starting key count, derived axes and inherited metadata - so later counts have a denominator. This makes 053's existing base-derived provenance reachable, not a new concept."
+    },
+    {
+      "decision": "A decision's attributed change spans every text file the projection produces (binaries skipped), derived from what the projection emitted rather than a maintained file list. Bounded by 053's existing truncation rule."
+    },
+    {
+      "decision": "Unmeasured is represented by absence: each count becomes number | undefined. A present 0 means measured-and-unchanged. Known limit: pre-feature records carry a present 0, so absence does not disambiguate them retroactively."
+    },
+    {
+      "decision": "Pre-feature records are marked by record version: bump DECISION_RECORD_VERSION to 2 and normalize a version<2 record read-only so its editor counts read as absent.",
+      "why": "FR-005 makes absence mean unmeasured, but shipped v1 records store a present 0, which absence cannot disambiguate. The record already carries a version field whose contract is read-what-you-can, so a version bump is the mechanism the format already has. Normalizing on read is not retroactive enrichment - nothing is written back and no activity is claimed.",
+      "rejected": "Blanket-unmeasured with no version mark (indistinguishable from a real v2 producer failure); a one-off banner at the top of the trail (does not survive reading one entry, and the PR summary has no banner)."
+    },
+    {
+      "decision": "A stage roll-up (FR-023) states the stage net effect from its effective entries: the latest non-superseded editor entry, not a sum.",
+      "why": "Editor counts are cumulative per step by design - a revisit appends a superseding entry carrying the step new total. Summing a carve of 40 revisited to 172 would roll up as 212. Taking the latest effective entry also matches prSummary, which already filters to effective entries, which is what SC-007 requires of the two surfaces.",
+      "rejected": "Restating the entries, or summing all entries including superseded - both double-count every revisit."
+    },
+    {
+      "decision": "EditorActionSummary and DecisionImpact are 053 own contract, not Day-1 locked types: change them under ordinary drift-guard discipline (interface + zod mirror in one commit), no major version bump and no joint session.",
+      "why": "Constitution Article I locks the Pattern interface in pattern.ts, specified in spec section 5 / specs/005. These two types live in decisionRecord.ts, were introduced by spec 053, and are named by none of those. The compile-time drift guards in schemas.ts are the machine-enforced link that makes the change safe. The spec asked for this to be confirmed before contract work begins.",
+      "rejected": "Escalating as a locked-contract change - correct for Pattern, wrong here; treating every contracts type as Day-1 locked would make 053 own follow-up unshippable."
+    },
+    {
+      "decision": "keysAdded is measured as newly-occupied host keys against the carve-projected IR reconstructed at completion, via a new pure helper occupiedHostKeys(ir), with host keys from the existing extractMechanismHostKey.",
+      "why": "FR-003 defines added as newly occupied, which needs a before state. Reconstructing it with applyCarveMutate(baseIr, deleted...) rather than snapshotting at stage entry keeps the derivation store-derived (FR-006) and adds no lifecycle: carve is the only stage between instantiation and mechanisms, and the store holds all three inputs at completion.",
+      "rejected": "Snapshotting key occupancy on stage entry (new per-stage state; a missed entry event silently reports every key as added); removing the field (permitted by FR-004 but the clarification explicitly chose the producer)."
+    },
+    {
+      "decision": "mechanismsAssigned reads the store via a new getMechanismAssignments dep wired to the existing selectDesktopAssignments(phaseResults) helper, not from the step result.",
+      "why": "The mechanisms adapter calls onComplete(undefined), so counting result.assignments is structurally always zero (defect D-1). selectDesktopAssignments is already the documented single source of truth for that phase-C read and says do not fork this definition, so using it means the trail and the studio cannot disagree - which is FR-002 actual requirement.",
+      "rejected": "Changing addPhysicalAdapter to pass assignments through onComplete - makes the editor aware of the audit (FR-006 forbids it) and duplicates store state."
+    },
+    {
+      "decision": "content-i18n-lint learns per-key optionality for content.flowQuestion.*.audit_label before any audit_label value is authored; an extra key in a target locale still fails.",
+      "why": "flowQuestions.json is parity-only and checkTargetLocaleParity compares whole key sets. fr/flowQuestions.json exists, so French has started - adding one optional field to one question would fail the lint for French immediately. The lint change must land first or CI goes red for a state the rule was always meant to permit.",
+      "rejected": "Authoring audit_label for every question in every locale (204 keys for a field the clarification made deliberately sparse); dropping audit_label and always using prompt (rejected in clarification - long interrogative prompts read badly as headlines)."
+    },
+    {
+      "decision": "FR-017a volatile content: the adapt-path HISTORY.md date stamp is held stable by a single named normalizer before diffing, rather than excluding the file. The .kps <Version> bump is deterministic (derived from baseIr.header.version) and needs no handling.",
+      "why": "stageAdaptHistory stamps new Date() per projection; within a session it is constant, but across midnight one boundary would show a spurious one-line change. Normalizing holds it stable (FR-017a permits either) while keeping a genuine HISTORY edit visible. The version finding is recorded so a future reader does not re-litigate it.",
+      "rejected": "Excluding HISTORY.md wholesale - cheaper, and it makes a real history edit invisible, which is the class of hole FR-016 was written against."
+    },
+    {
+      "decision": "The base baseline is recorded at choose_base from the instantiated store; if no working copy exists at that instant, no entry is written. Starting key count uses toRailNodes(baseIr, removalCapabilities) so it is in the same unit as keysRemoved (nodes + items).",
+      "why": "recordStepCompletion fires from StepHost after applyStepCompletion, and choose_base instantiation happens inside applyStepCompletion - so the working copy already exists, which is exactly FR-035, with no new event. The unit match is FR-034: a denominator derived any other way (e.g. buildProducedSet cardinality) would not divide into the numerator the trail already reports.",
+      "rejected": "Re-reading the base keyboard source to describe its contribution - forbidden by FR-035, and it describes the base rather than what the author started from; writing a zero baseline when uninstantiated - worse than no entry."
+    },
+    {
+      "decision": "FR-028 is enforced by a rendering test (DecisionEntryRow.identifiers.test.tsx) over one entry of every kind against the real English catalog; test-antipattern-lint is not extended.",
+      "why": "A test that fails CI is mechanical enforcement. test-antipattern-lint is a plain-node static scanner over test files - it cannot render a component, and teaching it to would put a runtime concern in a static tool. The same movement rewrites reducer.decisionRecording.test.ts to drive the production completion path (FR-027) and adds a per-dimension non-zero test (FR-029).",
+      "rejected": "Asserting on HeadlineSpec alone - cheaper and insufficient, since FR-008 is about rendered text where a catalog message could still interpolate an id."
+    }
+  ],
+  "approach": "Store-derived reporting through the seams 053 already built: every new count comes from an injected dep on createDecisionRecorder (alongside the working getDeletionCounts), so no editor component learns the audit exists and no adapter prop shape changes. The one contract move reshapes EditorActionSummary (counts to number|undefined) and DecisionImpact (single path to a per-file set plus sharedWith) in decisionRecord.ts with its zod mirror in the same commit. Recording stays on the existing recordStepCompletion event, which StepHost fires after applyStepCompletion, so the working copy the recorder reads is the one the step just produced.",
+  "step_summaries": {
+    "plan": {
+      "summary": "Plan + research + data-model + 3 contracts for spec 055: close the gap between the decision audit 053 specified and the one the build delivers, via store-derived producers, plain-language headlines, a whole-VFS impact capture, and a recorded base baseline.",
+      "key_finding": "Editor summary counts are CUMULATIVE per step (a revisit supersedes with the new total), so any consumer that aggregates a stage must take the latest effective entry, never a sum - this silently governs the FR-023 roll-up and was not visible from the spec alone."
+    },
+    "tasks": {
+      "summary": "43 tasks in 8 phases (Setup -> Foundational -> US1/US2/US3/US4/US5 -> Polish), laid out as 24 waves with explicit join points; all 38 functional requirements mapped to tasks.",
+      "key_finding": "The audit_label lint-parity rule (T001) and the contracts reshape (T004) are the two hard serialisation points: the first must precede any authored value or CI reddens for French, the second is a wave-of-one because the interface and its zod mirror must land in one commit or the drift guards fail the build."
+    }
+  },
+  "telemetryInstanceId": "c7509f96-1e29-4e6f-8a65-690a8a8ad00d"
+}
