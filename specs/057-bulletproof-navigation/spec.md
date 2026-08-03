@@ -59,6 +59,8 @@ Audited against `main` at commit `70b6c620`, 2026-08-03. Each is evidence for a 
 
 - **D-8 — there is no wayfinding surface at all.** The studio has no breadcrumb (`grep -ri breadcrumb` over `packages/studio` returns nothing) and no footer or status bar (`<footer>` appears once, inside an unrelated panel). The only indication of position is whatever the current step happens to render. An author several tabs deep has no persistent answer to "which project am I in, and how far along am I?".
 
+- **D-9a — the browser-history bridge is built on the assumption D-1 encodes, so fixing D-1 changes its ground truth.** `useSurveyBrowserHistorySync` pushes one browser entry per manifest-step advance and accepts a `popstate` only when the entry's `ksStep` tag equals the `expectedBackTarget` it predicts from the store ([useSurveyBrowserHistorySync.ts](../../packages/studio/src/hooks/useSurveyBrowserHistorySync.ts)). Its documented design explicitly names the current behaviour as a premise: "hash-route jumps away from `#survey` (this hook is unmounted with `SurveyView`; the returning hashchange remounts `SurveyView` fresh — an existing, unrelated invariant — and this hook's mount effect re-tags the current entry to match)". Once the position survives the round trip, the mount-time re-tag no longer re-tags a *reset* store but a *preserved* one, and the entries pushed before the author left are still on the browser stack. This is not a defect in the hook; it is a coupling that must be re-derived deliberately rather than discovered by a failing walk. The hook is covered by a live e2e spec ([browser-back.spec.ts](../../packages/studio/e2e/browser-back.spec.ts)) and a unit spec, both of which are the early-warning system for getting this wrong.
+
 - **D-9 — the first-visit gate silently discards a deep link.** `hashToRoute` forces a genuine newcomer to `#welcome` and rewrites the address bar to match, dropping whatever location was requested ([StudioShell.tsx:163-183](../../packages/studio/src/StudioShell.tsx#L163)). Today that costs a shared `#survey` link. Once locations name a step or a question, it silently discards strictly more.
 
 The common shape across D-1, D-5 and D-7 is worth naming, because it is what the requirements below are aimed at: **"where the author is" is modelled as component lifetime.** Position survives exactly as long as the component that holds it, and a route change ends that component. Fixing the one reset in D-1 addresses the loudest symptom; it does not, on its own, make navigation bulletproof, because four other kinds of position are held the same way.
@@ -220,7 +222,8 @@ A breadcrumb line in the Studio tab names the project, the current stage, and th
 - **FR-013**: The system MUST refuse a location that is unreachable in the current session — a step the active track skips, a step beyond a lock or gate the walk enforces, a step or question this build no longer has — and MUST state which of those applies rather than approximating.
 - **FR-014**: A refused or degraded location MUST NOT leave the author somewhere arbitrary; it MUST land on the nearest valid ancestor location and say so.
 - **FR-015**: The first-visit gate MUST preserve the requested location across the welcome screen and honour it once the visitor proceeds, rather than discarding it (D-9).
-- **FR-016**: Browser Back and Forward MUST move between locations the author actually visited, and MUST NOT trigger a silent rewrite of the address bar.
+- **FR-016**: Browser Back MUST remain correct once positions survive tab switches: it MUST step the wizard back through steps the author actually walked, and MUST NOT trigger a silent rewrite of the address bar. The existing history bridge's accepted degrades — a browser Forward is a deliberate no-op, and the first native Back after an in-app Back is absorbed — are NOT reopened by this feature. Changing either is a separate, explicit decision; what this feature MUST NOT do is break them by accident (D-9a).
+- **FR-017**: The history bridge's premise MUST be re-derived against the new contract. Its mount-time entry tagging, its back-target prediction, and its handling of entries pushed before the author left the tab MUST be correct when the wizard's position is preserved across a hash-route round trip, and MUST degrade to a no-op — never to a corrupted traversal — for any browser entry it cannot verify.
 
 ### C. The Compare tab
 
@@ -297,6 +300,8 @@ A breadcrumb line in the Studio tab names the project, the current stage, and th
 - **SC-010**: The footer is fully operable by keyboard alone: every dot reachable by Tab, named on focus, activated by Enter and Space, with a visible focus indicator, and the automated accessibility scan reports no new violations on any tab.
 - **SC-011**: Restoring a tab's view state performs no compile and no validation run.
 - **SC-012**: Opening a shared deep link as a first-time visitor lands on the requested location after the welcome screen, not on the default landing route.
+- **SC-013**: A browser-level walk that switches tabs mid-flow completes to a downloadable artifact, and the two gating E2E specs are demonstrated red against `main` and green after the fix, with both runs' output recorded.
+- **SC-014**: The native Back sequence in `browser-back.spec.ts` passes with a tab round trip inserted mid-walk, proving the history bridge survives a preserved position (FR-017).
 
 ## Assumptions
 
@@ -320,8 +325,59 @@ A breadcrumb line in the Studio tab names the project, the current stage, and th
 
 Named so planning can size the work; not a task list.
 
-- **Unit**: traversal preserved across simulated route changes; reset occurs only on explicit start-over; location resolution for reachable, unreachable and stale-build targets; footer dot derivation from a fixture decision record, including a revision; project-name precedence.
-- **Integration**: each of the four wizard entry points lands correctly; deep link → revise → supersede → staleness; Compare-tab isolation by full store comparison; view-state restoration without a compile.
-- **Accessibility**: keyboard-only traversal of the footer and the trail's links; accessible names present and localized; focus visible; automated scan clean on every tab.
-- **E2E**: a walk spec that switches tabs mid-flow and continues — the shared helpers in `packages/studio/e2e/helpers/surveyFlow.ts` gain the tab-switch step, and `seedReturningVisitor` interaction with FR-015 is exercised.
-- **Existing tests that encode the current contract and must be rewritten rather than removed**: the route/landing tests in `StudioShell.test.tsx`, the substage test in `CharactersStep.test.tsx`, and any preview-screen test that asserts today's shared-store behaviour.
+- **Unit (vitest)**: traversal preserved across simulated route changes; reset occurs only on explicit start-over; location resolution for reachable, unreachable and stale-build targets; footer dot derivation from a fixture decision record, including a revision; project-name precedence; the history bridge's tag/prediction behaviour under a preserved position (FR-017).
+- **Integration (vitest + Testing Library)**: each of the four wizard entry points lands correctly; deep link → revise → supersede → staleness; Compare-tab isolation by full store comparison; view-state restoration without a compile.
+- **Accessibility**: keyboard-only traversal of the footer and the trail's links; accessible names present and localized; focus visible; the axe scan clean on every tab.
+- **Existing tests that encode the current contract and must be rewritten rather than removed**: the route/landing tests in `StudioShell.test.tsx`, the substage test in `CharactersStep.test.tsx`, `useSurveyBrowserHistorySync.test.ts`, and any preview-screen test asserting today's shared-store behaviour.
+
+Unit and integration work is where most of this feature is *proven*. E2E is where it is *demonstrated* — a tab round trip is a browser-level event, and the position loss this spec exists to fix is only fully real once a browser has done it.
+
+## Playwright E2E process
+
+This feature is the first one whose central claim ("moving around is bulletproof") can only be demonstrated in a browser, so the E2E process is specified rather than left to the implementer. It rides the existing harness — one runner package, one config, one set of helpers — and adds no second lane.
+
+### Harness as it stands
+
+- Runner: the `playwright` devDependency of `@keyboard-studio/studio`. Specs import from `"playwright/test"`. **Do not** add `@playwright/test` as a second runner package ([playwright.config.ts](../../packages/studio/playwright.config.ts) states this; CLAUDE.md repeats it).
+- Config: `testDir: "e2e"`, `baseURL: http://localhost:5273`, a 240 s per-test timeout, and a `webServer` block that runs `pnpm dev` with `reuseExistingServer: true`.
+- Helpers: [e2e/helpers/surveyFlow.ts](../../packages/studio/e2e/helpers/surveyFlow.ts) (16 exported step drivers, from `seedReturningVisitor` and `driveIdentityLite` through `navigateToOutput` and `triggerDownload`) and [e2e/helpers/axe.ts](../../packages/studio/e2e/helpers/axe.ts) (`expectNoSeriousAxeViolations`, gating `serious`/`critical` only, per spec 056 FR-003).
+- E2E is deliberately excluded from both CI lanes — vitest excludes `e2e/**`, and tsc's include does not cover `e2e/**` or `playwright.config.ts`. Browser runs are a separate step.
+
+### Commands
+
+Run from `packages/studio` unless noted.
+
+| Purpose | Command |
+|---|---|
+| One-time browser binaries (repeat per version bump) | `npx playwright install chromium` |
+| Whole E2E suite | `pnpm --filter @keyboard-studio/studio test:e2e` (repo root) |
+| One spec | `npx playwright test e2e/tab-roundtrip.spec.ts` |
+| One test by title | `npx playwright test e2e/tab-roundtrip.spec.ts -g "returns to the same step"` |
+| Watch the browser | `npx playwright test e2e/tab-roundtrip.spec.ts --headed` |
+| Step through interactively | `npx playwright test e2e/tab-roundtrip.spec.ts --debug` |
+| Author selectors against a live app | `npx playwright codegen http://localhost:5273` |
+| Post-run report | `npx playwright show-report` |
+| Trace a failure | `npx playwright test --trace on` then `npx playwright show-trace <trace.zip>` |
+
+Notes that save an afternoon: the first test in a run pays a cold `../keyboards` catalog enumeration plus a kmcmplib WASM compile, which is why the timeout is 240 s — later tests are much faster because the dev server caches the catalog. `reuseExistingServer: true` means a `pnpm dev` you already have running is used as-is, so a stale build can silently be what you tested; restart it after engine changes.
+
+### Required new specs
+
+- **`e2e/tab-roundtrip.spec.ts` (US1, gating).** Drive the walk to a mid-flow step, then round-trip through each of the other four tabs in turn, asserting after each return: same step on screen, in-app Back still reaches the prior step, and — for the characters case — the built alphabet intact. This is the spec that would have caught the reported defect, and it must fail against `main` before it passes. Reuse `seedReturningVisitor` + `driveIdentityLite` + `pickBaseKeyboard` + `chooseAdaptTrack`; the tab switches themselves become a new shared helper (`switchTab`) rather than inline hash assignments in each spec.
+- **`e2e/compare-isolation.spec.ts` (US2, gating).** Establish a working copy, snapshot the observable project state through the app's own surfaces, run an adversarial Compare session (load a *different* keyboard, exercise every control the tab offers), return, and assert the project is unchanged and no rebase-confirm dialog ever appeared. Model the adversarial shape on the two existing base-switch specs ([switch-base-exploration.spec.ts](../../packages/studio/e2e/switch-base-exploration.spec.ts), [switch-base-rebase.spec.ts](../../packages/studio/e2e/switch-base-rebase.spec.ts)) — they already encode what a rebase prompt looks like from the outside.
+- **`e2e/decision-deeplink.spec.ts` (US3).** Complete a walk, open Decisions, activate the link on an early answer, assert arrival on that question with the recorded value present, change it, and assert the trail shows the supersession and the dependent steps went stale.
+- **`e2e/footer-progress.spec.ts` (US4).** Assert dot count and order against a scripted walk; drive the footer **keyboard-only** (Tab to a dot, assert its accessible name, activate with Enter) and assert arrival; assert a revision does not add a dot.
+
+### Specs that must be extended, not left alone
+
+- [browser-back.spec.ts](../../packages/studio/e2e/browser-back.spec.ts) — the direct guard on D-9a/FR-017. Extend it with a tab round trip in the middle of its walk, so the native Back sequence is exercised against a *preserved* position rather than only a fresh one. Its existing assertion that browser Forward is a no-op stays as-is; FR-016 keeps that degrade deliberate.
+- [copy-edit.spec.ts](../../packages/studio/e2e/copy-edit.spec.ts) and the two touch-derivation walks — add one tab round trip mid-walk so the long walks prove position survival incidentally, the way they already prove autosave incidentally.
+- [locale-switch.spec.ts](../../packages/studio/e2e/locale-switch.spec.ts) — extend to cover the Compare label in a non-English locale (FR-020/SC-006).
+- Every touched spec calls `expectNoSeriousAxeViolations` on the screens it visits, including the footer once it exists.
+
+### Gating policy
+
+- **FR-080**: The two gating specs (`tab-roundtrip`, `compare-isolation`) MUST be written to fail against `main` before the fix lands, and that failure MUST be recorded — an E2E spec that has never been seen red is not evidence.
+- **FR-081**: E2E stays out of the unit CI lanes, matching current house arrangement. A green E2E run is a named prerequisite for closing this feature, produced by a deliberate run and reported with its output, not assumed.
+- **FR-082**: New E2E steps MUST land in `e2e/helpers/surveyFlow.ts` rather than being copy-pasted per spec — the helper module is the reason the existing walks survived the spec 036 question-reordering, and a tab-switch step is exactly the kind of thing that will need to change in one place later.
+- **FR-083**: No spec added by this feature may be committed `.skip`-ped. If a lane is not ready, the spec is not written yet; a skipped spec reads as coverage and is not.
