@@ -24,6 +24,8 @@ from pathlib import Path
 
 # The sibling modules' filenames have hyphens, so import them dynamically.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import companion_config as cc  # noqa: E402
+
 wc = importlib.import_module("write-context")
 dff = importlib.import_module("derive-from-files")
 
@@ -217,27 +219,6 @@ def resolve(feature_dir: Path) -> dict:
     return resolution
 
 
-def _configure_stdio() -> None:
-    """Force UTF-8 on stdout/stderr before anything is printed.
-
-    The summary is non-ASCII by design (the documented `→` / `—` glyphs) and,
-    less avoidably, carries arbitrary user data: a spec name read from
-    .spec-context.json can hold any character. Windows defaults the console to
-    cp1252, which cannot encode either, so `print` raised UnicodeEncodeError
-    part-way through the block — surfacing as a truncated summary, a swallowed
-    `[companion] Warning:`, and no RESOLUTION line at all, which is the one line
-    /speckit.companion.resume actually parses.
-
-    errors="replace" is deliberate belt-and-braces: if a stream still can't take
-    a glyph, it degrades to a placeholder rather than losing the whole line.
-    """
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, ValueError, OSError):
-            pass  # not a reconfigurable TextIOWrapper — leave it as-is
-
-
 def _summary_lines(res: dict) -> list[str]:
     """The human summary as lines, built without printing (see _print_summary)."""
     if res.get("empty"):
@@ -287,10 +268,10 @@ def _print_summary(res: dict) -> None:
 
 
 def main() -> int:
-    # First statement, matching check-coverage.py: argparse writes --help and its
-    # error messages (which can quote a user-supplied path) before anything here
+    # First statement, as in every script here: argparse writes --help and its
+    # error messages (which can quote a user-supplied path) before anything else
     # runs, so the stream has to be safe before parsing, not after.
-    _configure_stdio()
+    cc.configure_stdio()
 
     parser = argparse.ArgumentParser(
         description="Resolve a feature's pipeline position and next action."

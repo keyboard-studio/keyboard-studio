@@ -35,6 +35,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import companion_config as cc  # noqa: E402
 
 
 def _load_resolver():
@@ -191,24 +192,8 @@ def render_human(result: dict) -> str:
     return "\n".join(lines)
 
 
-def _configure_stdio() -> None:
-    """Force UTF-8 on stdout/stderr before anything is printed.
-
-    Capability names and test paths are arbitrary user data, so even an
-    all-ASCII report template can hit a glyph the console default (cp1252 on
-    Windows) cannot encode, raising UnicodeEncodeError mid-report. Kept local
-    rather than shared: these scripts are independent best-effort entry points
-    with no module in common.
-    """
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, ValueError, OSError):
-            pass  # not a reconfigurable TextIOWrapper — leave it as-is
-
-
 def main(argv=None) -> int:
-    _configure_stdio()
+    cc.configure_stdio()
     ap = argparse.ArgumentParser(description="Report living-spec requirement-to-test coverage.")
     ap.add_argument("--root", default=".", help="repo root (default: cwd)")
     ap.add_argument("--capability", help="restrict to one capability by name")
