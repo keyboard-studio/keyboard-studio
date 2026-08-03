@@ -17,7 +17,7 @@
 // of this set at its own call site; the question reads this set raw.
 
 import { useEffect, useMemo, useState } from "react";
-import { deriveCarveNeededSet, normalizationFormForOutputForm } from "@keyboard-studio/engine";
+import { composeCombo, deriveCarveNeededSet, normalizationFormForOutputForm } from "@keyboard-studio/engine";
 import type { CharNormalizationForm } from "@keyboard-studio/engine";
 import { nonAlphabetConfirmedInventory } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -57,6 +57,18 @@ export interface CarveNeededSetResult {
   bcp47: string | undefined;
   /** True once there is any signal to reason about (tiered entries or a resolved CLDR set). */
   hasSignal: boolean;
+  /**
+   * Composed characters for each `worklist.blockedCombinations` entry (#526
+   * AC #3) — NOT unioned into `neededSet`/`tieredNeededSet` (a block-candidate
+   * is never "needed"; unioning it there would shield it from removal, the
+   * opposite of its purpose). Callers pass this straight through to
+   * `recommendedRemovalChars`'s `blockCandidateChars` argument, which adds
+   * these as ADDITIONAL removal-recommendation candidates without bypassing
+   * any of that function's existing safety guards. Empty when the worklist is
+   * absent/empty (S0-skip or pre-046 fallback) — a no-op union at the call
+   * site, so behavior degrades to byte-identical pre-#526 output.
+   */
+  blockCandidateChars: Set<string>;
 }
 
 /**
@@ -98,6 +110,19 @@ export function useCarveNeededSet(): CarveNeededSetResult {
   const nonAlphabetConfirmed = useMemo(
     () => nonAlphabetConfirmedInventory(confirmedInventory, alphabet),
     [confirmedInventory, alphabet],
+  );
+
+  // #526 AC #3: compose each blocked-combination pair into the same concrete
+  // grapheme composeCombo produces everywhere else in this pipeline, then
+  // normalize to `form` — the same normalization every other member of this
+  // hook's sets receives, so a direct Set.has(ch) comparison against
+  // recommendedRemovalChars' `produced` (already normalized to `form` there)
+  // behaves consistently regardless of the chosen output form.
+  const blockCandidateChars = useMemo(
+    () => new Set(
+      carveNeeded.blockCandidates.map((bc) => composeCombo(bc.base, [bc.mark], marksOutputForm).normalize(form)),
+    ),
+    [carveNeeded, marksOutputForm, form],
   );
 
   const tieredNeededSet = useMemo(
@@ -145,5 +170,6 @@ export function useCarveNeededSet(): CarveNeededSetResult {
     form,
     bcp47,
     hasSignal: tieredNeededSet.size > 0 || neededChars !== null,
+    blockCandidateChars,
   };
 }
