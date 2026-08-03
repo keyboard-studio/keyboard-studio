@@ -14,12 +14,12 @@ The `audit_label` lint rule **must land before the first `audit_label` value** (
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T001** [P] Teach `checkTargetLocaleParity` per-key optionality: a target-locale catalog MAY omit a key matching `content.flowQuestion.*.audit_label` without being reported missing; an **extra** key still fails; every other key stays strictly parity-checked · `utilities/content-i18n-lint/index.js`
-- [ ] **T002** [P] Add `audit_label` to the field list `extractFlowQuestionStrings` walks alongside `prompt` / `label` / `body` / `help_text`, emitted only when non-empty after trim (same guard the other four use); demoted `registry.reserve.ts` modules stay excluded · `utilities/i18n-content-extract/extract.ts`
+- [x] **T001** [P] Teach `checkTargetLocaleParity` per-key optionality: a target-locale catalog MAY omit a key matching `content.flowQuestion.*.audit_label` without being reported missing; an **extra** key still fails; every other key stays strictly parity-checked · `utilities/content-i18n-lint/index.js`
+- [x] **T002** [P] Add `audit_label` to the field list `extractFlowQuestionStrings` walks alongside `prompt` / `label` / `body` / `help_text`, emitted only when non-empty after trim (same guard the other four use); demoted `registry.reserve.ts` modules stay excluded · `utilities/i18n-content-extract/extract.ts`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
-- [ ] **T003** Confirm the prerequisite holds with no value authored yet: `pnpm run content-i18n-lint` and `pnpm run content-i18n-freshness` both green with `fr/flowQuestions.json` present · (verification only — no file edit)
+- [x] **T003** Confirm the prerequisite holds with no value authored yet: `pnpm run content-i18n-lint` and `pnpm run content-i18n-freshness` both green with `fr/flowQuestions.json` present · (verification only — no file edit)
 
 ---
 

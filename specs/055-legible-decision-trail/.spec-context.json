@@ -75,6 +75,30 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-08-03T02:43:17.808Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T02:47:30.806Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T02:49:55.490Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T02:50:44.682Z"
     }
   ],
   "coverage": {
@@ -458,5 +482,29 @@
       "key_finding": "The audit_label lint-parity rule (T001) and the contracts reshape (T004) are the two hard serialisation points: the first must precede any authored value or CI reddens for French, the second is a wave-of-one because the interface and its zod mirror must land in one commit or the drift guards fail the build."
     }
   },
-  "telemetryInstanceId": "c7509f96-1e29-4e6f-8a65-690a8a8ad00d"
+  "telemetryInstanceId": "c7509f96-1e29-4e6f-8a65-690a8a8ad00d",
+  "currentTask": "T003",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Added per-key optional parity for content.flowQuestion.*.audit_label in checkTargetLocaleParity (OPTIONAL_KEY_PATTERNS), plus 3 vitest cases; extra audit_label keys still fail",
+      "files": [
+        "utilities/content-i18n-lint/index.js"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Added audit_label to extractFlowQuestionStrings field walk (same non-empty-after-trim guard as prompt/label/body/help_text), read via a local cast since FlowQuestion has not yet gained the field on the canonical type",
+      "files": [
+        "utilities/i18n-content-extract/extract.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Verified the audit_label lint prerequisite holds with no value authored: content-i18n-lint and content-i18n-freshness both green with fr/flowQuestions.json present",
+      "files": [
+        "(verification only)"
+      ]
+    }
+  }
 }

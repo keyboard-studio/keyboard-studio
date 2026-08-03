@@ -154,15 +154,20 @@ export function extractCriteriaStrings(): ContentCatalog {
 }
 
 /**
- * Flow-question prose: `prompt`, `label`, `body`, `help_text`,
- * `options[].label`, `options[].note` (spec 050 research.md D4). Read only from
+ * Flow-question prose: `prompt`, `label`, `body`, `help_text`, `audit_label`,
+ * `options[].label`, `options[].note` (spec 050 research.md D4; `audit_label`
+ * per spec 055 contracts/catalog-audit-label.contract.md §2). Read only from
  * `mod.definition` of the four LIVE phase sub-registries (a/b/f/g) —
  * `mod.fixtures` (test vectors) and every control field (id, type, required,
  * next, options_source, engine_resolved, advisory, option.value) are never
  * read. `option.note` is rendered prose, not control: RadioField paints it as
  * the per-option helper line (QuestionField.tsx), so it is extracted like
  * `option.label`. `registry.reserve.ts`'s demoted modules are excluded per D2 —
- * no live flow renders them.
+ * no live flow renders them. `audit_label` is read via a local cast: the
+ * canonical `FlowQuestion` interface (packages/studio/src/survey/types.ts) has
+ * not yet gained the field (spec 055 lands it alongside the first authored
+ * value, T016) — extraction support intentionally precedes that per the
+ * Phase 1 ordering obligation.
  */
 export function extractFlowQuestionStrings(): ContentCatalog {
   const out: ContentCatalog = {};
@@ -185,11 +190,13 @@ export function extractFlowQuestionStrings(): ContentCatalog {
       seenIds.add(id);
 
       const base = `content.flowQuestion.${id}`;
-      const fields: Array<["prompt" | "label" | "body" | "help_text", string | undefined]> = [
+      const auditLabel = (definition as typeof definition & { audit_label?: string }).audit_label;
+      const fields: Array<["prompt" | "label" | "body" | "help_text" | "audit_label", string | undefined]> = [
         ["prompt", definition.prompt],
         ["label", definition.label],
         ["body", definition.body],
         ["help_text", definition.help_text],
+        ["audit_label", auditLabel],
       ];
       for (const [field, value] of fields) {
         if (typeof value === "string" && value.trim().length > 0) {
