@@ -33,6 +33,7 @@ import {
   type DecisionProvenance,
   type DecisionRecord,
 } from "@keyboard-studio/contracts";
+import { normalizeDecisionRecord } from "@keyboard-studio/engine";
 
 /**
  * A decision to record. The store owns `entryId`, `recordedAt`, and `supersedes`
@@ -302,17 +303,25 @@ export const useDecisionLogStore = create<DecisionLogState>((set, get) => ({
   read: () => get().record,
 
   hydrate: (record, droppedCount = 0) => {
+    // Every consumer of this store sees the normalized shape (specs/055 T008,
+    // contract §5), regardless of how `record` got here. In the studio's own
+    // read path it has already been normalized once, by the engine's
+    // `parseDecisionRecord` — `normalizeDecisionRecord` is a no-op there (a
+    // `version >= 2` record passes through by reference). This call is the
+    // defensive second seam: nothing here mutates `record` or writes
+    // anything back to storage; it only decides what goes into memory.
+    const normalized = normalizeDecisionRecord(record);
     // Reissuing an id that a restored entry already uses would let a later
     // append collide with recorded history, so the counter jumps past whatever
     // came in.
-    seq = Math.max(seq, highestSeq(record.entries));
+    seq = Math.max(seq, highestSeq(normalized.entries));
     set({
       record: {
         format: DECISION_RECORD_FORMAT,
-        version: record.version || DECISION_RECORD_VERSION,
-        keyboardId: record.keyboardId,
-        entries: record.entries,
-        truncated: record.truncated,
+        version: normalized.version || DECISION_RECORD_VERSION,
+        keyboardId: normalized.keyboardId,
+        entries: normalized.entries,
+        truncated: normalized.truncated,
       },
       droppedCount,
     });

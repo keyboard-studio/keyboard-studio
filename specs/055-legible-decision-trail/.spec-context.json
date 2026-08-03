@@ -131,6 +131,14 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-03T03:43:37.884Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:06:08.865Z"
     }
   ],
   "coverage": {
@@ -515,7 +523,7 @@
     }
   },
   "telemetryInstanceId": "c7509f96-1e29-4e6f-8a65-690a8a8ad00d",
-  "currentTask": "T007",
+  "currentTask": "T008",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -581,6 +589,19 @@
         "packages/studio/src/decisions/DecisionTrailView.test.tsx",
         "packages/studio/src/dashboard/FlowGraphView.tsx",
         "packages/studio/src/dashboard/FlowGraphView.pathOverlay.test.tsx"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Wired normalizeDecisionRecord into parseDecisionRecord (pre-validation, so v1 legacy-impact entries survive the v2 zod schema) and defensively into decisionLogStore.hydrate; relocated the pure normalizer from studio to engine/decision-audit since engine cannot import studio",
+      "files": [
+        "packages/engine/src/decision-audit/recordMigration.ts",
+        "packages/engine/src/decision-audit/recordMigration.test.ts",
+        "packages/engine/src/decision-audit/record.ts",
+        "packages/engine/src/decision-audit/record.test.ts",
+        "packages/engine/src/decision-audit/index.ts",
+        "packages/engine/src/index.ts",
+        "packages/studio/src/decisions/decisionLogStore.ts"
       ]
     }
   }

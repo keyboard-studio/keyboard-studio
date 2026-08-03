@@ -41,7 +41,7 @@ The contracts change breaks every consumer by design: with the counts optional, 
 
 **⟶ Wait for Wave 2 to finish, then:**
 
-- [ ] **T008** Wire `recordMigration` into the record read path so every consumer sees the normalized shape, and confirm nothing writes the normalized form back (append-only invariant, [record-shape.contract.md](contracts/record-shape.contract.md) §6) · `packages/studio/src/decisions/decisionLogStore.ts`
+- [x] **T008** Wire `recordMigration` into the record read path so every consumer sees the normalized shape, and confirm nothing writes the normalized form back (append-only invariant, [record-shape.contract.md](contracts/record-shape.contract.md) §6) · `packages/studio/src/decisions/decisionLogStore.ts`
 
 **Checkpoint**: the record can express *unmeasured*, a pre-feature record renders without claiming activity, and every consumer is forced by the typechecker to say so. No producer has changed yet.
 

@@ -215,6 +215,105 @@ describe("parseDecisionRecord — contract §5 version tolerance", () => {
   });
 });
 
+describe("parseDecisionRecord — v1 migration (specs/055-legible-decision-trail T008)", () => {
+  // Shaped the way the shipped v1 build actually wrote it: a stored (possibly
+  // zero) count for every editor-action dimension, and a captured impact as a
+  // single flat `path`/`hunks`/`magnitude` rather than the v2 `files` array.
+  // Before T008, `DecisionEntrySchema`'s v2 `DecisionImpactSchema` (which
+  // requires `files`) rejected this shape outright, so the entry was DROPPED
+  // before `normalizeDecisionRecord` ever ran — this is the read path itself,
+  // not a direct call to the normalizer (that is `recordMigration.test.ts`'s
+  // job).
+  const v1Raw = {
+    format: DECISION_RECORD_FORMAT,
+    version: 1,
+    keyboardId: "sil_bambara",
+    entries: [
+      {
+        entryId: "e1",
+        stepId: "carve",
+        payload: {
+          kind: "editor-action",
+          actionType: "gallery_edit",
+          summary: {
+            // The ambiguous stored zero this whole migration exists for.
+            keysRemoved: 0,
+            keysAdded: 12,
+            mechanismsAssigned: 3,
+            touchKeysAffected: 1,
+            sample: ["K_A", "K_B"],
+            sampleTruncated: false,
+          },
+        },
+        provenance: { agency: "hand-set" },
+        recordedAt: 1_700_000_000_000,
+        supersedes: null,
+        impact: {
+          state: "captured",
+          path: "source/sil_bambara.kmn",
+          hunks: [
+            { oldStart: 1, oldLines: 2, newStart: 1, newLines: 3, lines: [" a", "-b", "+c", "+d"] },
+          ],
+          magnitude: { added: 2, removed: 1 },
+        },
+      },
+    ],
+    truncated: null,
+  };
+
+  it("carries a v1 entry with a legacy captured impact through instead of dropping it", () => {
+    const text = JSON.stringify(v1Raw);
+    const result = parseDecisionRecord(text);
+
+    expect(result.unreadable).toBe(false);
+    expect(result.droppedCount).toBe(0);
+    expect(result.record.entries).toHaveLength(1);
+  });
+
+  it("reads the v1 entry's editor-action counts as absent, never as the stored number", () => {
+    const result = parseDecisionRecord(JSON.stringify(v1Raw));
+    const entry = result.record.entries[0]!;
+    if (entry.payload.kind !== "editor-action") throw new Error("expected editor-action");
+    const summary = entry.payload.summary;
+
+    // Explicit absence, not a falsiness check: the stored `0` is falsy too and
+    // would pass a naive `!summary.keysRemoved` assertion without proving
+    // anything about FR-005a.
+    expect("keysRemoved" in summary).toBe(false);
+    expect("keysAdded" in summary).toBe(false);
+    expect("mechanismsAssigned" in summary).toBe(false);
+    expect("touchKeysAffected" in summary).toBe(false);
+    expect(summary.sample).toEqual(["K_A", "K_B"]);
+  });
+
+  it("lifts the v1 entry's flat captured impact into a one-element `files` array", () => {
+    const result = parseDecisionRecord(JSON.stringify(v1Raw));
+    const impact = result.record.entries[0]!.impact;
+    if (impact === undefined || impact === null || impact.state !== "captured") {
+      throw new Error("expected a captured impact");
+    }
+    expect(impact.files).toEqual([
+      {
+        path: "source/sil_bambara.kmn",
+        hunks: [{ oldStart: 1, oldLines: 2, newStart: 1, newLines: 3, lines: [" a", "-b", "+c", "+d"] }],
+        magnitude: { added: 2, removed: 1 },
+      },
+    ]);
+    expect(impact.magnitude).toEqual({ added: 2, removed: 1 });
+  });
+
+  it("does not write the normalized form back — the source text and object are untouched by the read", () => {
+    const text = JSON.stringify(v1Raw);
+    const before = structuredClone(v1Raw);
+    parseDecisionRecord(text);
+    // Append-only invariant (contract §6): normalizing on read must not
+    // rewrite what was read. A v1 record on disk stays v1 on disk — the
+    // reader hands back a NEW value, never edits the source it read from.
+    expect(v1Raw).toEqual(before);
+    expect(JSON.stringify(v1Raw)).toBe(text);
+  });
+});
+
 describe("SC-009 — both directions of build compatibility", () => {
   it("a record this build writes is an ignorable unknown field for a build without the feature", () => {
     // The persisted shape is one optional field on the draft envelope. A build

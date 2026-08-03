@@ -76,6 +76,7 @@ export {
   DECISION_RECORD_VFS_PATH,
   diffLines,
   diffMagnitude,
+  normalizeDecisionRecord,
   parseDecisionRecord,
   PR_SUMMARY_MAX_ENTRIES,
   serializeDecisionRecord,
@@ -86,6 +87,8 @@ export {
 export type {
   DecisionSummaryOptions,
   ParseDecisionRecordResult,
+  PreMigrationDecisionRecord,
+  PreMigrationEntry,
 } from "./decision-audit/index.js";
 
 // Issue #183 — headless simulate() API is exposed via the `./simulator`

@@ -18,9 +18,21 @@
 // build did not measure — the opposite: activity is UN-claimed. Every
 // function here is pure: no I/O, no mutation of its input, a new value out.
 //
-// Wiring this into the actual read path is NOT this module's job —
-// decisionLogStore.ts (specs/055 T008) calls `normalizeDecisionRecord` from
-// wherever it reads a record in.
+// Lives beside `record.ts` (not in `packages/studio/src/decisions/`, where it
+// was first drafted) because the seam that needs it is `parseDecisionRecord`
+// itself (specs/055 T008): the strict v2 `DecisionEntrySchema` rejects a v1
+// captured impact's flat shape outright (no `files` array), so a v1 entry
+// must be normalized to the v2 shape BEFORE schema validation or it is
+// dropped before this module ever sees it — normalizing downstream of
+// validation would be a no-op for exactly the records this module exists to
+// rescue. `record.ts` calls `normalizeDecisionRecord` per candidate entry,
+// ahead of `DecisionEntrySchema.safeParse`. The engine cannot depend on the
+// studio (`engine-not-to-studio`, .dependency-cruiser.cjs), which is the
+// other reason this lives here: `decisionLogStore.ts`'s `hydrate` also calls
+// it, defensively, on whatever a caller hands in — but by the time a record
+// reaches `hydrate` via the studio's own read path it has already been
+// normalized once by `parseDecisionRecord`, so that second call is a no-op
+// for every record this build itself produces.
 
 import {
   DECISION_RECORD_VERSION,
@@ -49,7 +61,7 @@ interface LegacyCapturedImpact {
 type PreMigrationImpact = DecisionImpact | LegacyCapturedImpact;
 
 /** An entry as it may be found on any record this module accepts. */
-interface PreMigrationEntry extends Omit<DecisionEntry, "impact"> {
+export interface PreMigrationEntry extends Omit<DecisionEntry, "impact"> {
   impact?: PreMigrationImpact | null;
 }
 

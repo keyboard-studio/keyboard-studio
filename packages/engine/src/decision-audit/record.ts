@@ -29,6 +29,7 @@ import {
   type DecisionRecord,
   type DiffHunk,
 } from "@keyboard-studio/contracts";
+import { normalizeDecisionRecord, type PreMigrationDecisionRecord } from "./recordMigration.js";
 
 /** Outcome of a tolerant read. */
 export interface ParseDecisionRecordResult {
@@ -189,6 +190,42 @@ function unreadable(): ParseDecisionRecordResult {
 }
 
 /**
+ * Migrate one raw candidate entry to the v2 shape BEFORE schema validation,
+ * for a record whose declared `version` is older than
+ * {@link DECISION_RECORD_VERSION}.
+ *
+ * This has to happen ahead of `DecisionEntrySchema.safeParse`, not after: the
+ * v2 schema's `DecisionImpactSchema` requires a non-empty `files` array, so a
+ * v1 entry's flat `path`/`hunks`/`magnitude` capture fails validation
+ * outright and would otherwise be dropped and counted in `droppedCount`
+ * before `normalizeDecisionRecord` ever saw it — silently discarding exactly
+ * the captured impact this migration exists to carry forward (specs/055
+ * T008 blocking finding).
+ *
+ * Wrapped in a singleton record and a try/catch so one malformed candidate
+ * cannot poison a sibling's migration and cannot break the "never throws"
+ * contract of {@link parseDecisionRecord}: a candidate too malformed to
+ * normalize (missing `payload`, not an object, etc.) is handed to the schema
+ * UNCHANGED, where it fails validation and is dropped exactly as it would
+ * have been without this step.
+ */
+function migrateRawEntryIfPreV2(candidate: unknown, version: number): unknown {
+  if (version >= DECISION_RECORD_VERSION) return candidate;
+  try {
+    const wrapped: PreMigrationDecisionRecord = {
+      format: DECISION_RECORD_FORMAT,
+      version,
+      keyboardId: null,
+      entries: [candidate as PreMigrationDecisionRecord["entries"][number]],
+      truncated: null,
+    };
+    return normalizeDecisionRecord(wrapped).entries[0];
+  } catch {
+    return candidate;
+  }
+}
+
+/**
  * Read a decision record, salvaging whatever validates.
  *
  * Never throws. Never rejects a record for having an unfamiliar `version`: a
@@ -230,7 +267,8 @@ export function parseDecisionRecord(text: string | null | undefined): ParseDecis
   const seenIds = new Set<string>();
   let droppedCount = 0;
   for (const candidate of rawEntries) {
-    const parsed = DecisionEntrySchema.safeParse(candidate);
+    const migrated = migrateRawEntryIfPreV2(candidate, version);
+    const parsed = DecisionEntrySchema.safeParse(migrated);
     if (!parsed.success) {
       droppedCount++;
       continue;

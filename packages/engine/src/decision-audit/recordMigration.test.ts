@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import { DECISION_RECORD_FORMAT, type DecisionRecord } from "@keyboard-studio/contracts";
-import { normalizeDecisionRecord, type PreMigrationDecisionRecord } from "./recordMigration.ts";
+import { normalizeDecisionRecord, type PreMigrationDecisionRecord } from "./recordMigration.js";
 
 const V1_RECORD: PreMigrationDecisionRecord = {
   format: DECISION_RECORD_FORMAT,

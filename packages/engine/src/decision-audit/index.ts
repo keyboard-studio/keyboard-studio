@@ -18,6 +18,8 @@ export {
   serializedRecordBytes,
 } from "./record.js";
 export type { ParseDecisionRecordResult } from "./record.js";
+export { normalizeDecisionRecord } from "./recordMigration.js";
+export type { PreMigrationDecisionRecord, PreMigrationEntry } from "./recordMigration.js";
 export { shedDecisionDetail } from "./shed.js";
 export { buildDecisionSummaryBlock, PR_SUMMARY_MAX_ENTRIES } from "./prSummary.js";
 export type { DecisionSummaryOptions } from "./prSummary.js";
