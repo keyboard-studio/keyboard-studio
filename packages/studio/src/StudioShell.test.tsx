@@ -558,10 +558,10 @@ vi.mock("./lib/buildTouchLayoutJson.ts", () => ({
   }),
 }));
 
-// Shallow stubs for PreviewScreen and OutputScreen — routing tests assert on
+// Shallow stubs for CompareScreen and OutputScreen — routing tests assert on
 // the marker divs, not the internal pipeline.
-vi.mock("./components/PreviewScreen.tsx", () => ({
-  PreviewScreen: () => <div data-testid="preview-screen-root">preview-screen</div>,
+vi.mock("./components/CompareScreen.tsx", () => ({
+  CompareScreen: () => <div data-testid="compare-screen-root">compare-screen</div>,
 }));
 
 vi.mock("./components/OutputScreen.tsx", () => ({
@@ -945,12 +945,14 @@ describe("SurveyView — mechanisms → carve back-navigation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// StudioShell routing regression — #preview mounts PreviewScreen and #output
+// StudioShell routing regression — #preview mounts CompareScreen and #output
 // mounts OutputScreen (distinct screens, NOT RoutePlaceholder).
 // ---------------------------------------------------------------------------
 
-describe("StudioShell — route: #preview renders PreviewScreen", () => {
-  it("mounts PreviewScreen (not RoutePlaceholder) when hash is #preview", async () => {
+describe("StudioShell — route: #preview renders CompareScreen", () => {
+  // Spec 057: the route TOKEN stays `preview` while the tab is labelled
+  // "Compare" (contract §1), so this hash assertion is deliberately unchanged.
+  it("mounts CompareScreen (not RoutePlaceholder) when hash is #preview", async () => {
     window.location.hash = "#preview";
     localStorage.setItem("ks.visited", "1"); // returning visitor: deep-link hash is honored
 
@@ -958,11 +960,11 @@ describe("StudioShell — route: #preview renders PreviewScreen", () => {
       render(<StudioShell />);
     });
 
-    // PreviewScreen stub must be present.
-    expect(screen.getByTestId("preview-screen-root")).toBeTruthy();
+    // CompareScreen stub must be present.
+    expect(screen.getByTestId("compare-screen-root")).toBeTruthy();
     // OutputScreen must NOT be present — these are distinct screens.
     expect(screen.queryByTestId("output-screen-root")).toBeNull();
-    // RoutePlaceholder renders "Preview — coming soon"; must NOT be present.
+    // RoutePlaceholder renders a "coming soon" stub; must NOT be present.
     expect(screen.queryByText(/coming soon/i)).toBeNull();
   });
 });
@@ -978,8 +980,8 @@ describe("StudioShell — route: #output renders OutputScreen", () => {
 
     // OutputScreen stub must be present.
     expect(screen.getByTestId("output-screen-root")).toBeTruthy();
-    // PreviewScreen must NOT be present — these are distinct screens.
-    expect(screen.queryByTestId("preview-screen-root")).toBeNull();
+    // CompareScreen must NOT be present — these are distinct screens.
+    expect(screen.queryByTestId("compare-screen-root")).toBeNull();
     expect(screen.queryByText(/coming soon/i)).toBeNull();
   });
 });
@@ -996,7 +998,7 @@ describe("StudioShell — first-visit gate forces newcomers to welcome", () => {
     // The deep-linked #preview is overridden — a genuine newcomer lands on
     // welcome (the shallow WelcomeScreen stub above, per this file's routing-
     // test idiom).
-    expect(screen.queryByTestId("preview-screen-root")).toBeNull();
+    expect(screen.queryByTestId("compare-screen-root")).toBeNull();
     expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
     // The hash is rewritten to #welcome so leaving welcome fires a real hashchange.
     expect(window.location.hash).toBe("#welcome");
@@ -1010,7 +1012,7 @@ describe("StudioShell — first-visit gate forces newcomers to welcome", () => {
       render(<StudioShell />);
     });
 
-    expect(screen.getByTestId("preview-screen-root")).toBeTruthy();
+    expect(screen.getByTestId("compare-screen-root")).toBeTruthy();
   });
 });
 
@@ -1128,7 +1130,7 @@ describe("StudioShell — first-visit landing gate", () => {
     });
 
     expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
-    expect(screen.queryByTestId("preview-screen-root")).toBeNull();
+    expect(screen.queryByTestId("compare-screen-root")).toBeNull();
   });
 
   it("lifts the gate on a live hashchange once the newcomer leaves welcome (no remount)", async () => {
@@ -1174,7 +1176,7 @@ describe("StudioShell — first-visit landing gate", () => {
 
     // Gate lifted by the draft ⇒ the deep-linked hash is honored: land on
     // preview, NOT forced onto welcome and NOT defaulted to survey.
-    expect(screen.getByTestId("preview-screen-root")).toBeTruthy();
+    expect(screen.getByTestId("compare-screen-root")).toBeTruthy();
     expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
     expect(screen.queryByTestId("stage-identity")).toBeNull();
   });

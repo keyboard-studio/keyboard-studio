@@ -157,4 +157,29 @@ own conformance.
 
 Raw output: [`tab-roundtrip-green.raw.txt`](tab-roundtrip-green.raw.txt).
 
-<!-- T038: append the green compare-isolation run here -->
+### `compare-isolation.spec.ts` — GREEN (T038, SC-005)
+
+Run after the US2 implementation wave (T030–T037), alongside the locale spec
+that pins the rename:
+
+```
+Running 6 tests using 1 worker
+
+  ✓  1 compare-isolation … the tab exposes no identity-editing control over the project (6.5s)
+  ✓  2 compare-isolation … loading another keyboard raises no dialog and leaves the project untouched (dismiss) (15.2s)
+  ✓  3 compare-isolation … loading another keyboard and ACCEPTING anything offered still leaves the project untouched (13.3s)
+  ✓  4 locale-switch … switching to fr translates chrome and persists across reload (3.0s)
+  ✓  5 locale-switch … reads 'Compare' in English and never 'Preview' (1.7s)
+  ✓  6 locale-switch … in fr, falls back to the new id's source string — never the retired id's translation (2.3s)
+
+  6 passed (43.6s)
+```
+
+The assertion FR-025 turns on is **test 3**, the accept branch: the harness
+answers "yes" to every dialog the page raises, and the project is still on its
+own base with its recorded answers intact — because no dialog is raised at all.
+That is the difference between a guarded write path and an absent one:
+`useCompareArtifact` passes no `onInstantiate`, so
+`instantiateFromBaseIfConfirmed` is unreachable from this tab.
+
+Raw output: [`compare-green.raw.txt`](compare-green.raw.txt).

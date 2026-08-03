@@ -9,7 +9,7 @@
 //
 // The pipeline (usePreviewArtifact) runs independently on this screen so
 // stage reaches "ready" and canDownload evaluates correctly without depending
-// on a prior visit to PreviewScreen. The Zustand working-copy store persists
+// on a prior visit to another screen. The Zustand working-copy store persists
 // across hash navigation so handleDownload reads the settled store regardless
 // of which screen ran the compile.
 //

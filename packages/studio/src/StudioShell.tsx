@@ -5,8 +5,11 @@
 //                         [project_name (copy)] → characters (prefill/B) →
 //                         carve → mechanisms → sequences →
 //                         touch → help → done
-//   #preview            — PreviewScreen: "try it" — OSK preview + diagnostics
-//                         (no Download button, no SignUpPanel)
+//   #preview            — CompareScreen: look at a keyboard you are NOT
+//                         authoring — run it, read its source. Read-only:
+//                         no path from this tab into the working copy
+//                         (spec 057 US2). The route token stays `preview`
+//                         while the tab is labelled "Compare".
 //   #output             — OutputScreen: "ship it" — Download .zip +
 //                         SignUpPanel (no interactive OSK)
 
@@ -50,7 +53,7 @@ import { getPatternLibraryService } from "./lib/services.ts";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
 import { FlowMapView } from "./dashboard/DashboardView.tsx";
 import { runCompleteness } from "./dashboard/completeness.ts";
-import { PreviewScreen } from "./components/PreviewScreen.tsx";
+import { CompareScreen } from "./components/CompareScreen.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
@@ -235,7 +238,11 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: "survey", label: msg({ id: "nav.studio", message: "Studio" }) },
-  { id: "preview", label: msg({ id: "nav.preview", message: "Preview" }) },
+  // Spec 057 FR-020: a NEW message id, not a re-worded one. The tab's
+  // purpose changed — it is a read-only comparison surface now, not a
+  // preview of the author's own keyboard — so an existing translation of
+  // "Preview" is not a translation of this.
+  { id: "preview", label: msg({ id: "nav.compare", message: "Compare" }) },
   { id: "output", label: msg({ id: "nav.output", message: "Output" }) },
   // Spec 053 FR-017: unconditional, alongside Output and Preview rather than
   // beside the dev-gated Flow Map below.
@@ -1564,7 +1571,10 @@ export function StudioShell() {
       content = <SurveyView baseKeyboard={selectedBaseKeyboard} />;
       break;
     case "preview":
-      content = <PreviewScreen />;
+      // The route TOKEN stays `preview` while the tab is labelled "Compare"
+      // (spec 057 contract §1): renaming it would break every existing
+      // bookmark and every e2e hash assertion for no requirement's sake.
+      content = <CompareScreen />;
       break;
     case "output":
       content = <OutputScreen />;

@@ -13,7 +13,7 @@
 //   5. Pass the projected VFS to toZip (via getToZip service accessor).
 //   6. Return { bytes, warnings, keyboardId } so the caller can surface warnings.
 //
-// Entry point for PreviewShell.handleDownload and any other download / output
+// Entry point for OutputScreen's download and any other download / output
 // trigger. If the working copy is not instantiated (baseVfs === null),
 // serializeWorkingCopy returns null so the caller can show a "nothing to download"
 // state.
@@ -303,7 +303,7 @@ export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyF
  * pure helper the GitHub fork+PR path consumes), then serializes the projected
  * VFS to zip via the toZip service accessor. The public return shape
  * ({@link SerializeWorkingCopyResult}) is a superset of the projection metadata
- * plus the zip bytes — PreviewShell, the existing tests, and the
+ * plus the zip bytes — OutputScreen, the existing tests, and the
  * `<id>-<version>.zip` filename all depend on the `version` field.
  *
  * @see projectWorkingCopyForOutput — the projection helper (returns the VFS)
