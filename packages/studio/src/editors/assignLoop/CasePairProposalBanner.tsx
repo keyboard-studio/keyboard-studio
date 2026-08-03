@@ -26,6 +26,8 @@
 // @see specs/051-uppercase-counterpart-suggestion/contracts/case-pair-proposal.md
 
 import { Trans, useLingui } from "@lingui/react/macro";
+import { canonicalizeCombo } from "@keyboard-studio/engine";
+import { formatModifierCombo } from "../../lib/modifierTokenLabel.ts";
 import { ProposalBanner } from "./parts/ProposalBanner.tsx";
 import type { CasePairProposal } from "./casePairCompanion.ts";
 
@@ -61,6 +63,12 @@ export function CasePairProposalBanner({
             {proposal.counterpart}. Map {proposal.counterpart} to the{" "}
             {proposal.targetLayerLabel} layer as well?
           </Trans>
+        ) : proposal.mechanism === "ralt-layer" ? (
+          <Trans id="editor.assignLoop.companion.prompt.raltLayer">
+            {proposal.originalChar} has an uppercase form,{" "}
+            {proposal.counterpart}. Map {proposal.counterpart} to the{" "}
+            {raltLayerModifierLabel(proposal)} layer of {proposal.vkey}?
+          </Trans>
         ) : (
           <Trans id="editor.assignLoop.companion.prompt">
             {proposal.originalChar} has an uppercase form,{" "}
@@ -73,20 +81,25 @@ export function CasePairProposalBanner({
         <Trans id="editor.assignLoop.companion.confirmButton">Map it</Trans>
       }
       confirmAriaLabel={
-        // Touch gets its OWN id rather than a widened shared one. The shared
-        // message is still exactly right for the physical and combo paths
-        // (their parallel slot IS the shift plane), and a new id orphans no
-        // translation, where editing the shared message would restate it for
-        // two mechanisms that didn't change.
+        // Touch and ralt-layer each get their OWN id rather than a widened
+        // shared one. The shared message is still exactly right for the
+        // physical and combo paths (their parallel slot IS the shift plane),
+        // and a new id orphans no translation, where editing the shared
+        // message would restate it for two mechanisms that didn't change.
         proposal.mechanism === "touch"
           ? t({
               id: "editor.assignLoop.companion.confirmAriaLabel.touch",
               message: `Map ${proposal.counterpart} to the ${proposal.targetLayerLabel} layer of ${proposal.hostKey}`,
             })
-          : t({
-              id: "editor.assignLoop.companion.confirmAriaLabel",
-              message: `Map ${proposal.counterpart} to the shift layer of ${confirmTargetLabel(proposal)}`,
-            })
+          : proposal.mechanism === "ralt-layer"
+            ? t({
+                id: "editor.assignLoop.companion.confirmAriaLabel.raltLayer",
+                message: `Map ${proposal.counterpart} to the ${raltLayerModifierLabel(proposal)} layer of ${proposal.vkey}`,
+              })
+            : t({
+                id: "editor.assignLoop.companion.confirmAriaLabel",
+                message: `Map ${proposal.counterpart} to the shift layer of ${confirmTargetLabel(proposal)}`,
+              })
       }
       onConfirm={onConfirm}
       declineLabel={
@@ -100,10 +113,15 @@ export function CasePairProposalBanner({
               id: "editor.assignLoop.companion.declineAriaLabel.touch",
               message: `Do not map ${proposal.counterpart} to the ${proposal.targetLayerLabel} layer`,
             })
-          : t({
-              id: "editor.assignLoop.companion.declineAriaLabel",
-              message: `Do not map ${proposal.counterpart} to the shift layer`,
-            })
+          : proposal.mechanism === "ralt-layer"
+            ? t({
+                id: "editor.assignLoop.companion.declineAriaLabel.raltLayer",
+                message: `Do not map ${proposal.counterpart} to the ${raltLayerModifierLabel(proposal)} layer`,
+              })
+            : t({
+                id: "editor.assignLoop.companion.declineAriaLabel",
+                message: `Do not map ${proposal.counterpart} to the shift layer`,
+              })
       }
       onDismiss={onDismiss}
     />
@@ -126,5 +144,27 @@ function confirmTargetLabel(proposal: CasePairProposal): string {
       return proposal.combo.kind === "deadkey"
         ? proposal.combo.triggerKey
         : proposal.combo.indicator;
+    case "ralt-layer":
+      return proposal.vkey;
+  }
+}
+
+/**
+ * "Shift+RAlt"-style label for the ralt-layer proposal's target layer —
+ * `baseModifiers` (the lowercase placement's own modifiers) with `SHIFT`
+ * added, canonicalized to the SAME order the confirm handler's
+ * `comboToKeySpec`/`canonicalizeCombo` call emits (`[SHIFT RALT vkey]`), so
+ * the banner text never disagrees with what gets written. Falls back to a
+ * naive "+"-join on the (structurally unreachable) mutually-exclusive-combo
+ * throw — display-only, so it must never crash the banner.
+ */
+function raltLayerModifierLabel(
+  proposal: Extract<CasePairProposal, { mechanism: "ralt-layer" }>,
+): string {
+  const tokens = [...proposal.baseModifiers, "SHIFT" as const];
+  try {
+    return formatModifierCombo(canonicalizeCombo(tokens));
+  } catch {
+    return formatModifierCombo(tokens);
   }
 }

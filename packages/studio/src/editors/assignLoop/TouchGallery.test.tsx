@@ -1886,6 +1886,108 @@ describe("TouchGallery — suggestion card variants", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Suggestion gate — already-reachable-on-touch suppresses the redundant
+// suggestion card.
+//
+// Bug: a "re-seed from desktop" reseed can place a character directly onto a
+// longpress sub-key (engine/src/pattern-apply/applyDesktopModifications.ts's
+// placement pass — a Phase C letter whose host key is already occupied lands
+// as an `sk[]` alternate). The `suggestion` memo's desktop-assignment (`da`)
+// branch returned a longpress/replace suggestion unconditionally whenever a
+// Phase C assignment existed for the character, with NO check at all against
+// whether the character already has a working touch method — unlike the
+// no-desktop-assignment branch below it, which at least checked
+// `detectedChars`. Fix: gate on `enumerateTouchMethodsForChar` against the
+// CURRENT effective touch layout (layoutForLintAndGate — reflects the
+// reseed's own placement plus any Phase E edits already recorded), applied
+// before either branch runs.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — suggestion suppressed when the char already has a touch method", () => {
+  it("does NOT show a suggestion card when the current touch layout already has a longpress producing the char", async () => {
+    // Seed a Phase C simple_swap assignment for "x" — on its own this drives
+    // the `da` branch straight to a "replace" suggestion (see "shows a
+    // 'replace' suggestion..." above). Override the (mocked)
+    // buildTouchLayoutJson so the CURRENT touch layout already carries a
+    // longpress sub-key producing "x" off K_A — modelling the reseed's own
+    // auto-placed longpress that the real buildTouchLayoutJson this spy
+    // stands in for would have produced via applyDesktopModifications.
+    buildTouchLayoutJsonSpy.mockImplementation(() => ({
+      json: JSON.stringify({
+        phone: {
+          layer: [
+            {
+              id: "default",
+              row: [
+                {
+                  id: 1,
+                  key: [{ id: "K_A", text: "a", sk: [{ id: "U_0078", text: "x" }] }],
+                },
+              ],
+            },
+          ],
+        },
+      }),
+      warnings: [] as string[],
+    }));
+
+    const swapAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "x",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "simple_swap",
+          strategyId: "S-01",
+          slotValues: { kmnRules: "+ [K_X] > U+0078" },
+        },
+      ],
+      source: "user",
+    };
+    seedWithDesktopAssignment("x", swapAssignment);
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // No suggestion card at all — "x" already has a working method.
+    expect(screen.queryByText(/Suggested:/i)).toBeNull();
+    // The method chooser shows directly instead — same shape as the
+    // "no suggestion goes straight to chooser" case above.
+    expect(screen.queryByText(/How to reach it on touch/i)).not.toBeNull();
+  });
+
+  it("still shows the suggestion card for a character with NO existing touch method (control)", async () => {
+    // Same Phase C assignment as above, but WITHOUT overriding
+    // buildTouchLayoutJson: the default mock (defaultBuildTouchLayoutJsonImpl,
+    // re-pinned in beforeEach) maps only the CURRENT charTouch entries, which
+    // start empty, so "x" has no touch method yet. Proves the gate above is
+    // genuinely reachability-driven, not a blanket suppression of the `da`
+    // branch.
+    const swapAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "x",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "simple_swap",
+          strategyId: "S-01",
+          slotValues: { kmnRules: "+ [K_X] > U+0078" },
+        },
+      ],
+      source: "user",
+    };
+    seedWithDesktopAssignment("x", swapAssignment);
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expect(screen.queryByText(/Suggested: replace/i)).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Intro splash — first-entry orientation
 // ---------------------------------------------------------------------------
 
