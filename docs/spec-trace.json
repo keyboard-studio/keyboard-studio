@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-07-30",
+  "lastUpdated": "2026-08-03",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -750,6 +750,14 @@
     "specs/052-marks-treatment-question": {
       "title": "Feature Specification: Marks treatment question",
       "hash": "sha256:c67294a07baf3ef8",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/056-ada-accessibility": {
+      "title": "Feature Specification: ADA / WCAG 2.2 AA Accessibility Baseline",
+      "hash": "sha256:e5828442ef44c21d",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
