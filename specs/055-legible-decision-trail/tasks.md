@@ -132,7 +132,7 @@ The contracts change breaks every consumer by design: with the counts optional, 
 
 **⟶ Wait for T025 to finish, then:**
 
-- [ ] **T026** Tests through the production path: a base-instantiated session records the base and what it contributed (SC-012), and a base-supplied value renders as carried-from-base rather than author-set with the author's later replacement still visible (SC-013, US3 scenarios 5–6) · `packages/studio/src/steps/reducer.decisionRecording.test.ts`
+- [x] **T026** Tests through the production path: a base-instantiated session records the base and what it contributed (SC-012), and a base-supplied value renders as carried-from-base rather than author-set with the author's later replacement still visible (SC-013, US3 scenarios 5–6) · `packages/studio/src/steps/reducer.decisionRecording.test.ts`
 
 **Checkpoint**: US3 is independently functional — every count in the trail now has a stated denominator, and 053's `base-derived` provenance is reachable at last.
 
@@ -161,7 +161,7 @@ The contracts change breaks every consumer by design: with the counts optional, 
 
 **Wave 3 — independent (different files):**
 
-- [ ] **T030** [P] Render each changed file separately rather than merging them into one diff, plus the shared-change note naming the co-decisions; add `trail.entry.impact.shared` to the catalog. Keep "cannot be isolated" distinct from "changed nothing" (FR-017, FR-020) · `packages/studio/src/decisions/DecisionEntryRow.tsx` + `packages/studio/src/locales/en/messages.json`
+- [x] **T030** [P] Render each changed file separately rather than merging them into one diff, plus the shared-change note naming the co-decisions; add `trail.entry.impact.shared` to the catalog. Keep "cannot be isolated" distinct from "changed nothing" (FR-017, FR-020) · `packages/studio/src/decisions/DecisionEntryRow.tsx` + `packages/studio/src/locales/en/messages.json`
 - [x] **T031** [P] `formatEffect` gains a per-file cell for the widened captured impact and a shared-change note when `sharedWith` is present · `packages/engine/src/decision-audit/prSummary.ts`
 - [x] **T032** [P] Truncation over the enlarged captured payload: detail is shed, entries never are, and the threshold is neither raised nor exempted for this feature ([record-shape.contract.md](contracts/record-shape.contract.md) §6) · `packages/engine/src/decision-audit/shed.ts`
 
@@ -170,7 +170,7 @@ The contracts change breaks every consumer by design: with the counts optional, 
 **Wave 4 — independent (different files):**
 
 - [x] **T033** [P] Baseline and diff tests: binaries skipped never diffed, a zero-changed-file capture is `{ state: "none" }` and not an empty `files` array, aggregate magnitude equals the sum over `files`, and the volatile normalizer holds the date stamp while a real HISTORY edit still surfaces · `packages/studio/src/decisions/snapshotSource.test.ts`
-- [ ] **T034** [P] Identity-stage integration test: expanding each identity decision shows the `.kps` metadata change with the file identified, and the four answers made together show the same change stated as shared (SC-006, US4 scenarios 2–3) · `packages/studio/src/decisions/impact.test.ts`
+- [x] **T034** [P] Identity-stage integration test: expanding each identity decision shows the `.kps` metadata change with the file identified, and the four answers made together show the same change stated as shared (SC-006, US4 scenarios 2–3) · `packages/studio/src/decisions/impact.test.ts`
 
 **Checkpoint**: US4 is independently functional — no identity decision reports a reason a widened comparison would have resolved, and the shipped package and the shown change agree.
 
@@ -199,7 +199,7 @@ This phase is presentation over an unchanged record — cuttable without touchin
 
 **Wave 3 — independent (different files):**
 
-- [ ] **T038** [P] Grouping tests: stages in walked order (FR-022), a collapsed roll-up line per group (FR-023), every flat-trail entry still reachable (FR-024), an untouched stage never presented as changed (FR-025), and a revisit visible as history inside its stage (FR-026) · `packages/studio/src/decisions/DecisionTrailView.test.tsx`
+- [x] **T038** [P] Grouping tests: stages in walked order (FR-022), a collapsed roll-up line per group (FR-023), every flat-trail entry still reachable (FR-024), an untouched stage never presented as changed (FR-025), and a revisit visible as history inside its stage (FR-026) · `packages/studio/src/decisions/DecisionTrailView.test.tsx`
 - [ ] **T039** [P] Rendering a stage roll-up resolves **no** entry's impact, and expanding one entry resolves only that one (FR-021, SC-009) · `packages/studio/src/decisions/impact.test.ts`
 
 **Checkpoint**: US5 is independently functional — a long trail is scannable and grouping hides nothing.
@@ -210,7 +210,7 @@ This phase is presentation over an unchanged record — cuttable without touchin
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T040** [P] SC-007 made mechanical: generate the trail headlines and the PR summary from **one** record and assert they agree on stage naming, mentioned dimensions, and counts — including that both skip absent counts and say "not measured" rather than treating `undefined` as falsy alongside `0` (FR-015) · `packages/engine/src/decision-audit/prSummary.test.ts`
+- [x] **T040** [P] SC-007 made mechanical: generate the trail headlines and the PR summary from **one** record and assert they agree on stage naming, mentioned dimensions, and counts — including that both skip absent counts and say "not measured" rather than treating `undefined` as falsy alongside `0` (FR-015) · `packages/engine/src/decision-audit/prSummary.test.ts`
 - [x] **T041** [P] Extend the artifact-independence guard: an identical session with and without recording produces a byte-identical keyboard artifact across the widened capture (FR-007, SC-008 — the capture reads the projection and must never write to it) · `packages/studio/src/decisions/artifactIndependence.test.ts`
 - [x] **T042** [P] Document the closed gaps: note in the 053 spec folder that its FR-001..FR-028 are now delivered by 055, and record the `audit_label` field's ownership split (content owns values, engine owns plumbing) where the i18n conventions are documented · `specs/053-decision-audit/spec.md` + `docs/` as appropriate
 

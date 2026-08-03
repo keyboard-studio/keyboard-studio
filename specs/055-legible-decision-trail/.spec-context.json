@@ -355,6 +355,46 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-03T05:14:49.668Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T05:21:55.677Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T05:24:42.535Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T05:25:22.979Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T05:28:37.962Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T05:28:47.898Z"
     }
   ],
   "coverage": {
@@ -739,7 +779,7 @@
     }
   },
   "telemetryInstanceId": "c7509f96-1e29-4e6f-8a65-690a8a8ad00d",
-  "currentTask": "T042",
+  "currentTask": "T026",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1035,6 +1075,42 @@
         "specs/053-decision-audit/spec.md",
         "specs/050-flow-question-i18n/contracts/flow-question-catalog-format.md",
         "docs/i18n-spike.md"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Render each captured file separately (identified by path) instead of one merged diff blob, and add a count-based shared-change note for sharedWith, keeping all four impact states distinguishable",
+      "files": [
+        "packages/studio/src/decisions/DecisionEntryRow.tsx",
+        "packages/studio/src/locales/en/messages.json"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Identity-stage integration tests: widened .kps capture shown per decision with the file identified, joint attribution with self-exclusion, one comparison per boundary, and sharedWith absent on a single-decision boundary",
+      "files": [
+        "packages/studio/src/decisions/impact.test.ts"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "Added 11 staged-presentation tests to DecisionTrailView.test.tsx covering FR-022..FR-026 (walked order, collapsed roll-up, structural entry-set equality, untouched-stage omission, revisit history + 40->172 net roll-up); two it.fails markers document an id-collision defect on trail.stage.rollUp.composed",
+      "files": [
+        "packages/studio/src/decisions/DecisionTrailView.test.tsx"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "SC-007 agreement harness: one record renders both surfaces; stage naming, mentioned dimensions and counts asserted against record ground truth and the studio catalogue read as fixture data (no engine->studio import); FR-005a absent-vs-zero pinned on both sides, exposing a known PR-summary defect",
+      "files": [
+        "packages/engine/src/decision-audit/prSummary.test.ts"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "US3 production-path tests: base contribution (SC-012), no fabricated zero, FR-034 unit match, base-derived provenance (SC-013), FR-033 supersede",
+      "files": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
       ]
     }
   }

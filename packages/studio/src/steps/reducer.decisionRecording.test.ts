@@ -51,7 +51,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type {
+  BaseContribution,
   BaseKeyboard,
+  DecisionEntry,
   DecisionImpact,
   EditorActionSummary,
   KeyboardIR,
@@ -60,7 +62,11 @@ import type {
   VirtualFS,
 } from "@keyboard-studio/contracts";
 import { makeSlotId, parseKmn } from "@keyboard-studio/engine";
-import { recordStepCompletion, type ReducerDeps } from "./reducer.ts";
+import {
+  recordStepCompletion,
+  type InstantiateResult,
+  type ReducerDeps,
+} from "./reducer.ts";
 import {
   resetDecisionEntryIds,
   useDecisionLogStore,
@@ -71,6 +77,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { selectDesktopAssignments } from "../lib/unimplementedInventory.ts";
 import { deriveDesktopModifications } from "../lib/deriveDesktopModifications.ts";
+import { toRailNodes } from "../lib/irToCarveNodes.ts";
 
 // ---------------------------------------------------------------------------
 // Fixture keyboard — small, but parsed by the real codec
@@ -142,6 +149,113 @@ function vowelSlotId(ir: KeyboardIR, index: number): string {
   const store = ir.stores.find((s) => s.name === "vowels");
   if (store === undefined) throw new Error("fixture has no `vowels` store");
   return makeSlotId(store.nodeId, index);
+}
+
+// ---------------------------------------------------------------------------
+// Base-contribution fixtures (specs/055 FR-030..FR-035, T026)
+// ---------------------------------------------------------------------------
+
+/**
+ * A second base, for the mid-session swap the spec's edge cases name ("the
+ * earlier base's contribution remains on the record as history"). Every field
+ * differs from `BASE`, and its layout is deliberately a different size, so an
+ * entry that named the wrong base could not accidentally pass.
+ */
+const OTHER_BASE: BaseKeyboard = {
+  id: "other_base",
+  path: "release/o/other_base",
+  script: "Arab",
+  targets: ["windows", "macosx"],
+  displayName: "Other Base",
+  version: "2.0",
+};
+
+const OTHER_KMN = [
+  "store(&VERSION) '10.0'",
+  "store(&NAME) 'Other Base'",
+  "store(&KEYBOARDVERSION) '2.0'",
+  "",
+  "begin Unicode > use(main)",
+  "",
+  "group(main) using keys",
+  "",
+  "+ [K_C] > 'c'",
+  "+ [K_D] > 'd'",
+  "+ [K_E] > 'e'",
+  "+ [K_F] > 'f'",
+  "",
+].join("\n");
+
+/**
+ * A postfix-shaped base — `any(equalD) + '=' > index(equalU,1)` is the exact
+ * structure `detectMarkInputOrderFromImport` recognises, so instantiating from
+ * it makes the store seed `irAxes.markInputOrder` (workingCopyStore's
+ * `seedIrAxesFromBaseIr`). That is the only production path that puts a derived
+ * axis on a freshly instantiated working copy, and FR-031 requires the entry to
+ * state those axes.
+ */
+const POSTFIX_KMN = [
+  "store(&VERSION) '10.0'",
+  "store(&NAME) 'Postfix Base'",
+  "store(&KEYBOARDVERSION) '1.0'",
+  "",
+  "store(equalD) 'a' 'e'",
+  "store(equalU) 'á' 'é'",
+  "",
+  "begin Unicode > use(main)",
+  "",
+  "group(main) using keys",
+  "",
+  "any(equalD) + '=' > index(equalU,1)",
+  "",
+].join("\n");
+
+const POSTFIX_BASE: BaseKeyboard = {
+  id: "postfix_base",
+  path: "release/p/postfix_base",
+  script: "Latn",
+  targets: ["windows"],
+  displayName: "Postfix Base",
+  version: "1.0",
+};
+
+/** Instantiate an arbitrary base the way the choose-base step does. */
+function instantiateOther(base: BaseKeyboard, kmn: string): KeyboardIR {
+  const ir = parseKmn(kmn, `${base.id}.kmn`).ir;
+  useWorkingCopyStore.getState().instantiateFromBase(base, {
+    vfs: createVirtualFS([{ path: `source/${base.id}.kmn`, content: kmn, isBinary: false }]),
+    ir,
+  });
+  return ir;
+}
+
+/**
+ * `ChooseBaseAdapter`'s completion payload — the `InstantiateResult` the
+ * reducer's `choose_base` branch consumes.
+ *
+ * Recording runs AFTER `applyStepCompletion` (StepHost step 2 then 2b), so in
+ * these tests the store is instantiated first and this payload is what the step
+ * carried. `track: "copy"` is Track 1 — the reducer routes anything but
+ * `"adapt"` to `instantiateFromBaseIfConfirmed`.
+ */
+function chooseBaseResult(base: BaseKeyboard, ir: KeyboardIR | null): InstantiateResult {
+  return { base, vfs: null, ir, track: "copy" };
+}
+
+/**
+ * Every toggleable unit the carve rail offers for an IR, in the order it
+ * offers them.
+ *
+ * `CarveGallery` deletes a glyph with `deleteItem(g.gid)` (its `toggleGlyph`)
+ * and tallies its own total as the sum of `node.glyphs.length` — the same two
+ * halves `recordBaseContribution`'s `countStartingKeys` and the recorder's
+ * `keysRemoved` read. Deriving the ids from the rail rather than hand-listing
+ * them is what makes the FR-034 unit assertion below a real comparison.
+ */
+function railGlyphGids(ir: KeyboardIR): string[] {
+  return toRailNodes(ir, useWorkingCopyStore.getState().removalCapabilities).flatMap((node) =>
+    (node.glyphs ?? []).map((g) => g.gid),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -267,7 +381,62 @@ function realRecorder(
       const wc = useWorkingCopyStore.getState();
       return wc.identity?.keyboardId ?? wc.baseKeyboard?.id ?? null;
     },
+    // specs/055 FR-030..FR-035: the base baseline, read straight off the
+    // instantiated store — never a re-read of the base's source.
+    getBaseKeyboard: () => useWorkingCopyStore.getState().baseKeyboard,
+    getIrAxes: () => useWorkingCopyStore.getState().irAxes,
+    getInstantiationMode: () => useWorkingCopyStore.getState().instantiationMode,
+    getRemovalCapabilities: () => useWorkingCopyStore.getState().removalCapabilities,
+    // specs/055 FR-032/FR-033: the proposal register, seeded with the base's
+    // inherited values — the same three fields `recordBaseContribution`'s
+    // `inheritedMetadataOf` reports. Copied verbatim from StudioShell.tsx; see
+    // this file's KNOWN LIMITATION note.
+    resolveProposal: (questionId) => {
+      const base = useWorkingCopyStore.getState().baseKeyboard;
+      if (base === null) return undefined;
+      switch (questionId) {
+        case "script":
+          return { value: base.script, source: "base" };
+        case "targets":
+          return { value: base.targets, source: "base" };
+        case "version":
+          return { value: base.version, source: "base" };
+        default:
+          return undefined;
+      }
+    },
   });
+}
+
+/**
+ * Every base-contribution entry on the record, oldest first.
+ *
+ * A helper rather than an index, because "how many are there" is itself an
+ * assertion in several tests below (once per instantiation, never per revisit).
+ */
+function baseContributions(): (DecisionEntry & { payload: BaseContribution })[] {
+  return useDecisionLogStore
+    .getState()
+    .record.entries.filter(
+      (e): e is DecisionEntry & { payload: BaseContribution } =>
+        e.payload.kind === "base-contribution",
+    );
+}
+
+/** The single base-contribution entry, or a failure if there is not exactly one. */
+function onlyBaseContribution(): DecisionEntry & { payload: BaseContribution } {
+  const entries = baseContributions();
+  expect(entries).toHaveLength(1);
+  return entries[0]!;
+}
+
+/** Every survey-answer entry recorded for one question, oldest first. */
+function answerEntriesFor(questionId: string): DecisionEntry[] {
+  return useDecisionLogStore
+    .getState()
+    .record.entries.filter(
+      (e) => e.payload.kind === "survey-answer" && e.payload.questionId === questionId,
+    );
 }
 
 /** Only `recordDecision` is populated — nothing else in ReducerDeps is consulted. */
@@ -898,5 +1067,286 @@ describe("impact attribution", () => {
     const entries = useDecisionLogStore.getState().record.entries;
     expect(entries).toHaveLength(1);
     expect(entries[0]!.impact).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR-030..FR-035 / SC-012 — the inherited baseline, recorded at choose_base
+// through the same production path as everything above
+// ---------------------------------------------------------------------------
+
+/** The sole editor-action summary on a record that also holds other kinds. */
+function soleEditorSummary(): EditorActionSummary {
+  const editors = useDecisionLogStore
+    .getState()
+    .record.entries.filter((e) => e.payload.kind === "editor-action");
+  expect(editors).toHaveLength(1);
+  const payload = editors[0]!.payload;
+  if (payload.kind !== "editor-action") throw new Error("expected an editor action");
+  return payload.summary;
+}
+
+describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
+  it("records the base chosen and what it left in the working copy", () => {
+    const ir = instantiate();
+
+    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), depsWith(realRecorder()));
+
+    const entry = onlyBaseContribution();
+    expect(entry.stepId).toBe("choose_base");
+    expect(entry.payload.baseId).toBe(BASE_ID);
+    expect(entry.payload.baseDisplayName).toBe("Test Base");
+    expect(entry.payload.instantiationMode).toBe("new-from-base");
+    // The base's own properties, carried onto the working copy as-is and coded
+    // for the catalog rather than pre-rendered as prose (FR-008).
+    expect(entry.payload.inheritedMetadata).toEqual([
+      { field: "script", value: "Latn" },
+      { field: "targets", value: "windows" },
+      { field: "version", value: "1.0" },
+    ]);
+    // A measured starting inventory, not a placeholder: it agrees with the rail
+    // the carve gallery would render from the same IR.
+    expect(railGlyphGids(ir).length).toBeGreaterThan(0);
+    expect(entry.payload.startingKeyCount).toBe(railGlyphGids(ir).length);
+    // Every value in the payload came from the base, so the entry says so with
+    // the SAME vocabulary a base-carried answer uses (FR-032).
+    expect(entry.provenance).toEqual({ agency: "base-derived", source: "base" });
+  });
+
+  it("states the axes instantiation derived onto the working copy", () => {
+    // A postfix-shaped base: `instantiateFromBase` runs it through the engine's
+    // structural detector and seeds `irAxes.markInputOrder`. The plain fixture
+    // seeds nothing, so this is the case that can tell an empty list from a
+    // missing derivation.
+    const ir = instantiateOther(POSTFIX_BASE, POSTFIX_KMN);
+    expect(Object.keys(useWorkingCopyStore.getState().irAxes)).toEqual(["markInputOrder"]);
+
+    recordStepCompletion(
+      "choose_base",
+      chooseBaseResult(POSTFIX_BASE, ir),
+      depsWith(realRecorder()),
+    );
+
+    expect(onlyBaseContribution().payload.derivedAxes).toEqual(["markInputOrder"]);
+  });
+
+  it("derives the contribution from the instantiated working copy, not the step's payload (FR-035)", () => {
+    // The store holds BASE; the completion payload names OTHER_BASE with a
+    // four-key layout. A recorder that read the result — a re-read of the base
+    // the step announced, rather than of what the author actually started from
+    // — would name "Other Base" and report its inventory.
+    const ir = instantiate();
+    const otherIr = parseKmn(OTHER_KMN, `${OTHER_BASE.id}.kmn`).ir;
+    expect(railGlyphGids(otherIr).length).not.toBe(railGlyphGids(ir).length);
+
+    recordStepCompletion(
+      "choose_base",
+      chooseBaseResult(OTHER_BASE, otherIr),
+      depsWith(realRecorder()),
+    );
+
+    const entry = onlyBaseContribution();
+    expect(entry.payload.baseId).toBe(BASE_ID);
+    expect(entry.payload.baseDisplayName).toBe("Test Base");
+    expect(entry.payload.inheritedMetadata).toContainEqual({ field: "script", value: "Latn" });
+    expect(entry.payload.startingKeyCount).toBe(railGlyphGids(ir).length);
+  });
+
+  it("writes NO entry at all when nothing was instantiated (FR-030, research D-11)", () => {
+    // The production shape of this: a Track-1 rebase whose confirm the author
+    // cancelled, so `instantiateFromBaseIfConfirmed` no-ops and the step
+    // completes with the store still empty. There is no working copy to measure.
+    const deps = depsWith(realRecorder());
+    recordStepCompletion("choose_base", chooseBaseResult(BASE, null), deps);
+
+    // A later step DOES record, so this is an assertion about the absence of a
+    // base-contribution entry — not about an inert recorder.
+    recordStepCompletion(
+      "identity",
+      phaseResult([{ questionId: "il_language_english", answerType: "text", value: "Hausa" }]),
+      deps,
+    );
+
+    expect(baseContributions()).toEqual([]);
+    expect(useDecisionLogStore.getState().record.entries).toHaveLength(1);
+    expect(useDecisionLogStore.getState().record.entries[0]!.payload.kind).toBe("survey-answer");
+  });
+
+  it("keeps the earlier base's contribution as history when the base is swapped", () => {
+    // Spec edge case: "the earlier base's contribution remains on the record as
+    // history and the new base's is recorded as a superseding baseline".
+    const deps = depsWith(realRecorder());
+    const ir = instantiate();
+    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
+    const first = onlyBaseContribution();
+
+    const otherIr = instantiateOther(OTHER_BASE, OTHER_KMN);
+    recordStepCompletion("choose_base", chooseBaseResult(OTHER_BASE, otherIr), deps);
+
+    const entries = baseContributions();
+    expect(entries).toHaveLength(2);
+    // The first entry is untouched — the swap appended, it did not rewrite.
+    expect(entries[0]).toEqual(first);
+    expect(entries[1]!.payload.baseId).toBe(OTHER_BASE.id);
+    expect(entries[1]!.supersedes).toBe(first.entryId);
+    expect(entries[1]!.payload.startingKeyCount).toBe(railGlyphGids(otherIr).length);
+  });
+});
+
+describe("FR-034 — a stage's counts are interpretable against the baseline", () => {
+  it("counts the starting inventory in the same nodes+items unit as keysRemoved", () => {
+    const ir = instantiate();
+    const deps = depsWith(realRecorder());
+    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
+    const starting = onlyBaseContribution().payload.startingKeyCount;
+
+    // Carve away EVERY unit the rail offers, through the store action
+    // CarveGallery's own glyph toggle calls. If the baseline were counted in a
+    // different unit from the removals — a produced-character set, say, or the
+    // raw rule count — removing everything would not land on the baseline.
+    const gids = railGlyphGids(ir);
+    expect(gids.length).toBeGreaterThan(0);
+    for (const gid of gids) useWorkingCopyStore.getState().deleteItem(gid);
+
+    recordStepCompletion("carve", ADAPTER_EMITS_NOTHING, deps);
+
+    const after = useWorkingCopyStore.getState();
+    expect(soleEditorSummary().keysRemoved).toBe(after.deletedNodeIds.size + after.deletedItemIds.size);
+    expect(soleEditorSummary().keysRemoved).toBe(starting);
+  });
+
+  it("leaves a partial carve readable as a fraction of the baseline", () => {
+    const ir = instantiate();
+    const deps = depsWith(realRecorder());
+    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
+    const starting = onlyBaseContribution().payload.startingKeyCount ?? 0;
+
+    // One rule node removed out of the whole starting layout — the removal count
+    // alone says nothing, and it is the baseline beside it that makes it "1 of n".
+    useWorkingCopyStore.getState().deleteNode(ruleNodeIdFor(ir, "K_B"));
+    recordStepCompletion("carve", ADAPTER_EMITS_NOTHING, deps);
+
+    expect(soleEditorSummary().keysRemoved).toBe(1);
+    expect(starting).toBeGreaterThan(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SC-013 / FR-032 / FR-033 — a base-supplied value reads as CARRIED, and the
+// author's later replacement supersedes it rather than overwriting it
+// ---------------------------------------------------------------------------
+
+describe("SC-013 / FR-032 — a value carried from the base", () => {
+  it("records base-derived provenance when the answer is the base's own value", () => {
+    instantiate();
+
+    recordStepCompletion(
+      "identity",
+      phaseResult([
+        { questionId: "script", answerType: "select", value: BASE.script },
+        { questionId: "version", answerType: "text", value: BASE.version },
+      ]),
+      depsWith(realRecorder()),
+    );
+
+    const entries = useDecisionLogStore.getState().record.entries;
+    expect(entries).toHaveLength(2);
+    for (const entry of entries) {
+      // Carried, not author-set — the same pair the base-contribution entry
+      // uses, so the trail reaches 053's existing "from base" headline rather
+      // than a competing concept (FR-032).
+      expect(entry.provenance).toEqual({ agency: "base-derived", source: "base" });
+    }
+  });
+
+  it("matches a multi-valued inherited property (the register hands back an array)", () => {
+    instantiate();
+
+    recordStepCompletion(
+      "identity",
+      // `char-list` is the only array-valued AnswerType, and the register
+      // proposes `base.targets` as an array — so this is the shape in which a
+      // targets answer can be recognised as carried at all.
+      phaseResult([{ questionId: "targets", answerType: "char-list", value: [...BASE.targets] }]),
+      depsWith(realRecorder()),
+    );
+
+    expect(useDecisionLogStore.getState().record.entries[0]!.provenance).toEqual({
+      agency: "base-derived",
+      source: "base",
+    });
+  });
+
+  it("records the author's own value as hand-set when it is not the base's", () => {
+    instantiate();
+
+    recordStepCompletion(
+      "identity",
+      phaseResult([
+        // Differs from BASE.script — the author overrode what the base supplied,
+        // so naming the base here would credit a value that did not ship.
+        { questionId: "script", answerType: "select", value: "Arab" },
+        // A question the base contributes nothing to — the truthful floor.
+        { questionId: "il_language_english", answerType: "text", value: "Hausa" },
+      ]),
+      depsWith(realRecorder()),
+    );
+
+    for (const entry of useDecisionLogStore.getState().record.entries) {
+      expect(entry.provenance).toEqual({ agency: "hand-set" });
+    }
+  });
+
+  it("claims nothing from a base when no working copy was instantiated", () => {
+    // No instantiate(): the register reads the store, so with no base it has
+    // nothing to offer and the same answer records as the author's own.
+    recordStepCompletion(
+      "identity",
+      phaseResult([{ questionId: "script", answerType: "select", value: BASE.script }]),
+      depsWith(realRecorder()),
+    );
+
+    expect(useDecisionLogStore.getState().record.entries[0]!.provenance).toEqual({
+      agency: "hand-set",
+    });
+  });
+});
+
+describe("FR-033 — the author's replacement supersedes the base's value", () => {
+  it("keeps both the carried value and its replacement on the record", () => {
+    const deps = depsWith(realRecorder());
+    const ir = instantiate();
+    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
+    const baseEntry = onlyBaseContribution();
+
+    // The base's script, accepted as offered.
+    recordStepCompletion(
+      "identity",
+      phaseResult([{ questionId: "script", answerType: "select", value: BASE.script }]),
+      deps,
+    );
+    // The author walks back and replaces it.
+    recordStepCompletion(
+      "identity",
+      phaseResult([{ questionId: "script", answerType: "select", value: "Arab" }]),
+      deps,
+    );
+
+    const answers = answerEntriesFor("script");
+    expect(answers).toHaveLength(2);
+    // Both visible: the carried value is history, not a slot that was rewritten.
+    const carried = answers[0]!;
+    const replacement = answers[1]!;
+    expect(carried.provenance).toEqual({ agency: "base-derived", source: "base" });
+    expect(carried.payload.kind === "survey-answer" ? carried.payload.value : null).toBe("Latn");
+    expect(replacement.provenance).toEqual({ agency: "hand-set" });
+    expect(replacement.payload.kind === "survey-answer" ? replacement.payload.value : null).toBe(
+      "Arab",
+    );
+    expect(replacement.supersedes).toBe(carried.entryId);
+
+    // And the base's own contribution entry is untouched by any of it — it
+    // records what the session started with, which the override does not change.
+    expect(onlyBaseContribution()).toEqual(baseEntry);
   });
 });

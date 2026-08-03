@@ -8,11 +8,17 @@
 // The four impact states each get their own rendering, and the distinctions are
 // not cosmetic:
 //
-//   captured    -> the hunks
+//   captured    -> each changed file, identified by path, rendered as its own
+//                  block (specs/055 FR-017) — never merged into one diff blob
+//                  — plus a shared-change note (FR-019) when `sharedWith` is
+//                  present. Absent `sharedWith` means this entry claims the
+//                  change outright and nothing extra renders.
 //   none        -> "this changed nothing in the source", in words. NOT an empty
 //                  diff region, which reads as a failure (spec Edge Cases).
 //   unavailable -> the localized reason. The studio cannot isolate this change and
-//                  says so, rather than implying the decision did nothing.
+//                  says so, rather than implying the decision did nothing. The
+//                  two reasons (`lock-gate-dependency` / `no-rederivable-write-path`)
+//                  render distinct prose from each other AND from "none" (FR-020).
 //   shed        -> `impact` is null: the detail existed and was dropped to fit the
 //                  save budget. Distinct from "never captured" because the author
 //                  can act on it (a shorter session keeps its detail).
@@ -227,6 +233,40 @@ export function DecisionEntryRow({
         });
     }
   };
+
+  // FR-017/FR-018: one changed file, identified by its path. Called once per
+  // entry in `impact.files` (contracts/record-shape.contract.md §3) — the
+  // direct fix for D-3, where an identity decision that only touched the
+  // package's metadata file used to report "no isolable change" because the
+  // old single-path comparison only ever looked at the `.kmn`. `path` is
+  // author-facing content (the same exemption `DecisionFileChange.path` gets
+  // in the identifier guard, DecisionEntryRow.identifiers.test.tsx's module
+  // header §1), not an internal code, so it renders as-is.
+  const filePathLabel = (path: string): string =>
+    t({ id: "trail.entry.impact.file.path", message: `File changed: ${path}` });
+
+  // FR-019: where a stage's one captured change is attributed to several
+  // decisions, `sharedWith` carries the co-decisions' `entryId`s — internal
+  // identifiers FR-008 forbids putting in front of the author. This component
+  // is handed one `entry` at a time by design (FR-021: expanding one entry
+  // must not touch, let alone resolve, any OTHER entry's data), so there is no
+  // lookup here from an id to another entry's headline, and building one would
+  // mean reaching outside the row for exactly the data FR-021 says an expand
+  // must not need. So the note states the fact of sharing and its COUNT rather
+  // than naming co-decisions by id or by headline; the co-decisions themselves
+  // are the sibling rows the author is already looking at (DecisionTrailView
+  // groups entries by the stage they were made in), so "shared with N other
+  // decisions in this step" points at them without a lookup this row was never
+  // given and without ever printing an entryId.
+  const sharedNote = (count: number): string =>
+    t({
+      id: "trail.entry.impact.shared",
+      message: plural(count, {
+        one: "This change is shared with # other decision made in this step — expand it to see the same change.",
+        other:
+          "This change is shared with # other decisions made in this step — expand any of them to see the same change.",
+      }),
+    });
 
   // Joins exactly two already-resolved clauses. A named function rather than
   // an inline template at each call site so `a`/`b` are plain parameters —
@@ -502,10 +542,28 @@ export function DecisionEntryRow({
               })}
             </p>
           ) : impact.state === "captured" ? (
-            // One entry per changed file (specs/055-legible-decision-trail
-            // FR-016/FR-018); today's producers only ever attach one, so this
-            // renders the same as before. T027 widens the file set.
-            impact.files.map((file) => <DiffHunkList key={file.path} hunks={file.hunks} />)
+            // FR-017: each changed file renders in its OWN block, identified
+            // by path, rather than merged into one diff blob — the fix for
+            // D-3 (an identity decision used to report "no isolable change"
+            // because the old comparison only ever looked at the `.kmn`).
+            // FR-019: when the change is jointly attributed, the shared note
+            // renders ONCE, above the per-file blocks, so it reads as a
+            // statement about the whole captured change rather than being
+            // repeated per file. Absent `sharedWith` means this entry claims
+            // the change outright (053's default), so nothing extra renders.
+            <>
+              {impact.sharedWith !== undefined && impact.sharedWith.length > 0 && (
+                <p style={noticeStyle} data-testid="decision-entry-impact-shared">
+                  {sharedNote(impact.sharedWith.length)}
+                </p>
+              )}
+              {impact.files.map((file) => (
+                <div key={file.path} data-testid="decision-entry-impact-file" data-file-path={file.path}>
+                  <p style={noticeStyle}>{filePathLabel(file.path)}</p>
+                  <DiffHunkList hunks={file.hunks} />
+                </div>
+              ))}
+            </>
           ) : impact.state === "none" ? (
             <p style={noticeStyle}>
               {t({

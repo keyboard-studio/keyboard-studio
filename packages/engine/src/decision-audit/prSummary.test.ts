@@ -7,9 +7,17 @@
 // decision with its consequence — rather than by eyeballing one golden string,
 // so a future edit that drops the effects column fails here.
 
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 import { makeEmptyDecisionRecord } from "@keyboard-studio/contracts";
-import type { DecisionEntry, DecisionImpact, DecisionRecord } from "@keyboard-studio/contracts";
+import type {
+  DecisionEntry,
+  DecisionImpact,
+  DecisionRecord,
+  EditorActionSummary,
+  EditorActionType,
+} from "@keyboard-studio/contracts";
 import { buildDecisionSummaryBlock, PR_SUMMARY_MAX_ENTRIES } from "./prSummary.js";
 import { DECISION_RECORD_VFS_PATH } from "./sidecar.js";
 
@@ -314,5 +322,339 @@ describe("buildDecisionSummaryBlock — bounds", () => {
     });
 
     expect(block).toContain("Change detail for 7 decisions was omitted");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SC-007 / FR-015 — the two surfaces agree
+//
+// How the author-facing trail is generated here, given that an engine test may
+// not import studio code (053 FR-016; the `engine-not-to-studio` rule in
+// .dependency-cruiser.cjs):
+//
+//   * The trail's TEXT is the studio's own English catalogue, READ FROM DISK as
+//     fixture data (no module edge, so no layering violation) and rendered by
+//     the tiny ICU evaluator below. Reading the real file rather than pasting
+//     the strings in is what keeps the fixture honest: the catalogue's stage
+//     messages adopt `EDITOR_LABEL`'s wording by hand-copy
+//     ([headline-spec.contract.md](../../../../specs/055-legible-decision-trail/contracts/headline-spec.contract.md) §5),
+//     and a hand-copy is exactly the thing that rots. If either side is reworded,
+//     these tests fail instead of the two surfaces quietly diverging. `msg()`
+//     throws on a missing id, so a renamed message fails loudly rather than
+//     comparing against `undefined`.
+//
+//   * The trail's SELECTION (which message, which dimensions) is derived here
+//     from the record via the contract's §3 rules — deliberately NOT a copy of
+//     `headline.ts`, which `packages/studio/src/decisions/headline.test.ts`
+//     already locks against those same rules. So neither surface is ever
+//     compared against a re-implementation of itself: each is compared against
+//     the record's own ground truth, and thereby to each other.
+//
+// What "agree" means is decomposed into the three properties SC-007 names —
+// stage naming, mentioned dimensions, counts — rather than raw string equality,
+// because each surface stays responsible for its own text. Their no-change and
+// not-measured wordings differ by design, and only the composed English
+// editor-step sentence happens to coincide.
+// ---------------------------------------------------------------------------
+
+/** The four editor-step counts, in the fixed order the contract names (§3). */
+type CountKind = "keysRemoved" | "keysAdded" | "mechanismsAssigned" | "touchKeysAffected";
+
+const DIMENSION_ORDER: readonly CountKind[] = [
+  "keysRemoved",
+  "keysAdded",
+  "mechanismsAssigned",
+  "touchKeysAffected",
+];
+
+const STAGE_MESSAGE_ID: Record<EditorActionType, string> = {
+  gallery_edit: "trail.entry.headline.stage.galleryEdit",
+  mechanism_edit: "trail.entry.headline.stage.mechanismEdit",
+  touch_edit: "trail.entry.headline.stage.touchEdit",
+};
+
+const DIMENSION_MESSAGE_ID: Record<CountKind, string> = {
+  keysRemoved: "trail.entry.headline.dimension.keysRemoved",
+  keysAdded: "trail.entry.headline.dimension.keysAdded",
+  mechanismsAssigned: "trail.entry.headline.dimension.mechanismsAssigned",
+  touchKeysAffected: "trail.entry.headline.dimension.touchKeysAffected",
+};
+
+/** The engine's own wording when nothing measured changed — engine-local text. */
+const PR_NO_MEASURED_CHANGE = "no net change";
+
+const CATALOG_PATH = fileURLToPath(
+  new URL("../../../studio/src/locales/en/messages.json", import.meta.url),
+);
+const CATALOG: Record<string, string> = JSON.parse(readFileSync(CATALOG_PATH, "utf8")) as Record<
+  string,
+  string
+>;
+
+/** Look a message up, failing loudly if the id was renamed or removed. */
+function msg(id: string): string {
+  const message = CATALOG[id];
+  if (message === undefined) {
+    throw new Error(`studio catalogue has no "${id}" (${CATALOG_PATH})`);
+  }
+  return message;
+}
+
+/**
+ * Evaluate the one ICU form the trail's editor messages use: a single
+ * `{name, plural, one {…} other {…}}`, or plain `{name}` interpolation.
+ */
+function renderIcu(message: string, values: Record<string, string | number>): string {
+  const plural = /^\{(\w+), plural, one \{(.+?)\} other \{(.+?)\}\}$/.exec(message);
+  if (plural !== null) {
+    const count = Number(values[plural[1]!]);
+    return (count === 1 ? plural[2]! : plural[3]!).replace(/#/g, String(count));
+  }
+  return message.replace(/\{(\w+)\}/g, (_match, name: string) => String(values[name]));
+}
+
+function summaryOf(counts: Partial<Record<CountKind, number>>): EditorActionSummary {
+  return {
+    ...(counts.keysRemoved !== undefined ? { keysRemoved: counts.keysRemoved } : {}),
+    ...(counts.keysAdded !== undefined ? { keysAdded: counts.keysAdded } : {}),
+    ...(counts.mechanismsAssigned !== undefined
+      ? { mechanismsAssigned: counts.mechanismsAssigned }
+      : {}),
+    ...(counts.touchKeysAffected !== undefined
+      ? { touchKeysAffected: counts.touchKeysAffected }
+      : {}),
+    sample: [],
+    sampleTruncated: false,
+  };
+}
+
+function editorEntry(
+  entryId: string,
+  stage: EditorActionType,
+  counts: Partial<Record<CountKind, number>>,
+): DecisionEntry {
+  return answer({
+    entryId,
+    stepId: `step-${entryId}`,
+    payload: { kind: "editor-action", actionType: stage, summary: summaryOf(counts) },
+  });
+}
+
+/**
+ * Ground truth from the record alone: the dimensions in which something
+ * happened, in contract order. Present and non-zero — an absent count and a
+ * present `0` are both absent from this list, for different reasons.
+ */
+function mentionedDimensions(
+  counts: Partial<Record<CountKind, number>>,
+): { kind: CountKind; count: number }[] {
+  const mentioned: { kind: CountKind; count: number }[] = [];
+  for (const kind of DIMENSION_ORDER) {
+    const count = counts[kind];
+    if (count !== undefined && count > 0) mentioned.push({ kind, count });
+  }
+  return mentioned;
+}
+
+/** Ground truth: was every dimension measured, or is at least one absent? */
+function allMeasured(counts: Partial<Record<CountKind, number>>): boolean {
+  return DIMENSION_ORDER.every((kind) => counts[kind] !== undefined);
+}
+
+/** The author-facing headline, composed from the studio catalogue (see the note above). */
+function trailHeadline(
+  stage: EditorActionType,
+  counts: Partial<Record<CountKind, number>>,
+): string {
+  const stageName = msg(STAGE_MESSAGE_ID[stage]);
+  const mentioned = mentionedDimensions(counts);
+
+  if (mentioned.length > 0) {
+    const dimensions = mentioned
+      .map((dimension) =>
+        renderIcu(msg(DIMENSION_MESSAGE_ID[dimension.kind]), { count: dimension.count }),
+      )
+      .join(", ");
+    return renderIcu(msg("trail.entry.headline.editorStep.composed"), {
+      stage: stageName,
+      dimensions,
+    });
+  }
+
+  return renderIcu(
+    msg(
+      allMeasured(counts)
+        ? "trail.entry.headline.editorStep.noChange"
+        : "trail.entry.headline.editorStep.unmeasured",
+    ),
+    { stage: stageName },
+  );
+}
+
+/** The reviewer-facing Decision cell for a single-entry record. */
+function prHeadline(stage: EditorActionType, counts: Partial<Record<CountKind, number>>): string {
+  const block = buildDecisionSummaryBlock(recordOf([editorEntry("only", stage, counts)]));
+  return cellsOf(tableRows(block)[0] ?? "")[2]?.trim() ?? "";
+}
+
+/** Split `Stage (clause, clause)` into its stage name and its clause list. */
+function stageAndClauses(sentence: string): { stage: string; clauses: string[] } {
+  const parsed = /^(.*) \((.*)\)$/.exec(sentence);
+  if (parsed === null) throw new Error(`not a stage sentence: ${sentence}`);
+  return { stage: parsed[1]!, clauses: parsed[2]!.split(", ") };
+}
+
+const ALL_STAGES: readonly EditorActionType[] = ["gallery_edit", "mechanism_edit", "touch_edit"];
+
+describe("trail and PR summary agree (FR-015, SC-007)", () => {
+  it("names each stage with the same words on both surfaces", () => {
+    for (const stage of ALL_STAGES) {
+      const counts = { keysRemoved: 4 };
+      expect(stageAndClauses(prHeadline(stage, counts)).stage).toBe(
+        stageAndClauses(trailHeadline(stage, counts)).stage,
+      );
+    }
+
+    // The three stages are genuinely distinguished, so the test above cannot be
+    // satisfied by a catalogue that gave every stage the same name.
+    const names = ALL_STAGES.map((stage) => stageAndClauses(trailHeadline(stage, { keysRemoved: 4 })).stage);
+    expect(new Set(names).size).toBe(3);
+  });
+
+  it("mentions exactly the dimensions in which something happened, with the same counts", () => {
+    // One record, both surfaces. Zero and absent both present, in the same entry.
+    const counts = { keysRemoved: 312, keysAdded: 0, mechanismsAssigned: 2 };
+    const expected = ["312 keys removed", "2 mechanisms assigned"];
+
+    // Ground truth from the record itself — neither surface's opinion.
+    expect(mentionedDimensions(counts).map((d) => d.count)).toEqual([312, 2]);
+
+    expect(stageAndClauses(prHeadline("gallery_edit", counts)).clauses).toEqual(expected);
+    expect(stageAndClauses(trailHeadline("gallery_edit", counts)).clauses).toEqual(expected);
+  });
+
+  it("mentions a zero-valued dimension on neither surface", () => {
+    const counts = { keysRemoved: 5, keysAdded: 0, mechanismsAssigned: 0, touchKeysAffected: 0 };
+
+    for (const sentence of [prHeadline("gallery_edit", counts), trailHeadline("gallery_edit", counts)]) {
+      expect(stageAndClauses(sentence).clauses).toEqual(["5 keys removed"]);
+      expect(sentence).not.toContain("0 ");
+    }
+  });
+
+  it("agrees on singular and plural for every dimension (FR-012)", () => {
+    for (const kind of DIMENSION_ORDER) {
+      for (const count of [1, 2]) {
+        const counts = { [kind]: count } as Partial<Record<CountKind, number>>;
+        const pr = stageAndClauses(prHeadline("touch_edit", counts)).clauses;
+        const trail = stageAndClauses(trailHeadline("touch_edit", counts)).clauses;
+
+        expect(pr).toEqual(trail);
+        expect(pr).toHaveLength(1);
+        // The count is the record's, on both surfaces — not a re-derived one.
+        expect(pr[0]).toContain(String(count));
+      }
+    }
+
+    // Singular really is a distinct form, so the equality above has teeth.
+    expect(stageAndClauses(prHeadline("touch_edit", { keysAdded: 1 })).clauses).toEqual([
+      "1 key added",
+    ]);
+  });
+
+  it("agrees across a whole record, stage by stage", () => {
+    const fixtures: { entryId: string; stage: EditorActionType; counts: Partial<Record<CountKind, number>> }[] = [
+      { entryId: "a", stage: "gallery_edit", counts: { keysRemoved: 312, keysAdded: 1 } },
+      { entryId: "b", stage: "mechanism_edit", counts: { mechanismsAssigned: 7, keysAdded: 0 } },
+      { entryId: "c", stage: "touch_edit", counts: { touchKeysAffected: 1 } },
+    ];
+
+    const block = buildDecisionSummaryBlock(
+      recordOf(fixtures.map((f) => editorEntry(f.entryId, f.stage, f.counts))),
+    );
+    const rows = tableRows(block);
+    expect(rows).toHaveLength(fixtures.length);
+
+    fixtures.forEach((fixture, index) => {
+      const pr = stageAndClauses(cellsOf(rows[index] ?? "")[2]?.trim() ?? "");
+      const trail = stageAndClauses(trailHeadline(fixture.stage, fixture.counts));
+      const truth = mentionedDimensions(fixture.counts);
+
+      expect(pr.stage).toBe(trail.stage);
+      expect(pr.clauses).toEqual(trail.clauses);
+      expect(pr.clauses).toHaveLength(truth.length);
+      pr.clauses.forEach((clause, position) => {
+        expect(clause).toContain(String(truth[position]!.count));
+      });
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR-005a — absent (not measured) is not a falsy zero
+// ---------------------------------------------------------------------------
+
+describe("absent counts are not zero (FR-005a, SC-011)", () => {
+  const ABSENT: Partial<Record<CountKind, number>> = {};
+  const MEASURED_ZERO: Partial<Record<CountKind, number>> = {
+    keysRemoved: 0,
+    keysAdded: 0,
+    mechanismsAssigned: 0,
+    touchKeysAffected: 0,
+  };
+
+  it("renders an absent count as a number on neither surface", () => {
+    const partiallyMeasured = { keysRemoved: 3 };
+
+    for (const sentence of [
+      prHeadline("gallery_edit", ABSENT),
+      trailHeadline("gallery_edit", ABSENT),
+      prHeadline("gallery_edit", partiallyMeasured),
+      trailHeadline("gallery_edit", partiallyMeasured),
+    ]) {
+      expect(sentence).not.toContain("undefined");
+      expect(sentence).not.toContain("NaN");
+      expect(sentence).not.toContain("0 ");
+    }
+  });
+
+  it("says something different for not-measured than for measured-and-unchanged, on the trail", () => {
+    const unmeasured = trailHeadline("gallery_edit", ABSENT);
+    const unchanged = trailHeadline("gallery_edit", MEASURED_ZERO);
+
+    expect(unmeasured).not.toBe(unchanged);
+    // The difference is two distinct catalogue messages, not two renderings of
+    // one — a catalogue that collapsed them would fail here.
+    expect(msg("trail.entry.headline.editorStep.unmeasured")).not.toBe(
+      msg("trail.entry.headline.editorStep.noChange"),
+    );
+    // Both are positive statements about the stage, and neither reports a count.
+    const stageName = stageAndClauses(prHeadline("gallery_edit", { keysRemoved: 1 })).stage;
+    expect(unmeasured).toContain(stageName);
+    expect(unchanged).toContain(stageName);
+    expect(unmeasured).not.toMatch(/\d/);
+    expect(unchanged).not.toMatch(/\d/);
+  });
+
+  // KNOWN DEFECT, not a test bug. `formatEditorSummary` drops an absent count
+  // and a present `0` alike and then says "no net change" for both, so the
+  // reviewer-facing surface still lumps "not measured" in with "measured, and
+  // nothing changed" — the one thing FR-005a forbids, and a disagreement with
+  // the trail, which does distinguish them (the test above).
+  // headline-spec.contract.md §5 requires the engine side to "say 'not measured'
+  // when all four are absent"; that branch was never written. Reported rather
+  // than fixed here (T040 is a test task). `it.fails` keeps this executable and
+  // turns RED the moment the branch lands — flip it to `it` in the same commit.
+  it.fails(
+    "[KNOWN DEFECT] the PR summary should distinguish not-measured from no-change, and does not",
+    () => {
+      expect(prHeadline("gallery_edit", ABSENT)).not.toBe(prHeadline("gallery_edit", MEASURED_ZERO));
+    },
+  );
+
+  it("today says the same thing for both, which is what the defect above pins", () => {
+    const both = `Edited the character gallery (${PR_NO_MEASURED_CHANGE})`;
+    expect(prHeadline("gallery_edit", ABSENT)).toBe(both);
+    expect(prHeadline("gallery_edit", MEASURED_ZERO)).toBe(both);
   });
 });

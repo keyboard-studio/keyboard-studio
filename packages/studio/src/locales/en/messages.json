@@ -1014,6 +1014,8 @@
   "editor.carve.cascade.restoreMessage": "This character was removed from several places. Restore it everywhere it was removed?",
   "editor.touchSeed.intro": "This choice seeds the mobile/touch layout. Individual characters can still be reviewed and adjusted afterward in the Touch Layout step.",
   "trail.entry.impact.none": "This decision changed nothing in the keyboard source.",
+  "trail.entry.impact.shared": "{count, plural, one {This change is shared with # other decision made in this step — expand it to see the same change.} other {This change is shared with # other decisions made in this step — expand any of them to see the same change.}}",
+  "trail.entry.impact.file.path": "File changed: {path}",
   "trail.entry.impact.unavailable.lockGate": "This decision sits behind a step that has since been locked, so its effect can no longer be shown on its own.",
   "editor.assignLoop.inspector.storePair.input": "This is the input side of a paired-store rule. Its characters line up one-for-one with {pairedList}. When one of these is matched and the rule fires, the keyboard outputs the character at the same position in {pairedList}.",
   "editor.assignLoop.inspector.storePair.output": "This is the output side of a paired-store rule. Each character lines up one-for-one with {pairedList}; the rule picks the matching one based on what was input.",
