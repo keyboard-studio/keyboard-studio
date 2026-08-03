@@ -21,14 +21,22 @@ const DEFAULT_USER: GitHubUser = { id: 4144632, login: "octocat" };
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Minimal valid POST body accepted by ManagedPRBodySchema. */
+/**
+ * Minimal valid POST body accepted by ManagedPRBodySchema.
+ *
+ * `sourceFiles[].path` is package-root-relative, as the SPA posts it. The
+ * `release/<firstLetter>/<keyboardId>/` location is derived server-side by the
+ * core (see submit-paths.ts); a client-supplied `release/` first segment is
+ * now rejected outright as `metadata`, so a pre-prefixed fixture here would
+ * never reach the pipeline logic these tests are about.
+ */
 function validBody() {
   return {
     attribution: { displayName: "Alice", email: "alice@example.com" },
     keyboardId: "test_kbd",
     prTitle: "Add test keyboard",
     prBody: "This keyboard does stuff.",
-    sourceFiles: [{ path: "release/t/test_kbd/test_kbd.kmn", content: "c comment\n" }],
+    sourceFiles: [{ path: "source/test_kbd.kmn", content: "c comment\n" }],
   };
 }
 

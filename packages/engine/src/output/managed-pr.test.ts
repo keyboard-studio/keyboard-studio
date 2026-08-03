@@ -89,21 +89,26 @@ async function expectError(fetch: ManagedPRFetchFn): Promise<PublishManagedPRErr
 
 describe("publishManagedPR() — SS1 source-file filter", () => {
   it("excludes compiled artifacts (.kmx, .kvk, .js) and sidecars from the POST", async () => {
+    // Submitted paths are package-root-relative — the scaffolder's real
+    // layout (packages/engine/src/scaffolder/scaffolder.test.ts). The
+    // `release/<firstLetter>/<keyboardId>/` prefix is derived server-side
+    // (spec 054 §F-2 / contracts/http-api.md "Resulting git tree"); a
+    // submitted path is never allowed to start with `release`.
     const fs = createVirtualFS([
-      { path: "release/m/my_keyboard/source/my_keyboard.kmn", content: "store(&VERSION) '14.0'" },
-      { path: "release/m/my_keyboard/my_keyboard.kps", content: "<Keyboard/>" },
-      { path: "release/m/my_keyboard/build/my_keyboard.kmx", content: "COMPILED" },
-      { path: "release/m/my_keyboard/build/my_keyboard.kvk", content: "COMPILED" },
-      { path: "release/m/my_keyboard/build/my_keyboard.js", content: "COMPILED" },
-      { path: "release/m/my_keyboard/source/my_keyboard.kmn.imported", content: "SIDECAR" },
+      { path: "source/my_keyboard.kmn", content: "store(&VERSION) '14.0'" },
+      { path: "source/my_keyboard.kps", content: "<Keyboard/>" },
+      { path: "build/my_keyboard.kmx", content: "COMPILED" },
+      { path: "build/my_keyboard.kvk", content: "COMPILED" },
+      { path: "build/my_keyboard.js", content: "COMPILED" },
+      { path: "source/my_keyboard.kmn.imported", content: "SIDECAR" },
     ]);
     const { fetch, captured } = capturingFetch({ ok: true, body: SUCCESS_BODY });
 
     await publishManagedPR(fs, OPTS, fetch);
 
     const paths = postedBody(captured).sourceFiles.map((f) => f.path);
-    expect(paths).toContain("release/m/my_keyboard/source/my_keyboard.kmn");
-    expect(paths).toContain("release/m/my_keyboard/my_keyboard.kps");
+    expect(paths).toContain("source/my_keyboard.kmn");
+    expect(paths).toContain("source/my_keyboard.kps");
     expect(paths.some((p) => p.endsWith(".kmx"))).toBe(false);
     expect(paths.some((p) => p.endsWith(".kvk"))).toBe(false);
     expect(paths.some((p) => p.endsWith(".js"))).toBe(false);
@@ -112,15 +117,15 @@ describe("publishManagedPR() — SS1 source-file filter", () => {
 
   it("skips binary (non-string) entries — the managed body carries text only", async () => {
     const fs = createVirtualFS([
-      { path: "release/m/my_keyboard/source/my_keyboard.kmn", content: "store(&VERSION) '14.0'" },
-      { path: "release/m/my_keyboard/welcome/banner.png", content: new Uint8Array([1, 2, 3]) },
+      { path: "source/my_keyboard.kmn", content: "store(&VERSION) '14.0'" },
+      { path: "source/welcome/banner.png", content: new Uint8Array([1, 2, 3]) },
     ]);
     const { fetch, captured } = capturingFetch({ ok: true, body: SUCCESS_BODY });
 
     await publishManagedPR(fs, OPTS, fetch);
 
     const paths = postedBody(captured).sourceFiles.map((f) => f.path);
-    expect(paths).toEqual(["release/m/my_keyboard/source/my_keyboard.kmn"]);
+    expect(paths).toEqual(["source/my_keyboard.kmn"]);
   });
 });
 

@@ -629,13 +629,20 @@ const managedPipelineFetch: GitHubPipelineFetchFn = async (url, init) => {
   throw new Error(`unexpected request: ${method} ${url}`);
 };
 
+/**
+ * Submitted paths are package-root-relative -- the server derives and
+ * prepends the `release/<firstLetter>/<keyboardId>/` prefix itself (FR-004).
+ * Do not pre-prefix fixtures here; a pre-prefixed path (e.g.
+ * "release/m/my_keyboard/…") is rejected outright since "release" is a
+ * `metadata`-category first segment.
+ */
 function validManagedBody(overrides: Record<string, unknown> = {}) {
   return {
     attribution: { displayName: "Ada Lovelace", email: "ada@example.com" },
     keyboardId: "my_keyboard",
     prTitle: "[my_keyboard] Add it",
     prBody: "## Checklist\n- green",
-    sourceFiles: [{ path: "release/m/my_keyboard/my_keyboard.kmn", content: "store(&VERSION) '14.0'" }],
+    sourceFiles: [{ path: "my_keyboard.kmn", content: "store(&VERSION) '14.0'" }],
     ...overrides,
   };
 }

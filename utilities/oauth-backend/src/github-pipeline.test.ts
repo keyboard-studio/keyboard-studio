@@ -37,14 +37,21 @@ const VERIFIED_EMAIL = "ada-lovelace@users.noreply.github.com";
 const NEW_COMMIT_SHA = "abc1234567890def00000000000000000000000";
 const PR_URL = "https://github.com/keymanapp/keyboards/pull/4242";
 
+/**
+ * Submitted paths are package-root-relative (what the scaffolder emits and
+ * what the SPA actually posts) -- the server derives and prepends the
+ * `release/<firstLetter>/<keyboardId>/` prefix itself (FR-004). Any assertion
+ * that inspects the resulting git tree expects the PREFIXED form instead; see
+ * the "submitManagedPR() -- path prefixing" describe block below.
+ */
 const VALID_BODY: ManagedPRBody = {
   attribution: { displayName: "Ada Lovelace", email: "ada@example.com" },
   keyboardId: "my_keyboard",
   prTitle: "[my_keyboard] Add My Keyboard 1.0",
   prBody: "## Checklist\n- green",
   sourceFiles: [
-    { path: "release/m/my_keyboard/source/my_keyboard.kmn", content: "store(&VERSION) '14.0'" },
-    { path: "release/m/my_keyboard/my_keyboard.kps", content: "<Keyboard/>" },
+    { path: "source/my_keyboard.kmn", content: "store(&VERSION) '14.0'" },
+    { path: "my_keyboard.kps", content: "<Keyboard/>" },
   ],
 };
 
@@ -612,5 +619,132 @@ describe("submitManagedPR() -- identity gate", () => {
     const prCall = calls.find((c) => c.url.endsWith("/pulls") && c.method === "POST");
     expect(prCall?.body).toContain(VERIFIED_EMAIL);
     expect(prCall?.body).not.toContain("impersonated@example.com");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// submitManagedPR() -- path authority (spec 054 US2, T020)
+//
+// The path-validation gate (submit-paths.ts) runs AFTER the identity gate but
+// BEFORE getInstallationToken() -- the first outbound call -- so a rejected
+// path must show zero recorded fetch calls (SC-001), never echo the offending
+// path (FR-015 / US2 AC4), and every accepted path must land under the
+// keyboard's own derived tree prefix rather than being committed verbatim
+// (the README.md-at-repo-root regression, research finding F-2).
+// ---------------------------------------------------------------------------
+
+describe("submitManagedPR() -- path authority rejection", () => {
+  const rejectionCases: Array<{
+    category: "absolute" | "traversal" | "metadata" | "malformed";
+    path: string;
+  }> = [
+    { category: "absolute", path: "/etc/passwd" },
+    { category: "traversal", path: "../escape.txt" },
+    { category: "metadata", path: "release/evil.kmn" },
+    { category: "malformed", path: "source\\my_keyboard.kmn" },
+  ];
+
+  it.each(rejectionCases)(
+    "rejects a $category path with 400 invalid_path, zero outbound calls, and no path echoed",
+    async ({ category, path }) => {
+      const { fetch, callCount } = makeStub();
+      const body: ManagedPRBody = {
+        ...VALID_BODY,
+        sourceFiles: [{ path, content: "x" }],
+      };
+      const result = await submitManagedPR(AUTH_HEADER, body, makeConfig(fetch));
+
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error("unreachable");
+      expect(result.status).toBe(400);
+      expect(result.error).toBe("invalid_path");
+      expect((result as { category?: string }).category).toBe(category);
+
+      // SC-001: path validation must run before any outbound GitHub call.
+      expect(callCount()).toBe(0);
+
+      // FR-015 / US2 AC4: the offending path must never surface in the result.
+      expect(JSON.stringify(result)).not.toContain(path);
+    }
+  );
+
+  it("rejects the whole submission when only one path among several is bad, in list order", async () => {
+    const { fetch, callCount } = makeStub();
+    const body: ManagedPRBody = {
+      ...VALID_BODY,
+      sourceFiles: [
+        { path: "source/my_keyboard.kmn", content: "good" },
+        { path: "../escape.txt", content: "bad" },
+        { path: "README.md", content: "also good" },
+      ],
+    };
+    const result = await submitManagedPR(AUTH_HEADER, body, makeConfig(fetch));
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.status).toBe(400);
+    expect(result.error).toBe("invalid_path");
+    expect((result as { category?: string }).category).toBe("traversal");
+    expect(callCount()).toBe(0);
+  });
+
+  it("still shows zero outbound calls on the verified-identity refusal path, now that path validation sits between it and the first outbound call", async () => {
+    const { fetch, callCount } = makeStub();
+    const config = makeConfig(fetch, () => Promise.resolve(null));
+    // A body that would ALSO fail path validation, to prove the identity gate
+    // -- not the path gate -- is what produced the zero-call refusal here.
+    const body: ManagedPRBody = { ...VALID_BODY, sourceFiles: [{ path: "/etc/passwd", content: "x" }] };
+    const result = await submitManagedPR(AUTH_HEADER, body, config);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.status).toBe(401);
+    expect(result.error).toBe("unauthorized");
+    expect(callCount()).toBe(0);
+  });
+
+  it("fails 401, not 400, when BOTH unauthenticated and carrying a bad path -- identity runs first (ordering guarantee)", async () => {
+    const { fetch, callCount } = makeStub();
+    const body: ManagedPRBody = { ...VALID_BODY, sourceFiles: [{ path: "/etc/passwd", content: "x" }] };
+    // header === null -> makeConfig's default verifyUser resolves null for a null token.
+    const result = await submitManagedPR(null, body, makeConfig(fetch));
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.status).toBe(401);
+    expect(result.error).toBe("unauthorized");
+    expect(callCount()).toBe(0);
+  });
+});
+
+describe("submitManagedPR() -- path prefixing on an accepted submission", () => {
+  it("prefixes every submitted path with release/<firstLetter>/<keyboardId>/ in the created tree, including a README.md that used to land at the staging repo root", async () => {
+    const { fetch, calls } = makeStub();
+    const submittedFiles = [
+      { path: "source/my_keyboard.kmn", content: "store(&VERSION) '14.0'" },
+      { path: "my_keyboard.kps", content: "<Keyboard/>" },
+      { path: "README.md", content: "# My Keyboard" },
+    ];
+    const body: ManagedPRBody = { ...VALID_BODY, sourceFiles: submittedFiles };
+    const result = await submitManagedPR(AUTH_HEADER, body, makeConfig(fetch));
+    expect(result.ok).toBe(true);
+
+    const treeCall = calls.find((c) => c.url.endsWith("/git/trees") && c.method === "POST");
+    expect(treeCall).toBeDefined();
+    const parsed = JSON.parse(treeCall!.body!) as {
+      tree: Array<{ path: string; content: string }>;
+    };
+
+    // Same files, same contents, correctly located: the set of committed
+    // paths is exactly the submitted set with the derived prefix prepended.
+    expect(parsed.tree.map((entry) => entry.path)).toEqual(
+      submittedFiles.map((f) => `release/m/my_keyboard/${f.path}`)
+    );
+    for (const [i, entry] of parsed.tree.entries()) {
+      expect(entry.content).toBe(submittedFiles[i]!.content);
+    }
+
+    // The README.md-at-repo-root regression this feature exists to prevent:
+    // it must land under the keyboard's own tree, never at "README.md" bare.
+    const readmeEntry = parsed.tree.find((entry) => entry.path.endsWith("README.md"));
+    expect(readmeEntry?.path).toBe("release/m/my_keyboard/README.md");
+    expect(parsed.tree.some((entry) => entry.path === "README.md")).toBe(false);
   });
 });
