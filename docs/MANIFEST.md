@@ -26,6 +26,7 @@ Owned by `/km-doc`. Update this file whenever a doc is added, archived, or re-sc
 | [`docs/keyboard-design-principles.md`](keyboard-design-principles.md) | Keyboard design guidance | New design decisions ratified in spec | live |
 | [`docs/discus-principles-integration.md`](discus-principles-integration.md) | DISCUS principles integration notes | Changes to criteria.json DISCUS rows | live |
 | [`content/facets/**`](../content/facets/) + [`utilities/facet-lint/index.js`](../utilities/facet-lint/index.js) | Facet catalog (23 records) and its plain-node structural checker | New/changed facet record; facet-lint rule changes | live |
+| [`docs/accessibility.md`](accessibility.md) | ADA/WCAG 2.2 AA approach: measurement contract, UI house rules, curated resources | House-rule changes; new a11y tooling; spec 056 cycle closes | live |
 | [`docs/working-agreement.md`](working-agreement.md) | Team working agreement | Team process changes | live |
 | [`docs/github_flow.md`](github_flow.md) | Delivery-option progress (Options A/B/C) | Scaffolder, VFS, or output-path work lands | live |
 
