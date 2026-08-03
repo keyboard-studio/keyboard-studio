@@ -559,3 +559,67 @@ describe("FR-026 — a revisit stays visible as history inside its stage", () =>
     expect(summaryTextFor("carve")).not.toContain("212");
   });
 });
+
+// ===========================================================================
+// specs/055-legible-decision-trail T037-a11y — the stage-toggle's accessible
+// name (trail-ui a11y review, P1). Every toggle used to expose the SAME
+// name — "Show decisions" / "Hide decisions" — regardless of which stage it
+// belonged to, so a screen-reader user tabbing through a multi-stage trail
+// could not tell one button from another. The fix names the stage in the
+// accessible name; these tests prove distinguishability by ROLE + NAME, the
+// same lookup a screen-reader user's rotor/button list performs, rather than
+// inspecting an attribute value directly.
+// ===========================================================================
+
+describe("stage-toggle accessible name (trail a11y review P1)", () => {
+  it("gives each stage's toggle a name that includes its own stage, not a generic 'Hide decisions'", () => {
+    renderTrail(walkedRecord());
+
+    // Every group starts expanded, so every toggle currently reads "Hide
+    // decisions for <stage>" — and each of the four lookups below must
+    // resolve to exactly one button, proving the names do not collide.
+    expect(
+      screen.getByRole("button", { name: "Hide decisions for Keyboard identity" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Hide decisions for Choosing a base keyboard" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Hide decisions for Edited the character gallery" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Hide decisions for Assigned key mechanisms" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Hide decisions for Edited the touch layout" }),
+    ).toBeTruthy();
+  });
+
+  it("keeps the visible label as a leading substring of the accessible name (WCAG 2.5.3)", () => {
+    renderTrail(recordOf([editorEntry("c1", "carve", "gallery_edit", editorSummary({ keysRemoved: 17 }))]));
+    const toggle = within(groupFor("carve")).getByTestId("decision-stage-toggle");
+    expect(toggle.textContent).toBe("Hide decisions");
+    expect(toggle.getAttribute("aria-label")).toMatch(/^Hide decisions for /);
+  });
+
+  it("flips the name's state word on collapse, while still naming the same stage", () => {
+    renderTrail(recordOf([editorEntry("c1", "carve", "gallery_edit", editorSummary({ keysRemoved: 17 }))]));
+    fireEvent.click(within(groupFor("carve")).getByTestId("decision-stage-toggle"));
+    expect(
+      within(groupFor("carve")).getByRole("button", {
+        name: "Show decisions for Edited the character gallery",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("wires the toggle's aria-controls to the region it reveals", () => {
+    renderTrail(recordOf([editorEntry("c1", "carve", "gallery_edit", editorSummary({ keysRemoved: 17 }))]));
+    const toggle = within(groupFor("carve")).getByTestId("decision-stage-toggle");
+    const controlsId = toggle.getAttribute("aria-controls");
+    expect(controlsId).toBeTruthy();
+    // The referenced id resolves to the entries region the toggle reveals.
+    expect(document.getElementById(controlsId!)).toBe(
+      within(groupFor("carve")).getAllByTestId("decision-entry")[0]!.closest("ul"),
+    );
+  });
+});

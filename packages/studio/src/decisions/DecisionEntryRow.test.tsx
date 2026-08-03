@@ -166,3 +166,21 @@ describe("the four impact states", () => {
     }
   });
 });
+
+describe("entry-expand aria-controls (trail a11y review P2)", () => {
+  it("wires the expand button to the impact region it reveals", () => {
+    render(
+      <ul>
+        <DecisionEntryRow entry={entry()} superseded={false} resolveImpact={() => ({ state: "none" })} />
+      </ul>,
+    );
+    const toggle = screen.getByTestId("decision-entry-expand");
+    const controlsId = toggle.getAttribute("aria-controls");
+    expect(controlsId).toBeTruthy();
+
+    // Before expansion the referenced region does not exist yet — the button
+    // still carries the id it WILL reveal (ARIA APG disclosure pattern).
+    fireEvent.click(toggle);
+    expect(document.getElementById(controlsId!)).toBe(screen.getByTestId("decision-entry-impact"));
+  });
+});

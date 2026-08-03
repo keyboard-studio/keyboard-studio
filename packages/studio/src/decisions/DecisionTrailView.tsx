@@ -235,6 +235,56 @@ export function DecisionTrailView({
     }
   };
 
+  // A stage group's name ALONE — the same per-kind mapping `stageRollUpText`
+  // below uses for its own `stage` local (`stageActionLabel` for the three
+  // editor-roll-up kinds, `stepStageLabel` for the rest), kept as its own
+  // function so the stage-toggle's accessible name can name the stage without
+  // repeating the (possibly long) roll-up detail. Naming via the roll-up kind
+  // rather than always via `stepStageLabel(group.stepId)` matters: an editor
+  // stage's `stepId` (e.g. "carve", "mechanisms", "touch") is NOT one of
+  // `stepStageLabel`'s named cases — that switch only covers the non-editor
+  // stages — so a naive stepId-only lookup would call every editor stage "a
+  // stage this build does not name", which is worse than undistinguishable.
+  const groupStageName = (group: StageGroup): string => {
+    const rollUp = group.rollUp;
+    switch (rollUp.kind) {
+      case "not-recorded":
+      case "base-contribution":
+      case "survey-summary":
+        return stepStageLabel(group.stepId);
+      case "editor-summary":
+      case "editor-no-change":
+      case "editor-unmeasured":
+        return stageActionLabel(rollUp.actionType);
+      default: {
+        const _exhaustive: never = rollUp;
+        return _exhaustive;
+      }
+    }
+  };
+
+  // The stage-toggle button's accessible name (P1 fix, trail-ui a11y review):
+  // the visible label alone — "Show decisions" / "Hide decisions" — repeats
+  // identically on every stage, so a screen-reader user tabbing through a
+  // multi-stage trail cannot tell which stage a given button controls.
+  // Naming the stage via `groupStageName` makes every button's name
+  // distinguishable by construction among stages that have a name (both
+  // `EditorActionType` and the non-editor stepId are closed catalogs), and
+  // keeps the visible text ("Show/Hide decisions") as a leading substring of
+  // the accessible name (WCAG 2.5.3 Label in Name).
+  const stageToggleAriaLabel = (group: StageGroup, expanded: boolean): string => {
+    const stage = groupStageName(group);
+    return expanded
+      ? t({
+          id: "trail.stage.toggle.hide.named",
+          message: `Hide decisions for ${stage}`,
+        })
+      : t({
+          id: "trail.stage.toggle.show.named",
+          message: `Show decisions for ${stage}`,
+        });
+  };
+
   // A stage group's one-line account (FR-023), computed WITHOUT resolving any
   // entry's impact (FR-021) — every branch reads only `group.rollUp`, the pure
   // value stageGroups.ts already derived from the record.
@@ -364,6 +414,11 @@ export function DecisionTrailView({
           <ul style={listStyle}>
             {nonEmptyStageGroups.map((group) => {
               const expanded = !collapsedSteps.has(group.stepId);
+              // Derived from the manifest stepId (unique per group), never
+              // rendered as text — an `id` attribute is not author-facing
+              // content, so this is FR-008-clean the way `data-step-id`
+              // already is above.
+              const entriesRegionId = `decision-stage-entries-${group.stepId}`;
               return (
                 <li
                   key={group.stepId}
@@ -380,6 +435,8 @@ export function DecisionTrailView({
                       data-testid="decision-stage-toggle"
                       style={toggleStyle}
                       aria-expanded={expanded}
+                      aria-controls={entriesRegionId}
+                      aria-label={stageToggleAriaLabel(group, expanded)}
                       onClick={() => toggleStage(group.stepId)}
                     >
                       {expanded
@@ -388,7 +445,7 @@ export function DecisionTrailView({
                     </button>
                   </div>
                   {expanded && (
-                    <ul style={stageEntriesStyle}>
+                    <ul style={stageEntriesStyle} id={entriesRegionId}>
                       {group.entries.map((entry) => {
                         const superseded = supersededIds.has(entry.entryId);
                         return (

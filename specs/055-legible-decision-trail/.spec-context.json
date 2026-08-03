@@ -450,6 +450,22 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-08-03T05:53:41.150Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011-extract",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T06:13:58.828Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037-a11y",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T06:14:02.165Z"
     }
   ],
   "coverage": {
@@ -971,7 +987,7 @@
     }
   },
   "telemetryInstanceId": "c7509f96-1e29-4e6f-8a65-690a8a8ad00d",
-  "currentTask": "T022",
+  "currentTask": "T037-a11y",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1352,6 +1368,27 @@
       "files": [
         "packages/studio/src/locales/en/messages.json"
       ]
+    },
+    "T011-extract": {
+      "status": "DONE",
+      "did": "Extracted the recordDecision store-derived dep block into decisions/createStudioDecisionRecorder.ts, a shared factory StudioShell.tsx and reducer.decisionRecording.test.ts's realRecorder() both call, closing the production/test wiring-drift gap flagged as P1",
+      "files": [
+        "packages/studio/src/StudioShell.tsx",
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts",
+        "packages/studio/src/decisions/createStudioDecisionRecorder.ts"
+      ]
+    },
+    "T037-a11y": {
+      "status": "DONE",
+      "did": "Fixed P1: stage-toggle button now exposes a distinguishable aria-label naming its stage (e.g. Hide decisions for Keyboard identity); wired aria-controls on stage-toggle and entry-expand buttons to the regions they reveal (P2)",
+      "files": [
+        "packages/studio/src/decisions/DecisionTrailView.tsx",
+        "packages/studio/src/decisions/DecisionEntryRow.tsx",
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json",
+        "packages/studio/src/decisions/DecisionTrailView.test.tsx",
+        "packages/studio/src/decisions/DecisionEntryRow.test.tsx"
+      ]
     }
   },
   "verified": [
@@ -1377,6 +1414,11 @@
       "what": "Architecture boundary after relocating recordMigration into the engine",
       "command": "pnpm depcruise",
       "result": "no dependency violations (925 modules, 3075 dependencies) - engine-not-to-studio rule holds"
+    },
+    {
+      "what": "Post-implement review cycle (km-qc, km-synthesis, km-frontend, km-verification) and re-gate after two P1 fixes",
+      "command": "pnpm typecheck; pnpm -r test; pnpm lint; pnpm depcruise",
+      "result": "No P0. km-verification APPROVE - all five claims verified incl. two deliberate-defect experiments that correctly went red then reverted. Two P1s fixed (stage-toggle accessible names; extracted createStudioDecisionRecorder so shell and test share one wiring). Re-gate: typecheck clean, 8297 tests pass, lint 0 errors, depcruise 0 violations."
     }
   ],
   "concerns": [
@@ -1398,6 +1440,26 @@
     },
     {
       "note": "StudioShell.tsx createDecisionRecorder dep block is inline and unimportable, so reducer.decisionRecording.test.ts must re-state it verbatim - the same drift class this feature exists to fix. Recommend extracting a shared createStudioDecisionRecorder().",
+      "step": "implement"
+    },
+    {
+      "note": "km-qc P1 (open): BaseContribution.startingKeyCount is typed optional and every consumer carries a not-measured branch, but the sole producer recordBaseContribution.ts always computes a real number - a consumer branch with no production path that can reach it. Either wire a genuine absence path or drop the optionality and the dead UI branches.",
+      "step": "implement"
+    },
+    {
+      "note": "km-synthesis P2 (open): the collect-supersedes-then-filter-effective algorithm is now implemented three times independently - prSummary.ts, decisionLogStore.ts, and the new stageGroups.ts. Pre-existing 053 duplication that 055 added a third copy to. Candidate for a shared effectiveEntries() helper in packages/contracts.",
+      "step": "implement"
+    },
+    {
+      "note": "km-frontend P2 (open): the dimension/stage label switch statements are duplicated between DecisionEntryRow.tsx and DecisionTrailView.tsx - exactly the fork SC-007 depends on not happening; a future edit to one silently desyncs the other.",
+      "step": "implement"
+    },
+    {
+      "note": "km-qc P2 (open): prSummary.ts formatDecision base-contribution branch carries a stale comment claiming no producer writes the payload yet (recordBaseContribution landed in this same change), and its wording interpolates payload.baseId.",
+      "step": "implement"
+    },
+    {
+      "note": "km-qc P2 (open): createDecisionRecorder.ts snapshot capture .catch(() => {}) swallows every error with no logging, making a real projection-pipeline regression indistinguishable from the intended best-effort no-op.",
       "step": "implement"
     }
   ],

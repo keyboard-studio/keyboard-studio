@@ -488,6 +488,13 @@ export function DecisionEntryRow({
   // base-contribution entry — see `baseContributionDetail` above.
   const impact = expanded && !isBaseContribution ? resolveImpact(entry) : null;
 
+  // Derived from the entry's own id (unique per row), never rendered as text —
+  // an `id` attribute is not author-facing content, so this is FR-008-clean
+  // the way `data-entry-id` already is below. Wires the expand button's
+  // `aria-controls` to the region it reveals (ARIA APG disclosure pattern;
+  // trail-ui a11y review P2).
+  const impactRegionId = `decision-entry-impact-${entry.entryId}`;
+
   return (
     <li
       style={rowStyle}
@@ -518,6 +525,7 @@ export function DecisionEntryRow({
           data-testid="decision-entry-expand"
           style={expandButtonStyle}
           aria-expanded={expanded}
+          aria-controls={impactRegionId}
           onClick={() => setExpanded((prev) => !prev)}
         >
           {expanded
@@ -527,7 +535,7 @@ export function DecisionEntryRow({
       </div>
 
       {expanded && (
-        <div data-testid="decision-entry-impact" style={{ marginTop: 4 }}>
+        <div data-testid="decision-entry-impact" id={impactRegionId} style={{ marginTop: 4 }}>
           {baseContributionDetail !== null ? (
             baseContributionDetail
           ) : impact === null ? (

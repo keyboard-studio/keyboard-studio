@@ -58,14 +58,13 @@ import { AccountControl } from "./components/AccountControl.tsx";
 import { hasVisited } from "./lib/firstVisit.ts";
 import { manifest, validateManifestShape } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
-import { createDecisionRecorder } from "./decisions/createDecisionRecorder.ts";
+import { createStudioDecisionRecorder } from "./decisions/createStudioDecisionRecorder.ts";
 import { createSourceSnapshotter } from "./decisions/snapshotSource.ts";
 import { useDecisionLogStore } from "./decisions/decisionLogStore.ts";
 import { DecisionTrailView } from "./decisions/DecisionTrailView.tsx";
 import { resolveImpact } from "./decisions/impact.ts";
 import { buildPathOverlay } from "./dashboard/pathOverlay.ts";
 import { projectWorkingCopyForOutput } from "./lib/serializeWorkingCopy.ts";
-import { selectDesktopAssignments } from "./lib/unimplementedInventory.ts";
 import { StepHost } from "./components/StepHost.tsx";
 import { ResumeDraftBanner } from "./components/ResumeDraftBanner.tsx";
 import { SurveyResetButton } from "./components/SurveyResetButton.tsx";
@@ -628,85 +627,15 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     }),
   );
 
+  // The store-derived dep block itself lives in createStudioDecisionRecorder.ts,
+  // shared verbatim with reducer.decisionRecording.test.ts's `realRecorder()` —
+  // see that module's header for why this used to be inlined here and why that
+  // was a defect (specs/055 post-implement review, P1).
   const recordDecision = useMemo(
     () =>
-      createDecisionRecorder({
+      createStudioDecisionRecorder({
+        getWorkingCopyState: () => useWorkingCopyStore.getState(),
         snapshotter: snapshotterRef.current,
-        getDeletionCounts: () => {
-          const wc = useWorkingCopyStore.getState();
-          return {
-            nodes: wc.deletedNodeIds.size,
-            items: wc.deletedItemIds.size,
-            touchKeys: wc.deletedTouchKeyIds.size,
-          };
-        },
-        getDeletedIds: () => {
-          const wc = useWorkingCopyStore.getState();
-          return [...wc.deletedNodeIds, ...wc.deletedItemIds, ...wc.deletedTouchKeyIds];
-        },
-        // The store's phase-C physical mechanism assignments, via the ONE
-        // documented selector every other reader of this filter also uses
-        // (unimplementedInventory.ts's `selectDesktopAssignments` docstring) —
-        // recordEditorStep must never fork this definition (research D-01).
-        getMechanismAssignments: () => {
-          const wc = useWorkingCopyStore.getState();
-          return selectDesktopAssignments(wc.phaseResults);
-        },
-        // The base IR the working copy was instantiated from (research D-05) —
-        // `null` before instantiation.
-        getBaseIr: () => useWorkingCopyStore.getState().baseIr,
-        getDeletedNodeIds: () => useWorkingCopyStore.getState().deletedNodeIds,
-        getDeletedItemIds: () => useWorkingCopyStore.getState().deletedItemIds,
-        // The keyboard's own id once the author has set one, else the base's —
-        // matching how `deriveProjectKeyFromWorkingCopy` keys a project, so the
-        // record and the draft agree on which keyboard this is.
-        getKeyboardId: () => {
-          const wc = useWorkingCopyStore.getState();
-          return wc.identity?.keyboardId ?? wc.baseKeyboard?.id ?? null;
-        },
-        // specs/055 FR-030..FR-035 (research D-11): the base baseline, read
-        // straight off the instantiated store — never a re-read of the base's
-        // source. `null` before instantiation; `recordBaseContribution` (called
-        // only at `choose_base` completion) treats that as "no entry yet",
-        // never a fabricated zero.
-        getBaseKeyboard: () => useWorkingCopyStore.getState().baseKeyboard,
-        getIrAxes: () => useWorkingCopyStore.getState().irAxes,
-        getInstantiationMode: () => useWorkingCopyStore.getState().instantiationMode,
-        getRemovalCapabilities: () => useWorkingCopyStore.getState().removalCapabilities,
-        // specs/055 FR-032/FR-033: `resolveProposal` seeded with the base's
-        // inherited values — the SAME three fields `recordBaseContribution`'s
-        // `inheritedMetadataOf` reports above (script/targets/version), read
-        // straight off the instantiated store, never a re-read of the base's
-        // source. This is the wiring `recordSurveyAnswers.ts`'s module header
-        // anticipates: when a recorded answer's value equals one of these, it
-        // was carried from the base, not typed by the author, so
-        // `deriveAnswerProvenance` returns `{ agency: "base-derived", source:
-        // "base" }` instead of falling through to `"hand-set"` — reaching the
-        // already-authored `trail.entry.headline.fromBase` message.
-        //
-        // No new provenance concept (FR-032): this is a lookup over data the
-        // base-contribution recorder already reads, not a second "came from
-        // base" flag. And no mutation when the author later overrides one of
-        // these values (FR-033) — a differing answer simply fails the
-        // value-equality check in `deriveAnswerProvenance` and records as
-        // `"hand-set"`, so the base's own entry (recorded once, above, at
-        // `choose_base` completion) and the author's superseding answer both
-        // stay on the append-only record, exactly as 053 FR-015's supersede
-        // semantics require.
-        resolveProposal: (questionId) => {
-          const base = useWorkingCopyStore.getState().baseKeyboard;
-          if (base === null) return undefined;
-          switch (questionId) {
-            case "script":
-              return { value: base.script, source: "base" };
-            case "targets":
-              return { value: base.targets, source: "base" };
-            case "version":
-              return { value: base.version, source: "base" };
-            default:
-              return undefined;
-          }
-        },
       }),
     [],
   );

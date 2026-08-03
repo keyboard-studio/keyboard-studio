@@ -42,11 +42,10 @@
 // editor step (FR-002), and recording being inert with respect to the artifact
 // (FR-006 / SC-006).
 //
-// KNOWN LIMITATION, recorded rather than hidden: `realRecorder()` re-states
-// StudioShell's `createDecisionRecorder({…})` dep block, because that block is
-// written inline in StudioShell.tsx and cannot be imported. The expressions are
-// copied verbatim from there; if the shell's wiring changes, this must change
-// with it.
+// `realRecorder()` below calls the SAME `createStudioDecisionRecorder` factory
+// StudioShell.tsx uses — the store-derived dep block is written once, in
+// decisions/createStudioDecisionRecorder.ts, so this file cannot drift from
+// production wiring the way the pre-055 version did.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
@@ -71,7 +70,7 @@ import {
   resetDecisionEntryIds,
   useDecisionLogStore,
 } from "../decisions/decisionLogStore.ts";
-import { createDecisionRecorder } from "../decisions/createDecisionRecorder.ts";
+import { createStudioDecisionRecorder } from "../decisions/createStudioDecisionRecorder.ts";
 import type { SourceSnapshotter } from "../decisions/snapshotSource.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
@@ -348,8 +347,8 @@ function inertSnapshotter(): SourceSnapshotter {
 }
 
 /**
- * The recorder as StudioShell builds it: every count read live out of the
- * working-copy store.
+ * The recorder as StudioShell builds it: `createStudioDecisionRecorder`, the
+ * SAME factory StudioShell.tsx calls, pointed at the real working-copy store.
  *
  * The snapshotter is the ONLY override. That is the anti-regression property of
  * this harness — there is no parameter through which a test could supply a
@@ -358,53 +357,9 @@ function inertSnapshotter(): SourceSnapshotter {
 function realRecorder(
   overrides: { snapshotter?: SourceSnapshotter } = {},
 ): ReducerDeps["recordDecision"] {
-  return createDecisionRecorder({
+  return createStudioDecisionRecorder({
+    getWorkingCopyState: () => useWorkingCopyStore.getState(),
     snapshotter: overrides.snapshotter ?? inertSnapshotter(),
-    getDeletionCounts: () => {
-      const wc = useWorkingCopyStore.getState();
-      return {
-        nodes: wc.deletedNodeIds.size,
-        items: wc.deletedItemIds.size,
-        touchKeys: wc.deletedTouchKeyIds.size,
-      };
-    },
-    getDeletedIds: () => {
-      const wc = useWorkingCopyStore.getState();
-      return [...wc.deletedNodeIds, ...wc.deletedItemIds, ...wc.deletedTouchKeyIds];
-    },
-    getMechanismAssignments: () =>
-      selectDesktopAssignments(useWorkingCopyStore.getState().phaseResults),
-    getBaseIr: () => useWorkingCopyStore.getState().baseIr,
-    getDeletedNodeIds: () => useWorkingCopyStore.getState().deletedNodeIds,
-    getDeletedItemIds: () => useWorkingCopyStore.getState().deletedItemIds,
-    getKeyboardId: () => {
-      const wc = useWorkingCopyStore.getState();
-      return wc.identity?.keyboardId ?? wc.baseKeyboard?.id ?? null;
-    },
-    // specs/055 FR-030..FR-035: the base baseline, read straight off the
-    // instantiated store — never a re-read of the base's source.
-    getBaseKeyboard: () => useWorkingCopyStore.getState().baseKeyboard,
-    getIrAxes: () => useWorkingCopyStore.getState().irAxes,
-    getInstantiationMode: () => useWorkingCopyStore.getState().instantiationMode,
-    getRemovalCapabilities: () => useWorkingCopyStore.getState().removalCapabilities,
-    // specs/055 FR-032/FR-033: the proposal register, seeded with the base's
-    // inherited values — the same three fields `recordBaseContribution`'s
-    // `inheritedMetadataOf` reports. Copied verbatim from StudioShell.tsx; see
-    // this file's KNOWN LIMITATION note.
-    resolveProposal: (questionId) => {
-      const base = useWorkingCopyStore.getState().baseKeyboard;
-      if (base === null) return undefined;
-      switch (questionId) {
-        case "script":
-          return { value: base.script, source: "base" };
-        case "targets":
-          return { value: base.targets, source: "base" };
-        case "version":
-          return { value: base.version, source: "base" };
-        default:
-          return undefined;
-      }
-    },
   });
 }
 
