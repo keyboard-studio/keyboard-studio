@@ -21,6 +21,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const path = require('path');
 const https = require('https');
+const { spawnSync } = require('child_process');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const SPEC_FILE = path.join(REPO_ROOT, 'spec.md');
@@ -89,11 +90,55 @@ function collectDocs(entries) {
   return out;
 }
 
+/**
+ * Partition a list of paths into git-ignored and not, in one batched call.
+ *
+ * `docs/spec-trace.json` is a COMMITTED artifact: every unit that reaches it
+ * contributes an id and a human-readable title. A spec directory that git
+ * ignores is local-only by definition — work in progress, machine-local
+ * scratch, or deliberately embargoed — and must never be transcribed into a
+ * tracked file, because `acknowledge` would publish its title on the next
+ * commit. `readdirSync` alone cannot see that intent; git can.
+ *
+ * Returns the set of ignored paths. When git cannot be consulted at all (not
+ * installed, not a work tree), returns an empty set — the pre-existing
+ * behaviour of tracking every directory. That is the safe fallback here: with
+ * no git there is no commit, so nothing can leak, and failing the other way
+ * would silently drop real specs from the manifest.
+ */
+function gitIgnoredNames(names) {
+  if (names.length === 0) return new Set();
+  // `-z` is required, not cosmetic: without it git C-quotes any path it deems
+  // unusual — which on Windows means every backslash-bearing path comes back as
+  // `"D:\\repo\\specs\\x"` and no plain string compare matches. `-z` emits raw
+  // NUL-separated paths on both sides. Inputs are repo-relative POSIX paths so
+  // the returned strings compare directly against what we sent.
+  //
+  // Exit status: 0 = at least one path ignored, 1 = none ignored, >1 = real
+  // error. Only >1 is a failure.
+  const res = spawnSync('git', ['-C', REPO_ROOT, 'check-ignore', '-z', '--stdin'], {
+    input: names.map(n => 'specs/' + n).join('\0'),
+    encoding: 'utf8'
+  });
+  if (res.error || res.status === null || res.status > 1) return new Set();
+  return new Set(
+    res.stdout.split('\0').filter(Boolean).map(p => p.slice('specs/'.length))
+  );
+}
+
 function collectFeatureSpecs() {
   if (!fs.existsSync(SPECS_DIR)) return [];
-  const entries = fs.readdirSync(SPECS_DIR, { withFileTypes: true })
+  const names = fs.readdirSync(SPECS_DIR, { withFileTypes: true })
     .filter(e => e.isDirectory())
-    .map(e => ({ file: path.join(SPECS_DIR, e.name, 'spec.md'), id: 'specs/' + e.name, fallback: e.name }));
+    .map(e => e.name);
+  const ignored = gitIgnoredNames(names);
+  const entries = names
+    .filter(name => !ignored.has(name))
+    .map(name => ({
+      file: path.join(SPECS_DIR, name, 'spec.md'),
+      id: 'specs/' + name,
+      fallback: name
+    }));
   return collectDocs(entries);
 }
 

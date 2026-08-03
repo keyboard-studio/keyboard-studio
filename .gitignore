@@ -50,8 +50,10 @@ utilities/kbgen/data/cldr/
 .claude/scheduled_tasks.lock
 .claude/worktrees/
 
-# Local security-review scratch (per-machine; not a committed artifact)
-SECURITY-REVIEW.md
+# Local security-review scratch (per-machine; not a committed artifact).
+# Glob, not a literal: dated reports (SECURITY-REVIEW-YYYY-MM-DD.md) describe
+# live unpatched findings and must never reach this public repo.
+SECURITY-REVIEW*.md
 
 # Diagnostic probe output (Playwright screenshots, ad-hoc dumps)
 # Probes write to tmp/ by convention; never commit captures.
