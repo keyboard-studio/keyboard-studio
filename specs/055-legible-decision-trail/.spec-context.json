@@ -139,6 +139,54 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-03T04:06:08.865Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:10:13.567Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:11:31.292Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:13:08.873Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:16:26.622Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:17:39.238Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:18:44.782Z"
     }
   ],
   "coverage": {
@@ -523,7 +571,7 @@
     }
   },
   "telemetryInstanceId": "c7509f96-1e29-4e6f-8a65-690a8a8ad00d",
-  "currentTask": "T008",
+  "currentTask": "T020",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -602,6 +650,51 @@
         "packages/engine/src/decision-audit/index.ts",
         "packages/engine/src/index.ts",
         "packages/studio/src/decisions/decisionLogStore.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Reshaped headline.ts: injected HeadlineDeps.lookupQuestionLabel, QuestionName replacing raw questionId, zero-suppressed ordered HeadlineDimension, and three distinguished editorStep/editorStepNoChange/editorStepUnmeasured outcomes",
+      "files": [
+        "packages/studio/src/decisions/headline.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Added trail.entry.headline.question.unknown, stage.* (galleryEdit/mechanismEdit/touchEdit), dimension.* ICU plurals (keysRemoved/keysAdded/mechanismsAssigned/touchKeysAffected), and editorStep.composed/.noChange/.unmeasured to en/messages.json; retired trail.entry.headline.editorStep by removal (no repurpose, no rename)",
+      "files": [
+        "packages/studio/src/locales/en/messages.json"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Added production lookupQuestionLabel (createLookupQuestionLabel factory) resolving audit_label -> prompt -> undefined via resolveContentString, injectable for HeadlineDeps",
+      "files": [
+        "packages/studio/src/decisions/lookupQuestionLabel.ts",
+        "packages/studio/src/decisions/lookupQuestionLabel.test.ts"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Widened snapshotSource.ts's boundary baseline from one .kmn text to a Map<path,text> over every non-binary projected-VFS entry, diffing per path (union of both boundaries' paths) into a files[] set with aggregate magnitude; zero changed files still returns state:none",
+      "files": [
+        "packages/studio/src/decisions/snapshotSource.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Added pure occupiedHostKeys(ir) helper bridging IRRule structural shapes (simple_swap, deadkey_single_tap) into the existing extractMechanismHostKey, with 6 passing tests",
+      "files": [
+        "packages/studio/src/lib/occupiedHostKeys.ts",
+        "packages/studio/src/lib/occupiedHostKeys.test.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Added recordBaseContribution.ts: records one base-contribution entry at choose_base completion from injected working-copy-store getters (baseKeyboard/baseIr/irAxes/instantiationMode/removalCapabilities), with startingKeyCount from toRailNodes in the nodes+items unit and no entry written when the store isn't yet instantiated",
+      "files": [
+        "packages/studio/src/decisions/recordBaseContribution.ts",
+        "packages/studio/src/decisions/recordBaseContribution.test.ts"
       ]
     }
   }

@@ -1,5 +1,6 @@
 // snapshotSource — attribute a step's source change to the decision that caused
-// it (specs/053-decision-audit FR-008/FR-009, SC-005).
+// it (specs/053-decision-audit FR-008/FR-009, SC-005; widened to every projected
+// text file by specs/055-legible-decision-trail FR-016/FR-017/FR-018).
 //
 // WHY THE TEXT COMES FROM WHERE IT DOES
 //
@@ -16,10 +17,21 @@
 // so a codec emit is not the text that ships. Diffing a text nobody receives is
 // how an audit comes to disagree with its artifact (research D-04).
 //
+// WHY EVERY FILE, NOT ONE `.kmn`
+//
+// FR-016/FR-017 require a decision that only touched, say, the `.kps` to show
+// its change — not "no isolable change" because the comparison only ever looked
+// at the `.kmn`. The boundary baseline is therefore a `Map<path, text>` over
+// EVERY entry the projection holds with `isBinary === false`, and the path set
+// comes from enumerating `entries` at read time (never a maintained list, so a
+// file the projection starts emitting tomorrow is covered with no code change
+// here — FR-016). Binary entries are skipped: never diffed.
+//
 // This module holds NO projection logic of its own — the read is injected, and
-// the injected implementation in StudioShell delegates to the output projection.
-// What it owns is the boundary bookkeeping: the previous boundary's text, and the
-// net diff against it.
+// the injected implementation in StudioShell delegates to the output projection
+// (`projectWorkingCopyForOutput`, the same function the zip and PR paths call —
+// FR-018 holds by construction). What it owns is the boundary bookkeeping: the
+// previous boundary's per-path text, and the net diff against it, file by file.
 //
 // TIMING. Capture happens on step-completion events, never on a timer, so the
 // single 300 ms validation cycle (Constitution Article IV) gains nothing. The
@@ -27,24 +39,40 @@
 // entry synchronously and attaches the impact when it resolves.
 
 import { diffLines, diffMagnitude } from "@keyboard-studio/engine";
-import type { DecisionImpact } from "@keyboard-studio/contracts";
+import type { DecisionFileChange, DecisionImpact, VirtualFSEntry } from "@keyboard-studio/contracts";
 
-/** The projected `.kmn` at a boundary: the path it ships at, and its text. */
+/** The projected VFS's entries at a boundary — both text and binary. */
 export interface ProjectedSource {
-  path: string;
-  text: string;
+  entries: readonly VirtualFSEntry[];
 }
 
 export interface SourceSnapshotterDeps {
   /**
-   * Read the `.kmn` the output projection currently produces, or `null` when
+   * Read every entry the output projection currently holds, or `null` when
    * there is no working copy yet.
    *
    * MUST delegate to the shared projection — see the module header. An
    * implementation that emitted from the IR instead would satisfy the type and
    * violate SC-005.
    */
-  readProjectedKmn: () => Promise<ProjectedSource | null>;
+  readProjectedFiles: () => Promise<ProjectedSource | null>;
+}
+
+/**
+ * Reduce a projection's entries to the `path -> text` baseline this module
+ * diffs against: binary entries are skipped (never diffed), and a "text"
+ * entry whose content is not actually a string (defensively — the contract
+ * ties `isBinary` and content shape together, but this module does not trust
+ * that at a distance) is skipped the same way.
+ */
+function textBaseline(entries: readonly VirtualFSEntry[]): Map<string, string> {
+  const baseline = new Map<string, string>();
+  for (const entry of entries) {
+    if (entry.isBinary) continue;
+    if (typeof entry.content !== "string") continue;
+    baseline.set(entry.path, entry.content);
+  }
+  return baseline;
 }
 
 export interface SourceSnapshotter {
@@ -64,37 +92,63 @@ export interface SourceSnapshotter {
 }
 
 export function createSourceSnapshotter(deps: SourceSnapshotterDeps): SourceSnapshotter {
-  // The previous boundary's projected text. `null` means "no baseline yet", which
-  // is distinct from "the baseline is the empty string".
-  let previous: ProjectedSource | null = null;
+  // The previous boundary's `path -> text` baseline, over every non-binary
+  // entry the projection held at that boundary. `null` means "no baseline
+  // yet", which is distinct from "the baseline is an empty map" (a projection
+  // that genuinely produced zero text files — not expected in practice, but
+  // not this module's invariant to assume away).
+  let previous: Map<string, string> | null = null;
 
   return {
     captureAtBoundary: async () => {
-      let current: ProjectedSource | null;
+      let projected: ProjectedSource | null;
       try {
-        current = await deps.readProjectedKmn();
+        projected = await deps.readProjectedFiles();
       } catch {
         // A projection failure must never break a step transition. The step
         // completes, the decision is still recorded, and this entry simply has no
         // captured change — which the trail can express.
         return null;
       }
-      if (current === null) return null;
+      if (projected === null) return null;
 
+      const current = textBaseline(projected.entries);
       const baseline = previous;
       previous = current;
       if (baseline === null) return null; // First boundary — baseline only.
 
-      const hunks = diffLines(baseline.text, current.text);
-      if (hunks.length === 0) return { state: "none" };
-      const magnitude = diffMagnitude(hunks);
-      // One file today (specs/055-legible-decision-trail T027 widens this to
-      // the whole projected VFS); `magnitude` is the aggregate over `files`,
-      // currently identical to the single file's own magnitude.
+      // Enumerated from the union of both boundaries' own paths — never a
+      // maintained list (FR-016) — so a file the projection stops or starts
+      // emitting between boundaries is still compared, not silently skipped.
+      const paths = new Set<string>([...baseline.keys(), ...current.keys()]);
+      const files: DecisionFileChange[] = [];
+      let addedTotal = 0;
+      let removedTotal = 0;
+      for (const path of paths) {
+        const before = baseline.get(path) ?? "";
+        const after = current.get(path) ?? "";
+        const hunks = diffLines(before, after);
+        if (hunks.length === 0) continue;
+        const magnitude = diffMagnitude(hunks);
+        files.push({ path, hunks, magnitude });
+        addedTotal += magnitude.added;
+        removedTotal += magnitude.removed;
+      }
+
+      // Zero changed files is `{ state: "none" }`, never an empty `"captured"`
+      // (record-shape.contract.md §3 — `files` is non-empty by construction).
+      if (files.length === 0) return { state: "none" };
+
+      // `Set` iteration order followed insertion order from two maps built off
+      // `VirtualFS.entries()`, whose own order is documented "unspecified" — so
+      // sort by path here rather than let the rendered order depend on VFS
+      // internals.
+      files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+
       return {
         state: "captured",
-        files: [{ path: current.path, hunks, magnitude }],
-        magnitude,
+        files,
+        magnitude: { added: addedTotal, removed: removedTotal },
       };
     },
 

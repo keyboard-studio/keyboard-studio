@@ -57,7 +57,7 @@ The contracts change breaks every consumer by design: with the counts optional, 
 
 **Wave 1 — the one derivation with no shipped precedent (research D-05 names it the highest-uncertainty task; build and test it first):**
 
-- [ ] **T009** NEW pure helper `occupiedHostKeys(ir: KeyboardIR): ReadonlySet<string>` — which physical keys an IR occupies, host key recovered via the existing `extractMechanismHostKey`; an assignment yielding no host key contributes nothing rather than an empty-string key · `packages/studio/src/lib/occupiedHostKeys.ts` + `occupiedHostKeys.test.ts`
+- [x] **T009** NEW pure helper `occupiedHostKeys(ir: KeyboardIR): ReadonlySet<string>` — which physical keys an IR occupies, host key recovered via the existing `extractMechanismHostKey`; an assignment yielding no host key contributes nothing rather than an empty-string key · `packages/studio/src/lib/occupiedHostKeys.ts` + `occupiedHostKeys.test.ts`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
@@ -85,9 +85,9 @@ The contracts change breaks every consumer by design: with the counts optional, 
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T013** [P] Reshape the selection surface per [headline-spec.contract.md](contracts/headline-spec.contract.md) §1–§3: `HeadlineDeps.lookupQuestionLabel` injected (never imported), `QuestionName` replacing the raw `questionId`, `HeadlineDimension` carrying only counts that are **present and non-zero** in fixed order, and the three distinguished editor outcomes `editorStep` / `editorStepNoChange` / `editorStepUnmeasured`. No variant carries a `questionId`, an action-type string used as prose, a `stepId`, a message id, or a field name · `packages/studio/src/decisions/headline.ts`
-- [ ] **T014** [P] Add the new message ids from [headline-spec.contract.md](contracts/headline-spec.contract.md) §4 — `question.unknown`, the three `stage.*` names (adopting the engine's `EDITOR_LABEL` wording, **not** importing it), the four `dimension.*` ICU plurals, `editorStep.composed` / `.noChange` / `.unmeasured`; retire `trail.entry.headline.editorStep` rather than repurposing it, and rename no existing id · `packages/studio/src/locales/en/messages.json`
-- [ ] **T015** [P] NEW production `lookupQuestionLabel` resolving `audit_label` → `prompt` → `undefined` through the existing `resolveContentString("flowQuestions", id, field, englishValue, i18n)` seam that `QuestionField.tsx` already uses — no second per-question label store (FR-009) · `packages/studio/src/decisions/lookupQuestionLabel.ts` + test
+- [x] **T013** [P] Reshape the selection surface per [headline-spec.contract.md](contracts/headline-spec.contract.md) §1–§3: `HeadlineDeps.lookupQuestionLabel` injected (never imported), `QuestionName` replacing the raw `questionId`, `HeadlineDimension` carrying only counts that are **present and non-zero** in fixed order, and the three distinguished editor outcomes `editorStep` / `editorStepNoChange` / `editorStepUnmeasured`. No variant carries a `questionId`, an action-type string used as prose, a `stepId`, a message id, or a field name · `packages/studio/src/decisions/headline.ts`
+- [x] **T014** [P] Add the new message ids from [headline-spec.contract.md](contracts/headline-spec.contract.md) §4 — `question.unknown`, the three `stage.*` names (adopting the engine's `EDITOR_LABEL` wording, **not** importing it), the four `dimension.*` ICU plurals, `editorStep.composed` / `.noChange` / `.unmeasured`; retire `trail.entry.headline.editorStep` rather than repurposing it, and rename no existing id · `packages/studio/src/locales/en/messages.json`
+- [x] **T015** [P] NEW production `lookupQuestionLabel` resolving `audit_label` → `prompt` → `undefined` through the existing `resolveContentString("flowQuestions", id, field, englishValue, i18n)` seam that `QuestionField.tsx` already uses — no second per-question label store (FR-009) · `packages/studio/src/decisions/lookupQuestionLabel.ts` + test
 - [ ] **T016** [P] Author `definition.audit_label` on the questions whose `prompt` reads badly as a headline (sparse by design — most need none), then regenerate `content/i18n/en/flowQuestions.json` with the extractor rather than hand-editing it; `pnpm run content-i18n-freshness` and `pnpm run content-i18n-lint` stay green · question modules under `content/` + `content/i18n/en/flowQuestions.json`
 
 **⟶ Wait for Wave 1 to finish, then:**
@@ -115,7 +115,7 @@ The contracts change breaks every consumer by design: with the counts optional, 
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T020** [P] NEW baseline recorder: one entry at `choose_base` completion carrying `baseId`, `baseDisplayName`, `startingKeyCount`, `derivedAxes`, `inheritedMetadata`, `instantiationMode`, read from the **instantiated store** via injected deps (never a re-read of the base source, FR-035). `startingKeyCount` uses `toRailNodes(baseIr, removalCapabilities)` so the denominator is in the same `nodes + items` unit as `keysRemoved` (FR-034). No instantiated working copy at that instant → **no entry**, never a fabricated zero (research D-11) · `packages/studio/src/decisions/recordBaseContribution.ts` + `recordBaseContribution.test.ts`
+- [x] **T020** [P] NEW baseline recorder: one entry at `choose_base` completion carrying `baseId`, `baseDisplayName`, `startingKeyCount`, `derivedAxes`, `inheritedMetadata`, `instantiationMode`, read from the **instantiated store** via injected deps (never a re-read of the base source, FR-035). `startingKeyCount` uses `toRailNodes(baseIr, removalCapabilities)` so the denominator is in the same `nodes + items` unit as `keysRemoved` (FR-034). No instantiated working copy at that instant → **no entry**, never a fabricated zero (research D-11) · `packages/studio/src/decisions/recordBaseContribution.ts` + `recordBaseContribution.test.ts`
 - [ ] **T021** [P] Add the `baseContribution` variant to the selection surface — base name plus only the contributions actually present ([headline-spec.contract.md](contracts/headline-spec.contract.md) §2) · `packages/studio/src/decisions/headline.ts`
 - [ ] **T022** [P] Add `trail.entry.headline.baseContribution` plus the messages that render `derivedAxes` and `inheritedMetadata[].field` **codes** as prose — a code must never reach author-facing text (FR-008) · `packages/studio/src/locales/en/messages.json`
 
@@ -148,7 +148,7 @@ The contracts change breaks every consumer by design: with the counts optional, 
 
 **Wave 1 — the widened baseline:**
 
-- [ ] **T027** Hold the boundary baseline as a `Map<path, text>` over **every** projected-VFS entry with `isBinary === false` instead of one `.kmn` text, and diff per path into a `files[]` set plus an aggregate magnitude. The set is enumerated from `vfs.entries()`, never from a maintained file list (FR-016), and still read from `projectWorkingCopyForOutput` — the same projection the zip and PR paths call, so FR-018 holds by construction · `packages/studio/src/decisions/snapshotSource.ts`
+- [x] **T027** Hold the boundary baseline as a `Map<path, text>` over **every** projected-VFS entry with `isBinary === false` instead of one `.kmn` text, and diff per path into a `files[]` set plus an aggregate magnitude. The set is enumerated from `vfs.entries()`, never from a maintained file list (FR-016), and still read from `projectWorkingCopyForOutput` — the same projection the zip and PR paths call, so FR-018 holds by construction · `packages/studio/src/decisions/snapshotSource.ts`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
