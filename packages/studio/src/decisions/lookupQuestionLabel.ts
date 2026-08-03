@@ -18,16 +18,10 @@ import { questionRegistry } from "../survey/questions/registry.ts";
 import type { FlowQuestion } from "../survey/types.ts";
 
 /**
- * The two prose fields this module ever reads off a flow-question definition.
- * `audit_label` isn't declared on {@link FlowQuestion} yet — the extractor
- * reads it via the identical cast (see extract.ts's `extractFlowQuestionStrings`)
- * pending that field landing on the shared type — so this is the narrow view
- * this module needs rather than the whole definition.
+ * The two prose fields this module ever reads off a flow-question definition
+ * — a narrow view of `FlowQuestion` rather than the whole definition.
  */
-export interface QuestionLabelSource {
-  prompt?: string;
-  audit_label?: string;
-}
+export type QuestionLabelSource = Pick<FlowQuestion, "prompt" | "audit_label">;
 
 /**
  * Injection seam for the flow-question source. Defaults to reading the real
@@ -40,10 +34,11 @@ export type GetQuestionLabelSource = (questionId: string) => QuestionLabelSource
 function defaultGetQuestionLabelSource(questionId: string): QuestionLabelSource | undefined {
   const mod = questionRegistry[questionId];
   if (mod === undefined) return undefined;
-  // Same cast extract.ts uses: audit_label isn't on FlowQuestion's declared
-  // shape yet, but a question module may set it.
-  const definition = mod.definition as FlowQuestion & { audit_label?: string };
-  return { prompt: definition.prompt, audit_label: definition.audit_label };
+  const { definition } = mod;
+  return {
+    ...(definition.prompt !== undefined && { prompt: definition.prompt }),
+    ...(definition.audit_label !== undefined && { audit_label: definition.audit_label }),
+  };
 }
 
 /** Same trim guard the extractor uses to decide a field counts as "authored" (contract §2). */

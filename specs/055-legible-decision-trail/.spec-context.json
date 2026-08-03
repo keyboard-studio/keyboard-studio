@@ -187,6 +187,46 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-03T04:18:44.782Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:24:23.637Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:24:23.831Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:25:44.978Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:26:02.914Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:26:21.176Z"
     }
   ],
   "coverage": {
@@ -571,7 +611,7 @@
     }
   },
   "telemetryInstanceId": "c7509f96-1e29-4e6f-8a65-690a8a8ad00d",
-  "currentTask": "T020",
+  "currentTask": "T016",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -695,6 +735,59 @@
       "files": [
         "packages/studio/src/decisions/recordBaseContribution.ts",
         "packages/studio/src/decisions/recordBaseContribution.test.ts"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "createDecisionRecorder now attaches the boundary's one capture to every entry recorded at that boundary, with sharedWith naming co-decisions (self excluded) when more than one was recorded, absent otherwise",
+      "files": [
+        "packages/studio/src/decisions/createDecisionRecorder.ts"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Added normalizeHistoryDateStamp normalizer in snapshotSource.ts to hold HISTORY.md's stageAdaptHistory date stamp stable before diffing (FR-017a/D-09)",
+      "files": [
+        "packages/studio/src/decisions/snapshotSource.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "recordEditorStep.ts: mechanismsAssigned now counts getMechanismAssignments() (store-derived, never result.assignments); keysAdded computed as newly-occupied host keys via occupiedHostKeys(applyCarveMutate(baseIr,...)) unioned with phase-C assignment host keys; every unmeasured dimension left absent (undefined) per data-model.md section 1",
+      "files": [
+        "packages/studio/src/decisions/recordEditorStep.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "DecisionEntryRow renders the reshaped HeadlineSpec: question via injected createLookupQuestionLabel(i18n) with FR-014 unknown fallback, stage/dimension codes mapped to catalog text, editorStep composed via editorStep.composed, noChange/unmeasured rendered as distinct statements; retired the notMeasured stopgap",
+      "files": [
+        "packages/studio/src/decisions/DecisionEntryRow.tsx"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Authored 15 audit_label overrides and regenerated content/i18n/en/flowQuestions.json via the extractor",
+      "files": [
+        "packages/studio/src/survey/types.ts",
+        "packages/studio/src/survey/questions/a/il_language_english.ts",
+        "packages/studio/src/survey/questions/a/il_language_autonym.ts",
+        "packages/studio/src/survey/questions/a/il_target_script.ts",
+        "packages/studio/src/survey/questions/b/pb_discovery_intro.ts",
+        "packages/studio/src/survey/questions/b/pb_special_letters.ts",
+        "packages/studio/src/survey/questions/b/pb_punctuation_gate.ts",
+        "packages/studio/src/survey/questions/b/pb_char_count.ts",
+        "packages/studio/src/survey/questions/b/pb_standard_letters.ts",
+        "packages/studio/src/survey/questions/b/pb_typing_approach.ts",
+        "packages/studio/src/survey/questions/b/pb_use_case.ts",
+        "packages/studio/src/survey/questions/g/track_choice.ts",
+        "packages/studio/src/survey/questions/g/project_display_name.ts",
+        "packages/studio/src/survey/questions/f/pf_welcome_paragraph.ts",
+        "packages/studio/src/survey/questions/f/pf_credits.ts",
+        "packages/studio/src/survey/questions/f/pf_contact_info.ts",
+        "content/i18n/en/flowQuestions.json",
+        "utilities/i18n-content-extract/extract.ts",
+        "packages/studio/src/decisions/lookupQuestionLabel.ts"
       ]
     }
   }

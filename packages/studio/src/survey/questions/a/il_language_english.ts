@@ -28,6 +28,7 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 export const definition = {
   id: "il_language_english",
   prompt: "What is your language called in English?",
+  audit_label: "Language name (English)",
   help_text:
     "Start typing your language's English name and pick it from the list " +
     "(for example: Hausa, Swahili, Hindi). When two languages share a name, " +

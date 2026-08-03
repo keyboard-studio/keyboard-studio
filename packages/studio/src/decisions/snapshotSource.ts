@@ -75,6 +75,41 @@ function textBaseline(entries: readonly VirtualFSEntry[]): Map<string, string> {
   return baseline;
 }
 
+// ---------------------------------------------------------------------------
+// Volatile-content normalization (FR-017a, research D-09)
+// ---------------------------------------------------------------------------
+
+/**
+ * Hold `HISTORY.md`'s staged date stamp stable before diffing.
+ *
+ * `stageAdaptHistory` (packages/engine/src/output/adapt-staging.ts, invoked
+ * from packages/studio/src/lib/serializeWorkingCopy.ts) prepends an ATX
+ * heading of the exact shape `## <bumpedVersion> (<dateIso>)` to `HISTORY.md`
+ * on every projection, stamping `new Date().toISOString().slice(0, 10)`.
+ * Within one session that stamp is constant across boundaries and cancels
+ * out — but a boundary pair straddling local midnight would otherwise show a
+ * spurious one-line change attributed to whichever decision happened to be
+ * recorded then. This neutralises only that date token: only in
+ * `HISTORY.md`, and only inside the specific `## ... (YYYY-MM-DD)` heading
+ * shape `stageAdaptHistory` produces. A genuine edit anywhere else in the
+ * file — including a hand-edited line that isn't this heading shape — is
+ * left untouched and still surfaces as a hunk.
+ *
+ * (The `.kps` `<Version>` bump needs no equivalent treatment: it is derived
+ * deterministically from `baseIr.header.version`, not from wall-clock or
+ * randomness, so it is already stable across projections within a session
+ * and across a midnight boundary alike — research D-09.)
+ *
+ * Pure: returns a new string, never mutates `text`.
+ */
+function normalizeHistoryDateStamp(path: string, text: string): string {
+  if (path !== "HISTORY.md") return text;
+  return text.replace(
+    /^(## .+ )\(\d{4}-\d{2}-\d{2}\)$/gm,
+    "$1(0000-00-00)",
+  );
+}
+
 export interface SourceSnapshotter {
   /**
    * Capture the net source change since the previous boundary and advance the
@@ -125,8 +160,8 @@ export function createSourceSnapshotter(deps: SourceSnapshotterDeps): SourceSnap
       let addedTotal = 0;
       let removedTotal = 0;
       for (const path of paths) {
-        const before = baseline.get(path) ?? "";
-        const after = current.get(path) ?? "";
+        const before = normalizeHistoryDateStamp(path, baseline.get(path) ?? "");
+        const after = normalizeHistoryDateStamp(path, current.get(path) ?? "");
         const hunks = diffLines(before, after);
         if (hunks.length === 0) continue;
         const magnitude = diffMagnitude(hunks);

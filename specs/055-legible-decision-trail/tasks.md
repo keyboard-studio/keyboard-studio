@@ -61,7 +61,7 @@ The contracts change breaks every consumer by design: with the counts optional, 
 
 **⟶ Wait for Wave 1 to finish, then:**
 
-- [ ] **T010** `RecordEditorStepDeps` gains `getMechanismAssignments` plus the carve-projection inputs; `observeEditorStep`'s `mechanism_edit` branch computes `mechanismsAssigned` from the dep (never from `result.assignments`, which the adapter never populates) and `keysAdded` as `|after \ before|` over `occupiedHostKeys(applyCarveMutate(baseIr, deletedNodeIds, deletedItemIds))`; every dimension a stage does not measure is left **absent**, per the [data-model.md](data-model.md) §1 producer/consumer matrix · `packages/studio/src/decisions/recordEditorStep.ts`
+- [x] **T010** `RecordEditorStepDeps` gains `getMechanismAssignments` plus the carve-projection inputs; `observeEditorStep`'s `mechanism_edit` branch computes `mechanismsAssigned` from the dep (never from `result.assignments`, which the adapter never populates) and `keysAdded` as `|after \ before|` over `occupiedHostKeys(applyCarveMutate(baseIr, deletedNodeIds, deletedItemIds))`; every dimension a stage does not measure is left **absent**, per the [data-model.md](data-model.md) §1 producer/consumer matrix · `packages/studio/src/decisions/recordEditorStep.ts`
 
 **⟶ Wait for T010 to finish, then:**
 
@@ -88,13 +88,13 @@ The contracts change breaks every consumer by design: with the counts optional, 
 - [x] **T013** [P] Reshape the selection surface per [headline-spec.contract.md](contracts/headline-spec.contract.md) §1–§3: `HeadlineDeps.lookupQuestionLabel` injected (never imported), `QuestionName` replacing the raw `questionId`, `HeadlineDimension` carrying only counts that are **present and non-zero** in fixed order, and the three distinguished editor outcomes `editorStep` / `editorStepNoChange` / `editorStepUnmeasured`. No variant carries a `questionId`, an action-type string used as prose, a `stepId`, a message id, or a field name · `packages/studio/src/decisions/headline.ts`
 - [x] **T014** [P] Add the new message ids from [headline-spec.contract.md](contracts/headline-spec.contract.md) §4 — `question.unknown`, the three `stage.*` names (adopting the engine's `EDITOR_LABEL` wording, **not** importing it), the four `dimension.*` ICU plurals, `editorStep.composed` / `.noChange` / `.unmeasured`; retire `trail.entry.headline.editorStep` rather than repurposing it, and rename no existing id · `packages/studio/src/locales/en/messages.json`
 - [x] **T015** [P] NEW production `lookupQuestionLabel` resolving `audit_label` → `prompt` → `undefined` through the existing `resolveContentString("flowQuestions", id, field, englishValue, i18n)` seam that `QuestionField.tsx` already uses — no second per-question label store (FR-009) · `packages/studio/src/decisions/lookupQuestionLabel.ts` + test
-- [ ] **T016** [P] Author `definition.audit_label` on the questions whose `prompt` reads badly as a headline (sparse by design — most need none), then regenerate `content/i18n/en/flowQuestions.json` with the extractor rather than hand-editing it; `pnpm run content-i18n-freshness` and `pnpm run content-i18n-lint` stay green · question modules under `content/` + `content/i18n/en/flowQuestions.json`
+- [x] **T016** [P] Author `definition.audit_label` on the questions whose `prompt` reads badly as a headline (sparse by design — most need none), then regenerate `content/i18n/en/flowQuestions.json` with the extractor rather than hand-editing it; `pnpm run content-i18n-freshness` and `pnpm run content-i18n-lint` stay green · question modules under `content/` + `content/i18n/en/flowQuestions.json`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
 **Wave 2 — independent (different files):**
 
-- [ ] **T017** [P] Render the reshaped spec: stage **code** mapped to a catalog message, the dimension list composed through `editorStep.composed`, and the no-change / unmeasured outcomes rendered as statements rather than a row of zeros (US1 scenario 5, FR-011). `data-testid` values are the trail-UI contract — add, never rename · `packages/studio/src/decisions/DecisionEntryRow.tsx`
+- [x] **T017** [P] Render the reshaped spec: stage **code** mapped to a catalog message, the dimension list composed through `editorStep.composed`, and the no-change / unmeasured outcomes rendered as statements rather than a row of zeros (US1 scenario 5, FR-011). `data-testid` values are the trail-UI contract — add, never rename · `packages/studio/src/decisions/DecisionEntryRow.tsx`
 - [ ] **T018** [P] Selection tests without a DOM (FR-013): zero-and-absent suppression, fixed dimension order, plural agreement at a count of exactly one, the `{ known: false }` fallback, and the three-outcome table from [headline-spec.contract.md](contracts/headline-spec.contract.md) §3 · `packages/studio/src/decisions/headline.test.ts`
 
 **⟶ Wait for Wave 2 to finish, then:**
@@ -154,8 +154,8 @@ The contracts change breaks every consumer by design: with the counts optional, 
 
 **Wave 2 — independent (different files):**
 
-- [ ] **T028** [P] Add a single named normalizer that holds the `HISTORY.md` staged date stamp stable before diffing, so a boundary crossing midnight shows no spurious change while a genuine history edit stays visible. The `.kps` `<Version>` bump is deterministic (derived from `baseIr.header.version`) and needs no handling — recorded so it is not re-litigated (FR-017a, research D-09) · `packages/studio/src/decisions/snapshotSource.ts`
-- [ ] **T029** [P] Attach the boundary's **one** capture to every entry recorded at that boundary and populate `sharedWith` with the co-decisions' `entryId`s — never the entry's own. A single-decision boundary is unchanged: `sharedWith` absent, the entry claims the change outright. One comparison per boundary, so 053's model is preserved exactly (FR-019/FR-019a) · `packages/studio/src/decisions/createDecisionRecorder.ts`
+- [x] **T028** [P] Add a single named normalizer that holds the `HISTORY.md` staged date stamp stable before diffing, so a boundary crossing midnight shows no spurious change while a genuine history edit stays visible. The `.kps` `<Version>` bump is deterministic (derived from `baseIr.header.version`) and needs no handling — recorded so it is not re-litigated (FR-017a, research D-09) · `packages/studio/src/decisions/snapshotSource.ts`
+- [x] **T029** [P] Attach the boundary's **one** capture to every entry recorded at that boundary and populate `sharedWith` with the co-decisions' `entryId`s — never the entry's own. A single-decision boundary is unchanged: `sharedWith` absent, the entry claims the change outright. One comparison per boundary, so 053's model is preserved exactly (FR-019/FR-019a) · `packages/studio/src/decisions/createDecisionRecorder.ts`
 
 **⟶ Wait for Wave 2 to finish, then:**
 

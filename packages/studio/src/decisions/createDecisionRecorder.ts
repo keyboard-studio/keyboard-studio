@@ -6,23 +6,28 @@
 // judgement here — rather than inside `StudioShell`'s dep memo — means it can be
 // tested without mounting the shell.
 //
-// ATTRIBUTION RULE, and its deliberate limit
+// ATTRIBUTION RULE (specs/055-legible-decision-trail FR-019/FR-019a)
 //
-// A step boundary yields ONE net source diff (snapshotSource.ts). Attribution is
-// therefore only honest when the step produced exactly one decision:
+// A step boundary yields ONE net source diff (snapshotSource.ts). That capture is
+// attached to EVERY decision recorded at that boundary:
 //
 //   - an editor step: one aggregated entry, and the boundary diff is its change;
 //   - a question step that resolved a single answer: same;
-//   - a question step that resolved several answers: the diff CANNOT be split
-//     between them, so none of them claims it. Those entries fall through to the
-//     on-request counterfactual path (impact.ts), which reports the FR-011 reason
-//     when it cannot derive one.
+//   - a question step that resolved several answers: the SAME capture is
+//     attached to each of those entries, and each one's `sharedWith` names its
+//     co-decisions (their `entryId`s, never its own) — a joint statement of what
+//     those decisions did together, not a claim that any one of them did it
+//     alone.
 //
-// Attaching the whole step's diff to each of four answers would be the easy
-// alternative and would make every one of them overstate what it did. An entry
-// that says "cannot be isolated, here is why" is worth more than four that lie.
+// This is still exactly ONE comparison per boundary (FR-019a) — the capture
+// itself is computed once, below; only the attach step fans it out.
+//
+// A single-decision boundary is unchanged from before this feature:
+// `sharedWith` is absent, and the entry claims the change outright. An empty
+// array would say "shared with nobody", which is a different and wrong
+// statement, so the multi-vs-single branch below is not optional plumbing.
 
-import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { DecisionImpact, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useDecisionLogStore } from "./decisionLogStore.ts";
 import { recordSurveyAnswers, type ProposalLookup } from "./recordSurveyAnswers.ts";
 import { recordEditorStep, type DeletionCounts } from "./recordEditorStep.ts";
@@ -85,15 +90,31 @@ export function createDecisionRecorder(
       getDeletedIds: deps.getDeletedIds,
     });
 
+    // Every entry recorded at this boundary — a question step's answers, or an
+    // editor step's single aggregated entry (never both: a step is one or the
+    // other). This is the boundary's full co-decision set, collected BEFORE the
+    // capture resolves so `sharedWith` can name every sibling once it lands.
+    const recordedIds: string[] = editorId !== null ? [editorId] : answerIds;
+
     // Advance the source baseline on EVERY completion, whether or not anything
     // was recorded. Skipping non-recording steps would make the next diff span
     // two boundaries and attribute another step's change to this one.
-    const attributable = editorId ?? (answerIds.length === 1 ? answerIds[0]! : null);
     void deps.snapshotter
       .captureAtBoundary()
       .then((impact) => {
-        if (impact === null || attributable === null) return;
-        useDecisionLogStore.getState().attachImpact(attributable, impact);
+        if (impact === null || recordedIds.length === 0) return;
+        const store = useDecisionLogStore.getState();
+        // One capture, attached to every entry this boundary recorded. Only a
+        // "captured" impact carries `sharedWith` (the contract's other two
+        // states have no per-file data to share); it is added only when there
+        // is more than one co-decision, and always excludes the entry's own id.
+        for (const entryId of recordedIds) {
+          const forEntry: DecisionImpact =
+            impact.state === "captured" && recordedIds.length > 1
+              ? { ...impact, sharedWith: recordedIds.filter((id) => id !== entryId) }
+              : impact;
+          store.attachImpact(entryId, forEntry);
+        }
       })
       .catch(() => {
         // Capture is best-effort by design: the decision is already recorded, and

@@ -20,10 +20,12 @@
 // The `data-testid` values here are the contract (trail-ui.contract.md §2);
 // renaming one breaks tests.
 
-import { useState } from "react";
-import type { DecisionEntry, DecisionImpact } from "@keyboard-studio/contracts";
+import { useMemo, useState } from "react";
+import type { DecisionEntry, DecisionImpact, EditorActionType } from "@keyboard-studio/contracts";
 import { useLingui } from "@lingui/react/macro";
-import { headlineFor } from "./headline.ts";
+import { plural } from "@lingui/core/macro";
+import { headlineFor, type HeadlineDimension, type QuestionName } from "./headline.ts";
+import { createLookupQuestionLabel } from "./lookupQuestionLabel.ts";
 import { DiffHunkList } from "../ui/DiffHunkList.tsx";
 import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 
@@ -72,61 +74,140 @@ export function DecisionEntryRow({
   hidden = false,
   resolveImpact,
 }: DecisionEntryRowProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const [expanded, setExpanded] = useState(false);
 
-  const spec = headlineFor(entry);
+  // The production `lookupQuestionLabel` (specs/055 contracts/headline-spec.contract.md
+  // §1) — resolved once per locale rather than reconstructed on every render.
+  const lookupQuestionLabel = useMemo(() => createLookupQuestionLabel(i18n), [i18n]);
+  const spec = headlineFor(entry, { lookupQuestionLabel });
+
+  // A question's display name for interpolation. `known: false` selects the
+  // FR-014 fallback — readable prose, never the raw questionId and never blank.
+  const questionText = (question: QuestionName): string =>
+    question.known
+      ? question.label
+      : t({
+          id: "trail.entry.headline.question.unknown",
+          message: "a question this build no longer has",
+        });
+
+  // The editor stage as author-facing prose. `stage` is a code (FR-008); this
+  // is the one place it is ever mapped to text, and it is never rendered raw.
+  const stageLabel = (stage: EditorActionType): string => {
+    switch (stage) {
+      case "gallery_edit":
+        return t({
+          id: "trail.entry.headline.stage.galleryEdit",
+          message: "Edited the character gallery",
+        });
+      case "mechanism_edit":
+        return t({
+          id: "trail.entry.headline.stage.mechanismEdit",
+          message: "Assigned key mechanisms",
+        });
+      case "touch_edit":
+        return t({
+          id: "trail.entry.headline.stage.touchEdit",
+          message: "Edited the touch layout",
+        });
+      default: {
+        const _exhaustive: never = stage;
+        return _exhaustive;
+      }
+    }
+  };
+
+  // One dimension's ICU-pluralized text (FR-011/FR-012). `count` is destructured
+  // to a plain local so the Lingui macro derives the named placeholder `count`
+  // rather than a positional one.
+  const dimensionLabel = (dimension: HeadlineDimension): string => {
+    const { count } = dimension;
+    switch (dimension.kind) {
+      case "keysRemoved":
+        return t({
+          id: "trail.entry.headline.dimension.keysRemoved",
+          message: plural(count, { one: "# key removed", other: "# keys removed" }),
+        });
+      case "keysAdded":
+        return t({
+          id: "trail.entry.headline.dimension.keysAdded",
+          message: plural(count, { one: "# key added", other: "# keys added" }),
+        });
+      case "mechanismsAssigned":
+        return t({
+          id: "trail.entry.headline.dimension.mechanismsAssigned",
+          message: plural(count, {
+            one: "# mechanism assigned",
+            other: "# mechanisms assigned",
+          }),
+        });
+      case "touchKeysAffected":
+        return t({
+          id: "trail.entry.headline.dimension.touchKeysAffected",
+          message: plural(count, {
+            one: "# touch key affected",
+            other: "# touch keys affected",
+          }),
+        });
+      default: {
+        const _exhaustive: never = dimension.kind;
+        return _exhaustive;
+      }
+    }
+  };
 
   // The headline. Locals rather than member expressions in the template so the
-  // Lingui macro derives NAMED placeholders ({value}, {question}) instead of
-  // positional ones — a translator has to be able to reorder them.
+  // Lingui macro derives NAMED placeholders ({value}, {question}, {stage},
+  // {dimensions}) instead of positional ones — a translator has to be able to
+  // reorder them.
   let headline: string;
   if (spec.id === "chose") {
-    const { value, question } = spec;
+    const value = spec.value;
+    const question = questionText(spec.question);
     headline = t({
       id: "trail.entry.headline.chose",
       message: `Chose ${value} for ${question}`,
     });
   } else if (spec.id === "acceptedSuggested") {
-    const { value, question, source } = spec;
+    const value = spec.value;
+    const question = questionText(spec.question);
+    const source = spec.source;
     headline = t({
       id: "trail.entry.headline.acceptedSuggested",
       message: `Accepted suggested ${value} for ${question}, from ${source}`,
     });
   } else if (spec.id === "fromBase") {
-    const { value, question } = spec;
+    const value = spec.value;
+    const question = questionText(spec.question);
     headline = t({
       id: "trail.entry.headline.fromBase",
       message: `Carried ${value} for ${question} from the base keyboard`,
     });
-  } else {
-    const {
-      editor,
-      keysRemoved: keysRemovedCount,
-      keysAdded: keysAddedCount,
-      mechanismsAssigned: mechanismsAssignedCount,
-      touchKeysAffected: touchKeysAffectedCount,
-    } = spec;
-    // Absence renders as words, never coerced to a number (specs/055
-    // FR-005/FR-005a). This one string is a placeholder for T014/T022/T030,
-    // which own the real message-id design for the editor-step headline; it
-    // exists only so an unmeasured dimension has something true to say.
-    const notMeasured = t({
-      id: "trail.entry.headline.editorStep.notMeasured",
-      message: "not measured",
-    });
-    const countText = (count: number | undefined) =>
-      count === undefined ? notMeasured : String(count);
-    // Same local NAMES as the already-extracted catalog message uses (the
-    // Lingui macro derives each placeholder's name from the expression's own
-    // source text), just now holding formatted text instead of a raw number.
-    const keysRemoved = countText(keysRemovedCount);
-    const keysAdded = countText(keysAddedCount);
-    const mechanismsAssigned = countText(mechanismsAssignedCount);
-    const touchKeysAffected = countText(touchKeysAffectedCount);
+  } else if (spec.id === "editorStep") {
+    // At least one dimension is present and non-zero (FR-011) — the composed
+    // sentence names only what happened, never a row of zeros.
+    const stage = stageLabel(spec.stage);
+    const dimensions = spec.dimensions.map(dimensionLabel).join(", ");
     headline = t({
-      id: "trail.entry.headline.editorStep",
-      message: `Edited ${editor}: ${keysRemoved} keys removed, ${keysAdded} added, ${mechanismsAssigned} mechanisms assigned, ${touchKeysAffected} touch keys affected`,
+      id: "trail.entry.headline.editorStep.composed",
+      message: `${stage} (${dimensions})`,
+    });
+  } else if (spec.id === "editorStepNoChange") {
+    // Measured, and every count was zero — a statement, not a suppressed list
+    // (US1 scenario 5, FR-011).
+    const stage = stageLabel(spec.stage);
+    headline = t({
+      id: "trail.entry.headline.editorStep.noChange",
+      message: `${stage} (changed nothing)`,
+    });
+  } else {
+    // Not measured at all — genuinely different from "measured and zero"
+    // (FR-005a) and must read as a different sentence, not the same one.
+    const stage = stageLabel(spec.stage);
+    headline = t({
+      id: "trail.entry.headline.editorStep.unmeasured",
+      message: `${stage} (what this stage did was not recorded)`,
     });
   }
 
