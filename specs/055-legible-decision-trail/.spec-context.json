@@ -1462,20 +1462,38 @@
     },
     {
       "note": "km-synthesis P2 (open): the collect-supersedes-then-filter-effective algorithm is now implemented three times independently - prSummary.ts, decisionLogStore.ts, and the new stageGroups.ts. Pre-existing 053 duplication that 055 added a third copy to. Candidate for a shared effectiveEntries() helper in packages/contracts.",
-      "step": "implement"
+      "step": "implement",
+      "resolution": "RESOLVED 2026-08-03 (km-triage cycle 2): hoisted to packages/contracts as supersededEntryIds() + effectiveEntries(). Contracts, not a studio module, because the callers span the package boundary and engine-not-to-studio forbids the other direction. All four copies now read through it: prSummary.ts, stageGroups.ts, DecisionTrailView.tsx, and decisionLogStore.ts's liveEntryForSlot."
     },
     {
       "note": "km-frontend P2 (open): the dimension/stage label switch statements are duplicated between DecisionEntryRow.tsx and DecisionTrailView.tsx - exactly the fork SC-007 depends on not happening; a future edit to one silently desyncs the other.",
-      "step": "implement"
+      "step": "implement",
+      "resolution": "PARTIALLY RESOLVED 2026-08-03 (km-triage cycle 2): the STAGE mapping — the one SC-007 names — is now a single Record<EditorActionType, MessageDescriptor> in packages/studio/src/decisions/stageText.ts, consumed by both components, so a fourth EditorActionType is a compile error in one place instead of a silent miss in one of two. dimensionLabel is still duplicated: its messages carry ICU plural macros, and the msg()+resolveMessage convention shared modules use here has no precedent for plural (its no-i18n fallback does naive placeholder substitution, not ICU), so extracting it needs a resolver change rather than a move. Left open deliberately."
     },
     {
       "note": "km-qc P2 (open): prSummary.ts formatDecision base-contribution branch carries a stale comment claiming no producer writes the payload yet (recordBaseContribution landed in this same change), and its wording interpolates payload.baseId.",
-      "step": "implement"
+      "step": "implement",
+      "resolution": "RESOLVED 2026-08-03 (km-triage cycle 2) for the stale-comment half: prSummary.ts and record.ts both now state that recordBaseContribution.ts is landed and wired at choose_base completion. The baseId interpolation stands as-is and is not a defect — FR-008 governs the AUTHOR-facing trail; this block is the reviewer-facing PR body, where a keyboard's base id is the identifier a reviewer actually wants."
     },
     {
       "note": "km-qc P2 (open): createDecisionRecorder.ts snapshot capture .catch(() => {}) swallows every error with no logging, making a real projection-pipeline regression indistinguishable from the intended best-effort no-op.",
       "step": "implement"
+    },
+    {
+      "note": "km-keyman HIGH (km-triage cycle 2): a restored pre-v2 record stayed TAGGED v1 through hydrate (`normalized.version || DECISION_RECORD_VERSION` reads 1 as truthy) and through parseDecisionRecord, so draftPersistence snapshotted it as v1 and the NEXT read re-fired migrateRawEntryIfPreV2 over every entry appended since — normalizePayload omits all four editor counts unconditionally, so genuinely-measured counts were erased on each reload cycle. FR-005a's fabricated-absence failure, at the version boundary.",
+      "step": "implement",
+      "resolution": "RESOLVED 2026-08-03: normalizeDecisionRecord now tags its migrated result DECISION_RECORD_VERSION (it returns a v2-shaped record, so it must say so); parseDecisionRecord lifts a pre-v2 version to DECISION_RECORD_VERSION while passing an unrecognised FUTURE version through untouched (contract §5 row 3); hydrate takes Math.max(normalized.version, DECISION_RECORD_VERSION) as its own defensive floor. Guarded by three tests, including the full hydrate -> append-measured -> snapshot -> re-read loop in decisionLogStore.test.ts."
+    },
+    {
+      "note": "km-qc/km-keyman (km-triage cycle 2): slotKeyOf's delimiter had been downgraded from U+0000 to a space for the two pre-existing payload kinds, which no spec artifact asked for. Injective only while every stepId/questionId/actionType happens to exclude spaces — nothing type-enforces that, and slotKeyOf is load-bearing for the append-only supersession invariant.",
+      "step": "implement",
+      "resolution": "RESOLVED 2026-08-03 via km-triage's option (b): U+0000 restored as a named SLOT_DELIMITER constant written as the ESCAPE \u0000, not as raw bytes. Recovers collision-freedom by construction AND keeps the file textual — the raw-NUL spelling is what made git type this blob binary and render 'Binary files differ' instead of a reviewable diff. Guarded by a collision test covering both the same-branch and the cross-branch triples that a printable delimiter would conflate."
+    },
+    {
+      "note": "km-domain (km-triage cycle 2): five clause lists in the trail were assembled with a hardcoded \", \" AFTER each clause had been through the catalog — an English list convention with no translator seam, the same defect trail.entry.headline.baseContribution.joinTwo exists to avoid for the two-item case.",
+      "step": "implement",
+      "resolution": "RESOLVED 2026-08-03: formatClauseList (stageText.ts) wraps Intl.ListFormat over the active i18n.locale; all five sites (headline dimensions, derived axes, inherited metadata, stage roll-up dimensions) now use it. Two guard tests in DecisionEntryRow.test.tsx pin the conjunction, since every pre-existing assertion happened to be single-item and would not have caught a regression."
     }
   ],
-  "last_action": "all 43 tasks done - typecheck clean, 8292 tests pass, pnpm lint green (0 errors)"
+  "last_action": "km-triage cycle-2 findings resolved on 055-legible-decision-trail: record-version re-tagging (engine + studio), slotKeyOf delimiter restored as an escape, Intl.ListFormat for five clause lists, shared effectiveEntries/supersededEntryIds in contracts, shared stage-name mapping, three stale not-yet-landed comments corrected. Gate re-run green: typecheck 7/7, 8304 tests passed / 2 skipped, lint 8 checkers green, depcruise 0 violations."
 }

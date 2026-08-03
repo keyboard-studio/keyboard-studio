@@ -9,7 +9,11 @@
 // through as if it had been measured/produced by this feature.
 
 import { describe, expect, it } from "vitest";
-import { DECISION_RECORD_FORMAT, type DecisionRecord } from "@keyboard-studio/contracts";
+import {
+  DECISION_RECORD_FORMAT,
+  DECISION_RECORD_VERSION,
+  type DecisionRecord,
+} from "@keyboard-studio/contracts";
 import { normalizeDecisionRecord, type PreMigrationDecisionRecord } from "./recordMigration.js";
 
 const V1_RECORD: PreMigrationDecisionRecord = {
@@ -155,6 +159,15 @@ describe("normalizeDecisionRecord — v1 fixture (SC-011)", () => {
     const before = structuredClone(V1_RECORD);
     normalizeDecisionRecord(V1_RECORD);
     expect(V1_RECORD).toEqual(before);
+  });
+
+  it("tags the returned record v2, since that is the shape it returns", () => {
+    // The input on disk stays v1 (asserted above); what this function HANDS BACK
+    // is v2-shaped, and saying otherwise would be a lie with consequences — a
+    // caller that stores the result (decisionLogStore's `hydrate`) would keep the
+    // v1 tag and re-run this normalizer on the next read, stripping the counts
+    // entries appended in between genuinely measured (FR-005a).
+    expect(normalizeDecisionRecord(V1_RECORD).version).toBe(DECISION_RECORD_VERSION);
   });
 });
 

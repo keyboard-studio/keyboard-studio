@@ -18,10 +18,11 @@
 // never dropped from `entries` either (FR-026) — the group still shows them
 // as history, `rollUp` just does not read them.
 
-import type {
-  DecisionEntry,
-  EditorActionSummary,
-  EditorActionType,
+import {
+  supersededEntryIds,
+  type DecisionEntry,
+  type EditorActionSummary,
+  type EditorActionType,
 } from "@keyboard-studio/contracts";
 import { manifest } from "../steps/manifest.ts";
 import type { HeadlineDimension, HeadlineDimensionKind } from "./headline.ts";
@@ -165,10 +166,10 @@ function computeRollUp(
 export function buildStageGroups(
   record: { readonly entries: readonly DecisionEntry[] },
 ): readonly StageGroup[] {
-  const supersededIds = new Set<string>();
-  for (const entry of record.entries) {
-    if (entry.supersedes !== null) supersededIds.add(entry.supersedes);
-  }
+  // Computed once over the WHOLE record, not per stage: an entry in one stage
+  // can be superseded by a revisit that landed under the same stage later in the
+  // record, and `computeRollUp` below is handed one stage's entries at a time.
+  const supersededIds = supersededEntryIds(record.entries);
 
   const entriesByStep = new Map<string, DecisionEntry[]>();
   const firstSeenOrder: string[] = [];

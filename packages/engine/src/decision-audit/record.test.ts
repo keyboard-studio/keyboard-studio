@@ -302,6 +302,57 @@ describe("parseDecisionRecord — v1 migration (specs/055-legible-decision-trail
     expect(impact.magnitude).toEqual({ added: 2, removed: 1 });
   });
 
+  it("reports the migrated record as v2, so the migration cannot re-fire on a later read", () => {
+    // The read's OWN output is v2-shaped — every surviving entry went through
+    // `migrateRawEntryIfPreV2` above — so handing back the stale `1` would make
+    // the next reader migrate again. That matters because the studio stores this
+    // record and appends to it: a second migration would strip the counts those
+    // NEW entries genuinely measured, which is FR-005a's "absence must never be
+    // fabricated" failure relocated to the version boundary. Modelled here as
+    // the full loop, since neither half is wrong on its own.
+    const first = parseDecisionRecord(JSON.stringify(v1Raw));
+    expect(first.record.version).toBe(DECISION_RECORD_VERSION);
+
+    const withMeasuredAppend: DecisionRecord = {
+      ...first.record,
+      entries: [
+        ...first.record.entries,
+        editorEntry({
+          entryId: "measured-after-migration",
+          payload: {
+            kind: "editor-action",
+            actionType: "gallery_edit",
+            summary: {
+              keysRemoved: 0,
+              keysAdded: 7,
+              mechanismsAssigned: 2,
+              touchKeysAffected: 0,
+              sample: ["K_Z"],
+              sampleTruncated: false,
+            },
+          },
+        }),
+      ],
+    };
+
+    const second = parseDecisionRecord(serializeDecisionRecord(withMeasuredAppend));
+    const appended = second.record.entries.find((e) => e.entryId === "measured-after-migration")!;
+    if (appended.payload.kind !== "editor-action") throw new Error("expected editor-action");
+    // Present-and-zero survives as present-and-zero; a measured count survives
+    // as itself. Neither is normalized away a second time.
+    expect(appended.payload.summary).toMatchObject({
+      keysRemoved: 0,
+      keysAdded: 7,
+      mechanismsAssigned: 2,
+      touchKeysAffected: 0,
+    });
+    // The pre-existing v1 entry stays un-enriched — the fix re-tags the record,
+    // it does not retroactively invent counts for what v1 never measured.
+    const legacy = second.record.entries.find((e) => e.entryId === "e1")!;
+    if (legacy.payload.kind !== "editor-action") throw new Error("expected editor-action");
+    expect("keysAdded" in legacy.payload.summary).toBe(false);
+  });
+
   it("does not write the normalized form back — the source text and object are untouched by the read", () => {
     const text = JSON.stringify(v1Raw);
     const before = structuredClone(v1Raw);

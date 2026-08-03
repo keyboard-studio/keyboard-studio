@@ -27,6 +27,7 @@ import {
   DECISION_RECORD_FORMAT,
   DECISION_RECORD_VERSION,
   makeEmptyDecisionRecord,
+  supersededEntryIds,
   type DecisionEntry,
   type DecisionImpact,
   type DecisionPayload,
@@ -114,22 +115,45 @@ export interface DecisionLogState {
 // ---------------------------------------------------------------------------
 
 /**
+ * The delimiter between a slot key's parts.
+ *
+ * `U+0000` cannot occur in any of the identifiers composed below, so the key is
+ * injective BY CONSTRUCTION rather than by an assumption about today's naming
+ * conventions: two different (stepId, discriminant, id) triples can never
+ * produce the same key. A printable separator would only be safe while every
+ * id happens to exclude it — and nothing type-enforces that, so the guarantee
+ * would quietly rest on a convention instead of on the alphabet.
+ *
+ * Written as an ESCAPE, deliberately. An earlier revision of this file spelled
+ * the same delimiter as four raw `U+0000` BYTES in the source; `git` then types
+ * the blob binary and renders "Binary files differ" instead of a diff, so every
+ * change to this module — the module that enforces the append-only supersession
+ * invariant — became unreviewable on GitHub. The escape is plain ASCII source
+ * and produces the identical runtime string.
+ */
+const SLOT_DELIMITER = "\u0000";
+
+/**
  * The "slot" a decision occupies, for deciding whether a new decision replaces
  * an earlier one.
  *
  * A survey answer's slot is its question within its step; an editor action's is
  * its editor within its step. Two different questions in the same step are two
  * slots and never supersede each other — which is exactly why the slot is not
- * just `stepId`.
+ * just `stepId`. The single-letter middle part discriminates the payload kinds,
+ * so a question and an editor that happen to share an id are still two slots.
+ *
+ * The key is compared with `===` and never parsed back apart.
  */
 export function slotKeyOf(stepId: string, payload: DecisionPayload): string {
-  if (payload.kind === "survey-answer") return `${stepId} q ${payload.questionId}`;
-  if (payload.kind === "editor-action") return `${stepId} e ${payload.actionType}`;
-  // base-contribution (specs/055-legible-decision-trail D-11): recorded once at
-  // `choose_base` by a not-yet-landed producer (recordBaseContribution.ts). The
-  // slot only needs to exist and not collide with a survey or editor slot; that
-  // task owns whether a base-contribution entry is ever superseded.
-  return `${stepId} b ${payload.kind}`;
+  const d = SLOT_DELIMITER;
+  if (payload.kind === "survey-answer") return `${stepId}${d}q${d}${payload.questionId}`;
+  if (payload.kind === "editor-action") return `${stepId}${d}e${d}${payload.actionType}`;
+  // base-contribution (specs/055-legible-decision-trail D-11), recorded once at
+  // `choose_base` by recordBaseContribution.ts. The slot only needs to exist
+  // and not collide with a survey or editor slot; whether such an entry is ever
+  // superseded is that producer's business, not this function's.
+  return `${stepId}${d}b${d}${payload.kind}`;
 }
 
 /** Whether two payloads record the same decision with the same value. */
@@ -205,9 +229,7 @@ export function liveEntryForSlot(
   entries: readonly DecisionEntry[],
   slotKey: string,
 ): DecisionEntry | undefined {
-  const superseded = new Set(
-    entries.map((e) => e.supersedes).filter((id): id is string => id !== null),
-  );
+  const superseded = supersededEntryIds(entries);
   for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i]!;
     if (superseded.has(entry.entryId)) continue;
@@ -343,7 +365,19 @@ export const useDecisionLogStore = create<DecisionLogState>((set, get) => ({
     set({
       record: {
         format: DECISION_RECORD_FORMAT,
-        version: normalized.version || DECISION_RECORD_VERSION,
+        // Whatever came in, what goes into memory is v2-shaped —
+        // `normalizeDecisionRecord` guarantees that and already tags its
+        // result accordingly. `Math.max` is this seam's own restatement of
+        // that floor rather than a second opinion about it (see the module
+        // header: hydrate is the DEFENSIVE seam, and it takes a record from
+        // any caller). A newer build's record keeps its own higher version.
+        //
+        // What must never happen is a pre-v2 tag surviving into the store: a
+        // restored v1 draft would stay tagged v1 for the whole session, and
+        // since `draftPersistence` snapshots this state, the next read would
+        // re-run the migration over every entry appended in between and strip
+        // the counts those entries genuinely measured (FR-005a).
+        version: Math.max(normalized.version, DECISION_RECORD_VERSION),
         keyboardId: normalized.keyboardId,
         entries: normalized.entries,
         truncated: normalized.truncated,

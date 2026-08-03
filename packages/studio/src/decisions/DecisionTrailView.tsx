@@ -17,16 +17,18 @@
 // None of them hides the list, because a partial trail is still worth reading.
 
 import { useMemo, useState } from "react";
-import type {
-  DecisionEntry,
-  DecisionImpact,
-  DecisionRecord,
-  EditorActionType,
+import {
+  supersededEntryIds,
+  type DecisionEntry,
+  type DecisionImpact,
+  type DecisionRecord,
+  type EditorActionType,
 } from "@keyboard-studio/contracts";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { DecisionEntryRow } from "./DecisionEntryRow.tsx";
 import { buildStageGroups, type StageGroup } from "./stageGroups.ts";
+import { formatClauseList, stageActionLabel } from "./stageText.ts";
 import type { HeadlineDimension } from "./headline.ts";
 import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 
@@ -99,7 +101,7 @@ export function DecisionTrailView({
   droppedCount = 0,
   resolveImpact,
 }: DecisionTrailViewProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   // FR-015: superseded entries stay in the DOM as history, collapsed by default so
   // the trail reads as "what I decided" first and "how I got there" on request.
   const [showSuperseded, setShowSuperseded] = useState(false);
@@ -116,11 +118,10 @@ export function DecisionTrailView({
       return next;
     });
 
-  const supersededIds = useMemo(
-    () =>
-      new Set(record.entries.map((e) => e.supersedes).filter((id): id is string => id !== null)),
-    [record.entries],
-  );
+  // The same derivation stageGroups.ts and the engine's prSummary read through
+  // (contracts' `supersededEntryIds`), so a row dimmed as "replaced" here and a
+  // stage roll-up that declines to count it are always the same set of entries.
+  const supersededIds = useMemo(() => supersededEntryIds(record.entries), [record.entries]);
 
   const hasSuperseded = record.entries.some((e) => supersededIds.has(e.entryId));
 
@@ -135,32 +136,11 @@ export function DecisionTrailView({
   // dropped here — only a stage truly untouched is.
   const nonEmptyStageGroups = stageGroups.filter((group) => group.entries.length > 0);
 
-  // The editor stage a roll-up's `actionType` names (FR-008/FR-010) — the same
-  // catalogue ids DecisionEntryRow uses for entry headlines, so the trail and
-  // its stage summaries never disagree on what a stage is called (SC-007).
-  const stageActionLabel = (actionType: EditorActionType): string => {
-    switch (actionType) {
-      case "gallery_edit":
-        return t({
-          id: "trail.entry.headline.stage.galleryEdit",
-          message: "Edited the character gallery",
-        });
-      case "mechanism_edit":
-        return t({
-          id: "trail.entry.headline.stage.mechanismEdit",
-          message: "Assigned key mechanisms",
-        });
-      case "touch_edit":
-        return t({
-          id: "trail.entry.headline.stage.touchEdit",
-          message: "Edited the touch layout",
-        });
-      default: {
-        const _exhaustive: never = actionType;
-        return _exhaustive;
-      }
-    }
-  };
+  // The editor stage a roll-up's `actionType` names (FR-008/FR-010) — the SAME
+  // function DecisionEntryRow uses for entry headlines (stageText.ts), not a
+  // parallel mapping over the same union, so the trail and its stage summaries
+  // cannot disagree on what a stage is called (SC-007).
+  const stageLabel = (actionType: EditorActionType): string => stageActionLabel(actionType, i18n);
 
   // One dimension's ICU-pluralized text (FR-011/FR-012) — mirrors
   // DecisionEntryRow's dimensionLabel so a stage's composed roll-up reads the
@@ -236,7 +216,7 @@ export function DecisionTrailView({
   };
 
   // A stage group's name ALONE — the same per-kind mapping `stageRollUpText`
-  // below uses for its own `stage` local (`stageActionLabel` for the three
+  // below uses for its own `stage` local (`stageLabel` for the three
   // editor-roll-up kinds, `stepStageLabel` for the rest), kept as its own
   // function so the stage-toggle's accessible name can name the stage without
   // repeating the (possibly long) roll-up detail. Naming via the roll-up kind
@@ -255,7 +235,7 @@ export function DecisionTrailView({
       case "editor-summary":
       case "editor-no-change":
       case "editor-unmeasured":
-        return stageActionLabel(rollUp.actionType);
+        return stageLabel(rollUp.actionType);
       default: {
         const _exhaustive: never = rollUp;
         return _exhaustive;
@@ -300,22 +280,24 @@ export function DecisionTrailView({
         return t({ id: "trail.stage.rollUp.notRecorded", message: `${stage} (no decisions recorded)` });
       }
       case "editor-summary": {
-        const stage = stageActionLabel(rollUp.actionType);
+        const stage = stageLabel(rollUp.actionType);
         // `detail` is a GENERIC placeholder (mirrors
         // trail.entry.headline.baseContribution.withDetail's pattern): this id
         // means "stage name, then a pre-formatted parenthetical", one meaning
         // shared by all three "composed" roll-up kinds below. The dimension
         // list itself is already localized/pluralized by `dimensionLabel`
-        // before it ever reaches this placeholder.
-        const detail = rollUp.dimensions.map(dimensionLabel).join(", ");
+        // before it ever reaches this placeholder — including the separator
+        // between them, which `formatClauseList` derives from the locale rather
+        // than baking an English ", " into an already-translated string.
+        const detail = formatClauseList(rollUp.dimensions.map(dimensionLabel), i18n);
         return t({ id: "trail.stage.rollUp.composed", message: `${stage} (${detail})` });
       }
       case "editor-no-change": {
-        const stage = stageActionLabel(rollUp.actionType);
+        const stage = stageLabel(rollUp.actionType);
         return t({ id: "trail.stage.rollUp.noChange", message: `${stage} (changed nothing)` });
       }
       case "editor-unmeasured": {
-        const stage = stageActionLabel(rollUp.actionType);
+        const stage = stageLabel(rollUp.actionType);
         return t({ id: "trail.stage.rollUp.unmeasured", message: `${stage} (not measured)` });
       }
       case "base-contribution": {

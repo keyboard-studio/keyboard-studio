@@ -137,13 +137,23 @@ function normalizeEntry(entry: PreMigrationEntry): DecisionEntry {
  * normalized entry by entry per {@link normalizeEntry}. Never mutates
  * `record` and never writes anything back; the caller decides what to do
  * with the returned value.
+ *
+ * THE RETURNED RECORD IS TAGGED `version: DECISION_RECORD_VERSION`, because it
+ * is a v2-shaped record: every entry has been through {@link normalizeEntry}.
+ * Carrying the input's stale `1` forward would be a lie about the value handed
+ * back, and a load-bearing one — a caller that stores the returned record
+ * (decisionLogStore's `hydrate`, whose state `draftPersistence` snapshots)
+ * would keep the v1 tag for the rest of the session, so the NEXT read would
+ * re-run this migration over every entry appended in between and strip the
+ * counts those entries genuinely measured. That is FR-005a's "absence must
+ * never be fabricated" failure, relocated to the version boundary.
  */
 export function normalizeDecisionRecord(record: PreMigrationDecisionRecord): DecisionRecord {
   const version = typeof record.version === "number" ? record.version : 1;
   if (version >= DECISION_RECORD_VERSION) return record as DecisionRecord;
   return {
     format: record.format,
-    version: record.version,
+    version: DECISION_RECORD_VERSION,
     keyboardId: record.keyboardId,
     entries: record.entries.map(normalizeEntry),
     truncated: record.truncated,

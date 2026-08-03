@@ -32,6 +32,7 @@ import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { headlineFor, type HeadlineDimension, type QuestionName } from "./headline.ts";
 import { createLookupQuestionLabel } from "./lookupQuestionLabel.ts";
+import { formatClauseList, stageActionLabel } from "./stageText.ts";
 import { DiffHunkList } from "../ui/DiffHunkList.tsx";
 import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 
@@ -98,31 +99,11 @@ export function DecisionEntryRow({
           message: "a question this build no longer has",
         });
 
-  // The editor stage as author-facing prose. `stage` is a code (FR-008); this
-  // is the one place it is ever mapped to text, and it is never rendered raw.
-  const stageLabel = (stage: EditorActionType): string => {
-    switch (stage) {
-      case "gallery_edit":
-        return t({
-          id: "trail.entry.headline.stage.galleryEdit",
-          message: "Edited the character gallery",
-        });
-      case "mechanism_edit":
-        return t({
-          id: "trail.entry.headline.stage.mechanismEdit",
-          message: "Assigned key mechanisms",
-        });
-      case "touch_edit":
-        return t({
-          id: "trail.entry.headline.stage.touchEdit",
-          message: "Edited the touch layout",
-        });
-      default: {
-        const _exhaustive: never = stage;
-        return _exhaustive;
-      }
-    }
-  };
+  // The editor stage as author-facing prose. `stage` is a code (FR-008); it is
+  // never rendered raw. Shared with DecisionTrailView's stage roll-ups via
+  // stageText.ts, so an entry and the stage heading above it cannot end up
+  // calling the same stage two different things (SC-007).
+  const stageLabel = (stage: EditorActionType): string => stageActionLabel(stage, i18n);
 
   // One dimension's ICU-pluralized text (FR-011/FR-012). `count` is destructured
   // to a plain local so the Lingui macro derives the named placeholder `count`
@@ -322,7 +303,12 @@ export function DecisionEntryRow({
     // At least one dimension is present and non-zero (FR-011) — the composed
     // sentence names only what happened, never a row of zeros.
     const stage = stageLabel(spec.stage);
-    const dimensions = spec.dimensions.map(dimensionLabel).join(", ");
+    // `formatClauseList`, not `join(", ")`: the separator is part of the
+    // sentence a reader sees, and it is being inserted AFTER each clause has
+    // been through the catalog — so a hardcoded ", " would be an English list
+    // convention no translator has a seam to change. Same reasoning as
+    // `joinTwoClauses` above, generalized past two items.
+    const dimensions = formatClauseList(spec.dimensions.map(dimensionLabel), i18n);
     headline = t({
       id: "trail.entry.headline.editorStep.composed",
       message: `${stage} (${dimensions})`,
@@ -446,8 +432,13 @@ export function DecisionEntryRow({
       // check — but keeps the block below narrowed without an assertion.
       throw new Error("unreachable: isBaseContribution without a base-contribution payload");
     }
-    const derivedList = payload.derivedAxes.map(axisLabel).join(", ");
-    const inheritedList = payload.inheritedMetadata.map(metadataItemLabel).join(", ");
+    // Locale-formatted lists, for the reason given at the `dimensions` join
+    // above: both are lists of already-localized clauses.
+    const derivedList = formatClauseList(payload.derivedAxes.map(axisLabel), i18n);
+    const inheritedList = formatClauseList(
+      payload.inheritedMetadata.map(metadataItemLabel),
+      i18n,
+    );
     const hasDerived = payload.derivedAxes.length > 0;
     const hasInherited = payload.inheritedMetadata.length > 0;
 

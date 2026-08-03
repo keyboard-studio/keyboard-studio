@@ -24,12 +24,13 @@
 //
 // @see specs/053-decision-audit/contracts/decision-record.contract.md §2, §6
 
-import type {
-  DecisionEntry,
-  DecisionImpact,
-  DecisionRecord,
-  EditorActionSummary,
-  EditorActionType,
+import {
+  effectiveEntries,
+  type DecisionEntry,
+  type DecisionImpact,
+  type DecisionRecord,
+  type EditorActionSummary,
+  type EditorActionType,
 } from "@keyboard-studio/contracts";
 import { DECISION_RECORD_VFS_PATH } from "./sidecar.js";
 
@@ -136,10 +137,12 @@ function formatDecision(entry: DecisionEntry): string {
   }
 
   if (payload.kind === "base-contribution") {
-    // No producer writes this payload yet — recordBaseContribution.ts
-    // (specs/055-legible-decision-trail D-11) is a separate, not-yet-landed
-    // task. This clause only has to describe the shape truthfully once one
-    // does; it is not the final wording for that surface.
+    // Written by recordBaseContribution.ts (specs/055-legible-decision-trail
+    // D-11) at `choose_base` completion. The clause names the base and nothing
+    // else on purpose: the counts this payload also carries (starting keys,
+    // derived axes, inherited metadata) are the DENOMINATOR the later rows'
+    // own counts are read against, and restating them here would read as a
+    // change this row caused. Not claimed as final wording for the surface.
     return `Started from base \`${payload.baseId}\` ("${payload.baseDisplayName}")`;
   }
 
@@ -229,13 +232,11 @@ export function buildDecisionSummaryBlock(
   const maxEntries = opts.maxEntries ?? PR_SUMMARY_MAX_ENTRIES;
   const lines: string[] = ["## Authoring decisions"];
 
-  // An entry is superseded when a LATER entry names it. Collected up front so
-  // the effective set is one pass rather than a scan per row.
-  const supersededIds = new Set<string>();
-  for (const entry of record.entries) {
-    if (entry.supersedes !== null) supersededIds.add(entry.supersedes);
-  }
-  const effective = record.entries.filter((e) => !supersededIds.has(e.entryId));
+  // An entry is superseded when a LATER entry names it — see `effectiveEntries`
+  // in contracts, which is the one implementation the trail's stage roll-ups
+  // read through as well, so this block and that one cannot disagree about
+  // which decisions shaped the keyboard (SC-007).
+  const effective = effectiveEntries(record.entries);
 
   if (effective.length === 0) {
     lines.push("", "No decisions were recorded for this keyboard.");

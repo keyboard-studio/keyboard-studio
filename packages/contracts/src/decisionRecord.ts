@@ -331,3 +331,43 @@ export function makeEmptyDecisionRecord(keyboardId: string | null = null): Decis
     truncated: null,
   };
 }
+
+/**
+ * The `entryId`s that a LATER entry replaces.
+ *
+ * "Superseded" is a property of the record as a whole, never of an entry read on
+ * its own: an entry carries the id of what IT replaces
+ * ({@link DecisionEntry.supersedes}), so the only way to know an entry has been
+ * replaced is to look at every other entry's link. Hence one pass over the
+ * record rather than a predicate per entry.
+ */
+export function supersededEntryIds(
+  entries: readonly DecisionEntry[],
+): ReadonlySet<string> {
+  const superseded = new Set<string>();
+  for (const entry of entries) {
+    if (entry.supersedes !== null) superseded.add(entry.supersedes);
+  }
+  return superseded;
+}
+
+/**
+ * The entries that still stand — those nothing later replaced.
+ *
+ * The record is append-only, so a revisited decision leaves BOTH its entries in
+ * `entries` (FR-015); every surface that reports what the keyboard actually is —
+ * the PR summary's rows, a stage's roll-up counts, the live entry for a slot —
+ * has to read this filtered view, or a decision revised once counts twice.
+ * Order is preserved, so "the latest effective entry" is just the last element.
+ *
+ * Lives here, in contracts, because the callers span the package boundary: the
+ * engine's prSummary and the studio's trail both need it and the engine cannot
+ * import from the studio (`engine-not-to-studio`, .dependency-cruiser.cjs). It
+ * was independently reimplemented three times before being hoisted.
+ */
+export function effectiveEntries(
+  entries: readonly DecisionEntry[],
+): readonly DecisionEntry[] {
+  const superseded = supersededEntryIds(entries);
+  return entries.filter((entry) => !superseded.has(entry.entryId));
+}

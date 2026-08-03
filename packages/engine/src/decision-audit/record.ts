@@ -117,10 +117,12 @@ function serializeEntry(entry: DecisionEntry): unknown {
             },
           }
         : {
-            // base-contribution (specs/055-legible-decision-trail D-11). No
-            // producer writes this payload yet (recordBaseContribution.ts is a
-            // separate task); this branch only has to serialize the shape when
-            // one eventually does.
+            // base-contribution (specs/055-legible-decision-trail D-11),
+            // written by the studio's recordBaseContribution.ts at
+            // `choose_base` completion. `startingKeyCount` is optional and is
+            // emitted through the same `JSON.stringify`-drops-`undefined` route
+            // the editor counts above rely on, so an unmeasured count is absent
+            // rather than a written `0` (FR-005a).
             kind: entry.payload.kind,
             baseId: entry.payload.baseId,
             baseDisplayName: entry.payload.baseDisplayName,
@@ -303,7 +305,15 @@ export function parseDecisionRecord(text: string | null | undefined): ParseDecis
   return {
     record: {
       format: DECISION_RECORD_FORMAT,
-      version,
+      // A pre-v2 record has had every surviving entry migrated to the v2 shape
+      // by `migrateRawEntryIfPreV2` above, so the record returned here IS a v2
+      // record and must say so. Handing back the stale `1` would re-fire that
+      // migration on the next read — over entries appended in between, whose
+      // counts were genuinely measured — and strip them (FR-005a). An
+      // unrecognised FUTURE version is passed through untouched: contract §5
+      // row 3 reads a newer build's record entry by entry without claiming it
+      // as this build's own format.
+      version: version < DECISION_RECORD_VERSION ? DECISION_RECORD_VERSION : version,
       keyboardId,
       entries: repaired,
       truncated,
