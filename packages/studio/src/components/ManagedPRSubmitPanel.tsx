@@ -24,6 +24,15 @@
 //   5. Submission is not already in flight.
 //   6. The output-time staleness gate (outputBlocked) is not tripped — e.g. a
 //      stale touch-layout side-car after a post-Touch-step mechanics edit.
+//   7. A verified GitHub identity (`githubIdentity` prop) is present. The
+//      backend's managed-PR endpoint requires a verified GitHub identity and
+//      derives commit authorship from it (`Authorization: Bearer` from
+//      contracts/outputService.ts's `PublishManagedPROptions.accessToken`);
+//      it 401s otherwise. A signed-out author, and a Google-only author (who
+//      holds identity claims but no GitHub token), both fail this gate — the
+//      panel explains why rather than letting the request 401 after a full
+//      compile. `githubIdentity` omitted or null is treated identically to
+//      "no identity" (fail closed, matching the server).
 //
 // VFS acquisition: at submit time the panel calls projectWorkingCopyForOutput()
 // (the same helper handleDownload uses via serializeWorkingCopy) so the
@@ -35,6 +44,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import type { PublishManagedPRError } from "@keyboard-studio/contracts";
 import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
+import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { getManagedPROutputService, getManagedPRProxyEndpoint } from "../lib/services.ts";
 import {
   publishManagedPRErrorMessage,
@@ -177,6 +187,26 @@ export interface ManagedPRSubmitPanelProps {
     displayName?: string;
     email?: string;
   };
+  /**
+   * Verified GitHub identity for the submission, or null/undefined when the
+   * author has no GitHub session (signed out, or signed in with Google only —
+   * a Google session yields identity claims but no GitHub token, so Option B
+   * cannot accept it). Backend contract: this is the single source of truth
+   * for the identity gate — the caller (OutputScreen) owns deriving it from
+   * the auth hooks; this panel does not re-derive it. `accessToken` is sent
+   * as `Authorization: Bearer <accessToken>` on the managed-PR request (see
+   * `PublishManagedPROptions.accessToken` in
+   * packages/contracts/src/outputService.ts); the backend uses it to verify
+   * the identity and derive commit authorship, so the attribution form
+   * fields (name/email) supply only the human-readable label.
+   *
+   * Omitted or null disables Submit — fail closed, matching the server's
+   * 401-without-a-verified-identity behavior. This is independent of (and
+   * additional to) the panel's own self-contained `useGitHubAuth()` call
+   * below, which still supplies the `accessToken` used for the unrelated
+   * "My keyboards" `recordProjectSubmission` bookkeeping call.
+   */
+  githubIdentity?: { login: string; accessToken: string } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -198,6 +228,7 @@ export function ManagedPRSubmitPanel({
   outputBlocked = false,
   outputBlockedReason,
   prefill,
+  githubIdentity = null,
 }: ManagedPRSubmitPanelProps) {
   const { t, i18n } = useLingui();
   const nameId = useId();
@@ -209,9 +240,20 @@ export function ManagedPRSubmitPanel({
   // status:"submitted" on a successful publish without threading the token
   // down as a prop. `accessToken` (the primitive, not the whole `token`
   // object) is what recordProjectSubmission below actually needs, and is
-  // what the handleSubmit dependency array tracks.
+  // what the handleSubmit dependency array tracks. This is independent of
+  // `githubIdentity` (the prop) which gates the Submit button and supplies
+  // the Authorization bearer token for the managed-PR request itself.
   const { token } = useGitHubAuth();
   const accessToken = token?.accessToken ?? null;
+
+  // Self-contained useGoogleAuth() call, purely to distinguish "signed out"
+  // from "signed in with Google only" in the disabled-state copy below. This
+  // does not affect the gate itself (`githubIdentity` is the single source
+  // of truth for that, per the prop's docstring) — it only makes the
+  // explanation more precise for the Google-only case.
+  const { status: googleStatus } = useGoogleAuth();
+  const hasGitHubIdentity = githubIdentity !== null;
+  const isGoogleOnlySession = !hasGitHubIdentity && googleStatus === "connected";
 
   const [authorName, setAuthorName] = useState<string>(
     prefill?.displayName ?? "",
@@ -243,7 +285,11 @@ export function ManagedPRSubmitPanel({
   const emailValid = isValidEmail(email);
   const formReady = nameValid && emailValid && copyrightChecked;
   const submitEnabled =
-    formReady && canSubmit && !outputBlocked && submitState.kind !== "submitting";
+    formReady &&
+    canSubmit &&
+    !outputBlocked &&
+    hasGitHubIdentity &&
+    submitState.kind !== "submitting";
 
   // Fallback text for outputBlockedReason — normally the caller (OutputScreen)
   // always passes a localized reason when outputBlocked is true, but the prop
@@ -253,6 +299,20 @@ export function ManagedPRSubmitPanel({
     message: "output is currently blocked",
   });
   const effectiveBlockedReason = outputBlockedReason ?? blockedFallbackReason;
+
+  // The two no-GitHub-identity cases get distinct copy (see the
+  // `githubIdentity` prop docstring): a Google-only session needs to know a
+  // download is still available; a signed-out session just needs to sign in.
+  const signedOutReason = t({
+    id: "output.submit.button.ariaSignedOut",
+    message: "Submit unavailable — sign in with GitHub to submit to the community repository",
+  });
+  const googleOnlyReason = t({
+    id: "output.submit.button.ariaGoogleOnly",
+    message:
+      "Submit unavailable — submitting requires a GitHub account; sign in with GitHub, or download the keyboard instead",
+  });
+  const missingIdentityReason = isGoogleOnlySession ? googleOnlyReason : signedOutReason;
 
   const handleSubmit = useCallback(async () => {
     if (!submitEnabled) return;
@@ -316,6 +376,13 @@ export function ManagedPRSubmitPanel({
         prTitle,
         prBody,
         proxyEndpoint: getManagedPRProxyEndpoint(),
+        // Verified-identity bearer token (see PublishManagedPROptions.accessToken
+        // in packages/contracts/src/outputService.ts). Sourced from the
+        // `githubIdentity` prop — the single source of truth for the identity
+        // gate — not from the panel's own useGitHubAuth() call above. Guarded
+        // by submitEnabled's hasGitHubIdentity term, so githubIdentity is
+        // non-null on every reachable path through this branch.
+        accessToken: githubIdentity?.accessToken,
       });
       setSubmitState({ kind: "success", prUrl: result.prUrl });
 
@@ -341,7 +408,7 @@ export function ManagedPRSubmitPanel({
       }
       setSubmitState({ kind: "error", message });
     }
-  }, [submitEnabled, authorName, email, t, i18n, accessToken]);
+  }, [submitEnabled, authorName, email, t, i18n, accessToken, githubIdentity]);
 
   // ---------------------------------------------------------------------------
   // Success state — show PR link, no git jargon.
@@ -501,6 +568,27 @@ export function ManagedPRSubmitPanel({
         </label>
       </div>
 
+      {/* No verified GitHub identity — explain why Submit is unavailable.
+          Rendered even when other gates (outputBlocked/canSubmit/formReady)
+          are also unmet, since this is an independent, likely-longer-lived
+          prerequisite the author needs to see, not just hear via aria-label. */}
+      {!hasGitHubIdentity && (
+        <div role="status" aria-live="polite" style={{ fontSize: 12, color: "#d29922", marginTop: 4 }}>
+          {isGoogleOnlySession ? (
+            <Trans id="output.submit.identity.googleOnly.notice">
+              Submitting to the community repository requires a GitHub
+              account. You&rsquo;re signed in with Google only — sign in with
+              GitHub as well, or download the keyboard files instead.
+            </Trans>
+          ) : (
+            <Trans id="output.submit.identity.signedOut.notice">
+              Sign in with GitHub to submit to the community repository, or
+              download the keyboard files instead.
+            </Trans>
+          )}
+        </div>
+      )}
+
       {/* Submit button */}
       <button
         type="button"
@@ -514,20 +602,22 @@ export function ManagedPRSubmitPanel({
                 id: "output.submit.button.ariaBlocked",
                 message: `Submit unavailable — ${effectiveBlockedReason}`,
               })
-            : !canSubmit
-              ? t({
-                  id: "output.submit.button.ariaNotReady",
-                  message: "Submit unavailable until the keyboard compile is complete",
-                })
-              : !formReady
+            : !hasGitHubIdentity
+              ? missingIdentityReason
+              : !canSubmit
                 ? t({
-                    id: "output.submit.button.ariaFormIncomplete",
-                    message: "Fill in your name, email, and copyright confirmation to submit",
+                    id: "output.submit.button.ariaNotReady",
+                    message: "Submit unavailable until the keyboard compile is complete",
                   })
-                : t({
-                    id: "output.submit.button.ariaReady",
-                    message: "Submit keyboard to community repository",
-                  })
+                : !formReady
+                  ? t({
+                      id: "output.submit.button.ariaFormIncomplete",
+                      message: "Fill in your name, email, and copyright confirmation to submit",
+                    })
+                  : t({
+                      id: "output.submit.button.ariaReady",
+                      message: "Submit keyboard to community repository",
+                    })
         }
         style={submitButtonStyle(submitEnabled)}
       >

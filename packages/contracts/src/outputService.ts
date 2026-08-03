@@ -152,6 +152,14 @@ export interface PublishManagedPROptions {
   importAttribution?: string;
   /** Backend proxy URL (SPA reads from config; not hard-coded). */
   proxyEndpoint: string;
+  /**
+   * Verified-identity bearer token. Becomes `Authorization: Bearer <token>` on
+   * the managed-PR request; the backend verifies it against the identity
+   * provider and derives commit authorship from the result, so `attribution`
+   * supplies only the human label. Omitted, no header is sent and the backend
+   * refuses the submission.
+   */
+  accessToken?: string;
 }
 
 /** Reuses the same success shape as the Option A path. */

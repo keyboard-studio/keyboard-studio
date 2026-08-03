@@ -1,17 +1,19 @@
 /**
  * Server-side GitHub Git Data API pipeline for Option B (org-mediated PR).
  *
- * The SPA never holds a token in this path. It POSTs pre-filtered source files
- * plus author attribution to POST /submit/managed-pr; this module runs the
+ * The SPA holds no *repository* credential in this path. It POSTs pre-filtered
+ * source files plus author attribution to POST /submit/managed-pr, presenting
+ * its sign-in token purely as proof of identity; this module runs the
  * tree -> commit -> branch -> draft-PR pipeline using the GitHub App
- * installation token, which lives server-side only.
+ * installation token, which lives server-side only and is never returned.
  *
  * Vendored from packages/engine/src/output/github.ts -- keep in sync.
  *
  * Intentional divergences from the Option A origin:
  *   1. Org standing fork (forkOwner from config), not the user's fork.
  *   2. Branch name add/<keyboardId>-<shortHash> (collision suffix).
- *   3. Commit carries a Co-authored-by trailer crediting the human author.
+ *   3. Commit carries a Co-authored-by trailer crediting the human author,
+ *      addressed from the SERVER-VERIFIED identity, never from the request body.
  *   4. PR title normalized to "[<keyboardId>] <desc>" (keymanapp convention).
  *   5. PR body prepends a provenance block naming the human author.
  *   6. Installation-token 401/403 surfaces as upstream/unavailable, never as user auth/scope.
@@ -24,6 +26,8 @@
  */
 
 import type { ManagedPRBody } from "./managed-pr-schemas.js";
+import type { OAuthFetchFn } from "./handlers.js";
+import { parseBearer, verifyGitHubUser, type GitHubUser } from "./verify-github-user.js";
 
 // ---------------------------------------------------------------------------
 // Pipeline-local fetch abstraction -- richer than OAuthFetchResponse so we
@@ -68,11 +72,51 @@ export interface ManagedPRPipelineConfig {
    */
   orgLogin: string;
   fetch: GitHubPipelineFetchFn;
+  /**
+   * Verify a bearer token -> identity, or null when invalid. Deliberately the
+   * same member name, shape, and injection idiom as DraftHandlerConfig.verifyUser
+   * so there is exactly one identity path in the backend. Injected so tests stub
+   * it; buildManagedPRConfig wires the real verifier.
+   */
+  verifyUser: (token: string | null) => Promise<GitHubUser | null>;
+}
+
+/**
+ * Build a {@link ManagedPRPipelineConfig} wiring the real GitHub verifier, so
+ * neither HTTP edge constructs `verifyUser` itself — the role
+ * `buildDraftConfig` plays for the draft endpoints.
+ *
+ * Two fetch functions because the pipeline needs the richer
+ * {@link GitHubPipelineFetchFn} (it reads Retry-After on 429) while the verifier
+ * needs the looser `OAuthFetchFn`; both edges already have each in hand.
+ */
+export function buildManagedPRConfig(
+  getInstallationToken: () => Promise<string>,
+  orgLogin: string,
+  pipelineFetch: GitHubPipelineFetchFn,
+  oauthFetch: OAuthFetchFn
+): ManagedPRPipelineConfig {
+  return {
+    getInstallationToken,
+    orgLogin,
+    fetch: pipelineFetch,
+    verifyUser: (token) => verifyGitHubUser(token, oauthFetch),
+  };
 }
 
 // ---------------------------------------------------------------------------
 // Handler result -- mirrors handlers.ts HandlerResult, plus the extra fields
 // the engine's PublishManagedPRError mapping reads (branchName / retry).
+//
+// Failure identifiers this module can produce:
+//   401 unauthorized            -- no verified identity (missing/malformed/
+//                                  invalid/expired token, or provider
+//                                  unreachable: fail closed)
+//   400 invalid_path            -- a submitted path is outside the permitted
+//                                  tree; carries `category`, never the path
+//   409 branch_exists           -- carries branchName
+//   429 rate_limited            -- UPSTREAM GitHub limit; carries retryAfterSeconds
+//   502 submission_unavailable / upstream_error
 // ---------------------------------------------------------------------------
 
 export type ManagedPRHandlerResult =
@@ -121,15 +165,34 @@ export function normalizePrTitle(keyboardId: string, prTitle: string): string {
 }
 
 /**
+ * GitHub's canonical no-reply address for a verified login.
+ *
+ * The authorship address is DERIVED from the server-verified identity, never
+ * read from the request body: the SPA only ever requests the identity sign-up
+ * scope, so the verified identity carries no email, and a client-asserted
+ * address would let any caller credit the commit to anyone. The no-reply form
+ * is what GitHub itself uses when a user hides their address, so it is always
+ * deliverable-or-inert and always parses as attribution.
+ */
+function noReplyEmail(user: GitHubUser): string {
+  return `${user.login}@users.noreply.github.com`;
+}
+
+/**
  * Build the single-commit message: the normalized PR title followed by a
  * `Co-authored-by` trailer crediting the human author. The org account is the
  * committer; this trailer is how the human gets attribution in git history.
+ *
+ * `attribution.displayName` supplies the human label; `attribution.email` is
+ * accepted by the schema but deliberately NOT read here — the address comes
+ * from the verified identity (see {@link noReplyEmail}).
  */
 export function buildCommitMessage(
   normalizedTitle: string,
-  attribution: ManagedPRBody["attribution"]
+  attribution: ManagedPRBody["attribution"],
+  user: GitHubUser
 ): string {
-  return `${normalizedTitle}\n\nCo-authored-by: ${attribution.displayName} <${attribution.email}>`;
+  return `${normalizedTitle}\n\nCo-authored-by: ${attribution.displayName} <${noReplyEmail(user)}>`;
 }
 
 /**
@@ -139,10 +202,15 @@ export function buildCommitMessage(
  *
  * Divergence 5 from the Option A origin: Option A uses the PR body verbatim;
  * Option B must surface the human author because the committer is the org bot.
+ *
+ * The provenance block is the most human-read place in the submission, so the
+ * address here is the server-derived one too — leaving a client-asserted email
+ * in the block would preserve the impersonation vector the commit trailer just
+ * closed. `body.attribution.email` is accepted by the schema and never read.
  */
-export function buildPrBody(body: ManagedPRBody): string {
+export function buildPrBody(body: ManagedPRBody, user: GitHubUser): string {
   const provenance = [
-    `> Submitted through **Keyboard Studio** on behalf of **${body.attribution.displayName}** (${body.attribution.email}).`,
+    `> Submitted through **Keyboard Studio** on behalf of **${body.attribution.displayName}** (${noReplyEmail(user)}).`,
     `> Keyman maintainers: please contact the author above for licensing or DISCUS follow-up.`,
   ].join("\n");
 
@@ -180,10 +248,20 @@ function buildHeaders(token: string): Record<string, string> {
 /**
  * Run the org-mediated fork+PR pipeline for a validated request body.
  *
+ * `authHeader` is the raw `Authorization` header value and is the FIRST
+ * parameter, mirroring every function in draft-handlers.ts. The identity gate
+ * lives here, in the shared core, rather than in the two HTTP edges: neither
+ * edge can forget it because neither edge performs it.
+ *
  * Returns a discriminated result (never throws) in the same shape handlers.ts
  * uses, so the route can `if (!result.ok) reply.status(result.status)`.
  *
+ * Ordering is load-bearing: identity verification completes BEFORE
+ * getInstallationToken(), which is itself an outbound call, so a refused
+ * request issues zero outbound GitHub calls of any kind.
+ *
  * Error mapping (all token-leak-safe):
+ *  - No verified identity          -> 401 unauthorized (before any outbound call)
  *  - Network throw                 -> 502 submission_unavailable
  *  - GitHub 401/403 (org token)    -> 502 submission_unavailable (server misconfig)
  *  - GitHub 429                    -> 429 rate_limited (+ retryAfterSeconds from header)
@@ -191,10 +269,28 @@ function buildHeaders(token: string): Record<string, string> {
  *  - Any other non-ok              -> 502 upstream_error
  */
 export async function submitManagedPR(
+  authHeader: string | null | undefined,
   body: ManagedPRBody,
   config: ManagedPRPipelineConfig
 ): Promise<ManagedPRHandlerResult> {
   const { getInstallationToken, orgLogin, fetch: fetchFn } = config;
+
+  // Identity gate FIRST -- before getInstallationToken() below, which is an
+  // outbound call. verifyGitHubUser returns null for a missing, malformed,
+  // invalid, expired or revoked token, and swallows its own fetch throw, so the
+  // deployed path already fails closed. The try/catch makes that structural
+  // rather than a property of one injected implementation: ANY verifier that
+  // throws is treated as "not verified", so a future refactor cannot turn this
+  // fail-open, and both HTTP edges agree on 401 instead of diverging into
+  // 502 (serverless, which wraps this call) and 500 (Fastify, which does not).
+  let user: GitHubUser | null;
+  try {
+    user = await config.verifyUser(parseBearer(authHeader));
+  } catch {
+    user = null;
+  }
+  if (user === null) return { ok: false, status: 401, error: "unauthorized" };
+
   const forkBase = `${API_BASE}/repos/${orgLogin}/${UPSTREAM_REPO}`;
   const upstreamBase = `${API_BASE}/repos/${UPSTREAM_OWNER}/${UPSTREAM_REPO}`;
 
@@ -268,7 +364,7 @@ export async function submitManagedPR(
 
     // 5. Create the commit (org committer + Co-authored-by human trailer).
     const newCommit = await call(`${forkBase}/git/commits`, "POST", {
-      message: buildCommitMessage(normalizedTitle, body.attribution),
+      message: buildCommitMessage(normalizedTitle, body.attribution, user),
       tree: newTreeSha,
       parents: [masterCommitSha],
     });
@@ -291,7 +387,7 @@ export async function submitManagedPR(
     // 7. Open the draft PR upstream (divergences 4 and 5 from Option A).
     const pr = await call(`${upstreamBase}/pulls`, "POST", {
       title: normalizedTitle,
-      body: buildPrBody(body),
+      body: buildPrBody(body, user),
       head: `${orgLogin}:${branchName}`,
       base: "master",
       draft: true,

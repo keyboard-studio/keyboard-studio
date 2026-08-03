@@ -83,7 +83,7 @@ export function OutputScreen() {
   // provider is active. GitHub: login name (no email — only user:email scope
   // was requested at sign-up, and that is not surfaced in the SPA). Google:
   // name + email from the stored identity claims.
-  const { login: ghLogin } = useGitHubAuth();
+  const { login: ghLogin, token: ghToken } = useGitHubAuth();
   const { identity: googleIdentity } = useGoogleAuth();
 
   // ---------------------------------------------------------------------------
@@ -149,6 +149,18 @@ export function OutputScreen() {
       : ghLogin !== null
         ? { displayName: ghLogin }
         : {};
+
+  // Verified GitHub identity for the managed-PR gate. The panel itself has no
+  // way to know whether the caller's login/token pairing is trustworthy — it
+  // only renders what it is given — so the caller (here) owns the identity
+  // and must fail closed: a login with no token, or a token with no login, is
+  // not a usable submission identity, so BOTH must be present or the result
+  // is null (not `??`, which would let a half-populated pairing slip through).
+  const ghAccessToken = ghToken?.accessToken ?? null;
+  const submitGitHubIdentity: { login: string; accessToken: string } | null =
+    ghLogin !== null && ghAccessToken !== null
+      ? { login: ghLogin, accessToken: ghAccessToken }
+      : null;
 
   const rightPct = 100 - leftPct;
 
@@ -427,6 +439,11 @@ export function OutputScreen() {
                     })
               }
               prefill={submitPrefill}
+              // Threaded from here, not read inside the panel: the caller owns
+              // identity (see submitGitHubIdentity above), and the submit gate
+              // must fail closed when it is absent — an omitted/undefined prop
+              // defaults to null inside the panel, same as an explicit null.
+              githubIdentity={submitGitHubIdentity}
             />
 
             {/* Decoupled "Sign up with GitHub / Google" identity step (docs/github-integration.md

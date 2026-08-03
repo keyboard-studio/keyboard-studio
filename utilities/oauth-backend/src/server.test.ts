@@ -593,6 +593,12 @@ describe("POST /oauth/google/exchange — CORS parity", () => {
 const INSTALLATION_TOKEN = "ghs_INSTALLATION_TOKEN_SHOULD_NEVER_APPEAR";
 const ORG_LOGIN = "keyboard-studio-bot";
 
+// submitManagedPR now verifies the caller's identity via GET /user BEFORE it
+// ever mints an installation token — every test that expects the pipeline to
+// run must present a bearer token the stub fetch's /user branch accepts.
+const VALID_MANAGED_AUTH_HEADER = "Bearer gho_managed_pr_caller_token";
+const VERIFIED_MANAGED_USER = { id: 555, login: "ci-managed-user" };
+
 /** Build a minimal pipeline-compatible ok response. */
 function pipelineOk(body: object, status = 200): Awaited<ReturnType<GitHubPipelineFetchFn>> {
   return {
@@ -608,6 +614,10 @@ function pipelineOk(body: object, status = 200): Awaited<ReturnType<GitHubPipeli
 /** Multi-call fetch stub that walks the managed-PR pipeline happy path. */
 const managedPipelineFetch: GitHubPipelineFetchFn = async (url, init) => {
   const method = init?.method ?? "GET";
+  // submitManagedPR's identity gate calls GET /user before anything else in
+  // the pipeline runs. Every test below that expects the pipeline to proceed
+  // must present a bearer token, and this branch is what accepts it.
+  if (url.endsWith("/user")) return pipelineOk(VERIFIED_MANAGED_USER);
   if (url.includes("/git/ref/heads/master")) return pipelineOk({ object: { sha: "masterSha" } });
   if (url.includes("/git/commits/masterSha")) return pipelineOk({ tree: { sha: "treeSha" } });
   if (url.endsWith("/git/trees") && method === "POST") return pipelineOk({ sha: "newTree" });
@@ -736,6 +746,7 @@ describe("POST /submit/managed-pr — body validation", () => {
     const res = await mApp.inject({
       method: "POST",
       url: "/submit/managed-pr",
+      headers: { authorization: VALID_MANAGED_AUTH_HEADER },
       payload: validManagedBody(),
     });
     expect(res.statusCode).toBe(200);
@@ -745,12 +756,110 @@ describe("POST /submit/managed-pr — body validation", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// POST /submit/managed-pr — verified identity required (spec 054 US1 AC5)
+//
+// submitManagedPR's identity gate (parseBearer + verifyUser) runs BEFORE
+// getInstallationToken(), so a refused request must issue zero outbound calls
+// of any kind — not even the /user probe when the header yields no token at
+// all. This asserts the standalone Fastify deployment refuses/accepts
+// identically to the serverless one (buildManagedPRConfig wires the real
+// verifyGitHubUser here, exactly as api/submit-managed-pr.ts does).
+// ---------------------------------------------------------------------------
+
+describe("POST /submit/managed-pr — verified identity required", () => {
+  /** Records every URL+method the pipeline fetch stub was asked to make. */
+  function recordingFetch(userAccepts: boolean, calls: string[]): GitHubPipelineFetchFn {
+    return async (url, init) => {
+      calls.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.endsWith("/user")) {
+        return userAccepts
+          ? pipelineOk(VERIFIED_MANAGED_USER)
+          : {
+              ok: false,
+              status: 401,
+              statusText: "Unauthorized",
+              headers: { get: () => null },
+              json: async () => ({ message: "Bad credentials" }),
+              text: async () => '{"message":"Bad credentials"}',
+            };
+      }
+      return managedPipelineFetch(url, init);
+    };
+  }
+
+  it("returns 401 unauthorized and makes zero fetch calls when Authorization is absent", async () => {
+    const calls: string[] = [];
+    const mApp = await buildManagedServer(recordingFetch(true, calls));
+    const res = await mApp.inject({
+      method: "POST",
+      url: "/submit/managed-pr",
+      payload: validManagedBody(),
+    });
+    expect(res.statusCode).toBe(401);
+    expect(JSON.parse(res.body) as { error: string }).toEqual({ error: "unauthorized" });
+    expect(calls).toEqual([]);
+    await mApp.close();
+  });
+
+  it("returns 401 unauthorized and makes zero fetch calls when Authorization is malformed", async () => {
+    const calls: string[] = [];
+    const mApp = await buildManagedServer(recordingFetch(true, calls));
+    const res = await mApp.inject({
+      method: "POST",
+      url: "/submit/managed-pr",
+      headers: { authorization: "not-a-bearer-scheme opaque-value" },
+      payload: validManagedBody(),
+    });
+    expect(res.statusCode).toBe(401);
+    expect(JSON.parse(res.body) as { error: string }).toEqual({ error: "unauthorized" });
+    expect(calls).toEqual([]);
+    await mApp.close();
+  });
+
+  it("returns 401 unauthorized when the /user probe rejects the bearer token, and never reaches the pipeline", async () => {
+    const calls: string[] = [];
+    const mApp = await buildManagedServer(recordingFetch(false, calls));
+    const res = await mApp.inject({
+      method: "POST",
+      url: "/submit/managed-pr",
+      headers: { authorization: VALID_MANAGED_AUTH_HEADER },
+      payload: validManagedBody(),
+    });
+    expect(res.statusCode).toBe(401);
+    expect(JSON.parse(res.body) as { error: string }).toEqual({ error: "unauthorized" });
+    // The /user probe fired exactly once; nothing under /repos/ (the pipeline) did.
+    expect(calls.filter((c) => c.endsWith("/user")).length).toBe(1);
+    expect(calls.some((c) => c.includes("/repos/"))).toBe(false);
+    await mApp.close();
+  });
+
+  it("runs the pipeline and returns 200 { prUrl, commitSha } when the /user probe accepts the bearer token", async () => {
+    const calls: string[] = [];
+    const mApp = await buildManagedServer(recordingFetch(true, calls));
+    const res = await mApp.inject({
+      method: "POST",
+      url: "/submit/managed-pr",
+      headers: { authorization: VALID_MANAGED_AUTH_HEADER },
+      payload: validManagedBody(),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as { prUrl: string; commitSha: string };
+    expect(body.prUrl).toBe("https://github.com/keymanapp/keyboards/pull/77");
+    expect(body.commitSha).toBe("abc1234000000000000000000000000000000000");
+    expect(calls.some((c) => c.endsWith("/user"))).toBe(true);
+    expect(calls.some((c) => c.includes("/repos/"))).toBe(true);
+    await mApp.close();
+  });
+});
+
 describe("POST /submit/managed-pr — installation token never leaks", () => {
   it("is absent from a success response body", async () => {
     const mApp = await buildManagedServer();
     const res = await mApp.inject({
       method: "POST",
       url: "/submit/managed-pr",
+      headers: { authorization: VALID_MANAGED_AUTH_HEADER },
       payload: validManagedBody(),
     });
     expect(res.statusCode).toBe(200);
@@ -759,18 +868,25 @@ describe("POST /submit/managed-pr — installation token never leaks", () => {
   });
 
   it("is absent from an error (502) response body", async () => {
-    const failFetch: GitHubPipelineFetchFn = async () => ({
-      ok: false,
-      status: 401,
-      statusText: "Unauthorized",
-      headers: { get: () => null },
-      json: async () => ({}),
-      text: async () => "{}",
-    });
+    // /user must still accept -- this test exercises the installation-token
+    // failure path, not the identity gate, so the caller's own identity is
+    // verified fine; only the org's installation token is bad.
+    const failFetch: GitHubPipelineFetchFn = async (url) => {
+      if (url.endsWith("/user")) return pipelineOk(VERIFIED_MANAGED_USER);
+      return {
+        ok: false,
+        status: 401,
+        statusText: "Unauthorized",
+        headers: { get: () => null },
+        json: async () => ({}),
+        text: async () => "{}",
+      };
+    };
     const mApp = await buildManagedServer(failFetch);
     const res = await mApp.inject({
       method: "POST",
       url: "/submit/managed-pr",
+      headers: { authorization: VALID_MANAGED_AUTH_HEADER },
       payload: validManagedBody(),
     });
     expect(res.statusCode).toBe(502);
@@ -797,6 +913,7 @@ describe("POST /submit/managed-pr — installation token never leaks", () => {
     const res = await mApp.inject({
       method: "POST",
       url: "/submit/managed-pr",
+      headers: { authorization: VALID_MANAGED_AUTH_HEADER },
       payload: validManagedBody(),
     });
     expect(res.statusCode).toBe(429);

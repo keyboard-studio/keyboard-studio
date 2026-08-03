@@ -5,7 +5,7 @@
  *   POST /oauth/exchange         — GitHub authorization_code → access_token
  *   POST /oauth/refresh          — GitHub refresh_token → new access_token
  *   POST /oauth/google/exchange  — Google authorization_code → identity claims (only when GOOGLE_OAUTH_ENABLED=true)
- *   POST /submit/managed-pr      — Option B org-mediated fork+PR (no user token; 503 until org creds set)
+ *   POST /submit/managed-pr      — Option B org-mediated fork+PR (verified GitHub identity required; 503 until org creds set)
  *   GET  /oauth/health           — liveness probe (no auth)
  *
  * Environment variables (see README.md for full reference):
@@ -42,6 +42,7 @@ import {
 } from "./google-handlers.js";
 import { ManagedPRBodySchema } from "./managed-pr-schemas.js";
 import {
+  buildManagedPRConfig,
   submitManagedPR,
   type ManagedPRPipelineConfig,
   type GitHubPipelineFetchFn,
@@ -304,10 +305,20 @@ export async function buildServer(opts: {
   };
 
   // Managed-PR pipeline config is present only when App credentials are set.
+  // buildManagedPRConfig wires the real identity verifier, so this edge — like
+  // the serverless one — constructs no verifyUser of its own.
   const managedPRConfig: ManagedPRPipelineConfig | undefined =
     opts.getInstallationToken && opts.orgLogin
-      ? { getInstallationToken: opts.getInstallationToken, orgLogin: opts.orgLogin, fetch: pipelineFetch }
+      ? buildManagedPRConfig(opts.getInstallationToken, opts.orgLogin, pipelineFetch, nodeFetch)
       : undefined;
+
+  // Raw Authorization header, forwarded verbatim to the shared core. Declared
+  // here rather than beside the /drafts routes because /submit/managed-pr now
+  // needs it too — both families gate on the same helper.
+  const authHeaderOf = (req: { headers: Record<string, unknown> }): string | null => {
+    const h = req.headers["authorization"];
+    return typeof h === "string" ? h : null;
+  };
 
   // -------------------------------------------------------------------------
   // GET /oauth/health
@@ -403,7 +414,7 @@ export async function buildServer(opts: {
       });
     }
 
-    const result = await submitManagedPR(parsed.data, managedPRConfig);
+    const result = await submitManagedPR(authHeaderOf(req), parsed.data, managedPRConfig);
     if (!result.ok) {
       if (result.retryAfterSeconds !== undefined) {
         reply.header("Retry-After", String(result.retryAfterSeconds));
@@ -426,10 +437,6 @@ export async function buildServer(opts: {
   // real signed-in token is required exactly as in production.
   // -------------------------------------------------------------------------
   const draftConfig = buildDraftConfig(new MemoryDraftStore(), nodeFetch);
-  const authHeaderOf = (req: { headers: Record<string, unknown> }): string | null => {
-    const h = req.headers["authorization"];
-    return typeof h === "string" ? h : null;
-  };
   // Query-string draftId, defaulting to the single-draft slot for an
   // un-upgraded client that never sends one — mirrors api/drafts/index.ts.
   const draftIdOf = (req: { query: unknown }): string => {

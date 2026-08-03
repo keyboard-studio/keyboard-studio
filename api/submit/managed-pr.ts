@@ -1,5 +1,9 @@
-// POST /api/submit/managed-pr — Option B org-mediated fork+PR (no user token).
+// POST /api/submit/managed-pr — Option B org-mediated fork+PR.
 // Reachable at /submit/managed-pr via the vercel.json rewrite.
+//
+// The caller presents its sign-in token in `Authorization`; this edge forwards
+// that header verbatim to submitManagedPR and verifies nothing itself. The org
+// GitHub App credential the pipeline commits with stays server-side.
 //
 // Body-size note: Vercel serverless functions cap request bodies at ~4.5 MB.
 // ManagedPRBodySchema permits up to 50 files × 1 MiB = 50 MiB, so large
@@ -14,10 +18,12 @@ import {
   getInstallationToken,
 } from "../../utilities/oauth-backend/src/installation-token.js";
 import {
+  buildManagedPRConfig,
   submitManagedPR,
   type ManagedPRPipelineConfig,
   type GitHubPipelineFetchFn,
 } from "../../utilities/oauth-backend/src/github-pipeline.js";
+import type { OAuthFetchFn } from "../../utilities/oauth-backend/src/handlers.js";
 import {
   ManagedPRBodySchema,
 } from "../../utilities/oauth-backend/src/managed-pr-schemas.js";
@@ -44,6 +50,18 @@ const webPipelineFetch: GitHubPipelineFetchFn = async (url, init) => {
     text: () => res.text(),
   };
 };
+
+// OAuthFetchFn has optional init/method/headers, which is incompatible with
+// GitHubPipelineFetchFn by contravariance, so the identity verifier gets its
+// own thin adapter delegating to the same pipeline fetch. Mirrors the wrapper
+// server.ts already uses for the standalone deployment.
+const oauthFetchOver = (pipelineFetch: GitHubPipelineFetchFn): OAuthFetchFn =>
+  (url, init) =>
+    pipelineFetch(url, {
+      method: init?.method ?? "GET",
+      headers: init?.headers ?? {},
+      ...(init?.body !== undefined ? { body: init.body } : {}),
+    });
 
 // ---------------------------------------------------------------------------
 // Config builder — reads env vars; returns undefined when not fully configured.
@@ -75,8 +93,8 @@ function envManagedPRConfig(
 
   const configuredFetch = fetchOverride ?? webPipelineFetch;
 
-  return {
-    getInstallationToken: async () => {
+  return buildManagedPRConfig(
+    async () => {
       const token = await getInstallationToken();
       if (token === undefined) {
         throw new Error("GitHub App installation token not configured");
@@ -84,8 +102,9 @@ function envManagedPRConfig(
       return token;
     },
     orgLogin,
-    fetch: configuredFetch,
-  };
+    configuredFetch,
+    oauthFetchOver(configuredFetch),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -94,7 +113,8 @@ function envManagedPRConfig(
 
 /**
  * Run the managed-PR handler: method guard → config → body validation →
- * submitManagedPR → status mapping.
+ * submitManagedPR (which owns the identity gate and the path checks) → status
+ * mapping. No control logic lives here — the edge only forwards the header.
  *
  * `configOverride` lets tests inject a stub minter + stub fetch so no real env
  * or network is needed — mirrors `runTokenHandler`'s configOverride seam.
@@ -135,12 +155,16 @@ export async function runManagedPRHandler(
     return jsonResponse(400, { error: "invalid_request" });
   }
 
+  // The edge forwards the Authorization header and performs no verification of
+  // its own: parsing the bearer token and checking the identity both live in
+  // submitManagedPR, so the two deployments cannot diverge on the gate.
+  //
   // submitManagedPR's token-minting step (getInstallationToken) runs outside
   // that function's internal try/catch, so a throw there propagates here.
   // Map it to 502 submission_unavailable — same as a network-level failure.
   let result: Awaited<ReturnType<typeof submitManagedPR>>;
   try {
-    result = await submitManagedPR(parsed.data, config);
+    result = await submitManagedPR(req.headers.get("authorization"), parsed.data, config);
   } catch {
     return jsonResponse(502, { error: "submission_unavailable" });
   }

@@ -16,8 +16,22 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { ManagedPRSubmitPanel, type ManagedPRSubmitPanelProps } from "./ManagedPRSubmitPanel.tsx";
 
+/**
+ * Default verified GitHub identity used by `renderPanel` below. Most of this
+ * file's tests are about form gating / success / error handling, not the
+ * identity gate itself (that gate has its own describe block, "gh identity
+ * gate", further down) — so the default keeps those 20+ pre-existing tests
+ * reaching an enabled/submitting state without threading `githubIdentity`
+ * through every call site. Tests that care about the identity gate pass
+ * `githubIdentity` explicitly (including `null`), which overrides this default
+ * since it is spread after in `renderPanel`.
+ */
+const DEFAULT_GITHUB_IDENTITY = { login: "octocat", accessToken: "gho_default_test_token" };
+
 function renderPanel(props: ManagedPRSubmitPanelProps) {
-  return render(<ManagedPRSubmitPanel {...props} />);
+  return render(
+    <ManagedPRSubmitPanel githubIdentity={DEFAULT_GITHUB_IDENTITY} {...props} />,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -37,6 +51,11 @@ vi.mock("../lib/services.ts", () => ({
 // ProfileScreen.test.tsx / AccountControl.test.tsx.
 vi.mock("../hooks/useGitHubAuth.ts", () => ({ useGitHubAuth: vi.fn() }));
 
+// useGoogleAuth mocked the same way (same idiom as AccountControl.test.tsx).
+// The panel reads this ONLY to distinguish "signed out" from "Google-only"
+// copy in the disabled-state notice/aria-label — it never affects the gate.
+vi.mock("../hooks/useGoogleAuth.ts", () => ({ useGoogleAuth: vi.fn() }));
+
 // recordProjectSubmission mocked so the "My keyboards" submission-transition
 // call can be asserted without exercising the real localStorage/index/server
 // side effects (covered separately by draftPersistence.test.ts).
@@ -45,11 +64,13 @@ vi.mock("../lib/draftPersistence.ts", () => ({ recordProjectSubmission: vi.fn(as
 import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
 import { getManagedPROutputService } from "../lib/services.ts";
 import { useGitHubAuth, type UseGitHubAuthResult } from "../hooks/useGitHubAuth.ts";
+import { useGoogleAuth, type UseGoogleAuthResult } from "../hooks/useGoogleAuth.ts";
 import { recordProjectSubmission } from "../lib/draftPersistence.ts";
 
 const mockedProject = projectWorkingCopyForOutput as Mock;
 const mockedGetService = getManagedPROutputService as Mock;
 const mockedUseGitHubAuth = vi.mocked(useGitHubAuth);
+const mockedUseGoogleAuth = vi.mocked(useGoogleAuth);
 const mockedRecordProjectSubmission = vi.mocked(recordProjectSubmission);
 
 /** Default: signed out (token null) — matches the pre-existing test posture. */
@@ -68,8 +89,21 @@ function mockGitHubAuth(overrides: Partial<UseGitHubAuthResult> = {}): void {
   });
 }
 
+/** Default: no Google identity — matches the real hook's un-connected state. */
+function mockGoogleAuth(overrides: Partial<UseGoogleAuthResult> = {}): void {
+  mockedUseGoogleAuth.mockReturnValue({
+    status: "idle",
+    identity: null,
+    error: null,
+    connect: vi.fn(async () => {}),
+    disconnect: vi.fn(),
+    ...overrides,
+  });
+}
+
 beforeEach(() => {
   mockGitHubAuth();
+  mockGoogleAuth();
 });
 
 // Minimal VirtualFS-shaped object — the panel passes it through to publishManagedPR.
@@ -322,6 +356,20 @@ describe("ManagedPRSubmitPanel — success state", () => {
     });
   });
 
+  // NOTE on the interaction between the two "signed out" notions this test
+  // straddles: `mockGitHubAuth()` (the beforeEach default, unchanged here)
+  // makes the panel's OWN internal `useGitHubAuth()` call — the one that
+  // feeds `recordProjectSubmission`'s access-token argument — report
+  // signed-out (token: null). That is independent of the `githubIdentity`
+  // PROP (the gate `renderPanel` defaults to a valid identity so Submit is
+  // reachable at all — see `DEFAULT_GITHUB_IDENTITY` above and the prop's
+  // docstring on the component distinguishing the two paths). Without a
+  // valid `githubIdentity` prop, Submit stays disabled and this test could
+  // never click through to assert the recordProjectSubmission call — the
+  // original intent ("verify null is passed when the account is signed out")
+  // is only representable by keeping the identity PROP present while the
+  // internal hook stays signed out; it is not representable with BOTH
+  // signed out simultaneously, since then there is nothing to click.
   it("passes null to recordProjectSubmission when signed out", async () => {
     mockedProject.mockResolvedValueOnce(makeProjectResult());
     const svc = makeService();
@@ -496,7 +544,12 @@ describe("ManagedPRSubmitPanel — error states", () => {
 
   it("null projectWorkingCopyForOutput shows a form-level error", async () => {
     mockedProject.mockResolvedValueOnce(null);
-    mockedGetService.mockResolvedValueOnce(makeService());
+    // Deliberately do NOT queue a mockedGetService resolution: handleSubmit
+    // returns before calling getManagedPROutputService() when the projected
+    // working copy is null, so a queued value here is never consumed and
+    // (since vi.clearAllMocks() clears calls/results but not queued
+    // mockResolvedValueOnce implementations) would leak into whichever test
+    // runs next and calls getManagedPROutputService() first.
 
     renderPanel({ canSubmit: true });
     fillValidForm();
@@ -507,5 +560,99 @@ describe("ManagedPRSubmitPanel — error states", () => {
     await waitFor(() => {
       expect(screen.getByRole("alert").textContent).toMatch(/select a keyboard first/i);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: GitHub identity gate (spec 054 backend authz hardening)
+//
+// The server 401s a managed-PR request without a verified GitHub identity;
+// this panel fails closed the same way via the `githubIdentity` prop, and
+// explains why through the button's accessible name (not a raw text-node
+// match — see docs/accessibility.md). These tests deliberately do NOT use
+// the `renderPanel` helper's default identity — they override it directly
+// via the `githubIdentity` prop on each render call.
+// ---------------------------------------------------------------------------
+
+describe("ManagedPRSubmitPanel — GitHub identity gate", () => {
+  it("signed out: an otherwise-complete form stays disabled, and the accessible name explains sign-in is required", () => {
+    renderPanel({ canSubmit: true, githubIdentity: null });
+    fillValidForm();
+
+    const btn = screen.getByRole("button", {
+      name: "Submit unavailable — sign in with GitHub to submit to the community repository",
+    });
+    expect((btn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("Google-only: no GitHub identity but a connected Google session stays disabled, with a distinct Google-specific accessible name", () => {
+    mockGoogleAuth({
+      status: "connected",
+      identity: {
+        provider: "google",
+        sub: "123",
+        email: "tester@example.com",
+        emailVerified: true,
+        name: "Tester User",
+        picture: "",
+      },
+    });
+
+    renderPanel({ canSubmit: true, githubIdentity: null });
+    fillValidForm();
+
+    const btn = screen.getByRole("button", {
+      name: "Submit unavailable — submitting requires a GitHub account; sign in with GitHub, or download the keyboard instead",
+    });
+    expect((btn as HTMLButtonElement).disabled).toBe(true);
+
+    // Distinct from the plain signed-out copy — asserting the negative keeps
+    // this test honest that the two messages are actually different, not
+    // just that *a* message matched.
+    expect(
+      screen.queryByRole("button", {
+        name: "Submit unavailable — sign in with GitHub to submit to the community repository",
+      }),
+    ).toBeNull();
+  });
+
+  it("omitting the githubIdentity prop behaves identically to passing null (fail-closed default)", () => {
+    // Deliberately bypasses the `renderPanel` helper (which defaults
+    // `githubIdentity` to a valid identity for the rest of this file's
+    // tests) — this test's whole point is what happens when the prop key is
+    // absent entirely, pinning the component's destructuring default so a
+    // future refactor can't quietly turn "prop omitted" into "allowed".
+    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    fillValidForm();
+
+    const btn = screen.getByRole("button", {
+      name: "Submit unavailable — sign in with GitHub to submit to the community repository",
+    });
+    expect((btn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("a verified GitHub identity enables Submit, and its access token reaches publishManagedPR", async () => {
+    mockedProject.mockResolvedValueOnce(makeProjectResult());
+    const svc = makeService();
+    mockedGetService.mockResolvedValueOnce(svc);
+
+    renderPanel({
+      canSubmit: true,
+      githubIdentity: { login: "gate-test-user", accessToken: "gho_gate_test_token" },
+    });
+    fillValidForm();
+
+    const btn = screen.getByRole("button", {
+      name: "Submit keyboard to community repository",
+    });
+    expect((btn as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(btn);
+
+    await waitFor(() => {
+      expect(svc.publishManagedPR).toHaveBeenCalledTimes(1);
+    });
+    const options = svc.publishManagedPR.mock.calls[0]?.[1];
+    expect(options).toMatchObject({ accessToken: "gho_gate_test_token" });
   });
 });

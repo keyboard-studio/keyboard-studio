@@ -30,13 +30,19 @@ function makeResponse(spec: ResponseSpec): ManagedPRFetchResponse {
 /** A fetch that always returns `spec` and captures the single request made. */
 function capturingFetch(spec: ResponseSpec): {
   fetch: ManagedPRFetchFn;
-  captured: { url?: string; method?: string; body?: string };
+  captured: { url?: string; method?: string; body?: string; headers?: Record<string, string> };
 } {
-  const captured: { url?: string; method?: string; body?: string } = {};
+  const captured: {
+    url?: string;
+    method?: string;
+    body?: string;
+    headers?: Record<string, string>;
+  } = {};
   const fetch: ManagedPRFetchFn = async (url, init) => {
     captured.url = url;
     captured.method = init?.method;
     captured.body = init?.body;
+    captured.headers = init?.headers;
     return makeResponse(spec);
   };
   return { fetch, captured };
@@ -156,6 +162,45 @@ describe("publishManagedPR() — request shape", () => {
     const { fetch } = capturingFetch({ ok: true, body: SUCCESS_BODY });
     const result = await publishManagedPR(createVirtualFS([]), OPTS, fetch);
     expect(result).toEqual(SUCCESS_BODY);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// accessToken → Authorization header (verified-identity bearer token)
+// ---------------------------------------------------------------------------
+
+describe("publishManagedPR() — accessToken header", () => {
+  it("sends Authorization: Bearer <accessToken> when accessToken is set", async () => {
+    const { fetch, captured } = capturingFetch({ ok: true, body: SUCCESS_BODY });
+
+    await publishManagedPR(createVirtualFS([]), { ...OPTS, accessToken: "gho_abc123" }, fetch);
+
+    expect(captured.headers?.Authorization).toBe("Bearer gho_abc123");
+  });
+
+  it("omits the Authorization header entirely when accessToken is not set", async () => {
+    const { fetch, captured } = capturingFetch({ ok: true, body: SUCCESS_BODY });
+
+    await publishManagedPR(createVirtualFS([]), OPTS, fetch);
+
+    expect(Object.prototype.hasOwnProperty.call(captured.headers ?? {}, "Authorization")).toBe(
+      false
+    );
+  });
+
+  it("never forwards accessToken in the POST body — header credential only", async () => {
+    const { fetch, captured } = capturingFetch({ ok: true, body: SUCCESS_BODY });
+
+    await publishManagedPR(
+      createVirtualFS([]),
+      { ...OPTS, accessToken: "gho_super-secret-token" },
+      fetch
+    );
+
+    expect(captured.headers?.Authorization).toBe("Bearer gho_super-secret-token");
+    expect(captured.body ?? "").not.toContain("gho_super-secret-token");
+    const body = postedBody(captured) as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(body, "accessToken")).toBe(false);
   });
 });
 

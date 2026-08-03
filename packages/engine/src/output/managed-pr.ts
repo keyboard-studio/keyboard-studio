@@ -1,11 +1,12 @@
 // see spec.md §12 + docs/github_flow.md "Option B" — org-mediated PR submission.
 //
 // Unlike github.ts (Option A), the engine never touches the GitHub API here and
-// holds no token. It POSTs the source tree + attribution to the oauth-backend
-// proxy, which owns the org service-account token and runs the fork → tree →
-// commit (Co-authored-by) → branch → draft-PR pipeline server-side. From the
-// engine's perspective the proxy is just an HTTP endpoint returning
-// { prUrl, commitSha }.
+// holds no repository credential. It POSTs the source tree + attribution to the
+// oauth-backend proxy — forwarding the caller's sign-in token as `Authorization`
+// purely so the proxy can verify who is submitting — and the proxy owns the org
+// service-account token and runs the fork → tree → commit (Co-authored-by) →
+// branch → draft-PR pipeline server-side. From the engine's perspective the
+// proxy is just an HTTP endpoint returning { prUrl, commitSha }.
 
 import type {
   OutputService,
@@ -139,6 +140,13 @@ export async function publishManagedPR(
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
+        // Identity proof, not a repository credential: the proxy verifies it
+        // against the provider and derives commit authorship from the result.
+        // Omitted when the caller has no token, so pre-token callers are
+        // unaffected at this layer — the proxy is what refuses them.
+        ...(opts.accessToken !== undefined
+          ? { Authorization: `Bearer ${opts.accessToken}` }
+          : {}),
       },
       body: JSON.stringify(requestBody),
     });

@@ -12,6 +12,10 @@ import type {
   ManagedPRPipelineConfig,
   GitHubPipelineFetchResponse,
 } from "../../utilities/oauth-backend/src/github-pipeline.js";
+import type { GitHubUser } from "../../utilities/oauth-backend/src/verify-github-user.js";
+
+/** Default verified identity stubConfig()'s verifyUser resolves to. */
+const DEFAULT_USER: GitHubUser = { id: 4144632, login: "octocat" };
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -41,10 +45,17 @@ function postReq(body: unknown): Request {
  * sequence of responses in order (one per pipeline step). Under the same-repo
  * staging model there is no fork-check step, so a success run makes 6 calls:
  * master-ref, parent-commit, tree, commit, branch-ref, PR.
+ *
+ * `verifyUserOverride` defaults to resolving DEFAULT_USER so every existing
+ * (pre-D-10) caller of stubConfig keeps exercising the pipeline unchanged;
+ * the delegation tests below pass their own verifyUser to observe what it
+ * is handed, or to force the 401 gate.
  */
 function stubConfig(
   responses: Array<Partial<GitHubPipelineFetchResponse> & { body?: unknown }>,
   tokenOverride = "tok_test",
+  verifyUserOverride: (token: string | null) => Promise<GitHubUser | null> = () =>
+    Promise.resolve(DEFAULT_USER),
 ): ManagedPRPipelineConfig & { getCallCount: () => number } {
   let callIndex = 0;
   return {
@@ -62,6 +73,7 @@ function stubConfig(
         text: () => Promise.resolve(JSON.stringify(body)),
       };
     },
+    verifyUser: verifyUserOverride,
     getCallCount: () => callIndex,
   };
 }
@@ -214,6 +226,86 @@ describe("runManagedPRHandler — success", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Identity delegation (research D-10)
+//
+// The edge (managed-pr.ts) parses no bearer token and verifies no identity of
+// its own: it forwards the raw `Authorization` header value to submitManagedPR
+// verbatim, and submitManagedPR is the sole owner of the gate (parseBearer +
+// config.verifyUser). These tests are NOT re-testing the gate's own pass/fail
+// logic — that lives in utilities/oauth-backend/src/github-pipeline.test.ts.
+// They prove the edge re-implements nothing: the exact header value crosses
+// the boundary unparsed, a missing header crosses as `null` (never invented),
+// a rejected identity stops the pipeline before any outbound call, and none
+// of this disturbs the existing happy path.
+// ---------------------------------------------------------------------------
+
+describe("runManagedPRHandler — identity delegation (D-10)", () => {
+  it("forwards the raw Authorization header value to the core's verifyUser, unparsed by the edge", async () => {
+    let receivedToken: string | null | undefined = "not-called";
+    const config = stubConfig(successResponses(), "tok_test", (token) => {
+      receivedToken = token;
+      return Promise.resolve(DEFAULT_USER);
+    });
+    const req = new Request("https://app.example/submit/managed-pr", {
+      method: "POST",
+      body: JSON.stringify(validBody()),
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer distinctive_token_9f8e7d",
+      },
+    });
+    const res = await runManagedPRHandler(req, config);
+    expect(res.status).toBe(200);
+    // submitManagedPR's own parseBearer strips the "Bearer " prefix before
+    // calling verifyUser. Receiving exactly the token content here proves the
+    // full raw header reached submitManagedPR intact — the edge did not
+    // parse, reformat, substitute, or otherwise touch it.
+    expect(receivedToken).toBe("distinctive_token_9f8e7d");
+  });
+
+  it("passes null (not an invented value) to the core's verifyUser, returns 401, and starts zero pipeline calls when the Authorization header is absent", async () => {
+    let receivedToken: string | null | undefined = "not-called";
+    const config = stubConfig(successResponses(), "tok_test", (token) => {
+      receivedToken = token;
+      return Promise.resolve(null);
+    });
+    const req = new Request("https://app.example/submit/managed-pr", {
+      method: "POST",
+      body: JSON.stringify(validBody()),
+      headers: { "content-type": "application/json" },
+      // deliberately no Authorization header
+    });
+    const res = await runManagedPRHandler(req, config);
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "unauthorized" });
+    expect(receivedToken).toBeNull();
+    // The 401 must be issued before any outbound GitHub call, even though the
+    // stub fetch has a full success sequence queued and ready to serve.
+    expect(config.getCallCount()).toBe(0);
+  });
+
+  it("does not short-circuit: a valid verifyUser resolution still yields the unchanged 200 { prUrl, commitSha } shape", async () => {
+    const config = stubConfig(successResponses(), "tok_test", () =>
+      Promise.resolve(DEFAULT_USER),
+    );
+    const req = new Request("https://app.example/submit/managed-pr", {
+      method: "POST",
+      body: JSON.stringify(validBody()),
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer tok_test",
+      },
+    });
+    const res = await runManagedPRHandler(req, config);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { prUrl: string; commitSha: string };
+    expect(json.prUrl).toBe("https://github.com/keymanapp/keyboards/pull/99");
+    expect(json.commitSha).toBe("dddd4444dddd444");
+    expect(config.getCallCount()).toBe(successResponses().length);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Error mapping
 // ---------------------------------------------------------------------------
 
@@ -258,6 +350,7 @@ describe("runManagedPRHandler — error mapping", () => {
       getInstallationToken: () => Promise.reject(new Error("network down")),
       orgLogin: "test-org",
       fetch: async () => ({ ok: true, status: 200, statusText: "OK", headers: { get: () => null }, json: () => Promise.resolve({}), text: () => Promise.resolve("") }),
+      verifyUser: () => Promise.resolve(DEFAULT_USER),
     };
     const res = await runManagedPRHandler(postReq(validBody()), brokenConfig);
     expect(res.status).toBe(502);
