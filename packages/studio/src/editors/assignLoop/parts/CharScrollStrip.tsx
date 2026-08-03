@@ -48,6 +48,7 @@ import type { MechanismAssignment, Modality } from "@keyboard-studio/contracts";
 import { toUPlusNotation, toHex4 } from "@keyboard-studio/contracts";
 import { displayChar } from "../../../lib/irToCarveNodes.ts";
 import { getCharMechanisms } from "./charMechanisms.ts";
+import { indexOfChar, sameCharIdentity } from "../usePositionalCharNav.ts";
 import {
   BG_CARD,
   BORDER,
@@ -236,9 +237,15 @@ export function CharScrollStrip({
   // horizontal scroll inside the current window is never reset by an
   // unrelated re-render elsewhere in the gallery — it only re-centers when
   // navigation actually moves `currentChar` outside the previous window.
+  // `indexOfChar` (NFC identity), not raw `chars.indexOf` — a reflow that
+  // changes `currentChar`'s representation (e.g. collateInventory's NFC-dedup
+  // in survey/collation.ts) must not strand the window on a stale raw-string
+  // mismatch; see usePositionalCharNav.ts's module doc comment for the full
+  // rationale (the same shaped bug this strip's windowing shares with the
+  // Back/Next walk itself).
   const visibleChars = useMemo(() => {
     if (chars.length <= MAX_VISIBLE_CHIPS) return chars;
-    const idx = currentChar !== null ? chars.indexOf(currentChar) : -1;
+    const idx = currentChar !== null ? indexOfChar(chars, currentChar) : -1;
     const half = Math.floor(MAX_VISIBLE_CHIPS / 2);
     const start =
       idx === -1
@@ -250,8 +257,9 @@ export function CharScrollStrip({
   // Whether the selected character is inside the currently-rendered window —
   // see the roving-tabindex comment at the chip map below for why this
   // matters (the tab-reachability fallback when nothing in view is selected).
+  // NFC identity (indexOfChar), not raw `===` — same rationale as above.
   const hasSelectedVisible = useMemo(
-    () => visibleChars.some((c) => c === currentChar),
+    () => currentChar !== null && indexOfChar(visibleChars, currentChar) !== -1,
     [visibleChars, currentChar],
   );
 
@@ -352,7 +360,9 @@ export function CharScrollStrip({
             is selected. */}
         {visibleChars.map((c, index) => {
           const hex = charHex(c);
-          const isSelected = c === currentChar;
+          // NFC identity (not raw `===`) — same rationale as
+          // visibleChars/hasSelectedVisible above.
+          const isSelected = currentChar !== null && sameCharIdentity(c, currentChar);
           const isTabbable = isSelected || (!hasSelectedVisible && index === 0);
           const count = producesCountByChar.get(c) ?? 0;
           const badgeGood = count >= 1;

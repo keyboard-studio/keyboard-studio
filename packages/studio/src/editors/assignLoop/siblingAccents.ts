@@ -19,11 +19,31 @@
 // there is no locale casing to reason about here — an uppercase companion is
 // offered only when the author's language actually contains it.
 //
-// Latin-only for now: the base-letter gate (`/^[a-z]$/` on the case-folded
-// base) mirrors the gate TouchGallery's own `suggestion` memo already applies
-// before offering a longpress suggestion in the first place. Cyrillic/Greek
-// diacritic families are a plausible future extension but are NOT implemented
-// here.
+// Script-neutral base-letter gate (shaped-bug fix, diacritic-implementability):
+// the base-letter check tests General_Category L* (`\p{L}`, any script) rather
+// than the old `/^[a-z]$/` Latin-only regex. In practice this function is only
+// ever reached with a non-Latin base when a FUTURE caller derives a non-Latin
+// `hostKey` — today TouchGallery's own suggestion memo (the caller) still
+// gates `hostKey` derivation to `/^[a-zA-Z]$/` (a SEPARATE, legitimate
+// constraint: a physical longpress host key is a K_<LETTER> hardware key
+// label, which is inherently Latin on a standard keyboard — not the "is this
+// an accented letter" question this module answers), so a non-Latin base
+// still yields `[]` in practice via the caller's empty-hostKey early return,
+// not via this gate. Broadening here keeps this module's own semantics
+// consistent with the general `isDecomposableAccented` predicate rather than
+// re-deriving a narrower, redundant copy of it.
+//
+// TODO(a4-copy-gate): the "sibling accent" UX FRAMING (not this predicate) —
+// i.e. any string like "offer the rest of u's diacritic family" surfaced by a
+// caller — should be gated on the survey's A4 classification
+// (`diacriticBehavior`, packages/contracts/src/axes.ts, spec.md §7.1 A4; the
+// scriptClass "abugida" value, same file, A2, may be the more precise axis to
+// check instead/also — confirm with km-domain/km-strategy) so an Indic
+// abugida's virama/matra marks (Mn/Mc — they satisfy `\p{M}` and so this
+// broadened predicate) are never described with "accent"/"diacritic" language.
+// This module has no survey/axis dependency today; wiring one is a scope
+// decision for whichever caller owns the copy (TouchGallery's suggestion
+// card), not this pure placement generator.
 
 import { isDecomposableAccented } from "@keyboard-studio/contracts";
 import { isUppercaseLetter } from "../../lib/caseOrder.ts";
@@ -81,8 +101,9 @@ function markRank(mark: string): number {
  * (case-insensitively) other than `acceptedChar` itself. Lowercase siblings go
  * on `hostKey`'s default layer, uppercase siblings on its shift layer.
  *
- * Returns `[]` when the base is not a plain Latin letter (Cyrillic/Greek are a
- * future extension) or when the inventory has no sharing sibling.
+ * Returns `[]` when the base is not a single letter (any script — see the
+ * module doc comment on the script-neutral gate) or when the inventory has no
+ * sharing sibling.
  *
  * Ordering: lowercase placements first, then uppercase placements; within each
  * group, by the common-diacritic priority (a sibling's canonical mark), then by
@@ -94,7 +115,7 @@ export function siblingAccentPlacements(
   inventory: readonly string[] | ReadonlySet<string>,
 ): SiblingAccentPlacement[] {
   const baseLower = baseLetterOf(acceptedChar);
-  if (!/^[a-z]$/.test(baseLower)) return [];
+  if (!/^\p{L}$/u.test(baseLower)) return [];
 
   const seen = new Set<string>();
   const lower: Array<{ char: string; mark: string }> = [];

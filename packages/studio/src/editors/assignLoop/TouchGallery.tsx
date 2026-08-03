@@ -60,6 +60,7 @@ import {
   useEffect,
   useMemo,
   useCallback,
+  useRef,
   type CSSProperties,
 } from "react";
 import type { I18n } from "@lingui/core";
@@ -113,13 +114,15 @@ import {
   resolveTouchSeedSource,
 } from "../../lib/touchEmission.ts";
 import { formatUncoveredCharsList } from "../../lib/unimplementedInventory.ts";
+import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
 import { ErrorText } from "../../ui/index.ts";
 import {
   useWorkingCopyStore,
   type BulkAccentGroup,
 } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
-import { collate } from "../../survey/collation.ts";
+import { collateInventory } from "../../survey/collation.ts";
+import { nfcDedup } from "../../survey/charNormUtils.ts";
 import {
   promoteOnManualEdit,
   casePairTouchLayer,
@@ -155,7 +158,7 @@ import type {
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
-import { usePositionalCharNav } from "./usePositionalCharNav.ts";
+import { usePositionalCharNav, nearestSurvivingChar, indexOfChar } from "./usePositionalCharNav.ts";
 import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
@@ -587,6 +590,12 @@ function TouchLayerBuilder({
           })),
         ];
         return (
+          // key={index} intentionally kept: a layer-token slot's identity IS
+          // its position (onLayerTokenChange/onRemoveLayerSlot both address
+          // slots by index, and two slots can hold the identical value, e.g.
+          // two empty "" slots) — not the array-index anti-pattern this
+          // sweep otherwise targets. Same reasoning as MechanismGallery's
+          // raltTokens.map.
           <div
             key={index}
             style={{ display: "flex", alignItems: "center", gap: 6 }}
@@ -1378,11 +1387,55 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // — none of those depend on order, so sorting the single shared variable
   // is safe. The canonical `confirmedInventory` (rawInventory) is left
   // untouched; only this display-local derivation is sorted.
-  const inventory = useMemo(() => collate(rawInventory), [rawInventory]);
+  //
+  // `collateInventory` (not bare `collate`) — a bare combining mark in the
+  // inventory otherwise collates to ICU position 0 under `collate()`'s root
+  // comparator, inserting a phantom "first" walk entry and shifting every
+  // other character's index. `collateInventory` partitions letters/stacks
+  // (ICU order) from bare marks (raw code-point order, trailing) — see
+  // survey/collation.ts.
+  //
+  // `nfcDedup([], rawInventory)` — a walk entry can appear in
+  // confirmedInventory as BOTH its precomposed form (e.g. "ӝ" U+04DD) and its
+  // canonically-equivalent decomposed form (e.g. "ж"+combining-diaeresis),
+  // which are distinct JS strings the raw list would otherwise carry as two
+  // separate walk stops for what is visually one character. `detectedChars`/
+  // `baseTouchCoveredSet` below already NFC-normalize internally (matching
+  // the useInventoryDiff.ts:~108 pattern); `inventory` itself did not, so a
+  // decomposed duplicate stayed a phantom, never-covered walk stop even after
+  // its precomposed sibling was implemented. Deduping (and displaying the NFC
+  // form) here — not in confirmedInventory itself, which stays untouched —
+  // keeps both sides of every membership check consistent. NFD stacks with no
+  // precomposed codepoint (Africanist multi-mark sequences) round-trip
+  // through NFC unchanged (NFC(x) is not always length 1), so this never
+  // folds two GENUINELY different characters together.
+  const inventory = useMemo(
+    () => collateInventory(nfcDedup([], rawInventory)),
+    [rawInventory],
+  );
   // Stable primitive proxy for `inventory` — declared up here (rather than
   // beside the currentChar-sync effect) so detectedChars/touchLettersToAdd
   // below, which also need it, can be declared before that effect.
   const inventoryKey = inventory.join("\0");
+
+  // Session-aware desktop produced set (shaped-bug fix, diacritic-
+  // implementability) — the SAME `producedSet` MechanismGallery's coverage
+  // gate derives from (base .kmn + this session's physical assignments
+  // injected via applyAssignments/buildSessionProducedSet; see
+  // useInventoryDiff.ts and
+  // packages/engine/src/pattern-apply/sessionProducedSet.ts). Used ONLY by
+  // `handleContinue`'s completion-GATE re-check below (touchCoverage's
+  // `additionalProduced` parameter), so a touch inventory char composable
+  // only because its combining-mark component was assigned a DESKTOP deadkey
+  // this session (e.g. "ж" + a session-assigned diaeresis deadkey composing
+  // "ӝ") doesn't block completion. Deliberately NOT threaded into
+  // `detectedChars`/`touchLettersToAdd` below — those drive the INTERACTIVE
+  // walk (`usePositionalCharNav`'s `list`), which must stay static across a
+  // session for the identical reason useInventoryDiff.ts's own module doc
+  // gives for MechanismGallery's `lettersToAdd`: reflowing it whenever a
+  // session assignment changes coverage would strand/reflow the walk mid-edit
+  // (caught by this fix's own regression pass).
+  const { producedSet: desktopProducedSet } = useInventoryDiff();
 
   // Draft persistence — read on mount; write on every charTouch change.
   const touchDraft = useWorkingCopyStore((s) => s.touchDraft);
@@ -1703,6 +1756,13 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // Declared here (moved up from its old position further down) — earlier
   // than currentChar/usePositionalCharNav below — because touchLettersToAdd
   // (the walk list) needs it before either of those can be declared.
+  //
+  // Deliberately NOT session-aware (does not take desktopProducedSet): this
+  // memo drives touchLettersToAdd (the interactive walk denominator below),
+  // which must stay static across a session — see this file's
+  // desktopProducedSet declaration comment and useInventoryDiff.ts's module
+  // doc for why. The session-aware completion check lives in handleContinue
+  // below instead.
   const detectedChars = useMemo<Set<string>>(() => {
     if (detectionSeedLayout === null) return new Set<string>();
     try {
@@ -1778,20 +1838,34 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // can reference it; this state is otherwise independent of the intervening
   // code, so the reorder carries no behavior change.
   const [currentChar, setCurrentChar] = useState<string | null>(null);
+  // Previous run's touchLettersToAdd — feeds nearestSurvivingChar's "where was
+  // this character before the reflow" lookup below (same pattern
+  // MechanismGallery uses for its own lettersToAdd resync).
+  const prevTouchLettersToAddRef = useRef<readonly string[]>(touchLettersToAdd);
 
   // Sync currentChar when the walk list loads or changes.
   useEffect(() => {
     setCurrentChar((prev) => {
       if (touchLettersToAdd.length === 0) return null;
-      // Keep current char if it's still in the walk list.
-      if (prev !== null && touchLettersToAdd.includes(prev)) return prev;
-      // Pick the first unconfigured char.
-      return (
-        touchLettersToAdd.find((c) => !charTouch.has(c)) ??
-        touchLettersToAdd[0] ??
-        null
-      );
+      // Keep current char if it's still in the walk list — by NFC identity
+      // (indexOfChar), not raw equality, so a representation change (e.g.
+      // collateInventory's NFC-dedup) doesn't spuriously look like a removal.
+      if (prev !== null && indexOfChar(touchLettersToAdd, prev) !== -1) return prev;
+      if (prev === null) {
+        // First-ever pick — prefer the first unconfigured char.
+        return (
+          touchLettersToAdd.find((c) => !charTouch.has(c)) ??
+          touchLettersToAdd[0] ??
+          null
+        );
+      }
+      // `prev` was removed by this reflow — fall back to the NEAREST
+      // surviving neighbor (shaped-bug fix, walk-order/indexing) rather than
+      // jumping to "first unconfigured"/list[0]. See
+      // usePositionalCharNav.ts's `nearestSurvivingChar` doc comment.
+      return nearestSurvivingChar(prevTouchLettersToAddRef.current, prev, touchLettersToAdd);
     });
+    prevTouchLettersToAddRef.current = touchLettersToAdd;
     // Only re-run when the walk list itself changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [touchLettersToAddKey]);
@@ -1852,9 +1926,17 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // action and surface an inline message + the leave-warning modal (the gallery leave-warning)
   // naming the uncovered chars — "Come back later" (onSecondary below) is the
   // only path that still completes with characters unimplemented.
+  //
+  // desktopProducedSet (session-aware, see its own declaration above) is
+  // folded in here via touchCoverage's `additionalProduced` parameter — a
+  // completion-GATE-only use (this callback only runs on Continue/Done, never
+  // during interactive editing), so a touch character composable only
+  // because its combining-mark component was assigned a DESKTOP deadkey THIS
+  // session does not block completion, without touching the interactive
+  // walk's own (deliberately static) `detectedChars`/`touchLettersToAdd`.
   const handleContinue = useCallback(() => {
     if (layoutForLintAndGate !== null) {
-      const { uncovered } = touchCoverage(layoutForLintAndGate, inventory);
+      const { uncovered } = touchCoverage(layoutForLintAndGate, inventory, desktopProducedSet);
       if (uncovered.length > 0) {
         setUncoveredMessage(
           uncovered.map((c) => formatUncoveredTouchMessage(c)).join("; "),
@@ -1865,7 +1947,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       }
     }
     finalizeCompletion();
-  }, [layoutForLintAndGate, inventory, finalizeCompletion]);
+  }, [layoutForLintAndGate, inventory, desktopProducedSet, finalizeCompletion]);
 
   // Positional Back/Next/Skip/Previous navigation + suggestion-dismissal
   // tracking — shared with MechanismGallery via usePositionalCharNav so the
@@ -3742,7 +3824,13 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               </div>
               <ul style={{ margin: 0, paddingLeft: 18 }}>
                 {touchApplyWarnings.map((w, i) => (
-                  <li key={i}>{w}</li>
+                  // Content-derived key (warning text + position, since two
+                  // identical warning strings are legitimately possible and
+                  // must still each render) rather than a bare index — this
+                  // list regenerates fresh per apply attempt, so index alone
+                  // isn't wrong today, but keying off content is strictly
+                  // more correct and costs nothing.
+                  <li key={`${i}:${w}`}>{w}</li>
                 ))}
               </ul>
             </div>

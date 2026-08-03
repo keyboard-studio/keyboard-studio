@@ -49,6 +49,7 @@ import {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   type CSSProperties,
 } from "react";
 import type { I18n } from "@lingui/core";
@@ -68,12 +69,12 @@ import type {
 import {
   toUPlusNotation,
   isDecomposableAccented,
-  buildProducedSet,
 } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { collate } from "../../survey/collation.ts";
+import { collateInventory } from "../../survey/collation.ts";
+import { nfcDedup } from "../../survey/charNormUtils.ts";
 import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
-import { getPatternLibraryService } from "../../lib/services.ts";
+import { getPatternLibraryService, getPatternByIdSync } from "../../lib/services.ts";
 import { displayChar } from "../../lib/irToCarveNodes.ts";
 import { capabilityHint } from "./parts/InfoView.tsx";
 import type { AxisFill, DiscoveryAxisVector } from "@keyboard-studio/contracts";
@@ -90,6 +91,7 @@ import {
   collectModifierTokensInUse,
   collectCharContributors,
   collectCompositionMethod,
+  buildSessionProducedSet,
   type ModifierToken,
   type CharContributors,
 } from "@keyboard-studio/engine";
@@ -130,7 +132,7 @@ import {
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
-import { usePositionalCharNav } from "./usePositionalCharNav.ts";
+import { usePositionalCharNav, nearestSurvivingChar, indexOfChar } from "./usePositionalCharNav.ts";
 import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
@@ -870,6 +872,13 @@ function MethodChooser({
                       })),
                     ];
                     return (
+                      // key={index} intentionally kept: a raltTokens slot's
+                      // identity IS its position (onRaltTokenChange/
+                      // handleRemoveRaltSlot both address slots by index, and
+                      // two slots can hold the identical value, e.g. two
+                      // empty "" slots, so no content-derived key would be
+                      // stable/unique here either) — not the array-index
+                      // anti-pattern this sweep otherwise targets.
                       <div
                         key={index}
                         style={{
@@ -1348,9 +1357,39 @@ export function MechanismGallery({
   // check — both order-independent, so reordering here is safe. The
   // canonical `confirmedInventory` (rawInventory) is left untouched; only
   // this display-local derivation is sorted.
+  //
+  // `collateInventory` (not bare `collate`) — a bare combining mark added to
+  // the inventory (e.g. a lone U+0308 combining diaeresis, added ahead of a
+  // precomposed target like "ӝ") otherwise collates to ICU position 0 under
+  // `collate()`'s root comparator, inserting a phantom "first" walk entry and
+  // shifting every other character's index (the walk/nav indexing bug this
+  // fix addresses). `collateInventory` partitions letters/stacks (ICU order)
+  // from bare marks (raw code-point order, trailing) before returning —
+  // see survey/collation.ts.
+  //
+  // `nfcDedup([], rawInventory)` — same fix as TouchGallery's matching
+  // `inventory` derivation (see that file for the full rationale): a walk
+  // entry can appear in confirmedInventory as BOTH its precomposed form
+  // (e.g. "ӝ" U+04DD) and its canonically-equivalent decomposed form (e.g.
+  // "ж"+combining-diaeresis) — distinct JS strings that would otherwise
+  // surface as two separate walk stops for what is visually one character.
+  // Deduping (and displaying the NFC form) here — not in confirmedInventory
+  // itself, which stays untouched — keeps this gallery's walk consistent
+  // with TouchGallery's. NFD stacks with no precomposed codepoint
+  // (Africanist multi-mark sequences) round-trip through NFC unchanged
+  // (NFC(x) is not always length 1), so this never folds two genuinely
+  // different characters together.
   const inventory = useMemo(
-    () => collate(rawInventory),
+    () => collateInventory(nfcDedup([], rawInventory)),
     [rawInventory],
+  );
+
+  // This session's physical (desktop) assignments — feeds baseProducedSet
+  // below (session-aware coverage) and mechanismAssignments further down.
+  // Declared once, early, so both can share it.
+  const sessionAssignments = useMemo(
+    () => selectDesktopAssignments(phaseResults),
+    [phaseResults],
   );
 
   // The BASE (pre-augmentWithComposable) produced set — same derivation
@@ -1365,12 +1404,21 @@ export function MechanismGallery({
   // wrongly treated as directly produced here either; without this, the
   // early-out in collectCompositionMethod (`baseProduced.has(targetChar)`)
   // would suppress the real "A + ◌̂ → Â" composition row.
+  //
+  // `buildSessionProducedSet` (not bare `buildProducedSet(baseIr, ...)`) —
+  // shaped-bug fix (diacritic-implementability): this session's physical
+  // assignments are injected into the base .kmn (applyAssignments), reparsed,
+  // and the produced set is rebuilt from that preview IR, so a mark produced
+  // as a rule-output byproduct THIS session (e.g. a deadkey's bare
+  // combining-diaeresis output) is visible to collectCompositionMethod
+  // immediately — not just after the working copy is serialized. See
+  // packages/engine/src/pattern-apply/sessionProducedSet.ts.
   const baseProducedSet = useMemo(
     () =>
       baseIr !== null
-        ? buildProducedSet(baseIr, { excludeBackspaceCorrections: true })
+        ? buildSessionProducedSet(baseIr, sessionAssignments, getPatternByIdSync)
         : new Set<string>(),
-    [baseIr],
+    [baseIr, sessionAssignments],
   );
 
   // Spec 046 worklist filter (FR-020): a composed unit whose marks are ALL
@@ -1379,33 +1427,42 @@ export function MechanismGallery({
   // (plain bases, own-letter units, the productive marks themselves) keeps its
   // flat-inventory walk entry. No worklist (or an empty one) ⇒ identity.
   //
-  // The worklist-filtered result is then collated (same `collate` helper as
-  // `inventory` above) before being returned — this is the list
+  // The worklist-filtered result is then collated (same `collateInventory`
+  // helper as `inventory` above) before being returned — this is the list
   // usePositionalCharNav's `list` walks and the "first uncovered" default
   // below reads, so sorting it puts a lowercase letter immediately before
   // its uppercase counterpart in the Back/Next walk too. The SET of
   // characters (the coverage/gate denominator, criterion 18.6) is never
   // widened or narrowed by this — only its order changes.
+  //
+  // `nfcDedup([], inventoryLettersToAdd)` — same duplicate-walk-entry fix as
+  // `inventory` above: `inventoryLettersToAdd` (from useInventoryDiff.ts)
+  // carries confirmedInventory's raw, un-deduped entries (it NFC-normalizes
+  // only for its own produced-set lookup, then pushes the original raw
+  // string), so a decomposed/precomposed pair not yet produced would
+  // otherwise both survive into this walk's denominator as two stops for one
+  // grapheme. Deduping here — this gallery's own walk list, not the shared
+  // hook — keeps it consistent with `inventory` and with TouchGallery's
+  // matching `touchLettersToAdd`.
   const lettersToAdd = useMemo(() => {
-    let filtered = inventoryLettersToAdd;
+    const deduped = nfcDedup([], inventoryLettersToAdd);
+    let filtered = deduped;
     if (worklist !== undefined && worklist.markUnits.length > 0) {
       const productiveMarks = new Set(worklist.markUnits.map((u) => u.mark));
-      filtered = inventoryLettersToAdd.filter((c) => {
+      filtered = deduped.filter((c) => {
         const units = [...c.normalize("NFD")];
         if (units.length < 2) return true;
         const marks = units.slice(1);
         return !marks.every((m) => productiveMarks.has(m));
       });
     }
-    return collate(filtered);
+    return collateInventory(filtered);
   }, [inventoryLettersToAdd, worklist]);
 
   // Read Phase C assignments directly (not the merged session.assignments view)
   // so multiple methods per character are preserved.
-  const sessionAssignments = useMemo(
-    () => selectDesktopAssignments(phaseResults),
-    [phaseResults],
-  );
+  // (sessionAssignments itself is declared earlier, alongside baseProducedSet
+  // above, so both can share the one derivation.)
 
   // sessionAssignments with sequence assignments/mechanisms excluded — see
   // excludeSequenceMechanisms above. This gallery's whole covered/applied view
@@ -1451,17 +1508,35 @@ export function MechanismGallery({
   // Only advances when the user clicks "Next character →" or "Skip".
   const [currentChar, setCurrentChar] = useState<string | null>(null);
   const lettersKey = lettersToAdd.join("\0");
+  // Previous run's lettersToAdd — feeds nearestSurvivingChar's "where was this
+  // character before the reflow" lookup below. Updated at the end of the
+  // effect (not via a separate render), so it always holds the list the LAST
+  // sync ran against, not the list mid-render.
+  const prevLettersToAddRef = useRef<readonly string[]>(lettersToAdd);
   useEffect(() => {
     setCurrentChar((prev) => {
-      // Keep current char if it's still in the list (e.g., inventory refresh).
-      if (prev !== null && lettersToAdd.includes(prev)) return prev;
-      // Pick the first uncovered char, or the very first if all covered.
-      return (
-        lettersToAdd.find((c) => !coveredChars.has(c)) ??
-        lettersToAdd[0] ??
-        null
-      );
+      // Keep current char if it's still in the list (e.g., inventory
+      // refresh) — by NFC identity (indexOfChar), not raw equality, so a
+      // representation change (e.g. collateInventory's NFC-dedup) doesn't
+      // spuriously look like a removal.
+      if (prev !== null && indexOfChar(lettersToAdd, prev) !== -1) return prev;
+      if (prev === null) {
+        // First-ever pick — prefer the first UNCOVERED char over strict
+        // position 0.
+        return (
+          lettersToAdd.find((c) => !coveredChars.has(c)) ??
+          lettersToAdd[0] ??
+          null
+        );
+      }
+      // `prev` was removed by this reflow — fall back to the NEAREST
+      // surviving neighbor (shaped-bug fix, walk-order/indexing) rather than
+      // jumping to "first uncovered"/list[0], which can be arbitrarily far
+      // from where the author was in a long inventory. See
+      // usePositionalCharNav.ts's `nearestSurvivingChar` doc comment.
+      return nearestSurvivingChar(prevLettersToAddRef.current, prev, lettersToAdd);
     });
+    prevLettersToAddRef.current = lettersToAdd;
     // Intentionally omit coveredChars — only re-run when the
     // inventory list itself changes, not when methods are applied.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3533,7 +3608,7 @@ export function MechanismGallery({
                   .filter(
                     (a) => a.scope === "individual" && a.target === currentChar,
                   )
-                  .map((a, i) => {
+                  .map((a) => {
                     const ref = a.mechanisms[0];
                     const label =
                       ref !== undefined
@@ -3541,9 +3616,21 @@ export function MechanismGallery({
                         : a.mechanisms
                             .map((m) => methodLabel(m, i18n))
                             .join(", ");
+                    // Stable content-identity key (not array index) — a
+                    // removal reflows this filtered list, and an index key
+                    // would rebind React's reconciliation to the WRONG chip
+                    // (e.g. a mid-list removal making the last chip disappear
+                    // instead of the clicked one, or transferring hover/focus
+                    // state onto an unrelated chip). Every mechanism this
+                    // gallery can record carries a patternId + slotValues
+                    // (see applyAssignments.ts's own `mechanismKey`), so the
+                    // full mechanisms list serializes to a unique key.
+                    const chipKey = a.mechanisms
+                      .map((m) => `${m.patternId}::${JSON.stringify(m.slotValues ?? {})}`)
+                      .join("|");
                     return (
                       <HoverDangerChip
-                        key={i}
+                        key={chipKey}
                         onClick={() => handleRemoveMechanism(a)}
                         disabled={locked}
                         ariaLabel={t({

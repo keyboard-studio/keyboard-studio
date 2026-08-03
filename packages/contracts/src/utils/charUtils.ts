@@ -31,15 +31,43 @@ export function toUPlusNotation(char: string): string {
   return "U+" + toHex4(cp);
 }
 
-/** Returns true when `char` is an accented letter decomposable to base + combining mark
- *  (i.e. NFD produces exactly two code points and the second is in the Combining Diacritical
- *  Marks block U+0300–U+036F). */
+/** General_Category test for a single code point: Lu/Ll/Lo/Lt/Lm (any letter). */
+const IS_LETTER_CP = /^\p{L}$/u;
+
+/** General_Category test for a single code point: Mn/Mc/Me (any combining mark). */
+const IS_MARK_CP = /^\p{M}$/u;
+
+/**
+ * Returns true when `char` is a letter with one or more combining marks
+ * (i.e. `NFD(char)` has 2+ code points, the FIRST is a letter — General_Category
+ * Lu/Ll/Lo/Lt/Lm — and EVERY remaining code point is a combining mark —
+ * General_Category Mn/Mc/Me, tested via `\p{M}`).
+ *
+ * Script-neutral (shaped-bug fix — the predicate used to be Latin-only: NFD
+ * length exactly 2 with the second code point hardcoded to the Combining
+ * Diacritical Marks block U+0300–U+036F). Two broadenings, both domain-ruled:
+ *   - `\p{M}` (not a fixed block range) — Hebrew niqqud and Arabic marks live
+ *     outside U+0300–036F and would otherwise be silently excluded.
+ *   - NFD length >= 2 (not === 2) — multi-mark stacks (e.g. Vietnamese "ệ" =
+ *     e + circumflex + dot-below, 3 code points) are legitimate single
+ *     "accented letter" units, not a decomposition failure.
+ *
+ * Hangul jamo need no special-case carve-out: a precomposed Hangul syllable's
+ * NFD is a sequence of jamo, and jamo are General_Category Lo (letter), not M
+ * — so the "every remaining code point is a mark" check already excludes them
+ * for free.
+ *
+ * The name is kept (existing callers depend on it) even though the semantics
+ * broadened beyond "accented" in the diacritic-mark sense — see callers in
+ * MechanismGallery.tsx/TouchGallery.tsx/siblingAccents.ts, none of which
+ * assume the old NFD-length-2/U+0300-036F boundary specifically.
+ */
 export function isDecomposableAccented(char: string): boolean {
-  const nfd = char.normalize("NFD");
-  const cps = [...nfd];
-  if (cps.length !== 2) return false;
-  const secondCp = cps[1]?.codePointAt(0) ?? 0;
-  return secondCp >= 0x0300 && secondCp <= 0x036f;
+  const cps = [...char.normalize("NFD")];
+  if (cps.length < 2) return false;
+  const [first, ...rest] = cps;
+  if (first === undefined || !IS_LETTER_CP.test(first)) return false;
+  return rest.every((cp) => IS_MARK_CP.test(cp));
 }
 
 /**

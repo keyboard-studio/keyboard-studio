@@ -320,3 +320,154 @@ describe("useInventoryDiff — opaque fragment producedOutput", () => {
     expect(result.current.lettersToAdd).toEqual(["ɓ"]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 12. Session-aware composability (symptom-2 fix) — a SESSION assignment
+// (Phase C MechanismAssignment[]), NOT base-IR rules, makes "ж" (U+0436) and
+// the bare combining diaeresis "̈" (U+0308) produced THIS session; the
+// composition surface (producedSet, via augmentWithComposable) must then
+// recognize the precomposed "ӝ" (U+04DD = "ж" + U+0308) as implementable, and
+// the criterion 18.6 completion gate (unimplementedDesktopChars) must stop
+// listing it as unimplemented — even though NO assignment's own `target` is
+// "ӝ" and the base keyboard produces nothing at all.
+//
+// Uses the REAL `deadkey_single_tap` (S-02) content pattern
+// (content/patterns/desktop-input/deadkey-single-tap.yaml), resolved through
+// the studio's real getPatternByIdSync (no services mock — USE_REAL is not
+// overridden in this file), exactly the path useInventoryDiff's
+// buildSessionProducedSet call goes through in the running app.
+//
+// This is deliberately the SESSION-ASSIGNMENT path: the existing composition-
+// row tests above (§10, "composability") seed the composable parts via
+// seedBaseWithChars — i.e. base-IR rules already present before any session
+// assignment exists — which does NOT exercise buildSessionProducedSet's
+// physical-assignment round trip at all (that call short-circuits to the
+// base-only set whenever there are no physical assignments). This suite is
+// the one that actually walks that round trip.
+// ---------------------------------------------------------------------------
+
+describe("useInventoryDiff — session-aware composability (symptom-2 fix)", () => {
+  function makeDeadkeyAssignment(
+    target: string,
+    slotValues: {
+      triggerKey: string;
+      deadkeyName: string;
+      baseLetters: string;
+      accentedForms: string;
+      accentChar: string;
+    },
+  ) {
+    return {
+      scope: "individual" as const,
+      target,
+      modality: "physical" as const,
+      mechanisms: [
+        {
+          patternId: "deadkey_single_tap",
+          strategyId: "S-02",
+          slotValues,
+        },
+      ],
+      source: "user" as const,
+    };
+  }
+
+  function setPhaseCAssignments(assignments: ReturnType<typeof makeDeadkeyAssignment>[]) {
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      assignments,
+    });
+  }
+
+  it("producedSet contains the precomposed 'ӝ' (U+04DD) once separate session assignments produce 'ж' and the bare U+0308 byproduct — via augmentWithComposable, not a direct target match", async () => {
+    const { useInventoryDiff } = await import("./useInventoryDiff.ts");
+    // Base produces nothing at all — every glyph below is session-introduced.
+    seedBaseWithChars([]);
+    setInventory(["ж", "ӝ"]);
+
+    // Assignment 1: an unrelated deadkey whose COMPOSED OUTPUT store happens
+    // to include "ж" (base letter "p", arbitrary — the produced-set walk is
+    // static over rule/store contents, not a simulated key sequence).
+    const producesZhe = makeDeadkeyAssignment("ж", {
+      triggerKey: "K_QUOTE",
+      deadkeyName: "d1",
+      baseLetters: "p",
+      accentedForms: "ж",
+      accentChar: "́", // acute — irrelevant to this assignment's own byproduct use here
+    });
+
+    // Assignment 2: a DIFFERENT deadkey (different triggerKey/deadkeyName, so
+    // applyAssignments' same-triggerKey merge never fires) whose double-tap
+    // trigger rule emits the bare combining diaeresis U+0308 as a byproduct —
+    // never this assignment's own `target` ("q", a placeholder).
+    const producesBareDiaeresis = makeDeadkeyAssignment("q", {
+      triggerKey: "K_BKQUOTE",
+      deadkeyName: "d2",
+      baseLetters: "q",
+      accentedForms: "Q",
+      accentChar: "̈", // U+0308 combining diaeresis
+    });
+
+    setPhaseCAssignments([producesZhe, producesBareDiaeresis]);
+
+    const { result } = renderHook(() => useInventoryDiff());
+
+    // The session-aware produced set recognizes "ӝ" as implementable, even
+    // though it was never any assignment's own target.
+    expect(result.current.producedSet.has("ӝ")).toBe(true);
+    // Sanity: the two underlying components are genuinely there too.
+    expect(result.current.producedSet.has("ж")).toBe(true);
+    expect(result.current.producedSet.has("̈")).toBe(true);
+
+    // The STATIC walk denominator must NOT reflow — "ӝ" (and "ж") still show
+    // as needing addition, per useInventoryDiff's own documented contract
+    // that lettersToAdd never reacts to session assignments.
+    expect(result.current.lettersToAdd).toContain("ӝ");
+    expect(result.current.lettersToAdd).toContain("ж");
+  });
+
+  it("the criterion 18.6 completion gate (unimplementedDesktopChars) stops listing 'ӝ' as unimplemented once producedSet is passed, though it's still uncovered by uncoveredTargets alone", async () => {
+    const { useInventoryDiff } = await import("./useInventoryDiff.ts");
+    const { unimplementedDesktopChars } = await import("../lib/unimplementedInventory.ts");
+
+    seedBaseWithChars([]);
+    setInventory(["ж", "ӝ"]);
+
+    const producesZhe = makeDeadkeyAssignment("ж", {
+      triggerKey: "K_QUOTE",
+      deadkeyName: "d1",
+      baseLetters: "p",
+      accentedForms: "ж",
+      accentChar: "́",
+    });
+    const producesBareDiaeresis = makeDeadkeyAssignment("q", {
+      triggerKey: "K_BKQUOTE",
+      deadkeyName: "d2",
+      baseLetters: "q",
+      accentedForms: "Q",
+      accentChar: "̈",
+    });
+    setPhaseCAssignments([producesZhe, producesBareDiaeresis]);
+
+    const { result } = renderHook(() => useInventoryDiff());
+    const { lettersToAdd, producedSet } = result.current;
+
+    // No assignment's `target` is literally "ӝ" — without the session-aware
+    // produced set, the gate still flags it as unimplemented.
+    const withoutSessionAwareness = unimplementedDesktopChars(
+      [producesZhe, producesBareDiaeresis],
+      lettersToAdd,
+    );
+    expect(withoutSessionAwareness).toContain("ӝ");
+
+    // With the session-aware produced set supplied, the gate relaxation
+    // recognizes "ӝ" as already typeable and stops nagging for it.
+    const withSessionAwareness = unimplementedDesktopChars(
+      [producesZhe, producesBareDiaeresis],
+      lettersToAdd,
+      producedSet,
+    );
+    expect(withSessionAwareness).not.toContain("ӝ");
+  });
+});

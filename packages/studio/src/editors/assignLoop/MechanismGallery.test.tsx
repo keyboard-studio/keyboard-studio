@@ -38,7 +38,7 @@ import {
   type ReducerDeps,
 } from "../../steps/reducer.ts";
 import type { EditorStep, Step } from "../../steps/types.ts";
-import type { PatternLibraryService, VirtualFS } from "@keyboard-studio/contracts";
+import type { Pattern, PatternLibraryService, VirtualFS } from "@keyboard-studio/contracts";
 import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { latinDeadkeyAcuteSingle } from "@keyboard-studio/contracts/fixtures";
@@ -109,8 +109,24 @@ const mockSvc: PatternLibraryService = {
   },
 };
 
+// Synchronous counterpart of mockSvc.getById (same three well-known ids) —
+// needed by useInventoryDiff's buildSessionProducedSet call, which resolves
+// patterns synchronously inside a useMemo, not via the async service.
+function mockGetPatternByIdSync(id: string): Pattern | undefined {
+  if (id === latinDeadkeyAcuteSingle.id) return latinDeadkeyAcuteSingle;
+  if (id === PATTERN_SEQUENCE || id === PATTERN_DEADKEY) {
+    return {
+      ...latinDeadkeyAcuteSingle,
+      id,
+      title: id === PATTERN_SEQUENCE ? "Multi-char sequence" : "Deadkey single tap",
+    };
+  }
+  return undefined;
+}
+
 vi.mock("../../lib/services.ts", () => ({
   getPatternLibraryService: () => mockSvc,
+  getPatternByIdSync: mockGetPatternByIdSync,
   USE_REAL: false,
 }));
 
