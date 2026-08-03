@@ -42,7 +42,7 @@ import type { PlacementMap, PlacementCandidate } from "@keyboard-studio/contract
 import { topCandidate, strategyForCandidate, parseUPlusNotation, toUPlusNotation } from "@keyboard-studio/contracts";
 import type { StrategyId } from "@keyboard-studio/contracts";
 import { caseCounterpart } from "@keyboard-studio/engine";
-import { isOrthographicallyUnicameral } from "../editors/assignLoop/casePairCompanion.ts";
+import { isOrthographicallyUnicameral } from "../lib/casePairSuppression.ts";
 
 // ---------------------------------------------------------------------------
 // Confidence threshold
@@ -238,8 +238,8 @@ export function getSuggestionForChar(
  * `null`) for scripts where Unicode's formal case-pair mapping does not
  * correspond to a Shift-layer relationship in ordinary orthographic
  * practice (currently Georgian) — reuses the ONE predicate
- * `isOrthographicallyUnicameral` from `casePairCompanion.ts` rather than a
- * second copy of the script test.
+ * `isOrthographicallyUnicameral` from `../lib/casePairSuppression.ts` (shared
+ * with `casePairCompanion.ts`) rather than a second copy of the script test.
  *
  * @param char          The character to look up (typically the currently
  *                       displayed gallery character).

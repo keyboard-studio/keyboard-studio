@@ -81,20 +81,25 @@ export function CasePairProposalBanner({
         <Trans id="editor.assignLoop.companion.confirmButton">Map it</Trans>
       }
       confirmAriaLabel={
-        // Touch gets its OWN id rather than a widened shared one. The shared
-        // message is still exactly right for the physical and combo paths
-        // (their parallel slot IS the shift plane), and a new id orphans no
-        // translation, where editing the shared message would restate it for
-        // two mechanisms that didn't change.
+        // Touch and ralt-layer each get their OWN id rather than a widened
+        // shared one. The shared message is still exactly right for the
+        // physical and combo paths (their parallel slot IS the shift plane),
+        // and a new id orphans no translation, where editing the shared
+        // message would restate it for two mechanisms that didn't change.
         proposal.mechanism === "touch"
           ? t({
               id: "editor.assignLoop.companion.confirmAriaLabel.touch",
               message: `Map ${proposal.counterpart} to the ${proposal.targetLayerLabel} layer of ${proposal.hostKey}`,
             })
-          : t({
-              id: "editor.assignLoop.companion.confirmAriaLabel",
-              message: `Map ${proposal.counterpart} to the shift layer of ${confirmTargetLabel(proposal)}`,
-            })
+          : proposal.mechanism === "ralt-layer"
+            ? t({
+                id: "editor.assignLoop.companion.confirmAriaLabel.raltLayer",
+                message: `Map ${proposal.counterpart} to the ${raltLayerModifierLabel(proposal)} layer of ${proposal.vkey}`,
+              })
+            : t({
+                id: "editor.assignLoop.companion.confirmAriaLabel",
+                message: `Map ${proposal.counterpart} to the shift layer of ${confirmTargetLabel(proposal)}`,
+              })
       }
       onConfirm={onConfirm}
       declineLabel={
@@ -108,10 +113,15 @@ export function CasePairProposalBanner({
               id: "editor.assignLoop.companion.declineAriaLabel.touch",
               message: `Do not map ${proposal.counterpart} to the ${proposal.targetLayerLabel} layer`,
             })
-          : t({
-              id: "editor.assignLoop.companion.declineAriaLabel",
-              message: `Do not map ${proposal.counterpart} to the shift layer`,
-            })
+          : proposal.mechanism === "ralt-layer"
+            ? t({
+                id: "editor.assignLoop.companion.declineAriaLabel.raltLayer",
+                message: `Do not map ${proposal.counterpart} to the ${raltLayerModifierLabel(proposal)} layer`,
+              })
+            : t({
+                id: "editor.assignLoop.companion.declineAriaLabel",
+                message: `Do not map ${proposal.counterpart} to the shift layer`,
+              })
       }
       onDismiss={onDismiss}
     />

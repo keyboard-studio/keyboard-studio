@@ -2337,7 +2337,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
     );
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Map Ƒ to the shift layer of K_F/i,
+        name: /Map Ƒ to the Shift\+RAlt layer of K_F/i,
       }),
     );
 
@@ -2417,7 +2417,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Map Ƒ to the shift layer of K_F/i,
+        name: /Map Ƒ to the Shift\+RAlt layer of K_F/i,
       }),
     );
 
