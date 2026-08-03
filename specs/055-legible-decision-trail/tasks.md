@@ -69,7 +69,7 @@ The contracts change breaks every consumer by design: with the counts optional, 
 
 **⟶ Wait for T011 to finish, then:**
 
-- [ ] **T012** Rewrite the recording tests to drive the **production completion path** with real store state instead of the synthetic `{ answers: [], assignments: [...] }` payload no adapter emits, and add one test per dimension that drives it non-zero through that path — `keysRemoved`, `keysAdded`, `mechanismsAssigned`, `touchKeysAffected` (FR-027/FR-029, SC-002/SC-010) · `packages/studio/src/steps/reducer.decisionRecording.test.ts`
+- [x] **T012** Rewrite the recording tests to drive the **production completion path** with real store state instead of the synthetic `{ answers: [], assignments: [...] }` payload no adapter emits, and add one test per dimension that drives it non-zero through that path — `keysRemoved`, `keysAdded`, `mechanismsAssigned`, `touchKeysAffected` (FR-027/FR-029, SC-002/SC-010) · `packages/studio/src/steps/reducer.decisionRecording.test.ts`
 
 **Checkpoint**: US1 is independently functional — every editor stage's recorded counts match the working copy's own state after that stage, and no dimension survives without a producer a test can move.
 
@@ -116,14 +116,14 @@ The contracts change breaks every consumer by design: with the counts optional, 
 **Wave 1 — independent (different files):**
 
 - [x] **T020** [P] NEW baseline recorder: one entry at `choose_base` completion carrying `baseId`, `baseDisplayName`, `startingKeyCount`, `derivedAxes`, `inheritedMetadata`, `instantiationMode`, read from the **instantiated store** via injected deps (never a re-read of the base source, FR-035). `startingKeyCount` uses `toRailNodes(baseIr, removalCapabilities)` so the denominator is in the same `nodes + items` unit as `keysRemoved` (FR-034). No instantiated working copy at that instant → **no entry**, never a fabricated zero (research D-11) · `packages/studio/src/decisions/recordBaseContribution.ts` + `recordBaseContribution.test.ts`
-- [ ] **T021** [P] Add the `baseContribution` variant to the selection surface — base name plus only the contributions actually present ([headline-spec.contract.md](contracts/headline-spec.contract.md) §2) · `packages/studio/src/decisions/headline.ts`
+- [x] **T021** [P] Add the `baseContribution` variant to the selection surface — base name plus only the contributions actually present ([headline-spec.contract.md](contracts/headline-spec.contract.md) §2) · `packages/studio/src/decisions/headline.ts`
 - [ ] **T022** [P] Add `trail.entry.headline.baseContribution` plus the messages that render `derivedAxes` and `inheritedMetadata[].field` **codes** as prose — a code must never reach author-facing text (FR-008) · `packages/studio/src/locales/en/messages.json`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
 **Wave 2 — independent (different files):**
 
-- [ ] **T023** [P] Call the baseline recorder from the existing `recordStepCompletion` event at `choose_base` — `StepHost` already fires it **after** `applyStepCompletion`, so the working copy exists by then and no new event or timer is needed (Constitution Article IV) · `packages/studio/src/decisions/createDecisionRecorder.ts` + `packages/studio/src/StudioShell.tsx`
+- [x] **T023** [P] Call the baseline recorder from the existing `recordStepCompletion` event at `choose_base` — `StepHost` already fires it **after** `applyStepCompletion`, so the working copy exists by then and no new event or timer is needed (Constitution Article IV) · `packages/studio/src/decisions/createDecisionRecorder.ts` + `packages/studio/src/StudioShell.tsx`
 - [ ] **T024** [P] Render the base-contribution entry, resolving axis ids and metadata field codes through the catalog · `packages/studio/src/decisions/DecisionEntryRow.tsx`
 
 **⟶ Wait for Wave 2 to finish, then:**
@@ -169,7 +169,7 @@ The contracts change breaks every consumer by design: with the counts optional, 
 
 **Wave 4 — independent (different files):**
 
-- [ ] **T033** [P] Baseline and diff tests: binaries skipped never diffed, a zero-changed-file capture is `{ state: "none" }` and not an empty `files` array, aggregate magnitude equals the sum over `files`, and the volatile normalizer holds the date stamp while a real HISTORY edit still surfaces · `packages/studio/src/decisions/snapshotSource.test.ts`
+- [x] **T033** [P] Baseline and diff tests: binaries skipped never diffed, a zero-changed-file capture is `{ state: "none" }` and not an empty `files` array, aggregate magnitude equals the sum over `files`, and the volatile normalizer holds the date stamp while a real HISTORY edit still surfaces · `packages/studio/src/decisions/snapshotSource.test.ts`
 - [ ] **T034** [P] Identity-stage integration test: expanding each identity decision shows the `.kps` metadata change with the file identified, and the four answers made together show the same change stated as shared (SC-006, US4 scenarios 2–3) · `packages/studio/src/decisions/impact.test.ts`
 
 **Checkpoint**: US4 is independently functional — no identity decision reports a reason a widened comparison would have resolved, and the shipped package and the shown change agree.
@@ -188,8 +188,8 @@ This phase is presentation over an unchanged record — cuttable without touchin
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T035** [P] NEW derived grouping: `StageGroup { stepId, entries, rollUp }` ordered by the stage's position in the flow manifest, with a `stepId` absent from the manifest (`PRE_IDENTITY_STEP_ID`, or a step a later build removed) sorted first under a generic heading rather than dropped. `rollUp` states the stage's **net effect** from its *effective* entries — for an editor stage the latest non-superseded entry, never a sum, because editor counts are cumulative per step and summing double-counts every revisit (research D-02). Not persisted, not a second record · `packages/studio/src/decisions/stageGroups.ts` + `stageGroups.test.ts`
-- [ ] **T036** [P] Add `trail.stage.rollUp` · `packages/studio/src/locales/en/messages.json`
+- [x] **T035** [P] NEW derived grouping: `StageGroup { stepId, entries, rollUp }` ordered by the stage's position in the flow manifest, with a `stepId` absent from the manifest (`PRE_IDENTITY_STEP_ID`, or a step a later build removed) sorted first under a generic heading rather than dropped. `rollUp` states the stage's **net effect** from its *effective* entries — for an editor stage the latest non-superseded entry, never a sum, because editor counts are cumulative per step and summing double-counts every revisit (research D-02). Not persisted, not a second record · `packages/studio/src/decisions/stageGroups.ts` + `stageGroups.test.ts`
+- [x] **T036** [P] Add `trail.stage.rollUp` · `packages/studio/src/locales/en/messages.json`
 
 **⟶ Wait for Wave 1 to finish, then:**
 

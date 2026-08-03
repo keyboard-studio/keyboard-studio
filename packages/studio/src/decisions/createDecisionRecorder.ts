@@ -28,14 +28,21 @@
 // statement, so the multi-vs-single branch below is not optional plumbing.
 
 import type {
+  BaseKeyboard,
   DecisionImpact,
+  DiscoveryAxisVector,
   KeyboardIR,
   MechanismAssignment,
+  RemovalCapability,
   SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
 import { useDecisionLogStore } from "./decisionLogStore.ts";
 import { recordSurveyAnswers, type ProposalLookup } from "./recordSurveyAnswers.ts";
 import { recordEditorStep, type DeletionCounts } from "./recordEditorStep.ts";
+import {
+  recordBaseContribution,
+  type InstantiatedMode,
+} from "./recordBaseContribution.ts";
 import type { SourceSnapshotter } from "./snapshotSource.ts";
 
 export interface DecisionRecorderDeps {
@@ -64,6 +71,22 @@ export interface DecisionRecorderDeps {
    * having to announce it.
    */
   getKeyboardId: () => string | null;
+  /**
+   * The chosen base keyboard, or `null` before instantiation — feeds
+   * `recordBaseContribution` at `choose_base` completion only (specs/055
+   * FR-030..FR-035, research D-11).
+   */
+  getBaseKeyboard: () => BaseKeyboard | null;
+  /** Axes the studio has derived onto the working copy so far. */
+  getIrAxes: () => Partial<DiscoveryAxisVector>;
+  /** `null` before instantiation; one of the two literals once instantiated. */
+  getInstantiationMode: () => InstantiatedMode | null;
+  /**
+   * Same map `CarveGallery` reads to build its own rail — see
+   * `RecordBaseContributionDeps.getRemovalCapabilities` (recordBaseContribution.ts)
+   * for why a starting count must be read against this rather than defaulted.
+   */
+  getRemovalCapabilities: () => Map<string, RemovalCapability>;
   /** Optional per-question proposal register — see recordSurveyAnswers.ts. */
   resolveProposal?: ProposalLookup;
 }
@@ -94,6 +117,29 @@ export function createDecisionRecorder(
     // FR-004: carry the identity onto the record as soon as there is one. Entries
     // recorded before it are untouched apart from the record-level id.
     log.setKeyboardId(deps.getKeyboardId());
+
+    // specs/055 FR-030..FR-035 (research D-11): the base baseline, recorded once
+    // at `choose_base` completion. This fires here — not from a new event — because
+    // `choose_base`'s instantiation runs inside `applyStepCompletion`, and StepHost
+    // calls `recordStepCompletion` (which reaches this callback) AFTER that, so the
+    // working copy already exists (Constitution Article IV: no new timer/event).
+    // `recordBaseContribution` itself writes no entry when the store shows no
+    // instantiated working copy yet — that null is not papered over here.
+    //
+    // This entry does not join `recordedIds` below: it is not a diff the
+    // snapshotter's boundary capture describes (there is no "before" to compare
+    // against — the working copy did not exist a moment ago), so it gets no
+    // `DecisionImpact` attached.
+    if (stepId === "choose_base") {
+      recordBaseContribution({
+        append: log.append,
+        getBaseKeyboard: deps.getBaseKeyboard,
+        getBaseIr: deps.getBaseIr,
+        getIrAxes: deps.getIrAxes,
+        getInstantiationMode: deps.getInstantiationMode,
+        getRemovalCapabilities: deps.getRemovalCapabilities,
+      });
+    }
 
     const answerIds = isSurveyPhaseResult(result)
       ? recordSurveyAnswers(stepId, result, {

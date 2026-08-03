@@ -664,6 +664,19 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           const wc = useWorkingCopyStore.getState();
           return wc.identity?.keyboardId ?? wc.baseKeyboard?.id ?? null;
         },
+        // specs/055 FR-030..FR-035 (research D-11): the base baseline, read
+        // straight off the instantiated store — never a re-read of the base's
+        // source. `null` before instantiation; `recordBaseContribution` (called
+        // only at `choose_base` completion) treats that as "no entry yet",
+        // never a fabricated zero.
+        getBaseKeyboard: () => useWorkingCopyStore.getState().baseKeyboard,
+        getIrAxes: () => useWorkingCopyStore.getState().irAxes,
+        getInstantiationMode: () => useWorkingCopyStore.getState().instantiationMode,
+        getRemovalCapabilities: () => useWorkingCopyStore.getState().removalCapabilities,
+        // T025 (specs/055 FR-032/FR-033): wire `resolveProposal` here, seeded
+        // from the base's inherited values, to make `recordSurveyAnswers`'s
+        // existing `"base-derived"` provenance branch reachable. Left absent —
+        // not added by this task.
       }),
     [],
   );

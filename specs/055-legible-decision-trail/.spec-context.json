@@ -267,6 +267,54 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-03T04:36:49.561Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:42:23.027Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:43:02.568Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:43:53.221Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:47:12.791Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:47:55.905Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T04:57:32.358Z"
     }
   ],
   "coverage": {
@@ -651,7 +699,7 @@
     }
   },
   "telemetryInstanceId": "c7509f96-1e29-4e6f-8a65-690a8a8ad00d",
-  "currentTask": "T032",
+  "currentTask": "T012",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -864,6 +912,50 @@
       "did": "Confirmed shed.ts's existing largest-first, whole-impact-to-null truncation already bounds the widened multi-file captured payload per spec's own FR-016 resolution, and documented why per-file partial shedding is rejected (schema's files.min(1), and magnitude-vs-files masquerade risk under §6)",
       "files": [
         "packages/engine/src/decision-audit/shed.ts"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Wired recordBaseContribution into createDecisionRecorder, hooked at choose_base via the existing recordStepCompletion path (no new event/timer)",
+      "files": [
+        "packages/studio/src/decisions/createDecisionRecorder.ts",
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Added the baseContribution HeadlineSpec variant to headline.ts, removed the FR-008 baseId-as-label placeholder, and derived baseName/startingKeyCount/derivedAxisCount/inheritedFieldCount from BaseContribution with zero-suppression",
+      "files": [
+        "packages/studio/src/decisions/headline.ts"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "Added trail.stage.rollUp.{composed,noChange,unmeasured,notRecorded} to the English catalog to render a stage group's one-line account",
+      "files": [
+        "packages/studio/src/locales/en/messages.json"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Added buildStageGroups: pure derivation grouping decision-record entries by manifest stage order, with rollUp reading the latest effective (non-superseded) editor entry (D-02 revisit guard), not-recorded vs editor-no-change distinguished (FR-025), unknown/removed stepIds sorted first and never dropped (FR-024), and absent counts reported as unmeasured never 0 (FR-005a)",
+      "files": [
+        "packages/studio/src/decisions/stageGroups.ts",
+        "packages/studio/src/decisions/stageGroups.test.ts"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Rebuilt snapshotSource tests on the readProjectedFiles/{entries} harness; cover binary skip, none-vs-empty-capture, aggregate=sum, FR-016 enumeration, and the HISTORY.md date normalizer both ways (27 pass)",
+      "files": [
+        "packages/studio/src/decisions/snapshotSource.test.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Rewrote the recording tests onto the production completion path (real working-copy store + each adapter's own onComplete payload) and added a non-zero driver per reporting dimension plus absent-vs-present-zero assertions",
+      "files": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
       ]
     }
   }

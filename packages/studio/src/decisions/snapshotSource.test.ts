@@ -20,8 +20,12 @@
 // pretending the differ preserves `\r`.
 
 import { describe, expect, it, vi } from "vitest";
-import type { DiffHunk } from "@keyboard-studio/contracts";
-import { createSourceSnapshotter, type ProjectedSource } from "./snapshotSource.ts";
+import { DecisionImpactSchema } from "@keyboard-studio/contracts";
+import type { DiffHunk, VirtualFSEntry } from "@keyboard-studio/contracts";
+import {
+  createSourceSnapshotter,
+  type ProjectedSource,
+} from "./snapshotSource.ts";
 
 // ---------------------------------------------------------------------------
 // The oracle
@@ -47,8 +51,10 @@ function applyHunks(before: string, hunks: readonly DiffHunk[]): string {
     // 1-based, except that a side contributing no lines reports the line it
     // follows — the convention groupIntoHunks() emits.
     const start = hunk.oldLines > 0 ? hunk.oldStart - 1 : hunk.oldStart;
-    if (start < cursor) throw new Error(`hunk at ${String(start)} overlaps the previous one`);
-    if (start > src.length) throw new Error(`hunk starts past end of file: ${String(start)}`);
+    if (start < cursor)
+      throw new Error(`hunk at ${String(start)} overlaps the previous one`);
+    if (start > src.length)
+      throw new Error(`hunk starts past end of file: ${String(start)}`);
     out.push(...src.slice(cursor, start));
     cursor = start;
 
@@ -57,13 +63,17 @@ function applyHunks(before: string, hunks: readonly DiffHunk[]): string {
       const text = line.slice(1);
       if (marker === " ") {
         if (src[cursor] !== text) {
-          throw new Error(`context mismatch at line ${String(cursor + 1)}: ${JSON.stringify(text)}`);
+          throw new Error(
+            `context mismatch at line ${String(cursor + 1)}: ${JSON.stringify(text)}`,
+          );
         }
         out.push(text);
         cursor++;
       } else if (marker === "-") {
         if (src[cursor] !== text) {
-          throw new Error(`removal mismatch at line ${String(cursor + 1)}: ${JSON.stringify(text)}`);
+          throw new Error(
+            `removal mismatch at line ${String(cursor + 1)}: ${JSON.stringify(text)}`,
+          );
         }
         cursor++;
       } else if (marker === "+") {
@@ -79,10 +89,30 @@ function applyHunks(before: string, hunks: readonly DiffHunk[]): string {
 }
 
 // ---------------------------------------------------------------------------
-// Fixtures — a `.kmn` evolving across step boundaries
+// Fixtures — a projected package evolving across step boundaries
 // ---------------------------------------------------------------------------
+//
+// A boundary is what the projection held at that moment: a set of
+// `VirtualFSEntry`s, text and binary alike. The snapshotter derives its own
+// compared path set from that (FR-016), so the fixtures never name a path the
+// module is expected to know about — several of them deliberately use paths no
+// production code mentions.
 
 const PATH = "source/hausa_std.kmn";
+const KPS_PATH = "source/hausa_std.kps";
+const HISTORY_PATH = "HISTORY.md";
+const FONT_PATH = "fonts/hausa.ttf";
+
+/** One boundary's projected entries. */
+type Boundary = readonly VirtualFSEntry[];
+
+function textEntry(path: string, content: string): VirtualFSEntry {
+  return { path, content, isBinary: false };
+}
+
+function binaryEntry(path: string, bytes: readonly number[]): VirtualFSEntry {
+  return { path, content: Uint8Array.from(bytes), isBinary: true };
+}
 
 /** Boundary 0: as instantiated from the base. */
 const B0 = [
@@ -119,14 +149,86 @@ const B4 =
 
 const SESSION: readonly string[] = [B0, B1, B2, B3, B4];
 
-/** A snapshotter reading a scripted sequence of boundaries. */
-function scriptedSnapshotter(texts: readonly string[]) {
+/** The package metadata file — the file 053's single-`.kmn` comparison missed. */
+const KPS_V1 = [
+  '<?xml version="1.0" encoding="utf-8"?>',
+  "<Package>",
+  "  <Info>",
+  "    <Name>Hausa</Name>",
+  "    <Version>1.0</Version>",
+  "  </Info>",
+  "</Package>",
+].join("\n");
+
+/** The identity step renamed the package — a metadata-only decision. */
+const KPS_RENAMED = KPS_V1.replace(
+  "<Name>Hausa</Name>",
+  "<Name>Hausa Standard</Name>",
+);
+
+/**
+ * `HISTORY.md` exactly as `stageAdaptHistory` stages it: `## <version> (<date>)`
+ * followed by the adapt bullet, with the base's own history preserved below.
+ */
+const HISTORY_AUG_02 = [
+  "## 1.1 (2026-08-02)",
+  "* Adapted from hausa v1.0 via keyboard-studio.",
+  "",
+  "## 1.0 (2025-01-09)",
+  "* Initial release.",
+].join("\n");
+
+/** The identical projection, re-run one second after local midnight (FR-017a). */
+const HISTORY_AUG_03 = HISTORY_AUG_02.replace("(2026-08-02)", "(2026-08-03)");
+
+/** A genuine content edit — a changelog bullet the author actually added. */
+const HISTORY_EDITED = HISTORY_AUG_02.replace(
+  "* Adapted from hausa v1.0 via keyboard-studio.",
+  "* Adapted from hausa v1.0 via keyboard-studio.\n* Added the right-alt layer.",
+);
+
+/** A genuine heading change on the same day — the version moved, not the date. */
+const HISTORY_VERSION_BUMPED = HISTORY_AUG_02.replace("## 1.1 (", "## 1.2 (");
+
+/** A snapshotter reading a scripted sequence of projected boundaries. */
+function scriptedSnapshotter(boundaries: readonly Boundary[]) {
   let index = 0;
   const read = vi.fn(
     (): Promise<ProjectedSource | null> =>
-      Promise.resolve(index < texts.length ? { path: PATH, text: texts[index++]! } : null),
+      Promise.resolve(
+        index < boundaries.length ? { entries: boundaries[index++]! } : null,
+      ),
   );
-  return { snapshotter: createSourceSnapshotter({ readProjectedKmn: read }), read };
+  return {
+    snapshotter: createSourceSnapshotter({ readProjectedFiles: read }),
+    read,
+  };
+}
+
+/** Boundaries carrying the rule source alone — the shape 053's tests assumed. */
+function kmnOnly(texts: readonly string[]): readonly Boundary[] {
+  return texts.map((source) => [textEntry(PATH, source)]);
+}
+
+/**
+ * Capture across a `before` -> `after` boundary pair: the first read establishes
+ * the baseline, the second is the one under test.
+ */
+async function captureAcross(before: Boundary, after: Boundary) {
+  const { snapshotter } = scriptedSnapshotter([before, after]);
+  await snapshotter.captureAtBoundary();
+  return snapshotter.captureAtBoundary();
+}
+
+/** The captured impact of a boundary pair, or a thrown failure if it was not captured. */
+async function capturedAcross(before: Boundary, after: Boundary) {
+  const impact = await captureAcross(before, after);
+  if (impact?.state !== "captured") {
+    throw new Error(
+      `expected a captured impact, got ${impact === null ? "null" : impact.state}`,
+    );
+  }
+  return impact;
 }
 
 // ---------------------------------------------------------------------------
@@ -135,57 +237,67 @@ function scriptedSnapshotter(texts: readonly string[]) {
 
 describe("SC-005 — every captured impact re-applies to produce the shipped text", () => {
   it("re-applies across a whole scripted session, boundary by boundary", async () => {
-    const { snapshotter } = scriptedSnapshotter(SESSION);
+    const { snapshotter } = scriptedSnapshotter(kmnOnly(SESSION));
 
     // The first boundary establishes the baseline and describes no change.
     expect(await snapshotter.captureAtBoundary()).toBeNull();
 
     for (let i = 1; i < SESSION.length; i++) {
       const impact = await snapshotter.captureAtBoundary();
-      if (impact === null) throw new Error(`boundary ${String(i)} captured nothing`);
+      if (impact === null)
+        throw new Error(`boundary ${String(i)} captured nothing`);
       if (impact.state !== "captured") {
-        throw new Error(`boundary ${String(i)} was ${impact.state}, expected captured`);
+        throw new Error(
+          `boundary ${String(i)} was ${impact.state}, expected captured`,
+        );
       }
-      // The path names what shipped. One file today (T027 widens the set).
+      // The path names what shipped. These boundaries project one file, so the
+      // widened set (FR-016) still resolves to exactly that file.
       expect(impact.files).toHaveLength(1);
       expect(impact.files[0]!.path).toBe(PATH);
       // THE ASSERTION: previous boundary + this entry's hunks === this boundary.
-      expect(applyHunks(SESSION[i - 1]!, impact.files[0]!.hunks)).toBe(normalizeEol(SESSION[i]!));
+      expect(applyHunks(SESSION[i - 1]!, impact.files[0]!.hunks)).toBe(
+        normalizeEol(SESSION[i]!),
+      );
     }
   });
 
   it("re-applies a single-line replacement exactly", async () => {
-    const { snapshotter } = scriptedSnapshotter([B0, B1]);
+    const { snapshotter } = scriptedSnapshotter(kmnOnly([B0, B1]));
     await snapshotter.captureAtBoundary();
     const impact = await snapshotter.captureAtBoundary();
-    if (impact?.state !== "captured") throw new Error("expected a captured impact");
+    if (impact?.state !== "captured")
+      throw new Error("expected a captured impact");
     expect(applyHunks(B0, impact.files[0]!.hunks)).toBe(normalizeEol(B1));
     expect(impact.magnitude).toEqual({ added: 1, removed: 1 });
   });
 
   it("re-applies a deletion exactly", async () => {
-    const { snapshotter } = scriptedSnapshotter([B1, B2]);
+    const { snapshotter } = scriptedSnapshotter(kmnOnly([B1, B2]));
     await snapshotter.captureAtBoundary();
     const impact = await snapshotter.captureAtBoundary();
-    if (impact?.state !== "captured") throw new Error("expected a captured impact");
+    if (impact?.state !== "captured")
+      throw new Error("expected a captured impact");
     expect(applyHunks(B1, impact.files[0]!.hunks)).toBe(normalizeEol(B2));
     expect(impact.magnitude).toEqual({ added: 0, removed: 1 });
   });
 
   it("re-applies an append at end of file exactly", async () => {
-    const { snapshotter } = scriptedSnapshotter([B2, B3]);
+    const { snapshotter } = scriptedSnapshotter(kmnOnly([B2, B3]));
     await snapshotter.captureAtBoundary();
     const impact = await snapshotter.captureAtBoundary();
-    if (impact?.state !== "captured") throw new Error("expected a captured impact");
+    if (impact?.state !== "captured")
+      throw new Error("expected a captured impact");
     expect(applyHunks(B2, impact.files[0]!.hunks)).toBe(normalizeEol(B3));
     expect(impact.magnitude).toEqual({ added: 2, removed: 0 });
   });
 
   it("re-applies two separate changes in one boundary as separate hunks", async () => {
-    const { snapshotter } = scriptedSnapshotter([B3, B4]);
+    const { snapshotter } = scriptedSnapshotter(kmnOnly([B3, B4]));
     await snapshotter.captureAtBoundary();
     const impact = await snapshotter.captureAtBoundary();
-    if (impact?.state !== "captured") throw new Error("expected a captured impact");
+    if (impact?.state !== "captured")
+      throw new Error("expected a captured impact");
     // A mid-file rewrite and an end-of-file append are far enough apart not to
     // coalesce, so the applier's multi-hunk ordering is genuinely exercised.
     expect(impact.files[0]!.hunks.length).toBeGreaterThan(1);
@@ -194,10 +306,11 @@ describe("SC-005 — every captured impact re-applies to produce the shipped tex
 
   it("rejects hunks re-applied to the WRONG baseline", async () => {
     // The oracle has to be able to fail, or the assertions above prove nothing.
-    const { snapshotter } = scriptedSnapshotter([B1, B2]);
+    const { snapshotter } = scriptedSnapshotter(kmnOnly([B1, B2]));
     await snapshotter.captureAtBoundary();
     const impact = await snapshotter.captureAtBoundary();
-    if (impact?.state !== "captured") throw new Error("expected a captured impact");
+    if (impact?.state !== "captured")
+      throw new Error("expected a captured impact");
     expect(() => applyHunks(B3, impact.files[0]!.hunks)).toThrow();
   });
 });
@@ -208,14 +321,14 @@ describe("SC-005 — every captured impact re-applies to produce the shipped tex
 
 describe("boundary bookkeeping", () => {
   it("reports `none` — not an empty capture — when a boundary changed nothing", async () => {
-    const { snapshotter } = scriptedSnapshotter([B1, B1]);
+    const { snapshotter } = scriptedSnapshotter(kmnOnly([B1, B1]));
     await snapshotter.captureAtBoundary();
     expect(await snapshotter.captureAtBoundary()).toEqual({ state: "none" });
   });
 
   it("captures nothing while there is no working copy to project", async () => {
     const snapshotter = createSourceSnapshotter({
-      readProjectedKmn: () => Promise.resolve(null),
+      readProjectedFiles: () => Promise.resolve(null),
     });
     expect(await snapshotter.captureAtBoundary()).toBeNull();
     expect(await snapshotter.captureAtBoundary()).toBeNull();
@@ -226,41 +339,321 @@ describe("boundary bookkeeping", () => {
     // boundary would then attribute two steps' worth of change to one decision.
     let call = 0;
     const snapshotter = createSourceSnapshotter({
-      readProjectedKmn: () => {
+      readProjectedFiles: (): Promise<ProjectedSource | null> => {
         call += 1;
-        if (call === 1) return Promise.resolve({ path: PATH, text: B0 });
+        if (call === 1)
+          return Promise.resolve({ entries: [textEntry(PATH, B0)] });
         if (call === 2) return Promise.reject(new Error("projection failed"));
-        return Promise.resolve({ path: PATH, text: B1 });
+        return Promise.resolve({ entries: [textEntry(PATH, B1)] });
       },
     });
 
     expect(await snapshotter.captureAtBoundary()).toBeNull(); // baseline = B0
     expect(await snapshotter.captureAtBoundary()).toBeNull(); // failed read
     const impact = await snapshotter.captureAtBoundary();
-    if (impact?.state !== "captured") throw new Error("expected a captured impact");
+    if (impact?.state !== "captured")
+      throw new Error("expected a captured impact");
     // Still measured from B0 — nothing was lost and nothing was double-counted.
     expect(applyHunks(B0, impact.files[0]!.hunks)).toBe(normalizeEol(B1));
   });
 
   it("re-establishes a baseline after reset() instead of diffing across it", async () => {
-    const { snapshotter } = scriptedSnapshotter([B0, B1, B2]);
+    const { snapshotter } = scriptedSnapshotter(kmnOnly([B0, B1, B2]));
     await snapshotter.captureAtBoundary();
     snapshotter.reset();
     // First capture after a reset is a baseline again — a re-instantiation is not
     // a decision that changed the previous keyboard into this one.
     expect(await snapshotter.captureAtBoundary()).toBeNull();
     const impact = await snapshotter.captureAtBoundary();
-    if (impact?.state !== "captured") throw new Error("expected a captured impact");
+    if (impact?.state !== "captured")
+      throw new Error("expected a captured impact");
     expect(applyHunks(B1, impact.files[0]!.hunks)).toBe(normalizeEol(B2));
   });
 
   it("reads the projection exactly once per boundary", async () => {
     // The projection is shared with the live preview; capture must not run it a
     // second time per step (FR-008's "adds no projection pass").
-    const { snapshotter, read } = scriptedSnapshotter(SESSION);
+    const { snapshotter, read } = scriptedSnapshotter(kmnOnly(SESSION));
     await snapshotter.captureAtBoundary();
     await snapshotter.captureAtBoundary();
     await snapshotter.captureAtBoundary();
     expect(read).toHaveBeenCalledTimes(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR-016 / FR-017 — the compared set is whatever the projection emitted
+// ---------------------------------------------------------------------------
+//
+// The defect these were written against: a decision that touched only the
+// `.kps` reported "no isolable change", because the comparison only ever looked
+// at the `.kmn`. The fix is not "also look at the `.kps`" — a named list is how
+// the metadata file was missed in the first place — but "look at every text
+// entry the projection holds", enumerated at read time.
+
+describe("FR-016/FR-017 — every text file the projection produced is compared", () => {
+  it("names the `.kps` when a decision changed only package metadata", async () => {
+    const impact = await capturedAcross(
+      [textEntry(PATH, B1), textEntry(KPS_PATH, KPS_V1)],
+      [textEntry(PATH, B1), textEntry(KPS_PATH, KPS_RENAMED)],
+    );
+    // The rule source is untouched, so it must NOT appear; the metadata file must.
+    expect(impact.files.map((file) => file.path)).toEqual([KPS_PATH]);
+    expect(applyHunks(KPS_V1, impact.files[0]!.hunks)).toBe(
+      normalizeEol(KPS_RENAMED),
+    );
+    expect(impact.magnitude).toEqual({ added: 1, removed: 1 });
+  });
+
+  it("compares a file the projection newly emits, with no list to add it to", async () => {
+    // A path no production module mentions: if the compared set came from a
+    // maintained list, this file could not be on it, and the change would be lost.
+    const novelPath = "meta/hausa_std.provenance.json";
+    const novelText = ["{", '  "derivedFrom": "hausa"', "}"].join("\n");
+
+    const impact = await capturedAcross(
+      [textEntry(PATH, B1)],
+      [textEntry(PATH, B1), textEntry(novelPath, novelText)],
+    );
+
+    expect(impact.files.map((file) => file.path)).toEqual([novelPath]);
+    const added = impact.files[0]!.hunks.flatMap((hunk) =>
+      hunk.lines
+        .filter((line) => line.startsWith("+"))
+        .map((line) => line.slice(1)),
+    );
+    expect(added).toEqual(["{", '  "derivedFrom": "hausa"', "}"]);
+  });
+
+  it("compares a file the projection stops emitting, rather than skipping it", async () => {
+    const impact = await capturedAcross(
+      [textEntry(PATH, B1), textEntry(KPS_PATH, KPS_V1)],
+      [textEntry(PATH, B1)],
+    );
+    expect(impact.files.map((file) => file.path)).toEqual([KPS_PATH]);
+    const removed = impact.files[0]!.hunks.flatMap((hunk) =>
+      hunk.lines
+        .filter((line) => line.startsWith("-"))
+        .map((line) => line.slice(1)),
+    );
+    expect(removed).toContain("<Package>");
+    expect(removed).toContain("    <Name>Hausa</Name>");
+  });
+
+  it("sorts the changed files by path, whatever order the projection listed them", async () => {
+    // `VirtualFS.entries()` documents its order as unspecified, so the rendered
+    // order must not inherit it. These entries arrive in reverse sorted order.
+    const impact = await capturedAcross(
+      [textEntry(KPS_PATH, KPS_V1), textEntry(PATH, B1)],
+      [textEntry(KPS_PATH, KPS_RENAMED), textEntry(PATH, B3)],
+    );
+    expect(impact.files.map((file) => file.path)).toEqual([PATH, KPS_PATH]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Binaries are never diffed
+// ---------------------------------------------------------------------------
+
+describe("binary entries", () => {
+  it("never reports a binary file, even when its bytes changed", async () => {
+    const impact = await capturedAcross(
+      [textEntry(PATH, B1), binaryEntry(FONT_PATH, [0x00, 0x01, 0x00, 0x00])],
+      [textEntry(PATH, B2), binaryEntry(FONT_PATH, [0x4f, 0x54, 0x54, 0x4f])],
+    );
+    // The font's bytes changed across the boundary and are still absent.
+    expect(impact.files.map((file) => file.path)).toEqual([PATH]);
+  });
+
+  it("reports `none` when the only thing that changed was a binary", async () => {
+    // Skipping means skipping: a changed font is not a decision's attributed
+    // change, so this boundary changed nothing at all.
+    const impact = await captureAcross(
+      [textEntry(PATH, B1), binaryEntry(FONT_PATH, [0x00, 0x01, 0x00, 0x00])],
+      [textEntry(PATH, B1), binaryEntry(FONT_PATH, [0x4f, 0x54, 0x54, 0x4f])],
+    );
+    expect(impact).toEqual({ state: "none" });
+  });
+
+  it("still compares the text files sharing a boundary with a binary", async () => {
+    // Guards the opposite failure: skipping binaries must not skip the boundary.
+    const impact = await capturedAcross(
+      [binaryEntry(FONT_PATH, [0x00]), textEntry(KPS_PATH, KPS_V1)],
+      [binaryEntry(FONT_PATH, [0x00]), textEntry(KPS_PATH, KPS_RENAMED)],
+    );
+    expect(impact.files.map((file) => file.path)).toEqual([KPS_PATH]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Zero changed files is `{ state: "none" }`, never an empty capture
+// ---------------------------------------------------------------------------
+
+describe("zero changed files", () => {
+  it("reports `none` across a multi-file boundary where nothing moved", async () => {
+    const unchanged: Boundary = [
+      textEntry(PATH, B1),
+      textEntry(KPS_PATH, KPS_V1),
+      textEntry(HISTORY_PATH, HISTORY_AUG_02),
+    ];
+    const impact = await captureAcross(unchanged, [...unchanged]);
+    expect(impact).toEqual({ state: "none" });
+    // Stated the other way round, because this is the boundary that matters:
+    // `"captured"` with an empty `files` is not a valid record.
+    expect(impact).not.toHaveProperty("files");
+  });
+
+  it("emits a record the contract schema accepts — `files` is `.min(1)`", async () => {
+    // `DecisionImpactSchema` rejects `{ state: "captured", files: [] }`, so a
+    // regression that returned an empty capture here fails this parse.
+    const nothingChanged = await captureAcross(
+      kmnOnly([B1])[0]!,
+      kmnOnly([B1])[0]!,
+    );
+    expect(DecisionImpactSchema.safeParse(nothingChanged).success).toBe(true);
+
+    const somethingChanged = await captureAcross(
+      kmnOnly([B1])[0]!,
+      kmnOnly([B2])[0]!,
+    );
+    expect(DecisionImpactSchema.safeParse(somethingChanged).success).toBe(true);
+    expect(
+      DecisionImpactSchema.safeParse({
+        state: "captured",
+        files: [],
+        magnitude: { added: 0, removed: 0 },
+      }).success,
+    ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The aggregate magnitude is the sum over `files`
+// ---------------------------------------------------------------------------
+
+describe("aggregate magnitude", () => {
+  it("equals the sum over the changed files", async () => {
+    const impact = await capturedAcross(
+      [
+        textEntry(PATH, B1),
+        textEntry(KPS_PATH, KPS_V1),
+        textEntry(HISTORY_PATH, HISTORY_AUG_02),
+      ],
+      [
+        textEntry(PATH, B3),
+        textEntry(KPS_PATH, KPS_RENAMED),
+        textEntry(HISTORY_PATH, HISTORY_AUG_02),
+      ],
+    );
+
+    // Two changed files, so the sum is a real sum and not a pass-through.
+    expect(impact.files).toHaveLength(2);
+    for (const file of impact.files) {
+      expect(file.magnitude.added + file.magnitude.removed).toBeGreaterThan(0);
+    }
+
+    const summed = impact.files.reduce(
+      (total, file) => ({
+        added: total.added + file.magnitude.added,
+        removed: total.removed + file.magnitude.removed,
+      }),
+      { added: 0, removed: 0 },
+    );
+    expect(impact.magnitude).toEqual(summed);
+    // Spelled out, so a change that broke both sides identically still fails:
+    // `.kmn` loses one rule and gains two, `.kps` swaps its name line.
+    expect(impact.magnitude).toEqual({ added: 3, removed: 2 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR-017a — volatile content is held stable, genuine content is not
+// ---------------------------------------------------------------------------
+//
+// The rejected alternative was excluding `HISTORY.md` from the comparison
+// altogether. It would pass the midnight case below and silently lose every
+// real history edit — which is why the second half of this block exists.
+
+describe("FR-017a — the HISTORY.md date stamp", () => {
+  it("produces no hunk when only the staged date rolled past midnight", async () => {
+    const impact = await captureAcross(
+      [textEntry(PATH, B1), textEntry(HISTORY_PATH, HISTORY_AUG_02)],
+      [textEntry(PATH, B1), textEntry(HISTORY_PATH, HISTORY_AUG_03)],
+    );
+    // Same version, same bullets, next day's stamp: nothing a decision caused.
+    expect(impact).toEqual({ state: "none" });
+  });
+
+  it("keeps HISTORY.md out of a boundary that changed something else", async () => {
+    const impact = await capturedAcross(
+      [textEntry(PATH, B1), textEntry(HISTORY_PATH, HISTORY_AUG_02)],
+      [textEntry(PATH, B2), textEntry(HISTORY_PATH, HISTORY_AUG_03)],
+    );
+    expect(impact.files.map((file) => file.path)).toEqual([PATH]);
+  });
+
+  it("still surfaces a genuine HISTORY.md content edit", async () => {
+    const impact = await capturedAcross(
+      [textEntry(HISTORY_PATH, HISTORY_AUG_02)],
+      [textEntry(HISTORY_PATH, HISTORY_EDITED)],
+    );
+    expect(impact.files.map((file) => file.path)).toEqual([HISTORY_PATH]);
+    const added = impact.files[0]!.hunks.flatMap((hunk) =>
+      hunk.lines
+        .filter((line) => line.startsWith("+"))
+        .map((line) => line.slice(1)),
+    );
+    expect(added).toEqual(["* Added the right-alt layer."]);
+  });
+
+  it("still surfaces a genuine HISTORY.md edit made on the same day as a date roll", async () => {
+    // The hard case for a date-only normalizer: the stamp moved AND a bullet was
+    // added. Only the bullet may be attributed.
+    const impact = await capturedAcross(
+      [textEntry(HISTORY_PATH, HISTORY_AUG_02)],
+      [
+        textEntry(
+          HISTORY_PATH,
+          HISTORY_EDITED.replace("(2026-08-02)", "(2026-08-03)"),
+        ),
+      ],
+    );
+    expect(impact.files.map((file) => file.path)).toEqual([HISTORY_PATH]);
+    expect(impact.magnitude).toEqual({ added: 1, removed: 0 });
+  });
+
+  it("still surfaces a version bump inside the stamped heading", async () => {
+    // Only the date token is neutralised, not the whole heading line — the
+    // version moved and that is a genuine change.
+    const impact = await capturedAcross(
+      [textEntry(HISTORY_PATH, HISTORY_AUG_02)],
+      [textEntry(HISTORY_PATH, HISTORY_VERSION_BUMPED)],
+    );
+    expect(impact.files.map((file) => file.path)).toEqual([HISTORY_PATH]);
+    const added = impact.files[0]!.hunks.flatMap((hunk) =>
+      hunk.lines
+        .filter((line) => line.startsWith("+"))
+        .map((line) => line.slice(1)),
+    );
+    // The hunk carries the NORMALIZED line, so the neutralised date reaches the
+    // record as its placeholder. That is what "held stable across the
+    // comparison" costs: the version bump is legible, the stamp is not the
+    // shipped one, and a `HISTORY.md` hunk is therefore the one hunk that does
+    // not re-apply to the shipped text (SC-005's oracle above is deliberately
+    // never pointed at this file). Asserted rather than glossed, so a later
+    // decision to re-hydrate the real stamp has to come here and say so.
+    expect(added).toEqual(["## 1.2 (0000-00-00)"]);
+  });
+
+  it("normalizes the stamp only in HISTORY.md, not in a file that looks like it", async () => {
+    // The normalizer keys on the path. A heading of the same shape elsewhere is
+    // ordinary content, and a date change in it is a real change.
+    const readmePath = "README.md";
+    const impact = await capturedAcross(
+      [textEntry(readmePath, HISTORY_AUG_02)],
+      [textEntry(readmePath, HISTORY_AUG_03)],
+    );
+    expect(impact.files.map((file) => file.path)).toEqual([readmePath]);
+    expect(impact.magnitude).toEqual({ added: 1, removed: 1 });
   });
 });

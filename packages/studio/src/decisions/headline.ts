@@ -65,10 +65,26 @@ export type HeadlineSpec =
   | { id: "fromBase"; question: QuestionName; value: string }
   | { id: "editorStep"; stage: EditorActionType; dimensions: readonly HeadlineDimension[] }
   | { id: "editorStepNoChange"; stage: EditorActionType }
-  | { id: "editorStepUnmeasured"; stage: EditorActionType };
-// NOTE: the "baseContribution" variant is intentionally not added here —
-// specs/055-legible-decision-trail task T021 owns it. The base-contribution
-// payload branch below is a placeholder that falls back to "chose" until then.
+  | { id: "editorStepUnmeasured"; stage: EditorActionType }
+  | {
+      id: "baseContribution";
+      /** Author-facing base name (contract §2) — never `baseId`, the internal identifier. */
+      baseName: string;
+      /**
+       * Omitted (not `0`) when the working copy's starting inventory could not
+       * be measured — a genuinely empty base is a real `0` and IS mentioned
+       * (recordBaseContribution.ts's absence convention).
+       */
+      startingKeyCount?: number;
+      /**
+       * Omitted when nothing was derived — mirrors the FR-011 dimension rule:
+       * a present-but-empty contribution is not something that happened, so it
+       * is not mentioned (never a fabricated "deriving 0 properties").
+       */
+      derivedAxisCount?: number;
+      /** Omitted when nothing was inherited, by the same rule as {@link derivedAxisCount}. */
+      inheritedFieldCount?: number;
+    };
 
 /**
  * Render a recorded answer value for display.
@@ -150,17 +166,30 @@ export function headlineOf(
   }
 
   if (payload.kind === "base-contribution") {
-    // No producer writes this payload yet (recordBaseContribution.ts,
-    // specs/055-legible-decision-trail D-11, is a separate not-yet-landed
-    // task, as is this headline's own catalogue message and the
-    // "baseContribution" HeadlineSpec variant, task T021). Falls back to the
-    // existing "chose" shape so the trail renders something true rather than
-    // an unhandled discriminant; the fallback is intentionally plain rather
-    // than a designed sentence for this payload.
+    // baseName carries the author-facing display name; `payload.baseId` (the
+    // internal identifier) never rides along in any variant field (FR-008).
+    //
+    // The two derived counts are lengths of the payload's own code lists
+    // (`derivedAxes`, `inheritedMetadata`), always computable — unlike
+    // `startingKeyCount`, which the payload itself may leave absent when the
+    // inventory could not be measured. Per-code prose ("deriving cluster
+    // handling and mark input order") is not this module's job: the codes
+    // themselves stay on `payload.derivedAxes`/`payload.inheritedMetadata`,
+    // which the component reads directly to resolve each one through the
+    // `trail.entry.headline.axis.<id>` / `.field.<code>` catalogue with the
+    // `.unknown` fallback (contract §2) — this selection only carries the
+    // one-line summary's counts.
+    const derivedAxisCount = payload.derivedAxes.length;
+    const inheritedFieldCount = payload.inheritedMetadata.length;
+
     return {
-      id: "chose",
-      question: { known: true, label: payload.baseId },
-      value: payload.baseDisplayName,
+      id: "baseContribution",
+      baseName: payload.baseDisplayName,
+      ...(payload.startingKeyCount !== undefined
+        ? { startingKeyCount: payload.startingKeyCount }
+        : {}),
+      ...(derivedAxisCount > 0 ? { derivedAxisCount } : {}),
+      ...(inheritedFieldCount > 0 ? { inheritedFieldCount } : {}),
     };
   }
 
