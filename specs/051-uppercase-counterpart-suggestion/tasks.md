@@ -187,6 +187,64 @@ not `default`; a caseless letter raises nothing.
 
 ---
 
+## Phase 7: Follow-up fixes (post-#1411)
+
+**Purpose**: close the two defects the T047 manual walk exposed — both inside the shipped
+FR-005/FR-006 boundary ([spec.md](spec.md) 2026-07-28 amendment, US4, FR-012, FR-013). No new
+mechanism, no new UI affordance; both fixes route existing derivation through the helpers Phase 5
+already built rather than adding a second casing/layer path.
+
+- [x] T049 [P] [US4] Fix FR-012 in `packages/studio/src/editors/assignLoop/TouchGallery.tsx`:
+  rewrite `handleUseSuggestion` (~L1519–1522) to build its `ref` via
+  `buildTouchMechanismRef(nextMethod, hk, "", currentChar)` instead of the bare
+  `{ patternId, slotValues: { hostKey, char } }` literal, so `layer` is always derived through
+  `touchLayerForChar` — the same "one casing source" invariant `data-model.md` §Invariants 1
+  already requires of every other placement path. Do not hand-add a second `touchLayerForChar`
+  call at the suggestion site.
+- [x] T050 [US4] Add cases to `packages/studio/src/editors/assignLoop/TouchGallery.test.tsx`
+  pinning `handleUseSuggestion`'s output: accepting a longpress/replace suggestion for `ă` yields a
+  ref with `layer: "default"`; accepting one for `Ă` yields `layer: "shift"`, not a silent default.
+- [x] T051 [P] [US4] Fix FR-013 in `packages/studio/src/editors/assignLoop/TouchGallery.tsx`: give
+  `hostKeyShortLabel` (~L154–156) a required `layer: TouchLayerId` parameter and case the returned
+  letter uppercase when the layer id's hyphen-joined components include `shift` or `caps`,
+  lowercase otherwise (leaving non-casing ids such as `alt`/`ctrl`/`rightalt`/`rightctrl`/
+  `leftctrl`/`ncaps` out of scope, per FR-013 — do not invent a rendering rule for them); update
+  both call sites — the configured-mechanism chip in `touchMechanismLabel` (~L179, pass the
+  mechanism's own `slotValues.layer ?? "default"`) and the placement-suggestion text (~L1942,
+  ~L1970, pass `touchLayerForChar(currentChar)`). Leave `slotValues.hostKey` itself untouched — it
+  stays a resolved vkey name in both cases.
+- [x] T052 [US4] Add cases to `packages/studio/src/editors/assignLoop/TouchGallery.test.tsx`
+  pinning the label cases: `hostKeyShortLabel("K_A", "default")` reads lowercase `a`;
+  `hostKeyShortLabel("K_A", "shift")` reads uppercase `A`; a casing-bearing compound id such as
+  `"rightalt-shift"` also reads uppercase; a non-casing id such as `"alt"` reads the raw uppercase
+  vkey letter `A` (`hostKeyShortLabel("K_A", "alt")` — today's unchanged floor, not a rule this
+  feature defines); the configured-mechanism chip for a `default`-layer mechanism and the
+  suggestion text for a lowercase placement both render the lowercase form.
+- [x] T053 [P] [US4] If T051 changes any `Trans`/`t()` message content (not just the interpolated
+  value), extract catalogs: `pnpm --filter @keyboard-studio/studio messages:extract`, then confirm
+  `packages/studio/src/locales/en/messages.json` gained no unintended id changes and
+  `packages/studio/src/locales/fr/messages.json` keeps key-set parity, per the T042/T043 recipe, so
+  `i18n-catalog-lint` passes. A no-op if the fix only changes the label helper's return value, not
+  message text.
+- [x] T054 Run the repo gates: `pnpm typecheck`, `pnpm -r test`, `pnpm lint`. Run 2026-07-28:
+  typecheck clean (7/7 packages); engine 2139 pass once `pnpm run fetch-sldr` restored the
+  gitignored SLDR extract the `exemplarCodegen` determinism test regenerates against; studio
+  4476/4480 pass, the four failures being the pre-existing Windows-checkout CRLF floor in
+  `projectWorkingCopyVfs.flagParity` (×3) and `articleIVProbe` (×1) — neither file is in this
+  change's diff; ESLint 0 errors (128 warn-only `lingui/no-unlocalized-strings`, pre-existing, and
+  the 3 `react-hooks/exhaustive-deps` warnings on the touched file predate it — no dependency array
+  changed vs. `main`); depcruise clean over 859 modules. **`pnpm lint` does not run to completion on
+  this checkout**: `crew-lint` crashes with EISDIR when `.claude/worktrees/` is present, a known
+  local-environment defect unrelated to this change (no `.claude/**/km-*` file was touched).
+- [ ] T055 Re-walk the T047 manual steps from [quickstart.md](quickstart.md) §5 under `pnpm dev`,
+  now including the two defect scenarios: accepting the suggestion for `ă` lands on `default` with
+  a lowercase label; accepting it for `Ă` lands on `shift` with an uppercase label.
+
+**Checkpoint**: the suggestion-Accept path and every host-key label agree with the case-aware
+layer targeting Phase 5 introduced; T047 passes clean.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase dependencies
@@ -197,6 +255,10 @@ not `default`; a caseless letter raises nothing.
 - **Phase 4 (US2, combo)** — depends on Phase 3. Independent of Phase 2 and Phase 5.
 - **Phase 5 (US3, touch)** — depends on Phase 2 **and** Phase 3. Independent of Phase 4.
 - **Phase 6 (Polish)** — depends on every user-story phase intended to ship.
+- **Phase 7 (Follow-up fixes, post-#1411)** — depends on the shipped Phases 1–6 (it fixes code
+  those phases already landed). The FR-012 fix (T049–T050) and the FR-013 fix (T051–T052) touch the
+  same file but different functions/call sites and are otherwise independent — they can run in
+  parallel. Both precede the manual re-walk (T055).
 
 ### Within each user story
 

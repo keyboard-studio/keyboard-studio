@@ -64,9 +64,11 @@
     ],
     "storeMutations": [
       "advance",
+      "advance",
       "advance"
     ],
     "workingCopyMutations": [
+      "recordPhase",
       "recordPhase",
       "recordPhase"
     ],

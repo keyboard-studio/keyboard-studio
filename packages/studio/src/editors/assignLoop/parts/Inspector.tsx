@@ -243,13 +243,13 @@ interface StoreDetailProps {
 }
 type RoleType = 'input' | 'output' | 'input+output';
 
-function RoleChip({ role }: { role: RoleType }) {
+function RoleChip({ storeRole }: { storeRole: RoleType }) {
   const { t } = useLingui();
   const styles = {
     'input+output': { bg: 'color-mix(in srgb, #b8a0d8 18%, var(--app-surface))', border: '1px solid color-mix(in srgb, #b8a0d8 50%, transparent)', color: '#c8b0e8', label: t({ id: "editor.assignLoop.inspector.roleChip.inOut", message: "in+out" }) },
     'input': { bg: 'var(--app-accent-subtle)', border: '1px solid var(--app-border)', color: 'var(--app-accent-text)', label: t({ id: "editor.assignLoop.inspector.roleChip.input", message: "input" }) },
     'output': { bg: 'color-mix(in srgb, #7dbf8e 15%, var(--app-surface))', border: '1px solid color-mix(in srgb, #7dbf8e 40%, transparent)', color: '#7dbf8e', label: t({ id: "editor.assignLoop.inspector.roleChip.output", message: "output" }) },
-  }[role];
+  }[storeRole];
   return (
     <span style={{ font: '600 10px/1 var(--app-font)', padding: '3px 7px', borderRadius: 5, background: styles.bg, border: styles.border, color: styles.color }}>
       {styles.label}
@@ -260,9 +260,9 @@ function RoleChip({ role }: { role: RoleType }) {
 function storeRoleChip(node: CarveNode): React.ReactNode {
   const u = node.storeUsage;
   if (!u) return null;
-  if (u.asSource && u.asOutput) return <RoleChip role="input+output" />;
-  if (u.asSource) return <RoleChip role="input" />;
-  if (u.asOutput) return <RoleChip role="output" />;
+  if (u.asSource && u.asOutput) return <RoleChip storeRole="input+output" />;
+  if (u.asSource) return <RoleChip storeRole="input" />;
+  if (u.asOutput) return <RoleChip storeRole="output" />;
   return null;
 }
 
@@ -525,7 +525,7 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
                     {pname}
                   </button>
                   {/* Role chip — the paired store's own role (input/output/input+output) */}
-                  {role !== undefined && <RoleChip role={role} />}
+                  {role !== undefined && <RoleChip storeRole={role} />}
                   {/* Trigger key */}
                   {trigger !== undefined && (
                     <span style={{ font: '600 10px/1 var(--app-font)', color: 'var(--app-text-subtle)', whiteSpace: 'nowrap' }}>

@@ -127,11 +127,24 @@ export const galleryConfigStyle: CSSProperties = {
 /**
  * Method-card container style — active card gets an accent border and dark
  * highlight background; shared by MethodChooser and TouchMethodChooser.
+ *
+ * `overflow` is deliberately "visible", not "hidden". A key-picker
+ * (KeyPickerField -> ui/SelectMenu) or layer-slot dropdown living inside an
+ * expanded card's config panel renders its open option list as an
+ * absolutely-positioned `<ul>` (SelectMenu's LIST_STYLE) — a descendant of
+ * this card. `overflow: hidden` would clip that list to the card's rounded
+ * border instead of letting it float above surrounding content. The
+ * rounded-corner containment `overflow: hidden` used to buy (keeping the
+ * active card's #0d2840 background inside the 8px border-radius) isn't
+ * actually needed: every direct child here (the header button, the config
+ * div) is `background: "transparent"` (see galleryHeaderBtnStyle /
+ * galleryConfigStyle above), so the card's own background paints the full
+ * rounded box regardless.
  */
 export const galleryCardStyle = (active: boolean): CSSProperties => ({
   borderRadius: 8,
   border: `1px solid ${active ? ACCENT : BORDER}`,
   background: active ? "#0d2840" : BG_PAGE,
-  overflow: "hidden",
+  overflow: "visible",
   transition: "border-color 120ms ease, background 120ms ease",
 });

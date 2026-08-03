@@ -14,7 +14,7 @@
 // Inspector, ConfirmDialog) runs for real — this is a render-based test.
 
 import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from 'vitest';
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { render } from '../../test/renderWithI18n.tsx';
 import type { IRRule, IRGroup, IRStore, KeyboardIR, RemovalCapability } from '@keyboard-studio/contracts';
 import { createVirtualFS } from '@keyboard-studio/contracts';
@@ -700,7 +700,10 @@ describe('CarveGallery — bulk store-toggle collateral guard (P0)', () => {
     // after the setState above, mirroring the existing single-chip
     // collateral tests' "click the card, THEN click the trigger" sequencing.
     fireEvent.click(dkfCard);
-    fireEvent.click(within(dkfCard).getByRole('button', { name: 'Remove' }));
+    // The ToggleBox is a sibling of the card <button> under the row wrapper
+    // (spec 056 Cycle 1 fix — was previously a descendant, but nesting a
+    // real <button> inside a role="button" fires axe nested-interactive).
+    fireEvent.click(within(dkfCard.parentElement!).getByRole('button', { name: 'Remove' }));
 
     // Exactly one dialog, aggregating collateral for BOTH indices.
     expect(screen.getAllByRole('alertdialog')).toHaveLength(1);
@@ -733,7 +736,8 @@ describe('CarveGallery — bulk store-toggle collateral guard (P0)', () => {
     renderGallery(ir);
 
     const card = screen.getByTestId('carve-card-store#s');
-    fireEvent.click(within(card).getByRole('button', { name: 'Remove' }));
+    // ToggleBox is a sibling under the row wrapper (see spec 056 note above).
+    fireEvent.click(within(card.parentElement!).getByRole('button', { name: 'Remove' }));
 
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(useWorkingCopyStore.getState().isItemDeleted('store#s#0')).toBe(true);
@@ -773,7 +777,7 @@ describe('CarveGallery — language-driven surplus recommendation (removal banne
     // 'z' is absent from the resolved needed-set — surplus, banner shows and
     // lists exactly one character.
     await screen.findByText(/We recommend removing 1 character/);
-    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    fireEvent.click(screen.getByRole('button', { expanded: false, name: /We recommend removing/ }));
     expect(screen.getByRole('checkbox', { name: 'Remove U+007A' })).not.toBeNull();
     // 'q' IS in the resolved needed-set — never listed.
     expect(screen.queryByRole('checkbox', { name: 'Remove U+0071' })).toBeNull();
@@ -863,7 +867,7 @@ describe('CarveGallery — removal banner (#525 BANNER slice)', () => {
     // Collapsed by default — the checklist isn't in the DOM yet.
     expect(screen.queryByRole('checkbox', { name: 'Remove U+0061' })).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    fireEvent.click(screen.getByRole('button', { expanded: false, name: /We recommend removing/ }));
 
     expect(screen.getByRole('checkbox', { name: 'Remove U+0061' })).not.toBeNull(); // 'a'
     expect(screen.getByRole('checkbox', { name: 'Remove U+0062' })).not.toBeNull(); // 'b'
@@ -891,7 +895,7 @@ describe('CarveGallery — removal banner (#525 BANNER slice)', () => {
 
     renderGallery(ir, caps);
     await screen.findByText(/We recommend removing 2 characters/);
-    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    fireEvent.click(screen.getByRole('button', { expanded: false, name: /We recommend removing/ }));
 
     // Both pre-checked by default.
     const checkboxA = screen.getByRole('checkbox', { name: 'Remove U+0061' });
@@ -1105,7 +1109,7 @@ function mockCasePairContributors() {
 /** Opens the RemovalBanner checklist (mirrors the #525 BANNER slice tests' expand step). */
 async function expandBanner() {
   await screen.findByText(/We recommend removing/);
-  fireEvent.click(screen.getByRole('button', { expanded: false }));
+  fireEvent.click(screen.getByRole('button', { expanded: false, name: /We recommend removing/ }));
 }
 
 describe('CarveGallery — cased-letter proposal rows (spec 051 T028)', () => {
@@ -1214,5 +1218,83 @@ describe('CarveGallery — cased-letter proposal rows (spec 051 T028)', () => {
     // The counterpart's rule is untouched, and its tile stays lit.
     expect(useWorkingCopyStore.getState().isItemDeleted('r-low')).toBe(false);
     expect(tileIsRemoved(lowerTileName)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 15. Convenience shield — base letters the author kept at the pre-carve
+// question (session.retainedConvenienceChars) must never be proposed for
+// removal, even though the orthography does not use them.
+// ---------------------------------------------------------------------------
+
+describe('CarveGallery — convenience-retained characters are shielded', () => {
+  /** 'a' and 'b' are surplus; the language needs only 'q'. */
+  function renderSurplusAB(retained?: string[]) {
+    const ir = makeIR([
+      makeGroup('g-main', 'main', [
+        makeSimpleRule('r-a', 'K_A', 'a'),
+        makeSimpleRule('r-b', 'K_B', 'b'),
+      ]),
+    ]);
+    const caps = new Map<string, RemovalCapability>([
+      ['r-a', 'removable:simple'],
+      ['r-b', 'removable:simple'],
+    ]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => {
+      if (ch === 'a') return { ...emptyContributors(ch), ruleNodeIds: ['r-a'] };
+      if (ch === 'b') return { ...emptyContributors(ch), ruleNodeIds: ['r-b'] };
+      return emptyContributors(ch);
+    });
+    neededCharsResult.set(new Set(['q']));
+    renderGallery(ir, caps);
+    // AFTER renderGallery: instantiateFromExisting resets the session, so a
+    // retained list seeded before it would be wiped.
+    if (retained !== undefined) {
+      useWorkingCopyStore.setState((s) => ({
+        session: { ...s.session, retainedConvenienceChars: retained },
+      }));
+    }
+  }
+
+  it('drops a retained character from the recommendation count', async () => {
+    renderSurplusAB(['a']);
+    // Without the shield this reads "2 characters" (see the banner block above).
+    await screen.findByText(/We recommend removing 1 character(?!s)/);
+  });
+
+  it('never lists a retained character in the expanded checklist', async () => {
+    renderSurplusAB(['a']);
+    await screen.findByText(/We recommend removing 1 character(?!s)/);
+    fireEvent.click(screen.getByRole('button', { expanded: false, name: /We recommend removing/ }));
+
+    expect(screen.queryByRole('checkbox', { name: 'Remove U+0061' })).toBeNull(); // 'a' kept
+    expect(screen.getByRole('checkbox', { name: 'Remove U+0062' })).not.toBeNull(); // 'b' still surplus
+  });
+
+  it('hides the banner entirely when every surplus character was retained', async () => {
+    // Retain nothing first and WAIT for the banner. That await is what makes
+    // the negative assertion below meaningful: it proves the async CLDR lookup
+    // has settled and this fixture really does recommend both characters, so a
+    // later absence is the shield working rather than the test looking too early.
+    renderSurplusAB(undefined);
+    await screen.findByText(/We recommend removing 2 characters/);
+
+    useWorkingCopyStore.setState((s) => ({
+      session: { ...s.session, retainedConvenienceChars: ['a', 'b'] },
+    }));
+
+    await waitFor(() => {
+      expect(screen.queryByText(/We recommend removing/)).toBeNull();
+    });
+  });
+
+  it('recommends normally when the author kept nothing (asked, kept none)', async () => {
+    renderSurplusAB([]);
+    await screen.findByText(/We recommend removing 2 characters/);
+  });
+
+  it('recommends normally when the question was never asked', async () => {
+    renderSurplusAB(undefined);
+    await screen.findByText(/We recommend removing 2 characters/);
   });
 });

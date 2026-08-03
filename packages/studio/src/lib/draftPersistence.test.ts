@@ -1659,4 +1659,98 @@ describe("draftPersistence", () => {
       expect(listDrafts()).toEqual([]);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // spec 052 FR-021 / SC-010 — a pre-feature draft loads UNMIGRATED
+  // -------------------------------------------------------------------------
+  //
+  // Spec 052 replaced the marks station's answer type outright
+  // (MentalModelAnswer -> MarkTreatmentAnswer). The reason that is safe for
+  // saved drafts is a claim about WHAT PERSISTS: the station's answers are
+  // transient React state and never reach the draft — only the DERIVED
+  // `marksWorklist` and `marksOutputForm` do, and `PlacementWorklist`'s shape
+  // is unchanged (a promoted composed character occupies the same
+  // `ownLetterUnits` slot a composed unit already occupied).
+  //
+  // This test makes that claim falsifiable rather than merely asserted: it
+  // saves a draft whose phase result is byte-for-byte what a PRE-052 marks
+  // series produced — worklist + output form, and NO `computedAxes` — and
+  // requires it to load back identical, with no migration step and no
+  // injected default.
+  describe("spec 052 FR-021/SC-010: a draft saved before the marks-treatment change loads unmigrated", () => {
+    it("round-trips a pre-052 marks phase result unchanged — worklist shape intact, no computedAxes invented", () => {
+      const pk = "pre-052-draft-project";
+      instantiateMinimal(pk);
+
+      // Exactly the shape MarksSeriesStep emitted before spec 052: the derived
+      // worklist and the output form, with computedAxes ABSENT (its omission
+      // was the US4 defect, and an old draft must not acquire one on load).
+      const preFeatureMarksResult = {
+        phase: "C",
+        answers: [],
+        marksWorklist: {
+          ownLetterUnits: ["a", "e", "é"],
+          markUnits: [{ mark: "́", inputOrder: "postfix" }],
+          blockedCombinations: [{ base: "k", mark: "́" }],
+        },
+        marksOutputForm: "ready-made",
+      } as unknown as SurveyPhaseResult;
+
+      useWorkingCopyStore.getState().recordPhase(preFeatureMarksResult);
+      saveDraft(pk);
+
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      expect(loadDraft(pk)).toBe(true);
+
+      const restored = useWorkingCopyStore
+        .getState()
+        .phaseResults.find((r) => r.phase === "C");
+      expect(restored).toBeDefined();
+
+      // The worklist survives byte-identically — no field added, renamed, or
+      // retyped, so no migration was needed or performed.
+      expect(restored?.marksWorklist).toEqual(preFeatureMarksResult.marksWorklist);
+      expect(restored?.marksOutputForm).toBe("ready-made");
+
+      // And nothing was invented on the way in: an old draft carries no
+      // computedAxes, and load must not fabricate one (a fabricated A4 would
+      // silently change strategy selection for every pre-052 project).
+      expect(restored?.computedAxes).toBeUndefined();
+    });
+
+    it("the dual-reachability worklist a post-052 answer produces persists through the same path", () => {
+      // The other half of the compatibility claim: the NEW state — a mark unit
+      // AND its promoted composed characters as keyed units at the same time —
+      // needs no schema change to persist either.
+      const pk = "post-052-draft-project";
+      instantiateMinimal(pk);
+
+      const dualReachable = {
+        phase: "C",
+        answers: [],
+        marksWorklist: {
+          ownLetterUnits: ["a", "e", "á", "é"],
+          markUnits: [{ mark: "́", inputOrder: "prefix" }],
+          blockedCombinations: [],
+        },
+        marksOutputForm: "base-plus-mark",
+        computedAxes: { diacriticBehavior: "stacking-combining", markInputOrder: "prefix" },
+      } as unknown as SurveyPhaseResult;
+
+      useWorkingCopyStore.getState().recordPhase(dualReachable);
+      saveDraft(pk);
+
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      expect(loadDraft(pk)).toBe(true);
+
+      const restored = useWorkingCopyStore
+        .getState()
+        .phaseResults.find((r) => r.phase === "C");
+      expect(restored?.marksWorklist).toEqual(dualReachable.marksWorklist);
+      expect(restored?.computedAxes).toEqual(dualReachable.computedAxes);
+    });
+  });
+
 });

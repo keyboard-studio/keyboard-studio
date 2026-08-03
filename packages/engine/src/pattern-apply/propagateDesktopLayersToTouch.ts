@@ -77,10 +77,21 @@ import {
 /**
  * Legacy touch-layer-id aliases, keyed by {@link comboToTouchLayerId}'s
  * canonical id. scaffoldTouchLayout.ts's Case A (keyboards with NO shipped
- * touch layout) synthesizes a RALT-only layer under the id "altgr" rather
- * than "rightalt" — the only combo attested to diverge. Deliberately not
- * migrated here (out of scope for this fix); this alias lets propagation
+ * touch layout) used to synthesize a RALT-only layer under the id "altgr"
+ * rather than "rightalt" — the only combo attested to diverge. Deliberately
+ * not migrated here (out of scope for this fix); this alias lets propagation
  * find and patch that existing layer instead of creating a duplicate.
+ *
+ * NOTE: scaffoldTouchLayout.ts now emits the canonical "rightalt" /
+ * "rightalt-shift" ids directly (see its rename fixing the reseed-from-desktop
+ * touch-apply mismatch), so this alias no longer serves the scaffolder's own
+ * output. It is NOT for shipped keyboards: no keyboard in the
+ * keymanapp/keyboards or keyboard-studio/keyboards corpus has ever used an
+ * "altgr" touch-layer id (all use "rightalt"). It exists purely for
+ * `.keyman-touch-layout` artifacts produced by PRE-rename builds of
+ * scaffoldTouchLayout.ts — e.g. in-progress working copies / drafts persisted
+ * before this migration — which still carry the legacy "altgr" layer. Safe to
+ * retire only once no such pre-fix draft can still be loaded.
  */
 const LEGACY_TOUCH_LAYER_ID_ALIASES: ReadonlyMap<string, string> = new Map([
   ["rightalt", "altgr"],
@@ -182,10 +193,13 @@ export function propagateDesktopLayersToTouch(
         continue;
       }
 
-      // Legacy-id alias: scaffoldTouchLayout.ts's Case A (no shipped touch
-      // layout) synthesizes a RALT-only layer under the id "altgr", not
-      // "rightalt" (comboToTouchLayerId's id for the same combo). Patch that
-      // existing layer instead of synthesizing a second, duplicate one.
+      // Legacy-id alias: a `.keyman-touch-layout` produced by a PRE-rename
+      // build of scaffoldTouchLayout.ts (e.g. a draft/working copy persisted
+      // before this migration) may carry a RALT-only layer under the old id
+      // "altgr" rather than "rightalt" (comboToTouchLayerId's id for the same
+      // combo). No shipped corpus keyboard uses "altgr"; this only guards those
+      // pre-fix Studio-generated artifacts. Patch that existing layer instead
+      // of synthesizing a second, duplicate one.
       const aliasId = LEGACY_TOUCH_LAYER_ID_ALIASES.get(layerId);
       const aliasLayer =
         aliasId !== undefined

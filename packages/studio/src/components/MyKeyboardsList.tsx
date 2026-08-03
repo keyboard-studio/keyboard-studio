@@ -45,6 +45,7 @@ import {
   listDrafts,
   deleteProject,
   resumeProject,
+  loadDecisionRecordForProject,
   PENDING_PROJECT_KEY,
   type ProjectIndexEntry,
 } from "../lib/draftPersistence.ts";
@@ -296,6 +297,18 @@ export function MyKeyboardsList() {
     // place rather than silently navigating into an empty wizard.
   }
 
+  // Spec 053 US1: open one project's decision trail. Loads only that project's
+  // record — no resume, no repointing of the active project — which is what lets
+  // this work for a `submitted` row as well as a draft (spec Edge Cases: the
+  // record stays viewable after submission, it just stops changing).
+  function handleViewTrail(projectKey: string): void {
+    if (loadDecisionRecordForProject(projectKey)) {
+      navigateTo("trail");
+    }
+    // else: nothing recorded for this project — leave the card in place rather
+    // than navigating into an empty trail that looks like data loss.
+  }
+
   function handleDelete(projectKey: string): void {
     // The lingui macro requires `message` to be a string/template literal —
     // NOT a `+`-concatenated BinaryExpression — hence the single template
@@ -388,6 +401,7 @@ export function MyKeyboardsList() {
       )}
 
       {entries.length > 0 && (
+        // eslint-disable-next-line jsx-a11y/no-redundant-roles -- not redundant: Safari/VoiceOver drops list semantics from ul with list-style:none; the explicit role restores them
         <ul
           role="list"
           aria-label={t({ id: "profile.myKeyboards.listAriaLabel", message: "Your keyboards" })}
@@ -443,6 +457,19 @@ export function MyKeyboardsList() {
                       <Trans id="profile.myKeyboards.viewPrButton">View PR</Trans>
                     </a>
                   )}
+                  {/* Present for every status, submitted included — see handleViewTrail. */}
+                  <button
+                    type="button"
+                    style={actionButtonStyle}
+                    data-testid="my-keyboards-trail"
+                    aria-label={t({
+                      id: "profile.myKeyboards.trailAriaLabel",
+                      message: `View decisions for ${name}`,
+                    })}
+                    onClick={() => handleViewTrail(entry.projectKey)}
+                  >
+                    <Trans id="profile.myKeyboards.trailButton">Decisions</Trans>
+                  </button>
                   <button
                     type="button"
                     style={actionButtonStyle}

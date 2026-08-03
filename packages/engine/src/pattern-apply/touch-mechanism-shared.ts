@@ -37,6 +37,32 @@ export function isTouchSubKeyDuplicate(
 }
 
 /**
+ * Return `true` when a host key's OWN primary production is already `char`, so
+ * a placement targeting that key is a no-op rather than a longpress alternate.
+ *
+ * Without this, a key can be handed itself as its own `sk[]` alternate. That
+ * became easy to hit once placements started targeting the case-derived layer:
+ * a shift-layer seed key routinely already carries the uppercase form as its
+ * primary production, so re-placing that same character would append a
+ * self-referential popup entry.
+ *
+ * Deliberately narrower than {@link isTouchSubKeyDuplicate}: this is the
+ * main-key path, which compares `text`/`output` only and does NOT decode a
+ * `U_<HEX>` id — same split as `applyCarveKeycapRemovalsToVfs`'s
+ * `mainKeyValueMatches` vs. its sub-key predicate.
+ *
+ * @param key   The host key from a parsed touch layout (IR or raw JSON).
+ * @param char  The character being placed (e.g. "Á").
+ */
+export function isTouchKeyPrimaryProduction(
+  key: { text?: string; output?: string },
+  char: string,
+): boolean {
+  const target = char.normalize("NFC");
+  return key.text?.normalize("NFC") === target || key.output?.normalize("NFC") === target;
+}
+
+/**
  * Build the canonical (NFC) removal-membership set from a Phase D carve
  * `removals` list, shared by both `applyDesktopModifications` variants so
  * neither builds its own normalization pass (spec 035 contracts/seed-derivation.md
@@ -71,4 +97,22 @@ export function keyMatchesRemovalSet(
   }
   const decoded = candidate.id !== undefined ? unicodeKeyIdToChar(candidate.id) : undefined;
   return decoded !== undefined && removalSet.has(decoded.normalize("NFC"));
+}
+
+/**
+ * Resolve the index of the mobile platform ("phone" or "tablet") that Phase C
+ * placement replay ({@link applyDesktopModifications.ts}'s `applyPlacements`)
+ * and Phase E touch-assignment application (`applyTouchAssignments.ts`)
+ * target. "phone" wins when both are present — unchanged legacy behavior for
+ * every existing phone-only seed/shipped layout. "tablet" is the fallback so
+ * a tablet-style seed (`buildCaseASeed`'s `platformStyle:"tablet"` reseed
+ * path, scaffoldTouchLayout.ts) is still a valid replay/assignment target
+ * instead of silently no-op'ing. Returns -1 when neither is present.
+ */
+export function resolveMobilePlatformIndex(
+  platforms: ReadonlyArray<{ id: string }>,
+): number {
+  const phoneIdx = platforms.findIndex((p) => p.id === "phone");
+  if (phoneIdx !== -1) return phoneIdx;
+  return platforms.findIndex((p) => p.id === "tablet");
 }

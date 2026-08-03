@@ -138,33 +138,46 @@ export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, on
           };
 
           return (
+            // Outer wrapper is layout only — no role, no click handler, no
+            // tabIndex. The two interactive affordances (toggle + select) are
+            // real <button>s inside, so they don't nest. Previously the outer
+            // was role="button" with onClick, which put a real ToggleBox
+            // <button> inside a role="button" ancestor — axe's
+            // `nested-interactive` at serious (WCAG 4.1.2).
             <div
               key={node.nodeId}
-              data-testid={`carve-card-${node.nodeId}`}
-              data-kind={node.kind}
-              onClick={() => onSelect(node.nodeId)}
-              onMouseEnter={() => setInfo({ kind: 'node', node })}
-              onFocus={() => setInfo({ kind: 'node', node })}
-              onMouseLeave={clearInfo}
-              onBlur={clearInfo}
-              tabIndex={0}
               style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px',
                 background: active ? 'var(--app-accent-subtle)' : 'transparent',
                 boxShadow: active ? 'inset 3px 0 0 var(--app-accent)' : 'none',
               }}
             >
               <ToggleBox glyph={node.trigger} state={st} size={26} onClick={handleToggle} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
+              <button
+                type="button"
+                data-testid={`carve-card-${node.nodeId}`}
+                data-kind={node.kind}
+                onClick={() => onSelect(node.nodeId)}
+                onMouseEnter={() => setInfo({ kind: 'node', node })}
+                onFocus={() => setInfo({ kind: 'node', node })}
+                onMouseLeave={clearInfo}
+                onBlur={clearInfo}
+                style={{
+                  flex: 1, minWidth: 0, cursor: 'pointer', textAlign: 'left',
+                  background: 'transparent', border: 'none', padding: 0,
+                  font: 'inherit', color: 'inherit',
+                }}
+              >
+                <span style={{
+                  display: 'block',
                   fontSize: 13, fontWeight: active ? 600 : 500,
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   color: st === 'off' ? 'var(--app-text-subtle)' : 'var(--app-text)',
                   textDecoration: st === 'off' ? 'line-through' : 'none',
                 }}>
                   {resolveNodeName(node, i18n)}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 2 }}>
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 2 }}>
                   {total !== null && !showBreakdown && (
                     <span style={{ fontSize: 11, color: 'var(--app-text-subtle)' }}>{keptN}/{total}</span>
                   )}
@@ -189,8 +202,8 @@ export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, on
                       <WarnIcon size={11} />
                     </span>
                   )}
-                </div>
-              </div>
+                </span>
+              </button>
             </div>
           );
         };

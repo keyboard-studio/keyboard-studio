@@ -8,6 +8,7 @@ import tsParser from "@typescript-eslint/parser";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import reactHooks from "eslint-plugin-react-hooks";
 import lingui from "eslint-plugin-lingui";
+import jsxA11y from "eslint-plugin-jsx-a11y";
 
 export default [
   {
@@ -70,6 +71,42 @@ export default [
     files: ["**/*.test.ts", "**/*.test.tsx"],
     rules: {
       "no-console": "off",
+    },
+  },
+  {
+    // Accessibility gate for shipped studio JSX (spec 056 FR-002; house
+    // rules in docs/accessibility.md). Recommended ruleset at error
+    // severity — a defect this plugin detects (missing label, invalid
+    // ARIA, click-without-key) fails `pnpm lint`. Any rule demoted or
+    // disabled here needs an inline justification per FR-002. Tests are
+    // out of scope: fixture JSX never ships.
+    files: ["packages/studio/src/**/*.tsx"],
+    ignores: ["**/*.test.tsx", "**/test/**"],
+    plugins: { "jsx-a11y": jsxA11y },
+    rules: {
+      ...jsxA11y.flatConfigs.recommended.rules,
+      // ignoreNonDOM: only flag autoFocus on real DOM elements. A custom
+      // component's autoFocus prop (e.g. CharChipEditor autoFocus={false})
+      // is an API the component resolves internally — any DOM autoFocus it
+      // renders is still caught at that DOM site. Deliberate in-dialog focus
+      // placement per APG carries a per-site disable instead (ConfirmDialog).
+      "jsx-a11y/no-autofocus": ["error", { ignoreNonDOM: true }],
+      // Not a demotion — teach the rule which house primitives (packages/
+      // studio/src/ui) render a real form control, so a wrapping <label>
+      // counts as associated. Plain <label> next to plain <div> still errors.
+      "jsx-a11y/label-has-associated-control": [
+        "error",
+        {
+          controlComponents: [
+            "Checkbox",
+            "TextField",
+            "Textarea",
+            "SelectMenu",
+            "MultiSelect",
+            "RadioGroup",
+          ],
+        },
+      ],
     },
   },
   {

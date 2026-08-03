@@ -8,10 +8,16 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { render } from "../../../test/renderWithI18n.tsx";
-import { CharScrollStrip } from "./CharScrollStrip.tsx";
+import { CharScrollStrip, MAX_VISIBLE_CHIPS } from "./CharScrollStrip.tsx";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import { PATTERN_DEADKEY } from "../patternIds.ts";
 import { expectCurrentChar, getCurrentCharChip } from "../../../test/currentCharChip.ts";
+
+/** `count` distinct, collision-free single-codepoint characters (private-use
+ *  area, well away from every other test's ASCII/Latin fixtures in this file). */
+function manyChars(count: number): string[] {
+  return Array.from({ length: count }, (_, i) => String.fromCodePoint(0xe000 + i));
+}
 
 afterEach(() => {
   cleanup();
@@ -46,6 +52,80 @@ describe("CharScrollStrip — chip rendering", () => {
       />,
     );
     expect(container.firstChild).toBeNull();
+  });
+});
+
+describe("CharScrollStrip — large-inventory rendering cap (regression: full-inventory freeze)", () => {
+  // A `chars` list past MAX_VISIBLE_CHIPS mounted one <button> chip per
+  // character — for a real several-thousand-character inventory (e.g.
+  // Hakka's ~3k confirmed romanization inventory) this froze the tab on
+  // entry to the gallery. These lock the fix's actual contract: the DOM node
+  // count stays bounded, AND the currently-selected character is never
+  // truncated out of the rendered slice, however far into the list it is.
+
+  it("mounts at most MAX_VISIBLE_CHIPS chips for a list far larger than that", () => {
+    const chars = manyChars(MAX_VISIBLE_CHIPS + 500);
+    render(
+      <CharScrollStrip
+        chars={chars}
+        currentChar={chars[0] ?? null}
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+
+    expect(screen.getAllByRole("button")).toHaveLength(MAX_VISIBLE_CHIPS);
+  });
+
+  it("keeps the currently-selected chip rendered and aria-pressed even when its index is far past a naive head-of-list truncation", () => {
+    const chars = manyChars(MAX_VISIBLE_CHIPS + 500);
+    const lastChar = chars[chars.length - 1] ?? "";
+    render(
+      <CharScrollStrip
+        chars={chars}
+        currentChar={lastChar}
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+
+    expectCurrentChar(lastChar);
+    expect(getCurrentCharChip().getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("shows the 'Showing N of M' note only when the list is actually truncated", () => {
+    const chars = manyChars(MAX_VISIBLE_CHIPS + 500);
+    render(
+      <CharScrollStrip
+        chars={chars}
+        currentChar={chars[0] ?? null}
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+
+    expect(
+      screen.getByText(new RegExp(`Showing ${MAX_VISIBLE_CHIPS} of ${chars.length}`)),
+    ).toBeTruthy();
+  });
+
+  it("renders every chip with no truncation note when the list is exactly at the cap", () => {
+    const chars = manyChars(MAX_VISIBLE_CHIPS);
+    render(
+      <CharScrollStrip
+        chars={chars}
+        currentChar={chars[0] ?? null}
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+
+    expect(screen.getAllByRole("button")).toHaveLength(MAX_VISIBLE_CHIPS);
+    expect(screen.queryByText(/Showing \d+ of \d+/)).toBeNull();
   });
 });
 
@@ -194,6 +274,60 @@ describe("CharScrollStrip — current-chip selection (aria-pressed + accessible 
     );
 
     expect(() => getCurrentCharChip()).toThrow();
+  });
+});
+
+describe("CharScrollStrip — roving tabindex", () => {
+  // Only one chip should ever be a Tab stop at a time (tabIndex 0); the rest
+  // are tabIndex -1 and reachable only via ArrowLeft/ArrowRight (see
+  // handleKeyDown) or a mouse click — otherwise up to MAX_VISIBLE_CHIPS chips
+  // would each be its own Tab stop.
+  it("gives the selected chip tabIndex 0 and every other visible chip tabIndex -1", () => {
+    render(
+      <CharScrollStrip
+        chars={["a", "b", "c"]}
+        currentChar="b"
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+
+    expect(screen.getByTestId("char-scroll-chip-0061").getAttribute("tabindex")).toBe("-1");
+    expect(screen.getByTestId("char-scroll-chip-0062").getAttribute("tabindex")).toBe("0");
+    expect(screen.getByTestId("char-scroll-chip-0063").getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("falls back to tabIndex 0 on the FIRST visible chip when currentChar is null — the strip must stay Tab-reachable with no selection", () => {
+    render(
+      <CharScrollStrip
+        chars={["a", "b", "c"]}
+        currentChar={null}
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+
+    expect(screen.getByTestId("char-scroll-chip-0061").getAttribute("tabindex")).toBe("0");
+    expect(screen.getByTestId("char-scroll-chip-0062").getAttribute("tabindex")).toBe("-1");
+    expect(screen.getByTestId("char-scroll-chip-0063").getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("falls back to tabIndex 0 on the FIRST visible chip when currentChar is a stale value not present in `chars` — same guarantee for the indexOf === -1 case", () => {
+    render(
+      <CharScrollStrip
+        chars={["a", "b", "c"]}
+        currentChar="z" // not in `chars` at all
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+
+    expect(screen.getByTestId("char-scroll-chip-0061").getAttribute("tabindex")).toBe("0");
+    expect(screen.getByTestId("char-scroll-chip-0062").getAttribute("tabindex")).toBe("-1");
+    expect(screen.getByTestId("char-scroll-chip-0063").getAttribute("tabindex")).toBe("-1");
   });
 });
 
@@ -434,6 +568,102 @@ describe("CharScrollStrip — wheel horizontal scroll", () => {
     expect(strip.scrollLeft).toBe(100 + 80 * FACTOR); // 100 + 48 = 148
     expect(onSelectChar).not.toHaveBeenCalled();
     expect(event.defaultPrevented).toBe(true);
+  });
+});
+
+describe("CharScrollStrip — focus glue (DOM focus follows the newly selected chip, gated on an already-focused chip)", () => {
+  // ArrowLeft/ArrowRight cycling itself has moved to the PANE level —
+  // useCharCycleKeys.test.ts now owns the wrap-around/guard-key/no-op
+  // coverage that used to live here (see that file). What's left here is
+  // CharScrollStrip's own remaining contract: reacting to a `currentChar`
+  // prop change by (a) scrolling the new chip into view and (b) moving DOM
+  // focus onto it, but ONLY when focus was already resting on one of this
+  // strip's own chips — see the component's own doc comment on the
+  // `[currentChar]` effect for why the gate exists (a Next/Skip button click
+  // elsewhere in the pane must never yank focus onto a distant chip).
+  it("moving currentChar while focus is on a DIFFERENT chip in this strip moves focus to the new chip", () => {
+    const { rerender } = render(
+      <CharScrollStrip
+        chars={["a", "b", "c"]}
+        currentChar="b"
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+    // Simulate an in-progress roving-focus session: focus already sits on
+    // some chip in the strip (not necessarily the selected one).
+    screen.getByTestId("char-scroll-chip-0062").focus();
+    expect(document.activeElement).toBe(screen.getByTestId("char-scroll-chip-0062"));
+
+    rerender(
+      <CharScrollStrip
+        chars={["a", "b", "c"]}
+        currentChar="c"
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+
+    expect(document.activeElement).toBe(screen.getByTestId("char-scroll-chip-0063")); // "c"
+  });
+
+  it("moving currentChar while focus is OUTSIDE the strip does NOT steal focus onto the new chip (no double-handling / no hijack regression), but still scrolls the new chip into view", () => {
+    // jsdom does not implement scrollIntoView at all — the component
+    // feature-detects it (see CharScrollStrip.tsx's `[currentChar]` effect),
+    // so without a stub the call is silently skipped and this test would
+    // have nothing to assert on. Stub it here and restore afterward so
+    // other tests in this file keep running against the real feature-detect
+    // (undefined) path.
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const scrollSpy = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scrollSpy;
+
+    try {
+      // A sibling focusable control outside the strip — stands in for e.g. the
+      // gallery's own "Next character"/"Skip" button, which sits in the same
+      // pane but outside CharScrollStrip.
+      const outsideButton = document.createElement("button");
+      document.body.appendChild(outsideButton);
+      outsideButton.focus();
+      expect(document.activeElement).toBe(outsideButton);
+
+      const { rerender } = render(
+        <CharScrollStrip
+          chars={["a", "b", "c"]}
+          currentChar="b"
+          onSelectChar={vi.fn()}
+          assignments={[]}
+          modality="physical"
+        />,
+      );
+      // Rendering the strip itself must not steal focus from outsideButton.
+      expect(document.activeElement).toBe(outsideButton);
+
+      scrollSpy.mockClear();
+
+      rerender(
+        <CharScrollStrip
+          chars={["a", "b", "c"]}
+          currentChar="c"
+          onSelectChar={vi.fn()}
+          assignments={[]}
+          modality="physical"
+        />,
+      );
+
+      // Focus stays on outsideButton — the strip does not hijack it just
+      // because currentChar advanced.
+      expect(document.activeElement).toBe(outsideButton);
+      // But scrollIntoView is UNCONDITIONAL (not gated on focus location) —
+      // the newly selected chip must still be brought into view even though
+      // DOM focus never moved.
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+      outsideButton.remove();
+    } finally {
+      HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+    }
   });
 });
 

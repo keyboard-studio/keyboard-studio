@@ -28,6 +28,32 @@
  *   - Unknown patternId → one warning, no mutation.
  *   - Do NOT auto-seed sk[] from deadkey patterns (that is Case A behaviour,
  *     for keyboards that ship no touch layout).
+ *   - Positional-fallback-into-blank-placeholder: a modifier layer (e.g.
+ *     `rightalt`) commonly carries an un-named slot as a `T_BLANK` sentinel
+ *     (or an empty-text spacer — spacer-CLASS `sp`, per the canonical
+ *     `isSpacerKeyClass`/`SPACER_SP_VALUES` predicate in
+ *     `@keyboard-studio/contracts` touch-coverage.ts, never "any defined
+ *     `sp`" — real keys carry `sp:0`/`1`/`2`) rather than the desktop vkey
+ *     id, because Keyman only assigns a real id to a layer slot once
+ *     something is bound to it. Layer row/key arrays are strictly positional
+ *     and same-length across sibling layers, so when `hostKey` misses the
+ *     target layer's id-keyed lookup, resolve its (rowIndex, keyIndex) from
+ *     that platform's `"default"` layer and re-check the SAME position on
+ *     the target layer. If that slot is a blank placeholder, promote it in
+ *     place before applying the mechanism, rather than warning and dropping
+ *     the assignment: set its `id` to `hostKey`; clear its spacer `sp` only
+ *     (`width`/`pad`, if present, are load-bearing for row alignment and
+ *     survive untouched); copy `nextlayer` VERBATIM (including its absence)
+ *     from the target layer's first existing live key — scanned starting at
+ *     the candidate's own row and wrapping around, so a same-neighborhood
+ *     key wins over an unrelated control key earlier in row order — falling
+ *     back to `"default"` only when the layer has no live key anywhere; and, once
+ *     the mechanism has run, borrow the DEFAULT-layer key's base `text` at
+ *     the same position if the candidate's base `text` is still empty
+ *     (`longpress`/`flick`/`multitap` never set it; only `touch_key_replace`
+ *     does). A slot that doesn't exist at that position, or one that already
+ *     holds a different real key, is left alone (existing miss/warning
+ *     behavior).
  *   - Each assignment's `mechanisms[]` are ALL applied (not just the first) —
  *     one character may carry multiple touch methods simultaneously.
  *
@@ -46,10 +72,11 @@
  */
 
 import type { TouchAssignment } from "@keyboard-studio/contracts";
+import { isSpacerKeyClass } from "@keyboard-studio/contracts";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
-import type { RawKey, RawPlatform } from "./touch-layout-wire-format.js";
-import { resolveTouchLayerId } from "./touchLayer.js";
+import type { RawKey, RawPlatform, RawRow } from "./touch-layout-wire-format.js";
+import { DEFAULT_TOUCH_LAYER, resolveTouchLayerId } from "./touchLayer.js";
 
 /** The top-level raw .keyman-touch-layout JSON object. */
 type RawTouchLayout = Record<string, unknown>;
@@ -94,12 +121,17 @@ export function applyTouchAssignmentsToRawJson(
   // Guard: skip non-platform entries (e.g. top-level "_comment" strings) and
   // platforms whose `layer` field is absent or not an array.
   const platformLayerKeyMaps = new Map<string, Map<string, Map<string, RawKey>>>();
+  // Parallel index of each platform's layer row arrays (by layer id), kept for
+  // the positional fallback below — same layer/row-array traversal as the
+  // keyMap build above, so it costs nothing extra to collect alongside it.
+  const platformLayerRows = new Map<string, Map<string, RawRow[]>>();
   for (const pName of platformNames) {
     const platform = layout[pName];
     if (!platform || typeof platform !== "object") continue;
     const p = platform as RawPlatform;
     if (!Array.isArray(p.layer)) continue;
     const layerMaps = new Map<string, Map<string, RawKey>>();
+    const layerRows = new Map<string, RawRow[]>();
     for (const layer of p.layer) {
       if (!layer?.id) continue;
       if (!Array.isArray(layer.row)) continue;
@@ -111,12 +143,20 @@ export function applyTouchAssignmentsToRawJson(
         }
       }
       layerMaps.set(layer.id, keyMap);
+      layerRows.set(layer.id, layer.row);
     }
     if (layerMaps.size > 0) platformLayerKeyMaps.set(pName, layerMaps);
+    if (layerRows.size > 0) platformLayerRows.set(pName, layerRows);
   }
 
   // Track which platforms gained at least one new sk[] entry (for defaultHint).
   const platformsGainingSk = new Set<string>();
+
+  // Track keys promoted from a blank placeholder (positional fallback below),
+  // by object identity, so the post-mechanism base-text borrow (FIX 3) only
+  // ever applies to a key that was genuinely blank before this run — never to
+  // a real key that happened to be matched by id.
+  const promotedKeys = new Set<RawKey>();
 
   for (const assignment of assignments) {
     for (const ref of assignment.mechanisms) {
@@ -141,7 +181,36 @@ export function applyTouchAssignmentsToRawJson(
         // below rather than falling back to "default".
         const matchedPlatforms: string[] = [];
         for (const [pName, layerMaps] of platformLayerKeyMaps) {
-          if (layerMaps.get(layerId)?.has(hostKey)) matchedPlatforms.push(pName);
+          const targetMap = layerMaps.get(layerId);
+          if (targetMap?.has(hostKey)) {
+            matchedPlatforms.push(pName);
+            continue;
+          }
+
+          // Positional fallback: an id-based miss on a KNOWN target layer
+          // (targetMap exists — the layer id itself is real) may still be
+          // resolvable by position. Resolve hostKey's (rowIndex, keyIndex) in
+          // this platform's "default" layer, then check the SAME position on
+          // the target layer for a blank placeholder to promote in place.
+          if (targetMap) {
+            const rowsMap = platformLayerRows.get(pName);
+            const defaultRows = rowsMap?.get(DEFAULT_TOUCH_LAYER);
+            const targetRows = rowsMap?.get(layerId);
+            const position = defaultRows ? findKeyPosition(defaultRows, hostKey) : undefined;
+            const candidate =
+              position && targetRows ? getKeyAtPosition(targetRows, position) : undefined;
+            if (candidate && isBlankPlaceholder(candidate)) {
+              candidate.id = hostKey;
+              // Clear the spacer style only — width/pad (when the blank slot
+              // carries them) are load-bearing for row alignment and must
+              // survive promotion untouched.
+              delete candidate["sp"];
+              assignPromotedNextLayer(candidate, targetRows!, position!.rowIndex);
+              targetMap.set(hostKey, candidate);
+              matchedPlatforms.push(pName);
+              promotedKeys.add(candidate);
+            }
+          }
         }
 
         // Warn only when the key is found in NO platform's target layer.
@@ -166,6 +235,14 @@ export function applyTouchAssignmentsToRawJson(
           } else {
             // touch_key_replace
             applyKeyReplace(key, char);
+          }
+
+          // A key promoted from a blank placeholder has no base `text` of its
+          // own; `touch_key_replace` sets one, but longpress/flick/multitap
+          // don't, so borrow the DEFAULT-layer key's text at the same host
+          // key if it's still empty (else the promoted key renders invisible).
+          if (promotedKeys.has(key)) {
+            borrowBaseTextIfEmpty(key, hostKey, platformLayerKeyMaps.get(pName)!);
           }
         }
         continue;
@@ -192,6 +269,125 @@ export function applyTouchAssignmentsToRawJson(
 
   // Compact JSON: matches emitTouchLayout (Case A) — no pretty-print indent.
   return { json: JSON.stringify(layout), warnings };
+}
+
+// ---------------------------------------------------------------------------
+// Helpers — positional fallback (layer-id-agnostic; no keyboard/layer name
+// is ever hardcoded — every layer id comes from the JSON being processed)
+// ---------------------------------------------------------------------------
+
+/**
+ * Find `keyId`'s (rowIndex, keyIndex) position by scanning `rows` in order.
+ * Used to resolve a host key's position in a platform's "default" layer so
+ * the SAME position can be re-checked on a different (e.g. modifier) layer,
+ * whatever that layer happens to be named.
+ */
+function findKeyPosition(
+  rows: readonly RawRow[],
+  keyId: string,
+): { rowIndex: number; keyIndex: number } | undefined {
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+    const row = rows[rowIndex];
+    if (!row || !Array.isArray(row.key)) continue;
+    for (let keyIndex = 0; keyIndex < row.key.length; keyIndex++) {
+      if (row.key[keyIndex]?.id === keyId) return { rowIndex, keyIndex };
+    }
+  }
+  return undefined;
+}
+
+/** Read the key object at a given (rowIndex, keyIndex), or undefined if the
+ *  target layer's rows don't extend that far (different shape than default). */
+function getKeyAtPosition(
+  rows: readonly RawRow[],
+  position: { rowIndex: number; keyIndex: number },
+): RawKey | undefined {
+  return rows[position.rowIndex]?.key?.[position.keyIndex];
+}
+
+/** Empty/whitespace-only (or absent) text — shared by the blank predicate
+ *  below and the post-mechanism base-text borrow. */
+function isEmptyText(text: unknown): boolean {
+  return typeof text !== "string" || text.trim() === "";
+}
+
+/**
+ * A slot is an "assignable blank" — safe to promote into a live key — when it
+ * carries no real identity of its own: either the well-known `T_BLANK`
+ * sentinel, OR (more generally, covering layouts that use a different blank
+ * id or no id-based sentinel at all) an empty/whitespace `text` combined with
+ * a spacer-CLASS `sp` value (the canonical `isSpacerKeyClass` predicate from
+ * `@keyboard-studio/contracts` — `sp:8`/`sp:10`, never "any defined `sp`":
+ * real keys carry `sp:0` (normal), `sp:1` (special), or `sp:2` (shift), e.g.
+ * the spacebar ships as `{"id":"K_SPACE","text":" ","sp":0}`, and must never
+ * be promoted). A slot with real text, or one with neither signal, is left
+ * alone — it is a genuine key, not a placeholder, and must never be
+ * clobbered.
+ */
+export function isBlankPlaceholder(key: RawKey): boolean {
+  if (key.id === "T_BLANK") return true;
+  const sp = typeof key["sp"] === "number" ? (key["sp"] as number) : undefined;
+  return isEmptyText(key.text) && isSpacerKeyClass(sp);
+}
+
+/**
+ * Set a promoted key's `nextlayer` by sampling the TARGET layer's first
+ * existing live (non-blank) key and copying the field VERBATIM — including
+ * its ABSENCE. A transient modifier layer (e.g. `rightalt`) commonly carries
+ * `nextlayer:"default"` on its live keys to auto-revert after one tap, while
+ * a persistent layer (e.g. `caps`) deliberately omits `nextlayer` on its live
+ * keys to stay put — so copying "always default" would be wrong for the
+ * latter.
+ *
+ * The scan starts at the CANDIDATE's own row and proceeds forward, wrapping
+ * to the rows before it only if nothing turns up — every row is visited
+ * exactly once, so the fallback below only fires when the whole layer has no
+ * live key, but a key's own row (and the rows after it) are the most
+ * representative neighbors, ahead of an unrelated control row (e.g. a
+ * keyboard-wide backspace key) that happens to sit earlier in row order.
+ */
+function assignPromotedNextLayer(
+  candidate: RawKey,
+  targetRows: readonly RawRow[],
+  fromRowIndex: number,
+): void {
+  const orderedRows = [...targetRows.slice(fromRowIndex), ...targetRows.slice(0, fromRowIndex)];
+  for (const row of orderedRows) {
+    if (!Array.isArray(row.key)) continue;
+    for (const key of row.key) {
+      if (key === candidate || isBlankPlaceholder(key)) continue;
+      if (key.nextlayer !== undefined) {
+        candidate.nextlayer = key.nextlayer;
+      } else {
+        delete candidate.nextlayer;
+      }
+      return;
+    }
+  }
+  // Fallback heuristic: a layer with zero live keys gives no positive
+  // evidence either way, so default to the common auto-revert case.
+  candidate.nextlayer = "default";
+}
+
+/**
+ * Borrow the DEFAULT-layer key's base `text` (at the same `hostKey`) for a
+ * promoted-from-blank candidate whose base `text` is still empty after its
+ * mechanism ran. `touch_key_replace` sets `text` itself; `longpress`/
+ * `flick`/`multitap` do not, so without this a longpress-only promotion would
+ * keep the blank's empty `text` and render as an invisible button.
+ */
+function borrowBaseTextIfEmpty(
+  key: RawKey,
+  hostKey: string,
+  layerKeyMaps: Map<string, Map<string, RawKey>>,
+): void {
+  if (!isEmptyText(key.text)) return;
+  const defaultKey = layerKeyMaps.get(DEFAULT_TOUCH_LAYER)?.get(hostKey);
+  // `typeof` (not `isEmptyText`) narrows `defaultKey.text` from `string |
+  // undefined` to `string` for the assignment below.
+  if (defaultKey && typeof defaultKey.text === "string" && defaultKey.text.trim() !== "") {
+    key.text = defaultKey.text;
+  }
 }
 
 // ---------------------------------------------------------------------------

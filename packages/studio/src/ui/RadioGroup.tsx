@@ -95,7 +95,6 @@ interface RadioItemProps {
   checked: boolean;
   accentColor: string;
   onChange: (v: string) => void;
-  required?: boolean | undefined;
   disabled?: boolean | undefined;
   title?: string | undefined;
   detail?: React.ReactNode | undefined;
@@ -110,7 +109,6 @@ function RadioItem({
   checked,
   accentColor,
   onChange,
-  required,
   disabled,
   title,
   detail,
@@ -128,7 +126,6 @@ function RadioItem({
         title={title}
         className="ks-focus-ring"
         style={{ marginTop: 2, flexShrink: 0, accentColor }}
-        aria-required={required}
         // E2E hook: the live "adapt" option of the track_choice question
         // (packages/studio/src/survey/questions/g/track_choice.ts) is the
         // only wizard-critical radio target Playwright needs a stable,

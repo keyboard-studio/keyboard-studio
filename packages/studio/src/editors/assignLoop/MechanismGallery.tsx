@@ -8,13 +8,17 @@
 //   - Walks lettersToAdd in strict positional order (index-based, not a
 //     covered search) — Back/Next always move by one position, so an
 //     already-covered character is never jumped over.
-//   - Offers up to four methods:
+//   - Offers three methods:
 //       S-03 (sequence) — always shown
 //       S-02 (deadkey)  — only for decomposable accented letters
-//       S-01 (swap)     — always shown; user picks a physical key
-//       S-08 (ralt)     — always shown; user picks a base key + a modifier
-//                         layer combo (up to four ModifierTokens — see
-//                         @keyboard-studio/engine's modifierCombos.ts)
+//       "swap" (always shown; user picks a physical key) — a COMBINED
+//         S-01/S-08 card ("Assign to a key"). It starts with zero modifier
+//         layers, which is a plain S-01 simple_swap base-layer assignment;
+//         adding one or more layers (up to four ModifierTokens — see
+//         @keyboard-studio/engine's modifierCombos.ts) turns the same Apply
+//         into an S-08 modifier_as_layer_switch combo instead. There is no
+//         separate Base/Shift toggle — see handleApply's method === "swap"
+//         branch, which picks the write path from raltTokens' filled count.
 //   - "Add key" records a MechanismAssignment(scope:"individual"); the user
 //     advances explicitly via "Next character"/"Done".
 //   - "Skip this character" is pure forward navigation — it records nothing.
@@ -59,15 +63,19 @@ import type {
   MechanismRef,
   PlacementMap,
   PlacementWorklist,
+  RemovalCapability,
 } from "@keyboard-studio/contracts";
 import {
   toUPlusNotation,
   isDecomposableAccented,
+  buildProducedSet,
 } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { collate } from "../../survey/collation.ts";
 import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
 import { getPatternLibraryService } from "../../lib/services.ts";
 import { displayChar } from "../../lib/irToCarveNodes.ts";
+import { capabilityHint } from "./parts/InfoView.tsx";
 import type { AxisFill, DiscoveryAxisVector } from "@keyboard-studio/contracts";
 import {
   defaultFillAxes,
@@ -80,7 +88,10 @@ import {
   canonicalizeCombo,
   comboToKeySpec,
   collectModifierTokensInUse,
+  collectCharContributors,
+  collectCompositionMethod,
   type ModifierToken,
+  type CharContributors,
 } from "@keyboard-studio/engine";
 import {
   useKeyboardArtifact,
@@ -96,6 +107,7 @@ import {
   ALL_PICKABLE_KEYS,
   CUSTOM_KEY_OPTION_VALUE,
 } from "../../lib/keyOptions.ts";
+import { formatModifierCombo } from "../../lib/modifierTokenLabel.ts";
 import {
   resolveCharInput,
   resolveKeyPickerSelection,
@@ -110,15 +122,25 @@ import {
   type CasePairProposal,
 } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
+import {
+  appendNotDeletableSuffix,
+  composeContributorLabel,
+  compositionTooltip,
+} from "./existingMethodLabels.ts";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
+import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
-import { RemovableChipRow } from "./parts/RemovableChipRow.tsx";
+import {
+  RemovableChipRow,
+  HoverDangerChip,
+  NonDeletableMethodChip,
+} from "./parts/RemovableChipRow.tsx";
 import { ConfirmDialog } from "./parts/ConfirmDialog.tsx";
 import {
   unimplementedDesktopChars,
@@ -131,7 +153,6 @@ import {
   partitionSequenceAssignment,
   type SequenceApplied,
 } from "./SequenceBuilderPanel.tsx";
-import { RadioGroup } from "../../ui/RadioGroup.tsx";
 import { SelectMenu, type SelectMenuOption } from "../../ui/SelectMenu.tsx";
 import {
   BORDER,
@@ -210,19 +231,6 @@ const TRIGGER_KEY_RESOLVE_OPTIONS: KeyPickerResolveOptions = {
   blockDelimiters: true,
 };
 
-/** Display label per ModifierToken for the S-08 covered-chip badge (methodLabel). */
-const MODIFIER_TOKEN_LABELS: Record<string, string> = {
-  SHIFT: "Shift",
-  CTRL: "Ctrl",
-  RCTRL: "RCtrl",
-  LCTRL: "LCtrl",
-  ALT: "Alt",
-  RALT: "RAlt",
-  LALT: "LAlt",
-  CAPS: "Caps",
-  NCAPS: "NCaps",
-};
-
 // Takes an optional i18n + resolves via msg()/resolveMessage() rather than a
 // bare `t` parameter — Lingui's macro tracks the specific binding introduced
 // by useLingui(), so a re-bound `t` parameter is a distinct binding the
@@ -264,9 +272,12 @@ function methodLabel(
         .split(/\s+/)
         .filter(Boolean);
       const key = parts.pop() ?? "?";
+      // parts came from splitting a bracket-notation combo spec built by this
+      // gallery's own S-08 write path (comboToKeySpec), so its entries are
+      // always ModifierToken strings — asserted rather than re-typed here.
       const prefix =
         parts.length > 0
-          ? parts.map((tok) => MODIFIER_TOKEN_LABELS[tok] ?? tok).join("+")
+          ? formatModifierCombo(parts as ModifierToken[])
           : resolveMessage(
               i18n,
               msg({
@@ -409,21 +420,21 @@ function GalleryPreviewWithPatterns({
 }
 
 // ---------------------------------------------------------------------------
-// MethodChooser — S-03 / S-02 / S-01 / S-08 single-card selection + inline config
+// MethodChooser — S-03 / S-02 / combined-S-01-S-08 single-card selection +
+// inline config
 // ---------------------------------------------------------------------------
 
-type Method = "sequence" | "deadkey" | "swap" | "ralt";
+type Method = "sequence" | "deadkey" | "swap";
 
-// S-01 "assign to a key" target layer. 'base' is the long-standing default
-// (`+ [K_X] > ...`); 'shift' targets the shift layer of the same physical key
-// (`+ [SHIFT K_X] > ...`, or the NCAPS/CAPS pair when the key already has
-// explicit CAPS handling — see buildShiftRuleLines in @keyboard-studio/engine).
-// Labels follow the same 'Base'/'Shift' vocabulary as MOD_GROUP_DEFS
-// (packages/studio/src/lib/irToCarveNodes.ts) so the terminology matches the
-// carve gallery's Inspector/Rail.
-type SwapLayer = "base" | "shift";
+// "swap" is the combined "Assign to a key" card: a physical key picker plus
+// an optional modifier-layer combo (raltTokens below). There is no separate
+// Base/Shift toggle — a plain base-layer S-01 `simple_swap` assignment is
+// what zero layers means; adding a SHIFT token to the combo (once SHIFT
+// appears in the modifier pool) is the only way to reach the shift plane
+// under this merged card. See handleApply's method === "swap" branch, which
+// picks the S-01 vs. S-08 write path from the FILLED layer count.
 
-// S-08 "layer + key" target combo. A list of up to four ModifierTokens
+// S-08 layer-switch target combo — a list of up to four ModifierTokens
 // (SHIFT / CAPS / the alt family / the ctrl family — NCAPS is not offered,
 // see computeModifierPool), generalized beyond the old binary
 // 'ralt'|'shift-ralt' toggle (engine's modifierCombos.ts,
@@ -433,20 +444,24 @@ type SwapLayer = "base" | "shift";
 // kmcmplib-invalid and undeliverable by any real keypress, while the
 // all-generic form matches both a physical Ctrl+Alt press and a Windows
 // AltGr press via Keyman core's IsEquivalentShift).
-// Unlike the S-01 Shift toggle, the layer combo
-// is NOT gated on mnemonic layouts: `store(&mnemoniclayout)` changes only how
-// the base character of a key spec is resolved (base-layout character vs
-// physical position); a SHIFT flag inside the combo selects the shifted
-// plane and does not re-apply the base layout's own shift semantics, so the
-// combo is legitimate either way. Real mnemonic keyboards ship such rules:
-// sil_euro_latin declares `store(&mnemoniclayout) '1'` and maps e.g.
+// Unlike the old S-01 Shift toggle, the layer combo is NOT gated on mnemonic
+// layouts: `store(&mnemoniclayout)` changes only how the base character of a
+// key spec is resolved (base-layout character vs physical position); a
+// SHIFT flag inside the combo selects the shifted plane and does not
+// re-apply the base layout's own shift semantics, so the combo is legitimate
+// either way. Real mnemonic keyboards ship such rules: sil_euro_latin
+// declares `store(&mnemoniclayout) '1'` and maps e.g.
 // `[RALT SHIFT '<'] > U+00AB`.
 //
-// A slot value of "" means "not yet chosen" — only valid for a freshly-added
-// slot (index > 0); the first slot always defaults to a non-empty token
-// (generic ALT, or RALT once the keyboard already uses a chiral alt token —
-// see raltDefaultToken) so the card still reads as a layer-combo method by
-// default.
+// The card starts with ZERO layers (raltTokens = []) — a valid, applyable
+// state that plans a plain base-key assignment (see handleApply). A slot
+// value of "" means "not yet chosen": the FIRST layer added still defaults
+// to a non-empty token (generic ALT, or RALT once the keyboard already uses
+// a chiral alt token — see raltDefaultToken), mirroring the pre-merge
+// "Layer + key" card's always-prefilled first slot; every slot added after
+// that starts unselected ("") — Apply is disabled until it is filled or
+// removed (see canApply / handleRemoveRaltSlot, which now allows removing
+// all the way back to zero).
 const MAX_RALT_SLOTS = 4;
 
 /**
@@ -493,6 +508,18 @@ function computeModifierPool(
  * necessary: an earlier slot is never blocked by a later slot's pick, so a
  * change there can genuinely invalidate what a later slot already holds.
  */
+/**
+ * True when every PRESENT layer slot in the combined "Assign to a key" card
+ * has a chosen (non-"") token. Zero slots is vacuously true — the card's
+ * starting state, a valid plain base-key assignment. Shared by the render
+ * closure (drives "+ Add layer" visibility) and canApply (drives the Apply
+ * button) so the two never compute "all filled" via two separate
+ * expressions that could silently diverge.
+ */
+function raltAllFilled(tokens: readonly (ModifierToken | "")[]): boolean {
+  return tokens.every((tok) => tok !== "");
+}
+
 function optionsForRaltSlot(
   pool: readonly ModifierToken[],
   tokens: readonly (ModifierToken | "")[],
@@ -517,21 +544,18 @@ interface MethodChooserProps {
   onTriggerKeyCustomCharChange: (v: string) => void;
   deadkeyBaseLetter: string;
   onDeadkeyBaseLetterChange: (v: string) => void;
+  /** The single physical key picker for the combined "swap" card — the base
+   *  key of the layer combo when raltTokens is non-empty, or the plain
+   *  assigned key when it is empty. */
   selectedSwapKey: string;
   onSwapKeyChange: (v: string) => void;
   selectedSwapKeyCustomChar: string;
   onSwapKeyCustomCharChange: (v: string) => void;
-  selectedRaltKey: string;
-  onRaltKeyChange: (v: string) => void;
-  selectedRaltKeyCustomChar: string;
-  onRaltKeyCustomCharChange: (v: string) => void;
-  /** S-01 target layer — 'base' (default) or 'shift' (shift+key). */
-  swapLayer: SwapLayer;
-  onSwapLayerChange: (v: SwapLayer) => void;
   /**
    * S-08 target combo — a list of up to {@link MAX_RALT_SLOTS} chosen
    * ModifierTokens (one dropdown per slot; "" means "not yet chosen", only
-   * valid past the first slot).
+   * valid past the first slot). Empty means "no layer" — a plain S-01
+   * base-key assignment (see handleApply).
    */
   raltTokens: (ModifierToken | "")[];
   onRaltTokenChange: (index: number, value: string) => void;
@@ -541,12 +565,6 @@ interface MethodChooserProps {
   modifierPool: ModifierToken[];
   /** Tokens already used elsewhere in the working IR — rendered bold + "(in use)". */
   modifierTokensInUse: ReadonlySet<ModifierToken>;
-  /**
-   * True when the working keyboard is mnemonic — shift behaviour comes from
-   * the base layout, so the Shift toggle must be disabled (planShiftAssignment
-   * from @keyboard-studio/engine returns allowed:false, reason:"mnemonic").
-   */
-  shiftLayerDisabled: boolean;
 }
 
 const DEADKEY_OPTIONS = [
@@ -588,19 +606,12 @@ function MethodChooser({
   onSwapKeyChange,
   selectedSwapKeyCustomChar,
   onSwapKeyCustomCharChange,
-  selectedRaltKey,
-  onRaltKeyChange,
-  selectedRaltKeyCustomChar,
-  onRaltKeyCustomCharChange,
-  swapLayer,
-  onSwapLayerChange,
   raltTokens,
   onRaltTokenChange,
   onAddRaltSlot,
   onRemoveRaltSlot,
   modifierPool,
   modifierTokensInUse,
-  shiftLayerDisabled,
 }: MethodChooserProps) {
   const { t, i18n } = useLingui();
   const deadkeyBaseLetterResolveOptions =
@@ -649,15 +660,11 @@ function MethodChooser({
     deadkeyBaseLetterResolveOptions,
   );
 
-  // Resolved vkey for the S-01/S-08 layer-preview lines below — a custom
-  // selection still shows "Shift + <KEY>"/"Shift + RAlt + <KEY>" using the
-  // resolved physical key, never the raw "__custom__" sentinel or unresolved
-  // typed text.
+  // Resolved vkey for the combo-preview line below — a custom selection
+  // still shows the resolved physical key in the combo-spec preview, never
+  // the raw "__custom__" sentinel or unresolved typed text.
   const swapVkeyForDisplay = resolvedVkeyOf(
     resolveKeyPickerSelection(selectedSwapKey, selectedSwapKeyCustomChar),
-  );
-  const raltVkeyForDisplay = resolvedVkeyOf(
-    resolveKeyPickerSelection(selectedRaltKey, selectedRaltKeyCustomChar),
   );
 
   // Named locals for dotted-circle-wrapped interpolations used inside <Trans>/t()
@@ -728,103 +735,288 @@ function MethodChooser({
             </span>
           )}
         </button>
-        {method === "swap" && (
-          <div style={configStyle}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 12,
-                color: TEXT_DIM,
-                fontFamily: FONT,
-                flexWrap: "wrap",
-              }}
-            >
-              <span>
-                <Trans id="editor.assignLoop.keyLabel">Key:</Trans>
-              </span>
-              <KeyPickerField
-                value={selectedSwapKey}
-                onChange={onSwapKeyChange}
-                customChar={selectedSwapKeyCustomChar}
-                onCustomCharChange={onSwapKeyCustomCharChange}
-                options={KEY_OPTIONS}
-                selectAriaLabel={t({
-                  id: "editor.assignLoop.swap.keySelectAriaLabel",
-                  message: "Physical key for simple swap",
-                })}
-                customInputAriaLabel={t({
-                  id: "editor.assignLoop.swap.keyCustomAriaLabel",
-                  message: "Custom character for simple swap key",
-                })}
-              />
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span
-                id="swap-layer-label"
-                style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
-              >
-                <Trans id="editor.assignLoop.layerLabel">Layer:</Trans>
-              </span>
-              <RadioGroup
-                name="swap-layer"
-                value={swapLayer}
-                onChange={(v) => onSwapLayerChange(v as SwapLayer)}
-                ariaLabelledby="swap-layer-label"
-                options={[
-                  {
-                    value: "base",
-                    label: t({
-                      id: "editor.assignLoop.swap.layerBase",
-                      message: "Base",
-                    }),
-                  },
-                  {
-                    value: "shift",
-                    label: t({
-                      id: "editor.assignLoop.swap.layerShift",
-                      message: "Shift",
-                    }),
-                    disabled: shiftLayerDisabled,
-                    ...(shiftLayerDisabled
-                      ? {
-                          title: t({
-                            id: "editor.assignLoop.swap.shiftDisabledReason",
-                            message:
-                              "Mnemonic keyboard: shift behaviour comes from the base layout",
-                          }),
-                        }
-                      : {}),
-                  },
-                ]}
-              />
-            </div>
-            {swapLayer === "shift" && swapVkeyForDisplay !== null && (
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 12,
-                  color: TEXT_DIM,
-                  fontFamily: FONT,
-                }}
-              >
-                <Trans id="editor.assignLoop.swap.shiftPreview">
-                  Shift + {swapVkeyForDisplay.replace(/^K_/, "")} &rarr;{" "}
-                  <span
+        {method === "swap" &&
+          (() => {
+            const filledRaltTokens = raltTokens.filter(
+              (tok): tok is ModifierToken => tok !== "",
+            );
+            // Vacuously true at raltTokens.length === 0 (the card's starting
+            // state) — that is what lets raltHasRoomToAdd stay true from an
+            // empty start, so "+ Add layer" is visible before any layer has
+            // ever been added (requirement: the card must be able to add its
+            // first layer from zero). raltAllFilled is the shared helper
+            // (also used by canApply) — see its doc comment above.
+            const raltHasRoomToAdd =
+              raltTokens.length < MAX_RALT_SLOTS &&
+              raltAllFilled(raltTokens) &&
+              (() => {
+                const excluded = new Set<ModifierToken>();
+                for (const tok of filledRaltTokens) {
+                  for (const e of MODIFIER_EXCLUSIONS[tok]) excluded.add(e);
+                }
+                return modifierPool.some((tok) => !excluded.has(tok));
+              })();
+            const raltIsDesktopOnly =
+              filledRaltTokens.includes("CAPS") ||
+              filledRaltTokens.includes("NCAPS");
+            // Canonicalize once so the macOS-conflict note below keys off the
+            // RESULT of chirality unification, not the raw pre-canonicalization
+            // tokens: CTRL+RALT and CTRL+LALT both demote to the same generic
+            // [CTRL ALT] (see modifierCombos.ts's canonicalizeCombo doc), so
+            // neither should raise a RAlt-specific note, while a combo where
+            // RALT survives (e.g. [RALT] alone, or [SHIFT RALT]) still should.
+            // canonicalizeCombo only throws for a mutually-exclusive combo,
+            // which the dropdown's own exclusion logic (MODIFIER_EXCLUSIONS)
+            // already prevents from being constructed here.
+            let raltCanonicalTokens: ModifierToken[] = [];
+            try {
+              raltCanonicalTokens = canonicalizeCombo(filledRaltTokens);
+            } catch {
+              raltCanonicalTokens = filledRaltTokens;
+            }
+            // The preview keys off the RESOLVED vkey (swapVkeyForDisplay,
+            // custom-char aware) rather than the raw selectedSwapKey — a
+            // custom base character must show its resolved physical key in
+            // the combo-spec preview, never the "__custom__" sentinel. Only
+            // rendered once at least one layer is filled — with zero layers
+            // the plain key picker above is the whole story.
+            let raltPreviewSpec: string | null = null;
+            if (swapVkeyForDisplay !== null && filledRaltTokens.length > 0) {
+              try {
+                raltPreviewSpec = comboToKeySpec(
+                  raltCanonicalTokens,
+                  swapVkeyForDisplay,
+                );
+              } catch {
+                raltPreviewSpec = null;
+              }
+            }
+
+            return (
+              <div style={configStyle}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 12,
+                    color: TEXT_DIM,
+                    fontFamily: FONT,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <span>
+                    <Trans id="editor.assignLoop.keyLabel">Key:</Trans>
+                  </span>
+                  <KeyPickerField
+                    value={selectedSwapKey}
+                    onChange={onSwapKeyChange}
+                    customChar={selectedSwapKeyCustomChar}
+                    onCustomCharChange={onSwapKeyCustomCharChange}
+                    options={KEY_OPTIONS}
+                    selectAriaLabel={t({
+                      id: "editor.assignLoop.swap.keySelectAriaLabel",
+                      // Method-neutral: this picker is the base key of a
+                      // layer combo once a layer is added, not only a plain
+                      // (zero-layer) base swap — see the merged "Assign to a
+                      // key" card doc comment above.
+                      message: "Physical key for Assign to a key",
+                    })}
+                    customInputAriaLabel={t({
+                      id: "editor.assignLoop.swap.keyCustomAriaLabel",
+                      message: "Custom character for the assigned key",
+                    })}
+                  />
+                </div>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                >
+                  {raltTokens.length > 0 && (
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: TEXT_DIM,
+                        fontFamily: FONT,
+                      }}
+                    >
+                      {t({
+                        id: "editor.assignLoop.ralt.layersLabel",
+                        message: plural(raltTokens.length, {
+                          one: "Layer:",
+                          other: "Layers:",
+                        }),
+                      })}
+                    </span>
+                  )}
+                  {raltTokens.map((token, index) => {
+                    const options = optionsForRaltSlot(
+                      modifierPool,
+                      raltTokens,
+                      index,
+                    );
+                    const raltSlotOptions: SelectMenuOption[] = [
+                      {
+                        value: "",
+                        label: t({
+                          id: "editor.assignLoop.ralt.selectPlaceholder",
+                          message: "— Select —",
+                        }),
+                      },
+                      ...options.map((o) => ({
+                        value: o,
+                        label: modifierTokensInUse.has(o)
+                          ? `${o}${t({ id: "editor.assignLoop.ralt.inUseSuffix", message: " (in use)" })}`
+                          : o,
+                      })),
+                    ];
+                    return (
+                      <div
+                        key={index}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <SelectMenu
+                          value={token}
+                          onChange={(v) => onRaltTokenChange(index, v)}
+                          ariaLabel={t({
+                            id: "editor.assignLoop.ralt.layerSlotAriaLabel",
+                            message: `Layer ${index + 1} for layer-switch combo`,
+                          })}
+                          options={raltSlotOptions}
+                          renderOptionLabel={(opt) =>
+                            modifierTokensInUse.has(
+                              opt.value as ModifierToken,
+                            ) ? (
+                              <span style={{ fontWeight: 700 }}>
+                                {opt.label}
+                              </span>
+                            ) : (
+                              opt.label
+                            )
+                          }
+                          style={selectStyle}
+                        />
+                        <button
+                          type="button"
+                          aria-label={t({
+                            id: "editor.assignLoop.ralt.removeLayerAriaLabel",
+                            message: `Remove layer ${index + 1}`,
+                          })}
+                          onClick={() => onRemoveRaltSlot(index)}
+                          style={{
+                            background: "transparent",
+                            border: `1px solid ${BORDER}`,
+                            borderRadius: 4,
+                            color: TEXT_DIM,
+                            fontSize: 12,
+                            padding: "2px 8px",
+                            cursor: "pointer",
+                            fontFamily: FONT,
+                          }}
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {raltHasRoomToAdd && (
+                    <button
+                      type="button"
+                      aria-label={t({
+                        id: "editor.assignLoop.ralt.addLayerAriaLabel",
+                        message: "Add another layer",
+                      })}
+                      onClick={onAddRaltSlot}
+                      style={{
+                        alignSelf: "flex-start",
+                        background: "transparent",
+                        border: `1px solid ${BORDER}`,
+                        borderRadius: 4,
+                        color: TEXT_DIM,
+                        fontSize: 12,
+                        padding: "2px 10px",
+                        cursor: "pointer",
+                        fontFamily: FONT,
+                      }}
+                    >
+                      <Trans id="editor.assignLoop.ralt.addLayerButton">
+                        + Add layer
+                      </Trans>
+                    </button>
+                  )}
+                  <p
                     style={{
-                      fontFamily: "monospace",
-                      color: TEXT_MAIN,
-                      fontSize: 16,
+                      margin: 0,
+                      fontSize: 11,
+                      color: TEXT_DIM,
+                      fontFamily: FONT,
+                      lineHeight: 1.4,
                     }}
                   >
-                    {currentCharDisplay}
-                  </span>
-                </Trans>
-              </p>
-            )}
-          </div>
-        )}
+                    <Trans id="editor.assignLoop.ralt.addLayerHelp">
+                      Add a layer to place this character behind a modifier key
+                      — e.g. Shift for an uppercase/shifted output, or Right Alt
+                      (AltGr) for an extra character. With no layer, the
+                      character is assigned directly to the key.
+                    </Trans>
+                  </p>
+                </div>
+                {raltPreviewSpec !== null && (
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 12,
+                      color: TEXT_DIM,
+                      fontFamily: FONT,
+                    }}
+                  >
+                    {raltPreviewSpec} &rarr;{" "}
+                    <span
+                      style={{
+                        fontFamily: "monospace",
+                        color: TEXT_MAIN,
+                        fontSize: 16,
+                      }}
+                    >
+                      {displayChar(currentChar)}
+                    </span>
+                  </p>
+                )}
+                {raltIsDesktopOnly && (
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 11,
+                      color: TEXT_DIM,
+                      fontFamily: FONT,
+                    }}
+                  >
+                    <Trans id="editor.assignLoop.ralt.desktopOnlyNote">
+                      Desktop only — this layer will not appear on the touch
+                      layout.
+                    </Trans>
+                  </p>
+                )}
+                {raltCanonicalTokens.includes("RALT") && (
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 11,
+                      color: "#d29922",
+                      fontFamily: FONT,
+                    }}
+                  >
+                    <Trans id="editor.assignLoop.ralt.macosConflictNote">
+                      Note: RAlt may conflict with system shortcuts on macOS.
+                    </Trans>
+                  </p>
+                )}
+              </div>
+            );
+          })()}
       </div>
 
       {/* S-03 — always shown */}
@@ -1040,289 +1232,6 @@ function MethodChooser({
           </div>
         )}
       </div>
-
-      {/* S-08 — always shown */}
-      <div style={cardStyle(method === "ralt")}>
-        <button
-          type="button"
-          aria-pressed={method === "ralt"}
-          onClick={() => onMethodChange("ralt")}
-          style={headerBtnStyle}
-        >
-          <span
-            style={{
-              fontWeight: 600,
-              color: method === "ralt" ? ACCENT : TEXT_MAIN,
-            }}
-          >
-            <Trans id="editor.assignLoop.method.ralt.title">Layer + key</Trans>
-          </span>
-          {method !== "ralt" && (
-            <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              <Trans id="editor.assignLoop.method.ralt.summary">
-                Hold a modifier layer and press a base key to get{" "}
-                {currentCharDisplay}
-              </Trans>
-            </span>
-          )}
-        </button>
-        {method === "ralt" &&
-          (() => {
-            const filledRaltTokens = raltTokens.filter(
-              (tok): tok is ModifierToken => tok !== "",
-            );
-            const raltAllFilled =
-              raltTokens.length > 0 &&
-              filledRaltTokens.length === raltTokens.length;
-            const raltHasRoomToAdd =
-              raltTokens.length < MAX_RALT_SLOTS &&
-              raltAllFilled &&
-              (() => {
-                const excluded = new Set<ModifierToken>();
-                for (const tok of filledRaltTokens) {
-                  for (const e of MODIFIER_EXCLUSIONS[tok]) excluded.add(e);
-                }
-                return modifierPool.some((tok) => !excluded.has(tok));
-              })();
-            const raltIsDesktopOnly =
-              filledRaltTokens.includes("CAPS") ||
-              filledRaltTokens.includes("NCAPS");
-            // Canonicalize once so the macOS-conflict note below keys off the
-            // RESULT of chirality unification, not the raw pre-canonicalization
-            // tokens: CTRL+RALT and CTRL+LALT both demote to the same generic
-            // [CTRL ALT] (see modifierCombos.ts's canonicalizeCombo doc), so
-            // neither should raise a RAlt-specific note, while a combo where
-            // RALT survives (e.g. [RALT] alone, or [SHIFT RALT]) still should.
-            // canonicalizeCombo only throws for a mutually-exclusive combo,
-            // which the dropdown's own exclusion logic (MODIFIER_EXCLUSIONS)
-            // already prevents from being constructed here.
-            let raltCanonicalTokens: ModifierToken[] = [];
-            try {
-              raltCanonicalTokens = canonicalizeCombo(filledRaltTokens);
-            } catch {
-              raltCanonicalTokens = filledRaltTokens;
-            }
-            // The preview keys off the RESOLVED vkey (raltVkeyForDisplay,
-            // custom-char aware) rather than the raw selectedRaltKey — a custom
-            // base character must show its resolved physical key in the
-            // combo-spec preview, never the "__custom__" sentinel.
-            let raltPreviewSpec: string | null = null;
-            if (raltVkeyForDisplay !== null && filledRaltTokens.length > 0) {
-              try {
-                raltPreviewSpec = comboToKeySpec(
-                  raltCanonicalTokens,
-                  raltVkeyForDisplay,
-                );
-              } catch {
-                raltPreviewSpec = null;
-              }
-            }
-
-            return (
-              <div style={configStyle}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    fontSize: 12,
-                    color: TEXT_DIM,
-                    fontFamily: FONT,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <span>
-                    <Trans id="editor.assignLoop.ralt.baseKeyLabel">
-                      Base key:
-                    </Trans>
-                  </span>
-                  <KeyPickerField
-                    value={selectedRaltKey}
-                    onChange={onRaltKeyChange}
-                    customChar={selectedRaltKeyCustomChar}
-                    onCustomCharChange={onRaltKeyCustomCharChange}
-                    options={KEY_OPTIONS}
-                    selectAriaLabel={t({
-                      id: "editor.assignLoop.ralt.baseKeySelectAriaLabel",
-                      message: "Base key for layer-switch combo",
-                    })}
-                    customInputAriaLabel={t({
-                      id: "editor.assignLoop.ralt.baseKeyCustomAriaLabel",
-                      message:
-                        "Custom character for layer-switch combo base key",
-                    })}
-                  />
-                </div>
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
-                >
-                  <span
-                    style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
-                  >
-                    {t({
-                      id: "editor.assignLoop.ralt.layersLabel",
-                      message: plural(raltTokens.length, {
-                        one: "Layer:",
-                        other: "Layers:",
-                      }),
-                    })}
-                  </span>
-                  {raltTokens.map((token, index) => {
-                    const options = optionsForRaltSlot(
-                      modifierPool,
-                      raltTokens,
-                      index,
-                    );
-                    const raltSlotOptions: SelectMenuOption[] = [
-                      {
-                        value: "",
-                        label: t({
-                          id: "editor.assignLoop.ralt.selectPlaceholder",
-                          message: "— Select —",
-                        }),
-                      },
-                      ...options.map((o) => ({
-                        value: o,
-                        label: modifierTokensInUse.has(o)
-                          ? `${o}${t({ id: "editor.assignLoop.ralt.inUseSuffix", message: " (in use)" })}`
-                          : o,
-                      })),
-                    ];
-                    return (
-                      <div
-                        key={index}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                        }}
-                      >
-                        <SelectMenu
-                          value={token}
-                          onChange={(v) => onRaltTokenChange(index, v)}
-                          ariaLabel={t({
-                            id: "editor.assignLoop.ralt.layerSlotAriaLabel",
-                            message: `Layer ${index + 1} for layer-switch combo`,
-                          })}
-                          options={raltSlotOptions}
-                          renderOptionLabel={(opt) =>
-                            modifierTokensInUse.has(
-                              opt.value as ModifierToken,
-                            ) ? (
-                              <span style={{ fontWeight: 700 }}>
-                                {opt.label}
-                              </span>
-                            ) : (
-                              opt.label
-                            )
-                          }
-                          style={selectStyle}
-                        />
-                        {index > 0 && (
-                          <button
-                            type="button"
-                            aria-label={t({
-                              id: "editor.assignLoop.ralt.removeLayerAriaLabel",
-                              message: `Remove layer ${index + 1}`,
-                            })}
-                            onClick={() => onRemoveRaltSlot(index)}
-                            style={{
-                              background: "transparent",
-                              border: `1px solid ${BORDER}`,
-                              borderRadius: 4,
-                              color: TEXT_DIM,
-                              fontSize: 12,
-                              padding: "2px 8px",
-                              cursor: "pointer",
-                              fontFamily: FONT,
-                            }}
-                          >
-                            &times;
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {raltHasRoomToAdd && (
-                    <button
-                      type="button"
-                      aria-label={t({
-                        id: "editor.assignLoop.ralt.addLayerAriaLabel",
-                        message: "Add another layer",
-                      })}
-                      onClick={onAddRaltSlot}
-                      style={{
-                        alignSelf: "flex-start",
-                        background: "transparent",
-                        border: `1px solid ${BORDER}`,
-                        borderRadius: 4,
-                        color: TEXT_DIM,
-                        fontSize: 12,
-                        padding: "2px 10px",
-                        cursor: "pointer",
-                        fontFamily: FONT,
-                      }}
-                    >
-                      <Trans id="editor.assignLoop.ralt.addLayerButton">
-                        + Add layer
-                      </Trans>
-                    </button>
-                  )}
-                </div>
-                {raltPreviewSpec !== null && (
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 12,
-                      color: TEXT_DIM,
-                      fontFamily: FONT,
-                    }}
-                  >
-                    {raltPreviewSpec} &rarr;{" "}
-                    <span
-                      style={{
-                        fontFamily: "monospace",
-                        color: TEXT_MAIN,
-                        fontSize: 16,
-                      }}
-                    >
-                      {displayChar(currentChar)}
-                    </span>
-                  </p>
-                )}
-                {raltIsDesktopOnly && (
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 11,
-                      color: TEXT_DIM,
-                      fontFamily: FONT,
-                    }}
-                  >
-                    <Trans id="editor.assignLoop.ralt.desktopOnlyNote">
-                      Desktop only — this layer will not appear on the touch
-                      layout.
-                    </Trans>
-                  </p>
-                )}
-                {raltCanonicalTokens.includes("RALT") && (
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 11,
-                      color: "#d29922",
-                      fontFamily: FONT,
-                    }}
-                  >
-                    <Trans id="editor.assignLoop.ralt.macosConflictNote">
-                      Note: RAlt may conflict with system shortcuts on macOS.
-                    </Trans>
-                  </p>
-                )}
-              </div>
-            );
-          })()}
-      </div>
     </div>
   );
 }
@@ -1381,12 +1290,31 @@ export function MechanismGallery({
   const unflagCharForSequence = useWorkingCopyStore(
     (s) => s.unflagCharForSequence,
   );
-  const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  const rawInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const axes = useWorkingCopyStore(
     useShallow((s) => s.session.axes as Partial<DiscoveryAxisVector>),
   );
   const setAxisFills = useWorkingCopyStore((s) => s.setAxisFills);
+
+  // -- "Existing methods" (base keyboard producers for currentChar) --------
+  // baseIr is the source of truth projectWorkingCopyVfs itself projects
+  // from (never mutated by carve/output projection) — the same source
+  // useInventoryDiff() reads for the lettersToAdd/alreadyProduced diff below.
+  // removalCapabilities/deletedItemIds/isItemDeleted/cascadeDelete are the
+  // EXISTING carve overlay (workingCopyStore.ts) — no new store state is
+  // introduced here; a deletion recorded from this gallery is undone by the
+  // same Undo the carve gallery uses, and is projected at output by the
+  // existing carve-deletion projection step.
+  const baseIr = useWorkingCopyStore((s) => s.baseIr);
+  const removalCapabilities = useWorkingCopyStore((s) => s.removalCapabilities);
+  // deletedItemIds is selected (even though only isItemDeleted is called
+  // below) purely so this component re-renders when the overlay changes —
+  // isItemDeleted itself is a stable store-action reference and calling it
+  // does not, on its own, subscribe this component to deletedItemIds.
+  const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const isItemDeleted = useWorkingCopyStore((s) => s.isItemDeleted);
+  const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
 
   // One-time intro splash — read the seen flag on mount; mark it on "Get started".
   const mechIntroSeen = useWorkingCopyStore(
@@ -1396,24 +1324,80 @@ export function MechanismGallery({
     (s) => s.markGalleryIntroSeen,
   );
 
-  const { lettersToAdd: inventoryLettersToAdd } = useInventoryDiff();
+  const { lettersToAdd: inventoryLettersToAdd, alreadyProduced } =
+    useInventoryDiff();
+
+  // Display-only set for CharScrollStrip's badge (criterion 18.6 SHOW-ALL):
+  // characters the base keyboard already produces render the green
+  // produces->=1 badge via CharScrollStrip's `inheritedChars` (same contract
+  // TouchGallery's `detectedChars` already uses) even though they carry no
+  // MechanismAssignment of their own. lettersToAdd itself (the coverage/gate
+  // denominator, criterion 18.6) is NEVER widened — see the locked constraint
+  // on lettersToAdd above.
+  const alreadyProducedSet = useMemo(
+    () => new Set(alreadyProduced),
+    [alreadyProduced],
+  );
+
+  // Collated display order (spec 047 FR-007's default-ICU comparator, reused
+  // — not reinvented; see survey/collation.ts): puts a lowercase letter
+  // immediately before its uppercase counterpart (`"a".localeCompare("A")"`
+  // === -1 under the root collation) and keeps accented forms adjacent to
+  // their base. `inventory` feeds the SHOW-ALL CharScrollStrip below plus
+  // the empty-inventory guard and handleSelectDisplayChar's membership
+  // check — both order-independent, so reordering here is safe. The
+  // canonical `confirmedInventory` (rawInventory) is left untouched; only
+  // this display-local derivation is sorted.
+  const inventory = useMemo(
+    () => collate(rawInventory),
+    [rawInventory],
+  );
+
+  // The BASE (pre-augmentWithComposable) produced set — same derivation
+  // useInventoryDiff() itself starts from before augmenting, NOT
+  // alreadyProducedSet above (which is already augmented — the composable
+  // membership test the badge uses). Feeds collectCompositionMethod below:
+  // composition must stay strictly ONE level, so it needs the un-augmented
+  // set to decide "is this composable from what's DIRECTLY produced", never
+  // "from what's already-composable". `excludeBackspaceCorrections: true` —
+  // SAME option useInventoryDiff() passes — so a char reachable ONLY via a
+  // backspace-correction store rule (e.g. the SIL Cameroon Â shape) is not
+  // wrongly treated as directly produced here either; without this, the
+  // early-out in collectCompositionMethod (`baseProduced.has(targetChar)`)
+  // would suppress the real "A + ◌̂ → Â" composition row.
+  const baseProducedSet = useMemo(
+    () =>
+      baseIr !== null
+        ? buildProducedSet(baseIr, { excludeBackspaceCorrections: true })
+        : new Set<string>(),
+    [baseIr],
+  );
 
   // Spec 046 worklist filter (FR-020): a composed unit whose marks are ALL
   // productive mark keys is reachable via base key + mark key — it needs no
   // whole-unit placement of its own, so it leaves the walk. Everything else
   // (plain bases, own-letter units, the productive marks themselves) keeps its
   // flat-inventory walk entry. No worklist (or an empty one) ⇒ identity.
+  //
+  // The worklist-filtered result is then collated (same `collate` helper as
+  // `inventory` above) before being returned — this is the list
+  // usePositionalCharNav's `list` walks and the "first uncovered" default
+  // below reads, so sorting it puts a lowercase letter immediately before
+  // its uppercase counterpart in the Back/Next walk too. The SET of
+  // characters (the coverage/gate denominator, criterion 18.6) is never
+  // widened or narrowed by this — only its order changes.
   const lettersToAdd = useMemo(() => {
-    if (worklist === undefined || worklist.markUnits.length === 0) {
-      return inventoryLettersToAdd;
+    let filtered = inventoryLettersToAdd;
+    if (worklist !== undefined && worklist.markUnits.length > 0) {
+      const productiveMarks = new Set(worklist.markUnits.map((u) => u.mark));
+      filtered = inventoryLettersToAdd.filter((c) => {
+        const units = [...c.normalize("NFD")];
+        if (units.length < 2) return true;
+        const marks = units.slice(1);
+        return !marks.every((m) => productiveMarks.has(m));
+      });
     }
-    const productiveMarks = new Set(worklist.markUnits.map((u) => u.mark));
-    return inventoryLettersToAdd.filter((c) => {
-      const units = [...c.normalize("NFD")];
-      if (units.length < 2) return true;
-      const marks = units.slice(1);
-      return !marks.every((m) => productiveMarks.has(m));
-    });
+    return collate(filtered);
   }, [inventoryLettersToAdd, worklist]);
 
   // Read Phase C assignments directly (not the merged session.assignments view)
@@ -1560,7 +1544,9 @@ export function MechanismGallery({
     svc
       .filterFor(selectedBaseKeyboard, fullAxes)
       .then((ranked) => {
-        // Load ranked patterns PLUS all four methods the add-a-key UI offers.
+        // Load ranked patterns PLUS every pattern the add-a-key UI's three
+        // methods can write (the combined "swap" card writes EITHER
+        // PATTERN_SWAP or PATTERN_RALT, depending on the filled layer count).
         // Axis-based ranking may exclude off-strategy patterns, so load them
         // explicitly so the preview transform can always resolve an applied
         // assignment.
@@ -1635,13 +1621,10 @@ export function MechanismGallery({
   const [selectedSwapKey, setSelectedSwapKey] = useState("");
   const [selectedSwapKeyCustomChar, setSelectedSwapKeyCustomChar] =
     useState("");
-  const [selectedRaltKey, setSelectedRaltKey] = useState("");
-  const [selectedRaltKeyCustomChar, setSelectedRaltKeyCustomChar] =
-    useState("");
-  const [swapLayer, setSwapLayer] = useState<SwapLayer>("base");
-  const [raltTokens, setRaltTokens] = useState<(ModifierToken | "")[]>([
-    "RALT",
-  ]);
+  // Combined "Assign to a key" card — starts with zero layers (a plain
+  // base-key S-01 assignment); resetMethodState below resets it back to []
+  // per character too.
+  const [raltTokens, setRaltTokens] = useState<(ModifierToken | "")[]>([]);
 
   // Propose-then-confirm case-pair companion (spec v1.3.1 §3c — never apply
   // silently). Set right after a base-layer S-01 apply when the applied
@@ -1764,7 +1747,6 @@ export function MechanismGallery({
     hasAnotherCharAfterCurrent,
     handleNext,
     handleBack,
-    handleSelectChar,
     suggestionResolved,
     markSuggestionResolved,
   } = usePositionalCharNav({
@@ -1773,6 +1755,35 @@ export function MechanismGallery({
     setCurrentChar,
     onComplete: handleForwardComplete,
     onBack,
+  });
+
+  // Select-by-value for the CharScrollStrip's SHOW-ALL display list
+  // (criterion 18.6): `handleSelectChar` above is gated on `lettersToAdd`
+  // (usePositionalCharNav's own `list`), so clicking an already-produced
+  // chip through it would be a no-op — deliberately, since Back/Next/Skip
+  // must never step onto a char outside lettersToAdd's walk order. This
+  // sibling handler is the one CharScrollStrip actually calls: it jumps to
+  // ANY character in the full `inventory` (in or out of lettersToAdd) purely
+  // for inspection, without touching the positional walk state. A no-op
+  // when `char` isn't in `inventory` at all (defense-in-depth — every chip
+  // CharScrollStrip renders is itself drawn from `inventory`).
+  const handleSelectDisplayChar = useCallback(
+    (char: string) => {
+      if (!inventory.includes(char)) return;
+      setCurrentChar(char);
+    },
+    [inventory, setCurrentChar],
+  );
+
+  // ArrowLeft/ArrowRight character cycling, attached at the PANE level (the
+  // leftContent wrapping div below) rather than on CharScrollStrip itself —
+  // see useCharCycleKeys.ts for why. Reuses `handleSelectDisplayChar` (the
+  // SAME handler CharScrollStrip's chip onClick calls) so there is exactly
+  // one selection call site, not two.
+  const handlePaneKeyDown = useCharCycleKeys({
+    chars: inventory,
+    currentChar,
+    onSelectChar: handleSelectDisplayChar,
   });
 
   // Whether the suggestion row must stay hidden for the current character —
@@ -1795,11 +1806,8 @@ export function MechanismGallery({
     setDeadkeyBaseLetter("");
     setSelectedSwapKey("");
     setSelectedSwapKeyCustomChar("");
-    setSelectedRaltKey("");
-    setSelectedRaltKeyCustomChar("");
-    setSwapLayer("base");
-    setRaltTokens([raltDefaultToken]);
-  }, [raltDefaultToken]);
+    setRaltTokens([]);
+  }, []);
 
   // Reset method inputs (not suggestionResolved — that persists per char)
   // whenever currentChar changes.
@@ -1901,20 +1909,16 @@ export function MechanismGallery({
       return false;
     }
     if (method === "swap") {
+      // Combined "Assign to a key" card: the physical key must resolve
+      // (custom-char aware — a customChar sentinel only counts once it
+      // resolves to a real physical key) AND every PRESENT layer slot must
+      // be filled. Zero layers is vacuously "all filled" — a valid,
+      // applyable plain base-key assignment — but a layer slot the author
+      // added and left blank blocks Apply until it's filled or removed.
       return (
         resolvedVkeyOf(
           resolveKeyPickerSelection(selectedSwapKey, selectedSwapKeyCustomChar),
-        ) !== null
-      );
-    }
-    if (method === "ralt") {
-      // Resolved vkey (custom-char aware — a customChar sentinel only counts
-      // once it resolves to a real physical key) AND at least one layer
-      // chosen — empty-combo Apply is disabled.
-      return (
-        resolvedVkeyOf(
-          resolveKeyPickerSelection(selectedRaltKey, selectedRaltKeyCustomChar),
-        ) !== null && raltTokens.some((tok) => tok !== "")
+        ) !== null && raltAllFilled(raltTokens)
       );
     }
     // deadkey: trigger key must resolve to a physical key (real selection or
@@ -1938,8 +1942,6 @@ export function MechanismGallery({
     triggerKeyCustomChar,
     selectedSwapKey,
     selectedSwapKeyCustomChar,
-    selectedRaltKey,
-    selectedRaltKeyCustomChar,
     raltTokens,
     deadkeyBaseLetterResolveOptions,
   ]);
@@ -1970,15 +1972,20 @@ export function MechanismGallery({
   );
 
   const handleAddRaltSlot = useCallback(() => {
-    setRaltTokens((prev) =>
-      prev.length >= MAX_RALT_SLOTS ? prev : [...prev, ""],
-    );
-  }, []);
+    setRaltTokens((prev) => {
+      if (prev.length >= MAX_RALT_SLOTS) return prev;
+      // The FIRST layer added defaults to raltDefaultToken (mirrors the
+      // pre-merge "Layer + key" card, which always started with one
+      // pre-filled slot) — every slot added after that starts unselected
+      // ("") until the author picks one (canApply blocks Apply meanwhile).
+      return [...prev, prev.length === 0 ? raltDefaultToken : ""];
+    });
+  }, [raltDefaultToken]);
 
   const handleRemoveRaltSlot = useCallback((index: number) => {
-    setRaltTokens((prev) =>
-      prev.length <= 1 ? prev : prev.filter((_, i) => i !== index),
-    );
+    // No minimum — the combined card's zero-layer state is valid (a plain
+    // base-key assignment), so removing the last remaining layer is allowed.
+    setRaltTokens((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
   const handleApply = useCallback(() => {
@@ -2071,147 +2078,182 @@ export function MechanismGallery({
               ),
           ),
       });
-    } else if (method === "swap") {
+    } else {
+      // method === "swap" — combined "Assign to a key" card. Zero filled
+      // layers (raltTokens has none) plans a plain S-01 simple_swap base-key
+      // assignment; one or more filled layers plans an S-08
+      // modifier_as_layer_switch combo instead. Both write paths below are
+      // unchanged from the pre-merge "Assign to a key"/"Layer + key" cards —
+      // only the branching condition (chosenTokens.length) is new.
       const resolvedSwapVkey = resolvedVkeyOf(
         resolveKeyPickerSelection(selectedSwapKey, selectedSwapKeyCustomChar),
       );
       if (resolvedSwapVkey === null) return;
-      // S-01: simple_swap — kmnFragment uses {{kmnRules}}.
-      // Guard against a stale "shift" selection surviving a mid-flow mnemonic
-      // transition (e.g. base keyboard swap) — never emit a SHIFT-flagged rule
-      // when shift targeting isn't allowed.
-      const effectiveLayer: SwapLayer =
-        swapLayer === "shift" && shiftLayerAllowed ? "shift" : "base";
-      // capsHandling is a property of the KEY, not of which layer the author
-      // is targeting — a key that already carries explicit CAPS/NCAPS rules
-      // needs a CAPS-aware pair on EITHER layer (Layer-A Check #10), so
-      // compute it once and reuse for both the base and shift branches below.
-      const capsHandling =
-        workingIr !== null
-          ? planShiftAssignment(workingIr, "main", resolvedSwapVkey)
-              .capsHandling
-          : false;
-      let kmnRules: string;
-      if (effectiveLayer === "shift") {
-        kmnRules = buildShiftRuleLines(resolvedSwapVkey, currentChar, {
-          capsHandling,
-        }).join("\n");
-      } else {
-        // Base layer: bare `+ [K_X] > U+XXXX` when the key has no CAPS
-        // handling; the CAPS-aware NCAPS+CAPS pair otherwise — a bare rule on
-        // a CAPS-handling key would shadow that key's pre-existing CAPS/NCAPS
-        // pair, since applyAssignments splices new lines before existing
-        // ones (first-match-wins).
-        kmnRules = buildBaseRuleLines(resolvedSwapVkey, currentChar, {
-          capsHandling,
-        }).join("\n");
-      }
-      assignment = {
-        scope: "individual",
-        target: currentChar,
-        modality: "physical",
-        mechanisms: [
-          {
-            patternId: PATTERN_SWAP,
-            strategyId: "S-01",
-            slotValues: {
-              kmnRules,
-            },
-          },
-        ],
-        source: "user",
-      };
-
-      // Case-pair companion proposal (spec v1.3.1 §3c — propose-then-confirm,
-      // never apply silently). Only for a BASE-layer apply: the user chose
-      // base for currentChar, so the counterpart's natural home is the shift
-      // layer of the SAME key. Suppressed for mnemonic keyboards (shift
-      // targeting is unavailable) and for the toLower direction — assigning
-      // an uppercase char to base proposes nothing; only the base->uppercase
-      // (toUpper) direction is offered a companion. Scope cut, not a defect:
-      // the reverse direction is left for a future pass.
-      // The mnemonic gate and the base-layer gate are enforced HERE, at propose
-      // time — the shared hook owns only the casing decision (it reads the
-      // identity bcp47 itself, so no locale is plumbed through).
-      if (effectiveLayer === "base" && shiftLayerAllowed && workingIr !== null) {
-        proposeCompanion({
-          mechanism: "physical",
-          originalChar: currentChar,
-          vkey: resolvedSwapVkey,
-          capsHandling,
-          // Object identity, not target/index: the gallery allows several
-          // mechanisms per character, so confirm must locate exactly the
-          // assignment this proposal was raised for (FR-008).
-          baseAssignment: assignment,
-          // "Counterpart already placed" (spec §Edge Cases). `simple_swap`
-          // records its rule text as already-emitted .kmn lines in
-          // `slotValues.kmnRules` (buildBaseRuleLines / buildShiftRuleLines /
-          // buildCasePairRuleLines all interpolate the vkey literally), so we
-          // don't have exactly one line shape to string-match against — a
-          // combined CAPS quad, a bare shift line, and a CAPS/NCAPS shift pair
-          // all look different. Matching `target === counterpart` (this IS an
-          // assignment for the capital) together with the vkey appearing
-          // (word-boundary) anywhere in that assignment's `kmnRules` is
-          // reliable regardless of which of the three emitters produced it,
-          // without re-deriving or comparing exact rule text.
-          alreadyProduced: (counterpart) =>
-            sessionAssignments.some(
-              (a) =>
-                a.target === counterpart &&
-                a.mechanisms.some((m) => {
-                  const rules = m.slotValues?.["kmnRules"];
-                  return (
-                    typeof rules === "string" &&
-                    new RegExp(`\\b${resolvedSwapVkey}\\b`).test(rules)
-                  );
-                }),
-            ),
-        });
-      }
-    } else {
-      // method === "ralt"
-      const resolvedRaltVkey = resolvedVkeyOf(
-        resolveKeyPickerSelection(selectedRaltKey, selectedRaltKeyCustomChar),
-      );
-      if (resolvedRaltVkey === null) return;
-      // S-08: modifier_as_layer_switch — kmnFragment uses {{altgrKeyList}} and {{altgrOutputList}}.
-      // Build a single-entry held-layer rule for this character, keyed on
-      // whichever combo of ModifierTokens the author picked (generalized S-08).
       const chosenTokens = raltTokens.filter(
         (tok): tok is ModifierToken => tok !== "",
       );
-      let altgrKeyList: string;
-      try {
-        // Use the RESOLVED vkey (custom-char aware), never the raw
-        // selectedRaltKey — the latter may be the "__custom__" sentinel
-        // when the author typed a custom base character.
-        altgrKeyList = comboToKeySpec(
-          canonicalizeCombo(chosenTokens),
-          resolvedRaltVkey,
-        );
-      } catch {
-        // canonicalizeCombo only throws for a mutually-exclusive combo, which
-        // the dropdown's own exclusion logic (handleRaltTokenChange) already
-        // prevents from being selected — structurally unreachable today.
-        // Guarded anyway: skip recording rather than crashing the gallery.
-        return;
-      }
-      assignment = {
-        scope: "individual",
-        target: currentChar,
-        modality: "physical",
-        mechanisms: [
-          {
-            patternId: PATTERN_RALT,
-            strategyId: "S-08",
-            slotValues: {
-              altgrKeyList,
-              altgrOutputList: currentChar,
+
+      if (chosenTokens.length === 0) {
+        // ---- S-01: simple_swap — kmnFragment uses {{kmnRules}}. ----
+        // capsHandling is a property of the KEY — a key that already carries
+        // explicit CAPS/NCAPS rules needs a CAPS-aware pair (Layer-A Check
+        // #10).
+        const capsHandling =
+          workingIr !== null
+            ? planShiftAssignment(workingIr, "main", resolvedSwapVkey)
+                .capsHandling
+            : false;
+        // Base layer only now that the Base/Shift toggle is gone: bare
+        // `+ [K_X] > U+XXXX` when the key has no CAPS handling; the
+        // CAPS-aware NCAPS+CAPS pair otherwise — a bare rule on a
+        // CAPS-handling key would shadow that key's pre-existing CAPS/NCAPS
+        // pair, since applyAssignments splices new lines before existing
+        // ones (first-match-wins).
+        const kmnRules = buildBaseRuleLines(resolvedSwapVkey, currentChar, {
+          capsHandling,
+        }).join("\n");
+        assignment = {
+          scope: "individual",
+          target: currentChar,
+          modality: "physical",
+          mechanisms: [
+            {
+              patternId: PATTERN_SWAP,
+              strategyId: "S-01",
+              slotValues: {
+                kmnRules,
+              },
             },
-          },
-        ],
-        source: "user",
-      };
+          ],
+          source: "user",
+        };
+
+        // Case-pair companion proposal (spec v1.3.1 §3c — propose-then-confirm,
+        // never apply silently). The counterpart's natural home is the shift
+        // layer of the SAME key. Suppressed for mnemonic keyboards (shift
+        // targeting is unavailable) and for the toLower direction — assigning
+        // an uppercase char to base proposes nothing; only the base->uppercase
+        // (toUpper) direction is offered a companion. Scope cut, not a defect:
+        // the reverse direction is left for a future pass.
+        if (shiftLayerAllowed && workingIr !== null) {
+          proposeCompanion({
+            mechanism: "physical",
+            originalChar: currentChar,
+            vkey: resolvedSwapVkey,
+            capsHandling,
+            // Object identity, not target/index: the gallery allows several
+            // mechanisms per character, so confirm must locate exactly the
+            // assignment this proposal was raised for (FR-008).
+            baseAssignment: assignment,
+            // "Counterpart already placed" (spec §Edge Cases). `simple_swap`
+            // records its rule text as already-emitted .kmn lines in
+            // `slotValues.kmnRules` (buildBaseRuleLines / buildShiftRuleLines /
+            // buildCasePairRuleLines all interpolate the vkey literally), so we
+            // don't have exactly one line shape to string-match against — a
+            // combined CAPS quad, a bare shift line, and a CAPS/NCAPS shift pair
+            // all look different. Matching `target === counterpart` (this IS an
+            // assignment for the capital) together with the vkey appearing
+            // (word-boundary) anywhere in that assignment's `kmnRules` is
+            // reliable regardless of which of the three emitters produced it,
+            // without re-deriving or comparing exact rule text.
+            alreadyProduced: (counterpart) =>
+              sessionAssignments.some(
+                (a) =>
+                  a.target === counterpart &&
+                  a.mechanisms.some((m) => {
+                    const rules = m.slotValues?.["kmnRules"];
+                    return (
+                      typeof rules === "string" &&
+                      new RegExp(`\\b${resolvedSwapVkey}\\b`).test(rules)
+                    );
+                  }),
+              ),
+          });
+        }
+      } else if (chosenTokens.length === 1 && chosenTokens[0] === "SHIFT") {
+        // ---- Shift-plane assignment (S-01 via the shift layer) — spec §10
+        // Check #10 / shiftRules.ts. ----
+        // A combo whose ONLY modifier is SHIFT targets the SAME shift plane
+        // the pre-merge Base/Shift radio's "Shift" option wrote, via the
+        // SAME CAPS-aware builder (planShiftAssignment + buildShiftRuleLines)
+        // — not the store-based S-08 write path below, which never consults
+        // keyHasCapsHandling and would silently skip the NCAPS/CAPS pair a
+        // CAPS-handling key requires. Multi-modifier combos that also
+        // include SHIFT (e.g. [SHIFT ALT K_X]) are NOT rerouted here: they
+        // fall through to the S-08 branch below unchanged, which has never
+        // been CAPS-aware (shiftRules.ts is scoped to bare base/shift
+        // assignments only) — that is pre-existing S-08 behavior, not a
+        // regression introduced by the merged card.
+        //
+        // Not gated on shiftLayerAllowed/mnemonic: unlike the old radio, the
+        // layer-combo SHIFT option is intentionally selectable regardless of
+        // &MNEMONICLAYOUT (see the "is not gated by mnemonic layout" test) —
+        // capsHandling is the only per-key concern this plane needs.
+        const capsHandling =
+          workingIr !== null
+            ? planShiftAssignment(workingIr, "main", resolvedSwapVkey)
+                .capsHandling
+            : false;
+        const kmnRules = buildShiftRuleLines(resolvedSwapVkey, currentChar, {
+          capsHandling,
+        }).join("\n");
+        assignment = {
+          scope: "individual",
+          target: currentChar,
+          modality: "physical",
+          mechanisms: [
+            {
+              patternId: PATTERN_SWAP,
+              strategyId: "S-01",
+              slotValues: {
+                kmnRules,
+              },
+            },
+          ],
+          source: "user",
+        };
+        // No case-pair companion proposal here — mirrors the old Shift radio,
+        // which only proposed a companion from the BASE-layer apply (see the
+        // chosenTokens.length === 0 branch above); the counterpart of a
+        // shift-plane assignment isn't a further shift-plane target.
+      } else {
+        // ---- S-08: modifier_as_layer_switch — kmnFragment uses
+        // {{altgrKeyList}} and {{altgrOutputList}}. ----
+        // Build a single-entry held-layer rule for this character, keyed on
+        // whichever combo of ModifierTokens the author picked (generalized S-08).
+        let altgrKeyList: string;
+        try {
+          // Use the RESOLVED vkey (custom-char aware), never the raw
+          // selectedSwapKey — the latter may be the "__custom__" sentinel
+          // when the author typed a custom base character.
+          altgrKeyList = comboToKeySpec(
+            canonicalizeCombo(chosenTokens),
+            resolvedSwapVkey,
+          );
+        } catch {
+          // canonicalizeCombo only throws for a mutually-exclusive combo, which
+          // the dropdown's own exclusion logic (handleRaltTokenChange) already
+          // prevents from being selected — structurally unreachable today.
+          // Guarded anyway: skip recording rather than crashing the gallery.
+          return;
+        }
+        assignment = {
+          scope: "individual",
+          target: currentChar,
+          modality: "physical",
+          mechanisms: [
+            {
+              patternId: PATTERN_RALT,
+              strategyId: "S-08",
+              slotValues: {
+                altgrKeyList,
+                altgrOutputList: currentChar,
+              },
+            },
+          ],
+          source: "user",
+        };
+      }
     }
 
     recordAssignments([...sessionAssignments, assignment]);
@@ -2225,9 +2267,6 @@ export function MechanismGallery({
     deadkeyBaseLetter,
     selectedSwapKey,
     selectedSwapKeyCustomChar,
-    selectedRaltKey,
-    selectedRaltKeyCustomChar,
-    swapLayer,
     raltTokens,
     shiftLayerAllowed,
     workingIr,
@@ -2570,6 +2609,262 @@ export function MechanismGallery({
     ],
   );
 
+  // -- "Existing methods" — base keyboard's own producers for currentChar --
+  //
+  // Runs collectCharContributors against baseIr (never the carve working
+  // IR — baseIr is the same source-of-truth projectWorkingCopyVfs itself
+  // projects from) to find every place in the BASE keyboard that already
+  // produces currentChar, then flattens it to one row per method:
+  //   - a ruleNodeId is a whole-rule delete candidate — deletable unless
+  //     removalCapabilities marks it not-removable (context-sensitive /
+  //     opaque / unknown), in which case it's shown muted with a reason.
+  //     CURATION: when the char also has a PRODUCED store-slot row (see
+  //     below), the keystroke row(s) for the SAME char are omitted — the
+  //     store-slot row is the real, always-current method and a duplicate
+  //     "Press X" row alongside it is noise. Only when a keystroke is the
+  //     char's SOLE producer (no produced store-slot exists) is it kept —
+  //     the completeness floor is a last resort, never routinely skipped.
+  //   - a storeSlot is an output/input-store slot drop — deletable exactly
+  //     when its descriptor's `producedRole` is "produced" (a genuine
+  //     producer of the char). A `producedRole: "used"` slot (the char is
+  //     consumed as INPUT there — a deadkey base, or a non-deadkey rule's
+  //     own input-store occurrence — not produced) renders the same blue,
+  //     non-deletable chip as composition/unattributed/blocked: removing it
+  //     wouldn't remove a method that produces this char at all.
+  //   - a `blocked` entry (opaque fragment, or a multi-char literal output
+  //     that can't be split) is always muted, never silently dropped.
+  // A method already removed THIS session (its id already in
+  // deletedItemIds, via the existing carve overlay) is filtered out
+  // entirely — collectCharContributors always reads baseIr, which never
+  // reflects the overlay itself.
+  interface ExistingMethodRow {
+    id: string;
+    label: string;
+    deletable: boolean;
+    /**
+     * True exactly when this row's descriptor is `producedRole: "used"` — the
+     * char is only CONSUMED here (a deadkey base, or a non-deadkey rule's
+     * own any()-consumed input-store occurrence), never produced by it. Only
+     * a "slot" row can ever be `true`; every other kind (rule/blocked/
+     * composition/unattributed) always PRODUCES the char and is `false`.
+     * Drives the color split (blue vs. green) independently of `deletable`
+     * (the delete-affordance signal) — see `NonDeletableMethodChip`'s doc
+     * comment in parts/RemovableChipRow.tsx.
+     */
+    isUsed: boolean;
+    kind: "rule" | "slot" | "blocked" | "composition" | "unattributed";
+    reason?: string;
+  }
+
+  const existingMethodContributors = useMemo<CharContributors | null>(
+    () =>
+      baseIr !== null && currentChar !== null
+        ? collectCharContributors(baseIr, currentChar)
+        : null,
+    [baseIr, currentChar],
+  );
+
+  const existingMethods = useMemo<ExistingMethodRow[]>(() => {
+    if (existingMethodContributors === null || baseIr === null) return [];
+
+    // `descriptors` is INDEX-PARALLEL to ruleNodeIds, then storeSlots, then
+    // blocked, concatenated in that order (see collectCharContributors.ts's
+    // doc comment on `descriptors`) — slice it back into three per-array
+    // views rather than re-deriving a lookup, so each loop below can zip its
+    // own array against the matching descriptor by position.
+    const { descriptors } = existingMethodContributors;
+    const ruleDescriptors = descriptors.slice(
+      0,
+      existingMethodContributors.ruleNodeIds.length,
+    );
+    const storeSlotDescriptors = descriptors.slice(
+      existingMethodContributors.ruleNodeIds.length,
+      existingMethodContributors.ruleNodeIds.length +
+        existingMethodContributors.storeSlots.length,
+    );
+    const blockedDescriptors = descriptors.slice(
+      existingMethodContributors.ruleNodeIds.length +
+        existingMethodContributors.storeSlots.length,
+    );
+
+    const rows: ExistingMethodRow[] = [];
+
+    // Build the store-slot rows FIRST (before the keystroke/rule rows below)
+    // so the keystroke-drop curation can see whether a PRODUCED store-slot
+    // row already exists for this char — pushed into `rows` afterward to
+    // preserve the original rule-then-slot render order.
+    const storeSlotRows: ExistingMethodRow[] = [];
+    let hasProducedStoreSlot = false;
+    existingMethodContributors.storeSlots.forEach((slot, i) => {
+      if (isItemDeleted(slot.slotId)) return;
+      const descriptor = storeSlotDescriptors[i];
+      if (descriptor === undefined) return;
+      // producedRole "used" (a deadkey base, or a non-deadkey rule's own
+      // any()-consumed input-store occurrence — §0 in collectCharContributors)
+      // is not a producer of this char at all; render it exactly like
+      // composition/unattributed/blocked — blue, informational, never
+      // deletable. Absent producedRole (composition/unattributed shapes
+      // never reach this loop) never occurs here — every storeSlots
+      // descriptor is engine-constructed and always carries the field.
+      const isUsed = descriptor.producedRole === "used";
+      // Intentionally `kind === "store-slot"` only — a produced "deadkey" row
+      // (mark+base combination) does NOT count toward `hasProducedStoreSlot`
+      // and so never suppresses the plain-key keystroke row below. A dead-key
+      // combination is a DISTINCT input method, not a redundant restatement
+      // of the plain keystroke the way an alphabet/store fan-out slot is, so
+      // it must not drop the keystroke chip.
+      if (descriptor.kind === "store-slot" && !isUsed) {
+        hasProducedStoreSlot = true;
+      }
+      const baseLabel = composeContributorLabel(descriptor, i18n);
+      storeSlotRows.push({
+        id: slot.slotId,
+        label: isUsed ? appendNotDeletableSuffix(baseLabel, i18n) : baseLabel,
+        deletable: !isUsed,
+        isUsed,
+        kind: "slot",
+      });
+    });
+
+    existingMethodContributors.ruleNodeIds.forEach((nodeId, i) => {
+      if (isItemDeleted(nodeId)) return;
+      const descriptor = ruleDescriptors[i];
+      // Defensive only — the engine's index-parallel invariant guarantees
+      // this is always present; skip rather than mis-attach a label if it
+      // ever isn't.
+      if (descriptor === undefined) return;
+      // Keystroke-drop curation: a produced store-slot row already covers
+      // this char with a real, always-current method — a redundant
+      // "Press X" keystroke row is dropped. Only when NO produced store-slot
+      // exists (the keystroke is the char's sole producer) is this row kept.
+      if (hasProducedStoreSlot) return;
+      const capability: RemovalCapability | undefined =
+        removalCapabilities.get(nodeId);
+      const notRemovable = (capability ?? "").startsWith("not-removable:");
+      const ruleBaseLabel = composeContributorLabel(descriptor, i18n);
+      rows.push({
+        id: nodeId,
+        label: notRemovable
+          ? appendNotDeletableSuffix(ruleBaseLabel, i18n)
+          : ruleBaseLabel,
+        deletable: !notRemovable,
+        isUsed: false,
+        kind: "rule",
+        ...(notRemovable
+          ? {
+              reason: capabilityHint(
+                capability ?? "not-removable:unknown",
+                i18n,
+              ),
+            }
+          : {}),
+      });
+    });
+
+    rows.push(...storeSlotRows);
+
+    existingMethodContributors.blocked.forEach((b, i) => {
+      const descriptor = blockedDescriptors[i];
+      const blockedBaseLabel =
+        descriptor !== undefined
+          ? composeContributorLabel(descriptor, i18n)
+          : b.label;
+      rows.push({
+        id: `blocked:${i}:${b.label}`,
+        label: appendNotDeletableSuffix(blockedBaseLabel, i18n),
+        deletable: false,
+        isUsed: false,
+        kind: "blocked",
+        reason: b.reason,
+      });
+    });
+
+    // SHOW-ALL composition row (spec follow-up): currentChar isn't directly
+    // produced by the base (no real method row above covers it), but IS
+    // composable from characters the base DOES directly produce — synthesize
+    // one blue, non-deletable informational row via the SAME
+    // composeContributorLabel composer every other kind goes through.
+    // baseProducedSet is the PRE-augmentation set (see its own doc comment) —
+    // composition stays strictly one level, never chained off an
+    // already-composable char.
+    if (currentChar !== null) {
+      const compositionDescriptor = collectCompositionMethod(
+        baseProducedSet,
+        currentChar,
+      );
+      if (compositionDescriptor !== undefined) {
+        rows.push({
+          id: `composition:${currentChar}`,
+          label: appendNotDeletableSuffix(
+            composeContributorLabel(compositionDescriptor, i18n),
+            i18n,
+          ),
+          deletable: false,
+          isUsed: false,
+          kind: "composition",
+          reason: compositionTooltip(compositionDescriptor, i18n),
+        });
+      }
+    }
+
+    // SHOW-ALL floor (criterion 18.6-adjacent invariant): currentChar is
+    // GREEN (a member of the augmented alreadyProducedSet the CharScrollStrip
+    // badge uses) but, after everything above, still has zero rows — an
+    // unrecognized-shape producer collectCharContributors couldn't attribute
+    // at all. Append one truthful, no-arrow floor row rather than leave the
+    // section empty under a green badge.
+    if (
+      currentChar !== null &&
+      rows.length === 0 &&
+      alreadyProducedSet.has(currentChar)
+    ) {
+      rows.push({
+        id: `unattributed:${currentChar}`,
+        label: appendNotDeletableSuffix(
+          composeContributorLabel(
+            { kind: "unattributed", producedChar: currentChar, producedRole: "produced" },
+            i18n,
+          ),
+          i18n,
+        ),
+        deletable: false,
+        isUsed: false,
+        kind: "unattributed",
+      });
+    }
+
+    return rows;
+    // deletedItemIds is an intentional dep even though only isItemDeleted is
+    // called in the body — see the store-selector comment above.
+  }, [
+    existingMethodContributors,
+    baseIr,
+    removalCapabilities,
+    isItemDeleted,
+    deletedItemIds,
+    i18n,
+    currentChar,
+    baseProducedSet,
+    alreadyProducedSet,
+  ]);
+
+  const handleRemoveExistingMethod = useCallback(
+    (row: ExistingMethodRow) => {
+      if (!row.deletable) return;
+      // Routes through the SAME cascadeDelete the full carve gallery uses
+      // (CarveGallery.tsx) — a rule nodeId and a store slot id both go
+      // through the item channel there too, so a removal made here is
+      // reversible via the identical Undo stack and is reflected at output
+      // by the existing carve-deletion projection step. No new store state.
+      if (row.kind === "rule") {
+        cascadeDelete([row.id], []);
+      } else if (row.kind === "slot") {
+        cascadeDelete([], [row.id]);
+      }
+    },
+    [cascadeDelete],
+  );
+
   // Edit-after-Done: unlocks the desktop layout so a completed Mechanism
   // Gallery can be revisited and corrected. When a touch layout has already
   // been built from the (now-stale) physical layout, mark the TOUCH step
@@ -2598,9 +2893,6 @@ export function MechanismGallery({
         // custom-char text so re-opening "Enter my own character..." starts
         // clean instead of re-showing stale (possibly invalid) text.
         setSelectedSwapKeyCustomChar("");
-      } else if (method === "ralt" && ALL_PICKABLE_KEYS.has(keyId)) {
-        setSelectedRaltKey(keyId);
-        setSelectedRaltKeyCustomChar("");
       } else if (
         method === "deadkey" &&
         VALID_DEADKEY_TRIGGER_KEYS.has(keyId)
@@ -2760,7 +3052,16 @@ export function MechanismGallery({
             disabled: false,
             style: forwardBtnStyle,
           }
-        : currentChar !== null
+        : // The per-char Next/Done control is scoped to lettersToAdd's walk
+          // order (Back/Next/Skip/canGoNext all key off it — see the
+          // lettersToAdd-gating comment above). currentChar can now also be
+          // an already-produced character selected via the SHOW-ALL
+          // CharScrollStrip (handleSelectDisplayChar) — HIDE this button
+          // entirely rather than render it disabled in that case: it isn't
+          // a "global Next" separate from this one, so a disabled render
+          // would look like the walk is stuck rather than simply "you're
+          // inspecting a character outside this step's coverage".
+          currentChar !== null && lettersToAdd.includes(currentChar)
           ? {
               label: hasAnotherCharAfterCurrent
                 ? t({
@@ -2794,8 +3095,17 @@ export function MechanismGallery({
   // Left pane content
   // ---------------------------------------------------------------------------
 
+  // onKeyDown lives on this OUTER pane div (not on CharScrollStrip below) so
+  // ArrowLeft/ArrowRight cycles the character no matter which control inside
+  // the pane currently has focus — a plain native keydown bubbles up to here
+  // regardless of the focused descendant. See useCharCycleKeys.ts.
   const leftContent = (
+    /* eslint-disable-next-line jsx-a11y/no-static-element-interactions --
+       the bubbled keydown only ADDS a keyboard capability (ArrowLeft/Right
+       character cycling regardless of focused descendant, per the comment
+       above); the pane is not made pointer-interactive. */
     <div
+      onKeyDown={handlePaneKeyDown}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -2974,19 +3284,28 @@ export function MechanismGallery({
           </div>
         )}
 
-        {/* Character scroll strip — horizontal, all of lettersToAdd; click
-              any chip to jump straight to that character (replaces the old
-              "Previous character" button, which only ever stepped back one
-              position). Each chip's badge is the produces-count for that
-              character in THIS gallery's modality (physical) — see
-              charMechanisms.ts. */}
-        {lettersToAdd.length > 0 && (
+        {/* Character scroll strip — horizontal, SHOW-ALL of the confirmed
+              inventory (criterion 18.6), not just lettersToAdd: an author
+              should be able to see and inspect every character, including
+              ones the base keyboard already produces, not only the ones
+              still needing a method. `inheritedChars` feeds alreadyProduced
+              into CharScrollStrip's badge so those chips still show the
+              green produces->=1 badge (mirrors TouchGallery's
+              detectedChars). Selecting a chip goes through
+              handleSelectDisplayChar (not handleSelectChar, which is gated
+              on lettersToAdd) so an already-produced chip is still
+              selectable — see handleSelectDisplayChar's own doc comment and
+              the forwardButton guard below for what changes once such a
+              character is selected. lettersToAdd itself (coverage counter,
+              coverage gate, canGoNext) is never widened. */}
+        {inventory.length > 0 && (
           <CharScrollStrip
-            chars={lettersToAdd}
+            chars={inventory}
             currentChar={currentChar}
-            onSelectChar={handleSelectChar}
+            onSelectChar={handleSelectDisplayChar}
             assignments={sessionAssignments}
             modality="physical"
+            inheritedChars={alreadyProducedSet}
           />
         )}
 
@@ -3157,19 +3476,12 @@ export function MechanismGallery({
               onSwapKeyChange={setSelectedSwapKey}
               selectedSwapKeyCustomChar={selectedSwapKeyCustomChar}
               onSwapKeyCustomCharChange={setSelectedSwapKeyCustomChar}
-              selectedRaltKey={selectedRaltKey}
-              onRaltKeyChange={setSelectedRaltKey}
-              selectedRaltKeyCustomChar={selectedRaltKeyCustomChar}
-              onRaltKeyCustomCharChange={setSelectedRaltKeyCustomChar}
-              swapLayer={swapLayer}
-              onSwapLayerChange={setSwapLayer}
               raltTokens={raltTokens}
               onRaltTokenChange={handleRaltTokenChange}
               onAddRaltSlot={handleAddRaltSlot}
               onRemoveRaltSlot={handleRemoveRaltSlot}
               modifierPool={modifierPool}
               modifierTokensInUse={modifierTokensInUse}
-              shiftLayerDisabled={!shiftLayerAllowed}
             />
 
             {/* Case-pair companion proposal — propose-then-confirm, never
@@ -3230,12 +3542,11 @@ export function MechanismGallery({
                             .map((m) => methodLabel(m, i18n))
                             .join(", ");
                     return (
-                      <button
+                      <HoverDangerChip
                         key={i}
-                        type="button"
                         onClick={() => handleRemoveMechanism(a)}
                         disabled={locked}
-                        aria-label={t({
+                        ariaLabel={t({
                           id: "editor.assignLoop.removeMethodAriaLabel",
                           message: `Remove method ${label} for ${currentChar}`,
                         })}
@@ -3243,7 +3554,7 @@ export function MechanismGallery({
                           id: "editor.assignLoop.clickToRemove",
                           message: "click to remove",
                         })}
-                        style={{
+                        baseStyle={{
                           display: "inline-flex",
                           alignItems: "center",
                           gap: 4,
@@ -3261,15 +3572,116 @@ export function MechanismGallery({
                         {label}
                         <span
                           aria-hidden="true"
-                          style={{ fontSize: 10, opacity: 0.7 }}
+                          style={{ fontSize: 10, color: "inherit", opacity: 0.7 }}
                         >
                           {" ×"}
                         </span>
-                      </button>
+                      </HoverDangerChip>
                     );
                   })}
               </div>
             )}
+
+            {/* Existing methods — the BASE keyboard's own producers for
+                  currentChar (desktop "delete each pre-existing method").
+                  COLOR tracks PRODUCED vs. USED; deletability is a SEPARATE
+                  signal carried by which of the two branches below a row
+                  takes, not by color:
+                    - row.deletable        -> green HoverDangerChip: "×" +
+                      red-on-hover + click-to-delete (real keystroke/store-
+                      slot/deadkey producers removalCapabilities allows).
+                    - !deletable && isUsed  -> BLUE NonDeletableMethodChip: a
+                      "slot" row whose descriptor is producedRole "used" — the
+                      char is only CONSUMED here (a deadkey base, or a
+                      non-deadkey rule's own any()-consumed input-store
+                      occurrence), never produced by this row.
+                    - !deletable && !isUsed -> GREEN NonDeletableMethodChip,
+                      static: composition, unattributed (SHOW-ALL floor),
+                      blocked/opaque/multi-char, and a produced rule
+                      removalCapabilities marked not-removable. All of these
+                      PRODUCE the char but have no single rule/slot to
+                      surgically delete — green-without-"×" is the visual
+                      signal for "produced here, nothing single to delete."
+                  See existingMethods/handleRemoveExistingMethod above for how
+                  rows are built and removed, and NonDeletableMethodChip
+                  (parts/RemovableChipRow.tsx) for the shared static-chip
+                  palette. */}
+            {currentChar !== null && existingMethods.length > 0 && (
+              <div>
+                <p
+                  style={{
+                    margin: "0 0 6px",
+                    fontSize: 11,
+                    color: TEXT_DIM,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  <Trans id="editor.assignLoop.existingMethodsHeading">
+                    Existing methods
+                  </Trans>
+                </p>
+                <div
+                  role="group"
+                  aria-label={t({
+                    id: "editor.assignLoop.existingMethodsGroupAriaLabel",
+                    message: "Existing methods from the base keyboard",
+                  })}
+                  style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
+                >
+                  {existingMethods.map((row) =>
+                    row.deletable ? (
+                      <HoverDangerChip
+                        key={row.id}
+                        onClick={() => handleRemoveExistingMethod(row)}
+                        disabled={locked}
+                        ariaLabel={t({
+                          id: "editor.assignLoop.removeExistingMethodAriaLabel",
+                          message: `Remove existing method ${row.label} for ${currentChar}`,
+                        })}
+                        title={t({
+                          id: "editor.assignLoop.clickToRemove",
+                          message: "click to remove",
+                        })}
+                        baseStyle={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          padding: "3px 8px",
+                          background: "#0d2218",
+                          border: "1px solid #238636",
+                          borderRadius: 12,
+                          color: "#56d364",
+                          fontSize: 11,
+                          fontFamily:
+                            "ui-monospace, 'Cascadia Code', Consolas, monospace",
+                          cursor: locked ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {row.label}
+                        <span
+                          aria-hidden="true"
+                          style={{ fontSize: 10, color: "inherit", opacity: 0.7 }}
+                        >
+                          {" ×"}
+                        </span>
+                      </HoverDangerChip>
+                    ) : (
+                      <NonDeletableMethodChip
+                        key={row.id}
+                        variant={row.isUsed ? "blue" : "green"}
+                        {...(row.reason !== undefined
+                          ? { reason: row.reason }
+                          : {})}
+                      >
+                        {row.label}
+                      </NonDeletableMethodChip>
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
+
             {currentChar !== null &&
               hasSequenceForChar(sessionAssignments, currentChar) && (
                 <div
@@ -3418,6 +3830,7 @@ export function MechanismGallery({
             chipBackground="#0d2218"
             chipBorder="#238636"
             chipColor="#56d364"
+            hoverDanger
             items={[...coveredChars].map((c) => ({
               key: c,
               label: displayChar(c),
@@ -3449,6 +3862,7 @@ export function MechanismGallery({
             chipBackground="#1c2a3a"
             chipBorder="#58a6ff"
             chipColor="#58a6ff"
+            hoverDanger={false}
             items={sequenceRecordedChars.map((c) => ({
               key: c,
               label: displayChar(c),

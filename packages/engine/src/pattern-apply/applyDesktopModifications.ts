@@ -6,10 +6,15 @@
  *
  * Two passes over the layout, run in the same chronological order as the
  * desktop decisions they replay (Phase C placements precede Phase D carve):
- *   1. Placements — for each {char, hostKey}, land the char on the phone
- *      platform's "default" layer only, as the host key's own production when
- *      the host is empty, or as a longpress (sk[]) alternate when the host
- *      already produces something else.
+ *   1. Placements — for each {char, hostKey}, land the char on the mobile
+ *      platform's ("phone", or "tablet" when no "phone" platform is present —
+ *      see {@link resolveMobilePlatformIndex}) layer its case selects (see
+ *      {@link touchLayerForChar} in touchLayer.ts: an uppercase char targets
+ *      "shift", everything else targets "default"), as the host key's own
+ *      production when the host is empty, or as a longpress (sk[]) alternate
+ *      when the host already produces something else. A "shift"-targeted
+ *      placement falls back to "default" (with a warning) when the mobile
+ *      platform has no shift layer, so the char always stays reachable.
  *   2. Removals — walk EVERY platform/layer/row/key and strip any trace of a
  *      carved character (text/output/U_-id-decoded, plus sk/flick/multitap
  *      entries). A key whose primary production is carved is never deleted —
@@ -32,9 +37,12 @@ import { NodeIdMinter } from "../shared/node-ids.js";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import {
   buildRemovalSet,
+  isTouchKeyPrimaryProduction,
   isTouchSubKeyDuplicate,
   keyMatchesRemovalSet,
+  resolveMobilePlatformIndex,
 } from "./touch-mechanism-shared.js";
+import { DEFAULT_TOUCH_LAYER, touchLayerForChar } from "./touchLayer.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -181,8 +189,20 @@ function stripRemovedFromKey(
 }
 
 // ---------------------------------------------------------------------------
-// Pass 2 — placements (phone platform's "default" layer only)
+// Pass 2 — placements (mobile platform, layer selected by touchLayerForChar)
 // ---------------------------------------------------------------------------
+
+/** Mutable per-layer working state, created lazily the first time a
+ *  placement targets that layer. A layer with no state was never touched and
+ *  is returned by reference (same idiom as applyTouchAssignments.ts). */
+interface LayerWorkState {
+  /** Index of this layer within `phonePlatform.layers`. */
+  layerIndex: number;
+  /** Shallow-cloned rows whose key slots we replace as we accumulate changes. */
+  workingRows: Array<{ keys: TouchKeyIR[] }>;
+  /** key id -> { rowIdx, keyIdx }, built once per layer. */
+  keyIndex: Map<string, { rowIdx: number; keyIdx: number }>;
+}
 
 function applyPlacements(
   layout: TouchLayoutIR,
@@ -192,91 +212,149 @@ function applyPlacements(
 ): TouchLayoutIR {
   if (placements.length === 0) return layout;
 
-  const phonePlatformIndex = layout.platforms.findIndex((p) => p.id === "phone");
+  const phonePlatformIndex = resolveMobilePlatformIndex(layout.platforms);
   if (phonePlatformIndex === -1) {
     warnings.push(
-      "[desktop-modifications] no phone platform found in layout — all placements skipped",
+      "[desktop-modifications] no phone or tablet platform found in layout — all placements skipped",
     );
     return layout;
   }
   const phonePlatform = layout.platforms[phonePlatformIndex]!;
 
-  const defaultLayerIndex = phonePlatform.layers.findIndex((l) => l.id === "default");
-  if (defaultLayerIndex === -1) {
+  // Per-layer working state, populated lazily: a layer no placement targets
+  // is never cloned and therefore comes back reference-equal.
+  const layerStates = new Map<string, LayerWorkState>();
+
+  function resolveLayerState(layerId: string): LayerWorkState | undefined {
+    const existing = layerStates.get(layerId);
+    if (existing) return existing;
+
+    const layerIndex = phonePlatform.layers.findIndex((l) => l.id === layerId);
+    if (layerIndex === -1) return undefined;
+
+    const layer = phonePlatform.layers[layerIndex]!;
+    // Shallow-clone rows up-front; replace individual key slots as
+    // placements are processed (same idiom as applyTouchAssignments).
+    const workingRows: Array<{ keys: TouchKeyIR[] }> = layer.rows.map((row) => ({
+      keys: [...row.keys],
+    }));
+
+    const keyIndex = new Map<string, { rowIdx: number; keyIdx: number }>();
+    for (let ri = 0; ri < workingRows.length; ri++) {
+      const row = workingRows[ri]!;
+      for (let ki = 0; ki < row.keys.length; ki++) {
+        keyIndex.set(row.keys[ki]!.id, { rowIdx: ri, keyIdx: ki });
+      }
+    }
+
+    const state: LayerWorkState = { layerIndex, workingRows, keyIndex };
+    layerStates.set(layerId, state);
+    return state;
+  }
+
+  // The default layer must exist up front — a "shift"-targeted placement
+  // falls back to it (see resolveTargetLayer below), and a layout with no
+  // default layer at all skips every placement, same as before this change.
+  if (!resolveLayerState(DEFAULT_TOUCH_LAYER)) {
     warnings.push(
-      "[desktop-modifications] phone platform has no default layer — all placements skipped",
+      `[desktop-modifications] ${phonePlatform.id} platform has no default layer — all placements skipped`,
     );
     return layout;
   }
-  const defaultLayer = phonePlatform.layers[defaultLayerIndex]!;
 
-  // Shallow-clone rows up-front; replace individual key slots as placements
-  // are processed (same idiom as applyTouchAssignments).
-  const workingRows: Array<{ keys: TouchKeyIR[] }> = defaultLayer.rows.map((row) => ({
-    keys: [...row.keys],
-  }));
+  /**
+   * Resolve the layer a placement's char targets (via touchLayerForChar).
+   * Falls back to the default layer — with a warning — when the case rule
+   * picks a layer (e.g. "shift") the mobile platform doesn't have, so the
+   * char stays reachable rather than silently dropped.
+   */
+  function resolveTargetLayer(char: string): { state: LayerWorkState; layerId: string } {
+    const desiredLayerId = touchLayerForChar(char);
+    const desiredState = resolveLayerState(desiredLayerId);
+    if (desiredState) return { state: desiredState, layerId: desiredLayerId };
 
-  const keyIndex = new Map<string, { rowIdx: number; keyIdx: number }>();
-  for (let ri = 0; ri < workingRows.length; ri++) {
-    const row = workingRows[ri]!;
-    for (let ki = 0; ki < row.keys.length; ki++) {
-      keyIndex.set(row.keys[ki]!.id, { rowIdx: ri, keyIdx: ki });
-    }
+    warnings.push(
+      `[desktop-modifications] ${phonePlatform.id} platform has no "${desiredLayerId}" layer — "${char}" placed on the default layer instead`,
+    );
+    // Guaranteed present — checked above.
+    return { state: resolveLayerState(DEFAULT_TOUCH_LAYER)!, layerId: DEFAULT_TOUCH_LAYER };
   }
 
-  function getWorkingKey(hostKey: string): TouchKeyIR | undefined {
-    const pos = keyIndex.get(hostKey);
-    return pos ? workingRows[pos.rowIdx]!.keys[pos.keyIdx] : undefined;
+  function getWorkingKey(state: LayerWorkState, hostKey: string): TouchKeyIR | undefined {
+    const pos = state.keyIndex.get(hostKey);
+    return pos ? state.workingRows[pos.rowIdx]!.keys[pos.keyIdx] : undefined;
   }
 
-  function setWorkingKey(hostKey: string, updated: TouchKeyIR): void {
-    const pos = keyIndex.get(hostKey);
+  function setWorkingKey(state: LayerWorkState, hostKey: string, updated: TouchKeyIR): void {
+    const pos = state.keyIndex.get(hostKey);
     if (!pos) return;
-    workingRows[pos.rowIdx]!.keys[pos.keyIdx] = updated;
+    state.workingRows[pos.rowIdx]!.keys[pos.keyIdx] = updated;
   }
 
-  // Sensible fallback position: append a new letter key onto the last row
-  // (or a fresh row if the layer is empty) so the character stays reachable
-  // even with no obvious host position (e.g. no hostKey, or hostKey absent).
-  function placeFallback(char: string): void {
+  // Sensible fallback position: append a new letter key onto the last row of
+  // the target layer (or a fresh row if the layer is empty) so the character
+  // stays reachable even with no obvious host position (e.g. no hostKey, or
+  // hostKey absent from that layer).
+  function placeFallback(state: LayerWorkState, char: string): void {
     const fallbackKey: TouchKeyIR = {
       nodeId: minter.mint("touchKey"),
       id: charToUnicodeKeyId(char),
       text: char,
       provenance: "physical-suggested",
     };
-    if (workingRows.length === 0) {
-      workingRows.push({ keys: [fallbackKey] });
+    if (state.workingRows.length === 0) {
+      state.workingRows.push({ keys: [fallbackKey] });
     } else {
-      workingRows[workingRows.length - 1]!.keys.push(fallbackKey);
+      state.workingRows[state.workingRows.length - 1]!.keys.push(fallbackKey);
     }
-    const lastRowIdx = workingRows.length - 1;
-    keyIndex.set(fallbackKey.id, {
+    const lastRowIdx = state.workingRows.length - 1;
+    state.keyIndex.set(fallbackKey.id, {
       rowIdx: lastRowIdx,
-      keyIdx: workingRows[lastRowIdx]!.keys.length - 1,
+      keyIdx: state.workingRows[lastRowIdx]!.keys.length - 1,
     });
   }
 
   for (const rawPlacement of placements) {
     const { hostKey } = rawPlacement;
     // Normalize once so `text` and `id` (charToUnicodeKeyId NFC-normalizes
-    // internally) always agree, even for an NFD-form placement char.
+    // internally) always agree, even for an NFD-form placement char — and so
+    // touchLayerForChar sees a single precomposed code point for its case test.
     const char = rawPlacement.char.normalize("NFC");
-    const existing = hostKey ? getWorkingKey(hostKey) : undefined;
+    const { state, layerId } = resolveTargetLayer(char);
+    const existing = hostKey ? getWorkingKey(state, hostKey) : undefined;
 
     if (!hostKey) {
       warnings.push(
         `[desktop-modifications] placement for "${char}" has no hostKey — placed via fallback`,
       );
-      placeFallback(char);
+      placeFallback(state, char);
       continue;
     }
 
     if (!existing) {
       warnings.push(
-        `[desktop-modifications] host key "${hostKey}" not found in phone default layer — "${char}" placed via fallback`,
+        `[desktop-modifications] host key "${hostKey}" not found in ${phonePlatform.id} "${layerId}" layer — "${char}" placed via fallback`,
       );
-      placeFallback(char);
+      placeFallback(state, char);
+      continue;
+    }
+
+    // The host's own primary production is already this char (common on a
+    // shift-layer seed) — nothing to place; never hand a key itself as its own
+    // longpress alternate.
+    //
+    // This precedes the hand-set check deliberately: "there is nothing to
+    // place" is a stronger claim than "do not clobber". A hand-set host that
+    // already produces this char needs no placement at all, and routing it to
+    // the hand-set fallback appended a SECOND key with the same production
+    // (plus a warning about overwriting an author edit that was not happening).
+    // That input is routine now that placements target the case-derived layer:
+    // promoteOnManualEdit (spec-014 FR-014) marks the very key an author edits
+    // as hand-set, and the case-pair flow puts uppercase chars on the shift
+    // key, so a reseed replays a placement onto a hand-set key that already
+    // carries the char. A key with no production at all fails this predicate,
+    // so the empty-host branch below still owns that case.
+    if (isTouchKeyPrimaryProduction(existing, char)) {
       continue;
     }
 
@@ -287,7 +365,7 @@ function applyPlacements(
       warnings.push(
         `[desktop-modifications] host key "${hostKey}" is hand-set — "${char}" placed via fallback instead of overwriting an author edit`,
       );
-      placeFallback(char);
+      placeFallback(state, char);
       continue;
     }
 
@@ -301,7 +379,7 @@ function applyPlacements(
         text: char,
         provenance: "physical-suggested",
       };
-      setWorkingKey(hostKey, updated);
+      setWorkingKey(state, hostKey, updated);
       continue;
     }
 
@@ -322,13 +400,21 @@ function applyPlacements(
       sk: [...existingSk, newSkKey],
       provenance: "physical-suggested",
     };
-    setWorkingKey(hostKey, updated);
+    setWorkingKey(state, hostKey, updated);
   }
 
-  const updatedDefaultLayer = { ...defaultLayer, rows: workingRows };
-  const updatedLayers = phonePlatform.layers.map((layer, idx) =>
-    idx === defaultLayerIndex ? updatedDefaultLayer : layer,
-  );
+  // Reconstruct the layout with structural sharing: only the layers a
+  // placement actually targeted are rebuilt; every other layer and platform
+  // is returned by reference.
+  const rebuiltByIndex = new Map<number, LayerWorkState>();
+  for (const state of layerStates.values()) {
+    rebuiltByIndex.set(state.layerIndex, state);
+  }
+
+  const updatedLayers = phonePlatform.layers.map((layer, idx) => {
+    const state = rebuiltByIndex.get(idx);
+    return state ? { ...layer, rows: state.workingRows } : layer;
+  });
   const updatedPhonePlatform = { ...phonePlatform, layers: updatedLayers };
   const updatedPlatforms = layout.platforms.map((platform, idx) =>
     idx === phonePlatformIndex ? updatedPhonePlatform : platform,

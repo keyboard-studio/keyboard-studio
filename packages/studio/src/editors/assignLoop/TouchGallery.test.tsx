@@ -12,16 +12,30 @@
 import { describe, it, expect, afterEach, vi, beforeEach, beforeAll } from "vitest";
 import { screen, fireEvent, act, cleanup, waitFor, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
-import { TouchGallery, buildTouchMechanismRef } from "./TouchGallery.tsx";
+import {
+  TouchGallery,
+  buildTouchMechanismRef,
+  hostKeyShortLabel,
+  isCasingBearingTouchLayer,
+} from "./TouchGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
-import type { VirtualFS, MechanismAssignment } from "@keyboard-studio/contracts";
+import type {
+  VirtualFS,
+  MechanismAssignment,
+  IRGroup,
+  IRRule,
+} from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 import { expectCurrentChar } from "../../test/currentCharChip.ts";
-import { changeSelectMenu } from "../../test/selectMenuTestUtils.ts";
+import {
+  changeSelectMenu,
+  selectMenuValue,
+  selectMenuOptionValues,
+} from "../../test/selectMenuTestUtils.ts";
 import { installDialogShim } from "../../test/dialogShim.ts";
 import { PATTERN_SEQUENCE } from "./patternIds.ts";
 
@@ -29,10 +43,31 @@ import { PATTERN_SEQUENCE } from "./patternIds.ts";
 // vi.hoisted() — refs shared across mock closures and test bodies.
 // ---------------------------------------------------------------------------
 
-const { capturedVfsTransformRef, buildTouchLayoutJsonSpy, defaultBuildTouchLayoutJsonImpl } = vi.hoisted(() => {
+const {
+  capturedVfsTransformRef,
+  buildTouchLayoutJsonSpy,
+  defaultBuildTouchLayoutJsonImpl,
+  enumerateTouchMethodsForCharSpy,
+  originalEnumerateTouchMethodsForCharRef,
+} = vi.hoisted(() => {
   const capturedVfsTransformRef = {
     current: null as null | ((vfs: VirtualFS, kbId: string) => { warnings: string[] }),
   };
+  // Spy over the real `enumerateTouchMethodsForChar` — the color-model test
+  // below overrides it for exactly one, otherwise-unused target character
+  // (never colliding with any other test's inventory in this file) so it can
+  // assert a "layer-switch" row's rendering without constructing a real
+  // `.keyman-touch-layout` fixture. Every other call (any other character)
+  // falls through to the real implementation, captured via
+  // `originalEnumerateTouchMethodsForCharRef` in the `@keyboard-studio/engine`
+  // mock factory below — same "wrap by default" pattern MechanismGallery.
+  // test.tsx uses for `collectCharContributorsSpy`.
+  const originalEnumerateTouchMethodsForCharRef = {
+    current: null as
+      | null
+      | ((...args: unknown[]) => unknown),
+  };
+  const enumerateTouchMethodsForCharSpy = vi.fn();
   // Default spy implementation: deterministic JSON including the assignments so
   // tests can assert the transform's injected content differs between edits.
   // The `phone` platform below is real parseTouchLayout-shaped JSON — one key
@@ -71,7 +106,13 @@ const { capturedVfsTransformRef, buildTouchLayoutJsonSpy, defaultBuildTouchLayou
     };
   }
   const buildTouchLayoutJsonSpy = vi.fn(defaultBuildTouchLayoutJsonImpl);
-  return { capturedVfsTransformRef, buildTouchLayoutJsonSpy, defaultBuildTouchLayoutJsonImpl };
+  return {
+    capturedVfsTransformRef,
+    buildTouchLayoutJsonSpy,
+    defaultBuildTouchLayoutJsonImpl,
+    enumerateTouchMethodsForCharSpy,
+    originalEnumerateTouchMethodsForCharRef,
+  };
 });
 
 // ---------------------------------------------------------------------------
@@ -115,10 +156,15 @@ vi.mock("../../lib/buildTouchLayoutJson.ts", async (importOriginal) => {
 
 vi.mock("@keyboard-studio/engine", async (importOriginal) => {
   const original = await importOriginal<typeof import("@keyboard-studio/engine")>();
+  originalEnumerateTouchMethodsForCharRef.current = original.enumerateTouchMethodsForChar as (
+    ...args: unknown[]
+  ) => unknown;
+  enumerateTouchMethodsForCharSpy.mockImplementation(original.enumerateTouchMethodsForChar);
   return {
     ...original,
     // emitTouchLayout is used for minimalTouchJson; return a stable string.
     emitTouchLayout: vi.fn(() => '{"_minimal":true}'),
+    enumerateTouchMethodsForChar: enumerateTouchMethodsForCharSpy,
   };
 });
 
@@ -142,11 +188,21 @@ vi.mock("../../components/OskModeToggle.tsx", () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function seedStore(opts: { withInventory?: string[]; intro?: boolean } = {}) {
+function seedStore(
+  opts: {
+    withInventory?: string[];
+    intro?: boolean;
+    /** Override the seeded desktop IR — used by the touch-layer-picker tests
+     * to give the working copy real SHIFT/RALT rules so
+     * `collectLayerCombosInUse` (the picker's option source) has something
+     * to report beyond the always-present base layer. */
+    ir?: ReturnType<typeof makeTestIR>;
+  } = {},
+) {
   const vfs = createVirtualFS([
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
   ]);
-  const ir = makeTestIR([]);
+  const ir = opts.ir ?? makeTestIR([]);
   useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
   if (opts.withInventory !== undefined) {
     useWorkingCopyStore.getState().recordPhase({
@@ -250,33 +306,127 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     expect(buildTouchLayoutJsonSpy).not.toHaveBeenCalled();
   });
 
-  it("does NOT set source/<id>.keyman-touch-layout when the only assignment is touch_inherited (accepted 'already' suggestion)", async () => {
-    // "a" is present in the scaffolded default QWERTY touch layout (K_A), so with
-    // no Phase C desktop assignment the suggestion is "already". The manual
-    // "Already in touch layout" chooser card was removed; the auto-detected
-    // "already" suggestion is now the only path that records a touch_inherited
-    // assignment. Accepting it must NOT be treated as a real edit, so the
-    // touch-layout path must remain absent.
+  it("does NOT set source/<id>.keyman-touch-layout when the only assignment is touch_inherited", async () => {
+    // "a" is present in the scaffolded default QWERTY touch layout (K_A), so
+    // it is auto-detected as already reachable and shown read-only — there
+    // is no "already" suggestion card / Accept click that records
+    // touch_inherited anymore (see the "read-only existing implementation
+    // display" suite below). A touch_inherited entry can still reach
+    // charTouch via a persisted draft from a PRIOR mount that had one (the
+    // pattern-apply engine still understands the patternId, and back-nav
+    // must not resurrect a stray real-edit signal from it) — seed the draft
+    // directly, the way "Back survives a remount" (above) seeds a
+    // prior-mount draft, and assert accepting it is still not treated as a
+    // real edit.
     seedStore({ withInventory: ["a"] });
+    const inheritedAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "a",
+      modality: "touch",
+      mechanisms: [{ patternId: "touch_inherited" }],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [["a", inheritedAssignment]],
+      suggestionResolvedChars: ["a"],
+    });
 
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
-    });
-
-    // The "already" suggestion shows an Accept button — click it to record the
-    // touch_inherited assignment for "a" and advance.
-    const acceptBtn = screen
-      .queryAllByRole("button")
-      .find((b) => b.textContent?.trim() === "Accept") ?? null;
-    expect(acceptBtn).not.toBeNull();
-    await act(async () => {
-      fireEvent.click(acceptBtn!);
     });
 
     const vfs = runTransform("basic_kbdus");
     expect(vfs.get("source/basic_kbdus.keyman-touch-layout")).toBeUndefined();
     // buildTouchLayoutJson must NOT have been called (only inherited assignments).
     expect(buildTouchLayoutJsonSpy).not.toHaveBeenCalled();
+  });
+
+  it("shows a character already on the seed layout read-only (no confirm card, no Accept) and lets the author advance with no click", async () => {
+    // "a" is present in the scaffolded default QWERTY touch layout (K_A) —
+    // no Phase C desktop assignment, so it is auto-detected as already
+    // reachable and surfaced read-only via the "Existing methods" section;
+    // there must be no green confirm card and no Accept button for it.
+    seedStore({ withInventory: ["a"] });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // The old "Keep it as is?" confirm prompt is gone.
+    expect(screen.queryByText(/Keep it as is/i)).toBeNull();
+    // No Accept/Deny pair for it — nothing to click to "keep" a char that was
+    // never at risk of removal.
+    expect(
+      screen.queryAllByRole("button").some((b) => b.textContent?.trim() === "Accept"),
+    ).toBe(false);
+
+    // P1 regression guard: a character already detected on the seed layout
+    // must enable the primary forward button (Next/Done) with NO click (spec
+    // v1.3.1 §3c: "you shouldn't have to click anything to keep it"). "a" is
+    // the only inventory char here, so the button reads "Done".
+    const doneBtn = screen.getByRole("button", { name: "Done" });
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("entry-parity: an already-detected character is excluded from the walk entirely — the author lands directly on the genuinely unresolved one, and the forward button is HIDDEN (not just enabled) when inspecting the detected one via its chip", async () => {
+    // "a" (idx 0 in confirmedInventory) is present in the default touch
+    // layout (K_A) — detected, with no Phase C suggestion of its own — so it
+    // is excluded from the walk (touchLettersToAdd) entirely: the author
+    // never lands on it or steps through it via Back/Next/Skip. "中" has
+    // suggestion kind "none" too (not in the default layout, not a
+    // decomposable accented letter — same fixture precedent as the "Next
+    // advances positionally" test above) but is NOT detected, so it is the
+    // walk's only member and the entry point.
+    seedStore({ withInventory: ["a", "中"] });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // Entry parity with MechanismGallery: land directly on the one
+    // actionable character, not on the detected one first.
+    expectCurrentChar("中");
+    expect(screen.getByText("Character 1 of 1")).toBeTruthy();
+    const doneBtn = screen.getByRole("button", { name: "Done" });
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
+
+    // "a" is still inspectable via its CharScrollStrip chip (SHOW-ALL
+    // display, mirrors MechanismGallery's handleSelectDisplayChar) — but once
+    // selected this way, the forward Next/Done button is HIDDEN entirely
+    // (not rendered disabled), since it is outside the walk and this isn't a
+    // "global Next" for it.
+    fireEvent.click(screen.getByTestId("char-scroll-chip-0061"));
+    await waitFor(() => {
+      expectCurrentChar("a");
+    });
+    expect(screen.queryByTestId("touch-continue")).toBeNull();
+  });
+
+  it("entry-parity: the Back button is likewise HIDDEN (not just dead) when inspecting a detected out-of-walk character via its chip — usePositionalCharNav's handleBack is a no-op at currentIdx === -1, so a visible Back would look live but do nothing", async () => {
+    // Same fixture/setup as the forward-hidden test above: "a" is detected
+    // (excluded from the walk), "中" is the walk's only member and entry point.
+    seedStore({ withInventory: ["a", "中"] });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expectCurrentChar("中");
+
+    // On the walk's own entry point, Back is present (it's currentIdx 0 of
+    // the walk, so Back still resolves to "back to mechanisms" / onBack).
+    const backBtnsOnWalk = screen.queryAllByRole("button", { name: /back/i });
+    expect(backBtnsOnWalk.find((b) => b.textContent?.includes("Back"))).not.toBeUndefined();
+
+    // Inspect "a" via its CharScrollStrip chip — outside touchLettersToAdd,
+    // so currentIdx becomes -1 in usePositionalCharNav and handleBack is a
+    // no-op. The Back button must be hidden entirely here, not merely dead.
+    fireEvent.click(screen.getByTestId("char-scroll-chip-0061"));
+    await waitFor(() => {
+      expectCurrentChar("a");
+    });
+    const backBtnsInspecting = screen.queryAllByRole("button", { name: /back/i });
+    expect(backBtnsInspecting.find((b) => b.textContent?.includes("Back"))).toBeUndefined();
   });
 
   it("DOES set source/<id>.keyman-touch-layout with sk JSON after a longpress edit", async () => {
@@ -506,18 +656,26 @@ describe("TouchGallery — seed-source-aware detection reads the shipped layout 
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    // Inventory is ["x", "€"] — "x" (idx 0) carries the Phase C swap
-    // assignment ("replace" suggestion). Skip is pure positional navigation
-    // (records nothing) and works regardless of that suggestion's state.
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    // Inventory is ["x", "€"] — collated for display (spec 047's
+    // collateCompare puts "€" before the letter "x"), but only "x" carries a
+    // Phase C swap assignment ("replace" suggestion), so it is the walk's
+    // entry point regardless of display order (an actionable suggestion, even
+    // for a detected char, is never excluded — see touchLettersToAdd's
+    // desktopSuggestionTargets carve-out). "€" is detected ONLY via the
+    // shipped layout, with no Phase C suggestion of its own, so it is
+    // excluded from the walk entirely (entry-parity fix) — it is still
+    // reachable for inspection via its CharScrollStrip chip
+    // (handleSelectDisplayChar), not via Skip/Next.
+    expectCurrentChar("x");
+    fireEvent.click(screen.getByTestId("char-scroll-chip-20AC"));
     await waitFor(() => {
       expectCurrentChar("€");
     });
 
-    // The seed-source-aware detection (T015) must surface the "already"
-    // suggestion for "€" because it reads the SHIPPED layout (with mods
-    // replayed), not a fresh scaffold.
-    expect(screen.queryByText(/is already on the touch keyboard/i)).not.toBeNull();
+    // The seed-source-aware detection (T015) reads the SHIPPED layout (with
+    // mods replayed), not a fresh scaffold, so "€" is recognized as already
+    // reachable and surfaced read-only via the "Existing methods" section.
+    expect(screen.queryByText(/Existing methods/i)).not.toBeNull();
 
     // R11 emission: import-adapt + non-empty mods (the "x" placement,
     // derived from the Phase C assignment) injects the derived seed even
@@ -805,6 +963,58 @@ describe("TouchGallery — character-scroll-strip navigation", () => {
     expect(screen.getByTestId("char-scroll-chip-6708")).toBeTruthy();
   });
 
+  it("renders the char-scroll-strip ABOVE the per-char editing block, matching MechanismGallery's real placement (regression guard)", async () => {
+    seedStore({ withInventory: ["中", "日", "月"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    // "Touch mapping" is the eyebrow label unique to the per-char editing
+    // block. DOCUMENT_POSITION_FOLLOWING (4): the per-char block comes AFTER
+    // the strip in DOM order — i.e. the strip renders near the top of the
+    // pane, above the per-char block, not after it (the CHANGE-1 regression
+    // this test guards against).
+    const perCharEyebrow = screen.getByText("Touch mapping");
+    expect(
+      strip.compareDocumentPosition(perCharEyebrow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("orders a lowercase letter immediately before its uppercase counterpart, not in first-appearance order (spec 047 collateCompare reuse)", async () => {
+    // Seeded UPPERCASE-first (the old first-appearance order the gallery
+    // used to render in) — the collated display order must not follow it:
+    // "a" must render before "A", and "e" before "E".
+    seedStore({ withInventory: ["A", "a", "E", "e"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    const chipOrder = within(strip)
+      .getAllByRole("button")
+      .map((btn) => btn.getAttribute("data-testid"));
+
+    const lowerAIdx = chipOrder.indexOf("char-scroll-chip-0061"); // "a"
+    const upperAIdx = chipOrder.indexOf("char-scroll-chip-0041"); // "A"
+    const lowerEIdx = chipOrder.indexOf("char-scroll-chip-0065"); // "e"
+    const upperEIdx = chipOrder.indexOf("char-scroll-chip-0045"); // "E"
+    expect(lowerAIdx).toBeGreaterThanOrEqual(0);
+    expect(upperAIdx).toBeGreaterThanOrEqual(0);
+    expect(lowerEIdx).toBeGreaterThanOrEqual(0);
+    expect(upperEIdx).toBeGreaterThanOrEqual(0);
+    expect(lowerAIdx).toBeLessThan(upperAIdx);
+    expect(lowerEIdx).toBeLessThan(upperEIdx);
+
+    // No current-character assertion here: a/A/e/E are all reachable on the
+    // seed QWERTY layout and carry no Phase C suggestion, so the entry-parity
+    // walk list (touchLettersToAdd) excludes all four and there is no selected
+    // chip. The walk consumes this same collated order when it is non-empty —
+    // it is the `inventory` derivation both the strip and usePositionalCharNav
+    // read; the display order asserted above is the observable half.
+  });
+
   it("clicking an earlier character's chip moves back to it, ungated by intermediate configuration status", async () => {
     const onBack = vi.fn();
     seedStore({ withInventory: ["中", "日", "月"] });
@@ -947,7 +1157,15 @@ describe("TouchGallery — UsesSequencesCard (integration)", () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    expectCurrentChar("n");
+    // "n" is a plain Latin letter — detected via the OS-default physical
+    // fall-through (spec 040) — and the sequence assignment above targets
+    // "ŋ", not "n" itself, so "n" carries no suggestion of its own and is
+    // excluded from the walk (entry-parity fix). It is still reachable for
+    // inspection via its CharScrollStrip chip.
+    fireEvent.click(screen.getByTestId("char-scroll-chip-006E"));
+    await waitFor(() => {
+      expectCurrentChar("n");
+    });
     const card = await screen.findByTestId("uses-sequences-card");
     const row = within(card).getByTestId("uses-sequences-row-0");
     // The row names the sequence's own input pair and its produced char —
@@ -1019,19 +1237,20 @@ describe("TouchGallery — skip character", () => {
     expect((nextBtn as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("skipping the only (last) character completes the phase via onComplete", async () => {
-    // "a" (not "中") — the FR-008 completion gate (T016b) re-runs touchCoverage
-    // on the final layout before calling onComplete, so the char left
-    // unconfigured by Skip must be one the underlying seed already covers
-    // (present in the default QWERTY scaffold) for the gate to pass. This
-    // still exercises the regression this test guards: Skip records no
-    // assignment yet completion still fires.
+  it("completes via Done with no Skip needed when the only inventory char is already covered (entry-parity fix)", async () => {
+    // "a" is present in the default QWERTY scaffold, so it is excluded from
+    // the walk entirely (entry-parity fix) — touchLettersToAdd is empty and
+    // the gallery lands directly on the all-caught-up panel with its own
+    // Done control, rather than requiring a Skip click to reach a completable
+    // state. The FR-008 completion gate (T016b) re-runs touchCoverage on the
+    // final layout before calling onComplete, which "a" (already covered)
+    // passes.
     const onComplete = vi.fn();
     seedStore({ withInventory: ["a"] });
     await act(async () => {
       render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
     });
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    fireEvent.click(screen.getByTestId("touch-continue"));
     expect(onComplete).toHaveBeenCalledOnce();
   });
 });
@@ -1102,6 +1321,34 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
 });
 
 // ---------------------------------------------------------------------------
+// Physical-key type-to-select in an open key picker (SelectMenu's opt-in
+// resolveKeyToValue, wired by KeyPickerField via keyOptions.ts's
+// charToVkey) — same mechanism MechanismGallery covers, exercised here
+// against TouchGallery's long-press host-key picker.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — physical-key type-to-select in an open key picker", () => {
+  it("pressing A while the long-press host-key picker is open selects K_A", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // Suggestion kind "none" for "中" (no desktop assignment / touch layout /
+    // decomposable form) — the method chooser is already showing, defaulted
+    // to "Long-press on a key".
+    const trigger = screen.getByLabelText(/Host key for long-press/i);
+    fireEvent.click(trigger);
+    await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
+
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "a" });
+
+    expect(selectMenuValue(trigger)).toBe("K_A");
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Leave-warning modal (the same ConfirmDialog contract MechanismGallery uses,
 // see MechanismGallery.test.tsx's own "leave-warning modal open/closed state"
 // suite) — TouchGallery's version fires from the SAME handleContinue gate as
@@ -1115,11 +1362,14 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
 describe("TouchGallery — leave-warning modal open/closed state", () => {
   it("does NOT open the dialog when completion succeeds with every character covered", async () => {
     const onComplete = vi.fn();
-    seedStore({ withInventory: ["a"] }); // "a" is already covered by the default scaffold.
+    // "a" is already covered by the default scaffold, so it is excluded from
+    // the walk (entry-parity fix) and the gallery lands on the all-caught-up
+    // panel's own Done control directly — no Skip needed.
+    seedStore({ withInventory: ["a"] });
     const { container } = await act(async () =>
       render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />),
     );
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    fireEvent.click(screen.getByTestId("touch-continue"));
     expect(onComplete).toHaveBeenCalledOnce();
     expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
   });
@@ -1579,8 +1829,13 @@ describe("TouchGallery — suggestion card variants", () => {
 
   it("a suggestion card REAPPEARS after Skip (unlike Accept/Deny) — Skip resolves nothing", async () => {
     // Same longpress-suggestion fixture as above, plus a second inventory
-    // character ("x", no desktop assignment → suggestion kind "none") so
-    // there is somewhere to Skip forward to and Back from. Skip is pure
+    // character ("中", no desktop assignment, not in the default scaffold, not
+    // decomposable-accented → suggestion kind "none" AND not detected — same
+    // fixture precedent used throughout this file for a genuinely unresolved
+    // character) so there is somewhere to Skip forward to and Back from
+    // WITHOUT that second character being excluded from the walk itself
+    // (entry-parity fix — a plain Latin letter like "x" would be detected via
+    // the OS-default physical fall-through and excluded). Skip is pure
     // positional navigation and must not add "á" to suggestionResolved, so
     // returning to it must show the suggestion card again.
     const deadkeyAssignment: MechanismAssignment = {
@@ -1602,7 +1857,7 @@ describe("TouchGallery — suggestion card variants", () => {
       ],
       source: "user",
     };
-    seedWithDesktopAssignment("á", deadkeyAssignment, ["x"]);
+    seedWithDesktopAssignment("á", deadkeyAssignment, ["中"]);
 
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
@@ -1614,7 +1869,7 @@ describe("TouchGallery — suggestion card variants", () => {
     // Skip it — no accept/deny, no assignment recorded.
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     await waitFor(() => {
-      expectCurrentChar("x");
+      expectCurrentChar("中");
     });
 
     // Navigate back to "á" without ever resolving its suggestion.
@@ -1792,11 +2047,14 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
   });
 
   it("dedupes a mechanism whose existing slotValues has a different key order (mechanismRefEquals must be order-independent)", async () => {
-    // Two-character inventory: "y" is left unconfigured so the sync effect
-    // lands the initial currentChar there (not on the preconfigured "中",
-    // idx 0). Back is purely positional (idx 1 -> idx 0), so no history needs
-    // seeding to land back on "中" — mirroring how a real session would have
-    // visited "中" earlier, then moved on.
+    // Two-character inventory. The gallery's walk is collated (spec 047's
+    // collateCompare): the Latin letter "y" sorts before the CJK "中" under
+    // the default ICU collation, so "y" is idx 0 and "中" is idx 1
+    // regardless of the seed array's own order. "y" is left unconfigured so
+    // the sync effect lands the initial currentChar there too. Next is
+    // purely positional (idx 0 -> idx 1), so no history needs seeding to
+    // land on "中" — mirroring how a real session would have visited "y"
+    // first, then moved on.
     seedStore({ withInventory: ["中", "y"] });
 
     // Seed an existing mechanism for "中" whose slotValues key order is
@@ -1826,15 +2084,11 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    // Mount lands on "y" (first unconfigured char, idx 1). Back moves one
-    // position back (idx 1 -> idx 0), landing on the preconfigured
+    // Mount lands on "y" (first unconfigured char, idx 0). Skip moves one
+    // position forward (idx 0 -> idx 1), landing on the preconfigured
     // character — "中" has no suggestion, so the chooser (not a suggestion
     // card) shows directly.
-    const backBtn = screen.queryAllByRole("button", { name: /back/i }).find(
-      (b) => b.textContent?.includes("Back"),
-    ) ?? null;
-    expect(backBtn).not.toBeNull();
-    await act(async () => { fireEvent.click(backBtn!); });
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
 
     // Apply the same method+hostKey via the chooser (default method is
     // already "longpress_alternates" — matches buildMechanismRef's key order).
@@ -1858,22 +2112,43 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
     expect(entryAfter?.[1]?.mechanisms.length).toBe(1);
   });
 
-  it("accepting the 'already in layout' suggestion then adding a real method leaves no stray touch_inherited (mutual exclusivity holds)", async () => {
-    // "a" is present in the scaffolded default QWERTY touch layout → "already"
-    // suggestion (touch_inherited).
+  it("a real method REPLACES a persisted touch_inherited-only placeholder, leaving no stray touch_inherited (mutual exclusivity holds)", async () => {
+    // "a" is present in the scaffolded default QWERTY touch layout, so it is
+    // auto-detected as already reachable — that no longer surfaces an
+    // Accept-able suggestion card (see the "read-only existing
+    // implementation" suite), but a touch_inherited-only entry can still
+    // exist from a prior mount's persisted draft (see the
+    // vfsTransform-inject-only-when-real-edits suite's own touch_inherited
+    // test for the same seeding idiom). appendMechanismToChar's mutual-
+    // exclusivity rule (a real method REPLACES an inherited-only
+    // placeholder) is exercised here via the chooser, which is shown
+    // directly (suggestionDismissed is forced true once charTouch already
+    // has an entry for "a" — see `suggestionDismissed`'s derivation).
     seedStore({ withInventory: ["a"] });
+    const inheritedAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "a",
+      modality: "touch",
+      mechanisms: [{ patternId: "touch_inherited" }],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [["a", inheritedAssignment]],
+      suggestionResolvedChars: ["a"],
+    });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    const acceptBtn = screen.queryAllByRole("button").find(
-      (b) => b.textContent?.trim() === "Accept",
-    ) ?? null;
-    expect(acceptBtn).not.toBeNull();
-    await act(async () => { fireEvent.click(acceptBtn!); });
+    // "a" is excluded from the walk (entry-parity fix — detected, no Phase C
+    // suggestion of its own), so currentChar starts null; select it via its
+    // CharScrollStrip chip to reach the chooser (mirrors MechanismGallery's
+    // handleSelectDisplayChar precedent).
+    fireEvent.click(screen.getByTestId("char-scroll-chip-0061"));
+    await waitFor(() => {
+      expectCurrentChar("a");
+    });
 
-    // touch_inherited recorded; chooser now visible (suggestionDismissed forced
-    // true by handleSuggestionAccept) so a real method can be added.
     let draft = useWorkingCopyStore.getState().touchDraft;
     let entry = draft?.charTouchEntries.find(([c]) => c === "a");
     expect(entry?.[1]?.mechanisms.map((m) => m.patternId)).toEqual(["touch_inherited"]);
@@ -2328,5 +2603,1607 @@ describe("TouchGallery — shift-layer case-pair proposal (spec 051 US3)", () =>
     // dismissed, not applied.
     expect(touchMechanismsFor("Θ")).toHaveLength(0);
     expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// "Existing methods" color model — touch side (mirrors MechanismGallery's
+// desktop suite). Touch method descriptors carry no "used" concept at all
+// (unlike desktop's storeSlot rows), so every non-deletable touch row —
+// including a layer-switch main key, which still PRODUCES the character, it
+// just also switches layers — is GREEN, never blue.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — Existing methods color model (produced vs. used)", () => {
+  it("a layer-switch existing touch method renders GREEN and static — it produces the char, so it is never blue, and it has no delete affordance", async () => {
+    // A unique target char, never used by another test in this file, so this
+    // persistent conditional override can never affect anything else here.
+    const targetChar = "☃";
+    enumerateTouchMethodsForCharSpy.mockImplementation(
+      (layout: unknown, ch: string) => {
+        if (ch !== targetChar) {
+          return originalEnumerateTouchMethodsForCharRef.current!(layout, ch);
+        }
+        return [
+          {
+            id: "layer-switch:snowman",
+            kind: "tap",
+            host: "4",
+            producedChar: targetChar,
+            platform: "phone",
+            layer: "default",
+            deletable: false,
+            reasonCode: "layer-switch",
+          },
+        ];
+      },
+    );
+
+    seedStore({ withInventory: [targetChar] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    let row: HTMLElement;
+    await waitFor(() => {
+      row = screen.getByText(`Tap [4] → ${targetChar} - NOT DELETABLE`);
+      expect(row).toBeTruthy();
+    });
+    // GREEN (produced), not blue — a layer-switch key still produces the
+    // char; color tracks produced-vs-used, not deletability.
+    expect(row!.style.color).toBe("rgb(86, 211, 100)"); // #56d364
+    expect(row!.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
+    // Static: a <span>, not a <button> — no delete affordance at all.
+    expect(row!.tagName).toBe("SPAN");
+    expect(
+      screen.queryByRole("button", {
+        name: /Remove existing touch method/i,
+      }),
+    ).toBeNull();
+  });
+});
+
+// Touch layer picker — #1 longpress / #2 flick gain a layer option modeled
+// on MechanismGallery's merged "Assign to a key" card's S-08 layer-combo
+// picker: options are derived from the working KeyboardIR
+// (collectLayerCombosInUse), never hardcoded, and are ONLY the layers the
+// desktop keyboard actually uses.
+// ---------------------------------------------------------------------------
+
+describe("buildTouchMechanismRef — explicit layer override (touch layer picker)", () => {
+  it("uses the explicit layer over the case-derived default when provided", () => {
+    // Lowercase "a" would otherwise fall back to "default" — the explicit
+    // layer wins.
+    expect(
+      buildTouchMechanismRef("longpress_alternates", "K_A", "", "a", "rightalt")
+        ?.slotValues?.["layer"],
+    ).toBe("rightalt");
+    expect(
+      buildTouchMechanismRef("flick_gestures", "K_A", "n", "a", "shift")
+        ?.slotValues?.["layer"],
+    ).toBe("shift");
+  });
+
+  it("falls back to the case-derived layer when explicitLayer is omitted or empty", () => {
+    expect(
+      buildTouchMechanismRef("longpress_alternates", "K_A", "", "A", "")
+        ?.slotValues?.["layer"],
+    ).toBe("shift");
+    expect(
+      buildTouchMechanismRef("longpress_alternates", "K_A", "", "A")
+        ?.slotValues?.["layer"],
+    ).toBe("shift");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Touch layer builder fixtures — module scope so both the builder suite
+// below AND the uppercase-current-char regression suite further down (which
+// needs an IR that actually uses SHIFT, so the FR-006 case-derived seed is a
+// combo the desktop keyboard actually uses) can share them.
+// ---------------------------------------------------------------------------
+
+/** A rule with a single vkey context element carrying `modifiers`. */
+function makeVkeyRule(vkey: string, modifiers: string[], output: string): IRRule {
+  return {
+    nodeId: `rule:${vkey}:${modifiers.join(",") || "none"}`,
+    context: [{ kind: "vkey", name: vkey, modifiers }],
+    output: [{ kind: "char", value: output }],
+  };
+}
+
+function makeIrGroup(rules: IRRule[]): IRGroup {
+  return { nodeId: "group:main", name: "main", usingKeys: true, rules, readonly: false };
+}
+
+/** A desktop IR using the base layer, SHIFT, and RALT — the corpus
+ * `collectLayerCombosInUse` reports as `[["SHIFT"], ["RALT"]]` (insertion
+ * order), so the builder must offer exactly Shift + RAlt at slot 1 and
+ * nothing else (e.g. no Ctrl/Caps, which this IR never uses). */
+const irWithShiftAndRaltLayers = makeTestIR([
+  makeIrGroup([
+    makeVkeyRule("K_A", [], "a"),
+    makeVkeyRule("K_A", ["SHIFT"], "A"),
+    makeVkeyRule("K_E", ["RALT"], "é"),
+  ]),
+]);
+
+/** A desktop IR whose ONLY layer combo is the two-token SHIFT+RALT combo —
+ * no bare SHIFT and no bare RALT — so a partial ["SHIFT"] selection is
+ * genuinely invalid (not itself a member of D) until RALT is added too. */
+const irWithShiftRaltComboOnly = makeTestIR([
+  makeIrGroup([makeVkeyRule("K_E", ["SHIFT", "RALT"], "é")]),
+]);
+
+/** A desktop IR with two 2-token combos sharing SHIFT (SHIFT+RALT,
+ * SHIFT+CTRL) — used to show that, having picked SHIFT, the next slot
+ * offers exactly {RALT, CTRL} and nothing else (e.g. never CAPS, which
+ * appears in no combo at all). */
+const irWithTwoShiftCombos = makeTestIR([
+  makeIrGroup([
+    makeVkeyRule("K_E", ["SHIFT", "RALT"], "é"),
+    makeVkeyRule("K_U", ["SHIFT", "CTRL"], "ü"),
+  ]),
+]);
+
+/** A desktop IR where SHIFT alone is already a complete valid combo, with
+ * no combo extending it further — the "add" button must not appear once
+ * SHIFT is chosen, since no token can legally extend the selection toward
+ * ANY other combo in D. */
+const irWithShiftDeadEnd = makeTestIR([
+  makeIrGroup([
+    makeVkeyRule("K_A", ["SHIFT"], "A"),
+    makeVkeyRule("K_B", ["CTRL", "RALT"], "b"),
+  ]),
+]);
+
+/** A desktop IR that never uses bare SHIFT as a layer combo at all —
+ * `collectLayerCombosInUse` reports only `[["RALT"], ["CTRL"]]`. Used to
+ * regression-test the case where `seedLayerTokensForChar`'s case-derived
+ * `["SHIFT"]` seed for an uppercase current char is NOT itself a member of
+ * D — a recoverable edge (not a crash): the note shows, Apply stays
+ * disabled, and removing the seeded slot falls back to the always-valid
+ * base/default combo. */
+const irWithoutShiftCombo = makeTestIR([
+  makeIrGroup([
+    makeVkeyRule("K_E", ["RALT"], "é"),
+    makeVkeyRule("K_B", ["CTRL"], "b"),
+  ]),
+]);
+
+describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
+  /** Dismiss the auto-detected suggestion (if any) so the method chooser is
+   * showing, then switch to the given card (longpress is the default method,
+   * so switching there is a no-op click). */
+  async function openChooser(cardText: RegExp) {
+    const denyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Deny") ?? null;
+    if (denyBtn !== null) {
+      await act(async () => {
+        fireEvent.click(denyBtn);
+      });
+    }
+    const card = screen.queryByText(cardText);
+    expect(card).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(card!);
+    });
+  }
+
+  it("renders a layer builder for #1 longpress, defaulting to the base layer (no slots, add available)", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/long.press on a key/i);
+
+    // No slot dropdown yet — the base/default layer is the empty combo.
+    expect(
+      screen.queryByRole("button", { name: /^touch layer 1 for long-press$/i }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+    ).toBeTruthy();
+    expect(screen.getByText(/Resulting layer: Base/i)).toBeTruthy();
+  });
+
+  it("renders a layer builder for #2 swipe/flick, defaulting to the base layer (no slots, add available)", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/swipe a key \(flick\)/i);
+
+    expect(
+      screen.queryByRole("button", { name: /^touch layer 1 for flick$/i }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /add another touch layer for flick/i }),
+    ).toBeTruthy();
+  });
+
+  it("renders the layer builder for #3 multitap too, defaulting to the base layer", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/tap multiple times \(multitap\)/i);
+
+    expect(
+      screen.queryByRole("button", { name: /^touch layer 1 for multitap$/i }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /add another touch layer for multitap/i }),
+    ).toBeTruthy();
+    expect(screen.getByText(/Resulting layer: Base/i)).toBeTruthy();
+  });
+
+  it("renders the layer builder for #4 replace too, defaulting to the base layer", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/replace a key/i);
+
+    expect(
+      screen.queryByRole("button", { name: /^touch layer 1 for replace$/i }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /add another touch layer for replace/i }),
+    ).toBeTruthy();
+    expect(screen.getByText(/Resulting layer: Base/i)).toBeTruthy();
+  });
+
+  it("slot 1 options reflect ONLY the combos the desktop keyboard actually uses", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/long.press on a key/i);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for long-press$/i,
+    });
+    const values = await selectMenuOptionValues(slot1);
+    // "" is the placeholder ("— Select —"); SHIFT/RALT come from the seeded
+    // IR's own rules; nothing the IR doesn't use (e.g. CAPS/CTRL) leaks in.
+    expect(values).toEqual(["", "SHIFT", "RALT"]);
+  });
+
+  it("a token appearing in no combo at all is never offered, even mid-build", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithTwoShiftCombos });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/long.press on a key/i);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for long-press$/i,
+    });
+    await changeSelectMenu(slot1, "SHIFT");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+      );
+    });
+    const slot2 = screen.getByRole("button", {
+      name: /^touch layer 2 for long-press$/i,
+    });
+    const values = await selectMenuOptionValues(slot2);
+    // RALT and CTRL each complete one of the two SHIFT-combos in D; CAPS
+    // appears in neither and is never offered.
+    expect(values).toEqual(["", "RALT", "CTRL"]);
+  });
+
+  it("hides the add button once the selection has no legal extension toward any combo in D", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftDeadEnd });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/long.press on a key/i);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for long-press$/i,
+    });
+    await changeSelectMenu(slot1, "SHIFT");
+
+    // SHIFT alone is already a complete combo in D with no valid extension
+    // (the other combo, CTRL+RALT, does not contain SHIFT) — no add button.
+    expect(
+      screen.queryByRole("button", { name: /add another touch layer for long-press/i }),
+    ).toBeNull();
+  });
+
+  it("canApply blocks Apply on a partial combo, and applying a completed multi-token combo routes to that combined layer", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftRaltComboOnly });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/long.press on a key/i);
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_B");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for long-press$/i,
+    });
+    await changeSelectMenu(slot1, "SHIFT");
+
+    const applyBtn = () =>
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+
+    // Partial combo ["SHIFT"] is NOT itself a member of D (only [SHIFT,RALT]
+    // is) — Apply must stay disabled.
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(true);
+    expect(screen.getByText(/Not yet a layer this keyboard uses/i)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+      );
+    });
+    const slot2 = screen.getByRole("button", {
+      name: /^touch layer 2 for long-press$/i,
+    });
+    await changeSelectMenu(slot2, "RALT");
+
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(false);
+    expect(screen.getByText(/Resulting layer: Shift\+RAlt/i)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(applyBtn()!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "ä")?.[1]?.mechanisms ?? [];
+    // comboToTouchLayerId(["SHIFT","RALT"]) orders RALT before SHIFT
+    // (TOUCH_LAYER_PRECEDENCE_ORDER) -> "rightalt-shift".
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_B",
+      char: "ä",
+      layer: "rightalt-shift",
+    });
+  });
+
+  it("applying with a single-token layer selection (backward-compat with the single-select picker) routes the mechanism to that layer", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/long.press on a key/i);
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_B");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for long-press/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for long-press$/i,
+    });
+    await changeSelectMenu(slot1, "RALT");
+
+    const applyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+    expect(applyBtn).not.toBeNull();
+    expect(applyBtn?.hasAttribute("disabled")).toBe(false);
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "ä")?.[1]?.mechanisms ?? [];
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_B",
+      char: "ä",
+      layer: "rightalt",
+    });
+  });
+
+  // Twin of the test directly above — #2 flick gets the same layer builder,
+  // and a non-default selection there must route the flick mechanism onto
+  // that layer too.
+  it("applying flick with a single-token layer selection routes the mechanism to that layer", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/swipe a key \(flick\)/i);
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_B");
+
+    const directionSelect = screen.getByRole("button", {
+      name: /flick direction/i,
+    });
+    await changeSelectMenu(directionSelect, "n");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for flick/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for flick$/i,
+    });
+    await changeSelectMenu(slot1, "RALT");
+
+    const applyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "ä")?.[1]?.mechanisms ?? [];
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_B",
+      direction: "n",
+      char: "ä",
+      layer: "rightalt",
+    });
+  });
+
+  // Flick twin of the longpress multi-token apply test above — a completed
+  // 2-token desktop combo (Shift+RAlt) must route the flick mechanism to the
+  // combined layer, carrying BOTH slotValues.layer and slotValues.direction.
+  it("canApply blocks flick's Apply on a partial combo, and applying a completed multi-token combo routes to that combined layer", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftRaltComboOnly });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/swipe a key \(flick\)/i);
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_B");
+
+    const directionSelect = screen.getByRole("button", {
+      name: /flick direction/i,
+    });
+    await changeSelectMenu(directionSelect, "n");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for flick/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for flick$/i,
+    });
+    await changeSelectMenu(slot1, "SHIFT");
+
+    const applyBtn = () =>
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+
+    // Partial combo ["SHIFT"] is NOT itself a member of D (only [SHIFT,RALT]
+    // is) — Apply must stay disabled, same as the longpress case.
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(true);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for flick/i }),
+      );
+    });
+    const slot2 = screen.getByRole("button", {
+      name: /^touch layer 2 for flick$/i,
+    });
+    await changeSelectMenu(slot2, "RALT");
+
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(false);
+
+    await act(async () => {
+      fireEvent.click(applyBtn()!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "ä")?.[1]?.mechanisms ?? [];
+    // comboToTouchLayerId(["SHIFT","RALT"]) -> "rightalt-shift", same
+    // TOUCH_LAYER_PRECEDENCE_ORDER as the longpress twin.
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_B",
+      direction: "n",
+      char: "ä",
+      layer: "rightalt-shift",
+    });
+  });
+
+  // Multitap twin of the longpress/flick multi-token apply tests above — the
+  // layer builder is now shared by #3 multitap too.
+  it("canApply blocks multitap's Apply on a partial combo, and applying a completed multi-token combo routes to that combined layer", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftRaltComboOnly });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/tap multiple times \(multitap\)/i);
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_B");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for multitap/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for multitap$/i,
+    });
+    await changeSelectMenu(slot1, "SHIFT");
+
+    const applyBtn = () =>
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+
+    // Partial combo ["SHIFT"] is NOT itself a member of D (only [SHIFT,RALT]
+    // is) — Apply must stay disabled, same as longpress/flick.
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(true);
+    expect(screen.getByText(/Not yet a layer this keyboard uses/i)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for multitap/i }),
+      );
+    });
+    const slot2 = screen.getByRole("button", {
+      name: /^touch layer 2 for multitap$/i,
+    });
+    await changeSelectMenu(slot2, "RALT");
+
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(false);
+
+    await act(async () => {
+      fireEvent.click(applyBtn()!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "ä")?.[1]?.mechanisms ?? [];
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_B",
+      char: "ä",
+      layer: "rightalt-shift",
+    });
+  });
+
+  // Replace twin of the same test — the layer builder is now shared by #4
+  // replace too.
+  it("canApply blocks replace's Apply on a partial combo, and applying a completed multi-token combo routes to that combined layer", async () => {
+    seedStore({ withInventory: ["ä"], ir: irWithShiftRaltComboOnly });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/replace a key/i);
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_B");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for replace/i }),
+      );
+    });
+    const slot1 = screen.getByRole("button", {
+      name: /^touch layer 1 for replace$/i,
+    });
+    await changeSelectMenu(slot1, "SHIFT");
+
+    const applyBtn = () =>
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+
+    // Partial combo ["SHIFT"] is NOT itself a member of D (only [SHIFT,RALT]
+    // is) — Apply must stay disabled, same as the other three methods.
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(true);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /add another touch layer for replace/i }),
+      );
+    });
+    const slot2 = screen.getByRole("button", {
+      name: /^touch layer 2 for replace$/i,
+    });
+    await changeSelectMenu(slot2, "RALT");
+
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(false);
+
+    await act(async () => {
+      fireEvent.click(applyBtn()!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "ä")?.[1]?.mechanisms ?? [];
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_B",
+      char: "ä",
+      layer: "rightalt-shift",
+    });
+  });
+
+  // Defaults-first regression (spec §3c): an author who never touches the
+  // builder for multitap/replace must see byte-identical behavior to before
+  // this feature — the seeded layer (empty for lowercase, SHIFT for
+  // uppercase) is what gets applied, exactly as buildTouchMechanismRef's own
+  // touchLayerForChar fallback always produced.
+  it("multitap applies on the untouched default (base) layer when the builder is left alone", async () => {
+    seedStore({ withInventory: ["ä"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/tap multiple times \(multitap\)/i);
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_B");
+
+    const applyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+    expect(applyBtn).not.toBeNull();
+    expect(applyBtn?.hasAttribute("disabled")).toBe(false);
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "ä")?.[1]?.mechanisms ?? [];
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_B",
+      char: "ä",
+      layer: "default",
+    });
+  });
+
+  it("replace applies on the untouched default (base) layer when the builder is left alone", async () => {
+    seedStore({ withInventory: ["ä"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await openChooser(/replace a key/i);
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_B");
+
+    const applyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+    expect(applyBtn).not.toBeNull();
+    expect(applyBtn?.hasAttribute("disabled")).toBe(false);
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "ä")?.[1]?.mechanisms ?? [];
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_B",
+      char: "ä",
+      layer: "default",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Uppercase current char — touchLayerForChar's pre-existing case-derived
+// default (spec 051 FR-006) must survive the layer picker: the picker's
+// initial value for an uppercase current char is "shift", not "default", and
+// applying on that default layer must not raise a redundant case-pair
+// proposal (casePairTouchLayer("shift") === null — there is no "more
+// uppercase" layer to pair "shift" with). Closes the uppercase-path
+// regression gap: the existing suite above only ever seeds a lowercase
+// current char ("ä"/"θ"/"中").
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — uppercase current char (spec 051 FR-006 layer-picker regression)", () => {
+  it("layer builder seeds a SHIFT slot, and applying raises no case-pair proposal", async () => {
+    // "Á" is both uppercase (touchLayerForChar -> "shift") and decomposable
+    // accented (isDecomposableAccented -> true, so the auto-detected
+    // longpress suggestion card shows first — same shape as the "ä" tests
+    // above); Deny it to reach the method chooser. Seeded with an IR that
+    // actually uses SHIFT (irWithShiftAndRaltLayers) — the hard constraint
+    // (D3 of this feature) requires the FR-006 case-derived seed combo to be
+    // a combo the desktop keyboard actually uses, same as any other combo;
+    // every real Latin-script keyboard with uppercase letters satisfies this
+    // trivially (it must use SHIFT to produce them on desktop too).
+    seedStore({ withInventory: ["Á"], ir: irWithShiftAndRaltLayers });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const denyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Deny") ?? null;
+    expect(denyBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(denyBtn!);
+    });
+
+    // longpress_alternates is the per-char default method, so the chooser is
+    // already showing its card — the layer builder's seeded slot must
+    // preserve the pre-existing touchLayerForChar behavior: a single SHIFT
+    // slot for an uppercase current char, not the empty (base) combo.
+    const layerSelect = screen.getByRole("button", {
+      name: /^touch layer 1 for long-press$/i,
+    });
+    expect(selectMenuValue(layerSelect)).toBe("SHIFT");
+    expect(screen.getByText(/Resulting layer: Shift/i)).toBeTruthy();
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_A");
+
+    const applyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    // Applying at the picker's own default (shift) layer must not raise a
+    // redundant case-pair proposal banner — this is already the "uppermost"
+    // case layer, so there is nothing further to pair it with.
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const mechanisms =
+      draft?.charTouchEntries.find(([c]) => c === "Á")?.[1]?.mechanisms ?? [];
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "Á",
+      layer: "shift",
+    });
+  });
+
+  // Recoverable-edge regression: the case-derived ["SHIFT"] seed is NOT
+  // itself guaranteed to be a combo the desktop keyboard uses — seed and
+  // hard-constraint are two separate mechanisms, and an IR that never uses
+  // bare SHIFT as a layer (irWithoutShiftCombo) exposes that gap. This must
+  // surface as the same "not yet a layer this keyboard uses" note as any
+  // other invalid partial combo (never a crash), and Apply must stay
+  // disabled until the author removes the seeded slot, after which the
+  // empty/base combo (always valid) re-enables it.
+  it("shows the not-yet-valid note when the case-derived SHIFT seed is not itself a combo the desktop uses, and Apply re-enables once the seeded slot is removed", async () => {
+    seedStore({ withInventory: ["Á"], ir: irWithoutShiftCombo });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const denyBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Deny") ?? null;
+    expect(denyBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(denyBtn!);
+    });
+
+    // Seeded with a single SHIFT slot (touchLayerForChar("Á") === "shift"),
+    // but this IR's collectLayerCombosInUse reports only [["RALT"],["CTRL"]]
+    // — ["SHIFT"] is not a member of D.
+    const layerSelect = screen.getByRole("button", {
+      name: /^touch layer 1 for long-press$/i,
+    });
+    expect(selectMenuValue(layerSelect)).toBe("SHIFT");
+    expect(screen.getByText(/Not yet a layer this keyboard uses/i)).toBeTruthy();
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_A");
+
+    const applyBtn = () =>
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
+      null;
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(true);
+
+    // Remove the seeded (invalid) slot — the builder falls back to the
+    // empty/base combo, which is always valid.
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /^remove touch layer 1 for long-press$/i }),
+      );
+    });
+
+    expect(screen.queryByText(/Not yet a layer this keyboard uses/i)).toBeNull();
+    expect(screen.getByText(/Resulting layer: Base/i)).toBeTruthy();
+    expect(applyBtn()?.hasAttribute("disabled")).toBe(false);
+  });
+});
+// Spec 051 Phase 7 (T049/T050) — FR-012: the suggestion-Accept path
+// (handleUseSuggestion) must carry an explicit `layer`, derived the same way
+// every other placement path derives it (buildTouchMechanismRef /
+// touchLayerForChar) — not a bare literal that silently resolves to
+// "default" for every accepted suggestion, uppercase included.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — suggestion Accept carries an explicit layer (spec 051 FR-012)", () => {
+  function touchMechanismsFor(char: string) {
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    return (
+      draft?.charTouchEntries.find(([c]) => c === char)?.[1]?.mechanisms ?? []
+    );
+  }
+
+  it("accepting the longpress suggestion for a lowercase decomposable letter (ă) records layer: default", async () => {
+    seedStore({ withInventory: ["ă"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const acceptBtn =
+      screen
+        .queryAllByRole("button")
+        .find((b) => b.textContent?.trim() === "Accept") ?? null;
+    expect(acceptBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(acceptBtn!);
+    });
+
+    const mechanisms = touchMechanismsFor("ă");
+    expect(mechanisms).toHaveLength(1);
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "ă",
+      layer: "default",
+    });
+  });
+
+  it("accepting the longpress suggestion for the uppercase counterpart (Ă) records layer: shift, not a silent default", async () => {
+    seedStore({ withInventory: ["Ă"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const acceptBtn =
+      screen
+        .queryAllByRole("button")
+        .find((b) => b.textContent?.trim() === "Accept") ?? null;
+    expect(acceptBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(acceptBtn!);
+    });
+
+    const mechanisms = touchMechanismsFor("Ă");
+    expect(mechanisms).toHaveLength(1);
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "Ă",
+      layer: "shift",
+    });
+  });
+
+  it("accepting a 'replace' suggestion also carries an explicit layer (nextMethod = touch_key_replace dispatch)", async () => {
+    // Seed a Phase C simple_swap desktop assignment so suggestion.kind ===
+    // "replace" — exercises handleUseSuggestion's touch_key_replace branch,
+    // which the ă/Ă cases above (both "longpress") do not reach.
+    const swapAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "ă",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "simple_swap",
+          strategyId: "S-01",
+          slotValues: { kmnRules: "+ [K_A] > U+0103" },
+        },
+      ],
+      source: "user",
+    };
+    seedWithDesktopAssignment("ă", swapAssignment);
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expect(screen.queryByText(/Suggested: replace/i)).not.toBeNull();
+
+    const acceptBtn =
+      screen
+        .queryAllByRole("button")
+        .find((b) => b.textContent?.trim() === "Accept") ?? null;
+    expect(acceptBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(acceptBtn!);
+    });
+
+    const mechanisms = touchMechanismsFor("ă");
+    expect(mechanisms).toHaveLength(1);
+    expect(mechanisms[0]?.patternId).toBe("touch_key_replace");
+    expect(mechanisms[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "ă",
+      layer: "default",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Longpress accelerator (sibling accents) — accepting a longpress suggestion
+// for one accented letter offers the rest of its diacritic family, both
+// cases, in one confirm.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — longpress accelerator (sibling accents)", () => {
+  function touchMechanismsFor(char: string) {
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    return (
+      draft?.charTouchEntries.find(([c]) => c === char)?.[1]?.mechanisms ?? []
+    );
+  }
+  function bulkGroups() {
+    return useWorkingCopyStore.getState().touchDraft?.bulkAccentGroups ?? [];
+  }
+  /** Jump the gallery's positional walk directly to `char` via its
+   *  CharScrollStrip chip (ungated by covered/configured status — see
+   *  usePositionalCharNav's handleSelectChar) — the gallery's walk is now
+   *  collated (spec 047's collateCompare), so a breve letter like "ă" sorts
+   *  AFTER its grave/acute-accented siblings and is no longer reliably the
+   *  first (idx 0) character these fixtures used to land on by construction.
+   *  Single-codepoint BMP chars only (matches CharScrollStrip.tsx's charHex). */
+  function gotoChar(char: string) {
+    const hex = (char.codePointAt(0) ?? 0)
+      .toString(16)
+      .toUpperCase()
+      .padStart(4, "0");
+    fireEvent.click(screen.getByTestId(`char-scroll-chip-${hex}`));
+  }
+  async function acceptSuggestion() {
+    const acceptBtn =
+      screen
+        .queryAllByRole("button")
+        .find((b) => b.textContent?.trim() === "Accept") ?? null;
+    expect(acceptBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(acceptBtn!);
+    });
+  }
+  async function confirmBanner() {
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /Add the related accented letters to K_A/i,
+        }),
+      );
+    });
+  }
+  /** The Configured-row remove chip for `char` (aria-label "Remove <notation>
+   *  <char> …"), or undefined. Deliberately excludes the bulk box's "Remove
+   *  all …" control and the Skip/Accept buttons (which also name the current
+   *  char) so callers test the per-mechanism chip specifically. */
+  function individualChipFor(char: string) {
+    return screen.queryAllByRole("button").find((b) => {
+      const label = b.getAttribute("aria-label") ?? "";
+      return (
+        label.startsWith("Remove ") &&
+        !label.startsWith("Remove all") &&
+        label.includes(char)
+      );
+    });
+  }
+
+  it("accepting the longpress suggestion for ă raises the sibling-accent banner", async () => {
+    // Inventory holds only the a-family accents the language uses.
+    seedStore({ withInventory: ["ă", "à", "á", "À", "Á"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    // "ă" (breve) sorts after à/á/À/Á under the collated walk — jump to it
+    // directly rather than relying on mount's first-uncovered default.
+    gotoChar("ă");
+
+    await acceptSuggestion();
+
+    // "ă" itself is recorded directly (unaffected by the accelerator).
+    expect(touchMechanismsFor("ă")).toHaveLength(1);
+    expect(screen.getByText(/is part of a family of accented letters/i)).toBeTruthy();
+
+    // Nothing is placed yet — propose-then-confirm, never a silent auto-insert.
+    expect(touchMechanismsFor("à")).toHaveLength(0);
+    expect(touchMechanismsFor("À")).toHaveLength(0);
+  });
+
+  it("CHANGE 5: the proposal banner renders at the TOP — before the Configured chip row, in the same region the accepted bulk box later occupies", async () => {
+    seedStore({ withInventory: ["ă", "à", "á", "À", "Á"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await acceptSuggestion();
+    const proposalBanner = screen.getByRole("note", {
+      name: /Related accented letters suggestion/i,
+    });
+    const configuredHeading = screen.getByText("Configured");
+    // DOCUMENT_POSITION_FOLLOWING (4): configuredHeading comes AFTER the
+    // banner — i.e. the banner renders above/before the Configured chip row,
+    // not lower down near it (the pre-CHANGE-5 position).
+    expect(
+      proposalBanner.compareDocumentPosition(configuredHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    // Confirm the bulk proposal — its accepted, removable summary box now
+    // occupies the SAME region the proposal banner just did, still above the
+    // Configured chip row.
+    await confirmBanner();
+    const summaryBox = screen.getByText(/Added .* as long-press/i);
+    const configuredHeadingAfter = screen.getByText("Configured");
+    expect(
+      summaryBox.compareDocumentPosition(configuredHeadingAfter) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("Accept places only INVENTORY siblings — lowercase on default, uppercase on shift — in one click", async () => {
+    // The language uses à á and their capitals, but NOT â ä ã å etc.
+    seedStore({ withInventory: ["ă", "à", "á", "À", "Á"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    await acceptSuggestion();
+    await confirmBanner();
+
+    for (const lower of ["à", "á"]) {
+      const mechanisms = touchMechanismsFor(lower);
+      expect(mechanisms).toHaveLength(1);
+      expect(mechanisms[0]?.patternId).toBe("longpress_alternates");
+      expect(mechanisms[0]?.slotValues).toMatchObject({
+        hostKey: "K_A",
+        char: lower,
+        layer: "default",
+      });
+    }
+    for (const upper of ["À", "Á"]) {
+      expect(touchMechanismsFor(upper)[0]?.slotValues).toMatchObject({
+        hostKey: "K_A",
+        char: upper,
+        layer: "shift",
+      });
+    }
+
+    // "extras" NOT in the inventory are never added.
+    for (const extra of ["â", "ä", "ã", "å", "Â"]) {
+      expect(touchMechanismsFor(extra)).toHaveLength(0);
+    }
+
+    // The banner is gone after Accept.
+    expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
+  });
+
+  it("the batch appears as ONE bulk box (not per-sibling chips) and deletes them all at once", async () => {
+    seedStore({ withInventory: ["ă", "à", "á", "À", "Á"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    gotoChar("ă");
+
+    await acceptSuggestion();
+    await confirmBanner();
+
+    // One summary box, one Remove-all control.
+    expect(screen.getByText(/Added .* as long-press/i)).toBeTruthy();
+    const removeAll = screen.getByRole("button", { name: /Remove all/i });
+    expect(removeAll).toBeTruthy();
+    expect(bulkGroups()).toHaveLength(1);
+    expect(bulkGroups()[0]?.members).toEqual(["à", "á", "À", "Á"]);
+
+    // The siblings are NOT rendered as individual Configured chips — only the
+    // base "ă" keeps its own chip.
+    expect(individualChipFor("à")).toBeUndefined();
+    expect(individualChipFor("À")).toBeUndefined();
+    expect(individualChipFor("ă")).toBeTruthy();
+
+    // Remove-all clears every sibling in one click; the box disappears.
+    await act(async () => {
+      fireEvent.click(removeAll);
+    });
+    for (const c of ["à", "á", "À", "Á"]) {
+      expect(touchMechanismsFor(c)).toHaveLength(0);
+    }
+    expect(bulkGroups()).toHaveLength(0);
+    expect(screen.queryByText(/Added .* as long-press/i)).toBeNull();
+    // The base longpress the author accepted directly is untouched.
+    expect(touchMechanismsFor("ă")).toHaveLength(1);
+  });
+
+  it("the bulk box rehydrates from a persisted draft (survives unmount/remount)", async () => {
+    seedStore({ withInventory: ["ă", "à", "À"] });
+    const lp = (char: string, layer: string): MechanismAssignment => ({
+      scope: "individual",
+      target: char,
+      modality: "touch",
+      mechanisms: [
+        {
+          patternId: "longpress_alternates",
+          slotValues: { hostKey: "K_A", char, layer },
+        },
+      ],
+      source: "user",
+    });
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [
+        ["à", lp("à", "default")],
+        ["À", lp("À", "shift")],
+      ],
+      suggestionResolvedChars: [],
+      bulkAccentGroups: [
+        { id: "ă:K_A", hostKey: "K_A", baseChar: "ă", members: ["à", "À"] },
+      ],
+    });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // The summary box is present on first paint, driven by the persisted group.
+    expect(screen.getByText(/Added .* as long-press/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Remove all/i })).toBeTruthy();
+    // Still not individual chips.
+    expect(individualChipFor("à")).toBeUndefined();
+  });
+
+  it("Decline discards the proposal and places nothing", async () => {
+    seedStore({ withInventory: ["ă", "à", "á"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    gotoChar("ă");
+
+    await acceptSuggestion();
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /Do not add the related accented letters/i,
+        }),
+      );
+    });
+
+    expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
+    expect(touchMechanismsFor("à")).toHaveLength(0);
+    expect(bulkGroups()).toHaveLength(0);
+    // "ă" itself is untouched by declining the accelerator.
+    expect(touchMechanismsFor("ă")).toHaveLength(1);
+  });
+
+  it("does not fire for a 'replace' suggestion accept (desktop simple_swap, not an accent family)", async () => {
+    const swapAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "ă",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "simple_swap",
+          strategyId: "S-01",
+          slotValues: { kmnRules: "+ [K_A] > U+0103" },
+        },
+      ],
+      source: "user",
+    };
+    seedWithDesktopAssignment("ă", swapAssignment);
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    expect(screen.queryByText(/Suggested: replace/i)).not.toBeNull();
+
+    await acceptSuggestion();
+    expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
+  });
+
+  it("CHANGE 3: a 'replace' suggestion accept (no bulk possible) still raises the simple case-pair companion — not just the manual chooser's Apply", async () => {
+    const swapAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "ă",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "simple_swap",
+          strategyId: "S-01",
+          slotValues: { kmnRules: "+ [K_A] > U+0103" },
+        },
+      ],
+      source: "user",
+    };
+    seedWithDesktopAssignment("ă", swapAssignment);
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    await acceptSuggestion();
+
+    // No bulk banner (a "replace" suggestion is never a bulk trigger), but
+    // the simple companion DOES fire — this is the CHANGE 3 fix: previously
+    // only the manual chooser's Apply (handleApply) raised it.
+    expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
+    expect(screen.getByText(/has an uppercase form, Ă/i)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map Ă to the shift layer of/i }),
+      );
+    });
+    expect(touchMechanismsFor("Ă")[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "Ă",
+      layer: "shift",
+    });
+  });
+
+  it("CHANGE 4: a bulk proposal that includes the accepted char's OWN uppercase counterpart pre-empts the simple companion — denying the bulk then falls back to it", async () => {
+    // "à"'s own uppercase counterpart is "À", which IS among "à"'s inventory
+    // siblings here — so the bulk proposal (offering á/À) already covers it.
+    seedStore({ withInventory: ["à", "á", "À"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    // The collated walk puts "á" (acute) ahead of "à" (grave), so jump to "à"
+    // rather than relying on mount's first-uncovered default — "à" is the char
+    // whose own uppercase counterpart is among the bulk siblings.
+    gotoChar("à");
+
+    await acceptSuggestion();
+
+    // Bulk banner shown; simple companion DEFERRED (not shown alongside it —
+    // showing both would prompt placing À twice).
+    expect(screen.getByText(/is part of a family of accented letters/i)).toBeTruthy();
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+
+    // Deny the bulk proposal — the deferred simple companion is raised now,
+    // as the fallback.
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /Do not add the related accented letters/i,
+        }),
+      );
+    });
+    expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
+    expect(screen.getByText(/has an uppercase form, À/i)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Map À to the shift layer of/i }),
+      );
+    });
+    // "À" was placed via the SIMPLE companion path, not the bulk one — no
+    // bulk group was ever recorded (the bulk was denied).
+    expect(bulkGroups()).toHaveLength(0);
+    expect(touchMechanismsFor("À")).toHaveLength(1);
+    expect(touchMechanismsFor("À")[0]?.slotValues).toMatchObject({
+      hostKey: "K_A",
+      char: "À",
+      layer: "shift",
+    });
+  });
+
+  it("CHANGE 4: confirming the bulk proposal (which already placed the uppercase) never subsequently raises the simple companion", async () => {
+    seedStore({ withInventory: ["à", "á", "À"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    // Collated walk order puts "á" first — see the deny/fallback test above.
+    gotoChar("à");
+
+    await acceptSuggestion();
+    await confirmBanner();
+
+    // The uppercase was placed via the bulk group — the deferred simple
+    // companion is discarded, never shown.
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+    expect(bulkGroups()).toHaveLength(1);
+    expect(bulkGroups()[0]?.members).toEqual(["á", "À"]);
+  });
+
+  it("navigating away with an OPEN, UNDECIDED bulk proposal abandons BOTH the bulk proposal and its deferred simple companion — neither resurfaces on the new char", async () => {
+    // Same setup as the CHANGE 4 deny/confirm tests above: "à"'s own
+    // uppercase counterpart "À" is among the bulk siblings, so accepting the
+    // suggestion defers the simple companion behind the (still open) bulk
+    // banner.
+    seedStore({ withInventory: ["à", "á", "À"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    // Collated walk order puts "á" first — see the deny/fallback test above.
+    gotoChar("à");
+
+    await acceptSuggestion();
+    expect(screen.getByText(/is part of a family of accented letters/i)).toBeTruthy();
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+
+    // Navigate away WITHOUT confirming or dismissing the bulk banner ("à"
+    // already has its own directly-accepted mechanism, so the Next control
+    // is enabled here).
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-continue"));
+    });
+
+    // Both proposals are abandoned, not carried forward or silently
+    // resolved: no bulk banner, no deferred-companion fallback banner, and
+    // no bulk group was ever recorded.
+    expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+    expect(bulkGroups()).toHaveLength(0);
+    // Neither sibling was placed by the abandoned bulk proposal.
+    expect(touchMechanismsFor("á")).toHaveLength(0);
+    expect(touchMechanismsFor("À")).toHaveLength(0);
+  });
+
+  it("skips a sibling already produced on that host key's layer (not counted in the bulk group)", async () => {
+    // "à" is pre-seeded as already configured on K_A's default layer. Accepting
+    // "ă" must dedupe against it rather than double-placing — and since it was
+    // not NEWLY placed, it is not a member of this confirm's bulk group.
+    seedStore({ withInventory: ["ă", "à", "á"] });
+    const existingAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "à",
+      modality: "touch",
+      mechanisms: [
+        {
+          patternId: "longpress_alternates",
+          slotValues: { hostKey: "K_A", char: "à", layer: "default" },
+        },
+      ],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [["à", existingAssignment]],
+      suggestionResolvedChars: [],
+    });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    gotoChar("ă");
+
+    await acceptSuggestion();
+    await confirmBanner();
+
+    // "à" still carries exactly its pre-existing mechanism — not duplicated.
+    expect(touchMechanismsFor("à")).toHaveLength(1);
+    // "á" is newly placed by this batch.
+    expect(touchMechanismsFor("á")).toHaveLength(1);
+    expect(bulkGroups()[0]?.members).toEqual(["á"]);
+  });
+
+  it("removing the base chip after confirm removes ONLY the base, not the whole batch", async () => {
+    seedStore({ withInventory: ["ă", "à", "À"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    gotoChar("ă");
+
+    await acceptSuggestion();
+    await confirmBanner();
+
+    expect(touchMechanismsFor("ă")).toHaveLength(1);
+    expect(touchMechanismsFor("à")).toHaveLength(1);
+    expect(bulkGroups()).toHaveLength(1);
+
+    // Remove the base "ă"'s chip via the Configured row.
+    const removeBase = individualChipFor("ă");
+    expect(removeBase).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(removeBase!);
+    });
+
+    // Only the base is gone. The siblings are independent long-press alternates
+    // of the same key and stay put — deleting one rule must not delete the
+    // batch (that is what "Remove all" is for).
+    expect(touchMechanismsFor("ă")).toHaveLength(0);
+    expect(touchMechanismsFor("à")).toHaveLength(1);
+    expect(touchMechanismsFor("À")).toHaveLength(1);
+    expect(bulkGroups()).toHaveLength(1);
+    // The bulk box still shows (current char "ă" is still in the a-family).
+    expect(screen.getByText(/Added .* as long-press/i)).toBeTruthy();
+  });
+
+  it("clears an OPEN proposal when the base chip is removed before confirming", async () => {
+    seedStore({ withInventory: ["ă", "à"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    gotoChar("ă");
+
+    await acceptSuggestion();
+    expect(touchMechanismsFor("ă")).toHaveLength(1);
+    expect(screen.getByText(/is part of a family of accented letters/i)).toBeTruthy();
+
+    const removeBase = individualChipFor("ă");
+    expect(removeBase).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(removeBase!);
+    });
+
+    expect(touchMechanismsFor("ă")).toHaveLength(0);
+    expect(screen.queryByText(/is part of a family of accented letters/i)).toBeNull();
+    expect(touchMechanismsFor("à")).toHaveLength(0);
+  });
+
+  it("shows only the bulk box for the current character's family, not other families' boxes", async () => {
+    // Two persisted groups on different host keys (a-family and e-family).
+    // The gallery's walk is collated (spec 047's collateCompare), so "à"
+    // (not "è") is the first (idx 0) character regardless of the seed
+    // array's own order — jump to "è" explicitly via its chip.
+    seedStore({ withInventory: ["è", "à"] });
+    const lp = (
+      char: string,
+      hostKey: string,
+      layer: string,
+    ): MechanismAssignment => ({
+      scope: "individual",
+      target: char,
+      modality: "touch",
+      mechanisms: [
+        { patternId: "longpress_alternates", slotValues: { hostKey, char, layer } },
+      ],
+      source: "user",
+    });
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [
+        ["é", lp("é", "K_E", "default")], // e-family base chip
+        ["ê", lp("ê", "K_E", "default")], // e-family sibling (in box)
+        ["á", lp("á", "K_A", "default")], // a-family base chip
+        ["â", lp("â", "K_A", "default")], // a-family sibling (in box)
+      ],
+      suggestionResolvedChars: [],
+      bulkAccentGroups: [
+        { id: "é:K_E", hostKey: "K_E", baseChar: "é", members: ["ê"] },
+        { id: "á:K_A", hostKey: "K_A", baseChar: "á", members: ["â"] },
+      ],
+    });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    gotoChar("è");
+
+    // Current char "è" is in the e-family (host key K_E): only the e box shows.
+    expect(screen.getByText(/to e as long-press/i)).toBeTruthy();
+    expect(screen.queryByText(/to a as long-press/i)).toBeNull();
+    // The a-family base chip is also hidden while editing an e-family char;
+    // the e-family base chip is shown. (Siblings ê/â are always in the box.)
+    expect(individualChipFor("á")).toBeUndefined();
+    expect(individualChipFor("é")).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 051 Phase 7 (T051/T052) — FR-013: case-correct host-key labels.
+//
+// A Keyman vkey name carries no case of its own (`K_A` names the A key);
+// case is a property of the layer a placement targets. `hostKeyShortLabel`
+// takes the layer explicitly and cases the returned letter to match it.
+// ---------------------------------------------------------------------------
+
+// Every real vkey id in keyOptions.ts is already all-uppercase, so testing
+// the casing decision only through hostKeyShortLabel's output cannot tell a
+// correct component match from an accidental substring match — both render
+// "A" for "ncaps" today. This block tests the predicate directly, so a
+// regression from `components.includes("caps")` to the substring form
+// `layer.includes("caps")` fails HERE (isCasingBearingTouchLayer("ncaps")
+// would flip from false to true) even though hostKeyShortLabel's own output
+// would stay byte-identical for every real key id.
+describe("isCasingBearingTouchLayer — component match, not substring (spec 051 FR-013)", () => {
+  it("is true for shift, caps, and casing-bearing compounds", () => {
+    expect(isCasingBearingTouchLayer("shift")).toBe(true);
+    expect(isCasingBearingTouchLayer("caps")).toBe(true);
+    expect(isCasingBearingTouchLayer("rightalt-shift")).toBe(true);
+    expect(isCasingBearingTouchLayer("shift-ctrl-alt")).toBe(true);
+  });
+
+  it("is false for 'ncaps' and other non-casing layer ids", () => {
+    expect(isCasingBearingTouchLayer("ncaps")).toBe(false);
+    expect(isCasingBearingTouchLayer("alt")).toBe(false);
+    expect(isCasingBearingTouchLayer("ctrl")).toBe(false);
+    expect(isCasingBearingTouchLayer("rightalt")).toBe(false);
+    expect(isCasingBearingTouchLayer("rightctrl")).toBe(false);
+    expect(isCasingBearingTouchLayer("leftctrl")).toBe(false);
+    expect(isCasingBearingTouchLayer("default")).toBe(false);
+  });
+});
+
+describe("hostKeyShortLabel — case-correct labels by layer (spec 051 FR-013)", () => {
+  it("reads lowercase on the default layer and uppercase on the shift layer", () => {
+    expect(hostKeyShortLabel("K_A", "default")).toBe("a");
+    expect(hostKeyShortLabel("K_A", "shift")).toBe("A");
+  });
+
+  it("reads uppercase for a casing-bearing compound layer id (rightalt-shift)", () => {
+    expect(hostKeyShortLabel("K_A", "rightalt-shift")).toBe("A");
+  });
+
+  it("does not mistake 'ncaps' for a caps-bearing layer (component match, not substring)", () => {
+    expect(hostKeyShortLabel("K_A", "ncaps")).toBe("A");
+  });
+
+  it("leaves non-casing layer ids reading the raw uppercase vkey letter (today's floor, now pinned)", () => {
+    expect(hostKeyShortLabel("K_A", "alt")).toBe("A");
+    expect(hostKeyShortLabel("K_A", "ctrl")).toBe("A");
+    expect(hostKeyShortLabel("K_A", "rightalt")).toBe("A");
+    expect(hostKeyShortLabel("K_A", "rightctrl")).toBe("A");
+    expect(hostKeyShortLabel("K_A", "leftctrl")).toBe("A");
+  });
+});
+
+describe("TouchGallery — host-key label casing in the UI (spec 051 FR-013)", () => {
+  it("renders the configured-mechanism chip in lowercase for a default-layer mechanism", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const select = screen.queryByRole("button", { name: /host key/i });
+    expect(select).not.toBeNull();
+    await changeSelectMenu(select!, "K_A");
+    const applyBtn =
+      screen
+        .queryAllByRole("button")
+        .find((b) => b.textContent?.trim() === "Apply method") ?? null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    const configuredGroup = screen.getByRole("group", {
+      name: /configured characters/i,
+    });
+    expect(configuredGroup.textContent).toContain("long-press a");
+    expect(configuredGroup.textContent).not.toContain("long-press A");
+  });
+
+  it("renders the placement-suggestion text in lowercase for a lowercase placement", async () => {
+    seedStore({ withInventory: ["ä"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // "ä" is decomposable-accented and derives host key K_A (touchBehavior's
+    // suggestion useMemo) — a lowercase placement, so the suggestion text
+    // must read the lowercase keycap, not the raw uppercase vkey letter.
+    expect(screen.getByText(/Suggested: long-press/i).textContent).toMatch(
+      /long-press a to reach/i,
+    );
   });
 });

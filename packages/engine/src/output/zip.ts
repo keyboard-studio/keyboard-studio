@@ -1,7 +1,30 @@
 // see spec.md §12 — zip serialization of the virtual FS for download
+//
+// ARCHIVE SHAPE, AND ONE OPEN QUESTION FOR THE KEYMAN TEAM (specs/053, FR-020)
+//
+// The archive root IS the keyboard's directory content (`source/<id>.kmn`,
+// `<id>.kps`, `build/…`), and `NEXT_STEPS.md` has always been injected beside it.
+// There is therefore no existing "beside, not inside" position in this archive:
+// studio metadata and keyboard files share the root.
+//
+// FR-020 asks for the decision record to sit beside the keyboard's directory
+// rather than inside it. What ships is the closest thing this layout allows — a
+// clearly-named `.studio/` prefix at the root, excluded from the pull-request
+// commit by `isSidecarPath` (see ./sidecar.ts) and named in NEXT_STEPS.md as
+// not-to-be-copied. The keyboard's own files are byte-identical to a hand-authored
+// submission either way, which is the property SC-008 actually turns on.
+//
+// DEFERRED, deliberately: making the separation POSITIONAL — nesting the keyboard
+// under `<id>/` so the metadata is a true sibling — changes the shape of every
+// archive the studio has ever emitted and of the copy instructions people already
+// follow. That is a Keyman-team-facing call, not one to make inside this feature.
+// See specs/053-decision-audit/research.md D-07 and plan.md's Summary.
 
 import { zipSync, type Zippable } from "fflate";
-import type { OutputService, VirtualFS } from "@keyboard-studio/contracts";
+import { createVirtualFS } from "@keyboard-studio/contracts";
+import type { DecisionRecord, OutputService, VirtualFS } from "@keyboard-studio/contracts";
+import { addDecisionRecordSidecar } from "../decision-audit/sidecar.js";
+import { STUDIO_METADATA_PREFIX } from "./sidecar.js";
 
 // TextEncoder is global in Node 20+ and all modern browsers but absent from
 // the engine's lib.es2022-only tsconfig; cast through unknown.
@@ -17,7 +40,8 @@ Your keyboard has been packaged and is ready to submit to the Keyman keyboard re
 
 1. Fork \`keyboard-studio/keyboards\` at https://github.com/keyboard-studio/keyboards
 2. Create a branch: \`git checkout -b add/<your-keyboard-id>\`
-3. Copy the contents of this zip into \`release/<first-letter>/<your-keyboard-id>/\`
+3. Copy the keyboard files into \`release/<first-letter>/<your-keyboard-id>/\`.
+   Do not copy \`NEXT_STEPS.md\` or the \`${STUDIO_METADATA_PREFIX}\` folder — see "Studio metadata" below.
 4. Commit and push your branch
 5. Open a pull request from your fork to \`keyboard-studio/keyboards:master\`
 
@@ -25,6 +49,18 @@ Your keyboard has been packaged and is ready to submit to the Keyman keyboard re
 
 Email the zip archive to keymanhelp@sil.org with the subject:
 "New keyboard submission: <your-keyboard-id>"
+
+## Studio metadata (not part of the keyboard)
+
+This file and everything under \`${STUDIO_METADATA_PREFIX}\` were added by keyboard-studio
+for you, not for the keyboard repository. Do not copy them into
+\`release/<first-letter>/<your-keyboard-id>/\` — the keyboard's directory should look
+exactly as it would if you had written it by hand.
+
+- \`${STUDIO_METADATA_PREFIX}decision-record.json\` — the record of the decisions you made while
+  authoring, and what each one changed in the source. Useful for picking the work
+  up again later, or for answering a reviewer's question about why something is
+  the way it is.
 
 ## Resources
 
@@ -59,6 +95,15 @@ function safeEntryName(path: string): string {
   return segments.join("/");
 }
 
+export interface ToZipOptions {
+  /**
+   * Decision record to package as studio metadata (specs/053-decision-audit
+   * FR-020). Omitted for a session that recorded nothing; the archive is then
+   * byte-for-byte what it was before the feature existed.
+   */
+  decisionRecord?: DecisionRecord;
+}
+
 /**
  * Serialize a {@link VirtualFS} snapshot to a `.zip` archive.
  *
@@ -68,12 +113,25 @@ function safeEntryName(path: string): string {
  *   - Binary entries are stored uncompressed (level 0).
  *   - Text entries are deflated (level 6).
  *
- * Implements {@link OutputService.toZip}.
+ * A supplied `decisionRecord` is written through `addDecisionRecordSidecar` onto
+ * a DETACHED copy of the entry list — the caller's projected VFS is the live
+ * working copy's projection, and packaging must not mutate it. Routing through
+ * that writer rather than adding the file here keeps the record's path and its
+ * serialization in one place, so the packaged bytes and the persisted record
+ * cannot be different renderings of the same data.
+ *
+ * Implements {@link OutputService.toZip} — the extra options parameter is
+ * optional, so this stays assignable to the locked service signature.
  */
-export async function toZip(fs: VirtualFS): Promise<Uint8Array> {
+export async function toZip(fs: VirtualFS, opts: ToZipOptions = {}): Promise<Uint8Array> {
   const files: Zippable = {};
 
-  for (const entry of fs.entries()) {
+  const source =
+    opts.decisionRecord === undefined
+      ? fs
+      : addDecisionRecordSidecar(createVirtualFS(fs.entries()), opts.decisionRecord);
+
+  for (const entry of source.entries()) {
     const bytes: Uint8Array =
       typeof entry.content === "string"
         ? enc.encode(entry.content)

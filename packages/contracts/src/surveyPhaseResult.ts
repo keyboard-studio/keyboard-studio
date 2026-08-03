@@ -121,4 +121,26 @@ export interface SurveyPhaseResult {
    * output-form station has been confirmed.
    */
   marksOutputForm?: OutputForm;
+  /**
+   * Base-keyboard characters the author chose to KEEP even though the
+   * orthography does not use them — the loanword / email-address / web-address
+   * convenience set (the pre-carve convenience question).
+   *
+   * **Deliberately NOT part of `confirmedInventory`.** These are not the
+   * language's characters and must not become placement work: they are already
+   * on keys the base keyboard provides, and folding them into the inventory
+   * would put them on the mechanism gallery's worklist and inside the Phase F
+   * "every character implemented" gate as if the author had declared them part
+   * of the orthography. Their one job is to be *shielded from carve* — the
+   * carve gallery unions this list into its needed-set so the characters stop
+   * being proposed for removal.
+   *
+   * **Additive** — `undefined` for every phase that does not run the
+   * convenience question, and for a run that retained nothing (which is
+   * recorded as `[]`, not absent: an author who deliberately kept none is a
+   * different state from a question never asked). Merged across phases by
+   * {@link mergePhaseResults} (deduped union, first-appearance order,
+   * NFC-normalised).
+   */
+  retainedConvenienceChars?: string[];
 }

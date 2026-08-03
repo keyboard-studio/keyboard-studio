@@ -35,7 +35,7 @@ and build/lint wiring, so it clears the constitution gates without escalation.
 
 **Performance Goals**: zero runtime TMS calls; English bundled synchronously so first paint never blocks on a fetch; non-source locales code-split and lazily activated.
 
-**Constraints**: build-time localization only (no runtime Crowdin client in the shipped bundle); §12 team boundaries preserved (Tier A engine / Tier B content, separate Crowdin mappings); `criteria.json` localized copies must satisfy `CriterionSchema` and the 148-row count test must keep reading the canonical English file; no locked-schema edits.
+**Constraints**: build-time localization only (no runtime Crowdin client in the shipped bundle); §12 team boundaries preserved (Tier A engine / Tier B content, separate Crowdin mappings); localized criteria prose lives in the extracted sidecar (`content/i18n/{locale}/criteria.json`) and is never parsed as a `Criterion[]`, so the canonical English `criteria.json` stays the sole input to `ALL_CRITERIA` with its parse-parity and band-partition invariants intact; no locked-schema edits. *(Restated 2026-07-30 — the original `CriterionSchema` + "148-row count test" wording described the D7 design that D8 superseded and that was never built; see [research.md](research.md) D7/D8.)*
 
 **Scale/Scope**: P1 = studio UI chrome (~dozens of components); P2 = content strings (survey/adaptation prose, pattern `title`/`description`/`prompt`, criteria `description`); P3 = translator UX + ops. Locale count starts at `en` + one demo target (`fr`), grows by catalog files only.
 
@@ -45,7 +45,7 @@ and build/lint wiring, so it clears the constitution gates without escalation.
 
 | Article | Verdict | Notes |
 |---------|---------|-------|
-| I. Pattern schema locked | **PASS** | No edit to `pattern.ts`/`criteria.ts`/`schemas.ts`. Localization adds translated *values* only. Localized `criteria.<lang>.json` must satisfy `CriterionSchema`; the count test reads the canonical English file (FR-010). |
+| I. Pattern schema locked | **PASS** | No edit to `pattern.ts`/`criteria.ts`/`schemas.ts`. Localization adds translated *values* only. Localized criteria prose lives in the sidecar catalog and is never parsed as a `Criterion[]`; `ALL_CRITERIA` still parses only the canonical English file (FR-010, restated 2026-07-30 per D8). |
 | II. KeyboardIR spine | **PASS (N/A)** | Feature does not touch codec/IR/scaffold. |
 | III. Single working copy | **PASS (N/A)** | No working-copy or serialization change. |
 | IV. Validator layering / one debounce | **PASS** | The drift gate is a lint/CI-time checker, not a runtime validation path; introduces no second debounce timer and no parallel validation. |
@@ -89,17 +89,21 @@ packages/studio/
 utilities/i18n-catalog-lint/index.js       # drift gate, wired into `pnpm lint` [done]
 crowdin.yml                                 # root; Tier A active, Tier B deferred scaffold [done]
 
-# Tier B (P2, content team) — NOT yet created:
-content/i18n/{locale}/*.json               # generated sidecar catalogs
-utilities/i18n-content-extract/            # extract translatable prose from content records
-packages/contracts/data/criteria.<lang>.json  # localized criteria descriptions
+# Tier B (P2, content team) — landed:
+content/i18n/{locale}/*.json               # generated sidecar catalogs [done]
+utilities/i18n-content-extract/            # extract translatable prose from content records [done]
+utilities/content-i18n-lint/index.js       # Tier B freshness + locale key-set parity, wired into `pnpm lint` [done]
+# packages/contracts/data/criteria.<lang>.json — NOT built; superseded by the
+# sidecar above (research.md D7/D8). Criteria prose localizes as flat
+# content.criteria.<id>.description / .checklistText keys, never a Criterion[].
 ```
 
 **Structure Decision**: Web-application layout within the monorepo. Tier A lives
 entirely under `packages/studio` (engine team). Tier B adds a `content/i18n/`
-tree and an extraction utility under `utilities/` (content team + engine seam),
-plus localized `criteria.<lang>.json` in `packages/contracts`. The two tiers are
-separate Crowdin mappings to preserve the §12 boundary.
+tree and an extraction utility under `utilities/` (content team + engine seam);
+criteria prose localizes through that same `content/i18n/` tree rather than a
+localized record file in `packages/contracts` (D8). The two tiers are separate
+Crowdin mappings to preserve the §12 boundary.
 
 ## Implementation status (what the spike already landed)
 

@@ -325,7 +325,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
           }}
           placeholder={t({
             id: "survey.phaseB.charChipEditor.placeholder",
-            message: "Type your alphabet with a space between each character (a b c …)",
+            message: "Type your alphabet (a b c …)",
           })}
           aria-label={t({ id: "survey.phaseB.charChipEditor.ariaLabel", message: "Character to add" })}
           style={{
@@ -391,8 +391,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
         {unitCount === 0 ? (
           <p style={mutedParaFlush}>
             <Trans id="survey.phaseB.charChipEditor.empty">
-              No characters yet — type your whole alphabet above, with a space
-              between each character.
+              No characters yet — type your whole alphabet above.
             </Trans>
           </p>
         ) : (
@@ -1014,10 +1013,13 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
           a DOM-rendered menu. Applies to every character glyph on this step,
           incl. the character map — see phaseBDraftStore.selectedFont. */}
       <div style={{ maxWidth: 280 }} data-testid="phase-b-font-select">
-        <label id="phase-b-font-select-label"
-               style={{ display: "block", margin: "0 0 8px 0", fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>
+        {/* Not a <label>: the control is named via ariaLabelledby on the
+            SelectMenu below, and an un-associated label element (no htmlFor,
+            no nesting) adds no semantics or click-focus behavior. */}
+        <span id="phase-b-font-select-label"
+              style={{ display: "block", margin: "0 0 8px 0", fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>
           <Trans id="survey.phaseB.buildList.fontSelectLabel">Font for characters</Trans>
-        </label>
+        </span>
         <SelectMenu
           id="phase-b-font-select-control"
           value={selectedFont}
@@ -1048,8 +1050,8 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
           <Trans id="survey.phaseB.buildList.instructions">
             Add <strong>your whole alphabet</strong> on this page — every
             character your language uses, not just the special ones. Tick the
-            suggested characters below, then type any that are missing{" "}
-            <strong>with a space between each character</strong>, like this:
+            suggested characters below, then type any that are missing, like
+            this:
           </Trans>
         </p>
         <p style={{ margin: "8px 0 0 0", fontFamily: "monospace", fontSize: 15 }}>
@@ -1082,8 +1084,8 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         </h3>
         <p style={{ ...mutedParaFlush, margin: "0 0 12px 0" }}>
           <Trans id="survey.phaseB.buildList.typeAlphabetHelp">
-            Type the rest of your alphabet here, putting a space between each
-            character (for example: a b c ŋ ɛ), then press Enter or + Add.
+            Type the rest of your alphabet here (for example: a b c ŋ ɛ), then
+            press Enter or + Add.
           </Trans>
         </p>
         <CharChipEditor

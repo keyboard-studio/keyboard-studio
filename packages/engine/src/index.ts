@@ -48,7 +48,7 @@ export type {
 
 // Issues #46/#47 — output service (zip download + GitHub OAuth fork+PR).
 export { createOutputService, toZip, serializeToZip, createGitHubOutputService } from "./output/index.js";
-export type { GitHubOutputConfig, GitHubFetchFn } from "./output/index.js";
+export type { GitHubOutputConfig, GitHubFetchFn, ToZipOptions } from "./output/index.js";
 
 // Option B (org-mediated PR) output service.
 export { createManagedPROutputService } from "./output/index.js";
@@ -65,6 +65,29 @@ export type { ImportAttributionInput } from "./output/index.js";
 // Track 2 adapt-staging helpers (output-only; not used in the OSK preview path).
 export { bumpKeyboardVersion, stageAdaptHistory } from "./output/index.js";
 
+// Per-keyboard decision audit (specs/053-decision-audit) — the pure differ,
+// serializer, tolerant reader, save-budget shed pass, and the two evidence
+// surfaces the record ships through (the pull-request block and the packaged
+// `.studio/` sidecar). The recording seam itself is a studio concern
+// (packages/studio/src/decisions/).
+export {
+  addDecisionRecordSidecar,
+  buildDecisionSummaryBlock,
+  DECISION_RECORD_VFS_PATH,
+  diffLines,
+  diffMagnitude,
+  parseDecisionRecord,
+  PR_SUMMARY_MAX_ENTRIES,
+  serializeDecisionRecord,
+  serializedRecordBytes,
+  shedDecisionDetail,
+  STUDIO_METADATA_PREFIX,
+} from "./decision-audit/index.js";
+export type {
+  DecisionSummaryOptions,
+  ParseDecisionRecordResult,
+} from "./decision-audit/index.js";
+
 // Issue #183 — headless simulate() API is exposed via the `./simulator`
 // subpath export, NOT from this main entry. The vendored Keyman engine
 // uses bare import specifiers (e.g. `@keymanapp/common-types`) that resolve
@@ -80,12 +103,24 @@ export { isParallelIndexFanOut } from "./recognizer/rules/parallel-index-fanout.
 // Issue #19 — scaffolder (template-cleanup pipeline).
 export { createScaffolderService, renameFilesInVfs } from "./scaffolder/index.js";
 export { scaffoldIR, resetIdentity } from "./scaffolder/scaffold-ir.js";
-export { scaffoldTouchLayout, buildMinimalPhoneTouchLayout } from "./scaffolder/index.js";
+export {
+  scaffoldTouchLayout,
+  scaffoldTouchLayoutWithDiagnostics,
+  buildMinimalPhoneTouchLayout,
+} from "./scaffolder/index.js";
+export type { ScaffoldTouchLayoutResult } from "./scaffolder/index.js";
 // spec 035 — touch coverage guard (FR-008/SC-003).
 export { touchCoverage } from "./pattern-apply/touchCoverage.js";
 export type { TouchCoverageResult } from "./pattern-apply/touchCoverage.js";
-// spec 051 — shared "absent touch `layer` slot === default" rule.
-export { DEFAULT_TOUCH_LAYER, resolveTouchLayerId } from "./pattern-apply/touchLayer.js";
+// spec 051 — shared "absent touch `layer` slot === default" rule, plus the
+// shared case->layer placement rule the studio's touch gallery consumes (it
+// used to keep a hand-synced copy — see touchLayer.ts).
+export {
+  DEFAULT_TOUCH_LAYER,
+  SHIFT_TOUCH_LAYER,
+  resolveTouchLayerId,
+  touchLayerForChar,
+} from "./pattern-apply/touchLayer.js";
 export type { ScaffolderServiceOptions } from "./scaffolder/index.js";
 export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffolder/scaffold-ir.js";
 
@@ -158,6 +193,10 @@ export type { MissingCharSuggestions, CharNormalizationForm } from "./character-
 // Case-pair proposal helper for the shift-layer studio feature (bidirectional;
 // distinct from suggestMissing's isCovered coverage check — see casePair.ts docstring).
 export { caseCounterpart } from "./character-discovery/casePair.js";
+// Pre-carve "keep these for convenience?" candidates: basic-Latin letters the
+// base produces that the orthography does not use (loanwords / email / URLs).
+export { surplusBasicLatinCandidates, candidateChars } from "./character-discovery/convenienceChars.js";
+export type { ConvenienceCandidate, SurplusBasicLatinArgs } from "./character-discovery/convenienceChars.js";
 // Phase B tiered/browsable character-map candidate builder (right pane).
 // Reuses the cldr.ts exemplar-loading path; CHARACTER_MAP_BLOCKS is a
 // SEPARATE, multi-block-per-script table from cldr.ts's calibrated SCRIPT_BLOCKS.
@@ -182,8 +221,15 @@ export { proposeAttachments, deriveCaseCounterparts } from "./marks/attachment-p
 export type { AttachmentProposal, ProposedAttachmentState } from "./marks/attachment-proposals.js";
 export { resolveOutputFormProposal, hasDecidablePairs, normalizationFormForOutputForm } from "./marks/output-form-policy.js";
 export type { OutputForm, OutputFormProposal } from "./marks/output-form-policy.js";
-export { computeMentalModelPrefills, detectBaseMarkMechanism, PRODUCTIVITY_SPREAD_THRESHOLD } from "./marks/mental-model-prefill.js";
-export type { MentalModelPrefill, MentalModelAnswer, BaseMarkMechanism } from "./marks/mental-model-prefill.js";
+// The S2 answer (spec 052): treatment + promotion + input order, replacing the
+// single "own letter of the alphabet" enum. See specs/052-marks-treatment-question.
+export { treatmentFor, makeMarkTreatmentAnswer, pruneMarkOverrides, dominantTreatment, isClassMixed } from "./marks/treatment.js";
+export type { MarkTreatment, MarkTreatmentAnswer, PromotedComposedCharacter } from "./marks/treatment.js";
+export { promotableCharacters, expandCaseCounterpartPromotions, prunePromotions } from "./marks/promotion.js";
+export { computeMarkTreatmentPrefills, detectBaseMarkMechanism, unaffordableReasonFor, PRODUCTIVITY_SPREAD_THRESHOLD } from "./marks/treatment-prefill.js";
+export type { MarkTreatmentPrefill, MarkTreatmentPrefillOptions, KeyBudgetSignal, BaseMarkMechanism } from "./marks/treatment-prefill.js";
+export { deriveMarksComputedAxes, surfaceStrategyDisagreement } from "./marks/strategy-reconcile.js";
+export type { MarksComputedAxes, MarksReconcileInputs, DisagreementInputs } from "./marks/strategy-reconcile.js";
 export { buildPlacementWorklist, verifyWorklistCoverage } from "./marks/worklist.js";
 export type { WorklistInputs } from "./marks/worklist.js";
 export { expandCaseCounterpartAttachments } from "./marks/case-fold.js";
@@ -193,8 +239,8 @@ export { applyMarkGuards, MARKS_GUARD_GROUP, MARKS_UNWRAP_FROM_STORE, MARKS_UNWR
 export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
-export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, describeStorePairing, analyzeStores, storeRoleOf, buildProducerIndex, parseSlotId, makeSlotId, collectCharContributors, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap, isPlusSeparator } from "./pattern-apply/index.js";
-export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, DesktopModifications, ApplyDesktopModificationsResult, ApplyDesktopModificationsToRawJsonResult, PropagateDesktopLayersToTouchResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, StorePairingDescription, StoreAnalysis, StoreRole, ProducerIndex, CharContributors, ShiftAssignmentPlan, ModifierToken } from "./pattern-apply/index.js";
+export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, describeStorePairing, analyzeStores, storeRoleOf, buildProducerIndex, parseSlotId, makeSlotId, collectCharContributors, collectCompositionMethod, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap, addableTouchLayerTokens, optionsForTouchLayerSlot, isPlusSeparator, touchKeyAddress, touchSubKeyAddress, touchFlickAddress, enumerateTouchMethodsForChar, applyTouchKeycapRemovalsToLayout, applyTouchKeycapRemovalsToRawJson, applyTouchKeycapRemovalsToVfs } from "./pattern-apply/index.js";
+export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, DesktopModifications, ApplyDesktopModificationsResult, ApplyDesktopModificationsToRawJsonResult, PropagateDesktopLayersToTouchResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, StorePairingDescription, StoreAnalysis, StoreRole, ProducerIndex, CharContributors, ContributorDescriptor, ShiftAssignmentPlan, ModifierToken, TouchMethodDescriptor, ApplyTouchKeycapRemovalsResult, ApplyTouchKeycapRemovalsToRawJsonResult } from "./pattern-apply/index.js";
 
 // Facet-transform (spec 039): switch a base's source-construction facet value on
 // the working copy — propose-then-confirm, KeyboardIR copy-return, gated commit.

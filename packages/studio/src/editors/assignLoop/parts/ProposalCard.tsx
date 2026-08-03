@@ -1,0 +1,50 @@
+// ProposalCard — the shared green "note" card shell used by every
+// propose-then-confirm banner AND the sibling-accent bulk summary box in the
+// assignLoop galleries. Purely presentational: it owns the role="note"
+// container, the #0d2218/#238636 card styling, and the message paragraph.
+// Callers supply the message and their own action(s) as `children` — a
+// two-button confirm/decline pair (ProposalBanner) or a single "Remove all"
+// button (the bulk box) — so the shell never assumes a button model.
+
+import type { ReactNode } from "react";
+import { FONT } from "../../../lib/galleryTheme.ts";
+
+export interface ProposalCardProps {
+  /** Accessible name for the outer `role="note"` region. */
+  ariaLabel: string;
+  /** The prompt/summary — typically one or more `<Trans>` elements composed
+   *  by the caller so its own i18n ids stay in the caller's file. */
+  message: ReactNode;
+  /** The action control(s) — e.g. a confirm/decline pair or a single button. */
+  children: ReactNode;
+}
+
+export function ProposalCard({ ariaLabel, message, children }: ProposalCardProps) {
+  return (
+    <div
+      role="note"
+      aria-label={ariaLabel}
+      style={{
+        background: "#0d2218",
+        border: "1px solid #238636",
+        borderRadius: 8,
+        padding: "10px 14px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+      }}
+    >
+      <p
+        style={{
+          margin: 0,
+          fontSize: 12,
+          color: "#56d364",
+          fontFamily: FONT,
+        }}
+      >
+        {message}
+      </p>
+      {children}
+    </div>
+  );
+}

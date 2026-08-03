@@ -29,6 +29,7 @@ import {
   resolveLocationLabel,
 } from './irToCarveNodes.ts';
 import { _setContentCatalogForTesting, _resetContentI18nForTesting } from './contentI18n.ts';
+import { collectCharContributors } from '@keyboard-studio/engine';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -2369,9 +2370,16 @@ describe('recommendedRemovalChars', () => {
   });
 
   it('shields a surplus character when an opaque fragment ALSO produces it (a blocked entry shields even alongside a simple rule producer)', () => {
+    // collectCharContributors's opaque-fragment check walks `producedOutput`
+    // structurally (not a sourceText scan — see collectCharContributors.ts's
+    // doc comment), so the fragment needs a producedOutput sketch to be
+    // attributed as a blocked producer of 'y' here.
     const ir = makeIR({
       groups: [makeGroup([makeCharOnlyRule()])], // produces surplus 'y' too, via a simple rule
-      raw: [{ nodeId: 'raw-1', reason: 'unsupported-syntax', sourceText: "+ [K_X] > 'y'" } as unknown as KeyboardIR['raw'][number]],
+      raw: [{
+        nodeId: 'raw-1', reason: 'unsupported-syntax', sourceText: "+ [K_X] > 'y'",
+        producedOutput: [{ kind: 'char', value: 'y' }],
+      } as unknown as KeyboardIR['raw'][number]],
     });
 
     const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
@@ -2379,11 +2387,15 @@ describe('recommendedRemovalChars', () => {
     expect(result.map((r) => r.ch)).not.toContain('y');
   });
 
-  it('shields a produced character collectCharContributors finds NO producer for at all (zero ruleNodeIds/storeSlotIds/blocked — unrecognized shape, default-safe)', () => {
-    // buildProducedSet resolves 'y' from the fragment's producedOutput sketch,
-    // but collectCharContributors's textual blocked-check scans sourceText for
-    // the OUTPUT-side literal 'y' — this sourceText has none, so it finds no
-    // producer at all for 'y' (empty ruleNodeIds, storeSlotIds, AND blocked).
+  it('shields a character a RawKmnFragment structurally produces via producedOutput, even though sourceText carries no literal output token', () => {
+    // Fixed gap: collectCharContributors's opaque-fragment check now walks
+    // `producedOutput` structurally (the same run-merge + store-resolution
+    // element-walk `buildProducedSet` uses) rather than scanning `sourceText`
+    // for the target char after a `>` — so a fragment whose codec-extracted
+    // producedOutput sketch names 'y', but whose sourceText has no literal
+    // 'y' token at all (dk(1) is a deadkey reference, not 'y'), is still
+    // correctly found and attributed to `blocked` here — not left as an
+    // "unrecognized shape, zero producers" default-safe shield.
     const ir = makeIR({
       raw: [{
         nodeId: 'raw-1', reason: 'unsupported-syntax', sourceText: "+ [K_X] > dk(1)",
@@ -2391,8 +2403,10 @@ describe('recommendedRemovalChars', () => {
       } as unknown as KeyboardIR['raw'][number]],
     });
 
-    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+    const contributors = collectCharContributors(ir, 'y');
+    expect(contributors.blocked.some((b) => b.reason.includes('Opaque fragment'))).toBe(true);
 
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
     expect(result.map((r) => r.ch)).not.toContain('y');
   });
 
@@ -3012,11 +3026,13 @@ describe('collateral guard — truth table (spec 051 US2)', () => {
         nodeId: 'raw#1',
         reason: 'if-guard',
         sourceText: "if(&layer = 'x') + [K_Z] > 'ʒ'",
+        producedOutput: [{ kind: 'char', value: 'ʒ' }],
       }] as unknown as KeyboardIR['raw'],
     });
 
     // 'ʒ' is surplus and has a simple rule producer, but an opaque fragment also
-    // emits it — the codec cannot confirm what that fragment does, so shield.
+    // emits it (structurally, via producedOutput) — the codec cannot confirm
+    // what that fragment does, so shield.
     expect(recommendedRemovalChars({ ir, needed: new Set(['q']) }).map((r) => r.ch)).not.toContain('ʒ');
   });
 });

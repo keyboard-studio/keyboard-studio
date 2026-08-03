@@ -555,6 +555,10 @@ export function SurveyRunner({
   }
 
   return (
+    /* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions --
+       the bubbled keydown only ADDS a keyboard capability (Enter-to-advance
+       convenience); every control inside the form remains independently
+       keyboard-operable, and the container is not made pointer-interactive. */
     <div
       role="form"
       aria-label={t({ id: "survey.surveyRunner.formAriaLabel", message: `Survey phase ${{ phase: flow.phase }}` })}

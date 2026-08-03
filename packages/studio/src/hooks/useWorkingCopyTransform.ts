@@ -148,6 +148,7 @@ export function useWorkingCopyTransform(
   const storeBaseKeyboardId = useWorkingCopyStore((s) => s.baseKeyboard?.id ?? null);
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const deletedTouchKeyIds = useWorkingCopyStore((s) => s.deletedTouchKeyIds);
   const identity = useWorkingCopyStore((s) => s.identity);
   // Assignments: physical only (touch is projected via touchLayoutJson below).
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
@@ -165,8 +166,13 @@ export function useWorkingCopyTransform(
 
   // Deleted node IDs: sorted, joined string. O(n) but the carve set is small.
   const deletedKey = useMemo(
-    () => [...deletedNodeIds].sort().join("|") + ";" + [...deletedItemIds].sort().join("|"),
-    [deletedNodeIds, deletedItemIds],
+    () =>
+      [...deletedNodeIds].sort().join("|") +
+      ";" +
+      [...deletedItemIds].sort().join("|") +
+      ";" +
+      [...deletedTouchKeyIds].sort().join("|"),
+    [deletedNodeIds, deletedItemIds, deletedTouchKeyIds],
   );
 
   // Assignments key — compact string (scope:target:patternId/slotValues per assignment).
@@ -260,6 +266,7 @@ export function useWorkingCopyTransform(
         baseIr,
         deletedNodeIds,
         deletedItemIds,
+        deletedTouchKeyIds,
         assignments: effectiveAssignments,
         getPattern: (id) => patternMap?.get(id),
         identity: identityArg,

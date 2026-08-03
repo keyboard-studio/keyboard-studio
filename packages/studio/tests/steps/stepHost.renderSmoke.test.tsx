@@ -261,7 +261,7 @@ const editorSteps = manifest.filter(
 //   charactersStep    → CharactersStep                    → stub-CharactersStep
 //   carveStep         → CarveAdapter                      → CarveGallery stub
 //   mechanismsStep    → AddPhysicalAdapter                → MechanismGallery stub
-//   touchSeedSourceStep → TouchSeedSourcePanel            → TouchSeedSourcePanel stub
+//   touchSeedSourceStep → TouchSeedSourcePanel            → TouchSeedSourcePanel stub (layout:"full" — P0 fix, spec 035 R4b follow-up)
 //   touchStep         → AddTouchAdapter                   → TouchGallery stub
 //   helpStep          → PhaseFStepFactoryComponent        → FlowStepHost stub (flow_id=phase_f_helpdocs)
 //   packageStep       → PhaseFStepFactoryComponent        → FlowStepHost stub (flow_id=phase_f_helpdocs)
@@ -280,7 +280,11 @@ const STEP_TO_EXPECTED_STUB: Record<string, string> = {
 };
 
 // Full-layout step ids (declared in manifest as layout:"full").
-const FULL_LAYOUT_IDS = new Set<string>(["carve", "mechanisms", "touch"]);
+// touch_seed_source joined this set in the P0 fix (spec 035 R4b follow-up):
+// TouchSeedSourcePanel now renders its own inline live OSK preview, so the
+// step must be full-screen to suppress SurveyView's persistent right-pane
+// OSKFrame — see manifest.ts's FULL_LAYOUT_IDS guard.
+const FULL_LAYOUT_IDS = new Set<string>(["carve", "mechanisms", "touch", "touch_seed_source"]);
 
 describe("SC-005: declared component matches mounted component for all manifest editor steps", () => {
   for (const step of editorSteps) {

@@ -232,25 +232,50 @@ select / radio / bool / multi_select / notice.
   Auto-confirm rule: a mark with one attested base and no plausible
   additions (cedilla-on-c) is a pre-confirmed summary row, not a question.
   Case pairs derived here (retires `pb_capitals_marks` as a question).
-- **S2 `marks_mental_model`** — one radio per proposed class; the heart.
-  "Look at these letters: á à é è ọ́. Is each its own letter of the
-  alphabet — or a letter with a mark added (for example, to show tone)?"
-  Options: own-letter (consequence: each combination gets its own key
-  place) / letter-plus-mark (consequence: one mark key works with any
-  letter) / mixed → per-mark split. Prefill signals: productivity spread,
-  base keyboard's deadkey-vs-direct (import-mark-order machinery),
-  and the **spare-key budget** — if combinations exceed spare keys,
-  own-letter is unaffordable and the prefill explanation says so.
-  Repercussions shown, theory never explained.
-- **S3 `marks_input_order`** — today's `pb_mark_input_order`
-  (prefix/postfix), relocated; asked only if ≥1 class is letter-plus-mark;
-  prefilled from the base keyboard via
+- **S2 `marks_treatment`** — the heart. *(Superseded the original
+  `marks_mental_model` design in [specs/052-marks-treatment-question](../../specs/052-marks-treatment-question/spec.md);
+  the S3 station below is folded into it.)* **Three independently-settable
+  parts, not one mutually-exclusive answer:**
+  1. **treatment**, one radio group per proposed class, overridable per mark —
+     does this mark get a key of its own (works with every character it
+     attaches to), or does each marked character get a key of its own with no
+     key for the mark?
+  2. **promotion**, a *checkbox* set — which specific marked characters also
+     earn dedicated keys. Independent of treatment: a mark may have its own key
+     *and* have promoted characters, which is the Cameroonian tone case the
+     original single-answer design could not state at all.
+  3. **input order**, folded in from the retired S3.
+
+  The original wording ("Is each its own letter of the alphabet?") is
+  **retired**: it asked orthographic unithood — a collation and
+  literacy-teaching question — while the answer was consumed as a decision
+  about which unit receives a key, and it is a category error for Devanagari
+  dependent vowel signs, Arabic ḥarakāt, and Hebrew niqqud, all of which reach
+  this station. No designer-facing string here may assert or deny that a marked
+  form is a letter of an alphabet, and none may use production jargon; both are
+  asserted mechanically over a five-script fixture matrix, not left to review.
+
+  Prefill signals: productivity spread, the base keyboard's own mechanism
+  (import-mark-order machinery), and the **key budget** — now a real supplied
+  measurement (`packages/contracts/src/keyBudget.ts`) rather than the
+  never-passed parameter that made every base report "affordable". The budget
+  gates **promotion only, never treatment**, so at least one option is always
+  selectable. Every offered option carries an operable two-or-three-key
+  demonstration built from the author's own letters; the mark-before-character
+  option shows its otherwise-invisible pending state explicitly. Repercussions
+  shown, theory never explained.
+- **~~S3 `marks_input_order`~~ — retired as a station; folded into S2.** The
+  prefix/postfix question is now part of the S2 answer, which is what takes the
+  series from five rendered stations to four. Its content is *relocated, never
+  duplicated*: `survey/questions/reserve/pb_mark_input_order.ts` remains the
+  content source and the folded question reads its prompt, help text, and
+  options from that module. Still prefilled from the base keyboard via
   `packages/engine/src/strategy-selector/import-mark-order.ts`.
 - **S4 `marks_output_form`** — the NFC/NFD station, designer-framed, per
   the decision table. Unambiguous case → a notice with a change
   affordance, not a question ("stored as letter + mark, because ə́ has no
   single-character form — keeps search and backspace consistent").
-  Open case (all pairs compose but a letter-plus-mark class exists) →
+  Open case (all pairs compose but at least one mark has a key of its own) →
   radio, recommended option first, labels carrying concrete repercussions;
   the words "Unicode"/"normalization" never appear in the prompt. Preview
   must demonstrate backspace (ệ → ê → e).
@@ -259,23 +284,27 @@ select / radio / bool / multi_select / notice.
   one letter carry two marks at once (like ệ)?" Yes → confirm the attested
   stack list. Otherwise silently blocked.
 
-**Exit state:** the mechanism gallery receives a typed worklist — own-letter
-units (need placements), mark keys (need placement + S3 mechanism), blocked
-combinations (generated rules). Touch is deliberately not asked here: the
-per-class mental model carries to the touch-overlay act, which proposes the
-diacritic-row rendering there, with its own confirm.
+**Exit state:** the mechanism gallery receives a typed worklist — keyed units
+(plain letters, composed characters, and promoted characters, all needing
+placements), mark keys (needing placement + the S2 input order), blocked
+combinations (generated rules). A unit may now be reachable BOTH ways at once
+(a mark key plus a promoted character on its own key); that dual reachability is
+intended, so the worklist invariant is "every base and mark accounted for by at
+least one unit, nothing unclassified" rather than "exactly once". Touch is
+deliberately not asked here: the recorded treatment carries to the touch-overlay
+act, which proposes the diacritic-row rendering there, with its own confirm.
 
 **Implementation notes:** (1) Dynamic content is mandatory — prompts
 interpolate the user's glyphs, option lists come from the inventory; the
 static FlowQuestion shape can't express S1/S2, so these are **cards**
 (custom step components, per #1293 Act 5), specced here as question
-semantics; an MVP can degrade to one static global mental-model radio with
-per-class refinement deferred. (2) The series retires/absorbs:
+semantics. (2) The series retires/absorbs:
 `pb_accent_marks_gate` (S0), `pb_diacritic_select` (picker),
 `pb_mark_style` (split into S2 + S4), `pb_capitals_marks` (S1),
-`pb_stacking_marks` (S5); `pb_mark_input_order` survives as S3 — matching
-the survey-flow-rework note's Act 5b accented-letters absorption list, so
-this series is that card's specification.
+`pb_stacking_marks` (S5); `pb_mark_input_order` survives as the input-order
+part of S2 (it no longer has a station of its own) — matching the
+survey-flow-rework note's Act 5b accented-letters absorption list, so this
+series is that card's specification.
 
 ## PUA characters
 

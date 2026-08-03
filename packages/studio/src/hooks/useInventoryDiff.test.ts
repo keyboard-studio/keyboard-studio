@@ -171,6 +171,73 @@ describe("useInventoryDiff — NFC normalization", () => {
 });
 
 // ---------------------------------------------------------------------------
+// 10. Composability: precomposed char available from separately-produced parts
+// ---------------------------------------------------------------------------
+
+describe("useInventoryDiff — composability", () => {
+  it("a precomposed inventory char lands in alreadyProduced when its base + combining mark are both produced", async () => {
+    const { useInventoryDiff } = await import("./useInventoryDiff.ts");
+    // Base produces "U" and the bare combining circumflex accent (U+0302)
+    // separately, but never the precomposed "Û" (U+00DB) directly.
+    seedBaseWithChars(["U", "̂"]);
+    setInventory(["Û", "ŋ"]); // Û (precomposed), ŋ
+    const { result } = renderHook(() => useInventoryDiff());
+    expect(result.current.alreadyProduced).toContain("Û");
+    expect(result.current.lettersToAdd).not.toContain("Û");
+    expect(result.current.lettersToAdd).toContain("ŋ");
+  });
+
+  it("a precomposed inventory char stays in lettersToAdd when only the base letter is produced", async () => {
+    const { useInventoryDiff } = await import("./useInventoryDiff.ts");
+    // Base produces "U" only — no combining circumflex anywhere.
+    seedBaseWithChars(["U"]);
+    setInventory(["Û"]); // Û
+    const { result } = renderHook(() => useInventoryDiff());
+    expect(result.current.lettersToAdd).toContain("Û");
+    expect(result.current.alreadyProduced).not.toContain("Û");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 11. Lowercase-first walk ordering
+// ---------------------------------------------------------------------------
+
+describe("useInventoryDiff — lowercase-first ordering", () => {
+  it("moves an uppercase letter after all lowercase/non-letter entries, stably", async () => {
+    const { useInventoryDiff } = await import("./useInventoryDiff.ts");
+    // "B" (uppercase) precedes "a" (lowercase) in the raw confirmedInventory
+    // order; the sort must move "B" after "a" (and after the non-letter "1"),
+    // while "C" (also uppercase) keeps its position relative to "B" — both
+    // land after everything else, in their original relative order.
+    setInventory(["B", "a", "1", "C", "d"]);
+    const { result } = renderHook(() => useInventoryDiff());
+    expect(result.current.lettersToAdd).toEqual(["a", "1", "d", "B", "C"]);
+  });
+
+  it("does not disturb order when there are no uppercase letters", async () => {
+    const { useInventoryDiff } = await import("./useInventoryDiff.ts");
+    setInventory(["ŋ", "ɓ", "a"]);
+    const { result } = renderHook(() => useInventoryDiff());
+    expect(result.current.lettersToAdd).toEqual(["ŋ", "ɓ", "a"]);
+  });
+
+  it("orders a lowercase letter before its own uppercase counterpart", async () => {
+    const { useInventoryDiff } = await import("./useInventoryDiff.ts");
+    setInventory(["Θ", "θ"]);
+    const { result } = renderHook(() => useInventoryDiff());
+    expect(result.current.lettersToAdd).toEqual(["θ", "Θ"]);
+  });
+
+  it("applies the same ordering after the base-diff filter (post-lettersToAdd)", async () => {
+    const { useInventoryDiff } = await import("./useInventoryDiff.ts");
+    seedBaseWithChars(["x"]); // base produces none of the inventory below
+    setInventory(["E", "a", "D"]);
+    const { result } = renderHook(() => useInventoryDiff());
+    expect(result.current.lettersToAdd).toEqual(["a", "E", "D"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 6-8. Memoization stability
 // ---------------------------------------------------------------------------
 

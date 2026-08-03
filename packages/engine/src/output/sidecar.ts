@@ -10,19 +10,43 @@ export const SIDECAR_SUFFIX = ".kmn.imported";
 export const SIDECAR_HASH_SUFFIX = ".kmn.imported.sha256";
 
 /**
+ * Archive-root prefix marking studio metadata: zip-included, PR-excluded.
+ *
+ * The zip's root already IS the keyboard's directory content, so there is no
+ * existing "beside, not inside" position in the archive. This prefix is that
+ * position: everything under it is the studio talking to the author, never part
+ * of the keyboard being submitted. Directory-scoped rather than suffix-scoped
+ * so a second studio artifact needs no second predicate.
+ *
+ * @see specs/053-decision-audit/contracts/decision-record.contract.md §3
+ * @see specs/053-decision-audit/research.md D-07
+ */
+export const STUDIO_METADATA_PREFIX = ".studio/" as const;
+
+/**
  * Path discriminator for sidecar files.
  *
  * Sidecars travel in the VFS for zip and local working-tree presence.
  * publishPR filters them out via isSourceFile() using this predicate,
  * keeping them out of the keyboard-studio/keyboards PR commit tree.
  *
- * Also matches the `.kmn.imported.sha256` companion (written at import time
- * by importKeyboard to pin the hash of the original source for I5 verification).
- * The hash file has the same lifecycle as the sidecar: zip-included,
- * PR-excluded.
+ * Three matches, all with the same lifecycle:
+ *   - `.kmn.imported` — the original imported source (decision D9).
+ *   - `.kmn.imported.sha256` — its hash companion, pinned at import time by
+ *     importKeyboard for I5 verification.
+ *   - anything under {@link STUDIO_METADATA_PREFIX} — studio metadata such as
+ *     the packaged decision record (specs/053-decision-audit FR-019).
+ *
+ * The prefix test is ADDED, not substituted: the two suffix matches above are
+ * unchanged, so extending the predicate cannot alter what an import sidecar
+ * does.
  */
 export function isSidecarPath(path: string): boolean {
-  return path.endsWith(SIDECAR_SUFFIX) || path.endsWith(SIDECAR_HASH_SUFFIX);
+  return (
+    path.endsWith(SIDECAR_SUFFIX) ||
+    path.endsWith(SIDECAR_HASH_SUFFIX) ||
+    path.startsWith(STUDIO_METADATA_PREFIX)
+  );
 }
 
 /**

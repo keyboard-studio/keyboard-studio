@@ -158,10 +158,21 @@ export const mechanismsStep: EditorStep = step({
  * a bespoke chooser panel, NOT the surface-parameterized carve/add shell, so
  * `surface` is omitted (that field only describes the AddPhysicalAdapter /
  * AddTouchAdapter shell pattern the touch step below still uses).
+ *
+ * layout:"full" (P0 fix, spec 035 R4b follow-up): the panel now renders its
+ * own inline live OSK preview (OSKFrame, forced touch mode) beside the seed
+ * choices. Without layout:"full" this was an ordinary "pane" step, so
+ * StudioShell's two-pane shell ALSO mounted the app's persistent right-pane
+ * OSKFrame (showing the working copy's DESKTOP preview) at the same time —
+ * two live KMW iframes on screen, with the outer one showing the wrong
+ * (desktop) preview. Declaring layout:"full" makes StepHost/StudioShell
+ * early-return the panel alone (same mechanism as carve/mechanisms/touch),
+ * so the panel's single inline mobile OSK is the only OSK mounted here.
  */
 export const touchSeedSourceStep: EditorStep = step({
   id: "touch_seed_source",
   title: "Touch Seed Source",
+  layout: "full",
   spine: false,
   joinTarget: "touch",
   component: TouchSeedSourcePanel,

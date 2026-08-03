@@ -295,6 +295,235 @@ describe("applyDesktopModifications — placements", () => {
 });
 
 // ---------------------------------------------------------------------------
+// 4b. Placements — case-derived layer targeting
+// ---------------------------------------------------------------------------
+
+function phoneLayerKeys(layout: TouchLayoutIR, layerId: string): TouchKeyIR[] {
+  const phone = layout.platforms.find((p) => p.id === "phone")!;
+  const layer = phone.layers.find((l) => l.id === layerId)!;
+  return layer.rows.flatMap((r) => r.keys);
+}
+
+describe("applyDesktopModifications — placements target the case-derived layer", () => {
+  it("lands an uppercase char on the shift layer's host key (empty host -> primary)", () => {
+    const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })], {
+      shiftLayer: [{ nodeId: "node_K_A_shift", id: "K_A" }], // empty shift-layer host
+    });
+    const { layout: out, warnings } = applyDesktopModifications(layout, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }], // "Á" = "A" with acute (upper)
+    });
+    expect(warnings).toHaveLength(0);
+
+    const shiftKeys = phoneLayerKeys(out, "shift");
+    const placed = shiftKeys.find((k) => k.id === "U_00C1")!;
+    expect(placed).toBeDefined();
+    expect(placed.text).toBe("Á");
+
+    // Default layer's K_A is unchanged (still "a", no sk[]).
+    const defaultKa = getKey(out, "K_A")!;
+    expect(defaultKa.text).toBe("a");
+    expect(defaultKa.sk ?? []).toHaveLength(0);
+  });
+
+  it("lands an uppercase char on the shift layer's host key as an sk[] alternate when the shift host is occupied", () => {
+    const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })], {
+      // Occupied shift-layer host producing a DIFFERENT char than the
+      // placement — the realistic shift seed, where "K_A" already gives "A".
+      shiftLayer: [makeKey("K_A", { text: "A", output: "A" })],
+    });
+    const { layout: out, warnings } = applyDesktopModifications(layout, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+    expect(warnings).toHaveLength(0);
+
+    const shiftKa = phoneLayerKeys(out, "shift").find((k) => k.id === "K_A")!;
+    expect(shiftKa.text).toBe("A"); // primary production kept
+    expect(shiftKa.sk).toHaveLength(1);
+    expect(shiftKa.sk![0]!.text).toBe("Á");
+
+    // Default layer untouched.
+    const defaultKa = getKey(out, "K_A")!;
+    expect(defaultKa.text).toBe("a");
+    expect(defaultKa.sk ?? []).toHaveLength(0);
+  });
+
+  it("is a no-op when the shift host already produces the placed char (no self-referential sk[])", () => {
+    // A shift-layer seed commonly already carries the uppercase form as its
+    // primary production. Re-placing that same char must not append the key to
+    // its own sk[] — a key offering itself as its own longpress alternate.
+    const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })], {
+      shiftLayer: [makeKey("K_A", { text: "Á", output: "Á" })],
+    });
+    const { layout: out, warnings } = applyDesktopModifications(layout, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+    expect(warnings).toHaveLength(0);
+
+    const shiftKa = phoneLayerKeys(out, "shift").find((k) => k.id === "K_A")!;
+    expect(shiftKa.text).toBe("Á");
+    expect(shiftKa.sk ?? []).toHaveLength(0);
+  });
+
+  it("is a no-op when the host produces the placed char in a different normalization form", () => {
+    // Host text is NFD ("A" + combining acute); the placement is NFC "Á".
+    // Placements NFC-normalize before matching, so this is the same character
+    // and must not become an sk[] alternate.
+    const nfdUpperAAcute = "A" + String.fromCodePoint(0x0301);
+    const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })], {
+      shiftLayer: [makeKey("K_A", { text: nfdUpperAAcute, output: nfdUpperAAcute })],
+    });
+    const { layout: out } = applyDesktopModifications(layout, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+
+    const shiftKa = phoneLayerKeys(out, "shift").find((k) => k.id === "K_A")!;
+    expect(shiftKa.sk ?? []).toHaveLength(0);
+  });
+
+  it("still lands a lowercase char on the default layer (regression guard)", () => {
+    const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })], {
+      shiftLayer: [makeKey("K_A", { text: "Á", output: "Á" })],
+    });
+    const { layout: out, warnings } = applyDesktopModifications(layout, {
+      removals: [],
+      placements: [{ char: "á", hostKey: "K_A" }], // "á" = "a" with acute (lower)
+    });
+    expect(warnings).toHaveLength(0);
+
+    const defaultKa = getKey(out, "K_A")!;
+    expect(defaultKa.sk).toHaveLength(1);
+    expect(defaultKa.sk![0]!.text).toBe("á");
+
+    // Shift layer untouched.
+    const shiftKa = phoneLayerKeys(out, "shift").find((k) => k.id === "K_A")!;
+    expect(shiftKa.text).toBe("Á");
+    expect(shiftKa.sk ?? []).toHaveLength(0);
+  });
+
+  it("falls back to the default layer (with a warning) when no shift layer exists", () => {
+    const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })]); // no shift layer at all
+    const { layout: out, warnings } = applyDesktopModifications(layout, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/shift/);
+
+    const defaultKa = getKey(out, "K_A")!;
+    expect(defaultKa.sk).toHaveLength(1);
+    expect(defaultKa.sk![0]!.text).toBe("Á");
+  });
+
+  it("is a no-op when a HAND-SET host already produces the placed char (no duplicate fallback key)", () => {
+    // The no-op guard must precede the hand-set no-clobber branch: "nothing to
+    // place" beats "do not clobber". Routing this to the hand-set fallback
+    // appended a SECOND key with the same production and warned about
+    // overwriting an author edit that was not happening.
+    //
+    // Routine input now that placements target the case-derived layer:
+    // promoteOnManualEdit marks the key an author edits as hand-set, the
+    // case-pair flow puts uppercase chars on the shift key, and a reseed then
+    // replays the placement onto that hand-set key.
+    const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })], {
+      shiftLayer: [makeKey("K_A", { text: "Á", output: "Á", provenance: "hand-set" })],
+    });
+    const { layout: out, warnings } = applyDesktopModifications(layout, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+    expect(warnings).toHaveLength(0);
+
+    const shiftKeys = phoneLayerKeys(out, "shift");
+    expect(shiftKeys).toHaveLength(1); // no appended U_00C1 twin
+    expect(shiftKeys[0]!.id).toBe("K_A");
+    expect(shiftKeys[0]!.text).toBe("Á");
+    expect(shiftKeys[0]!.provenance).toBe("hand-set"); // author's edit untouched
+    expect(shiftKeys[0]!.sk ?? []).toHaveLength(0);
+  });
+
+  it("still falls back for a hand-set host that produces a DIFFERENT char", () => {
+    // The no-clobber branch itself is unchanged — only its position relative to
+    // the no-op guard moved. A hand-set host producing something else must
+    // still fall back rather than being overwritten.
+    const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })], {
+      shiftLayer: [makeKey("K_A", { text: "A", output: "A", provenance: "hand-set" })],
+    });
+    const { layout: out, warnings } = applyDesktopModifications(layout, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/hand-set/);
+
+    const shiftKeys = phoneLayerKeys(out, "shift");
+    const handSet = shiftKeys.find((k) => k.id === "K_A")!;
+    expect(handSet.text).toBe("A"); // not clobbered
+    expect(handSet.sk ?? []).toHaveLength(0);
+    const fallback = shiftKeys.find((k) => k.id === "U_00C1")!;
+    expect(fallback).toBeDefined(); // placement not lost
+    expect(fallback.text).toBe("Á");
+  });
+
+  it("routes each placement of a MIXED-CASE batch to its own layer in one call", () => {
+    // The per-layer working-state map is the machinery this change introduced;
+    // a single-placement test never exercises two layers being accumulated
+    // concurrently. Same hostKey, both cases, one call.
+    const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })], {
+      shiftLayer: [makeKey("K_A", { text: "A", output: "A" })],
+    });
+    const { layout: out, warnings } = applyDesktopModifications(layout, {
+      removals: [],
+      placements: [
+        { char: "á", hostKey: "K_A" },
+        { char: "Á", hostKey: "K_A" },
+      ],
+    });
+    expect(warnings).toHaveLength(0);
+
+    // Lowercase went to default, uppercase to shift — neither leaked.
+    const defaultKa = getKey(out, "K_A")!;
+    expect(defaultKa.text).toBe("a");
+    expect(defaultKa.sk).toHaveLength(1);
+    expect(defaultKa.sk![0]!.text).toBe("á");
+
+    const shiftKa = phoneLayerKeys(out, "shift").find((k) => k.id === "K_A")!;
+    expect(shiftKa.text).toBe("A");
+    expect(shiftKa.sk).toHaveLength(1);
+    expect(shiftKa.sk![0]!.text).toBe("Á");
+  });
+
+  it("appends the fallback to the SHIFT layer when the host key is absent from it", () => {
+    // Shift layers are routinely sparser than default. The fallback must land
+    // on the layer the case rule chose — not the default layer — and the
+    // warning must name that layer.
+    const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })], {
+      shiftLayer: [makeKey("K_Q", { text: "Q", output: "Q" })], // no K_A here
+    });
+    const { layout: out, warnings } = applyDesktopModifications(layout, {
+      removals: [],
+      placements: [{ char: "Á", hostKey: "K_A" }],
+    });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/not found/);
+    expect(warnings[0]).toMatch(/"shift" layer/);
+
+    const shiftKeys = phoneLayerKeys(out, "shift");
+    const placed = shiftKeys.find((k) => k.id === "U_00C1")!;
+    expect(placed).toBeDefined();
+    expect(placed.text).toBe("Á");
+
+    // Default layer got nothing — the fallback did not leak across layers.
+    expect(phoneLayerKeys(out, "default").some((k) => k.id === "U_00C1")).toBe(false);
+    const defaultKa = getKey(out, "K_A")!;
+    expect(defaultKa.sk ?? []).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 5. Provenance
 // ---------------------------------------------------------------------------
 

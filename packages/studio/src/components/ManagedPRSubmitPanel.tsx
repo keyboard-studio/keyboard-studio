@@ -41,6 +41,8 @@ import {
   isPublishManagedPRError,
 } from "../lib/publishManagedPRErrorMessage.ts";
 import { recordProjectSubmission } from "../lib/draftPersistence.ts";
+import { buildDecisionSummaryBlock } from "@keyboard-studio/engine";
+import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -275,6 +277,21 @@ export function ManagedPRSubmitPanel({
       // Build a minimal PR body — the backend prepends provenance and wraps
       // the title. The SPA provides the human description and copyright
       // attestation so the org bot's PR body is meaningful.
+      //
+      // The decision block (specs/053-decision-audit FR-018) is generated from
+      // the record AS IT STANDS at this moment, not maintained incrementally as
+      // the author works: a body assembled from a running buffer could describe
+      // a state the submitted keyboard was never in. It is deliberately English
+      // and unlocalized — the audience is a reviewer reading github.com, and
+      // that is the established precedent for engine-built PR blocks. Omitted
+      // entirely for a session that recorded nothing, rather than shipping an
+      // empty heading.
+      const decisionRecord = snapshotDecisionRecord();
+      const decisionBlock =
+        decisionRecord.entries.length === 0
+          ? []
+          : ["", "---", "", buildDecisionSummaryBlock(decisionRecord)];
+
       const prBody = [
         `## ${displayName}`,
         "",
@@ -283,6 +300,7 @@ export function ManagedPRSubmitPanel({
         "---",
         "",
         "**Copyright attestation:** The submitter has confirmed they are the copyright holder or are authorized to submit this keyboard to the community repository.",
+        ...decisionBlock,
       ].join("\n");
 
       const prTitle =
