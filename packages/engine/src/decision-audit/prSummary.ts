@@ -161,11 +161,24 @@ function formatEffect(impact: DecisionImpact | null | undefined): string {
 
   switch (impact.state) {
     case "captured": {
-      // `files` is non-empty (contract §3). Joined rather than one-per-row: the
-      // block is one row per decision, and a decision widened to several files
-      // (specs/055-legible-decision-trail T027) still gets one effect cell.
-      const paths = impact.files.map((file) => file.path).join(", ");
-      return `+${impact.magnitude.added} / -${impact.magnitude.removed} lines in \`${paths}\``;
+      // `files` is non-empty (contract §3). Every changed file is identified
+      // (FR-017) — a decision widened to several files (specs/055-legible-decision-trail
+      // T027) no longer collapses to one path, but the block stays one row per
+      // decision, so all files still live in this single effect cell.
+      const base =
+        impact.files.length === 1
+          ? `+${impact.magnitude.added} / -${impact.magnitude.removed} lines in \`${impact.files[0]!.path}\``
+          : `+${impact.magnitude.added} / -${impact.magnitude.removed} lines across ${impact.files.length} files: ${impact.files
+              .map((file) => `\`${file.path}\` (+${file.magnitude.added} / -${file.magnitude.removed})`)
+              .join(", ")}`;
+
+      // FR-019: a change one stage produced for several decisions is claimed
+      // jointly, never as though this entry were solely responsible. Absent
+      // `sharedWith`, the entry claims the change outright — today's wording,
+      // unchanged.
+      if (impact.sharedWith === undefined || impact.sharedWith.length === 0) return base;
+      const coDecisions = impact.sharedWith.map((entryId) => `\`${entryId}\``).join(", ");
+      return `${base} (shared with ${plural(impact.sharedWith.length, "decision", "decisions")}: ${coDecisions})`;
     }
     case "none":
       return "no source change";

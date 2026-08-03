@@ -65,7 +65,7 @@ The contracts change breaks every consumer by design: with the counts optional, 
 
 **⟶ Wait for T010 to finish, then:**
 
-- [ ] **T011** Wire the new deps in the shell: `getMechanismAssignments` → the existing `selectDesktopAssignments(phaseResults)` (the documented single source of truth — do not fork the definition), carve inputs → the working-copy store. No adapter prop shape changes and no editor component learns the audit exists (FR-006) · `packages/studio/src/StudioShell.tsx`
+- [x] **T011** Wire the new deps in the shell: `getMechanismAssignments` → the existing `selectDesktopAssignments(phaseResults)` (the documented single source of truth — do not fork the definition), carve inputs → the working-copy store. No adapter prop shape changes and no editor component learns the audit exists (FR-006) · `packages/studio/src/StudioShell.tsx`
 
 **⟶ Wait for T011 to finish, then:**
 
@@ -95,11 +95,11 @@ The contracts change breaks every consumer by design: with the counts optional, 
 **Wave 2 — independent (different files):**
 
 - [x] **T017** [P] Render the reshaped spec: stage **code** mapped to a catalog message, the dimension list composed through `editorStep.composed`, and the no-change / unmeasured outcomes rendered as statements rather than a row of zeros (US1 scenario 5, FR-011). `data-testid` values are the trail-UI contract — add, never rename · `packages/studio/src/decisions/DecisionEntryRow.tsx`
-- [ ] **T018** [P] Selection tests without a DOM (FR-013): zero-and-absent suppression, fixed dimension order, plural agreement at a count of exactly one, the `{ known: false }` fallback, and the three-outcome table from [headline-spec.contract.md](contracts/headline-spec.contract.md) §3 · `packages/studio/src/decisions/headline.test.ts`
+- [x] **T018** [P] Selection tests without a DOM (FR-013): zero-and-absent suppression, fixed dimension order, plural agreement at a count of exactly one, the `{ known: false }` fallback, and the three-outcome table from [headline-spec.contract.md](contracts/headline-spec.contract.md) §3 · `packages/studio/src/decisions/headline.test.ts`
 
 **⟶ Wait for Wave 2 to finish, then:**
 
-- [ ] **T019** NEW mechanical guard for FR-028: render one entry of **every** kind — each survey agency, each editor action type, the shed and unavailable states — through the real component against the real English catalog, and assert the rendered text matches no `snake_case` / `camelCase` identifier token drawn from the payload (research D-12: a CI-failing test is the mechanism; `test-antipattern-lint` is not extended) · `packages/studio/src/decisions/DecisionEntryRow.identifiers.test.tsx`
+- [x] **T019** NEW mechanical guard for FR-028: render one entry of **every** kind — each survey agency, each editor action type, the shed and unavailable states — through the real component against the real English catalog, and assert the rendered text matches no `snake_case` / `camelCase` identifier token drawn from the payload (research D-12: a CI-failing test is the mechanism; `test-antipattern-lint` is not extended) · `packages/studio/src/decisions/DecisionEntryRow.identifiers.test.tsx`
 
 **Checkpoint**: US2 is independently functional — SC-003 and SC-004 are mechanically enforced, and every line this feature renders is localisable.
 
@@ -162,8 +162,8 @@ The contracts change breaks every consumer by design: with the counts optional, 
 **Wave 3 — independent (different files):**
 
 - [ ] **T030** [P] Render each changed file separately rather than merging them into one diff, plus the shared-change note naming the co-decisions; add `trail.entry.impact.shared` to the catalog. Keep "cannot be isolated" distinct from "changed nothing" (FR-017, FR-020) · `packages/studio/src/decisions/DecisionEntryRow.tsx` + `packages/studio/src/locales/en/messages.json`
-- [ ] **T031** [P] `formatEffect` gains a per-file cell for the widened captured impact and a shared-change note when `sharedWith` is present · `packages/engine/src/decision-audit/prSummary.ts`
-- [ ] **T032** [P] Truncation over the enlarged captured payload: detail is shed, entries never are, and the threshold is neither raised nor exempted for this feature ([record-shape.contract.md](contracts/record-shape.contract.md) §6) · `packages/engine/src/decision-audit/shed.ts`
+- [x] **T031** [P] `formatEffect` gains a per-file cell for the widened captured impact and a shared-change note when `sharedWith` is present · `packages/engine/src/decision-audit/prSummary.ts`
+- [x] **T032** [P] Truncation over the enlarged captured payload: detail is shed, entries never are, and the threshold is neither raised nor exempted for this feature ([record-shape.contract.md](contracts/record-shape.contract.md) §6) · `packages/engine/src/decision-audit/shed.ts`
 
 **⟶ Wait for Wave 3 to finish, then:**
 

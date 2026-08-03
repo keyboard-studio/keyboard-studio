@@ -27,7 +27,12 @@
 // array would say "shared with nobody", which is a different and wrong
 // statement, so the multi-vs-single branch below is not optional plumbing.
 
-import type { DecisionImpact, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type {
+  DecisionImpact,
+  KeyboardIR,
+  MechanismAssignment,
+  SurveyPhaseResult,
+} from "@keyboard-studio/contracts";
 import { useDecisionLogStore } from "./decisionLogStore.ts";
 import { recordSurveyAnswers, type ProposalLookup } from "./recordSurveyAnswers.ts";
 import { recordEditorStep, type DeletionCounts } from "./recordEditorStep.ts";
@@ -40,6 +45,19 @@ export interface DecisionRecorderDeps {
   getDeletionCounts: () => DeletionCounts;
   /** Ids of the carved-away nodes/items, for the bounded sample. */
   getDeletedIds: () => readonly string[];
+  /**
+   * The store's phase-C physical mechanism assignments — see
+   * `RecordEditorStepDeps.getMechanismAssignments` (recordEditorStep.ts) for
+   * why this must stay `selectDesktopAssignments(phaseResults)` and never a
+   * forked filter.
+   */
+  getMechanismAssignments: () => readonly MechanismAssignment[];
+  /** The base IR the working copy was instantiated from, or `null`. */
+  getBaseIr: () => KeyboardIR | null;
+  /** Ids of the carved-away rule/store nodes, for the carve projection. */
+  getDeletedNodeIds: () => ReadonlySet<string>;
+  /** Ids of the carved-away store-slot items, for the carve projection. */
+  getDeletedItemIds: () => ReadonlySet<string>;
   /**
    * The keyboard identity, once known. Read on every completion so pre-identity
    * entries get stamped the moment an identity exists (FR-004) without any step
@@ -88,6 +106,10 @@ export function createDecisionRecorder(
       append: log.append,
       getDeletionCounts: deps.getDeletionCounts,
       getDeletedIds: deps.getDeletedIds,
+      getMechanismAssignments: deps.getMechanismAssignments,
+      getBaseIr: deps.getBaseIr,
+      getDeletedNodeIds: deps.getDeletedNodeIds,
+      getDeletedItemIds: deps.getDeletedItemIds,
     });
 
     // Every entry recorded at this boundary — a question step's answers, or an

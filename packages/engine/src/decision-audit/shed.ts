@@ -14,7 +14,31 @@
 //   - it records `truncated: { shedCount }`, so the trail states the loss rather
 //     than presenting a thinned record as complete.
 //
+// specs/055-legible-decision-trail widened a captured impact from one file's
+// diff to a `files[]` set spanning every text file the projection produces
+// (FR-016) — the per-entry payload this sheds got bigger, but the unit it
+// sheds did not change, by design (055 spec.md's FR-016 resolution: "stored
+// size stays bounded by 053's existing truncation rule"). The shed step below
+// still treats a whole `impact` as one opaque blob and either keeps it intact
+// or collapses it to `null`; it never trims `files` down to a shorter non-empty
+// list. Two reasons, both from record-shape.contract.md §6:
+//   - `files` is non-empty by schema (`.min(1)`); a captured impact with an
+//     empty `files` array is not a state the contract allows, so "shed all the
+//     files" cannot be represented by emptying the array. `impact: null` is the
+//     only legal representation of "everything captured for this decision was
+//     shed" — the same sentinel 053 already defined, reused rather than
+//     re-invented.
+//   - even a *partial* `files` list would be indistinguishable from a fully
+//     measured one: both are `{ state: "captured", files: [...], magnitude }`,
+//     and `magnitude` is specified as the aggregate over `files` (§3) — so a
+//     trimmed list paired with the original, larger aggregate would silently
+//     understate what's shown while overstating what's counted, i.e. exactly
+//     the "shed payload masquerading as a measurement" §6 rules out. Shedding
+//     stays legible by only ever choosing between "the full capture" and the
+//     already-distinguishable `null` — never a third, ambiguous shape in between.
+//
 // @see specs/053-decision-audit/contracts/decision-record.contract.md §2, §6
+// @see specs/055-legible-decision-trail/contracts/record-shape.contract.md §3, §6
 
 import type { DecisionEntry, DecisionRecord } from "@keyboard-studio/contracts";
 import { serializeDecisionRecord, serializedRecordBytes } from "./record.js";

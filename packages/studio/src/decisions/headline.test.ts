@@ -57,6 +57,15 @@ describe("headlineOf — question naming (FR-009/FR-014)", () => {
     expect(JSON.stringify(spec)).not.toContain("il_ghost_question");
   });
 
+  it("carries the label and not the identifier when the lookup DOES resolve", () => {
+    // Contract §2: no variant carries a questionId. That holds on the resolved
+    // path too, not only on the FR-014 fallback — the id must not ride along
+    // beside the label as a second, renderable field.
+    const spec = headlineOf(surveyAnswer("il_target_script", "Latn"), HAND_SET, deps);
+    expect(spec).toMatchObject({ question: { known: true, label: "Target script" } });
+    expect(JSON.stringify(spec)).not.toContain("il_target_script");
+  });
+
   it("does not confuse an unresolved lookup with an empty-string label", () => {
     // A lookup that resolves to "" is a different (and arguably buggy) case from
     // one that resolves to undefined; only undefined selects the fallback.
@@ -178,6 +187,60 @@ describe("headlineOf — plural agreement carries a faithful count of exactly on
     if (spec.id !== "editorStep") throw new Error("expected editorStep");
     expect(spec.dimensions).toEqual([{ kind: "keysRemoved", count: 1 }]);
   });
+
+  it("makes no singular/plural word choice of its own — a dimension carries only a code and a number", () => {
+    // If the selection ever grew a pre-pluralized noun ("key" / "keys"), FR-012
+    // would hold in English by coincidence and break in every locale with a
+    // different plural rule. The dimension's key set is the guard: exactly
+    // `kind` and `count`, nothing lexical.
+    const spec = headlineOf(editorAction("gallery_edit", { keysRemoved: 1 }), HAND_SET, deps);
+    if (spec.id !== "editorStep") throw new Error("expected editorStep");
+    const [only] = spec.dimensions;
+    if (only === undefined) throw new Error("expected one dimension");
+    expect(Object.keys(only).sort()).toEqual(["count", "kind"]);
+  });
+
+  it("carries 1 and 2 through the same path, so the boundary is the catalog's to decide", () => {
+    const one = headlineOf(editorAction("touch_edit", { touchKeysAffected: 1 }), HAND_SET, deps);
+    const two = headlineOf(editorAction("touch_edit", { touchKeysAffected: 2 }), HAND_SET, deps);
+    if (one.id !== "editorStep" || two.id !== "editorStep") {
+      throw new Error("expected editorStep for both");
+    }
+    expect(one.dimensions).toEqual([{ kind: "touchKeysAffected", count: 1 }]);
+    expect(two.dimensions).toEqual([{ kind: "touchKeysAffected", count: 2 }]);
+  });
+});
+
+describe("headlineOf — stage stays a code, in every outcome (FR-008/FR-010)", () => {
+  const stages = ["gallery_edit", "mechanism_edit", "touch_edit"] as const;
+
+  it.each(stages)("passes %s through unchanged when the step measured a change", (stage) => {
+    const spec = headlineOf(editorAction(stage, { keysAdded: 3 }), HAND_SET, deps);
+    expect(spec).toEqual({
+      id: "editorStep",
+      stage,
+      dimensions: [{ kind: "keysAdded", count: 3 }],
+    });
+  });
+
+  it.each(stages)("passes %s through unchanged in the no-change outcome", (stage) => {
+    const spec = headlineOf(
+      editorAction(stage, {
+        keysRemoved: 0,
+        keysAdded: 0,
+        mechanismsAssigned: 0,
+        touchKeysAffected: 0,
+      }),
+      HAND_SET,
+      deps,
+    );
+    expect(spec).toEqual({ id: "editorStepNoChange", stage });
+  });
+
+  it.each(stages)("passes %s through unchanged in the unmeasured outcome", (stage) => {
+    const spec = headlineOf(editorAction(stage, {}), HAND_SET, deps);
+    expect(spec).toEqual({ id: "editorStepUnmeasured", stage });
+  });
 });
 
 describe("headlineOf — the three editor outcomes (contract §3 table)", () => {
@@ -202,6 +265,21 @@ describe("headlineOf — the three editor outcomes (contract §3 table)", () => 
       name: "all absent -> editorStepUnmeasured",
       counts: {},
       expectedId: "editorStepUnmeasured",
+    },
+    {
+      // Not a row of contract §3's three-row table, which names only "all
+      // absent" for the third outcome. The implemented rule is the weaker
+      // "nothing non-zero AND at least one absent", which is the safe reading:
+      // a stage cannot be reported as having changed nothing on the strength of
+      // three zeros when the fourth dimension was never measured.
+      name: "some present zeros, at least one absent -> editorStepUnmeasured, never noChange",
+      counts: { keysRemoved: 0, keysAdded: 0, mechanismsAssigned: 0 },
+      expectedId: "editorStepUnmeasured",
+    },
+    {
+      name: "one present non-zero with the rest absent -> editorStep",
+      counts: { mechanismsAssigned: 2 },
+      expectedId: "editorStep",
     },
   ];
 

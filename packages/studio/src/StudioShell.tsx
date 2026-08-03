@@ -65,7 +65,7 @@ import { DecisionTrailView } from "./decisions/DecisionTrailView.tsx";
 import { resolveImpact } from "./decisions/impact.ts";
 import { buildPathOverlay } from "./dashboard/pathOverlay.ts";
 import { projectWorkingCopyForOutput } from "./lib/serializeWorkingCopy.ts";
-import { readVfsText } from "./lib/vfsText.ts";
+import { selectDesktopAssignments } from "./lib/unimplementedInventory.ts";
 import { StepHost } from "./components/StepHost.tsx";
 import { ResumeDraftBanner } from "./components/ResumeDraftBanner.tsx";
 import { SurveyResetButton } from "./components/SurveyResetButton.tsx";
@@ -608,7 +608,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // same reason as every other ReducerDeps member: the recorder needs stores/ and
   // lib/, and steps/ may import neither.
   //
-  // `readProjectedKmn` delegates to `projectWorkingCopyForOutput` — the SAME
+  // `readProjectedFiles` delegates to `projectWorkingCopyForOutput` — the SAME
   // function the download zip and the pull-request path use. That is not an
   // implementation convenience, it is FR-009/SC-005: the text the audit diffs must
   // be the text that ships, and this is the one function that produces it. Do not
@@ -621,13 +621,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // ---------------------------------------------------------------------------
   const snapshotterRef = useRef(
     createSourceSnapshotter({
-      readProjectedKmn: async () => {
+      readProjectedFiles: async () => {
         const projected = await projectWorkingCopyForOutput();
-        if (projected === null) return null;
-        const path = findKmnPath(projected.vfs);
-        if (path === undefined) return null;
-        const text = readVfsText(projected.vfs, path);
-        return text === undefined ? null : { path, text };
+        return projected === null ? null : { entries: projected.vfs.entries() };
       },
     }),
   );
@@ -648,6 +644,19 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           const wc = useWorkingCopyStore.getState();
           return [...wc.deletedNodeIds, ...wc.deletedItemIds, ...wc.deletedTouchKeyIds];
         },
+        // The store's phase-C physical mechanism assignments, via the ONE
+        // documented selector every other reader of this filter also uses
+        // (unimplementedInventory.ts's `selectDesktopAssignments` docstring) —
+        // recordEditorStep must never fork this definition (research D-01).
+        getMechanismAssignments: () => {
+          const wc = useWorkingCopyStore.getState();
+          return selectDesktopAssignments(wc.phaseResults);
+        },
+        // The base IR the working copy was instantiated from (research D-05) —
+        // `null` before instantiation.
+        getBaseIr: () => useWorkingCopyStore.getState().baseIr,
+        getDeletedNodeIds: () => useWorkingCopyStore.getState().deletedNodeIds,
+        getDeletedItemIds: () => useWorkingCopyStore.getState().deletedItemIds,
         // The keyboard's own id once the author has set one, else the base's —
         // matching how `deriveProjectKeyFromWorkingCopy` keys a project, so the
         // record and the draft agree on which keyboard this is.
