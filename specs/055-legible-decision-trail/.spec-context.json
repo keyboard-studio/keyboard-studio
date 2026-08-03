@@ -4,7 +4,7 @@
   "branch": "055-legible-decision-trail",
   "selectedAt": "2026-08-03T01:28:29.950Z",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "implemented",
   "history": [
     {
       "step": "specify",
@@ -435,6 +435,21 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-03T05:52:54.912Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T05:53:40.843Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-03T05:53:41.150Z"
     }
   ],
   "coverage": {
@@ -444,6 +459,9 @@
         "T010",
         "T011",
         "T012"
+      ],
+      "tests": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
       ]
     },
     "FR-002": {
@@ -451,6 +469,9 @@
       "tasks": [
         "T010",
         "T011"
+      ],
+      "tests": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
       ]
     },
     "FR-003": {
@@ -458,6 +479,9 @@
       "tasks": [
         "T009",
         "T010"
+      ],
+      "tests": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
       ]
     },
     "FR-004": {
@@ -466,6 +490,9 @@
         "T009",
         "T010",
         "T012"
+      ],
+      "tests": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
       ]
     },
     "FR-005": {
@@ -474,6 +501,10 @@
         "T004",
         "T006",
         "T010"
+      ],
+      "tests": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts",
+        "packages/contracts/src/schemas.test.ts"
       ]
     },
     "FR-006": {
@@ -482,12 +513,18 @@
         "T010",
         "T011",
         "T020"
+      ],
+      "tests": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
       ]
     },
     "FR-007": {
       "title": "This feature MUST NOT alter the keyboard artifact.",
       "tasks": [
         "T041"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/artifactIndependence.test.ts"
       ]
     },
     "FR-030": {
@@ -495,6 +532,9 @@
       "tasks": [
         "T020",
         "T023"
+      ],
+      "tests": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
       ]
     },
     "FR-031": {
@@ -509,6 +549,9 @@
       "tasks": [
         "T025",
         "T026"
+      ],
+      "tests": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
       ]
     },
     "FR-033": {
@@ -516,12 +559,18 @@
       "tasks": [
         "T025",
         "T026"
+      ],
+      "tests": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
       ]
     },
     "FR-034": {
       "title": "A stage's counts MUST be interpretable against the recorded starting inventory.",
       "tasks": [
         "T020"
+      ],
+      "tests": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
       ]
     },
     "FR-035": {
@@ -529,6 +578,9 @@
       "tasks": [
         "T020",
         "T023"
+      ],
+      "tests": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
       ]
     },
     "FR-008": {
@@ -539,6 +591,9 @@
         "T019",
         "T022",
         "T024"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/DecisionEntryRow.identifiers.test.tsx"
       ]
     },
     "FR-009": {
@@ -547,6 +602,9 @@
         "T013",
         "T015",
         "T016"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/lookupQuestionLabel.test.ts"
       ]
     },
     "FR-010": {
@@ -555,6 +613,9 @@
         "T013",
         "T014",
         "T017"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/headline.test.ts"
       ]
     },
     "FR-011": {
@@ -563,6 +624,9 @@
         "T013",
         "T017",
         "T018"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/headline.test.ts"
       ]
     },
     "FR-012": {
@@ -570,6 +634,9 @@
       "tasks": [
         "T014",
         "T018"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/headline.test.ts"
       ]
     },
     "FR-013": {
@@ -577,6 +644,9 @@
       "tasks": [
         "T013",
         "T018"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/headline.test.ts"
       ]
     },
     "FR-014": {
@@ -585,6 +655,10 @@
         "T013",
         "T015",
         "T018"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/headline.test.ts",
+        "packages/studio/src/decisions/DecisionEntryRow.identifiers.test.tsx"
       ]
     },
     "FR-015": {
@@ -593,12 +667,18 @@
         "T014",
         "T031",
         "T040"
+      ],
+      "tests": [
+        "packages/engine/src/decision-audit/prSummary.test.ts"
       ]
     },
     "FR-016": {
       "title": "A decision's attributed change MUST span every text file the projection produces, derived from what the projection emitted.",
       "tasks": [
         "T027"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/snapshotSource.test.ts"
       ]
     },
     "FR-017": {
@@ -606,18 +686,28 @@
       "tasks": [
         "T027",
         "T030"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/impact.test.ts",
+        "packages/studio/src/decisions/snapshotSource.test.ts"
       ]
     },
     "FR-017a": {
       "title": "Content that changes on every projection independently of any decision MUST NOT be attributed to a decision.",
       "tasks": [
         "T028"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/snapshotSource.test.ts"
       ]
     },
     "FR-018": {
       "title": "Every file compared MUST come from the same projection that produces the shipped keyboard.",
       "tasks": [
         "T027"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/snapshotSource.test.ts"
       ]
     },
     "FR-019": {
@@ -625,12 +715,18 @@
       "tasks": [
         "T029",
         "T030"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/impact.test.ts"
       ]
     },
     "FR-019a": {
       "title": "Joint attribution MUST NOT require more than one comparison per stage boundary.",
       "tasks": [
         "T029"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/impact.test.ts"
       ]
     },
     "FR-020": {
@@ -638,12 +734,19 @@
       "tasks": [
         "T007",
         "T030"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/impact.test.ts",
+        "packages/studio/src/decisions/DecisionEntryRow.test.tsx"
       ]
     },
     "FR-021": {
       "title": "Impact MUST be computed only on request for a specific decision; expanding one entry MUST NOT compute impact for any other.",
       "tasks": [
         "T039"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/impact.test.ts"
       ]
     },
     "FR-022": {
@@ -651,6 +754,9 @@
       "tasks": [
         "T035",
         "T037"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/DecisionTrailView.test.tsx"
       ]
     },
     "FR-023": {
@@ -658,6 +764,9 @@
       "tasks": [
         "T035",
         "T037"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/DecisionTrailView.test.tsx"
       ]
     },
     "FR-024": {
@@ -665,6 +774,9 @@
       "tasks": [
         "T035",
         "T038"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/DecisionTrailView.test.tsx"
       ]
     },
     "FR-025": {
@@ -672,6 +784,9 @@
       "tasks": [
         "T035",
         "T037"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/DecisionTrailView.test.tsx"
       ]
     },
     "FR-026": {
@@ -679,24 +794,37 @@
       "tasks": [
         "T035",
         "T038"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/DecisionTrailView.test.tsx",
+        "packages/studio/src/decisions/stageGroups.test.ts"
       ]
     },
     "FR-027": {
       "title": "Tests asserting what the record contains for a step MUST drive the production completion path for that step.",
       "tasks": [
         "T012"
+      ],
+      "tests": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
       ]
     },
     "FR-028": {
       "title": "The absence of an internal identifier from author-facing trail text MUST be enforced mechanically, not by review.",
       "tasks": [
         "T019"
+      ],
+      "tests": [
+        "packages/studio/src/decisions/DecisionEntryRow.identifiers.test.tsx"
       ]
     },
     "FR-029": {
       "title": "Every reporting dimension MUST have a test that drives it to a non-zero value through the production path.",
       "tasks": [
         "T012"
+      ],
+      "tests": [
+        "packages/studio/src/steps/reducer.decisionRecording.test.ts"
       ]
     },
     "FR-005a": {
@@ -707,6 +835,11 @@
         "T013",
         "T031",
         "T035"
+      ],
+      "tests": [
+        "packages/contracts/src/schemas.test.ts",
+        "packages/studio/src/decisions/headline.test.ts",
+        "packages/engine/src/decision-audit/prSummary.test.ts"
       ]
     }
   },
@@ -805,6 +938,21 @@
       "decision": "FR-028 is enforced by a rendering test (DecisionEntryRow.identifiers.test.tsx) over one entry of every kind against the real English catalog; test-antipattern-lint is not extended.",
       "why": "A test that fails CI is mechanical enforcement. test-antipattern-lint is a plain-node static scanner over test files - it cannot render a component, and teaching it to would put a runtime concern in a static tool. The same movement rewrites reducer.decisionRecording.test.ts to drive the production completion path (FR-027) and adds a per-dimension non-zero test (FR-029).",
       "rejected": "Asserting on HeadlineSpec alone - cheaper and insufficient, since FR-008 is about rendered text where a catalog message could still interpolate an id."
+    },
+    {
+      "decision": "recordMigration was relocated from packages/studio/src/decisions into packages/engine/src/decision-audit, and v1 normalization runs INSIDE parseDecisionRecord, pre-validation.",
+      "why": "The reshaped DecisionEntrySchema requires the v2 files array, so a real v1 entry failed validation and was silently dropped before any normalizer could see it - wiring the normalizer downstream would have been a no-op for exactly the records it exists to rescue. Normalizing pre-validation fixes that, and the engine is the only side both the parser and the studio can reach without violating the engine-not-to-studio dependency-cruiser rule.",
+      "rejected": "Wiring normalizeDecisionRecord into decisionLogStore.hydrate() alone (the task first named that file) - it runs after parse, so v1 captured impacts were already gone."
+    },
+    {
+      "decision": "The shared-change note names co-decisions by COUNT, not by resolving entryIds to headlines.",
+      "why": "sharedWith holds internal entryIds and FR-008 forbids an internal identifier reaching author-facing text; FR-021 also forbids one entry expansion touching another entry data, and DecisionEntryRow is deliberately handed only its own entry. The co-decisions are already visible as sibling rows in the same stage group, so stating the sharing by count satisfies FR-019 without either violation.",
+      "rejected": "Printing raw entryIds (fails FR-008 and the T019 CI guard); adding a cross-entry id-to-headline lookup (fails FR-021 lazy-resolution)."
+    },
+    {
+      "decision": "trail.stage.rollUp.composed was given one generic {stage} ({detail}) meaning rather than being split into three per-kind ids.",
+      "why": "It had been reused for three different messages, so lingui extraction kept only one and the base-contribution and survey-summary roll-ups rendered an empty parenthesis (Keyboard identity ()) - FR-023 unmet. All three branches already pre-format their own correctly-pluralized clause via their own ids, so the composed id genuine single meaning is stage name plus a pre-formatted parenthetical, mirroring trail.entry.headline.baseContribution.withDetail.",
+      "rejected": "Three separate composed ids - equally correct but duplicates a shape the entry-level catalog had already solved with a generic placeholder."
     }
   ],
   "approach": "Store-derived reporting through the seams 053 already built: every new count comes from an injected dep on createDecisionRecorder (alongside the working getDeletionCounts), so no editor component learns the audit exists and no adapter prop shape changes. The one contract move reshapes EditorActionSummary (counts to number|undefined) and DecisionImpact (single path to a per-file set plus sharedWith) in decisionRecord.ts with its zod mirror in the same commit. Recording stays on the existing recordStepCompletion event, which StepHost fires after applyStepCompletion, so the working copy the recorder reads is the one the step just produced.",
@@ -816,10 +964,14 @@
     "tasks": {
       "summary": "43 tasks in 8 phases (Setup -> Foundational -> US1/US2/US3/US4/US5 -> Polish), laid out as 24 waves with explicit join points; all 38 functional requirements mapped to tasks.",
       "key_finding": "The audit_label lint-parity rule (T001) and the contracts reshape (T004) are the two hard serialisation points: the first must precede any authored value or CI reddens for French, the second is a wave-of-one because the interface and its zod mirror must land in one commit or the drift guards fail the build."
+    },
+    "implement": {
+      "summary": "43 tasks across 8 phases: every editor stage now reports what it actually did from store-derived producers, entries read as plain sentences with no internal identifiers, the base keyboard contribution is recorded as the denominator later counts are read against, a decision impact spans every text file the projection emits with shared changes attributed jointly, and the trail groups by stage in flow order.",
+      "key_finding": "Three real defects surfaced only because tests were required to drive the PRODUCTION path rather than a synthetic payload: the stage roll-up reused one message id for three messages (rendering \"Keyboard identity ()\"), prSummary lumped not-measured in with measured-and-unchanged, and payloadsEqual ignored base-contribution so an idempotent choose_base revisit inflated the trail. All three were fixed and their pinned it.fails flipped green."
     }
   },
   "telemetryInstanceId": "c7509f96-1e29-4e6f-8a65-690a8a8ad00d",
-  "currentTask": "T043",
+  "currentTask": "T022",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1193,6 +1345,61 @@
         "packages/studio/src/locales/fr/messages.json",
         "packages/studio/src/locales/en/messages.json"
       ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Added trail.entry.headline.baseContribution plus 11 axis-code and 4 metadata-field prose messages with unknown-code fallbacks, so no internal code reaches author-facing text",
+      "files": [
+        "packages/studio/src/locales/en/messages.json"
+      ]
     }
-  }
+  },
+  "verified": [
+    {
+      "what": "Full typecheck across the monorepo",
+      "command": "pnpm typecheck",
+      "result": "Done - all 7 workspace projects clean, no errors"
+    },
+    {
+      "what": "Full test suite",
+      "command": "pnpm -r test",
+      "result": "8292 passed, 2 skipped, 0 failed (contracts 524, engine 2483, studio 4992, keyboard-lint 82, glottolog 42, oauth-backend 160, llm 9)"
+    },
+    {
+      "what": "Full lint gate incl. depcruise, crew-lint, facet-lint, i18n-catalog-lint, content-i18n-lint, content-i18n-freshness, test-antipattern-lint",
+      "command": "pnpm lint",
+      "result": "0 errors; all 8 checkers GREEN; 122 pre-existing lingui no-unlocalized-strings warnings in untouched files - eslint over this feature own files (decisions/, decision-audit/, occupiedHostKeys.ts) reports 0 problems",
+      "warnings": [
+        "122 lingui/no-unlocalized-strings warnings, all pre-existing and outside this feature files"
+      ]
+    },
+    {
+      "what": "Architecture boundary after relocating recordMigration into the engine",
+      "command": "pnpm depcruise",
+      "result": "no dependency violations (925 modules, 3075 dependencies) - engine-not-to-studio rule holds"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "resolveProposal registers base-derived provenance for questionIds script/targets/version, but no currently-registered live flow question uses those exact ids - the seam is correct and unit/integration-tested, but not yet reachable from a production screen. Same honest-limitation shape as the langtags register documented in recordSurveyAnswers.ts.",
+      "step": "implement"
+    },
+    {
+      "note": "resolveProposal targets case returns base.targets (an array), but char-list is the only array-valued AnswerType - a plausible targets answer (select/text) can never value-match and will always record hand-set.",
+      "step": "implement"
+    },
+    {
+      "note": "occupiedHostKeys reconstructs MechanismRef candidates from IR rule shape because IRRule carries no MechanismRef; it covers simple_swap and deadkey_single_tap only. multi_char_sequence has no reliable single-rule signature in a parsed .kmn and is deliberately not reconstructed, so a keysAdded arising solely from that mechanism would go uncounted.",
+      "step": "implement"
+    },
+    {
+      "note": "A HISTORY.md hunk carries the normalized date placeholder (0000-00-00) rather than the shipped stamp, so it is the one hunk that will not re-apply to the shipped text - an inherent cost of holding the stamp stable across the comparison rather than excluding the file. The shipped artifact itself is unaffected (guarded by artifactIndependence.test.ts).",
+      "step": "implement"
+    },
+    {
+      "note": "StudioShell.tsx createDecisionRecorder dep block is inline and unimportable, so reducer.decisionRecording.test.ts must re-state it verbatim - the same drift class this feature exists to fix. Recommend extracting a shared createStudioDecisionRecorder().",
+      "step": "implement"
+    }
+  ],
+  "last_action": "all 43 tasks done - typecheck clean, 8292 tests pass, pnpm lint green (0 errors)"
 }

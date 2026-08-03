@@ -117,7 +117,7 @@ The contracts change breaks every consumer by design: with the counts optional, 
 
 - [x] **T020** [P] NEW baseline recorder: one entry at `choose_base` completion carrying `baseId`, `baseDisplayName`, `startingKeyCount`, `derivedAxes`, `inheritedMetadata`, `instantiationMode`, read from the **instantiated store** via injected deps (never a re-read of the base source, FR-035). `startingKeyCount` uses `toRailNodes(baseIr, removalCapabilities)` so the denominator is in the same `nodes + items` unit as `keysRemoved` (FR-034). No instantiated working copy at that instant → **no entry**, never a fabricated zero (research D-11) · `packages/studio/src/decisions/recordBaseContribution.ts` + `recordBaseContribution.test.ts`
 - [x] **T021** [P] Add the `baseContribution` variant to the selection surface — base name plus only the contributions actually present ([headline-spec.contract.md](contracts/headline-spec.contract.md) §2) · `packages/studio/src/decisions/headline.ts`
-- [ ] **T022** [P] Add `trail.entry.headline.baseContribution` plus the messages that render `derivedAxes` and `inheritedMetadata[].field` **codes** as prose — a code must never reach author-facing text (FR-008) · `packages/studio/src/locales/en/messages.json`
+- [x] **T022** [P] Add `trail.entry.headline.baseContribution` plus the messages that render `derivedAxes` and `inheritedMetadata[].field` **codes** as prose — a code must never reach author-facing text (FR-008) · `packages/studio/src/locales/en/messages.json`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
