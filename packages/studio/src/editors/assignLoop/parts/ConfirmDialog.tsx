@@ -104,6 +104,11 @@ export function ConfirmDialog({
   };
 
   return (
+    /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions --
+       backdrop click-to-dismiss is a redundant pointer affordance on a native
+       <dialog> opened with showModal(); keyboard users already dismiss via the
+       native Escape route (the 'cancel' listener above). No keyboard capability
+       is missing, so no key handler belongs here. */
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
@@ -165,6 +170,10 @@ export function ConfirmDialog({
           )}
           {/* Primary (accent / filled) — "Yes, remove everywhere" */}
           <button
+            // Not page-load autofocus: this mounts when the modal opens,
+            // implementing the APG dialog pattern's required initial focus
+            // placement inside the dialog (docs/accessibility.md house rule 4).
+            // eslint-disable-next-line jsx-a11y/no-autofocus
             autoFocus
             onClick={onPrimary}
             style={{

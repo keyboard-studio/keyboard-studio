@@ -35,9 +35,22 @@ const menuRow: React.CSSProperties = { display: 'flex', alignItems: 'center', ga
 
 function RemovedMenu({ list, onRestore, onRestoreAll, onClose }: RemovedMenuProps) {
   const { t } = useLingui();
+  // Keyboard dismissal route: Escape closes the menu wherever focus sits
+  // (trigger button or a Restore button inside the panel). The backdrop
+  // below is the pointer counterpart of this same dismiss action.
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
   return (
     <>
-      <div onClick={onClose} style={backdrop} />
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions --
+          pointer counterpart of the Escape route installed above; hidden from
+          the accessibility tree, so it must not present as interactive. */}
+      <div onClick={onClose} aria-hidden="true" style={backdrop} />
       <div style={menuPanel}>
         <div style={menuHeader}>
           <span style={{ font: '600 11px/1 var(--app-font)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--app-text-subtle)' }}>
@@ -137,6 +150,8 @@ export function StatusBar({ kept, total, removedList, onRestore, onRestoreAll }:
         <button
           onClick={() => setOpen((o) => !o)}
           disabled={removedList.length === 0}
+          aria-expanded={open}
+          aria-haspopup="true"
           onMouseEnter={() => setInfo(removedInfo)}
           onFocus={() => setInfo(removedInfo)}
           onMouseLeave={clearInfo}

@@ -27,6 +27,7 @@
 // zip writer, not a new library introduction).
 
 import { test, expect } from "playwright/test";
+import { expectNoSeriousAxeViolations } from "./helpers/axe";
 import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
@@ -123,6 +124,10 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     const targetCard = page.getByTestId(`carve-card-${TARGET_NODE_ID}`);
     await expect(targetCard).toBeVisible();
     await expect(targetCard).toHaveAttribute("data-kind", "raw");
+
+    // Accessibility gate (spec 056 FR-003): scan the carve gallery screen.
+    await expectNoSeriousAxeViolations(page, "carve gallery (bj_cree_woods)");
+
     await targetCard.click();
 
     await page.getByTestId("raw-remove-anyway").click();
@@ -158,6 +163,9 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
 
     // handlePhaseFComplete navigates to #output.
     await page.waitForURL(/#output$/);
+
+    // Accessibility gate (spec 056 FR-003): scan the output screen.
+    await expectNoSeriousAxeViolations(page, "output screen (carve walk)");
 
     // ---------------------------------------------------------------------
     // AC2 checkpoint 2: the emitted .kmn omits the deleted rule.

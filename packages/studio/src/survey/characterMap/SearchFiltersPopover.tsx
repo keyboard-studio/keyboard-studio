@@ -63,6 +63,11 @@ export function SearchFiltersPopover({
           <span aria-hidden="true">▾</span>
         </button>
         {filtersOpen && (
+          /* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions --
+             the keydown listener only ADDS keyboard capability: it catches
+             Escape bubbling from the checkboxes inside to dismiss the popover
+             and restore focus to the trigger (house rule 4). The group itself
+             is not made pointer-interactive. */
           <div
             id="char-map-search-filters-panel"
             role="group"

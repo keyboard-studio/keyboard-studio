@@ -3100,6 +3100,10 @@ export function MechanismGallery({
   // the pane currently has focus — a plain native keydown bubbles up to here
   // regardless of the focused descendant. See useCharCycleKeys.ts.
   const leftContent = (
+    /* eslint-disable-next-line jsx-a11y/no-static-element-interactions --
+       the bubbled keydown only ADDS a keyboard capability (ArrowLeft/Right
+       character cycling regardless of focused descendant, per the comment
+       above); the pane is not made pointer-interactive. */
     <div
       onKeyDown={handlePaneKeyDown}
       style={{

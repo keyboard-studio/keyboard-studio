@@ -21,6 +21,7 @@
  */
 
 import { test, expect, type Page, type Download } from "playwright/test";
+import { expectNoSeriousAxeViolations } from "./helpers/axe";
 import { unzipSync } from "fflate";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -177,8 +178,14 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     await confirmPrefill(page);
     await completePhaseB(page);
 
+    // Accessibility gate (spec 056 FR-003): scan the completed Phase B screen.
+    await expectNoSeriousAxeViolations(page, "phase B complete (copy-edit walk)");
+
     // Navigate to Output tab and trigger the download.
     await navigateToOutput(page);
+
+    // Accessibility gate (spec 056 FR-003): scan the output screen.
+    await expectNoSeriousAxeViolations(page, "output screen (copy-edit walk)");
     const download = await triggerDownload(page);
 
     // Verify the download event fired and produced a file.

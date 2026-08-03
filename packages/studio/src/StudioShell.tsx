@@ -1210,7 +1210,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
               textAlign: "center",
             }}
           >
-            <span style={{ fontSize: 32, opacity: 0.4, fontFamily: "monospace" }}>[kb]</span>
+            {/* Decorative icon stand-in: aria-hidden (conveys nothing the next
+                line doesn't), and opacity floor 0.6 — #9aa7b8 over #0d1117 at
+                0.6 is 3.5:1, the minimum that clears the 3:1 large-text
+                contrast bar for sighted low-vision users (1.4.3). */}
+            <span aria-hidden="true" style={{ fontSize: 32, opacity: 0.6, fontFamily: "monospace" }}>[kb]</span>
             <span>
               <Trans id="preview.empty.hint">
                 Choose a base keyboard in the wizard to see a live preview here.

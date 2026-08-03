@@ -67,6 +67,7 @@
 // (also deleted afterward).
 
 import { test, expect, type Page } from "playwright/test";
+import { expectNoSeriousAxeViolations } from "./helpers/axe";
 import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
 import {
@@ -376,6 +377,9 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     await confirmPrefill(page);
     await addPlacedCharacterToInventory(page, PLACED_CHAR);
 
+    // Accessibility gate (spec 056 FR-003): scan the Phase B build-list screen.
+    await expectNoSeriousAxeViolations(page, "phase B build list (US2 piaroa walk)");
+
     // Manifest spine order (StudioShell.tsx): characters -> marks -> carve ->
     // mechanisms -> touch_seed_source -> touch -> help. The marks series for
     // the accented PLACED_CHAR was driven inside addPlacedCharacterToInventory.
@@ -383,6 +387,10 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     await driveMechanismsPlaceLetter(page, PLACED_CHAR);
     await confirmReseedDefault(page);
     await driveTouchGalleryAcceptPlacement(page, PLACED_CHAR);
+
+    // Accessibility gate (spec 056 FR-003): scan the post-touch-gallery screen.
+    await expectNoSeriousAxeViolations(page, "after touch gallery (US2 piaroa walk)");
+
     await driveHelpPhase(
       page,
       "Welcome to the Piaroa keyboard.",

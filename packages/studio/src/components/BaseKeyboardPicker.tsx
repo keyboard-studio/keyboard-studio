@@ -626,6 +626,7 @@ export function BaseKeyboardPicker({
                 const idRange = rb.matchRanges?.find((r) => r.field === "id");
 
                 return (
+                  // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- APG combobox pattern: keyboard selection happens on the input (handleKeyDown: ArrowUp/Down + Enter -> commit), never on individual options; the option's onClick is the redundant pointer affordance
                   <li
                     key={kb.id}
                     id={`${uid}-opt-${kb.id}`}

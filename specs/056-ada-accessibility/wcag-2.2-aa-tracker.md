@@ -4,7 +4,7 @@ Single source of truth for the studio's compliance percentage (spec [056-ada-acc
 
 **Rules.** Status is one of `unknown` / `pass` / `fail` / `n/a`. A row becomes `pass` only with evidence (CI-gating check, committed test file, or dated manual-audit note). A row becomes `n/a` only with a justification naming the condition that would re-apply it. `fail` rows link a filed `bug(studio)` issue. Compliance % = `pass` / (55 − `n/a`), recomputed in the summary line whenever a row changes.
 
-**Summary (2026-08-03, Cycle 0):** pass 0 · fail 0 · n/a 0 · unknown 55 · **compliance 0 / 55 = 0%** — no audit has run yet; Cycle 1 resolves every row (spec 056 FR-004).
+**Summary (2026-08-03, Cycle 1 in progress):** pass 0 · fail 0 · n/a 6 · unknown 49 · **compliance 0 / 49 = 0%** — the two automated gates landed (spec 056 FR-002 jsx-a11y at error severity in `pnpm lint`; FR-003 @axe-core/playwright serious/critical assertions in `boot-smoke.spec.ts` and the four walk specs), and one grep-verified block confirmed the six media-related criteria as `n/a`. **No criterion flipped to `pass`** — the honest reason: axe/lint each cover ≤ ~30–40% of real violations, none of the walk-spec surfaces have been scanned yet in this branch (corpus absent from the dev container), and no manual keyboard or screen-reader pass has run. FR-004's full baseline flip lands when the walk-spec axe runs and the keyboard-only pass execute in the corpus-having lane. Interim partial-evidence notes recorded on rows below.
 
 Criterion links: [How to Meet WCAG 2.2](https://www.w3.org/WAI/WCAG22/quickref/).
 
@@ -13,18 +13,18 @@ Criterion links: [How to Meet WCAG 2.2](https://www.w3.org/WAI/WCAG22/quickref/)
 | SC | Name | Level | Status | Evidence | Notes |
 |---|---|---|---|---|---|
 | 1.1.1 | Non-text Content | A | unknown | — | Glyph cells/key caps need codepoint-derived names (FR-007) |
-| 1.2.1 | Audio-only and Video-only (Prerecorded) | A | unknown | — | Proposed n/a: no media shipped; confirm at baseline |
-| 1.2.2 | Captions (Prerecorded) | A | unknown | — | Proposed n/a: no media shipped; confirm at baseline |
-| 1.2.3 | Audio Description or Media Alternative (Prerecorded) | A | unknown | — | Proposed n/a: no media shipped; confirm at baseline |
-| 1.2.4 | Captions (Live) | AA | unknown | — | Proposed n/a: no media shipped; confirm at baseline |
-| 1.2.5 | Audio Description (Prerecorded) | AA | unknown | — | Proposed n/a: no media shipped; confirm at baseline |
+| 1.2.1 | Audio-only and Video-only (Prerecorded) | A | n/a | 2026-08-03 grep `packages/studio/src` for `<audio`/`<video`/`new Audio`/`AudioContext`/`<track ` returned zero hits | Re-applies if any media shipped |
+| 1.2.2 | Captions (Prerecorded) | A | n/a | 2026-08-03 same grep | Re-applies if any prerecorded video shipped |
+| 1.2.3 | Audio Description or Media Alternative (Prerecorded) | A | n/a | 2026-08-03 same grep | Re-applies if any prerecorded video shipped |
+| 1.2.4 | Captions (Live) | AA | n/a | 2026-08-03 same grep | Re-applies if any live media surfaced |
+| 1.2.5 | Audio Description (Prerecorded) | AA | n/a | 2026-08-03 same grep | Re-applies if any prerecorded video shipped |
 | 1.3.1 | Info and Relationships | A | unknown | — | Landmarks, headings, label/field association |
 | 1.3.2 | Meaningful Sequence | A | unknown | — | Three-pane layout DOM order vs. visual order |
 | 1.3.3 | Sensory Characteristics | A | unknown | — | |
 | 1.3.4 | Orientation | AA | unknown | — | |
 | 1.3.5 | Identify Input Purpose | AA | unknown | — | Few identity fields; check author-name/e-mail inputs |
-| 1.4.1 | Use of Color | A | unknown | — | Diagnostic severity, selection state |
-| 1.4.2 | Audio Control | A | unknown | — | Proposed n/a: no auto-playing audio; confirm at baseline |
+| 1.4.1 | Use of Color | A | unknown | — | Partial (2026-08-03): axe `use-of-color` passes on app root + lint demo (`packages/studio/e2e/boot-smoke.spec.ts`), but walk surfaces (survey, galleries, output) are unscanned pending the corpus e2e lane — insufficient to flip |
+| 1.4.2 | Audio Control | A | n/a | 2026-08-03 same grep — no audio of any kind | Re-applies if any auto-playing audio surfaced |
 | 1.4.3 | Contrast (Minimum) | AA | unknown | — | Token-level check (FR-009) |
 | 1.4.4 | Resize Text | AA | unknown | — | 200% zoom, Cycle 2 |
 | 1.4.5 | Images of Text | AA | unknown | — | Rendered glyphs are content, not images of text — record reasoning |

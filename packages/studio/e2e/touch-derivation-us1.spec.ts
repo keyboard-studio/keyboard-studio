@@ -53,6 +53,7 @@
 // probes against packages/engine/src.
 
 import { test, expect, type Page } from "playwright/test";
+import { expectNoSeriousAxeViolations } from "./helpers/axe";
 import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
 import {
@@ -243,12 +244,19 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
     await confirmPrefill(page);
     await addPlacedCharacterToInventory(page);
 
+    // Accessibility gate (spec 056 FR-003): scan the Phase B build-list screen.
+    await expectNoSeriousAxeViolations(page, "phase B build list (US1 bambara walk)");
+
     // Manifest spine order (StudioShell.tsx): characters -> carve ->
     // mechanisms -> touch_seed_source -> touch -> help.
     await carveCharacters(page, CARVED_CHARS);
     await driveMechanismsPlaceLetter(page, PLACED_CHAR);
     await confirmImportAdaptDefault(page);
     await driveTouchGalleryAcceptPlacement(page, PLACED_CHAR);
+
+    // Accessibility gate (spec 056 FR-003): scan the post-touch-gallery screen.
+    await expectNoSeriousAxeViolations(page, "after touch gallery (US1 bambara walk)");
+
     await driveHelpPhase(
       page,
       "Welcome to the Bambara keyboard.",
@@ -256,6 +264,9 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
     );
 
     await page.waitForURL(/#output$/, { timeout: 30_000 });
+
+    // Accessibility gate (spec 056 FR-003): scan the output screen.
+    await expectNoSeriousAxeViolations(page, "output screen (US1 bambara walk)");
 
     // ---------------------------------------------------------------------
     // SC-001/SC-004: compile-clean + emit. The download button becoming

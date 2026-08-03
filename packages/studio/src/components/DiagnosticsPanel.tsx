@@ -73,6 +73,7 @@ export function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnos
           Compiler diagnostics ({diagnostics.length})
         </Trans>
       </div>
+      {/* eslint-disable-next-line jsx-a11y/no-redundant-roles -- not redundant: Safari/VoiceOver drops list semantics from ul with list-style:none; the explicit role restores them */}
       <ul
         style={{
           margin: 0,

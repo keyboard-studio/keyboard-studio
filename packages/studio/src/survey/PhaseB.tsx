@@ -1013,10 +1013,13 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
           a DOM-rendered menu. Applies to every character glyph on this step,
           incl. the character map — see phaseBDraftStore.selectedFont. */}
       <div style={{ maxWidth: 280 }} data-testid="phase-b-font-select">
-        <label id="phase-b-font-select-label"
-               style={{ display: "block", margin: "0 0 8px 0", fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>
+        {/* Not a <label>: the control is named via ariaLabelledby on the
+            SelectMenu below, and an un-associated label element (no htmlFor,
+            no nesting) adds no semantics or click-focus behavior. */}
+        <span id="phase-b-font-select-label"
+              style={{ display: "block", margin: "0 0 8px 0", fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>
           <Trans id="survey.phaseB.buildList.fontSelectLabel">Font for characters</Trans>
-        </label>
+        </span>
         <SelectMenu
           id="phase-b-font-select-control"
           value={selectedFont}

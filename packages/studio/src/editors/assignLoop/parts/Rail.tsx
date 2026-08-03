@@ -142,7 +142,18 @@ export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, on
               key={node.nodeId}
               data-testid={`carve-card-${node.nodeId}`}
               data-kind={node.kind}
+              role="button"
               onClick={() => onSelect(node.nodeId)}
+              onKeyDown={(e) => {
+                // Keyboard activation for the card itself; keys pressed on the
+                // nested ToggleBox button must not also select (hence the
+                // currentTarget guard). Space is prevented from scrolling.
+                if (e.target !== e.currentTarget) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelect(node.nodeId);
+                }
+              }}
               onMouseEnter={() => setInfo({ kind: 'node', node })}
               onFocus={() => setInfo({ kind: 'node', node })}
               onMouseLeave={clearInfo}

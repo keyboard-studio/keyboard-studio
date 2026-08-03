@@ -773,7 +773,7 @@ describe('CarveGallery — language-driven surplus recommendation (removal banne
     // 'z' is absent from the resolved needed-set — surplus, banner shows and
     // lists exactly one character.
     await screen.findByText(/We recommend removing 1 character/);
-    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    fireEvent.click(screen.getByRole('button', { expanded: false, name: /We recommend removing/ }));
     expect(screen.getByRole('checkbox', { name: 'Remove U+007A' })).not.toBeNull();
     // 'q' IS in the resolved needed-set — never listed.
     expect(screen.queryByRole('checkbox', { name: 'Remove U+0071' })).toBeNull();
@@ -863,7 +863,7 @@ describe('CarveGallery — removal banner (#525 BANNER slice)', () => {
     // Collapsed by default — the checklist isn't in the DOM yet.
     expect(screen.queryByRole('checkbox', { name: 'Remove U+0061' })).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    fireEvent.click(screen.getByRole('button', { expanded: false, name: /We recommend removing/ }));
 
     expect(screen.getByRole('checkbox', { name: 'Remove U+0061' })).not.toBeNull(); // 'a'
     expect(screen.getByRole('checkbox', { name: 'Remove U+0062' })).not.toBeNull(); // 'b'
@@ -891,7 +891,7 @@ describe('CarveGallery — removal banner (#525 BANNER slice)', () => {
 
     renderGallery(ir, caps);
     await screen.findByText(/We recommend removing 2 characters/);
-    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    fireEvent.click(screen.getByRole('button', { expanded: false, name: /We recommend removing/ }));
 
     // Both pre-checked by default.
     const checkboxA = screen.getByRole('checkbox', { name: 'Remove U+0061' });
@@ -1105,7 +1105,7 @@ function mockCasePairContributors() {
 /** Opens the RemovalBanner checklist (mirrors the #525 BANNER slice tests' expand step). */
 async function expandBanner() {
   await screen.findByText(/We recommend removing/);
-  fireEvent.click(screen.getByRole('button', { expanded: false }));
+  fireEvent.click(screen.getByRole('button', { expanded: false, name: /We recommend removing/ }));
 }
 
 describe('CarveGallery — cased-letter proposal rows (spec 051 T028)', () => {
@@ -1261,7 +1261,7 @@ describe('CarveGallery — convenience-retained characters are shielded', () => 
   it('never lists a retained character in the expanded checklist', async () => {
     renderSurplusAB(['a']);
     await screen.findByText(/We recommend removing 1 character(?!s)/);
-    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    fireEvent.click(screen.getByRole('button', { expanded: false, name: /We recommend removing/ }));
 
     expect(screen.queryByRole('checkbox', { name: 'Remove U+0061' })).toBeNull(); // 'a' kept
     expect(screen.getByRole('checkbox', { name: 'Remove U+0062' })).not.toBeNull(); // 'b' still surplus

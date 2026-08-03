@@ -41,8 +41,10 @@ export interface SelectMenuProps {
    * RadioGroup/MultiSelect — pass the id of a sibling label element.
    */
   ariaLabelledby?: string;
-  /** Same idiom as `RadioGroup`'s `required` prop (RadioGroup.tsx) — sets
-   * `aria-required` on the trigger button. */
+  /** Sets `aria-required` on the popup listbox (the role that supports the
+   * attribute — a plain button does not). The planned APG select-only
+   * combobox migration (spec 056 Cycle 2) moves it to the trigger when the
+   * trigger gains `role="combobox"`. */
   required?: boolean;
   /**
    * Value for `aria-label` on the trigger button — for call sites with no
@@ -496,7 +498,6 @@ export function SelectMenu({
         aria-expanded={open}
         aria-controls={listId}
         aria-labelledby={ariaLabelledby}
-        aria-required={required}
         aria-label={ariaLabelledby === undefined ? ariaLabel : undefined}
         // Not read by the component itself — a stable, value-based test hook
         // mirroring a native <select>'s own `.value`, since callers can no
@@ -518,6 +519,7 @@ export function SelectMenu({
             id={listId}
             role="listbox"
             tabIndex={-1}
+            aria-required={required}
             aria-activedescendant={activeDescendantId}
             style={{ ...LIST_STYLE, ...menuPosition }}
             onKeyDown={handleListKeyDown}
@@ -526,6 +528,7 @@ export function SelectMenu({
               const optionId = id !== undefined ? `${id}-option-${opt.value}` : undefined;
               const isSelected = opt.value === value;
               return (
+                // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- APG listbox pattern: keyboard selection happens on the focused <ul role="listbox"> (handleListKeyDown + aria-activedescendant), never on individual options; the option's onClick is the redundant pointer affordance
                 <li
                   key={opt.value}
                   role="option"
