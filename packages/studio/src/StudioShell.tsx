@@ -103,9 +103,13 @@ import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
 import { useSurveyBrowserHistorySync } from "./hooks/useSurveyBrowserHistorySync.ts";
 
 // Offer the resume banner only once per page load — on the first SurveyView
-// mount in this JS context, not on same-session route remounts (navigating away
-// and back is a fresh wizard, not a resume). A page reload resets this flag by
-// starting a new JS context.
+// mount in this JS context, not on same-session route remounts. A page reload
+// resets this flag by starting a new JS context.
+//
+// Spec 057: this flag is now the ONLY thing a route remount changes. The
+// traversal itself survives (FR-002), so a remount is not a fresh wizard and
+// there is nothing to offer to resume — re-offering the banner mid-session
+// would invite the author to "resume" the session they are already in.
 let resumeOfferConsumed = false;
 
 // Bind the manifest into the store's staleness actions.
@@ -442,49 +446,50 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const discoveryMethod = useSurveySessionStore((s) => s.discoveryMethod);
   const showCharacterMap = activeRightPane === "character-map" && discoveryMethod === "build-list";
 
-  // Reset the session store on mount — the store is a module-level singleton that
-  // persists across React tree unmounts/remounts (e.g. navigating away from the
-  // survey route and back creates a new SurveyView mount = a new wizard session).
-  // Without this reset the singleton would resume from stale prior state rather
-  // than starting at "identity". Component-local useState used to give this
-  // mount-fresh reset for free; this call restores that invariant for the store.
+  // NO mount-time reset (spec 057 FR-002/FR-003, defect D-1).
   //
-  // DEVIATION 2 (spec 034 US3, research D4): a durable draft may have just been
-  // restored in main.tsx (BEFORE this component — or any component — mounted),
-  // patching both the working-copy AND survey-session stores so the author
-  // resumes at their last `activeStepId`. An unconditional reset() here would
-  // immediately clobber that restore. `wasDraftRestoredThisBoot()` reads the
-  // module-level flag draftPersistence.loadDraft() sets on success; it is
-  // stable across StrictMode's double-invoked mount effects because
-  // loadDraft() itself only ever runs once, pre-mount, in main.tsx.
+  // This component used to call `useSurveySessionStore.getState().reset()` on
+  // mount, on the reading that "navigating away and back is a fresh wizard,
+  // not a resume". That reading was the defect. The survey-session store is a
+  // module-level singleton and the working-copy store beside it is never
+  // reset, so a route change lost the author's POSITION while keeping their
+  // CONTENT — the reported symptom exactly ("returning to Studio puts me back
+  // on question one, even though later questions are still filled"). It also
+  // cascaded: the reset was persisted by the autosave subscription (D-2), it
+  // broke every affordance that sets a target step and then navigates (D-3),
+  // and by returning `charactersSubStage` to "prefill" it made a later
+  // re-confirm silently empty the author's Phase B alphabet (D-4).
   //
-  // The localStorage draft (lib/draftAutosave.ts) is unaffected either way: it
-  // lives in localStorage, not the store — the resume banner below reads it and
-  // only applyDraft() (on Resume) hydrates the store.
-  // Flipped to true at the end of the reset/restore effect below — passed to
-  // useSurveyBrowserHistorySync as a live ordering guard (DEV-only): if a
-  // future edit reorders the two calls (or hoists the sync hook above this
-  // effect), that hook's own mount effect finds this still `false` and fails
-  // loud instead of silently tagging the browser entry with a stale
-  // activeStepId. See useSurveyBrowserHistorySync.ts's doc comment on the
-  // param.
-  const resetOrRestoreSettledRef = useRef(false);
+  // THE CONTRACT NOW: component lifetime is not a session boundary. A
+  // traversal reset happens only where the author asked for one, and there are
+  // exactly two such places — `handleStartOver()` below (the corner reset
+  // control and the terminal panels' "Start over") and WelcomeScreen's "I'm
+  // new". Both already call `reset()` explicitly; nothing was added to replace
+  // this deletion, because a second notion of session identity beside those
+  // two is the framing that produced the bug.
+  //
+  // `wasDraftRestoredThisBoot()` went with it: it existed only to stop this
+  // reset from clobbering a draft main.tsx had already restored pre-mount.
+  // With no reset there is nothing to guard, and a resume no longer depends on
+  // an unrelated durable-storage read having happened first (FR-005).
+
+  // F7 — browser Back/Forward integration for the survey wizard (see
+  // hooks/useSurveyBrowserHistorySync.ts for the full design + sync
+  // invariant). Its DEV ordering guard used to key on the reset/restore effect
+  // above; with that effect gone it keys on draft-restore settlement instead,
+  // which is the antecedent that genuinely remains (FR-017, D-9a). See that
+  // hook's doc comment on the parameter.
+  const draftRestoreSettledRef = useRef(false);
   useEffect(() => {
-    if (!wasDraftRestoredThisBoot()) {
-      useSurveySessionStore.getState().reset();
-    }
-    resetOrRestoreSettledRef.current = true;
+    // Reading the flag is the settlement: `loadDraft()` runs once, pre-mount,
+    // in main.tsx, so by the time any effect runs the answer is final. This
+    // effect exists to make the ORDER observable to the hook below, not to
+    // decide anything itself.
+    draftRestoreSettledRef.current = true;
     // Intentionally empty deps: runs exactly once on mount.
   }, []);
 
-  // F7 fix — browser Back/Forward integration for the survey wizard (see
-  // hooks/useSurveyBrowserHistorySync.ts for the full design + sync
-  // invariant). MUST be called after the reset/restore effect immediately
-  // above: its own mount effect reads the store's activeStepId to tag the
-  // current browser entry, and needs that effect's decision (reset vs.
-  // restored) already settled. resetOrRestoreSettledRef makes that ordering
-  // requirement a live DEV-mode check rather than declaration-order-only.
-  useSurveyBrowserHistorySync(resetOrRestoreSettledRef);
+  useSurveyBrowserHistorySync(draftRestoreSettledRef);
 
   // ---------------------------------------------------------------------------
   // Resume-draft banner + autosave (localStorage draft; lib/draftAutosave.ts).

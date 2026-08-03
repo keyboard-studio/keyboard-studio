@@ -123,5 +123,38 @@ verbatim from the combined run that immediately preceded it.
 The passing runs are appended below as each story lands — `tab-roundtrip` at
 T029 (US1) and `compare-isolation` at T038 (US2).
 
-<!-- T029: append the green tab-roundtrip run here -->
+### `tab-roundtrip.spec.ts` — GREEN (T029, SC-001)
+
+Run after the US1 implementation wave (T006 + T023–T027), against a dev server
+restarted by Playwright:
+
+```
+Running 1 test using 1 worker
+
+  ✓  1 e2e\tab-roundtrip.spec.ts:100:3 › tab round trip preserves the author's
+       position (spec 057 US1) › mid-walk position, history and Phase B
+       alphabet survive every tab round trip (9.4s)
+
+  1 passed (11.3s)
+```
+
+The same spec, unchanged in what it asserts about position, now passes every
+assertion the red run never reached: the walk survives a round trip through all
+four other tabs, in-app Back still reaches the step the author came from, and
+the Phase B alphabet is intact after leaving the build-list screen and
+returning.
+
+**One further scan-scoping change was needed between red and green**, recorded
+here rather than made quietly. Two more pre-existing 1.4.3 nodes surfaced as
+the test got further than it ever had before (`SignUpPanel`'s GitHub button on
+Output), and the **Flow Map** turned out to carry broad contrast and
+`scrollable-region-focusable` debt across most of its surface. The Flow Map is
+a developer aid — it renders only in `vite dev` or behind `VITE_SHOW_FLOWMAP=1`
+— so it is no longer axe-scanned by this spec at all; excluding it node by node
+would have left a scan that asserted nothing. **The round trip is still driven
+through `flowmap`**; only the a11y scan is scoped. Spec 056 owns the Flow Map's
+own conformance.
+
+Raw output: [`tab-roundtrip-green.raw.txt`](tab-roundtrip-green.raw.txt).
+
 <!-- T038: append the green compare-isolation run here -->

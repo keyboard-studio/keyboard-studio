@@ -687,11 +687,25 @@ function advanceToF() {
 beforeEach(() => {
   artifactHoisted.onInstantiateRef.current = null;
   artifactHoisted.stageSetters = [];
+  // Spec 057 (FR-072): every test in this file starts from a fresh wizard, and
+  // now has to SAY so.
+  //
+  // It used to be inherited from the defect: `SurveyView`'s mount effect reset
+  // the survey-session store, so every `render()` here silently started at
+  // "identity" no matter where the previous test had left the module-level
+  // singleton. Deleting that reset (D-1) is what makes a tab round trip
+  // preserve the author's position — and it also removes the per-test reset
+  // these suites were leaning on without stating.
+  //
+  // Resetting here is the honest replacement: test isolation is the test
+  // file's job, not a side effect of a component's mount.
+  useSurveySessionStore.getState().reset();
 });
 
 afterEach(() => {
   cleanup();
   useWorkingCopyStore.getState().reset();
+  useSurveySessionStore.getState().reset();
   vi.clearAllMocks();
   // The first-visit gate reads ks.visited / the ks.studio.draft key from
   // localStorage; clear it so gate state can't leak between tests.
@@ -2290,5 +2304,136 @@ describe("rehydrate of a corrupted persisted draft does not runaway-render (free
     expect(notifyCount).toBeLessThan(10);
 
     unsubscribe();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 057 US1 (T020) — traversal survives a route round trip.
+//
+// These tests encode the NEW contract, replacing the old "navigating away and
+// back is a fresh wizard" assumption (FR-002, FR-003, D-1). They are written
+// so that reinstating any mount-time reset makes them fail: each drives the
+// wizard forward, unmounts and remounts SurveyView exactly as a hash-route
+// change does, and asserts the traversal is where the author left it.
+//
+// `cleanup()` + a fresh `render()` is the right model for a route change here:
+// StudioShell's route switch swaps which component the content slot renders,
+// which unmounts SurveyView and mounts it again — the store singleton is what
+// spans the two, and that is precisely the seam under test.
+// ---------------------------------------------------------------------------
+
+describe("SurveyView — traversal survives a route round trip (spec 057 FR-002)", () => {
+  /**
+   * Mount the way `StudioShell` does: `baseKeyboard` is the WORKING-COPY
+   * STORE's base, not a fixed prop. That matters on the remount — `SurveyView`
+   * syncs `localBase` from this prop, so remounting with a hardcoded `null`
+   * would blank a base the author had already chosen and tell us nothing about
+   * traversal.
+   */
+  async function mountSurvey() {
+    const base =
+      useWorkingCopyStore.getState().baseKeyboard ??
+      useSurveySessionStore.getState().localBase;
+    await act(async () => {
+      render(<SurveyView baseKeyboard={base} />);
+    });
+  }
+
+  /** Unmount and remount, as a tab switch away and back does. */
+  async function routeRoundTrip() {
+    cleanup();
+    await mountSurvey();
+  }
+
+  it("keeps activeStepId and history across a remount", async () => {
+    useSurveySessionStore.getState().reset();
+    await mountSurvey();
+    advanceToTrack();
+
+    const before = {
+      activeStepId: useSurveySessionStore.getState().activeStepId,
+      history: [...useSurveySessionStore.getState().history],
+    };
+    expect(before.activeStepId).toBe("track");
+    expect(before.history.length).toBeGreaterThan(0);
+
+    await routeRoundTrip();
+
+    expect(useSurveySessionStore.getState().activeStepId).toBe(before.activeStepId);
+    expect([...useSurveySessionStore.getState().history]).toEqual(before.history);
+  });
+
+  it("renders the step the author left, not the first question", async () => {
+    useSurveySessionStore.getState().reset();
+    await mountSurvey();
+    advanceToPrefill();
+    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+
+    await routeRoundTrip();
+
+    // The reported symptom, inverted: the prefill screen is still on screen
+    // and the identity stage is not.
+    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
+  });
+
+  it("keeps the characters substage across a remount (D-4's antecedent)", async () => {
+    useSurveySessionStore.getState().reset();
+    await mountSurvey();
+    advanceToPrefill();
+    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    expect(useSurveySessionStore.getState().charactersSubStage).toBe("B");
+
+    await routeRoundTrip();
+
+    expect(useSurveySessionStore.getState().charactersSubStage).toBe("B");
+    expect(screen.getByTestId("stage-B")).toBeTruthy();
+  });
+
+  it("keeps the answers the walk recorded — identityResult and selectedTrack", async () => {
+    useSurveySessionStore.getState().reset();
+    await mountSurvey();
+    advanceToTrack();
+    fireEvent.click(screen.getByTestId("track-copy"));
+
+    const identityBefore = useSurveySessionStore.getState().identityResult;
+    const trackBefore = useSurveySessionStore.getState().selectedTrack;
+    expect(identityBefore).not.toBeNull();
+
+    await routeRoundTrip();
+
+    expect(useSurveySessionStore.getState().identityResult).toEqual(identityBefore);
+    expect(useSurveySessionStore.getState().selectedTrack).toBe(trackBefore);
+  });
+
+  it("survives repeated round trips — the loss is not merely deferred by one", async () => {
+    useSurveySessionStore.getState().reset();
+    await mountSurvey();
+    advanceToTrack();
+
+    await routeRoundTrip();
+    await routeRoundTrip();
+    await routeRoundTrip();
+
+    expect(useSurveySessionStore.getState().activeStepId).toBe("track");
+  });
+});
+
+describe("SurveyView — a reset happens only on an explicit start-over (spec 057 FR-003)", () => {
+  it("the corner reset control clears traversal back to identity", async () => {
+    useSurveySessionStore.getState().reset();
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+    advanceToTrack();
+    expect(useSurveySessionStore.getState().activeStepId).toBe("track");
+
+    // The real SurveyResetButton — arm, then confirm.
+    fireEvent.click(screen.getByTestId("survey-reset-arm"));
+    fireEvent.click(screen.getByTestId("survey-reset-yes"));
+
+    expect(useSurveySessionStore.getState().activeStepId).toBe("identity");
+    expect(useSurveySessionStore.getState().history).toEqual([]);
+    expect(useSurveySessionStore.getState().identityResult).toBeNull();
   });
 });

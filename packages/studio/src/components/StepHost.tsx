@@ -291,6 +291,14 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     }
 
     // 6. Navigate to output when help completes.
+    //
+    // Spec 057 FR-005/FR-008 (D-3): this hop leaves the wizard, and the way
+    // back in is the Studio tab. That return used to drop the author on the
+    // identity question — the walk they had just finished was thrown away by
+    // `SurveyView`'s mount reset. With the reset gone the traversal still
+    // records "help" (or wherever `advance` left it), so returning to Studio
+    // resumes the walk rather than restarting it. No extra state is stashed
+    // here: the position is already the store's job (FR-001).
     if (outcome.navigate === "output") {
       navigateTo("output");
     }

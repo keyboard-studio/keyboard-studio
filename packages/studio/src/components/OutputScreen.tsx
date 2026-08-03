@@ -126,6 +126,14 @@ export function OutputScreen() {
     // store action's docstring for the P0 regression a forward-push here
     // would reproduce (a stale history entry a later ordinary Back traversal
     // would resurface as Phase F).
+    //
+    // Spec 057 FR-005/FR-008 (D-3): the ORDER here is load-bearing and now
+    // actually holds. Setting the target step before navigating was always the
+    // right shape; it simply did not survive arrival, because `SurveyView`'s
+    // mount reset ran on the remount the hash change causes and put the author
+    // back on the identity question — the very thing the banner had promised
+    // to take them away from. With the reset gone (D-1) this lands on the
+    // gallery it names. Covered by `wizardEntryPoints.test.tsx`.
     sessionBackToUnfinishedGallery(
       touchLayoutCorrupted ? "touch" : blockedOnDesktop ? "mechanisms" : "touch",
     );

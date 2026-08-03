@@ -936,14 +936,20 @@ export function flushActiveDraft(): void {
  * successful apply — pin it as the active project.
  *
  * Reuses `loadDraft` rather than re-implementing the parse/validate/apply
- * sequence: on main, unlike the dev reference implementation, there is no
- * resume-banner component deciding whether to apply a draft — SurveyView's
- * mount effect reads `wasDraftRestoredThisBoot()` to decide whether to reset
- * the session store, and `loadDraft` already sets that flag on success. So
- * a `MyKeyboardsList` "Resume" click that calls this, then navigates to
- * `#survey`, resumes into the SAME already-applied stores rather than racing
- * a fresh reset — see `MyKeyboardsList.tsx`'s handleResume for the other half
- * of this.
+ * sequence.
+ *
+ * Spec 057 (FR-005): this docstring used to explain that a "Resume" click
+ * worked *because* `loadDraft` sets the `wasDraftRestoredThisBoot()` flag that
+ * `SurveyView`'s mount effect read before deciding whether to reset the
+ * session store. That was an apology for a defect, not a design: resume was
+ * the one wizard entry point that happened to work, and it worked only by
+ * tripping the guard on someone else's reset. A navigation primitive that
+ * requires an unrelated durable-storage read to have happened first is not a
+ * primitive.
+ *
+ * The reset is gone (D-1), so nothing here depends on that flag any more.
+ * This function now does exactly what it says: load the project's draft into
+ * the stores, and pin it active if that succeeded.
  *
  * A corrupt/wrong-shaped draft fails the whole resume (returns false,
  * pointer left untouched) rather than silently pinning a project whose

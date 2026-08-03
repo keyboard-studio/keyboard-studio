@@ -87,9 +87,9 @@ Written to encode the *new* contract — these files currently encode the old on
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T020** [P] [US1] Rewrite the route/landing tests to assert traversal is preserved across a simulated route change, and that a reset occurs only on an explicit start-over (FR-002, FR-003) · `packages/studio/src/StudioShell.test.tsx`
-- [ ] **T021** [P] [US1] Rewrite the substage test: re-entering the characters step at its build-list substage must not clear the Phase B draft alphabet; clearing stays tied to a genuine prefill → build-list transition (FR-007, D-4) · `packages/studio/src/survey/CharactersStep.test.tsx`
-- [ ] **T022** [P] [US1] Extend for the preserved-position case: mount-time entry tagging now agrees with a preserved store, `expectedBackTarget` computed from preserved history matches the pre-departure entries, and a `state === null` tab-switch entry is treated as foreign and no-ops (FR-017, D-9) · `packages/studio/src/hooks/useSurveyBrowserHistorySync.test.ts`
+- [x] **T020** [P] [US1] Rewrite the route/landing tests to assert traversal is preserved across a simulated route change, and that a reset occurs only on an explicit start-over (FR-002, FR-003) · `packages/studio/src/StudioShell.test.tsx`
+- [x] **T021** [P] [US1] Rewrite the substage test: re-entering the characters step at its build-list substage must not clear the Phase B draft alphabet; clearing stays tied to a genuine prefill → build-list transition (FR-007, D-4) · `packages/studio/src/survey/CharactersStep.test.tsx`
+- [x] **T022** [P] [US1] Extend for the preserved-position case: mount-time entry tagging now agrees with a preserved store, `expectedBackTarget` computed from preserved history matches the pre-departure entries, and a `state === null` tab-switch entry is treated as foreign and no-ops (FR-017, D-9) · `packages/studio/src/hooks/useSurveyBrowserHistorySync.test.ts`
 
 ### Implementation
 
@@ -97,17 +97,17 @@ Written to encode the *new* contract — these files currently encode the old on
 
 **⟶ Wait for the tests above, then — independent (different files), T006 and T023 landing together:**
 
-- [ ] **T006** [P] [US1] Delete `SurveyView`'s mount-time `useSurveySessionStore.getState().reset()` together with its `wasDraftRestoredThisBoot()` guard and the now-antecedent-less `resetOrRestoreSettledRef`; update the "navigating away and back is a fresh wizard" comment to state the new contract (FR-002, FR-003, D-1 — this one deletion also resolves D-2, D-3 and D-4) · `packages/studio/src/StudioShell.tsx`
-- [ ] **T023** [P] [US1] Re-derive the history bridge: rewrite the module docstring's premise (the remount no longer re-tags a *reset* store) and re-point the DEV ordering guard at draft-restore settlement, the antecedent that genuinely remains. Both accepted degrades stay closed — browser Forward is a deliberate no-op, the first native Back after an in-app Back is absorbed (FR-016, FR-017) · `packages/studio/src/hooks/useSurveyBrowserHistorySync.ts`
-- [ ] **T024** [P] [US1] Verify `handleGoToGallery` (the coverage-blocked banner's "go finish them now") lands on the incomplete gallery rather than the identity question, and fix if the deletion did not fully resolve it (FR-005, FR-008, D-3) · `packages/studio/src/components/OutputScreen.tsx`
-- [ ] **T025** [P] [US1] Verify "← Back to studio" returns to the step the author left (FR-005, FR-008, D-3) · `packages/studio/src/components/ProfileScreen.tsx`
-- [ ] **T026** [P] [US1] Verify the Phase-F → `#output` hop leaves a way back into the walk that preserves position (FR-005, FR-008, D-3) · `packages/studio/src/components/StepHost.tsx`
-- [ ] **T027** [P] [US1] Remove `handleResume`'s dependence on `wasDraftRestoredThisBoot()` as the thing that makes resume work, and retire the apologetic docstring — a navigation primitive must not require an unrelated durable-storage read first (FR-005) · `packages/studio/src/lib/draftPersistence.ts`
+- [x] **T006** [P] [US1] Delete `SurveyView`'s mount-time `useSurveySessionStore.getState().reset()` together with its `wasDraftRestoredThisBoot()` guard and the now-antecedent-less `resetOrRestoreSettledRef`; update the "navigating away and back is a fresh wizard" comment to state the new contract (FR-002, FR-003, D-1 — this one deletion also resolves D-2, D-3 and D-4) · `packages/studio/src/StudioShell.tsx`
+- [x] **T023** [P] [US1] Re-derive the history bridge: rewrite the module docstring's premise (the remount no longer re-tags a *reset* store) and re-point the DEV ordering guard at draft-restore settlement, the antecedent that genuinely remains. Both accepted degrades stay closed — browser Forward is a deliberate no-op, the first native Back after an in-app Back is absorbed (FR-016, FR-017) · `packages/studio/src/hooks/useSurveyBrowserHistorySync.ts`
+- [x] **T024** [P] [US1] Verify `handleGoToGallery` (the coverage-blocked banner's "go finish them now") lands on the incomplete gallery rather than the identity question, and fix if the deletion did not fully resolve it (FR-005, FR-008, D-3) · `packages/studio/src/components/OutputScreen.tsx`
+- [x] **T025** [P] [US1] Verify "← Back to studio" returns to the step the author left (FR-005, FR-008, D-3) · `packages/studio/src/components/ProfileScreen.tsx`
+- [x] **T026** [P] [US1] Verify the Phase-F → `#output` hop leaves a way back into the walk that preserves position (FR-005, FR-008, D-3) · `packages/studio/src/components/StepHost.tsx`
+- [x] **T027** [P] [US1] Remove `handleResume`'s dependence on `wasDraftRestoredThisBoot()` as the thing that makes resume work, and retire the apologetic docstring — a navigation primitive must not require an unrelated durable-storage read first (FR-005) · `packages/studio/src/lib/draftPersistence.ts`
 
 **⟶ Wait for the implementation wave, then:**
 
-- [ ] **T028** [P] [US1] Integration test covering all four entry points (coverage banner, "Back to studio", "Resume", Phase F hop) landing on their stated target — written so it fails if a future mount reset reappears (FR-008, SC-004) · `packages/studio/src/components/wizardEntryPoints.test.tsx`
-- [ ] **T029** [P] [US1] Restart `pnpm dev`, then run `e2e/tab-roundtrip.spec.ts` green and append the passing output beside the recorded red run (SC-001, SC-013) · `specs/057-bulletproof-navigation/evidence/gating-red.md`
+- [x] **T028** [P] [US1] Integration test covering all four entry points (coverage banner, "Back to studio", "Resume", Phase F hop) landing on their stated target — written so it fails if a future mount reset reappears (FR-008, SC-004) · `packages/studio/src/components/wizardEntryPoints.test.tsx`
+- [x] **T029** [P] [US1] Restart `pnpm dev`, then run `e2e/tab-roundtrip.spec.ts` green and append the passing output beside the recorded red run (SC-001, SC-013) · `specs/057-bulletproof-navigation/evidence/gating-red.md`
 
 **Checkpoint**: US1 is independently functional and testable — a tab round trip at any point in the walk preserves position and content, and the red→green transition is on record.
 

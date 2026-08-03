@@ -227,6 +227,94 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-03T22:44:30.695Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:00.747Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:01.006Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:01.244Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:01.520Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:01.825Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:02.073Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:02.314Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:02.565Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:02.844Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:03.119Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:12:27.759Z"
     }
   ],
   "telemetryInstanceId": "469b61c6-c778-40d3-b978-3516ec818e69",
@@ -740,7 +828,7 @@
       "what": "{\"check\": \"draftPersistence.ts:477-481 implements FR-041 order verbatim and MyKeyboardsList.tsx:51 imports from draftPersistence, not draftAutosave\", \"how\": \"grep imports + sed the label computation in both engines\", \"result\": \"confirmed - km-doc finding stands; research D-8 blast-radius claim was backwards\"}"
     }
   ],
-  "currentTask": "T041",
+  "currentTask": "T029",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -878,6 +966,84 @@
         "packages/studio/src/StudioShell.tsx",
         "packages/studio/src/components/WelcomeScreen.tsx",
         "packages/studio/src/lib/jumpToLocation.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Rewrote the route/landing tests to assert traversal survives a remount (step, history, substage, answers, repeated round trips) and that a reset happens only on explicit start-over; added the per-test session reset the deleted mount reset had been supplying",
+      "files": [
+        "packages/studio/src/StudioShell.test.tsx"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Pinned the Phase B alphabet contract: a remount at substage B does not clear the draft, while a genuine prefill->build-list confirm does",
+      "files": [
+        "packages/studio/src/survey/CharactersStep.test.tsx"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Extended the history-bridge suite for the preserved-position case: mount tag reflects the preserved step, expectedBackTarget matches pre-departure entries, a state===null tab-switch entry no-ops, a remount pushes no entry, and a jumpToStep landing pushes none either",
+      "files": [
+        "packages/studio/src/hooks/useSurveyBrowserHistorySync.test.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Deleted SurveyView mount-time reset together with its wasDraftRestoredThisBoot guard and resetOrRestoreSettledRef; replaced the comment with the new contract (component lifetime is not a session boundary)",
+      "files": [
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Re-derived the history bridge premise in the module docstring (three named ways it gets more correct against a preserved store) and re-pointed the DEV ordering guard at draft-restore settlement so it cannot go silently inert",
+      "files": [
+        "packages/studio/src/hooks/useSurveyBrowserHistorySync.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Verified handleGoToGallery lands on the named gallery; no code change needed beyond documenting why the order is load-bearing, covered by wizardEntryPoints.test.tsx",
+      "files": [
+        "packages/studio/src/components/OutputScreen.tsx"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Verified Back to studio returns to the step the author left; documented that it deliberately sets no target because position lives in the store",
+      "files": [
+        "packages/studio/src/components/ProfileScreen.tsx"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Verified the Phase-F -> #output hop leaves a position-preserving way back; documented that no extra state is stashed",
+      "files": [
+        "packages/studio/src/components/StepHost.tsx"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Retired resumeProject's apologetic docstring and its stated dependence on wasDraftRestoredThisBoot as the thing that makes resume work",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.ts"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Wrote the four-entry-point regression net plus an explicit test of the precondition they share, so a reinstated mount reset fails loudly",
+      "files": [
+        "packages/studio/src/components/wizardEntryPoints.test.tsx"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Ran tab-roundtrip green after the US1 wave and appended the passing output beside the recorded red; documented the one further axe-scan scoping change (Flow Map is a dev aid, no longer scanned; round trip still driven through it)",
+      "files": [
+        "specs/057-bulletproof-navigation/evidence/gating-red.md",
+        "specs/057-bulletproof-navigation/evidence/tab-roundtrip-green.raw.txt"
       ]
     }
   }

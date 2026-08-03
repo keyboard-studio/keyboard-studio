@@ -131,7 +131,30 @@ describe("draftAutosave — active project", () => {
     const meta = loadDraftMeta();
     expect(meta).not.toBeNull();
     expect(meta!.activeStepId).toBe("choose_base");
-    expect(meta!.label).toBe("Hausa");
+    // Spec 057 FR-072 — updated, not deleted. This used to expect "Hausa":
+    // `deriveLabel` read `survey.identityResult.english` first, which made this
+    // engine disagree with `draftPersistence.saveDraft` (the one behind the
+    // "My keyboards" cards, which has always implemented FR-041's order). Both
+    // now go through `lib/projectLabel.ts`, whose precedence is scaffold spec
+    // -> working-copy identity patch -> base keyboard -> null. This fixture has
+    // an identity ANSWER but no project name and no working copy, so there is
+    // nothing to name the project after yet — which is the point: the language
+    // is not the project's name.
+    expect(meta!.label).toBeNull();
+  });
+
+  it("labels the draft from the project name, not from the identity answer (spec 057 FR-041)", () => {
+    const store = useSurveySessionStore.getState();
+    store.advance("choose_base");
+    store.setIdentityResult(makeIdentity("Hausa"));
+    store.setScaffoldSpec({
+      keyboardId: "hausa_phonetic",
+      displayName: "Hausa Phonetic",
+    } as never);
+
+    saveDraft();
+
+    expect(loadDraftMeta()!.label).toBe("Hausa Phonetic");
   });
 
   it("saveDraft upserts a single index row for the active project across repeated saves", () => {
