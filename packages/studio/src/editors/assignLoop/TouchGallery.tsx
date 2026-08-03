@@ -2140,6 +2140,28 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // Per-character suggestion computation
   // ---------------------------------------------------------------------------
 
+  // Bug fix: every method (tap/longpress/multitap/flick) that ALREADY
+  // produces currentChar on the CURRENT effective touch layout —
+  // layoutForLintAndGate, not detectionSeedLayout. detectionSeedLayout is
+  // deliberately the pre-Phase-E seed (see its own doc comment above); the
+  // suggestion gate needs the layout that reflects everything the reseed
+  // itself already placed via applyDesktopModifications's mods-replay (a
+  // Phase C letter whose host key is occupied lands as a longpress sk[]
+  // alternate — see engine/src/pattern-apply/applyDesktopModifications.ts)
+  // PLUS any Phase E edit the author has already recorded in charTouch —
+  // layoutForLintAndGate is exactly that union (touchLayoutJson, parsed, when
+  // the R11 emission matrix says emit — which "reseed-from-desktop" always
+  // does — else falling back to detectionSeedLayout). Without this, a
+  // reseed's own auto-placed longpress was invisible to the suggestion memo,
+  // which offered a redundant longpress/replace suggestion for a character
+  // that already had a working method — see enumerateTouchMethodsForChar's
+  // doc comment for the descriptor shape this reuses (READ side of the same
+  // touch-method address scheme `existingTouchMethods` above already uses).
+  const currentCharTouchMethods = useMemo<TouchMethodDescriptor[]>(() => {
+    if (layoutForLintAndGate === null || currentChar === null) return [];
+    return enumerateTouchMethodsForChar(layoutForLintAndGate, currentChar);
+  }, [layoutForLintAndGate, currentChar]);
+
   type Suggestion =
     | { kind: "longpress"; hostKey: string }
     | { kind: "replace"; hostKey: string }
@@ -2147,6 +2169,19 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
   const suggestion = useMemo<Suggestion>(() => {
     if (currentChar === null) return { kind: "none" };
+
+    // A character already producible by SOME existing touch method needs no
+    // suggestion card at all — gates BOTH branches below (the Phase C
+    // desktop-assignment longpress/replace branch, and the decomposable-
+    // accented fallback), per the literal product rule: "a suggestion only
+    // happens when the key has no other method to produce that character."
+    // This deliberately also suppresses a "replace" suggestion (a desktop
+    // simple_swap onto a main key) when the char is already reachable via an
+    // existing longpress — see the module's suggestion-gating note; flagged
+    // for reviewer confirmation of that specific nuance.
+    if (currentCharTouchMethods.length > 0) {
+      return { kind: "none" };
+    }
 
     // Find Phase C desktop assignment for this character.
     const da = desktopAssignments.find((a) => a.target === currentChar);
@@ -2164,7 +2199,11 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // (detectedChars — see the module doc's "already covered" note) needs no
     // suggestion card at all: it is shown read-only in the "Existing methods"
     // section below — the author never has to click Accept to "keep"
-    // something that was never at risk of being removed.
+    // something that was never at risk of being removed. Kept alongside the
+    // currentCharTouchMethods gate above because detectedChars also folds in
+    // NFD-composability (augmentWithComposable, via touchCoverage) — a char
+    // reachable by composing two directly-reachable parts, which
+    // enumerateTouchMethodsForChar (direct producers only) does not capture.
     if (detectedChars.has(currentChar)) {
       return { kind: "none" };
     }
@@ -2180,7 +2219,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     }
 
     return { kind: "none" };
-  }, [currentChar, desktopAssignments, detectedChars]);
+  }, [currentChar, desktopAssignments, detectedChars, currentCharTouchMethods]);
 
   // ---------------------------------------------------------------------------
   // Per-character method state — reset when currentChar changes
