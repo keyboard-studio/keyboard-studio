@@ -4,7 +4,11 @@ Single source of truth for the studio's compliance percentage (spec [056-ada-acc
 
 **Rules.** Status is one of `unknown` / `pass` / `fail` / `n/a`. A row becomes `pass` only with evidence (CI-gating check, committed test file, or dated manual-audit note). A row becomes `n/a` only with a justification naming the condition that would re-apply it. `fail` rows link a filed `bug(studio)` issue. Compliance % = `pass` / (55 − `n/a`), recomputed in the summary line whenever a row changes.
 
-**Summary (2026-08-03, Cycle 1 in progress):** pass 0 · fail 0 · n/a 6 · unknown 49 · **compliance 0 / 49 = 0%** — the two automated gates landed (spec 056 FR-002 jsx-a11y at error severity in `pnpm lint`; FR-003 @axe-core/playwright serious/critical assertions in `boot-smoke.spec.ts` and the four walk specs), and one grep-verified block confirmed the six media-related criteria as `n/a`. **No criterion flipped to `pass`** — the honest reason: axe/lint each cover ≤ ~30–40% of real violations, none of the walk-spec surfaces have been scanned yet in this branch (corpus absent from the dev container), and no manual keyboard or screen-reader pass has run. FR-004's full baseline flip lands when the walk-spec axe runs and the keyboard-only pass execute in the corpus-having lane. Interim partial-evidence notes recorded on rows below.
+**Summary (2026-08-03, Cycle 1 in progress):** pass 0 · fail 2 · n/a 6 · unknown 47 · **compliance 0 / 49 = 0%** — the two automated gates landed (spec 056 FR-002 jsx-a11y at error severity in `pnpm lint`; FR-003 @axe-core/playwright serious/critical assertions in `boot-smoke.spec.ts` and the four walk specs), and one grep-verified block confirmed the six media-related criteria as `n/a`. **No criterion flipped to `pass`** — the honest reason: axe/lint each cover ≤ ~30–40% of real violations, and although the walk-spec axe scans NOW run against the sandboxed `../keyboards` corpus (the `pickSelectMenuOption` portal helper + `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` config override that landed with this update unblock them), the first real scans surfaced two serious violations that keep 1.4.3 and 4.1.2 at `fail`. No manual keyboard or screen-reader pass has run. FR-004's full baseline flip lands when the two `fail` rows are resolved and the manual passes execute. Interim partial-evidence notes recorded on rows below.
+
+**Walk-spec axe run (2026-08-03, from the `carve` + `copy-edit` walks in the sandboxed lane):**
+- `nested-interactive` — assign-loop rail cards (`data-kind="pattern"` `role="button"`) and carve card groups/stores contain nested `<ToggleBox>` buttons. Introduced by Cycle 1's "rail cards are now `role="button"` with Enter/Space activation" fix (`packages/studio/src/editors/assignLoop/parts/Rail.tsx:141`); the wrapper's `onKeyDown` guards against re-firing when the target is the nested button, but assistive tech still sees a button-inside-a-button. Needs a Cycle 2 ARIA redesign — either `role="listbox"` + `role="option"` on the rail with non-focusable ToggleBoxes, or split the two actions so they aren't nested. Affects 4.1.2 Name-Role-Value.
+- `color-contrast` — five surfaces recorded per scan: `button[aria-label="Hide info panel"]`, `button[data-testid="carve-continue"]`, `button[aria-label="Dismiss removal recommendation"]`, and two spans inside the pattern-card body. Token-level check pending (FR-009); Cycle 2 opens `bug(studio)` per surface. Affects 1.4.3 Contrast (Minimum).
 
 Criterion links: [How to Meet WCAG 2.2](https://www.w3.org/WAI/WCAG22/quickref/).
 
@@ -25,7 +29,7 @@ Criterion links: [How to Meet WCAG 2.2](https://www.w3.org/WAI/WCAG22/quickref/)
 | 1.3.5 | Identify Input Purpose | AA | unknown | — | Few identity fields; check author-name/e-mail inputs |
 | 1.4.1 | Use of Color | A | unknown | — | Partial (2026-08-03): axe `use-of-color` passes on app root + lint demo (`packages/studio/e2e/boot-smoke.spec.ts`), but walk surfaces (survey, galleries, output) are unscanned pending the corpus e2e lane — insufficient to flip |
 | 1.4.2 | Audio Control | A | n/a | 2026-08-03 same grep — no audio of any kind | Re-applies if any auto-playing audio surfaced |
-| 1.4.3 | Contrast (Minimum) | AA | unknown | — | Token-level check (FR-009) |
+| 1.4.3 | Contrast (Minimum) | AA | fail | 2026-08-03 walk-spec axe surfaced 5 nodes (Hide info panel, carve-continue, Dismiss removal recommendation, pattern-card body spans) | Cycle 2 opens per-surface `bug(studio)`; token-level check (FR-009) covers the broader sweep |
 | 1.4.4 | Resize Text | AA | unknown | — | 200% zoom, Cycle 2 |
 | 1.4.5 | Images of Text | AA | unknown | — | Rendered glyphs are content, not images of text — record reasoning |
 | 1.4.10 | Reflow | AA | unknown | — | Three-pane layout at 320 CSS px, Cycle 2 |
@@ -80,7 +84,7 @@ Criterion links: [How to Meet WCAG 2.2](https://www.w3.org/WAI/WCAG22/quickref/)
 
 | SC | Name | Level | Status | Evidence | Notes |
 |---|---|---|---|---|---|
-| 4.1.2 | Name, Role, Value | A | unknown | — | Custom widgets (FR-006); axe covers subset, manual completes |
+| 4.1.2 | Name, Role, Value | A | fail | 2026-08-03 walk-spec axe surfaced `nested-interactive` on assign-loop rail cards (`data-kind="pattern"` `role="button"`) + carve card groups/stores — nested `<ToggleBox>` buttons inside outer `role="button"` wrappers | Cycle 2 ARIA redesign — listbox+option pattern or split actions so they aren't nested; wrapper introduced in this cycle's rail-card fix (`Rail.tsx:141`) |
 | 4.1.3 | Status Messages | AA | unknown | — | aria-live for diagnostics/autosave (FR-008, D3 constraint) |
 
 *(4.1.1 Parsing was removed in WCAG 2.2 and is intentionally absent.)*

@@ -10,7 +10,7 @@
 //   cd packages/studio && npx playwright test locale-switch.spec.ts
 
 import { test, expect } from "playwright/test";
-import { seedReturningVisitor } from "./helpers/surveyFlow";
+import { pickSelectMenuOption, seedReturningVisitor } from "./helpers/surveyFlow";
 
 // Scope everything to the NavBar landmark (aria-label="Studio navigation",
 // StudioShell.tsx) — the survey's own language-identify question also has
@@ -28,18 +28,16 @@ function navBar(page: import("playwright/test").Page) {
  *
  * The switcher is a ui/SelectMenu (trigger `<button aria-haspopup="listbox">`
  * plus a DOM-rendered `<ul role="listbox">`), not a native `<select>` — native
- * popups don't open in the VS Code webview. So: open it, then click the option
- * by its `data-value` test hook. Same pattern as the survey's target-script and
- * host-key pickers in helpers/surveyFlow.ts; `selectOption()` cannot drive it.
+ * popups don't open in the VS Code webview. The listbox is portaled to
+ * `document.body`, so the pick goes through `aria-controls` (see
+ * `pickSelectMenuOption` in helpers/surveyFlow.ts); `selectOption()` cannot
+ * drive it.
  */
 async function chooseLocale(
   page: import("playwright/test").Page,
   locale: "en" | "fr",
 ): Promise<void> {
-  const trigger = navBar(page).locator("#nav-language-select");
-  await trigger.waitFor({ timeout: 10_000 });
-  await trigger.click();
-  await trigger.locator("xpath=..").locator(`li[data-value="${locale}"]`).click();
+  await pickSelectMenuOption(page, navBar(page).locator("#nav-language-select"), locale);
 }
 
 test.describe("Locale switcher — persistence + no first-paint English flash", () => {

@@ -76,6 +76,36 @@ async function fillComboboxFreeText(
 }
 
 /**
+ * Open a ui/SelectMenu trigger and click the option with the given `data-value`.
+ *
+ * SelectMenu portals its open `<ul role="listbox">` to `document.body` (see
+ * `src/ui/SelectMenu.tsx` header — the portal is what lets the list escape
+ * ancestor `overflow` clipping in the assign-loop galleries and elsewhere).
+ * That means the listbox is NOT a descendant of the trigger's DOM parent, so
+ * an `xpath=..` traverse from the trigger cannot see it; every walk-spec
+ * dropdown pick must go through the `aria-controls` link (mirrors the unit
+ * helper in `src/test/selectMenuTestUtils.ts`).
+ *
+ * For id-less SelectMenus (the key-picker in KeyPickerField.tsx uses
+ * `ariaLabel` without an `id` prop, so `aria-controls` is unset), fall back
+ * to the single currently-open `[role=listbox]` — SelectMenu closes any
+ * other open listbox on click-outside, so at most one is open at a time.
+ */
+export async function pickSelectMenuOption(
+  page: Page,
+  trigger: import("playwright/test").Locator,
+  value: string,
+): Promise<void> {
+  await trigger.waitFor({ timeout: 10_000 });
+  await trigger.click();
+  const listboxId = await trigger.getAttribute("aria-controls");
+  const listbox = listboxId !== null && listboxId.length > 0
+    ? page.locator(`#${listboxId}`)
+    : page.locator('[role="listbox"]');
+  await listbox.locator(`li[data-value="${value}"]`).click();
+}
+
+/**
  * Poll for an optional/conditional question's field to appear within a short
  * window, without blocking the whole helper if it never shows up. Used for
  * identity-lite questions that IdentityLite's `getNextOverride` may skip
@@ -163,12 +193,12 @@ export async function driveIdentityLite(
   // native <select> popups don't open in the VS Code webview, so this field
   // is now a ui/SelectMenu (button + DOM-rendered listbox), not a native
   // <select> — open it, then click the option by its data-value (the
-  // underlying script value), not Playwright's selectOption(). Same pattern
-  // as driveTouchGallery's host-key picker below.
-  const targetScriptSelect = page.locator("#il_target_script");
-  await targetScriptSelect.waitFor({ timeout: 10_000 });
-  await targetScriptSelect.click();
-  await targetScriptSelect.locator('xpath=..').locator(`li[data-value="${script}"]`).click();
+  // underlying script value), not Playwright's selectOption(). The listbox
+  // is portaled to document.body (see `src/ui/SelectMenu.tsx` header), so
+  // `pickSelectMenuOption` follows `aria-controls` rather than descending
+  // the trigger's parent. Same pattern as driveTouchGallery's host-key
+  // picker below.
+  await pickSelectMenuOption(page, page.locator("#il_target_script"), script);
   await surveyAdvance(page).click();
 
   // Robustness check for the phase boundary: identity-lite hands off
@@ -448,8 +478,7 @@ export async function driveTouchGallery(page: Page): Promise<void> {
     // reset on every currentChar change), so a disabled continueButton means
     // this character still needs the default long-press method + Apply.
     if (await continueButton.isDisabled()) {
-      await hostKeySelect.click();
-      await hostKeySelect.locator('xpath=..').locator('li[data-value="K_A"]').click();
+      await pickSelectMenuOption(page, hostKeySelect, "K_A");
       await applyButton.click();
     }
     await continueButton.click();
