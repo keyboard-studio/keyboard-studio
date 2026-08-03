@@ -6,6 +6,7 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 
 export const definition = {
   id: "pb_char_count",
+  audit_label: "New character count",
   prompt:
     "Roughly how many NEW characters does your keyboard need to add, beyond what the base keyboard already has?",
   help_text:

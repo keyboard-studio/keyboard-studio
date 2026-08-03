@@ -61,6 +61,12 @@ export interface FlowQuestion {
   label?: string;
   body?: string;
   help_text?: string;
+  /**
+   * Optional short noun-phrase override for this question's decision-trail
+   * headline (spec 055 FR-009, catalog-audit-label.contract.md). Authored
+   * only where `prompt` reads badly as a headline; sparse by design.
+   */
+  audit_label?: string;
   required?: boolean;
   options?: FlowOption[];
   /** Reference to a dynamic options source (e.g. "@langtags_iso639"). Not resolved in v1. */

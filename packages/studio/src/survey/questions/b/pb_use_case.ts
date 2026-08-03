@@ -6,6 +6,7 @@ import type { QuestionModule } from "../../types.ts";
 
 export const definition = {
   id: "pb_use_case",
+  audit_label: "Primary use case",
   prompt:
     "What will this keyboard mainly be used for — school materials, everyday texting, or official documents?",
   help_text:

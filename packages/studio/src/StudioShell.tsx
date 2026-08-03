@@ -58,14 +58,13 @@ import { AccountControl } from "./components/AccountControl.tsx";
 import { hasVisited } from "./lib/firstVisit.ts";
 import { manifest, validateManifestShape } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
-import { createDecisionRecorder } from "./decisions/createDecisionRecorder.ts";
+import { createStudioDecisionRecorder } from "./decisions/createStudioDecisionRecorder.ts";
 import { createSourceSnapshotter } from "./decisions/snapshotSource.ts";
 import { useDecisionLogStore } from "./decisions/decisionLogStore.ts";
 import { DecisionTrailView } from "./decisions/DecisionTrailView.tsx";
 import { resolveImpact } from "./decisions/impact.ts";
 import { buildPathOverlay } from "./dashboard/pathOverlay.ts";
 import { projectWorkingCopyForOutput } from "./lib/serializeWorkingCopy.ts";
-import { readVfsText } from "./lib/vfsText.ts";
 import { StepHost } from "./components/StepHost.tsx";
 import { ResumeDraftBanner } from "./components/ResumeDraftBanner.tsx";
 import { SurveyResetButton } from "./components/SurveyResetButton.tsx";
@@ -608,7 +607,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // same reason as every other ReducerDeps member: the recorder needs stores/ and
   // lib/, and steps/ may import neither.
   //
-  // `readProjectedKmn` delegates to `projectWorkingCopyForOutput` — the SAME
+  // `readProjectedFiles` delegates to `projectWorkingCopyForOutput` — the SAME
   // function the download zip and the pull-request path use. That is not an
   // implementation convenience, it is FR-009/SC-005: the text the audit diffs must
   // be the text that ships, and this is the one function that produces it. Do not
@@ -621,40 +620,22 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // ---------------------------------------------------------------------------
   const snapshotterRef = useRef(
     createSourceSnapshotter({
-      readProjectedKmn: async () => {
+      readProjectedFiles: async () => {
         const projected = await projectWorkingCopyForOutput();
-        if (projected === null) return null;
-        const path = findKmnPath(projected.vfs);
-        if (path === undefined) return null;
-        const text = readVfsText(projected.vfs, path);
-        return text === undefined ? null : { path, text };
+        return projected === null ? null : { entries: projected.vfs.entries() };
       },
     }),
   );
 
+  // The store-derived dep block itself lives in createStudioDecisionRecorder.ts,
+  // shared verbatim with reducer.decisionRecording.test.ts's `realRecorder()` —
+  // see that module's header for why this used to be inlined here and why that
+  // was a defect (specs/055 post-implement review, P1).
   const recordDecision = useMemo(
     () =>
-      createDecisionRecorder({
+      createStudioDecisionRecorder({
+        getWorkingCopyState: () => useWorkingCopyStore.getState(),
         snapshotter: snapshotterRef.current,
-        getDeletionCounts: () => {
-          const wc = useWorkingCopyStore.getState();
-          return {
-            nodes: wc.deletedNodeIds.size,
-            items: wc.deletedItemIds.size,
-            touchKeys: wc.deletedTouchKeyIds.size,
-          };
-        },
-        getDeletedIds: () => {
-          const wc = useWorkingCopyStore.getState();
-          return [...wc.deletedNodeIds, ...wc.deletedItemIds, ...wc.deletedTouchKeyIds];
-        },
-        // The keyboard's own id once the author has set one, else the base's —
-        // matching how `deriveProjectKeyFromWorkingCopy` keys a project, so the
-        // record and the draft agree on which keyboard this is.
-        getKeyboardId: () => {
-          const wc = useWorkingCopyStore.getState();
-          return wc.identity?.keyboardId ?? wc.baseKeyboard?.id ?? null;
-        },
       }),
     [],
   );

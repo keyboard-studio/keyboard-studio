@@ -101,8 +101,13 @@ describe("the four impact states", () => {
   it("captured — renders the hunks", () => {
     renderExpandedRow({
       state: "captured",
-      path: "source/hausa_std.kmn",
-      hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 2, lines: [" a", "+ 'ɓ'"] }],
+      files: [
+        {
+          path: "source/hausa_std.kmn",
+          hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 2, lines: [" a", "+ 'ɓ'"] }],
+          magnitude: { added: 1, removed: 0 },
+        },
+      ],
       magnitude: { added: 1, removed: 0 },
     });
     const region = screen.getByTestId("decision-entry-impact");
@@ -159,5 +164,96 @@ describe("the four impact states", () => {
         .toBeGreaterThan(0);
       cleanup();
     }
+  });
+});
+
+describe("entry-expand aria-controls (trail a11y review P2)", () => {
+  it("wires the expand button to the impact region it reveals", () => {
+    render(
+      <ul>
+        <DecisionEntryRow entry={entry()} superseded={false} resolveImpact={() => ({ state: "none" })} />
+      </ul>,
+    );
+    const toggle = screen.getByTestId("decision-entry-expand");
+    const controlsId = toggle.getAttribute("aria-controls");
+    expect(controlsId).toBeTruthy();
+
+    // Before expansion the referenced region does not exist yet — the button
+    // still carries the id it WILL reveal (ARIA APG disclosure pattern).
+    fireEvent.click(toggle);
+    expect(document.getElementById(controlsId!)).toBe(screen.getByTestId("decision-entry-impact"));
+  });
+});
+
+describe("clause lists are locale-formatted, not comma-joined (km-triage/km-domain)", () => {
+  // The dimension list, the derived-axis list and the inherited-metadata list are
+  // all assembled from clauses that have ALREADY been through the catalog. A
+  // hardcoded `", "` between them bakes an English list convention into
+  // translated output with no seam a translator can reach — the same defect
+  // `trail.entry.headline.baseContribution.joinTwo` exists to avoid for two
+  // items. `Intl.ListFormat` in the active locale is the seam.
+  it("joins two headline dimensions with the locale's conjunction", () => {
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={entry({
+            stepId: "carve",
+            payload: {
+              kind: "editor-action",
+              actionType: "gallery_edit",
+              summary: {
+                keysRemoved: 17,
+                keysAdded: 4,
+                mechanismsAssigned: 0,
+                touchKeysAffected: 0,
+                sample: [],
+                sampleTruncated: false,
+              },
+            },
+          })}
+          superseded={false}
+          resolveImpact={() => ({ state: "none" })}
+        />
+      </ul>,
+    );
+    const headline = screen.getByTestId("decision-entry-headline").textContent!;
+    // Both dimensions are named (FR-011 mentions only the non-zero ones), and the
+    // separator between them is the locale's — "17 keys removed and 4 keys added",
+    // not "17 keys removed, 4 keys added".
+    expect(headline).toContain("17 keys removed");
+    expect(headline).toContain("4 keys added");
+    expect(headline).toMatch(/17 keys removed and 4 keys added/);
+  });
+
+  it("joins three inherited-metadata items with the locale's list separators", () => {
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={entry({
+            stepId: "choose_base",
+            payload: {
+              kind: "base-contribution",
+              baseId: "basic_kbdus",
+              baseDisplayName: "US English",
+              derivedAxes: [],
+              inheritedMetadata: [
+                { field: "script", value: "Latn" },
+                { field: "targets", value: "windows" },
+                { field: "version", value: "1.0" },
+              ],
+              instantiationMode: "from-base",
+            },
+          })}
+          superseded={false}
+          resolveImpact={() => ({ state: "none" })}
+        />
+      </ul>,
+    );
+    fireEvent.click(screen.getByTestId("decision-entry-expand"));
+    const text = screen.getByTestId("decision-entry-impact").textContent!;
+    // English long-form conjunction list: "a, b, and c" — the "and" is what a
+    // plain `join(", ")` cannot produce, so this pins the seam rather than the
+    // exact punctuation of one locale.
+    expect(text).toMatch(/and keyboard version: 1\.0/);
   });
 });

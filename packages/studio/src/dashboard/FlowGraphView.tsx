@@ -736,7 +736,10 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                 })}
               </p>
             ) : outcome.impact.state === "captured" ? (
-              <DiffHunkList hunks={outcome.impact.hunks} />
+              // One entry per changed file (specs/055-legible-decision-trail
+              // FR-016/FR-018); today's producers only ever attach one, so
+              // this renders the same as before. T027 widens the file set.
+              outcome.impact.files.map((file) => <DiffHunkList key={file.path} hunks={file.hunks} />)
             ) : outcome.impact.state === "none" ? (
               <p style={noticeStyle}>
                 {t({

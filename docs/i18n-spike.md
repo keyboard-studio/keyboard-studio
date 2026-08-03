@@ -136,6 +136,13 @@ Crowdin dry-run). Summary:
   [specs/046-i18n-localization/research.md](../specs/046-i18n-localization/research.md)
   (D8) and spec 050's research.md (D7 — why `flowQuestions` freshness is
   delegated to the extractor CLI rather than mirrored in the plain-JS lint tool).
+  `flowQuestions` gained a fifth, optional field — `audit_label`, the
+  decision-trail headline override — from
+  [spec 055](../specs/055-legible-decision-trail/spec.md); content owns the
+  values (sparse by design), engine owns the extractor/lint/resolution
+  plumbing (see [specs/050-flow-question-i18n/contracts/flow-question-catalog-format.md](../specs/050-flow-question-i18n/contracts/flow-question-catalog-format.md)
+  and [specs/055-legible-decision-trail/contracts/catalog-audit-label.contract.md](../specs/055-legible-decision-trail/contracts/catalog-audit-label.contract.md)
+  for the full contract).
 
 **Verify manually:** `crowdin upload sources --dry-run -b main` (the CLI has no
 offline config validation — every command authenticates against the live

@@ -16,6 +16,7 @@ const VALID_SCRIPT_VALUES = new Set([
 export const definition = {
   id: "il_target_script",
   prompt: "Which script will THIS keyboard type?",
+  audit_label: "Keyboard script",
   help_text:
     "Choose the writing system this keyboard produces. It can differ from the " +
     "script your language normally uses: pick \"Latin romanization\" or \"IPA\" if " +

@@ -6,6 +6,7 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 
 export const definition = {
   id: "pb_typing_approach",
+  audit_label: "Typing approach",
   prompt:
     "How would you most naturally type an accented letter on this keyboard?",
   help_text:

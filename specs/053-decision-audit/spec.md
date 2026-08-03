@@ -8,6 +8,10 @@
 
 **Input**: User description: "CYOA decision audit — a per-keyboard decision log with impact evidence. Phase 1 only (log + read-only audit): an append-only, supersede-never-overwrite decision log persisted per keyboard; two event tiers (survey answers logged individually, editor activity aggregated per step); a user-facing decision trail with a plain-language headline per decision, expandable to the exact source diff computed counterfactually; a dev-gated path overlay on the dashboard flow map; on-demand one-branch-deep counterfactual at an inspected node; evidence shipping via the GitHub PR body plus a machine-readable record in the zip, with nothing new added to the keymanapp/keyboards source tree."
 
+## Delivery status
+
+FR-001..FR-028 and SC-001..SC-009 below **stand unchanged** and are now **delivered** by [specs/055-legible-decision-trail/spec.md](../055-legible-decision-trail/spec.md), which closes the gap between what this spec requires and what the shipped build produced (the recorder existed and ran, but under-reported, misattributed, and exposed internal identifiers instead of plain language). This spec is not superseded, amended, or corrected — its requirements were never wrong, only not yet fully realised.
+
 ## Governing documents
 
 This spec **implements**, and does not restate, the following. On conflict, they win.

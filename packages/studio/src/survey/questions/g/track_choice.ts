@@ -18,6 +18,7 @@ export const definition = {
   id: "track_choice",
   type: "radio" as const,
   prompt: "How do you want to work with {{base_name}}?",
+  audit_label: "Authoring approach",
   help_text:
     "Choose how you want to use this base keyboard. " +
     "Copy creates an independent new keyboard you can fully rename and own. " +

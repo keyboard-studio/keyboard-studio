@@ -54,6 +54,15 @@ const CATALOG_FILES = ["patterns.json", "adaptationQuestions.json", "criteria.js
 // separately guarantees).
 const PARITY_ONLY_FILES = ["flowQuestions.json"];
 
+// Per-key optional parity (spec 055 research.md D8 / contracts/catalog-audit-label.contract.md
+// §3): a target locale MAY omit a key matching this pattern without being
+// reported missing — an extra key still fails, and every other key stays
+// strictly parity-checked. Keyed by catalog file name; only flowQuestions.json
+// has an optional field today.
+const OPTIONAL_KEY_PATTERNS = {
+  "flowQuestions.json": /^content\.flowQuestion\.[^.]+\.audit_label$/,
+};
+
 // D8 id derivation (research.md): a record id may itself contain literal
 // dots (e.g. a criterion id like "4.3-copyright-holder-is-authorized") —
 // replace them with `_` when forming a catalog-key segment only. Duplicated
@@ -204,12 +213,15 @@ function checkTargetLocaleParity(problems, contentI18nDir, name, freshEnglish) {
   const locales = readdirSync(contentI18nDir, { withFileTypes: true })
     .filter((d) => d.isDirectory() && d.name !== SOURCE_LOCALE)
     .map((d) => d.name);
+  const optionalKeyPattern = OPTIONAL_KEY_PATTERNS[name];
 
   for (const locale of locales) {
     const file = path.join(contentI18nDir, locale, name);
     if (!existsSync(file)) continue; // hasn't started translating this catalog yet — not a gap
     const target = readCatalog(file);
-    const missing = keySet(freshEnglish).filter((k) => !(k in target));
+    const missing = keySet(freshEnglish).filter(
+      (k) => !(k in target) && !(optionalKeyPattern && optionalKeyPattern.test(k)),
+    );
     const extra = keySet(target).filter((k) => !(k in freshEnglish));
     if (missing.length || extra.length) {
       problems.push(

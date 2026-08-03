@@ -13,10 +13,14 @@ import {
   RawPatternSchema,
   CriterionSchema,
   RemovalCapabilitySchema,
+  EditorActionSummarySchema,
+  DecisionImpactSchema,
+  DecisionEntrySchema,
   toPattern,
 } from "./schemas";
 import { samplePatterns } from "./fixtures/patterns";
 import criteriaJsonRaw from "../data/criteria.json" with { type: "json" };
+import { EDITOR_ACTION_SAMPLE_LIMIT, DECISION_DIFF_CONTEXT_LINES } from "./decisionRecord";
 
 // -----------------------------------------------------------------------------
 // PatternSchema — strict canonical schema (spec §5)
@@ -287,5 +291,169 @@ describe("RemovalCapabilitySchema", () => {
     expect(RemovalCapabilitySchema.safeParse("not-removable").success).toBe(false);
     expect(RemovalCapabilitySchema.safeParse("").success).toBe(false);
     expect(RemovalCapabilitySchema.safeParse(42).success).toBe(false);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// EditorActionSummarySchema — absence is UNMEASURED, never coerced to 0
+// (specs/055-legible-decision-trail FR-005/FR-005a, contract §2).
+//
+// A `.default(0)` regression would make an absent count indistinguishable
+// from a genuinely-measured-and-zero one, which is exactly the bug FR-005a
+// forbids and exactly the thing a naive falsy check (`if (!summary.keysRemoved)`)
+// would fail to catch. These tests assert on absence directly — `in` plus
+// `toBeUndefined()` — and separately assert the converse, that a present `0`
+// is neither dropped nor rewritten.
+// -----------------------------------------------------------------------------
+
+describe("EditorActionSummarySchema (specs/055 contract §2 — absence is not zero)", () => {
+  const COUNT_FIELDS = [
+    "keysRemoved",
+    "keysAdded",
+    "mechanismsAssigned",
+    "touchKeysAffected",
+  ] as const;
+
+  it.each(COUNT_FIELDS)("parses with %s absent and keeps it absent, not coerced to 0", (field) => {
+    const input = { sample: [], sampleTruncated: false };
+    const result = EditorActionSummarySchema.safeParse(input);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    // Two independent assertions: a `.default(0)` regression would make
+    // `field in result.data` true (with value 0), so checking `in` catches it
+    // even though `result.data[field]` alone would also flag it via `toBe(0)`
+    // instead of `toBeUndefined()` — belt and suspenders against either shape
+    // of the coercion bug.
+    expect(field in result.data).toBe(false);
+    expect(result.data[field]).toBeUndefined();
+  });
+
+  it.each(COUNT_FIELDS)("parses with %s present as 0 and keeps 0 (measured, unchanged), not dropped", (field) => {
+    const input = { sample: [], sampleTruncated: false, [field]: 0 };
+    const result = EditorActionSummarySchema.safeParse(input);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(field in result.data).toBe(true);
+    expect(result.data[field]).toBe(0);
+  });
+
+  it("rejects a negative count", () => {
+    const input = { sample: [], sampleTruncated: false, keysRemoved: -1 };
+    expect(EditorActionSummarySchema.safeParse(input).success).toBe(false);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// DecisionImpact — the "captured" variant, DecisionFileChange, and sharedWith
+// (specs/055-legible-decision-trail contract §3).
+// -----------------------------------------------------------------------------
+
+describe('DecisionImpactSchema "captured" variant (specs/055 contract §3)', () => {
+  const sampleHunk = {
+    oldStart: 1,
+    oldLines: 1,
+    newStart: 1,
+    newLines: 1,
+    lines: ["-old", "+new"],
+  };
+  const sampleFile = {
+    path: "source/foo.kmn",
+    hunks: [sampleHunk],
+    magnitude: { added: 1, removed: 1 },
+  };
+
+  it("accepts a captured impact with at least one changed file", () => {
+    const input = {
+      state: "captured",
+      files: [sampleFile],
+      magnitude: { added: 1, removed: 1 },
+    };
+    expect(DecisionImpactSchema.safeParse(input).success).toBe(true);
+  });
+
+  it(
+    'rejects a captured impact whose files array is empty (contract §3: zero changed ' +
+      'files is the separate { state: "none" } variant, not an empty capture)',
+    () => {
+      const input = {
+        state: "captured",
+        files: [],
+        magnitude: { added: 0, removed: 0 },
+      };
+      expect(DecisionImpactSchema.safeParse(input).success).toBe(false);
+    },
+  );
+
+  it('accepts { state: "none" } as the way to say zero changed files', () => {
+    expect(DecisionImpactSchema.safeParse({ state: "none" }).success).toBe(true);
+  });
+
+  it('accepts { state: "unavailable" } with a valid reason', () => {
+    expect(
+      DecisionImpactSchema.safeParse({ state: "unavailable", reason: "lock-gate-dependency" }).success,
+    ).toBe(true);
+  });
+
+  it("sharedWith is optional on a captured impact (absent means solely responsible)", () => {
+    const input = {
+      state: "captured",
+      files: [sampleFile],
+      magnitude: { added: 1, removed: 1 },
+    };
+    const result = DecisionImpactSchema.safeParse(input);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.state === "captured") {
+      expect("sharedWith" in result.data).toBe(false);
+    }
+  });
+
+  // Contract §6: "sharedWith is written as part of the impact attach, which is
+  // already the one write-after-the-fact." That places "an entry never names
+  // itself" (contract §3) at the producer that attaches impact to an entry —
+  // the one place that has both the entry's own `entryId` and the `sharedWith`
+  // list in scope at once. `DecisionImpactSchema` validates the impact object
+  // in isolation and never sees the owning entry's id, and `DecisionEntrySchema`
+  // (below) has no cross-field refinement wiring the two together either. This
+  // test pins that scope deliberately: the schema layer is NOT where this
+  // invariant should be enforced, so it must not silently start rejecting a
+  // same-shaped id here — that would be the wrong layer catching it, invisibly,
+  // while the real producer boundary stays unguarded.
+  it("does not reject sharedWith at the schema layer even when a value matches the owning entryId (self-exclusion is a producer-level invariant, contract §6 — see note below)", () => {
+    const ownId = "entry-123";
+    const impact = {
+      state: "captured",
+      files: [sampleFile],
+      magnitude: { added: 1, removed: 1 },
+      sharedWith: [ownId],
+    };
+    expect(DecisionImpactSchema.safeParse(impact).success).toBe(true);
+
+    const entry = {
+      entryId: ownId,
+      stepId: "step-1",
+      payload: { kind: "editor-action", actionType: "gallery_edit", summary: { sample: [], sampleTruncated: false } },
+      provenance: { agency: "hand-set" as const },
+      recordedAt: 0,
+      supersedes: null,
+      impact,
+    };
+    expect(DecisionEntrySchema.safeParse(entry).success).toBe(true);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Regression pins (specs/055-legible-decision-trail contract §2/§3/§6) — these
+// two literals are shared between the recorder and its tests specifically so
+// they cannot drift apart; a change here is either a deliberate contract edit
+// (with the contract md updated in the same commit) or a regression.
+// -----------------------------------------------------------------------------
+
+describe("Decision-record numeric regression pins", () => {
+  it("EDITOR_ACTION_SAMPLE_LIMIT stays 12", () => {
+    expect(EDITOR_ACTION_SAMPLE_LIMIT).toBe(12);
+  });
+
+  it("DECISION_DIFF_CONTEXT_LINES stays 3", () => {
+    expect(DECISION_DIFF_CONTEXT_LINES).toBe(3);
   });
 });

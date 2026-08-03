@@ -14,6 +14,7 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 export const definition = {
   id: "il_language_autonym",
   prompt: "What is your language called in your own language?",
+  audit_label: "Language name (own language)",
   help_text:
     "The name your community uses for the language, in your own spelling and " +
     "characters. For example: Fà', Kiswahili, हिन्दी. Pick a suggested name or " +
