@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-03
 
-**Status**: Draft — open clarifications listed below, to be resolved in a clarification session before `/speckit-plan`
+**Status**: Clarified 2026-08-03 — Q1, Q2, Q3, Q4 and Q7 resolved in session (see Clarifications), plus the footer's journey model and dot timing. Q5, Q6, Q8, Q9 and Q10 remain on their recommended defaults, each settled by existing architecture or house accessibility rules rather than by an open design choice.
 
 **Input**: User description: "I need to be able to jump between the Studio, Preview, Output, Decisions, and flow map tabs and return where I was. Most of the time, returning to Studio puts me back on question one, even though later questions are still filled and things have been chosen. Preview should be renamed to 'Compare', with the purpose of being able to look at another keyboard's implementation, and choices made there should have no effect on the keyboard development flow. Moving around should be bulletproof. Put deep links on the decisions tab to jump back to decision points and revise those choices. I thought Jordan was going to give us breadcrumbs, but they haven't delivered. Add a narrow bottom footer (following the theme) that shows the name of the project and a dot for every completed question (excluding the 'confirm' questions). I want to be able to hover over the dot and return to that question."
 
@@ -67,17 +67,27 @@ The common shape across D-1, D-5 and D-7 is worth naming, because it is what the
 
 ## Clarifications
 
+### Session 2026-08-03
+
+- Q: Q7 — Is a breadcrumb bar in scope alongside the footer, or does the footer subsume it? → A: The breadcrumb bar **is** the footer. The footer with its navigation dots serves both purposes — "where am I" and jumping back to previous questions. There is no separate breadcrumb bar.
+- Q: When does a footer dot appear, given answers are recorded at step completion? → A: Hybrid — dots derive from recorded decision entries (appearing as steps complete); the current-position marker reads the live question from traversal state. The decision-recording path is not changed.
+- Q: Q4 — How isolated is the Compare tab? → A: Read-only. It loads another keyboard, runs it (typing into the OSK is allowed) and shows its source, but exposes no editing controls at all. The isolation is structural — no write path exists — not a guarded one.
+- Q: Q3 — After revising an answer reached by deep link, what is the default landing? → A: Revise-and-return — confirming returns the author to the location they jumped from, with staleness re-propagated; an explicit "continue from here instead" affordance is offered. No prompt on every revision.
+- Q: Q2 — Do the editor stages get dots, and is the footer only a history of what is done? → A: No — the row is the **whole journey**. It shows dots for completed questions *and* for the stages still to come, so the author sees the shape of what remains. Stages and questions are visually distinguished by size or shape as well as colour.
+- Q: Which questions and stages appear in the row? → A: Only those on **this author's path**. Nothing off-path is shown, not even greyed out. The look-ahead is the projected remaining path given the answers so far (the flow map's existing projection, not a second derivation), so when the walk reaches an optional or conditional question the row **grows** to include it.
+- Q: Q1 — How is a "confirm" question excluded from the footer dots? → A: By construction only — a dot exists exactly when the question produced a recorded decision entry, so notice nodes and acknowledgement screens are excluded because they record nothing. No opt-out flag is added in v1; none is known to be needed.
+
 ### Deferred — to resolve in a clarification session before planning
 
 The author's brief explicitly defers these ("we'll clarify any open questions later"). Each carries a recommended default so planning is not blocked if a session does not happen; a default that is accepted should be recorded here as an answer rather than left as a default.
 
-- **Q1 — Which questions are "confirm" questions, for the purpose of excluding them from the footer dots?** The codebase has no such category. It has `type: "notice"` nodes (four modules), and seven ids matching `*_confirm`, of which some are substantive questions with recorded answers (`pb_rtl_direction_confirm` is a required boolean that routes the flow) and others are acknowledgement screens (`pb_picker_confirm` is the character grid's "tick everything you use"). **Recommended default:** define the exclusion by *what the question does*, not by its name — a dot exists for every question that produced a recorded decision entry, so `notice` nodes and pure-acknowledgement screens are excluded by construction because they record nothing. Any remaining screen the author considers a "confirm" gets an explicit opt-out flag in its question definition, authored sparsely, in the same spirit as 055's `audit_label`.
-- **Q2 — Do the editor stages (carve, mechanisms, touch) get dots?** They are steps, not questions, and the brief says "a dot for every completed question". **Recommended default:** no dot per editor stage in v1; the footer represents question progress only. If stage progress is wanted, it is a second, visually distinct band rather than dots the author cannot distinguish from questions.
-- **Q3 — After revising an answer reached by deep link, where does the author land?** Two coherent models: (a) *revise and return* — the author changes the answer, confirms, and returns to the step they came from, with staleness re-propagated; (b) *revise and re-walk* — the answer change puts them back on the walk from that point forward. **Recommended default:** (a) revise-and-return, with an explicit "continue from here instead" affordance. Model (b) as the only option would make a one-field correction cost a full re-walk of everything after it.
-- **Q4 — How isolated is the Compare tab?** (a) Read-only: it can load and run another keyboard but exposes no editing controls at all; (b) sandboxed: it may edit its own throwaway copy, which is never serialized and never touches the working copy. **Recommended default:** (a) read-only for v1 — it is the smaller change, it cannot lose work, and it matches the stated purpose ("look at another keyboard's implementation"). (b) can follow if authors ask to experiment there.
+- ~~**Q1 — Which questions are "confirm" questions, for the purpose of excluding them from the footer dots?**~~ **Resolved 2026-08-03 — see Session above.** By construction only: a dot exists exactly when the question produced a recorded decision entry, so `notice` nodes and pure-acknowledgement screens are excluded because they record nothing, while a substantive question that merely has `confirm` in its id (`pb_rtl_direction_confirm`) correctly keeps its dot. **No opt-out flag is added in v1** — no question is known to need one, so the field would ship unused; it can be added later if a screen turns out to need suppressing.
+- ~~**Q2 — Do the editor stages (carve, mechanisms, touch) get dots?**~~ **Resolved 2026-08-03 — see Session above.** Yes. Stages appear in the row, including the ones still ahead of the author, and are visually distinct from question dots by size or shape as well as colour (FR-042, FR-046). The row is the whole journey, path-scoped per FR-049.
+- ~~**Q3 — After revising an answer reached by deep link, where does the author land?**~~ **Resolved 2026-08-03 — see Session above.** Revise-and-return is the default, with an explicit "continue from here instead" affordance; see FR-034.
+- ~~**Q4 — How isolated is the Compare tab?**~~ **Resolved 2026-08-03 — see Session above.** Read-only; see FR-023. The sandboxed model can follow as its own feature if authors ask to experiment there.
 - **Q5 — Does the Compare tab remember its selection across tab switches and reloads?** **Recommended default:** across tab switches within a session, yes (it is view state like any other); across reloads, no — it is not part of the project and does not belong in the durable draft.
 - **Q6 — Is the footer shown on every tab, including Welcome and Profile?** **Recommended default:** shown on every tab once a project exists; hidden on Welcome (no project yet) and wherever there is no project to name.
-- **Q7 — Is a breadcrumb bar in scope alongside the footer, or does the footer subsume it?** The brief mentions breadcrumbs as an unmet expectation rather than as an explicit ask. **Recommended default:** in scope, minimal — a single line naming project → current stage → current question, in the Studio tab's chrome, each segment a link to the corresponding location. It is the "where am I" half; the footer is the "how far along" half, and neither answers the other's question.
+- ~~**Q7 — Is a breadcrumb bar in scope alongside the footer, or does the footer subsume it?**~~ **Resolved 2026-08-03 — see Session above.** The footer *is* the breadcrumb: one strip, carrying both orientation and progress. US6 and FR-060…FR-062 are folded into US4 and section E accordingly.
 - **Q8 — Hover is the stated interaction for the dots. Hover alone is not accessible.** **Recommended default:** hover reveals the question's label; the dot is a real `button` that is tabbable, activates on Enter/Space, and shows the same label to assistive technology as its accessible name. Hover is the shortcut, not the mechanism (see FR-042…FR-047).
 - **Q9 — Which view state is session-scoped and which is durable?** **Recommended default:** everything named in FR-030 is session-scoped (survives tab switches, not reloads) except the wizard position and substage, which are already durable via the existing `TraversalSnapshot`. Nothing new is added to the durable envelope in v1.
 - **Q10 — Does the browser Back button follow tab switches, deep links, or both?** **Recommended default:** both, because both are `location.hash` changes and the browser will record them whether or not the design acknowledges it. The requirement is that Back must never land the author somewhere the app then silently rewrites (D-9's failure mode).
@@ -139,20 +149,23 @@ An author reviewing the Decisions tab sees they answered a question one way and 
 
 ### User Story 4 - See the project and its progress at all times, and click back into it (Priority: P2)
 
-A narrow footer sits at the bottom of every screen showing the project's name and one dot per completed question, in the order the author answered them. Hovering a dot names the question; activating it returns to that question.
+A narrow footer sits at the bottom of every screen showing the project's name and the author's whole journey as a row of dots: one per completed question, a marker for where they are now, and one per stage still ahead on their path. Hovering a dot names its question or stage; activating a reached one returns to it.
 
-**Why this priority**: It is the author's persistent answer to "where am I and how far along am I", and it is the second, always-visible route back into the walk. It depends on US1 and shares its jump mechanism with US3.
+**Why this priority**: It is the author's persistent answer to "where am I, how far have I come, and how much is left", and it is the second, always-visible route back into the walk. It depends on US1 and shares its jump mechanism with US3.
 
-**Independent Test**: Complete a known number of questions, assert the footer shows exactly that many dots in walk order excluding the categories Q1 settles, assert each dot's accessible name is the question's label, and assert activating one lands on that question.
+**Independent Test**: Complete a known number of questions, assert the row contains exactly those completed questions plus the current-position marker plus the stages still projected on this author's path — with nothing off-path present — assert question and stage dots are distinguishable by size or shape and not by colour alone, assert each dot's accessible name is its question's or stage's label, and assert activating a reached dot lands on it while an upcoming-stage dot is refused with a reason.
 
 **Acceptance Scenarios**:
 
-1. **Given** the author has answered eight questions, **When** they look at the footer, **Then** the project name is shown and eight dots are present in the order answered.
-2. **Given** the author hovers a dot, **When** the label appears, **Then** it names the question in the active locale.
-3. **Given** the author is using a keyboard only, **When** they tab to the footer, **Then** each dot is reachable, its name is announced, and Enter or Space returns them to that question.
+1. **Given** the author has answered eight questions, **When** they look at the footer, **Then** the project name is shown, eight completed-question dots are present in the order answered, the current position is marked, and the stages still ahead on their path are shown as visually distinct dots.
+2. **Given** the author hovers a dot, **When** the label appears, **Then** it names the question or stage in the active locale, and an upcoming stage is identifiable as not yet reached.
+3. **Given** the author is using a keyboard only, **When** they tab to the footer, **Then** each dot is reachable, its name is announced, and Enter or Space returns them to that question or stage.
 4. **Given** the author revises an earlier answer, **When** they return to the footer, **Then** the dot for that question is still a single dot — a revision replaces an answer, it does not add progress.
 5. **Given** no project is open, **When** the author is on the Welcome screen, **Then** the footer is absent rather than showing an empty shell (per Q6's default).
-6. **Given** a long walk, **When** the dot count exceeds the available width, **Then** the footer degrades legibly and every dot stays reachable, rather than overflowing or silently truncating.
+6. **Given** a long walk, **When** the mark count exceeds the available width, **Then** the footer degrades legibly, every mark stays reachable, and the current position stays visible without scrolling — rather than overflowing or silently truncating.
+7. **Given** the author reaches an optional question that was not previously on their projected path, **When** it is presented, **Then** a dot for it is appended to the row.
+8. **Given** the author's track skips a step, or a branch they did not take contains questions, **When** they look at the footer, **Then** no dot for any of those appears — not even greyed out.
+9. **Given** an upcoming-stage dot for a stage behind a gate the walk enforces, **When** the author activates it, **Then** the jump is refused with a stated reason rather than skipping the gate.
 
 ---
 
@@ -173,18 +186,19 @@ Returning to a tab restores what the author had set up there: the Flow Map's sec
 
 ---
 
-### User Story 6 - Know where you are without leaving the screen (Priority: P3)
+### User Story 6 - Know where you are now, in the same strip that shows how far you have come (Priority: P3)
 
-A breadcrumb line in the Studio tab names the project, the current stage, and the current question, each segment a link to that location.
+**The footer is the breadcrumb** (Q7, resolved). There is no separate breadcrumb bar. The one narrow strip names the project, marks the author's *current* position in the dot row, and lets them jump back to any earlier question — orientation and progress in the same surface.
 
-**Why this priority**: The brief raises breadcrumbs as an unmet expectation rather than a specified ask, and the footer already delivers the persistent-orientation half. Scoped as P3 and gated on Q7.
+**Why this priority**: US4 builds the strip; this story is the orientation half of it — the current-position marker and the stage context that answer "where am I" rather than "how far along". Separable because the strip is useful with dots alone, so it must not block US4.
 
-**Independent Test**: At three different points in the walk, assert the breadcrumb names the correct project, stage and question, and that activating the stage segment navigates to that stage's first screen.
+**Independent Test**: At three different points in the walk, assert the footer names the correct project, that the current position is marked distinguishably in the dot row (by more than colour), and that the current question is identifiable by name without hovering.
 
 **Acceptance Scenarios**:
 
-1. **Given** the author is on a question inside the characters stage, **When** they read the breadcrumb, **Then** it reads project → stage → question, with the current question not itself a link.
-2. **Given** the author activates the stage segment, **When** the navigation completes, **Then** they are at that stage, and the same revise-or-continue rules as US3 apply.
+1. **Given** the author is on a question inside the characters stage, **When** they read the footer, **Then** the project is named and the current position is marked in the dot row, distinguishable from completed questions by shape or another non-colour cue as well as colour.
+2. **Given** the author is on a question, **When** they inspect the current-position marker by keyboard or assistive technology, **Then** its accessible name identifies the current question, and it is not presented as a jump target to itself.
+3. **Given** the author jumps back to an earlier question, **When** the footer re-renders, **Then** the current-position marker has moved to that question and the dots ahead of it are still present (a jump back is not a loss of progress).
 
 ---
 
@@ -230,7 +244,7 @@ A breadcrumb line in the Studio tab names the project, the current stage, and th
 - **FR-020**: The tab currently labelled "Preview" MUST be labelled "Compare" in every author-facing surface, in every locale. Because the tab's *purpose* changes and not merely its wording, the label takes a new message id and the old id is retired per the catalog rules; existing translations of the old id MUST NOT be silently reused for the new meaning.
 - **FR-021**: The Compare tab MUST NOT write to the working copy, the survey session, the Phase B draft, or the decision record. No action available on that tab may change the author's project.
 - **FR-022**: Selecting a keyboard on the Compare tab MUST NOT instantiate, re-instantiate, or rebase the working copy, and MUST NOT surface a rebase-confirm dialog (D-6).
-- **FR-023**: The Compare tab MUST NOT expose controls that edit project identity or project source. Per Q4's default it exposes no editing controls at all; if Q4 resolves to the sandboxed model instead, whatever it exposes MUST operate on a copy that is never serialized and never merged.
+- **FR-023**: The Compare tab MUST expose **no editing controls at all** (Q4 resolved 2026-08-03: read-only). That includes controls that edit project identity or project source. Typing into the loaded keyboard's OSK and reading its source are inspection, not editing, and remain in scope per FR-024. The isolation MUST be structural — no reachable write path — rather than a guarded or flag-gated one, so that FR-025's adversarial test establishes an absence rather than a condition.
 - **FR-024**: The Compare tab MUST be able to load and exercise a keyboard the author is *not* authoring — that is its purpose — including running it and reading its source.
 - **FR-025**: A test MUST assert the isolation directly: a full working-copy state comparison across an adversarial Compare session (load a different keyboard, exercise every control) with equality required. The absence of a write path is the requirement; a test that only checks the happy path does not establish it.
 - **FR-026**: The rename MUST be swept across every surface that names the tab — navigation labels, aria labels, headings, message ids, tests, e2e specs, and documentation — with no surface left calling this tab "Preview". Unrelated uses of the word "preview" (the live OSK inside the Studio tab, the base-preview status store, `usePreviewArtifact`'s role on Output) are NOT in scope for renaming, and the sweep MUST NOT rename them.
@@ -241,7 +255,7 @@ A breadcrumb line in the Studio tab names the project, the current stage, and th
 - **FR-031**: Arriving at a question by deep link MUST show the currently-recorded answer, not an empty field and not a re-proposed default.
 - **FR-032**: Changing an answer reached by deep link MUST record a superseding entry through the existing append-only path (053 FR-015). No trail entry is edited or removed, and no new supersession concept is introduced.
 - **FR-033**: Changing an answer MUST re-propagate consequences through the existing staleness mechanism. This feature adds no second staleness path.
-- **FR-034**: After a revision the author MUST be able both to return to where they came from and to continue the walk from the revised point, and the choice MUST be explicit (Q3).
+- **FR-034**: After a revision the author MUST be able both to return to where they came from and to continue the walk from the revised point, and the choice MUST be explicit. **The default is revise-and-return** (Q3 resolved 2026-08-03): confirming the changed answer returns the author to the location they jumped from, and "continue from here instead" is offered as an explicit alternative rather than as a prompt on every revision. The jump therefore MUST carry its origin location so the return has a target.
 - **FR-035**: Entries whose target is unreachable (FR-013) MUST present the reason in place of a link, rather than a link that fails on activation.
 - **FR-036**: The deep-link affordance MUST NOT cause any impact resolution on render — 053's structural guarantee that mounting the trail resolves nothing and expanding one row resolves exactly that row is preserved.
 
@@ -249,13 +263,21 @@ A breadcrumb line in the Studio tab names the project, the current stage, and th
 
 - **FR-040**: A narrow footer MUST be present on the tabs where a project exists (Q6), styled from the existing theme tokens rather than new hard-coded colours, and MUST NOT materially reduce the vertical space available to the walk.
 - **FR-041**: The footer MUST show the project's name, derived through the same precedence the draft layer already uses (scaffold spec display name → identity patch display name → base keyboard display name), not a fourth derivation.
-- **FR-042**: The footer MUST show one dot per completed question, in the order the author answered them, excluding the categories Q1 settles. A question that has been revised MUST have exactly one dot.
-- **FR-043**: Each dot MUST be a real, individually focusable control with an accessible name naming its question in the active locale — not a decorative element with a hover-only tooltip.
-- **FR-044**: Hovering a dot MUST reveal the question's label; the same label MUST be available to keyboard and assistive-technology users without hovering.
-- **FR-045**: Activating a dot MUST navigate to that question, using the same mechanism and the same rules as the decision-trail deep links (FR-030…FR-035) — one jump implementation, not two.
-- **FR-046**: The dots MUST NOT convey state by colour alone, and their non-text contrast MUST meet the house rule (≥ 3:1). Focus MUST be visible on each dot.
-- **FR-047**: When the dot count exceeds the available width the footer MUST degrade legibly and keep every dot reachable — no silent truncation, no horizontal overflow of the page body.
+- **FR-042**: The footer's dot row MUST be a **whole-journey** strip, not a history: it shows where the author has been, where they are, and what is still to come. It carries three classes of mark, in journey order (resolved 2026-08-03):
+  - **Completed question** — one dot per completed question, in the order answered. Derived from the recorded decision entries, so a dot exists exactly when the question recorded one; `notice` nodes and pure-acknowledgement screens are therefore excluded by construction, with no exclusion list to maintain (Q1 resolved 2026-08-03). A dot appears when its step completes and the answer is recorded; the decision-recording path is NOT changed to commit per question. A question that has been revised MUST have exactly one dot.
+  - **Current position** — the author's live position, per FR-060, read from traversal state rather than from the record, so it is per-question accurate even inside a step whose answers are not yet recorded.
+  - **Upcoming stage** — the stages still ahead of the author on their projected path, so the strip shows the shape of the remaining journey rather than ending at the present moment.
+- **FR-043**: Each dot MUST be a real, individually focusable control with an accessible name naming its question or stage in the active locale — not a decorative element with a hover-only tooltip. An upcoming-stage dot MUST announce that it is not yet reached, so its name is not mistaken for completed progress.
+- **FR-044**: Hovering a dot MUST reveal its label; the same label MUST be available to keyboard and assistive-technology users without hovering.
+- **FR-045**: Activating a *reached* dot MUST navigate to that question or stage, using the same mechanism and the same rules as the decision-trail deep links (FR-030…FR-035) — one jump implementation, not two. Activating an **upcoming-stage** dot MUST NOT jump forward past a lock or gate the walk enforces: it is refused with a reason under FR-013's `beyond-gate`, exactly as a forward deep link is.
+- **FR-046**: The dots MUST NOT convey class or state by colour alone. Question dots and stage dots MUST differ by **size or shape as well as colour**, and the current-position marker MUST likewise carry a non-colour cue. Non-text contrast MUST meet the house rule (≥ 3:1), and focus MUST be visible on every dot.
+- **FR-047**: The row is longer than a completed-only row would be, since it includes the journey ahead. When the mark count exceeds the available width the footer MUST degrade legibly and keep every mark reachable — no silent truncation, no horizontal overflow of the page body, and the current position MUST remain visible without the author having to scroll to find it.
 - **FR-048**: All footer strings, including accessible names and tooltips, MUST go through the message catalog.
+- **FR-049**: The dot row MUST be scoped to **this author's path**, and MUST grow as the path resolves:
+  - a. A question or stage that is **not on the author's path** MUST NOT get a dot — not now and not as a greyed-out placeholder. A step the active track skips, a branch not taken, and a question behind an unmet condition are all absent from the row rather than shown as unreachable.
+  - b. The look-ahead MUST be derived from the **projected remaining path given the answers so far**, not from the full manifest. The flow map already computes this projection; the footer MUST read that same derivation rather than forking a second one.
+  - c. When the walk reaches an **optional or conditional** question that was not previously known to be on the path, its dot MUST be **appended** to the row at that point. The row therefore lengthens during the walk, and that is expected — not a defect.
+  - d. When a branch resolves such that previously-projected stages are no longer on the path, their dots MUST leave the row. Dots for questions already **completed** MUST NOT be removed by a later branch change; only the not-yet-reached look-ahead is re-projected (FR-063 already forbids a jump from truncating completed progress).
 
 ### F. Per-tab view state
 
@@ -264,11 +286,14 @@ A breadcrumb line in the Studio tab names the project, the current stage, and th
 - **FR-052**: View state MUST clear on start-over, together with the session it belongs to.
 - **FR-053**: Restoring view state MUST NOT trigger a recompile, a re-validation, or any authoring side effect.
 
-### G. Breadcrumbs (gated on Q7)
+### G. Orientation — the footer as breadcrumb (Q7 resolved)
 
-- **FR-060**: The Studio tab MUST show a breadcrumb naming project → current stage → current question.
-- **FR-061**: Each breadcrumb segment except the current one MUST navigate to its location under the same rules as FR-030…FR-035.
-- **FR-062**: The breadcrumb MUST read from the same location model as everything else (FR-001) — it may not re-derive position from the rendered component tree.
+There is no separate breadcrumb bar. These requirements constrain the same footer section E specifies.
+
+- **FR-060**: The footer MUST mark the author's current position in the dot row, so the strip answers "where am I" as well as "how far along". The marker MUST be distinguishable from a completed-question dot by a non-colour cue as well as colour (FR-046 applies to it unchanged).
+- **FR-061**: The current-position marker MUST NOT be a jump target to itself, and its accessible name MUST identify the current question. Every *other* dot navigates under the same rules as FR-030…FR-035 and FR-045 — one jump implementation, still not two.
+- **FR-062**: The footer MUST read position from the same location model as everything else (FR-001) — it may not re-derive position from the rendered component tree.
+- **FR-063**: Jumping back MUST NOT remove the dots ahead of the landing point. A jump is navigation, not a truncation of progress; only an answer change (FR-033's staleness) has downstream consequences.
 
 ### H. Non-regression
 
@@ -281,7 +306,9 @@ A breadcrumb line in the Studio tab names the project, the current stage, and th
 
 - **Location**: Where the author is, addressable and shareable. Names a tab; optionally a step within the wizard; optionally a question or sub-position within that step. Has a defined resolution outcome: reachable, unreachable-with-reason, or degraded-to-ancestor.
 - **View state**: Per-tab presentation settings that carry no authoring meaning — selected section, collapse sets, pane splits, OSK mode, scroll offsets. Session-scoped; never authoritative for anything the output depends on.
-- **Progress dot**: One completed question, as it appears in the footer. Carries the question's location and its author-facing label. Derived from the recorded decisions, not from a parallel counter.
+- **Progress dot**: One mark in the footer's journey row. Has a **class** — completed question, current position, or upcoming stage — which determines both how it is drawn (size or shape, never colour alone) and whether it is a jump target. Carries its location and its author-facing label. Completed-question dots derive from the recorded decisions, not from a parallel counter, so they appear when their step completes; upcoming-stage dots derive from the projected remaining path.
+- **Projected path**: The steps and questions this author will still walk, given the answers so far. Supplies the footer's look-ahead and is the reason a dot row can grow (an optional question is reached) or shrink at its tail (a branch resolves away). Read from the flow map's existing projection rather than re-derived. Nothing off this path is ever shown in the row.
+- **Current-position marker**: Where the author is *now*, shown in the same footer strip as the dots (FR-060). Derived from traversal state, not from the decision record, so it is per-question live even inside a step whose answers are not yet recorded. Not a jump target to itself (FR-061).
 - **Compare session**: A keyboard loaded on the Compare tab for inspection. Has no relationship to the working copy and no path into it.
 
 ## Success Criteria *(mandatory)*
@@ -296,7 +323,7 @@ A breadcrumb line in the Studio tab names the project, the current stage, and th
 - **SC-006**: No author-facing surface in any locale refers to the Compare tab as "Preview" after the rename, and no unrelated use of the word is renamed.
 - **SC-007**: Every trail entry whose target is reachable offers a working jump; every entry whose target is not reachable states why. A reader can get from any recorded decision to its decision point, or to a stated reason, in one activation.
 - **SC-008**: Revising an answer through a deep link produces exactly one new decision entry linked to the one it replaces, and marks the same steps stale as making the same change in the ordinary walk would.
-- **SC-009**: The footer's dot count equals the number of completed, non-excluded questions at every point in a scripted walk, including after revisions.
+- **SC-009**: At every point in a scripted walk, the footer's row contains exactly: one dot per completed non-excluded question, the current-position marker, and one dot per stage still ahead on the projected path — with nothing off-path present, including after revisions and after a branch resolves. Reaching an optional question appends its dot; the completed-question dots are never removed by a later re-projection.
 - **SC-010**: The footer is fully operable by keyboard alone: every dot reachable by Tab, named on focus, activated by Enter and Space, with a visible focus indicator, and the automated accessibility scan reports no new violations on any tab.
 - **SC-011**: Restoring a tab's view state performs no compile and no validation run.
 - **SC-012**: Opening a shared deep link as a first-time visitor lands on the requested location after the welcome screen, not on the default landing route.
@@ -308,8 +335,8 @@ A breadcrumb line in the Studio tab names the project, the current stage, and th
 - The hash-based routing model is retained; this feature widens the location vocabulary rather than replacing the router.
 - Location and view state are studio-local. Nothing here is added to the emitted package, the PR body, or any artifact the author ships.
 - The working-copy spine is unchanged: one persistent working copy, serialized only at output. The Compare tab sits outside it entirely.
-- The decision record remains the source of truth for which questions were answered; the footer derives from it rather than maintaining a parallel progress counter. Answers are recorded at step completion today, so if the footer is required to light a dot the instant a question is answered rather than when its step completes, that is an additional requirement on the recording path and should be raised in the clarification session (the per-question commit signal the runner already emits is the natural seam).
-- "Jordan" is not a system component; the breadcrumb work is unowned rather than in flight, and is treated here as new scope gated on Q7.
+- The decision record remains the source of truth for which questions were answered; the footer derives its dots from it rather than maintaining a parallel progress counter. Answers are recorded at step completion, and that timing is retained (resolved 2026-08-03): dots appear as steps complete. The footer therefore has two sources by design — the record for *progress* (the dots) and traversal state for *position* (FR-060's current-position marker). Neither is a parallel counter of the other, and the recording path is untouched, so 053's capture boundary and supersession chains are unaffected.
+- "Jordan" is not a system component; the breadcrumb work is unowned rather than in flight. Q7 resolved it into the footer rather than as a separate bar, so there is no distinct breadcrumb deliverable.
 - Cross-browser-tab coordination, multi-project side-by-side editing, and any change to what the output contains are out of scope.
 
 ## Out of scope
@@ -325,7 +352,7 @@ A breadcrumb line in the Studio tab names the project, the current stage, and th
 
 Named so planning can size the work; not a task list.
 
-- **Unit (vitest)**: traversal preserved across simulated route changes; reset occurs only on explicit start-over; location resolution for reachable, unreachable and stale-build targets; footer dot derivation from a fixture decision record, including a revision; project-name precedence; the history bridge's tag/prediction behaviour under a preserved position (FR-017).
+- **Unit (vitest)**: traversal preserved across simulated route changes; reset occurs only on explicit start-over; location resolution for reachable, unreachable and stale-build targets; footer row derivation — completed dots from a fixture decision record including a revision, look-ahead dots from a fixture projected path, path-scoping (nothing off-path), row growth when an optional question is reached, and tail re-projection when a branch resolves (FR-049); project-name precedence; the history bridge's tag/prediction behaviour under a preserved position (FR-017).
 - **Integration (vitest + Testing Library)**: each of the four wizard entry points lands correctly; deep link → revise → supersede → staleness; Compare-tab isolation by full store comparison; view-state restoration without a compile.
 - **Accessibility**: keyboard-only traversal of the footer and the trail's links; accessible names present and localized; focus visible; the axe scan clean on every tab.
 - **Existing tests that encode the current contract and must be rewritten rather than removed**: the route/landing tests in `StudioShell.test.tsx`, the substage test in `CharactersStep.test.tsx`, `useSurveyBrowserHistorySync.test.ts`, and any preview-screen test asserting today's shared-store behaviour.
@@ -366,7 +393,7 @@ Notes that save an afternoon: the first test in a run pays a cold `../keyboards`
 - **`e2e/tab-roundtrip.spec.ts` (US1, gating).** Drive the walk to a mid-flow step, then round-trip through each of the other four tabs in turn, asserting after each return: same step on screen, in-app Back still reaches the prior step, and — for the characters case — the built alphabet intact. This is the spec that would have caught the reported defect, and it must fail against `main` before it passes. Reuse `seedReturningVisitor` + `driveIdentityLite` + `pickBaseKeyboard` + `chooseAdaptTrack`; the tab switches themselves become a new shared helper (`switchTab`) rather than inline hash assignments in each spec.
 - **`e2e/compare-isolation.spec.ts` (US2, gating).** Establish a working copy, snapshot the observable project state through the app's own surfaces, run an adversarial Compare session (load a *different* keyboard, exercise every control the tab offers), return, and assert the project is unchanged and no rebase-confirm dialog ever appeared. Model the adversarial shape on the two existing base-switch specs ([switch-base-exploration.spec.ts](../../packages/studio/e2e/switch-base-exploration.spec.ts), [switch-base-rebase.spec.ts](../../packages/studio/e2e/switch-base-rebase.spec.ts)) — they already encode what a rebase prompt looks like from the outside.
 - **`e2e/decision-deeplink.spec.ts` (US3).** Complete a walk, open Decisions, activate the link on an early answer, assert arrival on that question with the recorded value present, change it, and assert the trail shows the supersession and the dependent steps went stale.
-- **`e2e/footer-progress.spec.ts` (US4).** Assert dot count and order against a scripted walk; drive the footer **keyboard-only** (Tab to a dot, assert its accessible name, activate with Enter) and assert arrival; assert a revision does not add a dot.
+- **`e2e/footer-progress.spec.ts` (US4).** Assert the row's full composition against a scripted walk — completed-question dots in order, the current-position marker, and the upcoming-stage dots for this author's path with nothing off-path present; assert question and stage dots are distinguishable by size or shape, not colour alone; drive the footer **keyboard-only** (Tab to a dot, assert its accessible name, activate with Enter) and assert arrival; assert a revision does not add a dot; assert reaching an optional question appends one; assert an upcoming-stage dot behind a gate is refused with a reason.
 
 ### Specs that must be extended, not left alone
 
