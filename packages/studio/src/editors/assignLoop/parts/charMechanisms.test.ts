@@ -25,7 +25,7 @@
 
 import { describe, it, expect } from "vitest";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
-import { getCharMechanisms } from "./charMechanisms.ts";
+import { getCharMechanisms, allCharsCovered } from "./charMechanisms.ts";
 import { PATTERN_SEQUENCE, PATTERN_DEADKEY, PATTERN_SWAP } from "../patternIds.ts";
 
 describe("getCharMechanisms — producesCount", () => {
@@ -236,5 +236,46 @@ describe("getCharMechanisms — usesSequences", () => {
     const result = getCharMechanisms("a", assignments, "physical");
     expect(result.producesCount).toBe(0);
     expect(result.usesSequences.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// allCharsCovered — whole-inventory "every char has getProducerBadge count
+// >= 1" check (the shared helper the Done-button forward-button spec in both
+// galleries calls). Direct-unit coverage complementing the render-level pins
+// in MechanismGallery.test.tsx/TouchGallery.test.tsx.
+// ---------------------------------------------------------------------------
+
+describe("allCharsCovered", () => {
+  it("true when every character has a direct session assignment (count >= 1)", () => {
+    const assignments: MechanismAssignment[] = [
+      { scope: "individual", target: "y", modality: "physical", mechanisms: [{ patternId: PATTERN_SWAP }] },
+      { scope: "individual", target: "z", modality: "physical", mechanisms: [{ patternId: PATTERN_SWAP }] },
+    ];
+
+    expect(
+      allCharsCovered(["y", "z"], assignments, "physical", new Set(), new Set()),
+    ).toBe(true);
+  });
+
+  it("false when at least one character has zero mechanisms (count === 0)", () => {
+    const assignments: MechanismAssignment[] = [
+      { scope: "individual", target: "y", modality: "physical", mechanisms: [{ patternId: PATTERN_SWAP }] },
+      // "z" has no assignment at all.
+    ];
+
+    expect(
+      allCharsCovered(["y", "z"], assignments, "physical", new Set(), new Set()),
+    ).toBe(false);
+  });
+
+  it("true when the only uncovered-by-assignment character is covered by baseDirectSet (signal (a))", () => {
+    expect(
+      allCharsCovered(["y", "z"], [], "physical", new Set(["y", "z"]), new Set()),
+    ).toBe(true);
+  });
+
+  it("empty chars list is vacuously true", () => {
+    expect(allCharsCovered([], [], "physical", new Set(), new Set())).toBe(true);
   });
 });

@@ -61,7 +61,7 @@ import {
   TEXT_DIM,
   FONT,
 } from "../../../lib/galleryTheme.ts";
-import { ERROR_RED } from "../../../ui/theme.ts";
+import { ERROR_RED, ERROR_BG } from "../../../ui/theme.ts";
 
 const WHEEL_SCROLL_FACTOR = 0.6; // dampen wheel delta so the strip pans a bit slower than the raw device delta
 
@@ -495,7 +495,7 @@ export function CharScrollStrip({
                     fontSize: 10,
                     fontWeight: 600,
                     lineHeight: "16px",
-                    background: badgeGood ? "#0d2218" : "#2a0a0a",
+                    background: badgeGood ? "#0d2218" : ERROR_BG,
                     // Composable chars get a DASHED border (never color
                     // alone) in addition to the `⊕` marker below — a shape
                     // distinction visible in grayscale. This span's own

@@ -137,7 +137,7 @@ import { usePositionalCharNav, nearestSurvivingChar, indexOfChar } from "./usePo
 import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
-import { getProducerBadge } from "./parts/charMechanisms.ts";
+import { getProducerBadge, allCharsCovered } from "./parts/charMechanisms.ts";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
 import {
@@ -173,6 +173,7 @@ import {
   galleryConfigStyle as configStyle,
   galleryCardStyle as cardStyle,
 } from "../../lib/galleryTheme.ts";
+import { ERROR_RED, ERROR_BG } from "../../ui/theme.ts";
 import {
   PATTERN_SEQUENCE,
   PATTERN_DEADKEY,
@@ -1335,7 +1336,8 @@ export function MechanismGallery({
     (s) => s.markGalleryIntroSeen,
   );
 
-  const { lettersToAdd: inventoryLettersToAdd } = useInventoryDiff();
+  const { lettersToAdd: inventoryLettersToAdd, producedSet: sessionProducedSet } =
+    useInventoryDiff();
 
   // Collated display order (spec 047 FR-007's default-ICU comparator, reused
   // — not reinvented; see survey/collation.ts): puts a lowercase letter
@@ -1505,6 +1507,18 @@ export function MechanismGallery({
   const sequenceRecordedChars = useMemo(
     () => lettersToAdd.filter((c) => hasSequenceForChar(sessionAssignments, c)),
     [lettersToAdd, sessionAssignments],
+  );
+
+  // Whole-inventory "every character is implemented" check (bug fix) — built
+  // on the SAME 3-signal getProducerBadge computation the CharScrollStrip
+  // badge uses, over the FULL SHOW-ALL `inventory` list (not just
+  // lettersToAdd — a base-produced char must count as covered too). Feeds
+  // the forward-button spec below: when true, the Done button is always
+  // rendered regardless of currentChar/walk membership (see that spec's
+  // top-priority branch).
+  const allCovered = useMemo(
+    () => allCharsCovered(inventory, sessionAssignments, "physical", baseOnlyProducedSet, baseProducedSet),
+    [inventory, sessionAssignments, baseOnlyProducedSet, baseProducedSet],
   );
 
   // One-time intro splash — shown on first entry to the desktop gallery so the
@@ -1783,6 +1797,21 @@ export function MechanismGallery({
     return altFamily ?? "RALT";
   }, [modifierPool]);
 
+  // The current character's 3-signal producer badge (charMechanisms.ts's
+  // getProducerBadge) — the SAME computation CharScrollStrip's own badge and
+  // the SHOW-ALL floor-row check (existingMethodContributors below) use,
+  // with the SAME 4 trailing args this gallery already passes to
+  // CharScrollStrip (baseOnlyProducedSet, baseProducedSet). Hoisted here so
+  // the suggestion gate below (currentCharBadge?.count ?? 0) === 0 and the
+  // floor-row check share one computation rather than each re-deriving it.
+  const currentCharBadge = useMemo(
+    () =>
+      currentChar !== null
+        ? getProducerBadge(currentChar, sessionAssignments, "physical", baseOnlyProducedSet, baseProducedSet)
+        : null,
+    [currentChar, sessionAssignments, baseOnlyProducedSet, baseProducedSet],
+  );
+
   // kbgen placement suggestion for the current character (null when no map or
   // no qualifying candidate). Memoized against currentChar + placementMap so it
   // only recomputes on actual input changes, not on unrelated re-renders.
@@ -1799,9 +1828,15 @@ export function MechanismGallery({
   // for coveredChars, via the shared unimplementedDesktopChars helper (do not
   // fork this definition — see lib/unimplementedInventory.ts). Non-empty only
   // when at least one character in lettersToAdd resolves to zero mechanisms.
+  // `sessionProducedSet` (useInventoryDiff's session-aware, composability-
+  // folded produced set) is threaded through here too — WITHOUT it, this
+  // legacy gate could disagree with the badge (getProducerBadge) about a
+  // character that is only covered by composition this session, firing a
+  // spurious "still unimplemented" warning on a Done click the badge itself
+  // already reports as green. See useInventoryDiff.ts / unimplementedInventory.ts.
   const unimplementedChars = useMemo(
-    () => unimplementedDesktopChars(sessionAssignments, lettersToAdd),
-    [sessionAssignments, lettersToAdd],
+    () => unimplementedDesktopChars(sessionAssignments, lettersToAdd, sessionProducedSet),
+    [sessionAssignments, lettersToAdd, sessionProducedSet],
   );
   const [showUnimplementedWarning, setShowUnimplementedWarning] =
     useState(false);
@@ -2897,18 +2932,10 @@ export function MechanismGallery({
     // everything above, still has zero rows — an unrecognized-shape producer
     // collectCharContributors couldn't attribute at all. Append one truthful,
     // no-arrow floor row rather than leave the section empty under a green
-    // badge.
-    if (
-      currentChar !== null &&
-      rows.length === 0 &&
-      getProducerBadge(
-        currentChar,
-        sessionAssignments,
-        "physical",
-        baseOnlyProducedSet,
-        baseProducedSet,
-      ).count > 0
-    ) {
+    // badge. Reuses the hoisted `currentCharBadge` (declared above, near the
+    // suggestion gate) rather than a second getProducerBadge call for the
+    // same character — one computation, two readers.
+    if (currentChar !== null && rows.length === 0 && (currentCharBadge?.count ?? 0) > 0) {
       rows.push({
         id: `unattributed:${currentChar}`,
         label: appendNotDeletableSuffix(
@@ -2936,8 +2963,7 @@ export function MechanismGallery({
     i18n,
     currentChar,
     baseProducedSet,
-    baseOnlyProducedSet,
-    sessionAssignments,
+    currentCharBadge,
   ]);
 
   const handleRemoveExistingMethod = useCallback(
@@ -3121,7 +3147,24 @@ export function MechanismGallery({
   // disabled and no completion button rendered) is unreachable.
   const doneLabel = t({ id: "editor.assignLoop.doneButton", message: "Done" });
   const forwardButton: ForwardButtonSpec | null =
-    locked && onComplete !== undefined
+    // TOP PRIORITY (bug fix): once every inventory character has count >= 1
+    // (allCovered, the SAME badge computation CharScrollStrip/currentCharBadge
+    // use), the Done button is ALWAYS rendered — regardless of currentChar or
+    // its walk (lettersToAdd) membership. Previously this button was hidden
+    // entirely for a currentChar outside lettersToAdd (e.g. an
+    // already-produced character reached via the SHOW-ALL CharScrollStrip),
+    // which could strand an author who had, in fact, finished every
+    // character — there was no visible way to advance. Falls through to the
+    // existing branches unchanged whenever any character is still count 0.
+    allCovered && onComplete !== undefined
+      ? {
+          label: doneLabel,
+          onClick: handleForwardComplete,
+          testId: "mechanisms-continue",
+          disabled: false,
+          style: forwardBtnStyle,
+        }
+      : locked && onComplete !== undefined
       ? {
           label: t({
             id: "editor.assignLoop.continueButton",
@@ -3453,8 +3496,33 @@ export function MechanismGallery({
                   qualifying placement candidate exists and hasn't been dismissed.
                   [Accept] pre-fills method + key picker; [Change] dismisses the
                   row so the author can select manually. No kbgen data => null =>
-                  row is absent and gallery behaves exactly as today. */}
-            {suggestion !== null && !suggestionDismissed && (
+                  row is absent and gallery behaves exactly as today.
+                  `currentCharCoveredBySequenceOrComposition` — an ADDITIONAL
+                  gate (bug fix): a character already GREEN via composition
+                  (signal (c)) or via its OWN recorded multi_char_sequence
+                  assignment (a signal (b) SESSION-DIRECT source
+                  `coveredChars` deliberately excludes — see
+                  excludeSequenceMechanisms — so the badge counts it but
+                  `coveredChars` doesn't) must never surface a "suggested"
+                  proposal — there is no single key/method left for a
+                  suggestion to propose. `suggestionDismissed` alone did not
+                  catch either case, since it only tracks explicit
+                  accept/deny or `coveredChars`.
+                  Deliberately NOT the badge's full `count` (which also folds
+                  in signal (a) BASE-DIRECT, `baseOnlyProducedSet`) — that set
+                  is the PRISTINE base only, so in practice this exclusion is
+                  moot for MechanismGallery today, but is kept symmetric with
+                  TouchGallery's matching gate (see that file's own doc
+                  comment for why baseDirect must never gate a suggestion:
+                  its touch equivalent, `baseTouchCoveredSet`, is
+                  session-aware and legitimately includes a character the
+                  "replace"/"longpress" suggestion still needs to prompt
+                  for). */}
+            {suggestion !== null &&
+              !suggestionDismissed &&
+              !(currentChar !== null &&
+                (hasSequenceForChar(sessionAssignments, currentChar) ||
+                  (currentCharBadge?.isComposable ?? false))) && (
               <div
                 role="note"
                 aria-label={t({
@@ -3462,8 +3530,21 @@ export function MechanismGallery({
                   message: "Placement suggestion from kbgen seeder",
                 })}
                 style={{
-                  background: "#0d2218",
-                  border: "1px solid #238636",
+                  // RED, not green — the suggestion row is suppressed only
+                  // when the current character is already covered via a
+                  // recorded SEQUENCE (`hasSequenceForChar`) or via
+                  // COMPOSITION (`currentCharBadge?.isComposable`), per the
+                  // gate above; base coverage (signal (a) BASE-DIRECT,
+                  // `baseOnlyProducedSet`) intentionally does NOT suppress
+                  // it. So this still reads as "not yet implemented",
+                  // matching the badge's own 0-count colors
+                  // (charMechanisms.ts / CharScrollStrip.tsx's `ERROR_RED` +
+                  // its paired dark-red background) rather than the
+                  // "already green" treatment this row previously kept even
+                  // once suggestions were scoped to uncovered characters
+                  // only.
+                  background: ERROR_BG,
+                  border: `1px solid ${ERROR_RED}`,
                   borderRadius: 8,
                   padding: "10px 14px",
                   display: "flex",
@@ -3475,7 +3556,7 @@ export function MechanismGallery({
                   style={{
                     margin: 0,
                     fontSize: 12,
-                    color: "#56d364",
+                    color: ERROR_RED,
                     fontFamily: FONT,
                     fontWeight: 600,
                   }}

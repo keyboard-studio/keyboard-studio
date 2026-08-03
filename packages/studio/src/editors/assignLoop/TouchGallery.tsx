@@ -167,7 +167,7 @@ import { usePositionalCharNav, nearestSurvivingChar, indexOfChar } from "./usePo
 import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
-import { getProducerBadge } from "./parts/charMechanisms.ts";
+import { getProducerBadge, allCharsCovered } from "./parts/charMechanisms.ts";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
 import { ProposalCard } from "./parts/ProposalCard.tsx";
@@ -196,6 +196,7 @@ import {
   galleryConfigStyle as configStyle,
   galleryCardStyle as cardStyle,
 } from "../../lib/galleryTheme.ts";
+import { ERROR_RED, ERROR_BG } from "../../ui/theme.ts";
 
 const selectStyle: CSSProperties = gallerySelectMenuStyle(160);
 
@@ -1291,11 +1292,24 @@ const suggestionDenyBtnStyle: CSSProperties = {
   fontFamily: FONT,
 };
 
-/** Message text style shared by all three suggestion-card variants. */
+/**
+ * Message text style shared by all three suggestion-card variants. RED, not
+ * green — the suggestion card is suppressed only when the current character
+ * is already covered via COMPOSITION (`showChooser`'s own doc comment:
+ * `currentCharBadge?.isComposable`); base/mirror coverage (signal (a),
+ * `touchBaseDirectSet`) intentionally does NOT suppress it — a character
+ * reachable via desktop-mirror inheritance but with no EXPLICIT touch
+ * mechanism yet is exactly the "replace"/"longpress" suggestion's own target
+ * scenario. So this still reads as "not yet implemented", matching the
+ * badge's own 0-count color (`ERROR_RED`, charMechanisms.ts /
+ * CharScrollStrip.tsx) rather than the "already green" treatment this card
+ * previously kept even once suggestions were scoped to uncovered characters
+ * only.
+ */
 const suggestionMessageStyle: CSSProperties = {
   margin: 0,
   fontSize: 12,
-  color: "#56d364",
+  color: ERROR_RED,
   fontFamily: FONT,
   fontWeight: 600,
 };
@@ -2128,6 +2142,113 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutForLintAndGate, inventoryKey, desktopDirectProducedSet]);
 
+  // Own-session TOUCH-modality direct targets — characters `charTouchAssignments`
+  // (THIS session's own charTouch map) already targets with at least one REAL
+  // (non-`touch_inherited`) mechanism, individual scope. Subtracted out of
+  // `directTouchProducedSet` below (`touchBaseDirectSet`) so signal (a)
+  // BASE-DIRECT and signal (b) SESSION-DIRECT (`directProducesCount` over
+  // `charTouchAssignments`, `touchBaseDirectSet`'s own doc comment explains
+  // why) stay DISJOINT once signal (a) is made session-aware. Same
+  // `scope`/`modality`/`touch_inherited` predicate `directProducesCount`
+  // itself applies — kept in sync deliberately, not re-derived loosely.
+  const touchOwnDirectTargets = useMemo<Set<string>>(() => {
+    const out = new Set<string>();
+    for (const a of charTouchAssignments) {
+      if (
+        a.modality === "touch" &&
+        a.scope === "individual" &&
+        a.mechanisms.some((m) => m.patternId !== "touch_inherited")
+      ) {
+        out.add(a.target);
+      }
+    }
+    return out;
+  }, [charTouchAssignments]);
+
+  // LIVE BASE-DIRECT signal (a) source for touch (bug fix — replaces the
+  // FROZEN `baseTouchCoveredSet` at every getProducerBadge/allCharsCovered
+  // call site below and at the CharScrollStrip badge prop). `baseTouchCoveredSet`
+  // is computed once from `detectionSeedLayout`, which deliberately EXCLUDES
+  // this session's own `charTouch` edits (see its own doc comment) — so a
+  // character reachable only via a seed touch key that the author's
+  // "replace" action later overwrote with a DIFFERENT character stayed
+  // reported covered by that set FOREVER, disagreeing with `handleContinue`'s
+  // live gate (`touchCoverage(layoutForLintAndGate, ...)`, which correctly
+  // sees the overwrite) — badge green + Done force-shown, but a click still
+  // got nagged by the "still unimplemented" warning.
+  //
+  // `touchOwnDirectTargets.size === 0` (no real touch edit recorded THIS
+  // session yet) short-circuits to the frozen `baseTouchCoveredSet`
+  // deliberately, not just as an optimization: with zero `charTouch` edits,
+  // NOTHING has happened yet that could make `baseTouchCoveredSet` stale, so
+  // it is still exactly correct — and staying on it here avoids leaning on
+  // `directTouchProducedSet`/`layoutForLintAndGate` for a case they were
+  // never contracted to carry alone (a base whose only in-scope signal is a
+  // desktop-mods replay with zero Phase E edits — see `layoutForLintAndGate`'s
+  // own R11-matrix-driven null/non-null split above).
+  //
+  // Once a real edit exists, `directTouchProducedSet` (derived from
+  // `layoutForLintAndGate`, which DOES bake in every `charTouch` edit —
+  // replace, delete, and brand-new key assignments alike, via
+  // `buildTouchLayoutJson`'s `appliedEdits`) is genuinely live, so a
+  // replaced-away character is correctly absent from it and a desktop-mirrored
+  // character stays present (it unions `desktopDirectProducedSet`). Subtracting
+  // `touchOwnDirectTargets` keeps this DISJOINT from signal (b) SESSION-DIRECT:
+  // without the subtraction, a character assigned a BRAND-NEW touch key this
+  // session would double-count (once via this now-live signal (a), once via
+  // signal (b)), regressing the "0 -> 1" (not "0 -> 2") badge contract the
+  // "Producer-count badge" integration suite pins. A character covered only
+  // via the seed, a desktop-mirror replay, or a since-restored/undeleted
+  // method (none of which are `touchOwnDirectTargets` members) is unaffected
+  // by the subtraction and stays correctly counted here.
+  const touchBaseDirectSet = useMemo<Set<string>>(() => {
+    if (touchOwnDirectTargets.size === 0) return baseTouchCoveredSet;
+    const out = new Set<string>();
+    for (const ch of directTouchProducedSet) {
+      if (!touchOwnDirectTargets.has(ch)) out.add(ch);
+    }
+    return out;
+  }, [baseTouchCoveredSet, directTouchProducedSet, touchOwnDirectTargets]);
+
+  // The current character's 3-signal producer badge (charMechanisms.ts's
+  // getProducerBadge) — the SAME computation CharScrollStrip's own badge and
+  // the SHOW-ALL floor-row check (existingMethodRows below) use, with the
+  // SAME 4 trailing args this gallery already passes to CharScrollStrip
+  // (touchBaseDirectSet, directTouchProducedSet). Hoisted here so the
+  // floor-row check (currentCharBadge?.count ?? 0) below and the isComposable
+  // suggestion gate share one computation rather than each re-deriving it.
+  const currentCharBadge = useMemo(
+    () =>
+      currentChar !== null
+        ? getProducerBadge(
+            currentChar,
+            charTouchAssignments,
+            "touch",
+            touchBaseDirectSet,
+            directTouchProducedSet,
+          )
+        : null,
+    [currentChar, charTouchAssignments, touchBaseDirectSet, directTouchProducedSet],
+  );
+
+  // Whole-inventory "every character is implemented" check (bug fix) — built
+  // on the SAME 3-signal getProducerBadge computation the CharScrollStrip
+  // badge uses, over the FULL SHOW-ALL `inventory` list (not just
+  // touchLettersToAdd — a detected/already-covered char must count as
+  // covered too). Feeds the forward-button JSX below: when true, the Done
+  // button is always rendered regardless of currentChar/walk membership.
+  const allCovered = useMemo(
+    () =>
+      allCharsCovered(
+        inventory,
+        charTouchAssignments,
+        "touch",
+        touchBaseDirectSet,
+        directTouchProducedSet,
+      ),
+    [inventory, charTouchAssignments, touchBaseDirectSet, directTouchProducedSet],
+  );
+
   // "Existing methods" for currentChar — every pre-existing touch method
   // (main key / longpress / multitap / flick) in the BASE touch layout that
   // STILL produces currentChar, mirroring MechanismGallery's desktop
@@ -2249,17 +2370,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // SHOW-ALL floor — currentChar is GREEN (getProducerBadge's count >= 1 —
     // the SAME 3-signal computation CharScrollStrip's badge uses, see
     // charMechanisms.ts) but still has zero rows after everything above.
-    if (
-      currentChar !== null &&
-      rows.length === 0 &&
-      getProducerBadge(
-        currentChar,
-        charTouchAssignments,
-        "touch",
-        baseTouchCoveredSet,
-        directTouchProducedSet,
-      ).count > 0
-    ) {
+    // Reuses the hoisted `currentCharBadge` (declared above, near the
+    // suggestion gate) rather than a second getProducerBadge call for the
+    // same character — one computation, two readers.
+    if (currentChar !== null && rows.length === 0 && (currentCharBadge?.count ?? 0) > 0) {
       rows.push({
         id: `unattributed:${currentChar}`,
         label: appendNotDeletableSuffix(
@@ -2281,8 +2395,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     i18n,
     currentChar,
     baseTouchCoveredSet,
-    directTouchProducedSet,
-    charTouchAssignments,
+    currentCharBadge,
   ]);
 
   // Restore affordance (FIX: deleteTouchKey was previously one-way in the UI
@@ -3231,7 +3344,81 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // When there is no suggestion to offer for the current character, skip the
   // suggestion card entirely and show the method chooser directly. Otherwise the
   // chooser appears once the suggestion is accepted or dismissed.
-  const showChooser = suggestionDismissed || suggestion.kind === "none";
+  // `currentCharBadge?.isComposable` — an ADDITIONAL gate (bug fix): a
+  // character already GREEN purely via COMPOSITION (signal (c) — its NFD
+  // components are all separately reachable) must never surface a
+  // "suggested" proposal — the badge already reports it covered, and there
+  // is no single key/method left for a suggestion to propose.
+  // `suggestionDismissed` alone did not catch this, since it only tracks
+  // explicit accept/deny or `charTouch` (this gallery's own direct-assignment
+  // set), not composability.
+  //
+  // Deliberately NOT gated on the badge's full `count` (which also folds in
+  // signal (a) BASE-DIRECT, `touchBaseDirectSet`): that set is LIVE and
+  // session-aware — it already includes a character reachable only because
+  // THIS session's own desktop assignment was replayed onto the touch seed
+  // (spec 035 R3), or because the live rendered touch layout reaches it some
+  // other way. That is exactly the "replace"/"longpress" suggestion's own
+  // target scenario (a character reachable via desktop-mirror inheritance
+  // but not yet an EXPLICIT touch mechanism) — gating on the full count would
+  // suppress that legitimate, already-tested suggestion. Signal (b)
+  // SESSION-DIRECT is not tested separately either: for touch it can only
+  // come from `charTouchAssignments` (built from `charTouch` itself), so it
+  // never disagrees with `suggestionDismissed`'s own `charTouch.has(...)`
+  // check above.
+  const showChooser =
+    suggestionDismissed || suggestion.kind === "none" || (currentCharBadge?.isComposable ?? false);
+
+  // ---------------------------------------------------------------------------
+  // Forward-button spec — mirrors MechanismGallery's ForwardButtonSpec.
+  // ---------------------------------------------------------------------------
+
+  interface TouchForwardButtonSpec {
+    label: string;
+    ariaLabel: string;
+    onClick: () => void;
+    disabled: boolean;
+  }
+
+  const touchDoneLabel = t({ id: "editor.assignLoop.doneButton", message: "Done" });
+  const touchForwardButton: TouchForwardButtonSpec | null =
+    // TOP PRIORITY (bug fix): once every inventory character has count >= 1
+    // (allCovered, the SAME badge computation CharScrollStrip/currentCharBadge
+    // use), the Done button is ALWAYS rendered — regardless of currentChar or
+    // its walk (touchLettersToAdd) membership. Previously this button was
+    // hidden entirely for a currentChar outside touchLettersToAdd (e.g. an
+    // already-detected character reached via the SHOW-ALL CharScrollStrip),
+    // which could strand an author who had, in fact, finished every
+    // character — there was no visible way to advance. Falls through to the
+    // existing branch unchanged whenever any character is still count 0.
+    // `onComplete` is a required TouchGalleryProps field (always defined),
+    // unlike MechanismGallery's optional one, so there is no separate
+    // undefined check here.
+    allCovered
+      ? {
+          label: touchDoneLabel,
+          ariaLabel: touchDoneLabel,
+          onClick: handleContinue,
+          disabled: false,
+        }
+      : currentChar !== null && touchLettersToAdd.includes(currentChar)
+        ? {
+            label: hasAnotherCharAfterCurrent
+              ? t({
+                  id: "editor.assignLoop.nextCharacterButton",
+                  message: "Next character →",
+                })
+              : touchDoneLabel,
+            ariaLabel: hasAnotherCharAfterCurrent
+              ? t({
+                  id: "editor.assignLoop.nextCharacterAriaLabel",
+                  message: "Next character",
+                })
+              : touchDoneLabel,
+            onClick: handleNext,
+            disabled: !canGoNext,
+          }
+        : null;
 
   // ---------------------------------------------------------------------------
   // Guard: no inventory
@@ -3382,18 +3569,21 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
           selectable for inspection, it is just never a walk stop. Each
           chip's badge is the 3-signal producer count for that character in
           THIS gallery's modality (touch) — see charMechanisms.ts's
-          getProducerBadge. `baseTouchCoveredSet` (signal (a), the pre-augment
-          seed-only covered set) and `directTouchProducedSet` (signal (c)'s
-          composition input, pre-augment + session-aware) feed that count so
-          a character already reachable on the seed touch layout, OR
-          composable from this session's own touch/desktop edits (e.g. a
-          precomposed char whose base + combining mark were each assigned a
-          method this session), badges as produced (>=1) rather than red 0 —
-          both before and after its suggestion is accepted (the accepted
-          touch_inherited placeholder is still not counted, so accepting
-          cannot double-count it). A character reachable BOTH by its own key
-          AND by composition now badges 2, not 1 (deletion-safety signal, per
-          product decision) — see getProducerBadge's own doc comment. */}
+          getProducerBadge. `touchBaseDirectSet` (signal (a), the LIVE
+          direct-reachability set — see that memo's own doc comment for why
+          it is live rather than the frozen `baseTouchCoveredSet`, and how it
+          stays disjoint from signal (b)) and `directTouchProducedSet`
+          (signal (c)'s composition input, pre-augment + session-aware) feed
+          that count so a character already reachable on the seed touch
+          layout, OR composable from this session's own touch/desktop edits
+          (e.g. a precomposed char whose base + combining mark were each
+          assigned a method this session), badges as produced (>=1) rather
+          than red 0 — both before and after its suggestion is accepted (the
+          accepted touch_inherited placeholder is still not counted, so
+          accepting cannot double-count it). A character reachable BOTH by
+          its own key AND by composition now badges 2, not 1
+          (deletion-safety signal, per product decision) — see
+          getProducerBadge's own doc comment. */}
       {inventory.length > 0 && (
         <CharScrollStrip
           chars={inventory}
@@ -3401,7 +3591,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
           onSelectChar={handleSelectDisplayChar}
           assignments={charTouchAssignments}
           modality="touch"
-          baseDirectSet={baseTouchCoveredSet}
+          baseDirectSet={touchBaseDirectSet}
           preAugmentSessionAwareSet={directTouchProducedSet}
         />
       )}
@@ -3414,8 +3604,23 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
           per-char block's toolbar below never renders while currentChar is
           null, and handleBack/handleNext are gated on `list.includes` (empty
           touchLettersToAdd), so this panel calls onBack/handleContinue
-          directly rather than going through those. */}
-      {totalChars === 0 && (
+          directly rather than going through those.
+          `&& currentChar === null` (pre-existing gap, fixed here): totalChars
+          (touchLettersToAdd.length) being 0 does not mean currentChar stays
+          null forever — the SHOW-ALL CharScrollStrip can still set it via
+          handleSelectDisplayChar (e.g. inspecting a detected-but-walk-excluded
+          character), independently of the walk. Without this guard, that
+          selection left THIS panel mounted (rendering its own
+          `data-testid="touch-continue"` Done button unconditionally)
+          alongside the per-char block below's OWN `touchForwardButton`
+          (same testid), which can ALSO render once `currentChar !== null` —
+          two elements sharing one test id. The per-char block's
+          `touchForwardButton` already reproduces this panel's Done affordance
+          whenever `allCovered` is true (see its own doc comment), so gating
+          this panel to `currentChar === null` loses no coverage: once a
+          selection sets `currentChar`, the per-char block becomes the single
+          source for the forward action. */}
+      {totalChars === 0 && currentChar === null && (
         <div
           style={{
             display: "flex",
@@ -3544,49 +3749,38 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               }}
             >
               {/* HIDE this button entirely (rather than render it disabled)
-                  when currentChar is outside touchLettersToAdd — mirrors
+                  when currentChar is outside touchLettersToAdd AND the whole
+                  inventory isn't yet fully covered — mirrors
                   MechanismGallery's forwardButton gating: currentChar can now
                   be a detected/already-covered character selected via the
                   SHOW-ALL CharScrollStrip (handleSelectDisplayChar), and the
                   walk's own Next/Done isn't a "global Next" for that
                   inspection — a disabled render would look like the walk is
                   stuck rather than simply "you're inspecting a character
-                  outside this step's coverage". */}
-              {currentChar !== null && touchLettersToAdd.includes(currentChar) && (
+                  outside this step's coverage". `touchForwardButton` (see its
+                  own doc comment above) is null in exactly that case;
+                  otherwise (including the TOP-PRIORITY allCovered case) it
+                  carries the label/handler/disabled state to render. */}
+              {touchForwardButton !== null && (
                 <button
                   type="button"
                   data-testid="touch-continue"
-                  onClick={handleNext}
-                  disabled={!canGoNext}
-                  aria-label={
-                    hasAnotherCharAfterCurrent
-                      ? t({
-                          id: "editor.assignLoop.nextCharacterAriaLabel",
-                          message: "Next character",
-                        })
-                      : t({
-                          id: "editor.assignLoop.doneButton",
-                          message: "Done",
-                        })
-                  }
+                  onClick={touchForwardButton.onClick}
+                  disabled={touchForwardButton.disabled}
+                  aria-label={touchForwardButton.ariaLabel}
                   style={{
                     padding: "9px 20px",
-                    background: canGoNext ? "#238636" : "#21262d",
+                    background: !touchForwardButton.disabled ? "#238636" : "#21262d",
                     border: "none",
                     borderRadius: 6,
-                    color: canGoNext ? "#e6edf3" : TEXT_DIM,
+                    color: !touchForwardButton.disabled ? "#e6edf3" : TEXT_DIM,
                     fontSize: 13,
                     fontWeight: 600,
-                    cursor: canGoNext ? "pointer" : "not-allowed",
+                    cursor: !touchForwardButton.disabled ? "pointer" : "not-allowed",
                     fontFamily: FONT,
                   }}
                 >
-                  {hasAnotherCharAfterCurrent
-                    ? t({
-                        id: "editor.assignLoop.nextCharacterButton",
-                        message: "Next character →",
-                      })
-                    : t({ id: "editor.assignLoop.doneButton", message: "Done" })}
+                  {touchForwardButton.label}
                 </button>
               )}
             </div>
@@ -3693,8 +3887,11 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 message: "Touch access method suggestion",
               })}
               style={{
-                background: "#0d2218",
-                border: "1px solid #238636",
+                // RED, not green — see suggestionMessageStyle's own doc
+                // comment for why (suppressed only for a composition-covered
+                // character; base/mirror coverage does not suppress it).
+                background: ERROR_BG,
+                border: `1px solid ${ERROR_RED}`,
                 borderRadius: 8,
                 padding: "10px 14px",
                 display: "flex",

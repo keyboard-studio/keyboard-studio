@@ -44,7 +44,7 @@ import {
 } from "../../steps/reducer.ts";
 import type { EditorStep, Step } from "../../steps/types.ts";
 import type { Pattern, PatternLibraryService, VirtualFS } from "@keyboard-studio/contracts";
-import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
+import { createVirtualFS, irPath, ARRAY_INDEX, makePlacementMap } from "@keyboard-studio/contracts";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { latinDeadkeyAcuteSingle } from "@keyboard-studio/contracts/fixtures";
 import { corpusBackedQwerty } from "@keyboard-studio/contracts/fixtures";
@@ -2377,6 +2377,221 @@ describe("MechanismGallery — Back after skipping the only character", () => {
     expect(backBtn).toBeTruthy();
     fireEvent.click(backBtn);
     expect(onBack).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// kbgen suggestion row — gated on the current character's producer badge
+// (bug fix: a char already green via composition must not ALSO show a
+// stale "suggested" proposal — there's no single key left for it to propose).
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — kbgen suggestion gated on the current char's producer badge", () => {
+  it("hides the suggestion for a composition-covered character (ǯ, badge count >= 1) and shows it for a plain uncovered character (count === 0) in the same session", async () => {
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+
+    // "ǯ" is composable from a session-produced ezh + that SAME deadkey's
+    // session-produced bare caron byproduct (identical fixture shape to the
+    // badge-count pins above) — no assignment of its own, badge count 1.
+    // "à" stays completely uncovered (badge count 0).
+    seedInventory(["ʒ", "̌", "ǯ", "à"]);
+
+    const producesEzhAndCaronByproduct: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: PATTERN_DEADKEY,
+          strategyId: "S-02",
+          slotValues: {
+            triggerKey: "K_QUOTE",
+            baseLetters: "z",
+            accentedForms: "ʒ",
+            accentChar: "̌",
+          },
+        },
+      ],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      assignments: [producesEzhAndCaronByproduct],
+    });
+
+    // A placement map offering a (would-be) suggestion for BOTH "ǯ" (should
+    // be suppressed by the badge) and "à" (should still show — count 0).
+    const placementMap = makePlacementMap({
+      bcp47Context: "test",
+      baseLayoutFamily: "QWERTY",
+      entries: [
+        {
+          codepoint: "U+01EF", // ǯ
+          candidates: [
+            {
+              vkey: "K_9",
+              modifiers: ["RALT"],
+              mechanism: "direct",
+              priorSource: "corpus",
+              priorCount: 3,
+              confidence: 0.8,
+            },
+          ],
+        },
+        {
+          codepoint: "U+00E0", // à
+          candidates: [
+            {
+              vkey: "K_A",
+              modifiers: ["RALT"],
+              mechanism: "direct",
+              priorSource: "corpus",
+              priorCount: 4,
+              confidence: 0.88,
+            },
+          ],
+        },
+      ],
+    });
+
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} placementMap={placementMap} />,
+      );
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+
+    // "ǯ" — composable (badge green 1, no own assignment): the placement map
+    // has a candidate for it, but the suggestion row must NOT render.
+    fireEvent.click(within(strip).getByTestId("char-scroll-chip-01EF"));
+    await waitFor(() => {
+      expectCurrentChar("ǯ");
+    });
+    expect(screen.queryByText(/Suggested: Right Alt \+ 9 for ǯ/i)).toBeNull();
+
+    // "à" — plain uncovered (badge count 0): the SAME placement map's
+    // suggestion for it DOES render.
+    fireEvent.click(within(strip).getByTestId("char-scroll-chip-00E0"));
+    await waitFor(() => {
+      expectCurrentChar("à");
+    });
+    expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Forward button — forced visible/enabled once the whole inventory is
+// covered, even when currentChar is outside lettersToAdd's walk (bug fix).
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — Done button forced visible when the whole inventory is covered", () => {
+  it("shows an ENABLED Done button when every inventory character has count >= 1, even navigated to an already-produced character outside lettersToAdd (previously hidden)", async () => {
+    const ruleZ: IRRule = {
+      nodeId: "r-z",
+      context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [ruleZ],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+
+    // "z" is directly produced by the base (badge count via signal (a)) —
+    // stays OUT of lettersToAdd. "y" is in lettersToAdd; give it its own
+    // session assignment so its badge count is also >= 1 — every inventory
+    // character is now covered.
+    seedInventory(["y", "z"]);
+    const yAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "y",
+      modality: "physical",
+      mechanisms: [{ patternId: PATTERN_SWAP, slotValues: { kmnRules: "+ [K_Y] > 'y'" } }],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      assignments: [yAssignment],
+    });
+
+    const onComplete = vi.fn();
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />,
+      );
+    });
+
+    // Navigate to "z" via the SHOW-ALL strip — outside lettersToAdd (["y"]
+    // only), the scenario that previously hid the forward button entirely.
+    fireEvent.click(screen.getByTestId("char-scroll-chip-007A"));
+    await waitFor(() => {
+      expectCurrentChar("z");
+    });
+
+    // The Done button is FORCED visible and enabled — the whole inventory
+    // (both "y" and "z") is covered.
+    const doneBtn = screen.getByTestId("mechanisms-continue");
+    expect(doneBtn.textContent).toMatch(/Done/i);
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(doneBtn);
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  it("does NOT force-show the Done button when at least one character is still count === 0, even when navigated to an already-produced character outside lettersToAdd", async () => {
+    const ruleZ: IRRule = {
+      nodeId: "r-z",
+      context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [ruleZ],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+
+    // "z" is directly produced by the base; "y" stays in lettersToAdd with
+    // NO session assignment at all — count 0, so the inventory is NOT fully
+    // covered.
+    seedInventory(["y", "z"]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />);
+    });
+
+    // Navigate to "z" — outside lettersToAdd (["y"]).
+    fireEvent.click(screen.getByTestId("char-scroll-chip-007A"));
+    await waitFor(() => {
+      expectCurrentChar("z");
+    });
+
+    // Not fully covered ("y" is still count 0) — the forward button stays
+    // hidden entirely, exactly as before this fix.
+    expect(screen.queryByTestId("mechanisms-continue")).toBeNull();
   });
 });
 

@@ -148,6 +148,32 @@ export function getProducerBadge(
 }
 
 /**
+ * Whole-inventory coverage check built directly on `getProducerBadge` — true
+ * only when EVERY character in `chars` has `count >= 1` (produced by at
+ * least one of the badge's three signals). Takes the SAME 4 trailing args
+ * (`assignments`, `modality`, `baseDirectSet`, `preAugmentSessionAwareSet`)
+ * each gallery already passes to `getProducerBadge`/`CharScrollStrip`, so
+ * this reads the identical per-character signal the badge itself shows —
+ * it can never diverge into a stale "all done" state the badges disagree
+ * with. Used to decide whether the forward Done button should be forced
+ * visible regardless of the current walk position (see MechanismGallery.tsx's
+ * and TouchGallery.tsx's own forward-button call sites).
+ */
+export function allCharsCovered(
+  chars: ReadonlyArray<string>,
+  assignments: ReadonlyArray<MechanismAssignment>,
+  modality: Modality,
+  baseDirectSet: ReadonlySet<string>,
+  preAugmentSessionAwareSet: ReadonlySet<string>,
+): boolean {
+  return chars.every(
+    (char) =>
+      getProducerBadge(char, assignments, modality, baseDirectSet, preAugmentSessionAwareSet)
+        .count >= 1,
+  );
+}
+
+/**
  * Compute both halves of the PRODUCES/USES split for `char` from
  * `assignments`. This function does not know where assignments come from,
  * only how to classify them — callers pass whichever list holds the
