@@ -24,10 +24,12 @@ import {
   DecisionEntrySchema,
   makeEmptyDecisionRecord,
   type DecisionEntry,
+  type DecisionFileChange,
   type DecisionImpact,
   type DecisionRecord,
   type DiffHunk,
 } from "@keyboard-studio/contracts";
+import { normalizeDecisionRecord, type PreMigrationDecisionRecord } from "./recordMigration.js";
 
 /** Outcome of a tolerant read. */
 export interface ParseDecisionRecordResult {
@@ -58,14 +60,24 @@ function serializeHunk(hunk: DiffHunk): unknown {
   };
 }
 
+function serializeFileChange(change: DecisionFileChange): unknown {
+  return {
+    path: change.path,
+    hunks: change.hunks.map(serializeHunk),
+    magnitude: { added: change.magnitude.added, removed: change.magnitude.removed },
+  };
+}
+
 function serializeImpact(impact: DecisionImpact): unknown {
   switch (impact.state) {
     case "captured":
       return {
         state: impact.state,
-        path: impact.path,
-        hunks: impact.hunks.map(serializeHunk),
+        files: impact.files.map(serializeFileChange),
         magnitude: { added: impact.magnitude.added, removed: impact.magnitude.removed },
+        // Written only when present, same convention as `provenance.source`
+        // below: absent and "solely responsible" are the same fact.
+        ...(impact.sharedWith !== undefined ? { sharedWith: [...impact.sharedWith] } : {}),
       };
     case "none":
       return { state: impact.state };
@@ -87,18 +99,41 @@ function serializeEntry(entry: DecisionEntry): unknown {
           answerType: entry.payload.answerType,
           value: Array.isArray(entry.payload.value) ? [...entry.payload.value] : entry.payload.value,
         }
-      : {
-          kind: entry.payload.kind,
-          actionType: entry.payload.actionType,
-          summary: {
-            keysRemoved: entry.payload.summary.keysRemoved,
-            keysAdded: entry.payload.summary.keysAdded,
-            mechanismsAssigned: entry.payload.summary.mechanismsAssigned,
-            touchKeysAffected: entry.payload.summary.touchKeysAffected,
-            sample: [...entry.payload.summary.sample],
-            sampleTruncated: entry.payload.summary.sampleTruncated,
-          },
-        };
+      : entry.payload.kind === "editor-action"
+        ? {
+            kind: entry.payload.kind,
+            actionType: entry.payload.actionType,
+            summary: {
+              // Optional per specs/055 FR-005a: written only when the producer
+              // actually measured the dimension. `JSON.stringify` drops an
+              // `undefined`-valued property on its own, so an unmeasured count
+              // is simply absent from the serialized form, never a written `0`.
+              keysRemoved: entry.payload.summary.keysRemoved,
+              keysAdded: entry.payload.summary.keysAdded,
+              mechanismsAssigned: entry.payload.summary.mechanismsAssigned,
+              touchKeysAffected: entry.payload.summary.touchKeysAffected,
+              sample: [...entry.payload.summary.sample],
+              sampleTruncated: entry.payload.summary.sampleTruncated,
+            },
+          }
+        : {
+            // base-contribution (specs/055-legible-decision-trail D-11),
+            // written by the studio's recordBaseContribution.ts at
+            // `choose_base` completion. `startingKeyCount` is optional and is
+            // emitted through the same `JSON.stringify`-drops-`undefined` route
+            // the editor counts above rely on, so an unmeasured count is absent
+            // rather than a written `0` (FR-005a).
+            kind: entry.payload.kind,
+            baseId: entry.payload.baseId,
+            baseDisplayName: entry.payload.baseDisplayName,
+            startingKeyCount: entry.payload.startingKeyCount,
+            derivedAxes: [...entry.payload.derivedAxes],
+            inheritedMetadata: entry.payload.inheritedMetadata.map((m) => ({
+              field: m.field,
+              value: m.value,
+            })),
+            instantiationMode: entry.payload.instantiationMode,
+          };
 
   return {
     entryId: entry.entryId,
@@ -157,6 +192,42 @@ function unreadable(): ParseDecisionRecordResult {
 }
 
 /**
+ * Migrate one raw candidate entry to the v2 shape BEFORE schema validation,
+ * for a record whose declared `version` is older than
+ * {@link DECISION_RECORD_VERSION}.
+ *
+ * This has to happen ahead of `DecisionEntrySchema.safeParse`, not after: the
+ * v2 schema's `DecisionImpactSchema` requires a non-empty `files` array, so a
+ * v1 entry's flat `path`/`hunks`/`magnitude` capture fails validation
+ * outright and would otherwise be dropped and counted in `droppedCount`
+ * before `normalizeDecisionRecord` ever saw it — silently discarding exactly
+ * the captured impact this migration exists to carry forward (specs/055
+ * T008 blocking finding).
+ *
+ * Wrapped in a singleton record and a try/catch so one malformed candidate
+ * cannot poison a sibling's migration and cannot break the "never throws"
+ * contract of {@link parseDecisionRecord}: a candidate too malformed to
+ * normalize (missing `payload`, not an object, etc.) is handed to the schema
+ * UNCHANGED, where it fails validation and is dropped exactly as it would
+ * have been without this step.
+ */
+function migrateRawEntryIfPreV2(candidate: unknown, version: number): unknown {
+  if (version >= DECISION_RECORD_VERSION) return candidate;
+  try {
+    const wrapped: PreMigrationDecisionRecord = {
+      format: DECISION_RECORD_FORMAT,
+      version,
+      keyboardId: null,
+      entries: [candidate as PreMigrationDecisionRecord["entries"][number]],
+      truncated: null,
+    };
+    return normalizeDecisionRecord(wrapped).entries[0];
+  } catch {
+    return candidate;
+  }
+}
+
+/**
  * Read a decision record, salvaging whatever validates.
  *
  * Never throws. Never rejects a record for having an unfamiliar `version`: a
@@ -198,7 +269,8 @@ export function parseDecisionRecord(text: string | null | undefined): ParseDecis
   const seenIds = new Set<string>();
   let droppedCount = 0;
   for (const candidate of rawEntries) {
-    const parsed = DecisionEntrySchema.safeParse(candidate);
+    const migrated = migrateRawEntryIfPreV2(candidate, version);
+    const parsed = DecisionEntrySchema.safeParse(migrated);
     if (!parsed.success) {
       droppedCount++;
       continue;
@@ -233,7 +305,15 @@ export function parseDecisionRecord(text: string | null | undefined): ParseDecis
   return {
     record: {
       format: DECISION_RECORD_FORMAT,
-      version,
+      // A pre-v2 record has had every surviving entry migrated to the v2 shape
+      // by `migrateRawEntryIfPreV2` above, so the record returned here IS a v2
+      // record and must say so. Handing back the stale `1` would re-fire that
+      // migration on the next read — over entries appended in between, whose
+      // counts were genuinely measured — and strip them (FR-005a). An
+      // unrecognised FUTURE version is passed through untouched: contract §5
+      // row 3 reads a newer build's record entry by entry without claiming it
+      // as this build's own format.
+      version: version < DECISION_RECORD_VERSION ? DECISION_RECORD_VERSION : version,
       keyboardId,
       entries: repaired,
       truncated,

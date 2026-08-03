@@ -8,6 +8,7 @@ import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 export const definition = {
   id: "pb_standard_letters",
   prompt: "Which best describes the letters your language uses?",
+  audit_label: "Alphabet type",
   help_text:
     "Think about the alphabet your language is written in. Pick the option " +
     "that best matches. If you are not sure, pick the closest one and you " +

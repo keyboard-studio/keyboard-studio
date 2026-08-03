@@ -122,7 +122,7 @@ import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { collate } from "../../survey/collation.ts";
 import {
   promoteOnManualEdit,
-  casePairTouchLayer,
+  casePairTouchTarget,
   type TouchLayerId,
 } from "./touchBehavior.ts";
 import {
@@ -2287,15 +2287,22 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // (optionsForTouchLayerSlot) already prevents an internally
   // exclusion-inconsistent selection from being constructible through the
   // UI, so the catch branch is defensive only.
-  const filledLayerTokens = layerTokens.filter(
-    (tok): tok is ModifierToken => tok !== "",
-  );
-  let assembledLayerCombo: ModifierToken[];
-  try {
-    assembledLayerCombo = canonicalizeCombo(filledLayerTokens);
-  } catch {
-    assembledLayerCombo = filledLayerTokens;
-  }
+  //
+  // Memoized because this array is a DEPENDENCY of `handleApply` and the
+  // case-pair path, where it replaced the previously-stable string
+  // `editingLayer`. A freshly-built array every render would re-create those
+  // callbacks on every unrelated re-render; `layerTokens` is state, so a new
+  // reference here means the author actually changed a slot.
+  const assembledLayerCombo = useMemo<ModifierToken[]>(() => {
+    const filled = layerTokens.filter(
+      (tok): tok is ModifierToken => tok !== "",
+    );
+    try {
+      return canonicalizeCombo(filled);
+    } catch {
+      return filled;
+    }
+  }, [layerTokens]);
 
   // Applicability (requirement 4): the empty combo (no slots filled) is
   // always valid — it's the base/default layer, which every desktop
@@ -2409,14 +2416,15 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // ---------------------------------------------------------------------------
 
   /**
-   * The touch layer the author is editing — the builder's assembled combo
-   * (`layerTouchId`) for all four methods, which now all carry the same
-   * touch-layer combo builder (see the module-level TouchLayerBuilder doc).
-   * Widens `casePairTouchLayer`'s mapping rather than rewriting the proposal
-   * site, exactly as anticipated when this was still hardcoded to
-   * longpress/flick only.
+   * Is `combo` one this keyboard actually defines? Same membership test
+   * `layerComboValid` uses, in the shape `casePairTouchTarget` consumes — it
+   * gates the compound case-pair candidates (e.g. SHIFT+RAlt) so the proposal
+   * never targets a touch layer the keyboard has no combo for.
    */
-  const editingLayer: TouchLayerId = layerTouchId;
+  const isLayerComboInUse = useCallback(
+    (combo: readonly ModifierToken[]) => validLayerComboKeys.has(combo.join("+")),
+    [validLayerComboKeys],
+  );
 
   const {
     proposal: casePairProposal,
@@ -2798,16 +2806,23 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // regardless of the bulk sibling-accent path below, since a "replace"
     // suggestion (desktop simple_swap) or a longpress with no siblings to
     // offer still deserves the simple companion.
-    const targetLayer = casePairTouchLayer(editingLayer);
+    //
+    // Passed the assembled COMBO, not the flattened layer id — same reason
+    // handleApply below is: the flattened id cannot express "this combo plus
+    // SHIFT", which is what the case-pair relation actually is (see
+    // casePairTouchTarget).
+    const target = casePairTouchTarget(assembledLayerCombo, isLayerComboInUse);
+    const targetLayer = target?.layer;
     const companionInput:
       | Extract<CasePairProposalInput, { mechanism: "touch" }>
       | null =
-      targetLayer !== null
+      target !== null
         ? {
             mechanism: "touch",
             originalChar: currentChar,
             hostKey: hk,
-            targetLayer,
+            targetLayer: target.layer,
+            targetLayerLabel: touchLayerComboLabel(target.combo, i18n),
             baseRef: ref,
             alreadyProduced: (counterpart) =>
               (charTouch.get(counterpart)?.mechanisms ?? []).some((m) => {
@@ -2859,10 +2874,12 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     currentChar,
     markSuggestionResolved,
     inventoryKey,
-    editingLayer,
+    assembledLayerCombo,
+    isLayerComboInUse,
     charTouch,
     identityBcp47,
     proposeCompanion,
+    i18n,
   ]);
 
   const handleSuggestionChange = useCallback(() => {
@@ -2889,18 +2906,28 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
     // Case-pair proposal (FR-005): offer the capital on the casing-parallel
     // layer of the layer being edited. Suppressed when that layer has no
-    // parallel (already a shift/caps layer), and by the hook itself when the
-    // character has no confident capital. Deliberately independent of
+    // parallel (already a shift/caps layer) or when the parallel is a combo
+    // this keyboard does not define, and by the hook itself when the character
+    // has no confident capital. Deliberately independent of
     // `suggestionResolved`, which governs the placement-suggestion card — a
     // different object entirely.
-    const targetLayer = casePairTouchLayer(editingLayer);
-    if (targetLayer !== null && resolvedHostKey !== null) {
+    //
+    // Passed the assembled COMBO, not `layerTouchId` — the flattened id cannot
+    // express "this combo plus SHIFT", which is what the case-pair relation
+    // actually is (see casePairTouchTarget).
+    const target = casePairTouchTarget(assembledLayerCombo, isLayerComboInUse);
+    if (target !== null && resolvedHostKey !== null) {
       const hk = resolvedHostKey;
+      const targetLayer = target.layer;
       proposeCompanion({
         mechanism: "touch",
         originalChar: currentChar,
         hostKey: hk,
         targetLayer,
+        // Labelled from the target's own combo through the same helper the
+        // builder's "Resulting layer:" preview uses, so the banner names
+        // exactly the layer the confirm will write to.
+        targetLayerLabel: touchLayerComboLabel(target.combo, i18n),
         // Object identity, not target/index (FR-008).
         baseRef: ref,
         // "Counterpart already placed" (spec §Edge Cases): the capital is
@@ -2946,8 +2973,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     flickDirection,
     layerTokens,
     charTouch,
-    editingLayer,
+    assembledLayerCombo,
+    isLayerComboInUse,
     proposeCompanion,
+    i18n,
   ]);
 
   // "Skip this character" is pure forward navigation — it records nothing,

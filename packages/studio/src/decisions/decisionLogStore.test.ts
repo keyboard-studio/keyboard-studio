@@ -6,13 +6,19 @@
 // decision fields are ever rewritten in place.
 
 import { beforeEach, describe, expect, it } from "vitest";
-import type { DecisionEntry, DecisionPayload } from "@keyboard-studio/contracts";
+import {
+  DECISION_RECORD_VERSION,
+  type DecisionEntry,
+  type DecisionPayload,
+} from "@keyboard-studio/contracts";
+import { parseDecisionRecord, serializeDecisionRecord } from "@keyboard-studio/engine";
 import {
   chainTip,
   liveEntryForSlot,
   payloadsEqual,
   resetDecisionEntryIds,
   slotKeyOf,
+  snapshotDecisionRecord,
   useDecisionLogStore,
 } from "./decisionLogStore.ts";
 
@@ -232,12 +238,73 @@ describe("hydrate", () => {
     const next = store.append({ stepId: "carve", payload: carve(1), provenance: HAND_SET });
     expect(next).toBe("d8");
   });
+
+  it("re-tags a restored pre-v2 record as v2, so a later reload cannot re-migrate it", () => {
+    // The chain this guards: a restored v1 draft that stays TAGGED v1 in the
+    // store gets snapshotted by draftPersistence under that tag, so the next
+    // `parseDecisionRecord` re-runs the v1 migration — which omits all four
+    // editor counts unconditionally — over the entries appended in between.
+    // Those counts were genuinely measured by this build, and erasing them is
+    // exactly the fabricated-absence FR-005a forbids. Asserting on the record's
+    // version is asserting that the loop cannot start.
+    const store = useDecisionLogStore.getState();
+    store.hydrate({
+      format: "keyboard-studio.decision-record",
+      version: 1,
+      keyboardId: "hausa_std",
+      entries: [],
+      truncated: null,
+    });
+    expect(useDecisionLogStore.getState().record.version).toBe(DECISION_RECORD_VERSION);
+
+    // A measured entry appended after the restore, snapshotted and read back the
+    // way draftPersistence does it, keeps its counts.
+    store.append({ stepId: "carve", payload: carve(3, ["K_A"]), provenance: HAND_SET });
+    const reread = parseDecisionRecord(
+      serializeDecisionRecord(snapshotDecisionRecord()),
+    ).record;
+    const appended = reread.entries.at(-1)!;
+    if (appended.payload.kind !== "editor-action") throw new Error("expected editor-action");
+    expect(appended.payload.summary.keysRemoved).toBe(3);
+  });
+
+  it("keeps a newer build's higher version rather than pinning it down to this one", () => {
+    // Contract §5 row 3: a record from a future build is read entry by entry, not
+    // re-labelled as this build's format. The v2 floor above must not become a
+    // ceiling.
+    useDecisionLogStore.getState().hydrate({
+      format: "keyboard-studio.decision-record",
+      version: 99,
+      keyboardId: null,
+      entries: [],
+      truncated: null,
+    });
+    expect(useDecisionLogStore.getState().record.version).toBe(99);
+  });
 });
 
 describe("pure helpers", () => {
   it("slotKeyOf separates questions from editors within a step", () => {
     expect(slotKeyOf("s", answer("q", "1"))).not.toBe(slotKeyOf("s", carve(1)));
     expect(slotKeyOf("s", answer("q", "1"))).toBe(slotKeyOf("s", answer("q", "2")));
+  });
+
+  it("slotKeyOf cannot be collided by an id that contains the key's own structure", () => {
+    // The delimiter is `U+0000`, which no identifier can contain — so the key is
+    // injective by construction rather than by a convention about how stepIds and
+    // questionIds happen to be spelled today. This test is the guard on that
+    // choice: with a PRINTABLE delimiter (a space, say), the two triples below
+    // would compose the same key, and one decision would silently supersede an
+    // unrelated one — quietly breaking the append-only supersession invariant
+    // this module's header calls the whole point.
+    const shifted = slotKeyOf("step q inner", answer("outer", "v"));
+    const straight = slotKeyOf("step", answer("inner q outer", "v"));
+    expect(shifted).not.toBe(straight);
+
+    // And across the two branches: under a space delimiter these compose the
+    // identical key ("s q e gallery_edit"), so a survey answer and an editor
+    // action would share one slot and supersede each other.
+    expect(slotKeyOf("s", answer("e gallery_edit", "v"))).not.toBe(slotKeyOf("s q", carve(1)));
   });
 
   it("payloadsEqual compares char-list values element-wise", () => {

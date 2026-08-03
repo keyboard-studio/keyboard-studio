@@ -134,4 +134,65 @@ describe("content-i18n-lint flowQuestions parity (spec 050 T013/T014)", () => {
     const { problems } = runFlowQuestions(dir);
     expect(problems).toEqual([]);
   });
+
+  describe("audit_label per-key optionality (spec 055 research.md D8)", () => {
+    it("does not flag a target locale that omits an audit_label key", () => {
+      const dir = tempContentI18nDir();
+      writeFileSync(
+        join(dir, "en", "flowQuestions.json"),
+        JSON.stringify({
+          "content.flowQuestion.q1.prompt": "Prompt one",
+          "content.flowQuestion.q1.audit_label": "Label one",
+        }),
+      );
+      // fr has started the catalog but has not authored audit_label yet.
+      writeFileSync(
+        join(dir, "fr", "flowQuestions.json"),
+        JSON.stringify({ "content.flowQuestion.q1.prompt": "Invite une" }),
+      );
+
+      const { problems } = runFlowQuestions(dir);
+      expect(problems).toEqual([]);
+    });
+
+    it("still flags a target locale missing a non-audit_label key alongside a missing audit_label", () => {
+      const dir = tempContentI18nDir();
+      writeFileSync(
+        join(dir, "en", "flowQuestions.json"),
+        JSON.stringify({
+          "content.flowQuestion.q1.prompt": "Prompt one",
+          "content.flowQuestion.q1.audit_label": "Label one",
+        }),
+      );
+      // fr is missing both keys — audit_label is exempt, prompt is not.
+      writeFileSync(join(dir, "fr", "flowQuestions.json"), JSON.stringify({}));
+
+      const { problems } = runFlowQuestions(dir);
+      expect(problems).toHaveLength(1);
+      expect(problems[0]).toContain("missing");
+      expect(problems[0]).toContain("content.flowQuestion.q1.prompt");
+      expect(problems[0]).not.toContain("content.flowQuestion.q1.audit_label");
+    });
+
+    it("still flags an extra/stale audit_label key not present in English", () => {
+      const dir = tempContentI18nDir();
+      writeFileSync(
+        join(dir, "en", "flowQuestions.json"),
+        JSON.stringify({ "content.flowQuestion.q1.prompt": "Prompt one" }),
+      );
+      // fr carries an audit_label for a question that has none in English.
+      writeFileSync(
+        join(dir, "fr", "flowQuestions.json"),
+        JSON.stringify({
+          "content.flowQuestion.q1.prompt": "Invite une",
+          "content.flowQuestion.q1.audit_label": "Orphaned label",
+        }),
+      );
+
+      const { problems } = runFlowQuestions(dir);
+      expect(problems).toHaveLength(1);
+      expect(problems[0]).toContain("stale/extra");
+      expect(problems[0]).toContain("content.flowQuestion.q1.audit_label");
+    });
+  });
 });

@@ -24,12 +24,13 @@
 //
 // @see specs/053-decision-audit/contracts/decision-record.contract.md §2, §6
 
-import type {
-  DecisionEntry,
-  DecisionImpact,
-  DecisionRecord,
-  EditorActionSummary,
-  EditorActionType,
+import {
+  effectiveEntries,
+  type DecisionEntry,
+  type DecisionImpact,
+  type DecisionRecord,
+  type EditorActionSummary,
+  type EditorActionType,
 } from "@keyboard-studio/contracts";
 import { DECISION_RECORD_VFS_PATH } from "./sidecar.js";
 
@@ -74,24 +75,57 @@ function plural(count: number, one: string, many: string): string {
 }
 
 /**
- * Describe an editor step by its non-zero counts.
+ * One count's clause, or `undefined` when it contributes nothing to the
+ * sentence.
+ *
+ * `count === undefined` (not measured) and `count === 0` (measured, unchanged)
+ * both produce no clause here, but for different reasons — neither is coerced
+ * into the other. `undefined > 0` would be `false` in JS and silently treat
+ * "not measured" the same as "measured zero", which is exactly the
+ * lumping-together FR-005a forbids, so both are checked explicitly instead of
+ * relying on the numeric comparison alone.
+ */
+function formatCount(count: number | undefined, one: string, many: string): string | undefined {
+  if (count === undefined) return undefined;
+  if (count === 0) return undefined;
+  return plural(count, one, many);
+}
+
+/**
+ * Describe an editor step by its non-zero, measured counts.
  *
  * Counts only — a step that removed three hundred keys says so in one clause
  * rather than listing them (contract §6). Zero-valued categories are dropped so
  * a gallery edit does not report "0 touch keys affected" as though touch had
  * been considered and left alone.
+ *
+ * When no category contributes a clause, the sentence still must not lump two
+ * different findings together (FR-005a): "no net change" means every category
+ * was measured and came back zero, which is itself evidence the step ran and
+ * genuinely changed nothing; "not measured" means the record has no count for
+ * at least one category, so there is nothing to report either way. Coercing
+ * `undefined` to falsy alongside `0` is exactly the mistake FR-005a forbids, so
+ * the two are distinguished explicitly rather than by relying on
+ * `parts.length === 0` alone. This mirrors, without importing, the trail's own
+ * three-way split into `editorStep` / `editorStepNoChange` /
+ * `editorStepUnmeasured` (headline-spec.contract.md §3, §5).
  */
 function formatEditorSummary(summary: EditorActionSummary): string {
-  const parts: string[] = [];
-  if (summary.keysRemoved > 0) parts.push(plural(summary.keysRemoved, "key removed", "keys removed"));
-  if (summary.keysAdded > 0) parts.push(plural(summary.keysAdded, "key added", "keys added"));
-  if (summary.mechanismsAssigned > 0) {
-    parts.push(plural(summary.mechanismsAssigned, "mechanism assigned", "mechanisms assigned"));
-  }
-  if (summary.touchKeysAffected > 0) {
-    parts.push(plural(summary.touchKeysAffected, "touch key affected", "touch keys affected"));
-  }
-  return parts.length === 0 ? "no net change" : parts.join(", ");
+  const parts = [
+    formatCount(summary.keysRemoved, "key removed", "keys removed"),
+    formatCount(summary.keysAdded, "key added", "keys added"),
+    formatCount(summary.mechanismsAssigned, "mechanism assigned", "mechanisms assigned"),
+    formatCount(summary.touchKeysAffected, "touch key affected", "touch keys affected"),
+  ].filter((part): part is string => part !== undefined);
+  if (parts.length > 0) return parts.join(", ");
+
+  const allMeasured =
+    summary.keysRemoved !== undefined &&
+    summary.keysAdded !== undefined &&
+    summary.mechanismsAssigned !== undefined &&
+    summary.touchKeysAffected !== undefined;
+
+  return allMeasured ? "no net change" : "not measured";
 }
 
 /** The decision itself, as one English clause. */
@@ -100,6 +134,16 @@ function formatDecision(entry: DecisionEntry): string {
 
   if (payload.kind === "editor-action") {
     return `${EDITOR_LABEL[payload.actionType]} (${formatEditorSummary(payload.summary)})`;
+  }
+
+  if (payload.kind === "base-contribution") {
+    // Written by recordBaseContribution.ts (specs/055-legible-decision-trail
+    // D-11) at `choose_base` completion. The clause names the base and nothing
+    // else on purpose: the counts this payload also carries (starting keys,
+    // derived axes, inherited metadata) are the DENOMINATOR the later rows'
+    // own counts are read against, and restating them here would read as a
+    // change this row caused. Not claimed as final wording for the surface.
+    return `Started from base \`${payload.baseId}\` ("${payload.baseDisplayName}")`;
   }
 
   const value = `"${formatValue(payload.value)}"`;
@@ -136,8 +180,26 @@ function formatEffect(impact: DecisionImpact | null | undefined): string {
   if (impact === null) return "omitted to keep the record within size limits";
 
   switch (impact.state) {
-    case "captured":
-      return `+${impact.magnitude.added} / -${impact.magnitude.removed} lines in \`${impact.path}\``;
+    case "captured": {
+      // `files` is non-empty (contract §3). Every changed file is identified
+      // (FR-017) — a decision widened to several files (specs/055-legible-decision-trail
+      // T027) no longer collapses to one path, but the block stays one row per
+      // decision, so all files still live in this single effect cell.
+      const base =
+        impact.files.length === 1
+          ? `+${impact.magnitude.added} / -${impact.magnitude.removed} lines in \`${impact.files[0]!.path}\``
+          : `+${impact.magnitude.added} / -${impact.magnitude.removed} lines across ${impact.files.length} files: ${impact.files
+              .map((file) => `\`${file.path}\` (+${file.magnitude.added} / -${file.magnitude.removed})`)
+              .join(", ")}`;
+
+      // FR-019: a change one stage produced for several decisions is claimed
+      // jointly, never as though this entry were solely responsible. Absent
+      // `sharedWith`, the entry claims the change outright — today's wording,
+      // unchanged.
+      if (impact.sharedWith === undefined || impact.sharedWith.length === 0) return base;
+      const coDecisions = impact.sharedWith.map((entryId) => `\`${entryId}\``).join(", ");
+      return `${base} (shared with ${plural(impact.sharedWith.length, "decision", "decisions")}: ${coDecisions})`;
+    }
     case "none":
       return "no source change";
     case "unavailable":
@@ -170,13 +232,11 @@ export function buildDecisionSummaryBlock(
   const maxEntries = opts.maxEntries ?? PR_SUMMARY_MAX_ENTRIES;
   const lines: string[] = ["## Authoring decisions"];
 
-  // An entry is superseded when a LATER entry names it. Collected up front so
-  // the effective set is one pass rather than a scan per row.
-  const supersededIds = new Set<string>();
-  for (const entry of record.entries) {
-    if (entry.supersedes !== null) supersededIds.add(entry.supersedes);
-  }
-  const effective = record.entries.filter((e) => !supersededIds.has(e.entryId));
+  // An entry is superseded when a LATER entry names it — see `effectiveEntries`
+  // in contracts, which is the one implementation the trail's stage roll-ups
+  // read through as well, so this block and that one cannot disagree about
+  // which decisions shaped the keyboard (SC-007).
+  const effective = effectiveEntries(record.entries);
 
   if (effective.length === 0) {
     lines.push("", "No decisions were recorded for this keyboard.");

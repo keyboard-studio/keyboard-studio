@@ -6,6 +6,7 @@ import type { QuestionModule } from "../../types.ts";
 export const definition = {
   id: "pf_credits",
   prompt: "Who should be acknowledged for creating this keyboard?",
+  audit_label: "Credits",
   help_text:
     "List the people, organizations, or committees who worked on the keyboard. " +
     "You can include names, roles, or organizations. For example: \"Bafut " +

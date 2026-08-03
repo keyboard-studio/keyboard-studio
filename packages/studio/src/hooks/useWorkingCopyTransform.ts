@@ -38,8 +38,9 @@
 // None of the above change on every render, so the VfsTransform reference
 // is stable across renders when the working copy has not changed.
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import type { Pattern, VirtualFS } from "@keyboard-studio/contracts";
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
@@ -58,6 +59,54 @@ export interface UseWorkingCopyTransformOptions {
    * transform still proceeds with carve + identity.
    */
   patternMap?: Map<string, Pattern> | null;
+  /**
+   * The id of the BaseKeyboard the returned transform is about to be plugged
+   * into (i.e. the `baseKeyboard` argument passed to the SAME
+   * `useKeyboardArtifact` call this transform feeds). Bug F4: preview-before-
+   * commit (StudioShell's `localBase`, usePreviewArtifact's own picker state)
+   * lets the author preview a DIFFERENT base than the one already committed
+   * to `workingCopyStore` — e.g. commit base A, carve some of it, then preview
+   * candidate base B before deciding whether to switch. `baseIr` /
+   * `deletedNodeIds` / `deletedItemIds` below are keyed to A's IR node ids;
+   * projecting them onto B's freshly-fetched VFS is not merely stale, it is
+   * incoherent (B's IR has no relation to A's node ids), and left the
+   * candidate base's compile pipeline unable to reach "ready" (kmcmplib
+   * errors on the cross-base projected .kmn, and Retry hits the same
+   * mismatch every time — the only escape was "Start over").
+   *
+   * When provided (non-undefined) and it does not match the store's own
+   * `baseKeyboard.id`, the returned transform is `null` — the candidate
+   * base compiles cleanly with NO carve/assignment/identity overlay, exactly
+   * like previewing it for the very first time. The store's carve state for
+   * the committed base is untouched (not cleared), so re-previewing that SAME
+   * base again (before confirming the switch) restores the projected
+   * preview. Omit this option (existing behavior) for callers that always
+   * operate on the already-instantiated working copy's own base (the post-
+   * commit galleries — MechanismGallery, TouchGallery) — there is no
+   * "different candidate base" for them to diverge from.
+   *
+   * Tri-state contract — the three states are NOT interchangeable:
+   *   - **omitted** (`undefined`): no gating at all. Correct only for post-
+   *     commit call sites (MechanismGallery, TouchGallery) that always render
+   *     the store's own already-instantiated base and have no candidate-base
+   *     picker of their own. A dev-mode warning fires (once) if a call site
+   *     omits this while a transform is actually being built, since a new
+   *     call site with its own candidate-base state that omits it would
+   *     silently reintroduce bug F4 — pass the store's own base id explicitly
+   *     if omission really is correct, to document intent and silence the
+   *     warning.
+   *   - **`null`**: "no candidate base chosen yet" — gates the transform to
+   *     `null` unconditionally (there is nothing to match). Callers with a
+   *     candidate-base picker MUST initialize that picker state
+   *     *synchronously* from the store (e.g. `useState(() =>
+   *     store.baseKeyboard?.id ?? null)`, not a lazy post-mount effect) —
+   *     `null` suppresses the overlay, so a lazily-initialized picker renders
+   *     one frame of the (incorrect) ungated preview before its effect runs
+   *     and flips the gate on, i.e. a visible ungated→gated preview flash.
+   *   - **string**: gate on equality with the store's `baseKeyboard.id`;
+   *     mismatch → `null`, match → the normal overlaid transform.
+   */
+  previewedBaseId?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -80,9 +129,23 @@ export function useWorkingCopyTransform(
   opts?: UseWorkingCopyTransformOptions,
 ): VfsTransform | null {
   const patternMap = opts?.patternMap ?? null;
+  // undefined (the default) means "no gating" — see the option's doc comment.
+  const previewedBaseId = opts?.previewedBaseId;
+
+  // P1 fix (bug F4 footgun): omitting previewedBaseId is legitimate for
+  // post-commit call sites (MechanismGallery, TouchGallery) but is a silent
+  // way for a FUTURE call site with its own candidate-base picker to
+  // reintroduce F4. Warn once per hook instance (mount), dev-only, only when
+  // a transform is actually being built (not while baseIr is still null) —
+  // see the gate check below where this ref is consulted.
+  const omittedWarnedRef = useRef(false);
 
   // Layer values — read individually so the memo only fires when they change.
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
+  // The base id the store's carve/identity layers actually belong to. Compared
+  // against previewedBaseId below (F4 fix) so a candidate-base preview never
+  // receives another base's carve overlay.
+  const storeBaseKeyboardId = useWorkingCopyStore((s) => s.baseKeyboard?.id ?? null);
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const deletedTouchKeyIds = useWorkingCopyStore((s) => s.deletedTouchKeyIds);
@@ -140,6 +203,31 @@ export function useWorkingCopyTransform(
     // No baseIr → carve step cannot run. The transform is not usable yet.
     if (baseIr === null) return null;
 
+    // P1 fix (bug F4 footgun): a transform is genuinely about to be built —
+    // warn (once per mount, dev-only) if the caller omitted previewedBaseId
+    // rather than explicitly opting into "no gating". This is advisory, not
+    // enforced: MechanismGallery/TouchGallery's omission is correct and will
+    // warn once too, which is an acceptable, non-spammy cost for catching a
+    // future candidate-base-picker call site that forgets the option.
+    if (previewedBaseId === undefined && !omittedWarnedRef.current) {
+      omittedWarnedRef.current = true;
+      devLog.warn(
+        "[useWorkingCopyTransform] previewedBaseId was omitted. If this call site can preview a candidate base " +
+          "other than the store's committed baseKeyboard (bug F4), pass previewedBaseId explicitly. If this call " +
+          "site only ever renders the store's own already-instantiated base (e.g. a post-commit gallery), pass " +
+          "the store's own base id to document that intent and silence this warning.",
+      );
+    }
+
+    // F4 fix: the store's carve/identity layers belong to storeBaseKeyboardId.
+    // When the caller tells us which base its OWN pipeline is about to compile
+    // (previewedBaseId) and that differs from the base the layers belong to,
+    // the overlay does not apply — return null rather than project one base's
+    // node ids onto a different base's freshly-fetched VFS.
+    if (previewedBaseId !== undefined && previewedBaseId !== storeBaseKeyboardId) {
+      return null;
+    }
+
     return (vfs: VirtualFS, keyboardId: string): { warnings: string[]; effectiveKeyboardId?: string } => {
       // Assignment-warning: when assignments exist but no patternMap was supplied,
       // emit a diagnostic and skip assignments (pass empty array to projectWorkingCopyVfs).
@@ -193,6 +281,8 @@ export function useWorkingCopyTransform(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     baseIr,
+    previewedBaseId,
+    storeBaseKeyboardId,
     deletedKey,
     assignmentsKey,
     identityDisplayName,

@@ -14,6 +14,7 @@ export const definition = {
   id: "project_display_name",
   type: "text" as const,
   prompt: "What is the display name for your new keyboard?",
+  audit_label: "Keyboard display name",
   help_text:
     "Give your keyboard a human-readable name, for example \"Hausa (QWERTY)\" " +
     "or \"Ewondo Keyboard\". This name appears in the Keyman application and the " +

@@ -762,6 +762,22 @@
       "implements": [],
       "decisions": [],
       "notes": ""
+    },
+    "specs/053-decision-audit": {
+      "title": "Feature Specification: Per-keyboard decision audit (CYOA Phase 1 — record and review)",
+      "hash": "sha256:beb0740daabeff6c",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/055-legible-decision-trail": {
+      "title": "Feature Specification: Legible decision trail — every stage reports what it did",
+      "hash": "sha256:584aac4859b80265",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
     }
   }
 }

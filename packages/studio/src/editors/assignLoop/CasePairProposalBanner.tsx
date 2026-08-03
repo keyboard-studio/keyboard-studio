@@ -5,8 +5,14 @@
 // shipped in MechanismGallery, so the physical-key interaction is byte-
 // identical to what authors already know and its translations survive: an id
 // is a permanent handle, and renaming one orphans every locale that has
-// translated it. Only the PROMPT varies by mechanism, and it varies by
-// selecting an additive id — the physical `.prompt` keeps its exact message.
+// translated it. What varies by mechanism varies by selecting an ADDITIVE id —
+// the physical/combo messages keep their exact text.
+//
+// The touch mechanism names its target layer in all three of its strings
+// (prompt, confirm, decline) because its case-pair layer is not always the
+// shift layer: the layer is the edited layer's combo plus SHIFT, so an author
+// editing the RAlt layer is being offered `rightalt-shift`. The other two
+// mechanisms pair onto the shift plane by construction and keep saying so.
 //
 // No third button and no "apply to all": each proposal is an independent
 // per-placement confirm (spec Out of scope — bulk actions).
@@ -54,8 +60,8 @@ export function CasePairProposalBanner({
         ) : proposal.mechanism === "touch" ? (
           <Trans id="editor.assignLoop.companion.prompt.touch">
             {proposal.originalChar} has an uppercase form,{" "}
-            {proposal.counterpart}. Map {proposal.counterpart} to the shift
-            layer as well?
+            {proposal.counterpart}. Map {proposal.counterpart} to the{" "}
+            {proposal.targetLayerLabel} layer as well?
           </Trans>
         ) : proposal.mechanism === "ralt-layer" ? (
           <Trans id="editor.assignLoop.companion.prompt.raltLayer">
@@ -74,20 +80,39 @@ export function CasePairProposalBanner({
       confirmLabel={
         <Trans id="editor.assignLoop.companion.confirmButton">Map it</Trans>
       }
-      confirmAriaLabel={t({
-        id: "editor.assignLoop.companion.confirmAriaLabel",
-        message: `Map ${proposal.counterpart} to the shift layer of ${confirmTargetLabel(proposal)}`,
-      })}
+      confirmAriaLabel={
+        // Touch gets its OWN id rather than a widened shared one. The shared
+        // message is still exactly right for the physical and combo paths
+        // (their parallel slot IS the shift plane), and a new id orphans no
+        // translation, where editing the shared message would restate it for
+        // two mechanisms that didn't change.
+        proposal.mechanism === "touch"
+          ? t({
+              id: "editor.assignLoop.companion.confirmAriaLabel.touch",
+              message: `Map ${proposal.counterpart} to the ${proposal.targetLayerLabel} layer of ${proposal.hostKey}`,
+            })
+          : t({
+              id: "editor.assignLoop.companion.confirmAriaLabel",
+              message: `Map ${proposal.counterpart} to the shift layer of ${confirmTargetLabel(proposal)}`,
+            })
+      }
       onConfirm={onConfirm}
       declineLabel={
         <Trans id="editor.assignLoop.companion.declineButton">
           No thanks
         </Trans>
       }
-      declineAriaLabel={t({
-        id: "editor.assignLoop.companion.declineAriaLabel",
-        message: `Do not map ${proposal.counterpart} to the shift layer`,
-      })}
+      declineAriaLabel={
+        proposal.mechanism === "touch"
+          ? t({
+              id: "editor.assignLoop.companion.declineAriaLabel.touch",
+              message: `Do not map ${proposal.counterpart} to the ${proposal.targetLayerLabel} layer`,
+            })
+          : t({
+              id: "editor.assignLoop.companion.declineAriaLabel",
+              message: `Do not map ${proposal.counterpart} to the shift layer`,
+            })
+      }
       onDismiss={onDismiss}
     />
   );

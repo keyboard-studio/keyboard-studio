@@ -98,7 +98,7 @@ input side and output side both case-shifted through `caseCounterpart`:
 ### Touch (FR-005)
 
 Appends a touch ref for `counterpart` via `appendMechanismToChar`, carrying the same `hostKey` and
-`layer: targetLayer` (`casePairTouchLayer(editingLayer)`). Because the counterpart is a different
+`layer: targetLayer` (`casePairTouchTarget(editingCombo, isComboInUse).layer`). Because the counterpart is a different
 character, this creates its own `charTouch` entry and cannot interact with the source character's
 `touch_inherited` exclusivity rules.
 
