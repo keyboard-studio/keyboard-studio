@@ -30,6 +30,18 @@ const path = require("node:path");
 
 const SCRIPT = path.join(__dirname, "index.js");
 
+/**
+ * Read-only violations, counted at module scope.
+ *
+ * The mock's request handler runs in a different scope from run()'s `failures`
+ * counter, so an earlier version set process.exitCode there and nothing else.
+ * The exit code was right, but the final summary still printed "all N scenarios
+ * produced the expected verdict" directly beneath the [FAIL] line — a summary
+ * contradicting its own output, in a tool whose only job is to be trustworthy
+ * when read by hand. Counted here so the summary can never disagree.
+ */
+let readOnlyViolations = 0;
+
 /** Crowdin's collection envelope: { data: [{ data: row }], pagination }. */
 const collection = (rows) => ({
   data: rows.map((r) => ({ data: r })),
@@ -139,7 +151,7 @@ function serve(scenario) {
     // Assert read-only: any non-GET reaching the mock is a defect in the script.
     if (req.method !== "GET") {
       console.error(`[FAIL] script issued a ${req.method} to ${p} — must be read-only`);
-      process.exitCode = 1;
+      readOnlyViolations++;
     }
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify(body));
@@ -241,12 +253,26 @@ async function run() {
   }
 
   console.log("");
-  if (failures === 0) {
-    console.log(`[OK] all ${SCENARIOS.length} scenarios produced the expected verdict.`);
-    return 0;
+  // Both failure classes gate the summary. A read-only violation is reported on
+  // its own line rather than folded into the scenario count, because it means
+  // something categorically worse than a wrong verdict: the diagnostic is not
+  // read-only, which is the property that makes it safe to hand to someone.
+  if (readOnlyViolations > 0) {
+    console.error(
+      `[ERROR] ${readOnlyViolations} read-only violation(s): the diagnostic issued a ` +
+        `non-GET request. It must never be able to mutate the Crowdin project.`,
+    );
   }
-  console.error(`[ERROR] ${failures} of ${SCENARIOS.length} scenarios failed.`);
-  return 1;
+  if (failures > 0) {
+    console.error(`[ERROR] ${failures} of ${SCENARIOS.length} scenarios failed.`);
+  }
+  if (failures > 0 || readOnlyViolations > 0) return 1;
+
+  console.log(
+    `[OK] all ${SCENARIOS.length} scenarios produced the expected verdict, ` +
+      `and every request was a GET.`,
+  );
+  return 0;
 }
 
-run().then((code) => process.exit(code || process.exitCode || 0));
+run().then((code) => process.exit(code));
