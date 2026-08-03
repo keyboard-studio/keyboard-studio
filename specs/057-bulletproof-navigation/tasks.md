@@ -54,22 +54,22 @@ The single location vocabulary (FR-001, FR-006, FR-010…FR-014), the session-sc
 
 **⟶ Wait for Wave 1 to finish, then:**
 
-- [ ] **T010** [P] Unit-test the grammar: `parseLocation(formatLocation(loc))` deep-equals `loc` for every valid shape, plus the full parse-failure matrix from the contract · `packages/studio/src/lib/location.test.ts`
-- [ ] **T011** [P] Create the pure resolver: `resolveLocation(loc, ctx): LocationResolution` over the closed `UnreachableReason` set (`step-not-in-build`, `question-not-in-build`, `skipped-by-track`, `beyond-gate`, `no-project`); a `degraded` result's `to` must itself resolve `reachable`, found by dropping `question`, then `step`, then falling back to the route (FR-012, FR-013, FR-014) · `packages/studio/src/lib/resolveLocation.ts`
-- [ ] **T012** [P] Widen `navigateTo` with a `Location` overload, keeping the `RouteId` signature so every current call site compiles unchanged; the module stays the only writer of `window.location.hash` (FR-006) · `packages/studio/src/lib/navigate.ts`
-- [ ] **T013** [P] [US5] Unit-test the store: every slot's initial value, `paneSplitPct` clamping on read, `scrollTop` keyed by stable pane id, and `reset()` clearing every slot · `packages/studio/src/stores/viewStateStore.test.ts`
-- [ ] **T014** [P] [US4] Unit-test the project-label precedence across all four tiers including blank-string skips, plus the case that currently distinguishes the two engines — `identityResult` present and disagreeing with `scaffoldSpec` — which has zero existing coverage (spec Test surface) · `packages/studio/src/lib/projectLabel.test.ts`
-- [ ] **T015** [P] [US4] Converge **both** shipped draft engines on `deriveProjectLabel` so the footer is not a fourth derivation (FR-041): `draftPersistence.saveDraft`'s inline `displayName` computation (lines 477-481, already this order — a pure substitution) **and** `draftAutosave.deriveLabel` (lines 180-187, currently identity-english-first — a real behaviour change). The `deriveLabel` change is visible only in `ResumeDraftBanner.tsx:90`'s quoted name, and only when `identityResult` disagrees with `scaffoldSpec`; "My keyboards" card labels are unaffected because they already run through `draftPersistence` · `packages/studio/src/lib/draftAutosave.ts`, `packages/studio/src/lib/draftPersistence.ts`
+- [x] **T010** [P] Unit-test the grammar: `parseLocation(formatLocation(loc))` deep-equals `loc` for every valid shape, plus the full parse-failure matrix from the contract · `packages/studio/src/lib/location.test.ts`
+- [x] **T011** [P] Create the pure resolver: `resolveLocation(loc, ctx): LocationResolution` over the closed `UnreachableReason` set (`step-not-in-build`, `question-not-in-build`, `skipped-by-track`, `beyond-gate`, `no-project`); a `degraded` result's `to` must itself resolve `reachable`, found by dropping `question`, then `step`, then falling back to the route (FR-012, FR-013, FR-014) · `packages/studio/src/lib/resolveLocation.ts`
+- [x] **T012** [P] Widen `navigateTo` with a `Location` overload, keeping the `RouteId` signature so every current call site compiles unchanged; the module stays the only writer of `window.location.hash` (FR-006) · `packages/studio/src/lib/navigate.ts`
+- [x] **T013** [P] [US5] Unit-test the store: every slot's initial value, `paneSplitPct` clamping on read, `scrollTop` keyed by stable pane id, and `reset()` clearing every slot · `packages/studio/src/stores/viewStateStore.test.ts`
+- [x] **T014** [P] [US4] Unit-test the project-label precedence across all four tiers including blank-string skips, plus the case that currently distinguishes the two engines — `identityResult` present and disagreeing with `scaffoldSpec` — which has zero existing coverage (spec Test surface) · `packages/studio/src/lib/projectLabel.test.ts`
+- [x] **T015** [P] [US4] Converge **both** shipped draft engines on `deriveProjectLabel` so the footer is not a fourth derivation (FR-041): `draftPersistence.saveDraft`'s inline `displayName` computation (lines 477-481, already this order — a pure substitution) **and** `draftAutosave.deriveLabel` (lines 180-187, currently identity-english-first — a real behaviour change). The `deriveLabel` change is visible only in `ResumeDraftBanner.tsx:90`'s quoted name, and only when `identityResult` disagrees with `scaffoldSpec`; "My keyboards" card labels are unaffected because they already run through `draftPersistence` · `packages/studio/src/lib/draftAutosave.ts`, `packages/studio/src/lib/draftPersistence.ts`
 
 **⟶ Wait for T011 and T012, then:**
 
-- [ ] **T016** [P] Unit-test the resolution matrix: one case per `UnreachableReason`, each `degraded` case asserting its `to` resolves `reachable` against the same `ctx`, and referential transparency (spec Test surface) · `packages/studio/src/lib/resolveLocation.test.ts`
-- [ ] **T017** [P] Create the ONE jump primitive: `jumpToLocation(loc, opts?)` → `arrived` | `refused` | `degraded`; resolves, then either sets the traversal target and navigates or surfaces the refusal — never partially arrives (FR-012). Carries `opts.returnTo` for FR-034 · `packages/studio/src/lib/jumpToLocation.ts`
+- [x] **T016** [P] Unit-test the resolution matrix: one case per `UnreachableReason`, each `degraded` case asserting its `to` resolves `reachable` against the same `ctx`, and referential transparency (spec Test surface) · `packages/studio/src/lib/resolveLocation.test.ts`
+- [x] **T017** [P] Create the ONE jump primitive: `jumpToLocation(loc, opts?)` → `arrived` | `refused` | `degraded`; resolves, then either sets the traversal target and navigates or surfaces the refusal — never partially arrives (FR-012). Carries `opts.returnTo` for FR-034 · `packages/studio/src/lib/jumpToLocation.ts`
 
 **⟶ Wait for T017, then:**
 
-- [ ] **T018** [P] Unit-test the jump primitive: arrival sets the traversal target *and* navigates; a refusal does neither; a degrade lands on the ancestor and reports the reason; `returnTo` is retained for the caller · `packages/studio/src/lib/jumpToLocation.test.ts`
-- [ ] **T019** [P] Teach `hashToRoute` to parse a full `Location` via `parseLocation`, falling back to `defaultLandingRoute()` on an unknown route token exactly as today, and route on the parsed location (FR-010, FR-011) · `packages/studio/src/StudioShell.tsx`
+- [x] **T018** [P] Unit-test the jump primitive: arrival sets the traversal target *and* navigates; a refusal does neither; a degrade lands on the ancestor and reports the reason; `returnTo` is retained for the caller · `packages/studio/src/lib/jumpToLocation.test.ts`
+- [x] **T019** [P] Teach `hashToRoute` to parse a full `Location` via `parseLocation`, falling back to `defaultLandingRoute()` on an unknown route token exactly as today, and route on the parsed location (FR-010, FR-011) · `packages/studio/src/StudioShell.tsx`
 
 **Checkpoint**: the location vocabulary exists, is unit-proven, and the traversal reset is gone. No surface consumes it yet.
 
@@ -167,7 +167,7 @@ Written to encode the *new* contract — these files currently encode the old on
 **⟶ Wait for T039, then — independent (different files):**
 
 - [ ] **T040** [P] [US3] Add `trail.jump.label` and one `trail.jump.unreachable.*` id per `UnreachableReason`; these are shared by the trail and the footer's upcoming dots (FR-035, FR-045, FR-048) · `packages/studio/src/locales/en/messages.json`, `packages/studio/src/locales/fr/messages.json`
-- [ ] **T041** [P] [US3] Hold the requested `Location` in a module-level pending slot before the welcome gate's `replaceState` to `#welcome`, and consume it in `leaveWelcome` through `jumpToLocation` so reachability rules apply; keep the `replaceState` itself, which exists to avoid the same-value-hash soft-lock (FR-015, D-10) · `packages/studio/src/StudioShell.tsx`
+- [x] **T041** [P] [US3] Hold the requested `Location` in a module-level pending slot before the welcome gate's `replaceState` to `#welcome`, and consume it in `leaveWelcome` through `jumpToLocation` so reachability rules apply; keep the `replaceState` itself, which exists to avoid the same-value-hash soft-lock (FR-015, D-10) · `packages/studio/src/StudioShell.tsx`
 
 **⟶ Wait for T040, then:**
 

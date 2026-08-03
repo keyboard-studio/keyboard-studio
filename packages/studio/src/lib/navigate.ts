@@ -9,20 +9,13 @@
 // widens what a caller can address (route, step, question — see lib/location.ts)
 // without introducing a second writer of `window.location.hash`.
 
-import { formatLocation, type Location } from "./location.ts";
+import { formatLocation, type Location, type RouteId } from "./location.ts";
 
-export type RouteId =
-  | 'welcome'
-  | 'survey'
-  | 'preview'
-  | 'output'
-  | 'flowmap'
-  // The decision trail (specs/053-decision-audit). Unconditionally valid, unlike
-  // 'flowmap': FR-017 makes it a PRODUCTION surface — an author reviewing what
-  // their own decisions did to their keyboard is the feature, not a developer aid
-  // — so it must never sit behind the dev gate in StudioShell's VALID_ROUTES.
-  | 'trail'
-  | 'profile';
+// `RouteId` now lives in lib/location.ts — the route token set is part of the
+// hash grammar, and defining it there is what keeps these two modules from
+// importing each other. Re-exported so every existing
+// `import { RouteId } from "./navigate.ts"` compiles unchanged.
+export type { RouteId };
 
 /** Existing signature — every current call site keeps compiling unchanged. */
 export function navigateTo(route: RouteId): void;

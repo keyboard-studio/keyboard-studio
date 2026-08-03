@@ -23,7 +23,32 @@
 // `window.location.hash` (FR-006).
 
 import type { ActiveStepId } from "../stores/surveySessionStore.ts";
-import type { RouteId } from "./navigate.ts";
+
+/**
+ * The seven top-level routes.
+ *
+ * Defined HERE rather than in navigate.ts because the route token set is part
+ * of the grammar this module owns — `parseLocation` has to know which tokens
+ * are routes. `navigate.ts` re-exports it, so every existing
+ * `import { RouteId } from "./navigate.ts"` keeps working and no call site
+ * moves.
+ *
+ * `preview` is retained deliberately: FR-020 renames the tab the author sees
+ * to "Compare", not the route token (contract §1).
+ */
+export type RouteId =
+  | "welcome"
+  | "survey"
+  | "preview"
+  | "output"
+  | "flowmap"
+  // The decision trail (specs/053-decision-audit). Unconditionally valid,
+  // unlike 'flowmap': FR-017 makes it a PRODUCTION surface — an author
+  // reviewing what their own decisions did to their keyboard is the feature,
+  // not a developer aid — so it must never sit behind the dev gate in
+  // StudioShell's VALID_ROUTES.
+  | "trail"
+  | "profile";
 
 /**
  * Where the author is. Immutable — `jumpToLocation` produces a new one;
@@ -51,7 +76,7 @@ const SEGMENT = /^[a-z0-9_]+$/;
  * this build is a routing decision, not a grammar one, and keeping the two
  * separate means a parse failure always means "malformed", never "gated off".
  */
-const ROUTES: ReadonlySet<string> = new Set<RouteId>([
+const ROUTES: ReadonlySet<RouteId> = new Set<RouteId>([
   "welcome",
   "survey",
   "preview",
@@ -79,7 +104,7 @@ export function parseLocation(hash: string): Location | null {
   if (segments.some((s) => s === "")) return null;
 
   const [route, step, question] = segments as [string, string?, string?];
-  if (!ROUTES.has(route)) return null;
+  if (!ROUTES.has(route as RouteId)) return null;
   if (step !== undefined && !SEGMENT.test(step)) return null;
   if (question !== undefined && !SEGMENT.test(question)) return null;
 

@@ -35,6 +35,8 @@ import {
 } from "./lib/draftPersistence.ts";
 import { useGitHubAuth } from "./hooks/useGitHubAuth.ts";
 import { type RouteId } from "./lib/navigate.ts";
+import { parseLocation } from "./lib/location.ts";
+import { setPendingWelcomeLocation } from "./lib/jumpToLocation.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
@@ -162,7 +164,18 @@ function defaultLandingRoute(): RouteId {
 
 function useRoute(): RouteId {
   const hashToRoute = (): RouteId => {
+    // Spec 057 FR-010/FR-011: the hash may now carry a step and a question
+    // (`#survey/characters/pb_rtl_direction_confirm`). `parseLocation` is the
+    // ONE grammar — routing reads the parsed location's `route` rather than
+    // treating the whole hash as a token, so a deep-linked hash no longer
+    // falls through to the landing route just because it has segments.
+    //
+    // A malformed hash parses to null and behaves exactly as an unknown token
+    // always has: fall back to `defaultLandingRoute()`. Reachability of the
+    // step/question is NOT decided here — that is `resolveLocation`'s job, and
+    // deciding it here would swallow FR-013's stated reason.
     const raw = window.location.hash.slice(1);
+    const parsed = parseLocation(raw);
     const landing = defaultLandingRoute();
     // A genuine newcomer (never visited, no resumable draft) always lands on
     // welcome first — even on a deep-linked hash (a shared #survey/#preview
@@ -176,11 +189,18 @@ function useRoute(): RouteId {
       // navigateTo("survey"), a same-value hash assignment that fires zero
       // hashchange events per spec, soft-locking the user on WelcomeScreen.
       if (raw !== "welcome") {
+        // Spec 057 FR-015 (D-9): hold the requested location before the
+        // rewrite discards it, so `leaveWelcome` can honour it on exit
+        // instead of dropping a shared deep link on the floor. The
+        // replaceState itself stays — it exists to avoid the same-value-hash
+        // soft-lock described below.
+        if (parsed !== null) setPendingWelcomeLocation(parsed);
         window.history.replaceState(window.history.state, "", "#welcome");
       }
       return "welcome";
     }
-    return isRouteId(raw) ? raw : landing;
+    if (parsed !== null && isRouteId(parsed.route)) return parsed.route;
+    return landing;
   };
 
   const [route, setRoute] = useState<RouteId>(hashToRoute);

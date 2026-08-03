@@ -139,6 +139,94 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-03T22:31:55.590Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:33:21.331Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:33:21.559Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:33:21.786Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:33:22.028Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:33:22.271Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:33:22.521Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:44:29.664Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:44:29.919Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:44:30.160Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:44:30.425Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:44:30.695Z"
     }
   ],
   "telemetryInstanceId": "469b61c6-c778-40d3-b978-3516ec818e69",
@@ -652,7 +740,7 @@
       "what": "{\"check\": \"draftPersistence.ts:477-481 implements FR-041 order verbatim and MyKeyboardsList.tsx:51 imports from draftPersistence, not draftAutosave\", \"how\": \"grep imports + sed the label computation in both engines\", \"result\": \"confirmed - km-doc finding stands; research D-8 blast-radius claim was backwards\"}"
     }
   ],
-  "currentTask": "T005",
+  "currentTask": "T041",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -709,6 +797,87 @@
       "files": [
         "specs/057-bulletproof-navigation/evidence/gating-red.md",
         "specs/057-bulletproof-navigation/evidence/tab-roundtrip-red.clean.txt"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Unit-tested the grammar: total round trip over every valid shape plus a 15-case parse-failure matrix",
+      "files": [
+        "packages/studio/src/lib/location.test.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Created the pure resolveLocation resolver over the closed UnreachableReason set, with degraded results landing on a nearest ancestor that itself resolves reachable",
+      "files": [
+        "packages/studio/src/lib/resolveLocation.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Widened navigateTo with a Location overload; the RouteId signature is unchanged so every call site still compiles, and the module stays the only writer of window.location.hash",
+      "files": [
+        "packages/studio/src/lib/navigate.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Unit-tested viewStateStore: initial values, per-surface independence, clamp-on-read, stable scroll keys, and reset clearing every slot",
+      "files": [
+        "packages/studio/src/stores/viewStateStore.test.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Unit-tested the project-label precedence across all four tiers, blank-string skips, and the previously-uncovered identity-disagrees-with-scaffoldSpec case",
+      "files": [
+        "packages/studio/src/lib/projectLabel.test.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Converged both shipped draft engines on deriveProjectLabel: draftPersistence.saveDraft (pure substitution) and draftAutosave.deriveLabel (real behaviour change, resume banner only)",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.ts",
+        "packages/studio/src/lib/draftAutosave.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Unit-tested the resolution matrix: one case per UnreachableReason, each degrade asserting its 'to' resolves reachable, plus reason precedence and referential transparency",
+      "files": [
+        "packages/studio/src/lib/resolveLocation.test.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Created the ONE jump primitive jumpToLocation (arrived/refused/degraded) plus a jumpToStep traversal action on surveySessionStore, a pending-question hand-off slot, and returnTo retention for FR-034",
+      "files": [
+        "packages/studio/src/lib/jumpToLocation.ts",
+        "packages/studio/src/stores/surveySessionStore.ts"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Unit-tested the jump primitive: arrival sets the target AND navigates, history truncates to the walked path, a gated forward jump degrades without moving the store, and returnTo is retained",
+      "files": [
+        "packages/studio/src/lib/jumpToLocation.test.ts"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Taught hashToRoute to parse a full Location via parseLocation, routing on the parsed route and falling back to defaultLandingRoute() on a malformed hash exactly as before",
+      "files": [
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Held the requested Location across the welcome gate (setPendingWelcomeLocation before the replaceState) and consumed it in leaveWelcome through jumpToLocation so reachability rules apply",
+      "files": [
+        "packages/studio/src/StudioShell.tsx",
+        "packages/studio/src/components/WelcomeScreen.tsx",
+        "packages/studio/src/lib/jumpToLocation.ts"
       ]
     }
   }
