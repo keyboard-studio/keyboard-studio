@@ -99,6 +99,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     form: carveNormalizationForm,
     bcp47: identityBcp47,
     hasSignal,
+    blockCandidateChars,
   } = useCarveNeededSet();
 
   // Base characters the author chose to KEEP at the pre-carve convenience
@@ -120,9 +121,15 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
 
   const recommended = useMemo(
     () => (instantiationMode !== null && hasSignal && ir
-      ? recommendedRemovalChars({ ir, needed: neededSet, bcp47: identityBcp47, form: carveNormalizationForm })
+      ? recommendedRemovalChars({
+        ir,
+        needed: neededSet,
+        bcp47: identityBcp47,
+        form: carveNormalizationForm,
+        blockCandidateChars,
+      })
       : []),
-    [ir, instantiationMode, hasSignal, neededSet, identityBcp47, carveNormalizationForm],
+    [ir, instantiationMode, hasSignal, neededSet, identityBcp47, carveNormalizationForm, blockCandidateChars],
   );
   // irToCharacterView's internal lookup key is always NFC-normalized
   // (irToCharacterView.ts) — recommended[].ch is normalized to `form` (NFD on

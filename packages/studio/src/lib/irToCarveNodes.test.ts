@@ -2,8 +2,8 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { I18n } from '@lingui/core';
-import type { IRRule, IRGroup, IRStore, KeyboardIR, Pattern, StoreItem } from '@keyboard-studio/contracts';
-import { buildProducedSet } from '@keyboard-studio/contracts';
+import type { IRRule, IRGroup, IRStore, KeyboardIR, Pattern, StoreItem, PlacementWorklist } from '@keyboard-studio/contracts';
+import { buildProducedSet, makeConfirmedAlphabet } from '@keyboard-studio/contracts';
 import {
   ruleModifier,
   modifierLabel,
@@ -33,7 +33,7 @@ import {
   isTouchOnlyVkeyName,
 } from './irToCarveNodes.ts';
 import { _setContentCatalogForTesting, _resetContentI18nForTesting } from './contentI18n.ts';
-import { collectCharContributors, parseSlotId, isPlusSeparator } from '@keyboard-studio/engine';
+import { collectCharContributors, parseSlotId, isPlusSeparator, deriveCarveNeededSet } from '@keyboard-studio/engine';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -2584,6 +2584,175 @@ describe('recommendedRemovalChars — form parameter (spec: base-plus-mark drive
     expect(result.map((r) => r.ch)).toEqual(['y']);
   });
 });
+
+// ---------------------------------------------------------------------------
+// recommendedRemovalChars — blockCandidateChars (#526 AC #3)
+// ---------------------------------------------------------------------------
+
+describe('recommendedRemovalChars — blockCandidateChars (#526 AC #3)', () => {
+  it('surfaces a block-candidate grapheme (composed from PlacementWorklist.blockedCombinations via composeCombo) as a candidate, tagged reason "blocked-combination", when its rule shape passes the existing guards', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule-blocked-combo', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: 'é' }] }],
+      }],
+    });
+
+    const result = recommendedRemovalChars({
+      ir,
+      needed: new Set(['q']), // 'é' absent — surplus
+      blockCandidateChars: new Set(['é']),
+    });
+
+    expect(result.map((r) => r.ch)).toContain('é');
+    expect(result.find((r) => r.ch === 'é')?.reason).toBe('blocked-combination');
+  });
+
+  it('does NOT tag an ordinary CLDR-surplus result with `reason` — only chars named via blockCandidateChars get it', () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result.map((r) => r.ch)).toEqual(['y']);
+    expect(result[0]?.reason).toBeUndefined();
+  });
+
+  it('shields an ATTESTED combo even when it is also passed as a blockCandidateChars entry — needed still wins (conservative default: block-candidates never bypass the surplus check)', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule-attested-combo', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: 'é' }] }],
+      }],
+    });
+
+    // 'é' is in `needed` (e.g. an attested stack landed it in requiredPrimary)
+    // even though its base+mark pair is ALSO named in blockedCombinations —
+    // exactly the "attested stack wins" shape carve-needed-set.test.ts pins.
+    const result = recommendedRemovalChars({
+      ir,
+      needed: new Set(['é']),
+      blockCandidateChars: new Set(['é']),
+    });
+
+    expect(result.map((r) => r.ch)).not.toContain('é');
+  });
+
+  it('degrade-when-absent: an empty (or omitted) blockCandidateChars produces byte-identical output to calling without the argument at all', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          makeCharOnlyRule(), // produces surplus 'y'
+          { nodeId: 'rule-dk', context: [{ kind: 'deadkey', id: 1 }, { kind: 'char', value: 'a' }], output: [{ kind: 'char', value: 'z' }] },
+        ],
+      }],
+    });
+    const needed = new Set(['q']);
+
+    const withoutArg = recommendedRemovalChars({ ir, needed });
+    const withEmptySet = recommendedRemovalChars({ ir, needed, blockCandidateChars: new Set() });
+
+    expect(withEmptySet).toEqual(withoutArg);
+  });
+
+  it('a block-candidate whose sole producer is a deadkey-context rule is still shielded — block-candidates run through the SAME allowlist rule-shielding guard, not a shortcut around it', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule-dk-combo', context: [{ kind: 'deadkey', id: 1 }, { kind: 'char', value: 'a' }], output: [{ kind: 'char', value: 'é' }] },
+        ],
+      }],
+    });
+
+    const result = recommendedRemovalChars({
+      ir,
+      needed: new Set(['q']),
+      blockCandidateChars: new Set(['é']),
+    });
+
+    expect(result.map((r) => r.ch)).not.toContain('é');
+  });
+
+  it('a block-candidate whose sole producer is an opaque raw fragment is still shielded', () => {
+    const ir = makeIR({
+      raw: [{
+        nodeId: 'raw-1', reason: 'unsupported-syntax', sourceText: "+ [K_X] > dk(1)",
+        producedOutput: [{ kind: 'char', value: 'é' }],
+      } as unknown as KeyboardIR['raw'][number]],
+    });
+
+    const result = recommendedRemovalChars({
+      ir,
+      needed: new Set(['q']),
+      blockCandidateChars: new Set(['é']),
+    });
+
+    expect(result.map((r) => r.ch)).not.toContain('é');
+  });
+
+  it('a block-candidate grapheme with NO producer at all in the IR is shielded (default-safe — nothing to remove)', () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces only 'y'
+
+    const result = recommendedRemovalChars({
+      ir,
+      needed: new Set(['q']),
+      blockCandidateChars: new Set(['é']), // never produced anywhere in this IR
+    });
+
+    expect(result.map((r) => r.ch)).not.toContain('é');
+    expect(result.map((r) => r.ch)).toEqual(['y']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #526 AC #2 regression — carve must never recommend removing a reachable
+// productive-mark combo, even when CLDR would call it surplus. No new
+// production logic backs this (see deriveCarveNeededSet's optionalSecondary
+// tier + useCarveNeededSet's union into neededSet); this test pins the
+// existing wiring end-to-end so a future refactor can't silently regress it.
+// ---------------------------------------------------------------------------
+
+describe('#526 AC #2 regression — productive-mark reachable combo is never recommended for removal', () => {
+  it('a reachable base+mark combo for a PRODUCTIVE mark lands in deriveCarveNeededSet.optionalSecondary, and once unioned into `needed` (as useCarveNeededSet does), recommendedRemovalChars never proposes it — even though a CLDR-only needed-set (without this union) would call it surplus', () => {
+    const ACUTE = '́';
+    const alphabet = makeConfirmedAlphabet({
+      bases: ['a', 'e'],
+      marks: [ACUTE],
+    });
+    const worklist: PlacementWorklist = {
+      ownLetterUnits: ['a', 'e'],
+      markUnits: [{ mark: ACUTE, inputOrder: 'postfix' }], // productive
+      blockedCombinations: [],
+    };
+    const carveNeeded = deriveCarveNeededSet({ alphabet, worklist });
+    expect(carveNeeded.optionalSecondary.has('á')).toBe(true); // reachable combo, productive class
+
+    // A bare CLDR exemplar set for this (hypothetical) language does not list
+    // 'á' at all — this is the "CLDR would call it surplus" premise.
+    const cldrOnlyNeeded = new Set(['a', 'e']);
+    expect(cldrOnlyNeeded.has('á')).toBe(false);
+
+    // The real pipeline (useCarveNeededSet) unions optionalSecondary into
+    // `neededSet` before recommendedRemovalChars ever sees it.
+    const neededSet = new Set([...cldrOnlyNeeded, ...carveNeeded.requiredPrimary, ...carveNeeded.optionalSecondary]);
+
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        // Deadkey-composed, exactly how a productive mark's reachable combo
+        // is actually produced — isSimpleRemovableRule would reject this rule
+        // shape too, but the needed-set union is the shield under test here.
+        rules: [{ nodeId: 'rule-a-acute', context: [{ kind: 'deadkey', id: 1 }, { kind: 'char', value: 'a' }], output: [{ kind: 'char', value: 'á' }] }],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: neededSet });
+
+    expect(result.map((r) => r.ch)).not.toContain('á');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // coordinatedCollateralForSlots (#525/#931 follow-up — manual-carve safety)
 // ---------------------------------------------------------------------------

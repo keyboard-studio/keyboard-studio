@@ -2549,6 +2549,17 @@ export interface RecommendedRemovalChar {
    * gallery unions them at apply time.
    */
   caseGroup?: string[];
+  /**
+   * Present (#526 AC #3) only when `ch` was surfaced via the `blockCandidateChars`
+   * argument — i.e. the marks series' confirmed alphabet names this grapheme's
+   * base+mark pair as one that must never be reachable (`PlacementWorklist.blockedCombinations`),
+   * not merely a CLDR/exemplar gap. Undefined for every ordinary CLDR-surplus
+   * result, so existing callers/tests that don't know about this signal see no
+   * change. A higher-confidence signal than the plain surplus check — the UI
+   * may use it to present the row with stronger wording — but it does NOT
+   * change which guards ran; see `recommendedRemovalChars`'s doc.
+   */
+  reason?: "blocked-combination";
 }
 
 /**
@@ -2600,18 +2611,45 @@ export interface RecommendedRemovalChar {
  * (used well beyond carve), its output is re-normalized to `form` here at
  * this comparison seam, alongside `needed`, so both sides of the
  * surplus-detection match under the SAME form.
+ *
+ * `blockCandidateChars` (#526 AC #3, default empty — omitting it is
+ * byte-identical to pre-#526 behavior) — composed graphemes for the marks
+ * series' `PlacementWorklist.blockedCombinations` (from
+ * `useCarveNeededSet`'s `blockCandidateChars`, via `composeCombo`). These are
+ * UNIONED into the candidate-iteration set alongside `produced` so a
+ * block-candidate grapheme gets exactly the same 3-guard treatment (surplus
+ * check, allowlist rule-shielding, coordinated-removal collateral guard)
+ * every ordinary produced character gets — this argument only ADDS candidate
+ * material, it never bypasses a guard. Note the surplus check (guard 1) still
+ * applies to block-candidate chars too: a block-candidate whose composed
+ * grapheme also happens to be a member of `needed` is NOT recommended, even
+ * though the confirmed alphabet names its base+mark pair as one that must
+ * never be reachable — a deliberately conservative default (flagged for
+ * km-strategy/km-domain follow-up, not resolved here).
  */
 export function recommendedRemovalChars(args: {
   ir: KeyboardIR;
   needed: ReadonlySet<string>;
   bcp47?: string | null | undefined;
   form?: CharNormalizationForm;
+  blockCandidateChars?: ReadonlySet<string>;
 }): RecommendedRemovalChar[] {
-  const { ir, needed: rawNeeded, bcp47, form = 'NFC' } = args;
+  const { ir, needed: rawNeeded, bcp47, form = 'NFC', blockCandidateChars = new Set<string>() } = args;
   if (rawNeeded.size === 0) return [];
   const needed = new Set([...rawNeeded].map((ch) => ch.normalize(form)));
 
   const produced = new Set([...buildProducedSet(ir)].map((ch) => ch.normalize(form)));
+  // Normalized to `form` for the same reason `produced`/`needed` are — the
+  // caller (useCarveNeededSet) already normalizes to its own `form`, but this
+  // function must never assume the caller's form matches the `form` argument
+  // it was invoked with.
+  const blockCandidates = new Set([...blockCandidateChars].map((ch) => ch.normalize(form)));
+  // Deliberately a SEPARATE set from `produced` — the case-pairing fold below
+  // (FR-013/FR-014) buckets by `produced` membership to find an uppercase
+  // counterpart, and a block-candidate grapheme is (by definition) not
+  // actually produced; folding it into `produced` itself would let an
+  // unrealized combo participate in that fold as if it were a real character.
+  const candidateChars = blockCandidates.size === 0 ? produced : new Set([...produced, ...blockCandidates]);
   const storesById = new Map(ir.stores.map((s) => [s.nodeId, s]));
   const rulesById = new Map<string, IRRule>();
   for (const group of ir.groups) {
@@ -2628,7 +2666,7 @@ export function recommendedRemovalChars(args: {
 
   const results: RecommendedRemovalChar[] = [];
 
-  for (const ch of produced) {
+  for (const ch of candidateChars) {
     if (isCharCoveredForLocale(ch, needed, bcp47 ?? '', form)) continue; // needed — not a candidate
     if (isAlwaysKeepCategory(ch)) continue; // digit/punctuation/symbol — never a removal candidate
 
@@ -2666,7 +2704,11 @@ export function recommendedRemovalChars(args: {
 
     if (!allSimple || dependsOnNeeded) continue;
 
-    results.push({ ch, contributors });
+    results.push({
+      ch,
+      contributors,
+      ...(blockCandidates.has(ch) ? { reason: 'blocked-combination' as const } : {}),
+    });
   }
 
   // FR-014 (contracts/case-pairing.md "Proposal-row granularity"): when both members of
