@@ -132,10 +132,27 @@ describe("createLookupQuestionLabel", () => {
     expect(lookup("q1")).toBe("Langue");
   });
 
-  it("defaults to reading the live question registry when no source is injected, matching a known question's prompt", () => {
+  it("defaults to reading the live question registry when no source is injected, preferring a question's audit_label", () => {
+    // il_language_english carries an audit_label, so the live registry must
+    // resolve to it rather than to the long interrogative prompt -- which is
+    // the whole reason the field exists.
     const mod = questionRegistry["il_language_english"];
     expect(mod).toBeDefined();
+    expect(mod!.definition.audit_label).toBeTruthy();
     const lookup = createLookupQuestionLabel();
-    expect(lookup("il_language_english")).toBe(mod!.definition.prompt);
+    expect(lookup("il_language_english")).toBe(mod!.definition.audit_label);
+    expect(lookup("il_language_english")).not.toBe(mod!.definition.prompt);
+  });
+
+  it("defaults to the live question registry's prompt for a question with no audit_label", () => {
+    const id = Object.keys(questionRegistry).find(
+      (key) =>
+        questionRegistry[key]?.definition.prompt !== undefined &&
+        questionRegistry[key]?.definition.audit_label === undefined,
+    );
+    expect(id).toBeDefined();
+    const mod = questionRegistry[id!];
+    const lookup = createLookupQuestionLabel();
+    expect(lookup(id!)).toBe(mod!.definition.prompt);
   });
 });

@@ -427,6 +427,14 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-03T05:38:01.923Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T05:52:54.912Z"
     }
   ],
   "coverage": {
@@ -811,7 +819,7 @@
     }
   },
   "telemetryInstanceId": "c7509f96-1e29-4e6f-8a65-690a8a8ad00d",
-  "currentTask": "T039",
+  "currentTask": "T043",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1175,6 +1183,15 @@
       "did": "Added 9 FR-021/SC-009 tests: stage roll-up render resolves zero impacts (incl. a 200-entry trail), expanding one entry resolves exactly that one, and the injected resolver is the trail's only route to impact",
       "files": [
         "packages/studio/src/decisions/impact.test.ts"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "Full gate green: pnpm typecheck (7 packages), pnpm -r test (8292 passed, 2 skipped, 0 failed), pnpm lint (0 errors, all 8 checkers green); fixed stale lookupQuestionLabel expectation and reconciled fr catalog parity",
+      "files": [
+        "packages/studio/src/decisions/lookupQuestionLabel.test.ts",
+        "packages/studio/src/locales/fr/messages.json",
+        "packages/studio/src/locales/en/messages.json"
       ]
     }
   }

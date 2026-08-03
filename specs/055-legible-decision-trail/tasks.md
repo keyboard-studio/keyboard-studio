@@ -216,7 +216,7 @@ This phase is presentation over an unchanged record — cuttable without touchin
 
 **⟶ Wait for Wave 1 to finish, then:**
 
-- [ ] **T043** Full gate before hand-off: `pnpm typecheck`, `pnpm -r test`, `pnpm lint` (which runs `depcruise`, `crew-lint`, `content-i18n-lint`, `content-i18n-freshness`, and `test-antipattern-lint`), plus a walkthrough of SC-001..SC-013 recording the evidence for each · (verification only — no file edit)
+- [x] **T043** Full gate before hand-off: `pnpm typecheck`, `pnpm -r test`, `pnpm lint` (which runs `depcruise`, `crew-lint`, `content-i18n-lint`, `content-i18n-freshness`, and `test-antipattern-lint`), plus a walkthrough of SC-001..SC-013 recording the evidence for each · (verification only — no file edit)
 
 ---
 
