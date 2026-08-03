@@ -33,10 +33,33 @@ export function parseBearer(header: string | null | undefined): string | null {
   return token === "" ? null : token;
 }
 
+/** Optional provenance settings for {@link verifyGitHubUser}. */
+export interface VerifyOptions {
+  /**
+   * Client ids this deployment issued tokens under — `GITHUB_CLIENT_ID` (the
+   * GitHub App user-to-server credential behind sign-in) and
+   * `GITHUB_OAUTH_CLIENT_ID` (the classic OAuth App behind the Option A
+   * `public_repo` flow). When the `GET /user` response carries an
+   * `X-OAuth-Client-ID` header matching none of these, verification fails.
+   *
+   * Pass **both** configured ids: accepting only one refuses Option A's
+   * classic-OAuth-App tokens on the draft endpoints.
+   *
+   * An absent header passes and an empty/omitted array disables the check —
+   * both fail-open, deliberately. This is defense-in-depth against a token
+   * issued to some *other* application, a precondition an attacker must already
+   * have met; making an absent header fatal would break every fetch adapter
+   * that does not surface headers. Identity verification itself stays
+   * fail-closed (an unreachable provider still yields null, below).
+   */
+  allowedClientIds?: readonly string[];
+}
+
 /**
  * Verify a GitHub access token by calling `GET /user`. Returns the verified
- * identity, or null when the token is missing/invalid/revoked or GitHub is
- * unreachable — callers map null to 401. Never throws.
+ * identity, or null when the token is missing/invalid/revoked, GitHub is
+ * unreachable, or the token was issued to a different application than the
+ * configured ones — callers map null to 401. Never throws.
  *
  * A `User-Agent` is required by the GitHub API; `Accept` pins the v3 JSON media
  * type. The token is never logged.
@@ -44,6 +67,7 @@ export function parseBearer(header: string | null | undefined): string | null {
 export async function verifyGitHubUser(
   token: string | null,
   fetchFn: OAuthFetchFn,
+  options?: VerifyOptions,
 ): Promise<GitHubUser | null> {
   if (token === null || token === "") return null;
 
@@ -62,6 +86,15 @@ export async function verifyGitHubUser(
   }
 
   if (!res.ok) return null;
+
+  // Token provenance: refuse a token this application did not issue. Both an
+  // absent header and an unconfigured allow-list skip the check (see
+  // VerifyOptions.allowedClientIds for why that is deliberate).
+  const allowed = options?.allowedClientIds;
+  if (allowed !== undefined && allowed.length > 0) {
+    const presented = res.headers?.get("X-OAuth-Client-ID") ?? null;
+    if (presented !== null && !allowed.includes(presented)) return null;
+  }
 
   let body: unknown;
   try {

@@ -48,6 +48,10 @@ const webFetch: OAuthFetchFn = async (url, init) => {
     ok: res.ok,
     status: res.status,
     json: () => res.json() as Promise<unknown>,
+    // Surfaced so the token-provenance check in verify-github-user.ts has an
+    // `X-OAuth-Client-ID` to read. Web `Headers.get` is case-insensitive and
+    // returns null for an absent name, which is exactly the contract.
+    headers: res.headers,
   };
 };
 

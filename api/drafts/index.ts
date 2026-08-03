@@ -50,6 +50,10 @@ const webFetch: OAuthFetchFn = async (url, init) => {
     ok: res.ok,
     status: res.status,
     json: () => res.json() as Promise<unknown>,
+    // Load-bearing for the token-provenance check: this is the adapter the
+    // serverless draft endpoints verify identity through, so dropping headers
+    // here would silently disable FR-012 on the deployed route.
+    headers: res.headers,
   };
 };
 
