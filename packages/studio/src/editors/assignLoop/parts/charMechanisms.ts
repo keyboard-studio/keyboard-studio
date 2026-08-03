@@ -5,28 +5,19 @@
 // the two computations can never drift against each other or against what
 // the badge shows.
 //
-// PRODUCES (the badge count): mechanisms whose OUTPUT is `char` — i.e. an
-// `individual`-scope assignment TARGETING `char`, in the caller's own
-// modality. Deliberately counts EVERY mechanism type (S-01/S-02/S-03/S-08 on
-// desktop; longpress/flick/multitap/replace on touch) — sequences count as
-// producers here even though each gallery's own excludeSequenceMechanisms
-// filter (MechanismGallery.tsx) hides sequence-owned assignments from THAT
-// gallery's own "Added"/"Applied methods" chips. That exclusion is a
-// sequence-ownership concern for THIS gallery's own edit surface; the
-// badge is a cross-cutting "how many ways in total" count and must not
-// inherit it. The one type NEVER counted here is TouchGallery's own
-// `touch_inherited` placeholder mechanism — it marks "already reachable via
-// the base touch layout, not user-configured" (see TouchGallery.tsx's own
-// exclusion of it), not a real producer; every other touch-coverage check in
-// the codebase excludes it, so this selector must too. Seed reachability is
-// instead counted through the separate `inheritedChars` parameter below, so
-// that a character the base layout already produces badges as reachable
-// whether or not the author ever accepted its "already in layout" suggestion
-// — and is never double-counted when they did. producesCount counts MECHANISMS, not assignments — a
-// single assignment may carry more than one real mechanism for the same
-// target (MechanismGallery's multiple-methods-per-character support), and
-// each counts as a separate "way", matching the badge's own aria-label
-// ("# way(s) produce this character").
+// THE BADGE ITSELF is `getProducerBadge`, below (the 3-signal "how many
+// independent ways can you produce this character" model — see that
+// function's own doc comment for the full contract). This file's other
+// export, `getCharMechanisms`, is the PRE-getProducerBadge PRODUCES/USES
+// predicate: its `usesSequences` half is what actually feeds
+// UsesSequencesCard's "sequences using this character" list (Part 3) today;
+// its `producesCount` half is a narrower, non-composition-aware direct-match
+// count (individual-scope, modality-matching mechanisms targeting `char`,
+// same exclusion of `touch_inherited` as `getProducerBadge`'s signal (b)) —
+// superseded by `getProducerBadge` for the badge itself, and kept only
+// because `directProducesCount` (which both this and `getProducerBadge` call)
+// is genuinely shared. Do not wire `getCharMechanisms.producesCount` into a
+// new badge display — use `getProducerBadge`.
 //
 // USES (the bottom list): every recorded multi_char_sequence
 // (PATTERN_SEQUENCE) MechanismRef where `char` appears in ANY slot —
@@ -41,6 +32,7 @@
 // themselves are a disjoint set.
 
 import type { MechanismAssignment, MechanismRef, Modality } from "@keyboard-studio/contracts";
+import { composableComponentsFor } from "@keyboard-studio/contracts";
 import { PATTERN_SEQUENCE } from "../patternIds.ts";
 
 /** One recorded sequence that uses `char` — paired with the assignment's own target (the char the sequence PRODUCES). */
@@ -52,7 +44,7 @@ export interface UsedSequenceEntry {
 }
 
 export interface CharMechanismsResult {
-  /** Count of ways `char` is produced: mechanisms (any pattern) whose OUTPUT is `char` — individual-scope, this modality — plus one for seed reachability when `char` is in the caller's `inheritedChars`. */
+  /** Count of REAL (non-`touch_inherited`) mechanisms whose OUTPUT is `char` — individual-scope, this modality. Composition-unaware — see this file's own header comment for how this relates to `getProducerBadge`, the actual badge computation. */
   producesCount: number;
   /** Every recorded sequence where `char` appears in ANY slot (input or output), across all modalities in the given assignments. */
   usesSequences: UsedSequenceEntry[];
@@ -65,42 +57,13 @@ function sequenceRefUsesChar(ref: MechanismRef, char: string): boolean {
 }
 
 /**
- * Compute both halves of the PRODUCES/USES split for `char` from
- * `assignments`. This function does not know where assignments come from,
- * only how to classify them — callers pass whichever list holds the
- * assignments relevant to the half they need. MechanismGallery passes its
- * own physical `sessionAssignments` for both halves. TouchGallery passes two
- * different lists for its two call sites: its local `charTouch` map values
- * (touch) for the PRODUCES badge, and its Phase C desktop assignments
- * (physical) for the USES list, since sequences are always recorded with
- * physical modality — neither call site concatenates the two.
- *
- * `inheritedChars` (optional) is the set of characters the caller's SEED
- * layout already produces without any author edit — TouchGallery's
- * `detectedChars` (the "already in touch layout" set). A character in that
- * set is genuinely produced by the keyboard, so it contributes one way to
- * `producesCount`. MechanismGallery has no such notion and omits it.
- */
-/**
- * The direct-match half of `producesCount` on its own, with none of the
- * `inheritedChars`/seed-reachability bonus folded in: the count of REAL
+ * The direct-match half of `producesCount` on its own: the count of REAL
  * (non-`touch_inherited`) mechanisms whose OUTPUT is `char` via an
  * individual-scope, `modality`-matching assignment in `assignments`.
  *
- * Exported so a caller building its OWN session-aware "inherited" bonus set
- * — MechanismGallery's `alreadyProducedSet`, TouchGallery's
- * `sessionDetectedChars` — can EXCLUDE a character this returns > 0 for
- * before passing that set as `inheritedChars` below. Both of those
- * session-aware sets are (in part) *re-derived* from the very same
- * assignments this function scans — a session-produced glyph set is built
- * by re-parsing the base .kmn AS MODIFIED by this session's assignments
- * (`buildSessionProducedSet`) — so a char already counted here would
- * otherwise be counted a SECOND time via the `inheritedChars` bonus below
- * for the exact same single mechanism, not a genuinely distinct second way
- * to produce it. See MechanismGallery.tsx's/TouchGallery.tsx's own
- * `alreadyProducedSet`/`sessionDetectedChars` doc comments for the full
- * rationale, and this file's own `getCharMechanisms` — which now calls this
- * helper for its own direct-match half, so the two can never drift.
+ * Exported as the shared primitive both `getCharMechanisms`'s own
+ * `producesCount` and `getProducerBadge`'s signal (b) (SESSION-DIRECT) build
+ * on, so the two can never drift against each other.
  */
 export function directProducesCount(
   char: string,
@@ -119,17 +82,87 @@ export function directProducesCount(
   return count;
 }
 
+// ---------------------------------------------------------------------------
+// getProducerBadge — the 3-signal "how many independent ways can you produce
+// this character" model behind CharScrollStrip's badge (deletion-safety
+// signal, per product decision: a char reachable BOTH by its own key AND by
+// composition shows 2, not 1). Replaces the former inheritedChars/
+// directTargets-exclusion workaround each gallery used to build for itself
+// (MechanismGallery's old `alreadyProducedSet` exclusion, TouchGallery's old
+// `sessionDetectedChars` exclusion) — those built one combined "is this
+// reachable at all" set and subtracted direct targets from it to avoid a
+// double-count; this instead sums three DISJOINT signals directly, so the
+// double-count can't recur.
+//
+//   (a) BASE-DIRECT (0/1)     — `char` is a member of `baseDirectSet`.
+//   (b) SESSION-DIRECT (count) — `directProducesCount(char, assignments,
+//       modality)`, counted PER MECHANISM (not collapsed to a boolean) — two
+//       keys assigned to the same char is 2, not 1.
+//   (c) COMPOSITION (0/1)    — `char`'s own canonical-NFD components are ALL
+//       members of `preAugmentSessionAwareSet` (`composableComponentsFor`,
+//       one level, no recursion — @keyboard-studio/contracts/ir/composable).
+//
+// (a)/(b) test `char`'s OWN direct output; (c) tests `char`'s COMPONENTS —
+// this is what keeps the three signals disjoint. `baseDirectSet` and
+// `preAugmentSessionAwareSet` MUST both be PRE-AUGMENT (never folded through
+// `augmentWithComposable`) — an augmented set already contains composed
+// characters as ordinary members, which would let (a) or (c) silently
+// re-count a composition the OTHER signal already contributed, reintroducing
+// the double-count this model exists to prevent. See MechanismGallery.tsx's
+// and TouchGallery.tsx's own call-site doc comments for which pre-augment set
+// each passes for which gallery/modality.
+export interface ProducerBadge {
+  /** Total independent ways `char` can be produced: baseDirect + sessionDirect + (isComposable ? 1 : 0). */
+  count: number;
+  /** True when signal (a) or (b) contributed > 0 — `char` has at least one non-composition producing mechanism. */
+  hasDirect: boolean;
+  /** True when signal (c) fired — `char`'s NFD components are all directly reachable, independent of whether `char` itself is. */
+  isComposable: boolean;
+  /**
+   * `char`'s own canonical-NFD components, in NFD order, when `isComposable`
+   * is true — empty otherwise. Exposed so a caller building a compose-clause
+   * display string (CharScrollStrip's `composeComponentNames`) reuses the
+   * decomposition `composableComponentsFor` already computed here, rather
+   * than re-running `char.normalize("NFD")` a second time.
+   */
+  components: string[];
+}
+
+export function getProducerBadge(
+  char: string,
+  assignments: ReadonlyArray<MechanismAssignment>,
+  modality: Modality,
+  baseDirectSet: ReadonlySet<string>,
+  preAugmentSessionAwareSet: ReadonlySet<string>,
+): ProducerBadge {
+  const baseDirect = baseDirectSet.has(char) ? 1 : 0;
+  const sessionDirect = directProducesCount(char, assignments, modality);
+  const composable = composableComponentsFor(preAugmentSessionAwareSet, char);
+  const isComposable = composable !== undefined;
+  return {
+    count: baseDirect + sessionDirect + (isComposable ? 1 : 0),
+    hasDirect: baseDirect > 0 || sessionDirect > 0,
+    isComposable,
+    components: composable?.components ?? [],
+  };
+}
+
+/**
+ * Compute both halves of the PRODUCES/USES split for `char` from
+ * `assignments`. This function does not know where assignments come from,
+ * only how to classify them — callers pass whichever list holds the
+ * assignments relevant to the half they need. The sole production caller
+ * (`UsesSequencesCard.tsx`) only reads the `usesSequences` half; the
+ * `producesCount` half exists for callers/tests exercising the direct-match
+ * predicate on its own (see this file's header comment re: `getProducerBadge`
+ * being the actual badge computation).
+ */
 export function getCharMechanisms(
   char: string,
   assignments: ReadonlyArray<MechanismAssignment>,
   modality: Modality,
-  inheritedChars?: ReadonlySet<string>,
 ): CharMechanismsResult {
-  // Seed reachability is one way to produce the character, independent of the
-  // touch_inherited placeholder the "already" suggestion records (which is
-  // excluded below) — so accepting that suggestion cannot double-count it.
-  let producesCount = inheritedChars?.has(char) === true ? 1 : 0;
-  producesCount += directProducesCount(char, assignments, modality);
+  const producesCount = directProducesCount(char, assignments, modality);
   const usesSequences: UsedSequenceEntry[] = [];
 
   for (const a of assignments) {

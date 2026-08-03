@@ -1112,6 +1112,101 @@ describe("TouchGallery — character-scroll-strip producer badge (integration)",
 });
 
 // ---------------------------------------------------------------------------
+// Compose marker (CharScrollStrip Part 1, 3-signal count model) — integration
+// coverage for the TOUCH modality specifically.
+//
+// MechanismGallery.test.tsx already pins the compose marker's render-level
+// contract (data-testid `char-scroll-badge-compose-<HEX>`) for the desktop/
+// physical path. The touch path is MORE complex — its composition signal
+// (`directTouchProducedSet`, charMechanisms.ts's `getProducerBadge` signal
+// (c) input) folds a cross-modality union of `desktopDirectProducedSet`
+// (this session's desktop physical assignments, via
+// `selectDesktopAssignments`) and this session's own touch coverage (via
+// `computeTouchCoverage(layoutForLintAndGate, inventory)`) — see the
+// `directTouchProducedSet` memo's own doc comment in TouchGallery.tsx. That
+// fold had no render-level pin before this suite. Seeds touch assignments
+// directly via `setTouchDraft` (the same store-seed precedent the rest of
+// this file uses, e.g. the "does NOT set ... touch_inherited" test above)
+// rather than driving the method-chooser UI twice — the fixture under test is
+// the composability FOLD, not the Apply flow itself (already covered by the
+// "Producer-count badge" suite above).
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — character-scroll-strip compose marker (integration)", () => {
+  it("a composable-only touch character (ǯ, reachable only via NFD composition of its own-key-produced ʒ + combining caron) shows the compose marker, badged 1", async () => {
+    seedStore({ withInventory: ["ʒ", "̌", "ǯ"] });
+    const ezhAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "touch",
+      mechanisms: [{ patternId: "touch_key_replace", slotValues: { hostKey: "K_Z", char: "ʒ", layer: "default" } }],
+      source: "user",
+    };
+    const caronAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "̌",
+      modality: "touch",
+      mechanisms: [{ patternId: "touch_key_replace", slotValues: { hostKey: "K_QUOTE", char: "̌", layer: "default" } }],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [
+        ["ʒ", ezhAssignment],
+        ["̌", caronAssignment],
+      ],
+      suggestionResolvedChars: [],
+    });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    // ǯ (U+01EF): no own-key touch assignment — its NFD components (ʒ,
+    // combining caron) are BOTH directly touch-produced this session, so it
+    // badges GREEN 1 via composition alone, with the compose marker present.
+    expect(within(strip).getByTestId("char-scroll-badge-compose-01EF")).toBeTruthy();
+    expect(within(strip).getByTestId("char-scroll-badge-01EF").textContent).toBe("1");
+  });
+
+  it("a plain own-key touch character (ʒ, not NFD-decomposable) shows NO compose marker", async () => {
+    seedStore({ withInventory: ["ʒ", "̌", "ǯ"] });
+    const ezhAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "touch",
+      mechanisms: [{ patternId: "touch_key_replace", slotValues: { hostKey: "K_Z", char: "ʒ", layer: "default" } }],
+      source: "user",
+    };
+    const caronAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "̌",
+      modality: "touch",
+      mechanisms: [{ patternId: "touch_key_replace", slotValues: { hostKey: "K_QUOTE", char: "̌", layer: "default" } }],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [
+        ["ʒ", ezhAssignment],
+        ["̌", caronAssignment],
+      ],
+      suggestionResolvedChars: [],
+    });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    // ʒ (U+0292) itself has its own touch key and is not NFD-decomposable, so
+    // composition can never fire for it — marker ABSENT, badge reflects the
+    // direct assignment only (1), not inflated by a phantom composition bonus.
+    expect(within(strip).queryByTestId("char-scroll-badge-compose-0292")).toBeNull();
+    expect(within(strip).getByTestId("char-scroll-badge-0292").textContent).toBe("1");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // UsesSequencesCard (Part 3) — integration coverage.
 //
 // UsesSequencesCard.tsx (packages/studio/src/editors/assignLoop/parts/) has

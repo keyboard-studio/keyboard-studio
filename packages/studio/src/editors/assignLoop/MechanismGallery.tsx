@@ -69,6 +69,7 @@ import type {
 import {
   toUPlusNotation,
   isDecomposableAccented,
+  buildProducedSet,
 } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { collateInventory } from "../../survey/collation.ts";
@@ -136,7 +137,7 @@ import { usePositionalCharNav, nearestSurvivingChar, indexOfChar } from "./usePo
 import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
-import { directProducesCount } from "./parts/charMechanisms.ts";
+import { getProducerBadge } from "./parts/charMechanisms.ts";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
 import {
@@ -1334,10 +1335,7 @@ export function MechanismGallery({
     (s) => s.markGalleryIntroSeen,
   );
 
-  const {
-    lettersToAdd: inventoryLettersToAdd,
-    producedSet: sessionAwareProducedSet,
-  } = useInventoryDiff();
+  const { lettersToAdd: inventoryLettersToAdd } = useInventoryDiff();
 
   // Collated display order (spec 047 FR-007's default-ICU comparator, reused
   // — not reinvented; see survey/collation.ts): puts a lowercase letter
@@ -1383,79 +1381,36 @@ export function MechanismGallery({
     [phaseResults],
   );
 
-  // Display-only set for CharScrollStrip's badge (criterion 18.6 SHOW-ALL):
-  // characters this session's keyboard already produces — directly OR via
-  // one-level composition (e.g. ǯ from a directly-produced ezh + a directly-
-  // produced caron, both added THIS session) — render the green produces->=1
-  // badge via CharScrollStrip's `inheritedChars` (same contract TouchGallery's
-  // `detectedChars` already uses) even though they carry no
-  // MechanismAssignment of their own.
-  //
-  // Sourced from `useInventoryDiff()`'s SESSION-AWARE `producedSet` — not the
-  // static base-only `alreadyProduced` this used to read — because the badge
-  // is meant to answer "does a method exist to produce this character right
-  // now", and a composable char's method (the same synthesized composition
-  // row `collectCompositionMethod` below renders in "Existing methods") only
-  // exists once its components were produced THIS session; the static set
-  // would leave it red 0 until output. `producedSet` is already augmented via
-  // `augmentWithComposable` over the FULL `inventory` (not just
-  // `lettersToAdd`), through the exact same `composableComponentsFor`
-  // predicate `collectCompositionMethod` uses below (see
-  // packages/contracts/src/ir/composable.ts) — so a char this set marks
-  // green always has a real composition row backing it, and the two can
-  // never disagree.
-  //
-  // EXCLUDES characters `directProducesCount` already counts for
-  // `sessionAssignments` (this SAME assignments list, "physical" modality) —
-  // `sessionAwareProducedSet` is (in part) `buildSessionProducedSet`
-  // re-deriving these exact same assignments' own output by reparsing the
-  // merged .kmn, so folding an already-directly-assigned char into this
-  // badge-bonus set would double-count ONE mechanism as two "ways" (see
-  // charMechanisms.ts's `directProducesCount` doc comment). A char that is
-  // BOTH base-produced (or composable) AND separately, redundantly
-  // hand-assigned this session under-counts by one "way" here rather than
-  // risk that inflation — no case in the current test suite depends on the
-  // richer count, and correctness of the common (single-producer) case
-  // matters more than precision on that rare double-producer edge; flagged
-  // as a product-visible ambiguity, not silently guessed away.
-  //
-  // lettersToAdd itself (the coverage/gate denominator, criterion 18.6, and
-  // the walk MEMBERSHIP `usePositionalCharNav` steps over) is NEVER widened
-  // by this — it stays sourced from the STATIC base-only diff (see the
-  // locked constraint on lettersToAdd above and useInventoryDiff's own module
-  // doc): a composable-but-not-yet-assigned character stays IN the walk
-  // (same as before), it just now badges green instead of red, and
-  // `currentChar` still does not auto-advance past it.
-  const alreadyProducedSet = useMemo(() => {
-    // One pass over the (small) session assignment list — not one call of
-    // `directProducesCount` per member of `sessionAwareProducedSet` (which
-    // can run to thousands of glyphs for a large inventory) — to find every
-    // char this modality's own individual-scope assignments already count
-    // directly, then filter those out of the badge-bonus set in a single
-    // second pass.
-    const directTargets = new Set<string>();
-    for (const target of new Set(sessionAssignments.map((a) => a.target))) {
-      if (directProducesCount(target, sessionAssignments, "physical") > 0) {
-        directTargets.add(target);
-      }
-    }
-    const out = new Set<string>();
-    for (const ch of sessionAwareProducedSet) {
-      if (!directTargets.has(ch)) out.add(ch);
-    }
-    return out;
-  }, [sessionAwareProducedSet, sessionAssignments]);
+  // BASE-DIRECT signal (a) of the 3-signal producer badge (charMechanisms.ts's
+  // getProducerBadge) — the PRISTINE base-only produced set: no session
+  // assignments folded in at all, no `augmentWithComposable`. Contrast with
+  // `baseProducedSet` below, which DOES fold in this session's physical
+  // assignments (feeds signal (c), COMPOSITION) — the two are deliberately
+  // different sets. `excludeBackspaceCorrections: true` matches every other
+  // base-produced-set caller in this file (see `baseProducedSet` below) so a
+  // char reachable only via a backspace-correction rule is not wrongly
+  // counted as directly produced here either. Memoized on `baseIr` alone —
+  // this never reacts to session assignments, same as `lettersToAdd`.
+  const baseOnlyProducedSet = useMemo(
+    () =>
+      baseIr !== null
+        ? buildProducedSet(baseIr, { excludeBackspaceCorrections: true })
+        : new Set<string>(),
+    [baseIr],
+  );
 
-  // The BASE (pre-augmentWithComposable) produced set — same derivation
-  // useInventoryDiff() itself starts from before augmenting, NOT
-  // alreadyProducedSet above (which is already augmented — the composable
-  // membership test the badge uses). Feeds collectCompositionMethod below:
-  // composition must stay strictly ONE level, so it needs the un-augmented
-  // set to decide "is this composable from what's DIRECTLY produced", never
-  // "from what's already-composable". `excludeBackspaceCorrections: true` —
-  // SAME option useInventoryDiff() passes — so a char reachable ONLY via a
-  // backspace-correction store rule (e.g. the SIL Cameroon Â shape) is not
-  // wrongly treated as directly produced here either; without this, the
+  // The BASE (pre-augmentWithComposable) SESSION-AWARE produced set — this
+  // session's physical assignments folded into the base, but never itself run
+  // through `augmentWithComposable`. This is the badge's signal (c)
+  // (COMPOSITION) input — `preAugmentSessionAwareSet` — AND
+  // `collectCompositionMethod` below's own input: composition must stay
+  // strictly ONE level, so it needs the un-augmented set to decide "is this
+  // composable from what's DIRECTLY produced [this session]", never "from
+  // what's already-composable". Contrast with `baseOnlyProducedSet` above
+  // (no session assignments at all — signal (a)). `excludeBackspaceCorrections:
+  // true` — SAME option useInventoryDiff() passes — so a char reachable ONLY
+  // via a backspace-correction store rule (e.g. the SIL Cameroon Â shape) is
+  // not wrongly treated as directly produced here either; without this, the
   // early-out in collectCompositionMethod (`baseProduced.has(targetChar)`)
   // would suppress the real "A + ◌̂ → Â" composition row.
   //
@@ -2937,15 +2892,22 @@ export function MechanismGallery({
     }
 
     // SHOW-ALL floor (criterion 18.6-adjacent invariant): currentChar is
-    // GREEN (a member of the augmented alreadyProducedSet the CharScrollStrip
-    // badge uses) but, after everything above, still has zero rows — an
-    // unrecognized-shape producer collectCharContributors couldn't attribute
-    // at all. Append one truthful, no-arrow floor row rather than leave the
-    // section empty under a green badge.
+    // GREEN (getProducerBadge's count >= 1 — the SAME 3-signal computation
+    // CharScrollStrip's badge uses, see charMechanisms.ts) but, after
+    // everything above, still has zero rows — an unrecognized-shape producer
+    // collectCharContributors couldn't attribute at all. Append one truthful,
+    // no-arrow floor row rather than leave the section empty under a green
+    // badge.
     if (
       currentChar !== null &&
       rows.length === 0 &&
-      alreadyProducedSet.has(currentChar)
+      getProducerBadge(
+        currentChar,
+        sessionAssignments,
+        "physical",
+        baseOnlyProducedSet,
+        baseProducedSet,
+      ).count > 0
     ) {
       rows.push({
         id: `unattributed:${currentChar}`,
@@ -2974,7 +2936,8 @@ export function MechanismGallery({
     i18n,
     currentChar,
     baseProducedSet,
-    alreadyProducedSet,
+    baseOnlyProducedSet,
+    sessionAssignments,
   ]);
 
   const handleRemoveExistingMethod = useCallback(
@@ -3418,11 +3381,11 @@ export function MechanismGallery({
               should be able to see and inspect every character, including
               ones already produced (directly by the base, or composable
               from this session's own assignments), not only the ones
-              still needing a method. `inheritedChars` feeds the
-              session-aware `alreadyProducedSet` into CharScrollStrip's
-              badge so those chips still show the green produces->=1 badge
-              (mirrors TouchGallery's detectedChars). Selecting a chip goes
-              through
+              still needing a method. `baseDirectSet`/`preAugmentSessionAwareSet`
+              feed the 3-signal producer badge (charMechanisms.ts's
+              getProducerBadge) so those chips still show the green
+              produces->=1 badge (mirrors TouchGallery's matching props).
+              Selecting a chip goes through
               handleSelectDisplayChar (not handleSelectChar, which is gated
               on lettersToAdd) so an already-produced chip is still
               selectable — see handleSelectDisplayChar's own doc comment and
@@ -3436,7 +3399,8 @@ export function MechanismGallery({
             onSelectChar={handleSelectDisplayChar}
             assignments={sessionAssignments}
             modality="physical"
-            inheritedChars={alreadyProducedSet}
+            baseDirectSet={baseOnlyProducedSet}
+            preAugmentSessionAwareSet={baseProducedSet}
           />
         )}
 

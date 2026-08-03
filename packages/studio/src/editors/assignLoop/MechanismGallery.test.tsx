@@ -28,7 +28,12 @@ import { describe, it, expect, afterEach, vi, beforeEach, beforeAll } from "vite
 import { screen, fireEvent, act, cleanup, waitFor, within, renderHook } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { render } from "../../test/renderWithI18n.tsx";
-import { MechanismGallery, PATTERN_SEQUENCE, PATTERN_DEADKEY } from "./MechanismGallery.tsx";
+import {
+  MechanismGallery,
+  PATTERN_SEQUENCE,
+  PATTERN_DEADKEY,
+  PATTERN_SWAP,
+} from "./MechanismGallery.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { useWorkingCopyStore, bindManifest } from "../../stores/workingCopyStore.ts";
 import {
@@ -1963,6 +1968,191 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
     // real session assignment, not just inventory noise.
     const ezhBadge = within(strip).getByTestId("char-scroll-badge-0292");
     expect(ezhBadge.textContent).toBe("1");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Part 1 (3-signal count model) — case-table pins. Each reuses the same
+  // deadkey-byproduct fixture shape as the test above (one PATTERN_DEADKEY
+  // assignment whose accentedForms output is "ʒ" and whose double-tap
+  // byproduct is the bare combining caron "̌") — the exact shape verified not
+  // to collide inside applyAssignments' merge-by-group-name injection (see
+  // that test's own doc comment for why a SECOND PATTERN_DEADKEY assignment
+  // would collide on `group(deadkeys)`/`deadkey(accent)`; the own-key
+  // assignment below deliberately uses PATTERN_SWAP instead so it can coexist
+  // with the deadkey assignment in the same session).
+  // ---------------------------------------------------------------------------
+
+  it("a char reachable BOTH by its own key AND by composition (ǯ own-key + ʒ/caron session-composable) badges GREEN 2, with the compose marker present", async () => {
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+
+    seedInventory(["ʒ", "̌", "ǯ"]);
+
+    const producesEzhAndCaronByproduct: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: PATTERN_DEADKEY,
+          strategyId: "S-02",
+          slotValues: {
+            triggerKey: "K_QUOTE",
+            baseLetters: "z",
+            accentedForms: "ʒ",
+            accentChar: "̌",
+          },
+        },
+      ],
+      source: "user",
+    };
+    // ǯ's OWN key — deliberately PATTERN_SWAP (not a second PATTERN_DEADKEY,
+    // which would collide with the assignment above inside applyAssignments'
+    // merge-by-group-name injection — see this block's own header comment).
+    // `getById`/`getPatternByIdSync` don't resolve PATTERN_SWAP in this
+    // file's mocks, so it contributes a session-DIRECT mechanism (counted by
+    // `directProducesCount`, which never resolves patterns) without being
+    // baked into the re-parsed preview .kmn buildSessionProducedSet reads —
+    // exactly what this test needs: ǯ's own-key count and its composability
+    // (from the OTHER assignment) come from two independent signals.
+    const ownKeyForZhCaron: MechanismAssignment = {
+      scope: "individual",
+      target: "ǯ",
+      modality: "physical",
+      mechanisms: [{ patternId: PATTERN_SWAP, slotValues: { kmnRules: "+ [K_9] > 'ǯ'" } }],
+      source: "user",
+    };
+
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      assignments: [producesEzhAndCaronByproduct, ownKeyForZhCaron],
+    });
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    const ezhCaronBadge = within(strip).getByTestId("char-scroll-badge-01EF");
+    expect(ezhCaronBadge.textContent).toBe("2");
+    expect(ezhCaronBadge.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
+
+    // Compose marker present — ǯ IS composable (in addition to its own key).
+    expect(
+      within(strip).getByTestId("char-scroll-badge-compose-01EF"),
+    ).toBeTruthy();
+  });
+
+  it("a character assigned to TWO independent keys (two individual-scope mechanisms, no composability) badges GREEN 2 with no compose marker", async () => {
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+
+    // "ʒ" alone (no caron, no ǯ) — not NFD-decomposable, so composition can
+    // never fire for it; this pins the "own-key-only" side of the case table
+    // (a two-key char must read 2, not double-count into 3 or collapse to 1).
+    seedInventory(["ʒ"]);
+
+    const firstKey: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: PATTERN_DEADKEY,
+          strategyId: "S-02",
+          slotValues: { triggerKey: "K_QUOTE", baseLetters: "z", accentedForms: "ʒ" },
+        },
+      ],
+      source: "user",
+    };
+    const secondKey: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "physical",
+      mechanisms: [{ patternId: PATTERN_SWAP, slotValues: { kmnRules: "+ [K_9] > 'ʒ'" } }],
+      source: "user",
+    };
+
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      assignments: [firstKey, secondKey],
+    });
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    const ezhBadge = within(strip).getByTestId("char-scroll-badge-0292");
+    expect(ezhBadge.textContent).toBe("2");
+    expect(ezhBadge.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
+    expect(
+      screen.queryByTestId("char-scroll-badge-compose-0292"),
+    ).toBeNull();
+  });
+
+  it("the compose marker is present for a composable-only character (ǯ) and ABSENT for a plain own-key character (ʒ) in the SAME strip", async () => {
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+
+    seedInventory(["ʒ", "̌", "ǯ"]);
+
+    const producesEzhAndCaronByproduct: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: PATTERN_DEADKEY,
+          strategyId: "S-02",
+          slotValues: {
+            triggerKey: "K_QUOTE",
+            baseLetters: "z",
+            accentedForms: "ʒ",
+            accentChar: "̌",
+          },
+        },
+      ],
+      source: "user",
+    };
+
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      assignments: [producesEzhAndCaronByproduct],
+    });
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+
+    // ǯ: composable-only (no own-key assignment) — marker PRESENT.
+    expect(
+      within(strip).getByTestId("char-scroll-badge-compose-01EF"),
+    ).toBeTruthy();
+    expect(within(strip).getByTestId("char-scroll-badge-01EF").textContent).toBe("1");
+
+    // ʒ: own-key only, not NFD-decomposable — marker ABSENT.
+    expect(
+      within(strip).queryByTestId("char-scroll-badge-compose-0292"),
+    ).toBeNull();
+    expect(within(strip).getByTestId("char-scroll-badge-0292").textContent).toBe("1");
   });
 });
 
