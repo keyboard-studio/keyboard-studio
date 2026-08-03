@@ -287,13 +287,16 @@ def _print_summary(res: dict) -> None:
 
 
 def main() -> int:
+    # First statement, matching check-coverage.py: argparse writes --help and its
+    # error messages (which can quote a user-supplied path) before anything here
+    # runs, so the stream has to be safe before parsing, not after.
+    _configure_stdio()
+
     parser = argparse.ArgumentParser(
         description="Resolve a feature's pipeline position and next action."
     )
     parser.add_argument("--feature-dir", default=None)
     args = parser.parse_args()
-
-    _configure_stdio()
 
     root = wc._repo_root()
     feature_dir = wc.resolve_feature_dir(root, args.feature_dir)
