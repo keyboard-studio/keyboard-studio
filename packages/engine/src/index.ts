@@ -236,7 +236,7 @@ export type { MarksComputedAxes, MarksReconcileInputs, DisagreementInputs } from
 export { buildPlacementWorklist, verifyWorklistCoverage } from "./marks/worklist.js";
 export type { WorklistInputs } from "./marks/worklist.js";
 export { expandCaseCounterpartAttachments } from "./marks/case-fold.js";
-export { deriveCarveNeededSet } from "./marks/carve-needed-set.js";
+export { deriveCarveNeededSet, composeCombo } from "./marks/carve-needed-set.js";
 export type { CarveNeededSet, DeriveCarveNeededSetArgs } from "./marks/carve-needed-set.js";
 export { applyMarkGuards, MARKS_GUARD_GROUP, MARKS_UNWRAP_FROM_STORE, MARKS_UNWRAP_TO_STORE } from "./pattern-apply/mark-guards.js";
 export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
