@@ -27,6 +27,11 @@ import {
   type GoogleHandlerResult,
 } from "../../utilities/oauth-backend/src/google-handlers.js";
 import { GoogleExchangeBodySchema } from "../../utilities/oauth-backend/src/google-schemas.js";
+import {
+  enforceRateLimit,
+  rateLimitKey,
+  type RateLimitStore,
+} from "../../utilities/oauth-backend/src/rate-limit.js";
 
 export { exchangeCore, refreshCore, ExchangeBodySchema, RefreshBodySchema };
 export { googleExchangeCore, GoogleExchangeBodySchema };
@@ -98,18 +103,73 @@ export function jsonResponse(
 }
 
 /**
- * Run a POST JSON token endpoint: method guard → config → body validation →
- * core call → status mapping. `configOverride` lets tests inject a stub fetch
- * and credentials; production omits it and reads from env.
+ * Client address as the platform reports it, or null when it does not.
+ *
+ * `x-forwarded-for` may be a comma-separated chain; the left-most entry is the
+ * originating client. The value is only ever fed to {@link rateLimitKey}, which
+ * hashes it — no caller should log or store what this returns.
+ */
+export function clientAddress(req: Request): string | null {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded !== null && forwarded.trim() !== "") {
+    return (forwarded.split(",")[0] ?? "").trim() || null;
+  }
+  const realIp = req.headers.get("x-real-ip");
+  return realIp !== null && realIp.trim() !== "" ? realIp.trim() : null;
+}
+
+/**
+ * Rate-limit configuration for a token endpoint. Optional throughout: a route
+ * that passes none is not limited, exactly as before this existed.
+ */
+export interface TokenRateLimit {
+  /** Omit or pass null to leave the endpoint unmetered (logs one `[WARN]`). */
+  store: RateLimitStore | null;
+  /** Endpoint discriminator — keeps each endpoint's budget separate. */
+  endpoint: string;
+  windowSeconds: number;
+  limit: number;
+}
+
+/**
+ * Run a POST JSON token endpoint: method guard → **rate limit** → config → body
+ * validation → core call → status mapping. `configOverride` lets tests inject a
+ * stub fetch and credentials; production omits it and reads from env.
+ *
+ * The limiter sits directly after the method guard, which puts it ahead of
+ * everything that could reach the provider (FR-010: the limit is enforced before
+ * the outbound call). It is behind the method guard rather than in front of it so
+ * a client spraying non-POST requests cannot burn the budget that legitimate
+ * sign-ins from the same address need.
  */
 export async function runTokenHandler<T>(
   req: Request,
   schema: z.ZodType<T>,
   core: (body: T, config: HandlerConfig) => Promise<HandlerResult>,
   configOverride?: HandlerConfig,
+  rateLimit?: TokenRateLimit,
 ): Promise<Response> {
   if (req.method !== "POST") {
     return jsonResponse(405, { error: "method_not_allowed" }, { Allow: "POST" });
+  }
+
+  if (rateLimit !== undefined) {
+    const verdict = await enforceRateLimit(
+      rateLimit.store,
+      rateLimitKey(rateLimit.endpoint, clientAddress(req)),
+      rateLimit.windowSeconds,
+      rateLimit.limit,
+    );
+    if (!verdict.allowed) {
+      // `request_rate_limited`, not `rate_limited` — the latter already means
+      // "the upstream provider limited us" on the managed-PR path, and FR-011
+      // requires the two to stay distinguishable.
+      return jsonResponse(
+        429,
+        { error: "request_rate_limited" },
+        { "Retry-After": String(verdict.retryAfterSeconds) },
+      );
+    }
   }
 
   let config: HandlerConfig;

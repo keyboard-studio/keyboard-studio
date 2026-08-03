@@ -6,14 +6,20 @@
 // the config override (same DI pattern as the utility's own handler tests) so
 // no network and no real credentials are needed.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   runTokenHandler,
   exchangeCore,
   ExchangeBodySchema,
   envConfig,
+  clientAddress,
   type HandlerConfig,
+  type TokenRateLimit,
 } from "./_shared.js";
+import {
+  MemoryRateLimitStore,
+  type RateLimitStore,
+} from "../../utilities/oauth-backend/src/rate-limit.js";
 
 function stubConfig(
   ghResponse: { ok: boolean; status: number; body: unknown },
@@ -206,5 +212,141 @@ describe("envConfig", () => {
     const cfg = envConfig(stub);
     expect(cfg.oauthClientId).toBeUndefined();
     expect(cfg.oauthClientSecret).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rate limiter (US4 / FR-010, FR-011)
+//
+// The limiter itself is unit-tested in utilities/oauth-backend
+// (rate-limit.test.ts); what matters here is that the serverless glue refuses on
+// the same terms as the standalone server — before the outbound call, with the
+// code and header the contract pins.
+// ---------------------------------------------------------------------------
+
+describe("runTokenHandler — rate limiter", () => {
+  /** Config that counts outbound calls, so "before the provider call" is checkable. */
+  function countingConfig(): { config: HandlerConfig; calls: () => number } {
+    let calls = 0;
+    return {
+      config: {
+        clientId: "test-client-id",
+        clientSecret: "test-client-secret",
+        fetch: async () => {
+          calls += 1;
+          return {
+            ok: true,
+            status: 200,
+            json: () =>
+              Promise.resolve({ access_token: "gho_x", token_type: "bearer", scope: "public_repo" }),
+          };
+        },
+      },
+      calls: () => calls,
+    };
+  }
+
+  const limitOf = (store: RateLimitStore | null, limit: number): TokenRateLimit => ({
+    store,
+    endpoint: "oauth/exchange",
+    windowSeconds: 60,
+    limit,
+  });
+
+  const exchangeReq = () => postReq({ code: "gh-code" });
+
+  it("admits up to the limit, then returns 429 request_rate_limited with Retry-After", async () => {
+    const { config } = countingConfig();
+    const rl = limitOf(new MemoryRateLimitStore(() => 1_700_000_040_000), 2);
+
+    for (let i = 0; i < 2; i++) {
+      const ok = await runTokenHandler(exchangeReq(), ExchangeBodySchema, exchangeCore, config, rl);
+      expect(ok.status, `request ${i + 1}`).toBe(200);
+    }
+
+    const refused = await runTokenHandler(exchangeReq(), ExchangeBodySchema, exchangeCore, config, rl);
+    expect(refused.status).toBe(429);
+    // Not `rate_limited`: that code means the upstream provider limited us.
+    expect(await refused.json()).toEqual({ error: "request_rate_limited" });
+    expect(refused.headers.get("Retry-After")).toBe("60");
+  });
+
+  it("refuses before the outbound provider call (FR-010)", async () => {
+    const { config, calls } = countingConfig();
+    const rl = limitOf(new MemoryRateLimitStore(() => 1_700_000_040_000), 1);
+
+    await runTokenHandler(exchangeReq(), ExchangeBodySchema, exchangeCore, config, rl);
+    expect(calls()).toBe(1);
+
+    const refused = await runTokenHandler(exchangeReq(), ExchangeBodySchema, exchangeCore, config, rl);
+    expect(refused.status).toBe(429);
+    expect(calls()).toBe(1);
+  });
+
+  it("checks the method before the limiter, so non-POST spam cannot burn the budget", async () => {
+    const { config } = countingConfig();
+    const rl = limitOf(new MemoryRateLimitStore(() => 1_700_000_040_000), 1);
+
+    for (let i = 0; i < 5; i++) {
+      const res = await runTokenHandler(
+        new Request("https://app.example/oauth/exchange", { method: "GET" }),
+        ExchangeBodySchema,
+        exchangeCore,
+        config,
+        rl,
+      );
+      expect(res.status).toBe(405);
+    }
+
+    // The budget is untouched, so a legitimate sign-in from the same address
+    // still succeeds.
+    const ok = await runTokenHandler(exchangeReq(), ExchangeBodySchema, exchangeCore, config, rl);
+    expect(ok.status).toBe(200);
+  });
+
+  it("stays unmetered when no store is configured (fail open)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { config } = countingConfig();
+    const rl = limitOf(null, 1);
+
+    try {
+      for (let i = 0; i < 4; i++) {
+        const res = await runTokenHandler(exchangeReq(), ExchangeBodySchema, exchangeCore, config, rl);
+        expect(res.status).toBe(200);
+      }
+      expect(String(warn.mock.calls[0]?.[0])).toContain("[WARN]");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("is not applied at all when no rate limit is passed", async () => {
+    const { config } = countingConfig();
+    // Routes that pass nothing behave exactly as they did before the limiter
+    // existed — /oauth/refresh and the Google exchange rely on this.
+    for (let i = 0; i < 5; i++) {
+      const res = await runTokenHandler(exchangeReq(), ExchangeBodySchema, exchangeCore, config);
+      expect(res.status).toBe(200);
+    }
+  });
+});
+
+describe("clientAddress", () => {
+  const reqWith = (headers: Record<string, string>) =>
+    new Request("https://app.example/oauth/exchange", { method: "POST", headers });
+
+  it("takes the left-most x-forwarded-for entry", () => {
+    expect(clientAddress(reqWith({ "x-forwarded-for": "203.0.113.7, 70.41.3.18" }))).toBe(
+      "203.0.113.7",
+    );
+  });
+
+  it("falls back to x-real-ip", () => {
+    expect(clientAddress(reqWith({ "x-real-ip": "203.0.113.9" }))).toBe("203.0.113.9");
+  });
+
+  it("returns null when the platform reports no address", () => {
+    expect(clientAddress(reqWith({}))).toBeNull();
+    expect(clientAddress(reqWith({ "x-forwarded-for": "  " }))).toBeNull();
   });
 });

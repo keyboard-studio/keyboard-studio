@@ -14,8 +14,14 @@ import {
   putDraft,
   type DraftHandlerConfig,
 } from "./draft-handlers.js";
-import { MemoryDraftStore } from "./draft-store.js";
-import { DEFAULT_DRAFT_ID, MAX_DRAFT_BYTES, type DraftMeta } from "./draft-schemas.js";
+import { MemoryDraftStore, type DraftStore, type DraftUsage } from "./draft-store.js";
+import {
+  DEFAULT_DRAFT_ID,
+  MAX_DRAFT_BYTES,
+  MAX_DRAFTS_PER_USER,
+  MAX_TOTAL_DRAFT_BYTES,
+  type DraftMeta,
+} from "./draft-schemas.js";
 import type { GitHubUser } from "./verify-github-user.js";
 
 const USER: GitHubUser = { id: 4144632, login: "octocat" };
@@ -252,5 +258,214 @@ describe("back-compat: un-upgraded client omits draftId/status/prUrl", () => {
     const list = await listDrafts(AUTH, config);
     expect(list.ok && list.data.drafts).toHaveLength(1);
     expect(list.ok && list.data.drafts[0]?.draftId).toBe(DEFAULT_DRAFT_ID);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Quota (US4 / FR-008, FR-009)
+//
+// The point of these is the *subtraction*: the quota compares against what
+// storage would hold after the write, so replacing a row is measured as a delta.
+// That is what lets a user sitting at quota keep saving work they already have.
+// ---------------------------------------------------------------------------
+
+describe("putDraft() quota", () => {
+  /** Meta for one of the user's draft slots. */
+  const slot = (draftId: string): DraftMeta => ({ ...META, draftId });
+
+  /** A payload that serializes to at least `bytes` bytes. */
+  function payloadOfSize(bytes: number): unknown {
+    // JSON.stringify({p:"x…"}) adds 8 bytes of framing; never go negative.
+    return { p: "x".repeat(Math.max(0, bytes - 8)) };
+  }
+
+  /**
+   * A config whose store reports a fixed aggregate usage while behaving normally
+   * for everything else — including {@link MemoryDraftStore.getDraftBytes}, so
+   * the FR-009 subtraction still uses the row's real size.
+   *
+   * This is how the byte ceiling gets exercised without allocating 64 MiB: the
+   * per-draft limit caps any single draft at 4 MiB, so reaching the aggregate for
+   * real would take seventeen full-size drafts and prove nothing extra.
+   */
+  function configAtUsage(usage: DraftUsage, base = new MemoryDraftStore()): DraftHandlerConfig {
+    const store: DraftStore = {
+      getMeta: (u, d) => base.getMeta(u, d),
+      getDraft: (u, d) => base.getDraft(u, d),
+      putDraft: (u, l, m, dr) => base.putDraft(u, l, m, dr),
+      deleteDraft: (u, d) => base.deleteDraft(u, d),
+      listMeta: (u) => base.listMeta(u),
+      getDraftBytes: (u, d) => base.getDraftBytes(u, d),
+      getUsage: () => Promise.resolve(usage),
+    };
+    return { store, verifyUser: async () => USER };
+  }
+
+  it("refuses 409 draft_quota_exceeded at the draft-count limit", async () => {
+    const config = makeConfig();
+    for (let i = 0; i < MAX_DRAFTS_PER_USER; i++) {
+      const res = await putDraft(AUTH, putBody(slot(`kb-${i}`)), config);
+      expect(res.status, `draft ${i + 1} of ${MAX_DRAFTS_PER_USER}`).toBe(200);
+    }
+
+    const overflow = await putDraft(AUTH, putBody(slot("one-too-many")), config);
+    expect(overflow.ok).toBe(false);
+    expect(overflow.status).toBe(409);
+    expect(overflow.ok === false && overflow.error).toBe("draft_quota_exceeded");
+  });
+
+  it("refuses 409 draft_quota_exceeded at the total-bytes limit", async () => {
+    // Reaching 64 MiB for real would need seventeen 4 MiB drafts (the per-draft
+    // ceiling refuses anything bigger, as the 413 test below pins), so the
+    // aggregate is reported instead. What is under test is the handler's
+    // arithmetic, not the store's ability to hold 64 MiB.
+    const config = configAtUsage({ draftCount: 1, totalBytes: MAX_TOTAL_DRAFT_BYTES });
+
+    const overflow = await putDraft(AUTH, putBody(slot("one-byte-too-far")), config);
+
+    expect(overflow.ok).toBe(false);
+    expect(overflow.status).toBe(409);
+    expect(overflow.ok === false && overflow.error).toBe("draft_quota_exceeded");
+  });
+
+  it("admits a write that lands exactly on the byte ceiling", async () => {
+    const draft = { hello: "world" };
+    const exactBytes = new TextEncoder().encode(JSON.stringify(draft)).length;
+    const config = configAtUsage({
+      draftCount: 1,
+      totalBytes: MAX_TOTAL_DRAFT_BYTES - exactBytes,
+    });
+
+    // The comparison is `>`, not `>=`: the quota is a ceiling the caller may
+    // reach, not one they must stay below.
+    const res = await putDraft(AUTH, putBody(slot("exact"), draft), config);
+    expect(res.ok).toBe(true);
+    expect(res.status).toBe(200);
+  });
+
+  it("still accepts a same-size update to an existing draft at the count limit (FR-009)", async () => {
+    const config = makeConfig();
+    for (let i = 0; i < MAX_DRAFTS_PER_USER; i++) {
+      expect((await putDraft(AUTH, putBody(slot(`kb-${i}`)), config)).status).toBe(200);
+    }
+
+    // At quota by count. Re-saving an existing slot is an update, not an insert,
+    // so the count does not grow and the save must succeed — otherwise a user
+    // who filled their quota could no longer save the keyboard they are editing.
+    const resave = await putDraft(
+      AUTH,
+      putBody({ ...slot("kb-0"), savedAt: META.savedAt + 5_000 }),
+      config,
+    );
+    expect(resave.ok).toBe(true);
+    expect(resave.status).toBe(200);
+  });
+
+  it("still accepts a same-size or smaller update to an existing draft at the byte limit (FR-009)", async () => {
+    const base = new MemoryDraftStore();
+    const existing = payloadOfSize(300_000);
+    await base.putDraft(USER.id, USER.login, slot("big-1"), existing);
+    // Sitting exactly on the ceiling, with big-1 accounting for part of it.
+    const config = configAtUsage({ draftCount: 1, totalBytes: MAX_TOTAL_DRAFT_BYTES }, base);
+
+    // totalBytes - existingBytes + newBytes: re-saving the same bytes returns
+    // the total to where it was, and shrinking lands below it. Neither can push
+    // it up, so a user pinned at the ceiling can always keep saving.
+    const resaved = await putDraft(AUTH, putBody(slot("big-1"), existing), config);
+    expect(resaved.ok).toBe(true);
+    expect(resaved.status).toBe(200);
+
+    const shrunk = await putDraft(AUTH, putBody(slot("big-1"), payloadOfSize(2048)), config);
+    expect(shrunk.ok).toBe(true);
+    expect(shrunk.status).toBe(200);
+
+    // A *new* slot at the same ceiling is refused — the allowance belongs to the
+    // row being replaced, not to any write.
+    const fresh = await putDraft(AUTH, putBody(slot("big-2"), payloadOfSize(2048)), config);
+    expect(fresh.status).toBe(409);
+  });
+
+  it("treats a draft the store reports as zero bytes as present, not absent", async () => {
+    // Absent and empty are distinct: getDraftBytes returns null for no row and a
+    // number for a row. A store that reported 0 for a real row must still have
+    // its owner's re-save counted as an update, or a user at the count limit
+    // could no longer save that draft.
+    const base = new MemoryDraftStore();
+    await base.putDraft(USER.id, USER.login, slot("thin"), undefined);
+    expect(await base.getDraftBytes(USER.id, "thin")).toBe(0);
+    expect(await base.getDraftBytes(USER.id, "never-saved")).toBeNull();
+
+    const config = configAtUsage({ draftCount: MAX_DRAFTS_PER_USER, totalBytes: 0 }, base);
+
+    const resave = await putDraft(AUTH, putBody(slot("thin")), config);
+    expect(resave.ok).toBe(true);
+    expect(resave.status).toBe(200);
+
+    // Contrast: a slot the store has never seen is an insert, and the count
+    // limit refuses it.
+    const insert = await putDraft(AUTH, putBody(slot("never-saved")), config);
+    expect(insert.status).toBe(409);
+  });
+
+  it("leaves existing drafts intact after a refusal", async () => {
+    const config = makeConfig();
+    const keeper = { keep: "this" };
+    expect((await putDraft(AUTH, putBody(slot("kb-0"), keeper), config)).status).toBe(200);
+    for (let i = 1; i < MAX_DRAFTS_PER_USER; i++) {
+      await putDraft(AUTH, putBody(slot(`kb-${i}`)), config);
+    }
+
+    expect((await putDraft(AUTH, putBody(slot("overflow")), config)).status).toBe(409);
+
+    // The refusal happens before the store is written, so nothing was displaced
+    // and the rejected slot was never created.
+    const survivor = await getDraftContent(AUTH, config, "kb-0");
+    expect(survivor.ok && survivor.data.draft).toEqual(keeper);
+    const list = await listDrafts(AUTH, config);
+    expect(list.ok && list.data.drafts).toHaveLength(MAX_DRAFTS_PER_USER);
+    const rejected = await getDraftMeta(AUTH, config, "overflow");
+    expect(rejected.ok && rejected.data.meta).toBeNull();
+  });
+
+  it("does not throttle a normal authoring session (SC-005)", async () => {
+    const config = makeConfig();
+    // A realistic session: a handful of keyboards, saved repeatedly at the
+    // autosave/sync cadence. Nothing here should ever see a quota refusal.
+    for (let round = 0; round < 40; round++) {
+      for (const id of ["cree-woods", "bambara", "piaroa"]) {
+        const res = await putDraft(
+          AUTH,
+          putBody({ ...slot(id), savedAt: META.savedAt + round * 1_000 }, payloadOfSize(200_000)),
+          config,
+        );
+        expect(res.status, `${id} round ${round + 1}`).toBe(200);
+      }
+    }
+  });
+
+  it("keeps quotas per user, so one author cannot exhaust another's", async () => {
+    const store = new MemoryDraftStore();
+    const busy: DraftHandlerConfig = { store, verifyUser: async () => USER };
+    const other: DraftHandlerConfig = {
+      store,
+      verifyUser: async () => ({ id: 999, login: "hubot" }),
+    };
+
+    for (let i = 0; i < MAX_DRAFTS_PER_USER; i++) {
+      await putDraft(AUTH, putBody(slot(`kb-${i}`)), busy);
+    }
+    expect((await putDraft(AUTH, putBody(slot("overflow")), busy)).status).toBe(409);
+
+    expect((await putDraft(AUTH, putBody(slot("kb-0")), other)).status).toBe(200);
+  });
+
+  it("reports the per-draft ceiling as 413, not as a quota refusal", async () => {
+    const config = makeConfig();
+    // draft_too_large is about THIS draft; draft_quota_exceeded is about the
+    // caller's aggregate. FR-011 keeps them distinguishable.
+    const oversized = putBody(slot("huge"), payloadOfSize(MAX_DRAFT_BYTES + 1024));
+    const res = await putDraft(AUTH, oversized, config);
+    expect(res.status).toBe(413);
+    expect(res.ok === false && res.error).toBe("draft_too_large");
   });
 });

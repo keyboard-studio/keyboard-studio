@@ -58,6 +58,15 @@ import {
 } from "./draft-handlers.js";
 import { DEFAULT_DRAFT_ID } from "./draft-schemas.js";
 import { MemoryDraftStore } from "./draft-store.js";
+import {
+  MemoryRateLimitStore,
+  enforceRateLimit,
+  rateLimitKey,
+  OAUTH_EXCHANGE_ENDPOINT,
+  OAUTH_EXCHANGE_MAX_REQUESTS,
+  OAUTH_EXCHANGE_WINDOW_SECONDS,
+  type RateLimitStore,
+} from "./rate-limit.js";
 
 // ---------------------------------------------------------------------------
 // Startup validation — fail fast if secrets are absent
@@ -235,8 +244,26 @@ export async function buildServer(opts: {
    * global fetch Response already provides these fields; test stubs must too.
    */
   fetchFn?: GitHubPipelineFetchFn;
+  /**
+   * Backing store for the `/oauth/exchange` rate limiter. Defaults to a fresh
+   * {@link MemoryRateLimitStore}, so the standalone deployment is metered out of
+   * the box and behaves like the serverless one; pass explicit `null` to leave
+   * the endpoint unmetered (one `[WARN]`, the documented fail-open path — useful
+   * for suites that exercise the exchange repeatedly and are not testing the
+   * limiter).
+   *
+   * Per-process, so unlike the serverless deployment's Postgres counter this is
+   * not enforceable across replicas. That is acceptable here: this server is a
+   * single-process dev/standalone service.
+   */
+  rateLimitStore?: RateLimitStore | null;
 }): Promise<ReturnType<typeof Fastify>> {
   const app = Fastify({ logger: { level: "warn" } });
+
+  // Undefined means "not specified" → metered by default; explicit null means
+  // "deliberately unmetered", which enforceRateLimit turns into a [WARN].
+  const rateLimitStore: RateLimitStore | null =
+    opts.rateLimitStore === undefined ? new MemoryRateLimitStore() : opts.rateLimitStore;
 
   // -------------------------------------------------------------------------
   // CORS — explicit allowlist, no wildcard with credentials
@@ -331,6 +358,23 @@ export async function buildServer(opts: {
   // POST /oauth/exchange
   // -------------------------------------------------------------------------
   app.post("/oauth/exchange", async (req, reply) => {
+    // Limiter first, so it is ahead of everything that could reach GitHub
+    // (FR-010). `req.ip` never leaves this line — rateLimitKey hashes it, and
+    // the bucket key is all that is stored or compared. Mirrors the order the
+    // serverless edge uses in api/oauth/_shared.ts's runTokenHandler.
+    const verdict = await enforceRateLimit(
+      rateLimitStore,
+      rateLimitKey(OAUTH_EXCHANGE_ENDPOINT, req.ip),
+      OAUTH_EXCHANGE_WINDOW_SECONDS,
+      OAUTH_EXCHANGE_MAX_REQUESTS,
+    );
+    if (!verdict.allowed) {
+      // `request_rate_limited`, not `rate_limited`: the latter already means the
+      // upstream provider limited us, and FR-011 keeps the two distinguishable.
+      reply.header("Retry-After", String(verdict.retryAfterSeconds));
+      return reply.status(429).send({ error: "request_rate_limited" });
+    }
+
     const parsed = ExchangeBodySchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.status(400).send({

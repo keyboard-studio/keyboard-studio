@@ -73,10 +73,10 @@ export interface DraftStore {
    * figure, which a per-user aggregate cannot supply.
    *
    * `null` rather than `0` for an absent draft, so the same call also answers
-   * insert-vs-update for the count check without a second round trip. A stored
-   * draft can legitimately measure 0 bytes (a payload of `undefined` — `draft`
-   * is `z.unknown()`, so omitting it parses), and conflating that with absent
-   * would count a re-save as an insert.
+   * insert-vs-update for the count check without a second round trip. Absent and
+   * empty stay distinct on purpose: no size is not a size of zero, and a store
+   * that recorded `size_bytes = 0` for a real row would otherwise have its
+   * owner's re-save counted as an insert and refused at the count limit.
    */
   getDraftBytes(userId: number, draftId: string): Promise<number | null>;
 }

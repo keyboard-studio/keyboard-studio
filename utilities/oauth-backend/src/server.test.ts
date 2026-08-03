@@ -6,9 +6,14 @@
  * that secrets never appear in responses.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { buildServer } from "./server.js";
 import type { GitHubPipelineFetchFn } from "./github-pipeline.js";
+import {
+  MemoryRateLimitStore,
+  OAUTH_EXCHANGE_MAX_REQUESTS,
+  OAUTH_EXCHANGE_WINDOW_SECONDS,
+} from "./rate-limit.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -86,6 +91,12 @@ beforeAll(async () => {
     googleClientSecret: "ci-google-client-secret-SHOULD-NEVER-APPEAR",
     allowedOrigins: [ALLOWED_ORIGIN],
     fetchFn: successFetch,
+    // Unmetered on purpose. This app is shared across the whole file and every
+    // injected request carries the same client address, so a live limiter would
+    // pool every /oauth/exchange assertion into one budget — adding an exchange
+    // test somewhere below would then break unrelated tests above it. The
+    // limiter has its own server and its own budget further down.
+    rateLimitStore: null,
   });
   await app.ready();
 });
@@ -1104,5 +1115,146 @@ describe("Google identity disabled (GitHub-only deployment)", () => {
       payload: { code: "github-code-abc" },
     });
     expect(res.statusCode).toBe(200);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /oauth/exchange — rate limiter (US4 / FR-010, FR-011)
+//
+// The standalone deployment must refuse and admit on the same terms as the
+// serverless one, so the limiter is on by default here too. These tests get
+// their own server (and therefore their own budget) rather than sharing the
+// file-level app, which is deliberately unmetered — see the note at its
+// beforeAll.
+// ---------------------------------------------------------------------------
+
+describe("POST /oauth/exchange — rate limiter", () => {
+  /** A server whose limiter is live, with a clock the test controls. */
+  async function limitedApp(now: () => number) {
+    const srv = await buildServer({
+      clientId: "ci-client-id",
+      clientSecret: "ci-client-secret-SHOULD-NEVER-APPEAR",
+      googleOAuthEnabled: false,
+      allowedOrigins: [ALLOWED_ORIGIN],
+      fetchFn: successFetch,
+      rateLimitStore: new MemoryRateLimitStore(now),
+    });
+    await srv.ready();
+    return srv;
+  }
+
+  const exchangeOnce = (srv: Awaited<ReturnType<typeof buildServer>>) =>
+    srv.inject({ method: "POST", url: "/oauth/exchange", payload: { code: "github-code-abc" } });
+
+  it("admits exactly the configured budget, then refuses 429 request_rate_limited", async () => {
+    const srv = await limitedApp(() => 1_700_000_040_000);
+    try {
+      for (let i = 0; i < OAUTH_EXCHANGE_MAX_REQUESTS; i++) {
+        expect((await exchangeOnce(srv)).statusCode, `request ${i + 1}`).toBe(200);
+      }
+
+      const refused = await exchangeOnce(srv);
+      expect(refused.statusCode).toBe(429);
+      // Not `rate_limited` — that code means GitHub limited us (FR-011).
+      expect(JSON.parse(refused.body)).toEqual({ error: "request_rate_limited" });
+      expect(refused.headers["retry-after"]).toBe(String(OAUTH_EXCHANGE_WINDOW_SECONDS));
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it("enforces the limit before the outbound exchange", async () => {
+    let outboundCalls = 0;
+    const countingFetch: typeof successFetch = (url, init) => {
+      outboundCalls += 1;
+      return successFetch(url, init);
+    };
+    const srv = await buildServer({
+      clientId: "ci-client-id",
+      clientSecret: "ci-client-secret-SHOULD-NEVER-APPEAR",
+      googleOAuthEnabled: false,
+      allowedOrigins: [ALLOWED_ORIGIN],
+      fetchFn: countingFetch,
+      rateLimitStore: new MemoryRateLimitStore(() => 1_700_000_040_000),
+    });
+    await srv.ready();
+    try {
+      for (let i = 0; i < OAUTH_EXCHANGE_MAX_REQUESTS; i++) await exchangeOnce(srv);
+      const before = outboundCalls;
+
+      const refused = await exchangeOnce(srv);
+
+      expect(refused.statusCode).toBe(429);
+      // FR-010: the refusal costs GitHub nothing.
+      expect(outboundCalls).toBe(before);
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it("refuses before body validation, so a junk payload still costs budget", async () => {
+    const srv = await limitedApp(() => 1_700_000_040_000);
+    try {
+      for (let i = 0; i < OAUTH_EXCHANGE_MAX_REQUESTS; i++) {
+        expect((await srv.inject({ method: "POST", url: "/oauth/exchange", payload: {} })).statusCode).toBe(400);
+      }
+
+      const refused = await srv.inject({ method: "POST", url: "/oauth/exchange", payload: {} });
+      expect(refused.statusCode).toBe(429);
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it("admits again once the window rolls over", async () => {
+    let nowMs = 1_700_000_040_000;
+    const srv = await limitedApp(() => nowMs);
+    try {
+      for (let i = 0; i < OAUTH_EXCHANGE_MAX_REQUESTS; i++) await exchangeOnce(srv);
+      expect((await exchangeOnce(srv)).statusCode).toBe(429);
+
+      nowMs += OAUTH_EXCHANGE_WINDOW_SECONDS * 1000;
+      expect((await exchangeOnce(srv)).statusCode).toBe(200);
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it("never echoes the client address in a refusal", async () => {
+    const srv = await limitedApp(() => 1_700_000_040_000);
+    try {
+      for (let i = 0; i < OAUTH_EXCHANGE_MAX_REQUESTS; i++) await exchangeOnce(srv);
+      const refused = await exchangeOnce(srv);
+
+      expect(refused.body).not.toContain("127.0.0.1");
+      expect(JSON.parse(refused.body)).toEqual({ error: "request_rate_limited" });
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it("stays unmetered, with one [WARN], when no store is configured", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const srv = await buildServer({
+      clientId: "ci-client-id",
+      clientSecret: "ci-client-secret-SHOULD-NEVER-APPEAR",
+      googleOAuthEnabled: false,
+      allowedOrigins: [ALLOWED_ORIGIN],
+      fetchFn: successFetch,
+      rateLimitStore: null,
+    });
+    await srv.ready();
+    try {
+      // Well past the budget: an unconfigured limiter must not refuse anything —
+      // a storage outage must not become a sign-in outage (research D-5).
+      for (let i = 0; i < OAUTH_EXCHANGE_MAX_REQUESTS + 5; i++) {
+        expect((await exchangeOnce(srv)).statusCode).toBe(200);
+      }
+      expect(warn).toHaveBeenCalled();
+      expect(String(warn.mock.calls[0]?.[0])).toContain("[WARN]");
+    } finally {
+      await srv.close();
+      warn.mockRestore();
+    }
   });
 });
