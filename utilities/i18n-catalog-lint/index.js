@@ -21,6 +21,11 @@
 //     needs to catch up, which shouldn't block CI/build.
 //   • target locales (fr, …): the KEY SET must match (values legitimately
 //     differ — those are translations) — catches strings not propagated.
+//   • target locales, additionally: the values must not have COLLAPSED into
+//     the English source. Key-set parity is blind to this, because a Crowdin
+//     export of an untranslated project returns source text under every
+//     original key — same keys, no translations left. See
+//     utilities/i18n-collapse-guard.
 //
 // Fix when it fails:  pnpm --filter @keyboard-studio/studio messages:extract
 
@@ -28,6 +33,7 @@ const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { checkEnglishCollapse } = require("../i18n-collapse-guard/index.js");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const STUDIO_DIR = path.join(REPO_ROOT, "packages", "studio");
@@ -140,6 +146,22 @@ try {
             (missing.length ? ` — missing: ${missing.join(", ")}` : "") +
             (extra.length ? ` — stale/extra: ${extra.join(", ")}` : ""),
         );
+      }
+
+      // Key-set parity above cannot see a catalog whose keys all survived but
+      // whose VALUES were all replaced by English — the exact shape a Crowdin
+      // export takes when the project holds no translations for this locale.
+      const committedSource = readCatalog(
+        path.join(COMMITTED_DIR, SOURCE_LOCALE, CATALOG_FILE),
+      );
+      if (committedSource !== null) {
+        const collapse = checkEnglishCollapse({
+          en: committedSource,
+          target: committed,
+          locale,
+          catalog: CATALOG_FILE,
+        });
+        if (collapse) problems.push(collapse);
       }
     }
   }

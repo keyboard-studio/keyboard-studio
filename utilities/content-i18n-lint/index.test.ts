@@ -196,3 +196,97 @@ describe("content-i18n-lint flowQuestions parity (spec 050 T013/T014)", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// English-collapse guard (utilities/i18n-collapse-guard)
+//
+// Key-set parity above is deliberately value-blind. That leaves one corruption
+// invisible to it: a Crowdin export of a project holding no translations
+// returns the SOURCE TEXT under every original key, so the key set matches
+// perfectly while every translation is gone. This happened for real -- the
+// scheduled download produced exactly that catalog and only a GitHub
+// permissions error stopped it from opening the revert PR.
+// ---------------------------------------------------------------------------
+
+/** n distinct English entries, so fixtures clear the guard's MIN_KEYS floor. */
+function englishCatalog(n: number): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (let i = 0; i < n; i++) out[`content.flowQuestion.q${i}.prompt`] = `Prompt ${i}`;
+  return out;
+}
+
+function mapValues(
+  obj: Record<string, string>,
+  f: (v: string, k: string) => string,
+): Record<string, string> {
+  return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, f(v, k)]));
+}
+
+describe("content-i18n-lint English-collapse guard", () => {
+  it("flags a target catalog whose values all collapsed back to the English source", () => {
+    const dir = tempContentI18nDir();
+    const en = englishCatalog(30);
+    writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
+    // Exactly what the Crowdin download produced: same keys, English values.
+    writeFileSync(join(dir, "fr", "flowQuestions.json"), JSON.stringify(en));
+
+    const { problems } = runFlowQuestions(dir);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("collapsed into the English source");
+    expect(problems[0]).toContain("fr");
+  });
+
+  it("passes a genuinely translated catalog", () => {
+    const dir = tempContentI18nDir();
+    const en = englishCatalog(30);
+    writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
+    writeFileSync(
+      join(dir, "fr", "flowQuestions.json"),
+      JSON.stringify(mapValues(en, (v) => `Invite ${v}`)),
+    );
+
+    const { problems } = runFlowQuestions(dir);
+    expect(problems).toEqual([]);
+  });
+
+  it("tolerates the few values that legitimately equal English (proper nouns, OK, symbols)", () => {
+    const dir = tempContentI18nDir();
+    const en = englishCatalog(30);
+    writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
+    // A handful identical, the rest translated -- the real fr catalog measures
+    // ~1.2% identical, so a small overlap must not trip the guard.
+    let kept = 0;
+    writeFileSync(
+      join(dir, "fr", "flowQuestions.json"),
+      JSON.stringify(mapValues(en, (v) => (kept++ < 4 ? v : `Invite ${v}`))),
+    );
+
+    const { problems } = runFlowQuestions(dir);
+    expect(problems).toEqual([]);
+  });
+
+  it("passes an all-empty catalog — empty is how 'not translated yet' is represented", () => {
+    const dir = tempContentI18nDir();
+    const en = englishCatalog(30);
+    writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
+    // Bootstrapping a new locale as empty values is correct and must pass;
+    // bootstrapping it as English values is the bug and must not.
+    writeFileSync(
+      join(dir, "fr", "flowQuestions.json"),
+      JSON.stringify(mapValues(en, () => "")),
+    );
+
+    const { problems } = runFlowQuestions(dir);
+    expect(problems).toEqual([]);
+  });
+
+  it("does not fire on a catalog too small for the ratio to mean anything", () => {
+    const dir = tempContentI18nDir();
+    const en = englishCatalog(3);
+    writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
+    writeFileSync(join(dir, "fr", "flowQuestions.json"), JSON.stringify(en));
+
+    const { problems } = runFlowQuestions(dir);
+    expect(problems).toEqual([]);
+  });
+});
