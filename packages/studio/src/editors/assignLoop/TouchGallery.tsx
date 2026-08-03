@@ -162,6 +162,7 @@ import { usePositionalCharNav, nearestSurvivingChar, indexOfChar } from "./usePo
 import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
+import { directProducesCount } from "./parts/charMechanisms.ts";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
 import { ProposalCard } from "./parts/ProposalCard.tsx";
@@ -2057,6 +2058,71 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detectionSeedLayout, inventoryKey]);
 
+  // Session-aware "detected" set — parity fix, same bug class as
+  // MechanismGallery's `alreadyProducedSet`: `detectedChars` above is
+  // deliberately STATIC (seed-only, no session edits — see its own doc
+  // comment, needed because it also drives `touchLettersToAdd`'s walk
+  // membership). That leaves a character composable only via THIS session's
+  // edits (e.g. a precomposed char reachable because its base + combining
+  // mark were each assigned a method this session, touch OR desktop) stuck
+  // badging red 0 until output. This makes an independently-memoized
+  // `touchCoverage` call with the SAME arguments as the one `handleContinue`'s
+  // completion gate makes (not a shared/cached invocation) —
+  // `layoutForLintAndGate` (this session's touch edits baked in) plus
+  // `desktopProducedSet` (this session's desktop physical assignments, see
+  // useInventoryDiff.ts) — so the badge can never disagree with the gate
+  // about what's covered. Feeds ONLY the CharScrollStrip badge below and the
+  // "Existing methods" floor-row check further down — NEVER
+  // `touchLettersToAdd` (the walk denominator) and never currentChar's
+  // advance logic, so walk membership and the documented
+  // no-auto-advance/no-skip invariants are untouched.
+  //
+  // EXCLUDES characters `directProducesCount` already counts for
+  // `charTouchAssignments` (THIS SAME assignments list CharScrollStrip's
+  // `assignments` prop below carries, "touch" modality): `layoutForLintAndGate`
+  // already has this session's own touch edits baked in, so a char with a
+  // real touch assignment this session is BOTH directly matched by
+  // `getCharMechanisms`' own assignment loop AND covered here — folding it
+  // into the badge-bonus set too would double-count that ONE mechanism as
+  // two "ways" (see charMechanisms.ts's `directProducesCount` doc comment;
+  // MechanismGallery.tsx's matching `alreadyProducedSet` derivation has the
+  // identical exclusion and the same rare-edge-case trade-off note).
+  const sessionDetectedChars = useMemo<Set<string>>(() => {
+    if (layoutForLintAndGate === null) return detectedChars;
+    try {
+      const { uncovered } = touchCoverage(
+        layoutForLintAndGate,
+        inventory,
+        desktopProducedSet,
+      );
+      const uncoveredSet = new Set(uncovered);
+      const directTargets = new Set<string>();
+      for (const target of new Set(charTouchAssignments.map((a) => a.target))) {
+        if (directProducesCount(target, charTouchAssignments, "touch") > 0) {
+          directTargets.add(target);
+        }
+      }
+      return new Set(
+        inventory.filter((c) => !uncoveredSet.has(c) && !directTargets.has(c)),
+      );
+    } catch (err) {
+      devLog.error(
+        "[TouchGallery] sessionDetectedChars coverage failed",
+        err,
+      );
+      return detectedChars;
+    }
+    // inventoryKey is the stable primitive proxy for `inventory` — same
+    // precedent as detectedChars/baseTouchCoveredSet above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    layoutForLintAndGate,
+    inventoryKey,
+    desktopProducedSet,
+    detectedChars,
+    charTouchAssignments,
+  ]);
+
   // "Existing methods" for currentChar — every pre-existing touch method
   // (main key / longpress / multitap / flick) in the BASE touch layout that
   // STILL produces currentChar, mirroring MechanismGallery's desktop
@@ -2175,13 +2241,13 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       }
     }
 
-    // SHOW-ALL floor — currentChar is GREEN (detectedChars, the augmented set
-    // the CharScrollStrip badge uses) but still has zero rows after
-    // everything above.
+    // SHOW-ALL floor — currentChar is GREEN (sessionDetectedChars, the
+    // session-aware augmented set the CharScrollStrip badge uses) but still
+    // has zero rows after everything above.
     if (
       currentChar !== null &&
       rows.length === 0 &&
-      detectedChars.has(currentChar)
+      sessionDetectedChars.has(currentChar)
     ) {
       rows.push({
         id: `unattributed:${currentChar}`,
@@ -2204,7 +2270,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     i18n,
     currentChar,
     baseTouchCoveredSet,
-    detectedChars,
+    sessionDetectedChars,
   ]);
 
   // Restore affordance (FIX: deleteTouchKey was previously one-way in the UI
@@ -3304,12 +3370,14 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
           selectable for inspection, it is just never a walk stop. Each
           chip's badge is the produces-count for that character in THIS
           gallery's modality (touch) — see charMechanisms.ts.
-          `inheritedChars` feeds the seed-reachable set into that count so a
-          character this gallery reports as "already in the touch layout"
-          badges as produced (>=1) rather than red 0 — both before and after
-          its suggestion is accepted (the accepted touch_inherited
-          placeholder is still not counted, so accepting cannot double-count
-          it). */}
+          `inheritedChars` feeds the session-aware `sessionDetectedChars` set
+          into that count so a character already reachable on the seed touch
+          layout, OR composable from this session's own touch/desktop edits
+          (e.g. a precomposed char whose base + combining mark were each
+          assigned a method this session), badges as produced (>=1) rather
+          than red 0 — both before and after its suggestion is accepted (the
+          accepted touch_inherited placeholder is still not counted, so
+          accepting cannot double-count it). */}
       {inventory.length > 0 && (
         <CharScrollStrip
           chars={inventory}
@@ -3317,7 +3385,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
           onSelectChar={handleSelectDisplayChar}
           assignments={charTouchAssignments}
           modality="touch"
-          inheritedChars={detectedChars}
+          inheritedChars={sessionDetectedChars}
         />
       )}
 

@@ -1871,6 +1871,99 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
       expect(badgeAfter.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
     });
   });
+
+  // Regression pin for the reported gap: the badge must reflect SESSION-
+  // AWARE composability (useInventoryDiff's `producedSet`, augmented via
+  // augmentWithComposable), not just the static base-only diff. Mirrors the
+  // deadkey-byproduct fixture shape proven in
+  // packages/studio/src/hooks/useInventoryDiff.test.ts's "session-aware
+  // composability (symptom-2 fix)" suite and
+  // packages/engine/src/pattern-apply/sessionProducedSet.test.ts, adapted to
+  // the exact user-reported scenario: ezh U+0292 "ʒ" (this assignment's own
+  // accented-form output) and combining caron U+030C "̌" (this SAME deadkey's
+  // double-tap byproduct — never this assignment's own `target`) are each
+  // produced by ONE session assignment, and the precomposed ezh-with-caron
+  // "ǯ" U+01EF (whose canonical NFD is exactly ʒ + U+030C) has NO assignment
+  // of its own — neither is in the base .kmn.
+  //
+  // A single assignment (rather than sessionProducedSet.test.ts's two-
+  // assignment byproduct fixture) is deliberate here: this file's mocked
+  // `getPatternByIdSync` (see the mock near the top of this file) resolves
+  // PATTERN_DEADKEY to the `latinDeadkeyAcuteSingle` fixture, whose
+  // kmnFragment hardcodes a single fixed deadkey-state name ("accent") with
+  // no `{{deadkeyName}}` placeholder — unlike the real `deadkey_single_tap`
+  // content pattern, two instances of it would collide on the same
+  // `group(deadkeys)`/`deadkey(accent)` name. One assignment's own
+  // baseLetters/accentedForms/accentChar list is enough to exercise the
+  // byproduct path without that collision.
+  it("a precomposed char composable from THIS SESSION's own assignments (ǯ from a session-produced ezh + that SAME deadkey's session-produced bare caron byproduct, neither in the base) shows a GREEN 1 badge — not a stale RED 0 — while staying in the walk", async () => {
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+
+    // The base produces none of ʒ/̌/ǯ — every one of these is session-
+    // introduced (or, for ǯ, only reachable by composing two that are).
+    seedInventory(["ʒ", "̌", "ǯ"]);
+
+    // One real deadkey assignment: its own accented-form output is "ʒ"
+    // (base letter "z" + trigger), and its double-tap byproduct — the SAME
+    // deadkey's `accentChar` — is the bare combining caron U+030C, never
+    // this (or any) assignment's own `target`.
+    const producesEzhAndCaronByproduct: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: PATTERN_DEADKEY,
+          strategyId: "S-02",
+          slotValues: {
+            triggerKey: "K_QUOTE",
+            baseLetters: "z",
+            accentedForms: "ʒ",
+            accentChar: "̌", // U+030C combining caron — this deadkey's double-tap byproduct
+          },
+        },
+      ],
+      source: "user",
+    };
+
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      assignments: [producesEzhAndCaronByproduct],
+    });
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+
+    // The bug: ǯ has no assignment of its own, so before this fix its badge
+    // read straight from the STATIC base-only diff and stayed red 0 even
+    // though ʒ + ̌ were both produced this session. After the fix it reads
+    // from the session-aware, composable-augmented set and is green 1.
+    const ezhCaronBadge = within(strip).getByTestId("char-scroll-badge-01EF");
+    expect(ezhCaronBadge.textContent).toBe("1");
+    expect(ezhCaronBadge.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
+
+    // Walk MEMBERSHIP is untouched: ǯ carries no MechanismAssignment of its
+    // own, so it must still be a real chip an author can navigate to — the
+    // fix only recolors the badge, it never removes a composable char from
+    // the strip/walk (the hard constraint this fix must not regress).
+    fireEvent.click(within(strip).getByTestId("char-scroll-chip-01EF"));
+    expectCurrentChar("ǯ");
+
+    // Directly-produced ʒ badges green too (ordinary direct-assignment path,
+    // unaffected by this fix) — sanity check the fixture actually wired a
+    // real session assignment, not just inventory noise.
+    const ezhBadge = within(strip).getByTestId("char-scroll-badge-0292");
+    expect(ezhBadge.textContent).toBe("1");
+  });
 });
 
 // ---------------------------------------------------------------------------

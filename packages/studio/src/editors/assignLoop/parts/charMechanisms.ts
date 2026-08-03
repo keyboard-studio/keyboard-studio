@@ -81,6 +81,44 @@ function sequenceRefUsesChar(ref: MechanismRef, char: string): boolean {
  * set is genuinely produced by the keyboard, so it contributes one way to
  * `producesCount`. MechanismGallery has no such notion and omits it.
  */
+/**
+ * The direct-match half of `producesCount` on its own, with none of the
+ * `inheritedChars`/seed-reachability bonus folded in: the count of REAL
+ * (non-`touch_inherited`) mechanisms whose OUTPUT is `char` via an
+ * individual-scope, `modality`-matching assignment in `assignments`.
+ *
+ * Exported so a caller building its OWN session-aware "inherited" bonus set
+ * — MechanismGallery's `alreadyProducedSet`, TouchGallery's
+ * `sessionDetectedChars` — can EXCLUDE a character this returns > 0 for
+ * before passing that set as `inheritedChars` below. Both of those
+ * session-aware sets are (in part) *re-derived* from the very same
+ * assignments this function scans — a session-produced glyph set is built
+ * by re-parsing the base .kmn AS MODIFIED by this session's assignments
+ * (`buildSessionProducedSet`) — so a char already counted here would
+ * otherwise be counted a SECOND time via the `inheritedChars` bonus below
+ * for the exact same single mechanism, not a genuinely distinct second way
+ * to produce it. See MechanismGallery.tsx's/TouchGallery.tsx's own
+ * `alreadyProducedSet`/`sessionDetectedChars` doc comments for the full
+ * rationale, and this file's own `getCharMechanisms` — which now calls this
+ * helper for its own direct-match half, so the two can never drift.
+ */
+export function directProducesCount(
+  char: string,
+  assignments: ReadonlyArray<MechanismAssignment>,
+  modality: Modality,
+): number {
+  let count = 0;
+  for (const a of assignments) {
+    if (a.modality === modality && a.scope === "individual" && a.target === char) {
+      // "touch_inherited" is a placeholder marker ("already reachable, not
+      // user-configured"), never a real producing mechanism — exclude it so
+      // it can't inflate the count. See file-header comment.
+      count += a.mechanisms.filter((m) => m.patternId !== "touch_inherited").length;
+    }
+  }
+  return count;
+}
+
 export function getCharMechanisms(
   char: string,
   assignments: ReadonlyArray<MechanismAssignment>,
@@ -91,15 +129,10 @@ export function getCharMechanisms(
   // touch_inherited placeholder the "already" suggestion records (which is
   // excluded below) — so accepting that suggestion cannot double-count it.
   let producesCount = inheritedChars?.has(char) === true ? 1 : 0;
+  producesCount += directProducesCount(char, assignments, modality);
   const usesSequences: UsedSequenceEntry[] = [];
 
   for (const a of assignments) {
-    if (a.modality === modality && a.scope === "individual" && a.target === char) {
-      // "touch_inherited" is a placeholder marker ("already reachable, not
-      // user-configured"), never a real producing mechanism — exclude it so
-      // it can't inflate the count. See file-header comment.
-      producesCount += a.mechanisms.filter((m) => m.patternId !== "touch_inherited").length;
-    }
     for (const ref of a.mechanisms) {
       if (sequenceRefUsesChar(ref, char)) {
         usesSequences.push({ target: a.target, ref });
