@@ -20,13 +20,13 @@ Establishes the shared E2E step and captures the red evidence FR-080 demands. No
 
 **Wave 1 — one task (blocks both gating specs):**
 
-- [ ] **T001** [US1] Add a `switchTab(page, route)` step driver (the one shared tab-switch helper — no inline hash assignment in any spec, FR-082). **Select tabs by `nav a[href="#${route}"]`, never by visible label text**: the route token stays `preview` (contract §1) while the label flips to Compare in T032, so a text-based selector would break this shared helper across the red/green boundary · `packages/studio/e2e/helpers/surveyFlow.ts`
+- [x] **T001** [US1] Add a `switchTab(page, route)` step driver (the one shared tab-switch helper — no inline hash assignment in any spec, FR-082). **Select tabs by `nav a[href="#${route}"]`, never by visible label text**: the route token stays `preview` (contract §1) while the label flips to Compare in T032, so a text-based selector would break this shared helper across the red/green boundary · `packages/studio/e2e/helpers/surveyFlow.ts`
 
 **⟶ Wait for T001, then — independent (different files):**
 
-- [ ] **T002** [P] Ensure Chromium binaries are present for this Playwright version (`npx playwright install chromium` from `packages/studio`); record the version used. Gates **T005 only** — the specs can be authored without it · no file change — note the result in the evidence file created by T005
-- [ ] **T003** [P] [US1] Write the gating spec: drive the walk to a mid-flow step, round-trip through each of the other four tabs via `switchTab`, and after each return assert same step on screen, in-app Back still reaches the prior step, and (for the characters case) the built alphabet intact; call `expectNoSeriousAxeViolations` on each screen visited · `packages/studio/e2e/tab-roundtrip.spec.ts`
-- [ ] **T004** [P] [US2] Write the gating spec: establish a working copy, snapshot observable project state through the app's own surfaces, run an adversarial Compare session, return, and assert the project is unchanged with no rebase-confirm dialog raised.
+- [x] **T002** [P] Ensure Chromium binaries are present for this Playwright version (`npx playwright install chromium` from `packages/studio`); record the version used. Gates **T005 only** — the specs can be authored without it · no file change — note the result in the evidence file created by T005
+- [x] **T003** [P] [US1] Write the gating spec: drive the walk to a mid-flow step, round-trip through each of the other four tabs via `switchTab`, and after each return assert same step on screen, in-app Back still reaches the prior step, and (for the characters case) the built alphabet intact; call `expectNoSeriousAxeViolations` on each screen visited · `packages/studio/e2e/tab-roundtrip.spec.ts`
+- [x] **T004** [P] [US2] Write the gating spec: establish a working copy, snapshot observable project state through the app's own surfaces, run an adversarial Compare session, return, and assert the project is unchanged with no rebase-confirm dialog raised.
 
   **Red-reason discipline — this is why the task is worded at this level of detail.** FR-080 requires the spec to fail *for the right reason*, and the spec.md guidance "model the adversarial shape on `switch-base-exploration.spec.ts` / `switch-base-rebase.spec.ts`" points at the wrong component: those drive `editors/panels/BaseResolution.tsx` (which has `base-card-*` and `base-confirm` test ids). This tab's picker is `components/BaseKeyboardPicker.tsx` — a plain combobox with **zero `data-testid`** and **no confirm button**, where selecting an option calls `commit()` and fires `onChange` immediately. Reuse only those specs' **option-selection idiom** (`[id$="-opt-${id}"]`); a literal port of their confirm-button idiom dies on selector-not-found, which is a worthless red.
 
@@ -34,7 +34,7 @@ Establishes the shared E2E step and captures the red evidence FR-080 demands. No
 
 **⟶ Wait for T002, T003 and T004, then:**
 
-- [ ] **T005** Run both gating specs against the current (pre-fix) tree and record the red output verbatim, **including which assertion failed in each** — an E2E spec that has never been seen red is not evidence, and a spec that went red on a missing selector is not evidence either (FR-080, SC-013). **Restart `pnpm dev` before the run**: `reuseExistingServer: true` means an already-running dev server is used as-is, so an un-restarted one can silently retest a stale build · `specs/057-bulletproof-navigation/evidence/gating-red.md`
+- [x] **T005** Run both gating specs against the current (pre-fix) tree and record the red output verbatim, **including which assertion failed in each** — an E2E spec that has never been seen red is not evidence, and a spec that went red on a missing selector is not evidence either (FR-080, SC-013). **Restart `pnpm dev` before the run**: `reuseExistingServer: true` means an already-running dev server is used as-is, so an un-restarted one can silently retest a stale build · `specs/057-bulletproof-navigation/evidence/gating-red.md`
 
 **Checkpoint**: both gating specs exist, neither is `.skip`-ped (FR-083), and both are on record as failing.
 
@@ -48,9 +48,9 @@ The single location vocabulary (FR-001, FR-006, FR-010…FR-014), the session-sc
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T007** [P] Create the hash grammar: `Location` interface, `parseLocation(hash)` (returns `null` on a parse failure — trailing slash, empty segment, `question` without `step`, or a segment outside `[a-z0-9_]`), `formatLocation(loc)` including the leading `#` · `packages/studio/src/lib/location.ts`
-- [ ] **T008** [P] [US5] Create the session-scoped view-state store: slots `flowMapSection`, `trailCollapsedSteps`, `trailShowSuperseded`, `paneSplitPct`, `oskMode`, `scrollTop`, `compareSelection`, plus `reset()`. Module-level zustand singleton, no storage layer (FR-051, FR-053, Q9) · `packages/studio/src/stores/viewStateStore.ts`
-- [ ] **T009** [P] [US4] Extract the one project-label precedence — `deriveProjectLabel(input)`: **scaffold spec display name → working-copy identity-patch display name → base keyboard display name → `null`**. This is FR-041's stated order, and it is already shipped verbatim in `draftPersistence.ts:477-481` (the engine behind the "My keyboards" cards). Research D-8 concluded the opposite by examining `draftAutosave.deriveLabel` instead — see the correction in [research.md](research.md) D-8 · `packages/studio/src/lib/projectLabel.ts`
+- [x] **T007** [P] Create the hash grammar: `Location` interface, `parseLocation(hash)` (returns `null` on a parse failure — trailing slash, empty segment, `question` without `step`, or a segment outside `[a-z0-9_]`), `formatLocation(loc)` including the leading `#` · `packages/studio/src/lib/location.ts`
+- [x] **T008** [P] [US5] Create the session-scoped view-state store: slots `flowMapSection`, `trailCollapsedSteps`, `trailShowSuperseded`, `paneSplitPct`, `oskMode`, `scrollTop`, `compareSelection`, plus `reset()`. Module-level zustand singleton, no storage layer (FR-051, FR-053, Q9) · `packages/studio/src/stores/viewStateStore.ts`
+- [x] **T009** [P] [US4] Extract the one project-label precedence — `deriveProjectLabel(input)`: **scaffold spec display name → working-copy identity-patch display name → base keyboard display name → `null`**. This is FR-041's stated order, and it is already shipped verbatim in `draftPersistence.ts:477-481` (the engine behind the "My keyboards" cards). Research D-8 concluded the opposite by examining `draftAutosave.deriveLabel` instead — see the correction in [research.md](research.md) D-8 · `packages/studio/src/lib/projectLabel.ts`
 
 **⟶ Wait for Wave 1 to finish, then:**
 

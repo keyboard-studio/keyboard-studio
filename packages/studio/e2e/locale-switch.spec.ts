@@ -10,7 +10,7 @@
 //   cd packages/studio && npx playwright test locale-switch.spec.ts
 
 import { test, expect } from "playwright/test";
-import { seedReturningVisitor } from "./helpers/surveyFlow";
+import { seedReturningVisitor, selectMenuOption } from "./helpers/surveyFlow";
 
 // Scope everything to the NavBar landmark (aria-label="Studio navigation",
 // StudioShell.tsx) — the survey's own language-identify question also has
@@ -36,10 +36,10 @@ async function chooseLocale(
   page: import("playwright/test").Page,
   locale: "en" | "fr",
 ): Promise<void> {
-  const trigger = navBar(page).locator("#nav-language-select");
-  await trigger.waitFor({ timeout: 10_000 });
-  await trigger.click();
-  await trigger.locator("xpath=..").locator(`li[data-value="${locale}"]`).click();
+  // Through the shared driver: SelectMenu portals its listbox to
+  // document.body, so the option is not reachable through the trigger's
+  // parent (see selectMenuOption's docstring).
+  await selectMenuOption(page, navBar(page).locator("#nav-language-select"), locale);
 }
 
 test.describe("Locale switcher — persistence + no first-paint English flash", () => {

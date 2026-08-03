@@ -75,6 +75,70 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-08-03T21:48:04.387Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T21:51:16.337Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T21:55:08.137Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T21:55:08.370Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T21:55:08.609Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:12:42.095Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:12:42.369Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:12:42.633Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:31:55.590Z"
     }
   ],
   "telemetryInstanceId": "469b61c6-c778-40d3-b978-3516ec818e69",
@@ -587,5 +651,65 @@
     {
       "what": "{\"check\": \"draftPersistence.ts:477-481 implements FR-041 order verbatim and MyKeyboardsList.tsx:51 imports from draftPersistence, not draftAutosave\", \"how\": \"grep imports + sed the label computation in both engines\", \"result\": \"confirmed - km-doc finding stands; research D-8 blast-radius claim was backwards\"}"
     }
-  ]
+  ],
+  "currentTask": "T005",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Added switchTab(page, route) shared tab-switch step driver selecting by nav a[href] (never label text) plus a TabRoute type",
+      "files": [
+        "packages/studio/e2e/helpers/surveyFlow.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Wrote the gating tab-roundtrip E2E spec: mid-walk position, in-app Back history and Phase B alphabet across all four other tabs, with axe scans",
+      "files": [
+        "packages/studio/e2e/tab-roundtrip.spec.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Wrote the gating compare-isolation E2E spec: identity-control-absence anchor plus a dialog-counting harness with dismiss AND accept branches asserting post-state via window.__ksE2E__",
+      "files": [
+        "packages/studio/e2e/compare-isolation.spec.ts"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Confirmed Chromium binaries present for Playwright 1.61.1",
+      "files": [
+        "(no file change)"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Created the hash grammar: Location interface, parseLocation (null on trailing slash/empty segment/bare question/bad charclass/unknown route) and formatLocation",
+      "files": [
+        "packages/studio/src/lib/location.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Created the session-scoped viewStateStore: module zustand singleton, seven slots, reset(), clamp-on-read pane-split reader, no storage layer",
+      "files": [
+        "packages/studio/src/stores/viewStateStore.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Extracted deriveProjectLabel — the ONE FR-041 precedence (scaffoldSpec -> identity patch -> base keyboard -> null) with blank-string skips",
+      "files": [
+        "packages/studio/src/lib/projectLabel.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Recorded the gating red baseline: tab-roundtrip fails on position loss after a #preview round trip; all three compare-isolation tests fail on the live identity panel and the rebase-confirm dialog. Two evidence-invalidating issues fixed and documented first (portalled SelectMenu selector; pre-existing 1.4.3 contrast debt)",
+      "files": [
+        "specs/057-bulletproof-navigation/evidence/gating-red.md",
+        "specs/057-bulletproof-navigation/evidence/tab-roundtrip-red.clean.txt"
+      ]
+    }
+  }
 }

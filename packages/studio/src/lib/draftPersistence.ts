@@ -34,6 +34,7 @@ import {
   usePhaseBDraftStore,
 } from "../stores/phaseBDraftStore.ts";
 import { DEFAULT_PHASE_B_FONT, isPhaseBFontValue } from "../survey/surveyStyles.ts";
+import { deriveProjectLabel } from "./projectLabel.ts";
 import {
   applyDecisionRecordSnapshot,
   snapshotDecisionRecord,
@@ -474,11 +475,17 @@ export function saveDraft(projectKey: string): void {
   // displayName: Track-1 scaffoldSpec (project_name step) first, then the
   // identity patch's displayName (Track 2 / post-Phase-A Track 1), then the
   // base keyboard's own display name as a last resort.
-  const displayName =
-    session.scaffoldSpec?.displayName ??
-    wc.identity?.displayName ??
-    wc.baseKeyboard?.displayName ??
-    null;
+  //
+  // Spec 057 FR-041: that order is now stated once, in lib/projectLabel.ts, so
+  // the footer is not a third derivation. This call is a pure substitution —
+  // deriveProjectLabel implements exactly the precedence that was inlined here
+  // (with the addition of a blank-string skip, which the `??` chain could not
+  // express).
+  const displayName = deriveProjectLabel({
+    scaffoldSpec: session.scaffoldSpec,
+    identity: wc.identity,
+    baseKeyboard: wc.baseKeyboard,
+  });
 
   // languageTag: identity-lite's computed BCP47 tag first (may be "" if the
   // step hasn't completed or the language subtag was left blank — normalize

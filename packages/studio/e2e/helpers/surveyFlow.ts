@@ -13,7 +13,30 @@
  *   - il_target_script is the fifth question
  */
 
-import { type Page, expect } from "playwright/test";
+import { type Locator, type Page, expect } from "playwright/test";
+
+/**
+ * Open a `ui/SelectMenu` and click one option by its underlying value.
+ *
+ * Native `<select>` popups do not open in the VS Code webview, so these fields
+ * are a button + a DOM-rendered `<ul role="listbox">`. The list is
+ * **portalled to `document.body`** (SelectMenu.tsx: an ancestor with
+ * `overflow: hidden` would otherwise clip it), so it is NOT a descendant of
+ * the trigger — an `xpath=..`-scoped option query can never find it, and hangs
+ * until the test's own timeout with no clue as to why.
+ *
+ * Scoped to the OPEN listbox at page level, which is the only place the
+ * options actually live.
+ */
+export async function selectMenuOption(
+  page: Page,
+  trigger: Locator,
+  value: string,
+): Promise<void> {
+  await trigger.waitFor({ timeout: 15_000 });
+  await trigger.click();
+  await page.locator(`ul[role="listbox"] li[data-value="${value}"]`).click({ timeout: 15_000 });
+}
 
 /**
  * Every phase in the specs that renders SurveyRunner shares one forward
@@ -159,16 +182,10 @@ export async function driveIdentityLite(
   await page.waitForSelector("#il_language_code", { timeout: 15_000 });
   await surveyAdvance(page).click();
 
-  // Q5: Target script (select) — required.
-  // native <select> popups don't open in the VS Code webview, so this field
-  // is now a ui/SelectMenu (button + DOM-rendered listbox), not a native
-  // <select> — open it, then click the option by its data-value (the
-  // underlying script value), not Playwright's selectOption(). Same pattern
-  // as driveTouchGallery's host-key picker below.
-  const targetScriptSelect = page.locator("#il_target_script");
-  await targetScriptSelect.waitFor({ timeout: 10_000 });
-  await targetScriptSelect.click();
-  await targetScriptSelect.locator('xpath=..').locator(`li[data-value="${script}"]`).click();
+  // Q5: Target script (select) — required. A ui/SelectMenu, not a native
+  // <select>; see selectMenuOption above for why the option cannot be reached
+  // through the trigger's parent.
+  await selectMenuOption(page, page.locator("#il_target_script"), script);
   await surveyAdvance(page).click();
 
   // Robustness check for the phase boundary: identity-lite hands off
@@ -432,10 +449,8 @@ export async function driveTouchGallery(page: Page): Promise<void> {
   }
 
   const continueButton = page.getByTestId("touch-continue");
-  // native <select> popups don't open in the VS Code webview, so the host
-  // key picker is now a ui/SelectMenu (button + DOM-rendered listbox), not
-  // a native <select> — open it, then click the option by its data-value
-  // (the underlying vkey), not Playwright's selectOption().
+  // A ui/SelectMenu like the target-script field above — its options are
+  // portalled to document.body, so they go through selectMenuOption.
   const hostKeySelect = page.getByRole("button", { name: "Host key for long-press" });
   const applyButton = page.getByRole("button", { name: /^Apply touch method for/ });
 
@@ -448,8 +463,7 @@ export async function driveTouchGallery(page: Page): Promise<void> {
     // reset on every currentChar change), so a disabled continueButton means
     // this character still needs the default long-press method + Apply.
     if (await continueButton.isDisabled()) {
-      await hostKeySelect.click();
-      await hostKeySelect.locator('xpath=..').locator('li[data-value="K_A"]').click();
+      await selectMenuOption(page, hostKeySelect, "K_A");
       await applyButton.click();
     }
     await continueButton.click();
@@ -489,6 +503,39 @@ export async function driveHelpPhase(
     }
   }
   throw new Error("driveHelpPhase: did not reach #output within the expected question count");
+}
+
+/**
+ * The top-level tab route tokens, as they appear in the hash and therefore in
+ * the nav link's `href`. These are ROUTE tokens, not labels — `preview` is the
+ * route behind the tab the author sees as "Compare" (spec 057 FR-020 renames
+ * the label only; contract §1 keeps the token so bookmarks and every existing
+ * hash assertion survive).
+ */
+export type TabRoute = "survey" | "preview" | "output" | "trail" | "flowmap";
+
+/**
+ * Switch top-level tabs the way an author does — by clicking the nav link.
+ *
+ * The ONE tab-switch step driver (spec 057 FR-082): no spec assigns
+ * `window.location.hash` inline, so a change to how tabs are reached lands
+ * here once rather than in every walk.
+ *
+ * Selects by `nav a[href="#${route}"]`, deliberately NOT by visible label
+ * text. The `preview` route's label flips from "Preview" to "Compare" inside
+ * this feature, and a text-based selector would break this shared helper
+ * across the red/green boundary — the href is the stable handle.
+ *
+ * Waits for the hash to actually settle before returning, so a caller can
+ * assert on the destination without racing the hashchange listener.
+ */
+export async function switchTab(page: Page, route: TabRoute): Promise<void> {
+  await page.click(`nav a[href="#${route}"]`);
+  await page.waitForFunction(
+    (expected) => window.location.hash.slice(1).split("/")[0] === expected,
+    route,
+    { timeout: 15_000 },
+  );
 }
 
 /**
