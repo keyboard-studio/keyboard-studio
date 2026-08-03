@@ -20,6 +20,8 @@
 // @see specs/051-uppercase-counterpart-suggestion/contracts/case-pair-proposal.md
 
 import { Trans, useLingui } from "@lingui/react/macro";
+import { canonicalizeCombo } from "@keyboard-studio/engine";
+import { formatModifierCombo } from "../../lib/modifierTokenLabel.ts";
 import { ProposalBanner } from "./parts/ProposalBanner.tsx";
 import type { CasePairProposal } from "./casePairCompanion.ts";
 
@@ -54,6 +56,12 @@ export function CasePairProposalBanner({
             {proposal.originalChar} has an uppercase form,{" "}
             {proposal.counterpart}. Map {proposal.counterpart} to the shift
             layer as well?
+          </Trans>
+        ) : proposal.mechanism === "ralt-layer" ? (
+          <Trans id="editor.assignLoop.companion.prompt.raltLayer">
+            {proposal.originalChar} has an uppercase form,{" "}
+            {proposal.counterpart}. Map {proposal.counterpart} to the{" "}
+            {raltLayerModifierLabel(proposal)} layer of {proposal.vkey}?
           </Trans>
         ) : (
           <Trans id="editor.assignLoop.companion.prompt">
@@ -101,5 +109,27 @@ function confirmTargetLabel(proposal: CasePairProposal): string {
       return proposal.combo.kind === "deadkey"
         ? proposal.combo.triggerKey
         : proposal.combo.indicator;
+    case "ralt-layer":
+      return proposal.vkey;
+  }
+}
+
+/**
+ * "Shift+RAlt"-style label for the ralt-layer proposal's target layer —
+ * `baseModifiers` (the lowercase placement's own modifiers) with `SHIFT`
+ * added, canonicalized to the SAME order the confirm handler's
+ * `comboToKeySpec`/`canonicalizeCombo` call emits (`[SHIFT RALT vkey]`), so
+ * the banner text never disagrees with what gets written. Falls back to a
+ * naive "+"-join on the (structurally unreachable) mutually-exclusive-combo
+ * throw — display-only, so it must never crash the banner.
+ */
+function raltLayerModifierLabel(
+  proposal: Extract<CasePairProposal, { mechanism: "ralt-layer" }>,
+): string {
+  const tokens = [...proposal.baseModifiers, "SHIFT" as const];
+  try {
+    return formatModifierCombo(canonicalizeCombo(tokens));
+  } catch {
+    return formatModifierCombo(tokens);
   }
 }

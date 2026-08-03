@@ -2292,6 +2292,146 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
 });
 
 // ---------------------------------------------------------------------------
+// Case-pair companion — ralt-layer proposal, raised right after ACCEPTING
+// the lowercase S-08 RAlt suggestion (not on a separate navigation to the
+// uppercase sibling — see handleSuggestionAccept).
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion accept)", () => {
+  it("accepting the lowercase ƒ RAlt suggestion raises the companion banner for Ƒ", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffHookPlacementMap}
+        />,
+      );
+    });
+
+    expectCurrentChar("ƒ");
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Accept suggestion: RAlt \+ K_F for ƒ/i,
+      }),
+    );
+
+    expect(screen.getByText(/has an uppercase form, Ƒ/i)).toBeTruthy();
+  });
+
+  it("confirming records a modifier_as_layer_switch mechanism for Ƒ with altgrKeyList \"[SHIFT RALT K_F]\"", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffHookPlacementMap}
+        />,
+      );
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Accept suggestion: RAlt \+ K_F for ƒ/i,
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Map Ƒ to the shift layer of K_F/i,
+      }),
+    );
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    const companion = assignments.find((a) => a.target === "Ƒ");
+    expect(companion).toBeDefined();
+    expect(companion?.mechanisms[0]?.patternId).toBe(
+      "modifier_as_layer_switch",
+    );
+    expect(companion?.mechanisms[0]?.strategyId).toBe("S-08");
+    expect(companion?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
+      "[SHIFT RALT K_F]",
+    );
+    expect(companion?.mechanisms[0]?.slotValues?.["altgrOutputList"]).toBe(
+      "Ƒ",
+    );
+
+    // Prompt is dismissed after confirm.
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+
+  it("does NOT raise the companion banner when accepting a suggestion for an already-uppercase char", async () => {
+    seedInventory(["Ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffHookPlacementMap}
+        />,
+      );
+    });
+
+    expectCurrentChar("Ƒ");
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Accept suggestion: Shift\+RAlt \+ K_F for Ƒ/i,
+      }),
+    );
+
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+
+  it("stale-guard: confirming a ralt-layer companion whose base assignment vanished via an unaudited mutation path records nothing", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffHookPlacementMap}
+        />,
+      );
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Accept suggestion: RAlt \+ K_F for ƒ/i,
+      }),
+    );
+    expect(screen.getByText(/has an uppercase form, Ƒ/i)).toBeTruthy();
+
+    // Simulate a hypothetical future mutation path that touches
+    // sessionAssignments WITHOUT going through handleRemoveCovered /
+    // handleRemoveMechanism (which proactively dismiss the banner) — direct
+    // store mutation bypassing the component's own handlers entirely, the
+    // same technique the physical and combo stale-guard tests above use. The
+    // component's pendingCompanion state is untouched by this, so the banner
+    // remains visible in the DOM, exercising the confirm-time staleness
+    // re-check in handleCompanionConfirm's "ralt-layer" branch
+    // (`sessionAssignments.includes(pendingCompanion.baseAssignment)`) rather
+    // than any removal-time dismissal.
+    await act(async () => {
+      useWorkingCopyStore.getState().recordAssignments([]);
+    });
+    expect(screen.getByText(/has an uppercase form, Ƒ/i)).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Map Ƒ to the shift layer of K_F/i,
+      }),
+    );
+
+    // Nothing was recorded for the counterpart — the stale proposal was
+    // dismissed, not applied.
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments.find((a) => a.target === "Ƒ")).toBeUndefined();
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Preview wiring — loading / error / ready states (right pane)
 // ---------------------------------------------------------------------------
 

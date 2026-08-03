@@ -61,6 +61,7 @@
   "preview.overlay.error.fetch.detail": "{0} — check network or proxy config",
   "survey.characterMapPane.group.hiddenNote": "{0} characters hidden.",
   "editor.assignLoop.companion.prompt.combo": "{0} has an uppercase form, {1}. Add the uppercase combo for {2} as well?",
+  "editor.assignLoop.companion.prompt.raltLayer": "{0} has an uppercase form, {1}. Map {2} to the {3} layer of {4}?",
   "editor.assignLoop.companion.prompt.touch": "{0} has an uppercase form, {1}. Map {2} to the shift layer as well?",
   "editor.assignLoop.companion.prompt": "{0} has an uppercase form, {1}. Map {2} to the shift layer of the same key as well?",
   "editor.assignLoop.touch.coverageLine": "{0} of {totalChars} configured",

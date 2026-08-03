@@ -1875,6 +1875,12 @@ export function MechanismGallery({
     if (suggestion === null || currentChar === null) return;
     const { vkey } = suggestion.topCandidate;
     let assignment: MechanismAssignment;
+    // Set only by the S-08 branch below, to the LOWERCASE placement's own
+    // modifiers (never including SHIFT — see the guard there) — carries the
+    // ralt-layer companion's propose() call outside the branch so it fires
+    // AFTER recordAssignments below, once `assignment` is the exact object
+    // the proposal must reference (FR-008 identity guard).
+    let raltCompanionModifiers: ModifierToken[] | null = null;
     if (suggestion.strategyId === "S-01") {
       const cp =
         currentChar
@@ -1941,6 +1947,21 @@ export function MechanismGallery({
         ],
         source: "user",
       };
+      // Case-pair companion proposal (spec v1.3.1 §3c — propose-then-confirm)
+      // for the RAlt-layer counterpart, raised right after the author accepts
+      // THIS suggestion — the flow the user actually takes, rather than
+      // waiting for them to separately navigate to the uppercase character
+      // (which today only gets its OWN suggestion row via
+      // getSuggestionForCharWithCasePair, not this propose-then-confirm
+      // banner). Only when `tokens` has no SHIFT of its own: a candidate that
+      // already carries SHIFT is itself the uppercase case-pair fallback
+      // (placementSeeds.ts), so IT is the companion — proposing a further
+      // companion for it would double up. `useCasePairCompanion`'s own
+      // `caseCounterpart` direction check (toUpper only) independently
+      // suppresses this for an already-uppercase `currentChar`.
+      if (!tokens.includes("SHIFT")) {
+        raltCompanionModifiers = tokens;
+      }
     } else {
       markSuggestionResolved(currentChar);
       devLog.warn(
@@ -1950,6 +1971,33 @@ export function MechanismGallery({
     }
     recordAssignments([...sessionAssignments, assignment]);
     markSuggestionResolved(currentChar);
+    if (raltCompanionModifiers !== null) {
+      proposeCompanion({
+        mechanism: "ralt-layer",
+        originalChar: currentChar,
+        vkey,
+        baseModifiers: raltCompanionModifiers,
+        baseAssignment: assignment,
+        // "Counterpart already placed" (spec §Edge Cases): redundant if the
+        // counterpart already has a PATTERN_RALT mechanism whose altgrKeyList
+        // names this same vkey — mirrors the manual S-08 write path's
+        // word-boundary match on kmnRules (see the "Assign to a key" card's
+        // alreadyProduced above), applied to altgrKeyList instead.
+        alreadyProduced: (counterpart) =>
+          sessionAssignments.some(
+            (a) =>
+              a.target === counterpart &&
+              a.mechanisms.some((m) => {
+                const keyList = m.slotValues?.["altgrKeyList"];
+                return (
+                  m.patternId === PATTERN_RALT &&
+                  typeof keyList === "string" &&
+                  new RegExp(`\\b${vkey}\\b`).test(keyList)
+                );
+              }),
+          ),
+      });
+    }
     resetMethodState();
   }, [
     suggestion,
@@ -1958,6 +2006,7 @@ export function MechanismGallery({
     recordAssignments,
     resetMethodState,
     markSuggestionResolved,
+    proposeCompanion,
   ]);
 
   // Change: dismiss the suggestion row; pickers stay blank for manual selection.
@@ -2307,6 +2356,22 @@ export function MechanismGallery({
           // Guarded anyway: skip recording rather than crashing the gallery.
           return;
         }
+        // No ralt-layer case-pair companion proposal here (unlike the
+        // suggestion-accept path's handleSuggestionAccept, which does raise
+        // one). This "Assign to a key" card lets the author pick ANY combo of
+        // up to four ModifierTokens — chosenTokens may already include SHIFT
+        // (e.g. the author manually building the SHIFT+RALT companion
+        // itself), or be an unrelated combo (e.g. CTRL+ALT) that carries no
+        // case-pair meaning at all. Unlike the suggestion-accept path — whose
+        // candidate is always a kbgen-seeded, RALT-only lowercase placement,
+        // so "this base placement's own modifiers, plus SHIFT" is always a
+        // sound companion to propose — there is no reliable signal here that
+        // chosenTokens IS a lowercase case-pair's RALT layer rather than an
+        // arbitrary combo. Proposing unconditionally would misfire (double
+        // SHIFT, or a nonsensical companion for CTRL+ALT). Scope cut, not a
+        // defect: a future pass could special-case chosenTokens === ["RALT"]
+        // specifically, but that is a narrower rule than exists today for any
+        // other manual-apply companion.
         assignment = {
           scope: "individual",
           target: currentChar,
@@ -2480,6 +2545,52 @@ export function MechanismGallery({
 
     if (pendingCompanion.mechanism === "combo") {
       confirmComboCompanion(pendingCompanion);
+      return;
+    }
+
+    if (pendingCompanion.mechanism === "ralt-layer") {
+      // Stale-proposal guard — same rule as the physical branch below (FR-008):
+      // the assignment this was raised for must still be present, by reference.
+      if (!sessionAssignments.includes(pendingCompanion.baseAssignment)) {
+        clearCompanion();
+        return;
+      }
+      // The companion's modifiers are the lowercase placement's own modifiers
+      // with SHIFT added — the SAME comboToKeySpec/canonicalizeCombo builder
+      // the manual S-08 write path and the suggestion-accept fix use, so the
+      // emitted altgrKeyList shape can never drift between the three call
+      // sites. canonicalizeCombo only throws for a mutually-exclusive combo —
+      // structurally unreachable here since baseModifiers was itself already
+      // a valid, applied combo — but guarded the same defensive way as the
+      // other write paths rather than assumed.
+      let altgrKeyList: string;
+      try {
+        altgrKeyList = comboToKeySpec(
+          canonicalizeCombo([...pendingCompanion.baseModifiers, "SHIFT"]),
+          pendingCompanion.vkey,
+        );
+      } catch {
+        clearCompanion();
+        return;
+      }
+      const companionAssignment: MechanismAssignment = {
+        scope: "individual",
+        target: pendingCompanion.counterpart,
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_RALT,
+            strategyId: "S-08",
+            slotValues: {
+              altgrKeyList,
+              altgrOutputList: pendingCompanion.counterpart,
+            },
+          },
+        ],
+        source: "user",
+      };
+      recordAssignments([...sessionAssignments, companionAssignment]);
+      clearCompanion();
       return;
     }
 
