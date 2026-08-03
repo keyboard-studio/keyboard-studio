@@ -44,8 +44,18 @@ export type ClientDiscriminator = GitHubOAuthClient;
 export const ExchangeBodySchema = z.object({
   /** The one-time authorization code from GitHub's redirect. */
   code: z.string().min(1),
-  /** PKCE code verifier (S256 flow). Pass through to GitHub when provided. */
-  code_verifier: z.string().min(1).optional(),
+  /**
+   * PKCE code verifier (S256 flow). **Required** — an authorization code alone
+   * is not sufficient to obtain a token, so an intercepted code is useless
+   * without the verifier that never left the originating browser tab. This
+   * matches `GoogleExchangeBodySchema`, where the verifier has always been
+   * mandatory.
+   *
+   * Zod runs before the handler body, so a request omitting it is refused with
+   * `invalid_request` before any outbound call is made — that property holds by
+   * construction rather than by a check in `exchange()`.
+   */
+  code_verifier: z.string().min(1),
   /** Redirect URI used in the original authorization request, if any. */
   redirect_uri: z.string().url().optional(),
   /**

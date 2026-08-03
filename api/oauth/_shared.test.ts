@@ -86,7 +86,7 @@ describe("runTokenHandler — HTTP glue", () => {
       status: 200,
       body: { access_token: "gho_test", token_type: "bearer", scope: "public_repo" },
     });
-    const res = await runTokenHandler(postReq({ code: "abc123" }), ExchangeBodySchema, exchangeCore, config);
+    const res = await runTokenHandler(postReq({ code: "abc123", code_verifier: "verifier" }), ExchangeBodySchema, exchangeCore, config);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       access_token: "gho_test",
@@ -101,7 +101,7 @@ describe("runTokenHandler — HTTP glue", () => {
       status: 200,
       body: { error: "bad_verification_code", error_description: "leak me" },
     });
-    const res = await runTokenHandler(postReq({ code: "stale" }), ExchangeBodySchema, exchangeCore, config);
+    const res = await runTokenHandler(postReq({ code: "stale", code_verifier: "verifier" }), ExchangeBodySchema, exchangeCore, config);
     expect(res.status).toBe(400);
     const json = (await res.json()) as { error: string };
     expect(json.error).toBe("bad_verification_code");
@@ -124,7 +124,7 @@ describe("runTokenHandler — client discriminator", () => {
         return { ok: true, status: 200, json: () => Promise.resolve({ access_token: "gho_app", token_type: "bearer", scope: "" }) };
       },
     };
-    const res = await runTokenHandler(postReq({ code: "abc" }), ExchangeBodySchema, exchangeCore, config);
+    const res = await runTokenHandler(postReq({ code: "abc", code_verifier: "verifier" }), ExchangeBodySchema, exchangeCore, config);
     expect(res.status).toBe(200);
     expect((captured.body as Record<string, unknown>)["client_id"]).toBe("app-cid");
   });
@@ -141,7 +141,7 @@ describe("runTokenHandler — client discriminator", () => {
         return { ok: true, status: 200, json: () => Promise.resolve({ access_token: "gho_oauth", token_type: "bearer", scope: "public_repo" }) };
       },
     };
-    const res = await runTokenHandler(postReq({ code: "abc", client: "oauth_app" }), ExchangeBodySchema, exchangeCore, config);
+    const res = await runTokenHandler(postReq({ code: "abc", code_verifier: "verifier", client: "oauth_app" }), ExchangeBodySchema, exchangeCore, config);
     expect(res.status).toBe(200);
     expect((captured.body as Record<string, unknown>)["client_id"]).toBe("oauth-cid");
   });
@@ -150,14 +150,14 @@ describe("runTokenHandler — client discriminator", () => {
     // stubConfigWithOAuth is used here — config has no OAuth pair
     const config = stubConfig({ ok: true, status: 200, body: { access_token: "gho_app", token_type: "bearer", scope: "" } });
     // config has no oauthClientId/oauthClientSecret
-    const res = await runTokenHandler(postReq({ code: "abc", client: "oauth_app" }), ExchangeBodySchema, exchangeCore, config);
+    const res = await runTokenHandler(postReq({ code: "abc", code_verifier: "verifier", client: "oauth_app" }), ExchangeBodySchema, exchangeCore, config);
     expect(res.status).toBe(500);
     expect((await res.json() as { error: string }).error).toBe("server_misconfigured");
   });
 
   it("returns 400 invalid_request when client has an unknown value", async () => {
     const config = stubConfigWithOAuth({ ok: true, status: 200, body: {} });
-    const res = await runTokenHandler(postReq({ code: "abc", client: "not_valid" }), ExchangeBodySchema, exchangeCore, config);
+    const res = await runTokenHandler(postReq({ code: "abc", code_verifier: "verifier", client: "not_valid" }), ExchangeBodySchema, exchangeCore, config);
     expect(res.status).toBe(400);
     expect((await res.json() as { error: string }).error).toBe("invalid_request");
   });
@@ -253,7 +253,7 @@ describe("runTokenHandler — rate limiter", () => {
     limit,
   });
 
-  const exchangeReq = () => postReq({ code: "gh-code" });
+  const exchangeReq = () => postReq({ code: "gh-code", code_verifier: "verifier" });
 
   it("admits up to the limit, then returns 429 request_rate_limited with Retry-After", async () => {
     const { config } = countingConfig();

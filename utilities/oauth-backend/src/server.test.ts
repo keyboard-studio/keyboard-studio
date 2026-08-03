@@ -147,7 +147,7 @@ describe("POST /oauth/exchange — body validation", () => {
     const res = await app.inject({
       method: "POST",
       url: "/oauth/exchange",
-      payload: { code: "abc", redirect_uri: "not-a-url" },
+      payload: { code: "abc", code_verifier: "verifier", redirect_uri: "not-a-url" },
     });
     expect(res.statusCode).toBe(400);
   });
@@ -157,7 +157,7 @@ describe("POST /oauth/exchange — body validation", () => {
     const res = await app.inject({
       method: "POST",
       url: "/oauth/exchange",
-      payload: { code: "abc", redirect_uri: submittedBadUrl },
+      payload: { code: "abc", code_verifier: "verifier", redirect_uri: submittedBadUrl },
     });
     expect(res.statusCode).toBe(400);
     // The response body must never contain the submitted value
@@ -173,7 +173,7 @@ describe("POST /oauth/exchange — body validation", () => {
     const res = await app.inject({
       method: "POST",
       url: "/oauth/exchange",
-      payload: { code: "github-code-abc" },
+      payload: { code: "github-code-abc", code_verifier: "verifier" },
     });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body) as {
@@ -195,7 +195,7 @@ describe("POST /oauth/exchange — secret leakage", () => {
     const res = await app.inject({
       method: "POST",
       url: "/oauth/exchange",
-      payload: { code: "some-code" },
+      payload: { code: "some-code", code_verifier: "verifier" },
     });
     expect(res.body).not.toContain("ci-client-secret-SHOULD-NEVER-APPEAR");
   });
@@ -215,7 +215,7 @@ describe("POST /oauth/exchange — secret leakage", () => {
     const res = await errApp.inject({
       method: "POST",
       url: "/oauth/exchange",
-      payload: { code: "bad-code" },
+      payload: { code: "bad-code", code_verifier: "verifier" },
     });
     expect(res.body).not.toContain("ci-client-secret-SHOULD-NEVER-APPEAR");
     expect(res.statusCode).toBe(400);
@@ -250,7 +250,7 @@ describe("POST /oauth/exchange — upstream gateway errors", () => {
     const res = await gatewayApp.inject({
       method: "POST",
       url: "/oauth/exchange",
-      payload: { code: "some-code" },
+      payload: { code: "some-code", code_verifier: "verifier" },
     });
     expect(res.statusCode).toBe(502);
     const body = JSON.parse(res.body) as { error: string };
@@ -1001,7 +1001,7 @@ describe("POST /oauth/exchange — client discriminator", () => {
 
     const res = await discriminatorApp.inject({
       method: "POST", url: "/oauth/exchange",
-      payload: { code: "some-code" },
+      payload: { code: "some-code", code_verifier: "verifier" },
     });
     expect(res.statusCode).toBe(200);
     const sentPayload = JSON.parse(captured.body ?? "{}") as Record<string, unknown>;
@@ -1033,7 +1033,7 @@ describe("POST /oauth/exchange — client discriminator", () => {
 
     const res = await discriminatorApp.inject({
       method: "POST", url: "/oauth/exchange",
-      payload: { code: "some-code", client: "oauth_app" },
+      payload: { code: "some-code", code_verifier: "verifier", client: "oauth_app" },
     });
     expect(res.statusCode).toBe(200);
     const sentPayload = JSON.parse(captured.body ?? "{}") as Record<string, unknown>;
@@ -1054,7 +1054,7 @@ describe("POST /oauth/exchange — client discriminator", () => {
 
     const res = await noOAuthApp.inject({
       method: "POST", url: "/oauth/exchange",
-      payload: { code: "some-code", client: "oauth_app" },
+      payload: { code: "some-code", code_verifier: "verifier", client: "oauth_app" },
     });
     expect(res.statusCode).toBe(500);
     expect((JSON.parse(res.body) as { error: string }).error).toBe("server_misconfigured");
@@ -1064,7 +1064,7 @@ describe("POST /oauth/exchange — client discriminator", () => {
   it("returns 400 invalid_request when client has an unknown value", async () => {
     const res = await app.inject({
       method: "POST", url: "/oauth/exchange",
-      payload: { code: "some-code", client: "unknown_client" },
+      payload: { code: "some-code", code_verifier: "verifier", client: "unknown_client" },
     });
     expect(res.statusCode).toBe(400);
     expect((JSON.parse(res.body) as { error: string }).error).toBe("invalid_request");
@@ -1112,7 +1112,7 @@ describe("Google identity disabled (GitHub-only deployment)", () => {
     const res = await ghOnlyApp.inject({
       method: "POST",
       url: "/oauth/exchange",
-      payload: { code: "github-code-abc" },
+      payload: { code: "github-code-abc", code_verifier: "verifier" },
     });
     expect(res.statusCode).toBe(200);
   });
@@ -1144,7 +1144,7 @@ describe("POST /oauth/exchange — rate limiter", () => {
   }
 
   const exchangeOnce = (srv: Awaited<ReturnType<typeof buildServer>>) =>
-    srv.inject({ method: "POST", url: "/oauth/exchange", payload: { code: "github-code-abc" } });
+    srv.inject({ method: "POST", url: "/oauth/exchange", payload: { code: "github-code-abc", code_verifier: "verifier" } });
 
   it("admits exactly the configured budget, then refuses 429 request_rate_limited", async () => {
     const srv = await limitedApp(() => 1_700_000_040_000);

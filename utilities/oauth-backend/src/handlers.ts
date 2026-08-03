@@ -38,6 +38,19 @@ export interface OAuthFetchResponse {
   ok: boolean;
   status: number;
   json(): Promise<unknown>;
+  /**
+   * Response headers, when the adapter surfaces them.
+   *
+   * Optional by design: the token-exchange flows above read no headers, and
+   * every existing test stub returns a bare `{ ok, status, json }` object. Only
+   * the token-provenance check in `verify-github-user.ts` reads this (it needs
+   * GitHub's `X-OAuth-Client-ID` on `GET /user`), and it treats an absent
+   * `headers` the same as an absent header — the check does not engage.
+   *
+   * Mirrors the read side of the DOM `Headers` interface only; name lookup is
+   * case-insensitive there, and adapters are expected to preserve that.
+   */
+  headers?: { get(name: string): string | null };
 }
 
 // ---------------------------------------------------------------------------
