@@ -100,7 +100,30 @@ export function DecisionEntryRow({
       message: `Carried ${value} for ${question} from the base keyboard`,
     });
   } else {
-    const { editor, keysRemoved, keysAdded, mechanismsAssigned, touchKeysAffected } = spec;
+    const {
+      editor,
+      keysRemoved: keysRemovedCount,
+      keysAdded: keysAddedCount,
+      mechanismsAssigned: mechanismsAssignedCount,
+      touchKeysAffected: touchKeysAffectedCount,
+    } = spec;
+    // Absence renders as words, never coerced to a number (specs/055
+    // FR-005/FR-005a). This one string is a placeholder for T014/T022/T030,
+    // which own the real message-id design for the editor-step headline; it
+    // exists only so an unmeasured dimension has something true to say.
+    const notMeasured = t({
+      id: "trail.entry.headline.editorStep.notMeasured",
+      message: "not measured",
+    });
+    const countText = (count: number | undefined) =>
+      count === undefined ? notMeasured : String(count);
+    // Same local NAMES as the already-extracted catalog message uses (the
+    // Lingui macro derives each placeholder's name from the expression's own
+    // source text), just now holding formatted text instead of a raw number.
+    const keysRemoved = countText(keysRemovedCount);
+    const keysAdded = countText(keysAddedCount);
+    const mechanismsAssigned = countText(mechanismsAssignedCount);
+    const touchKeysAffected = countText(touchKeysAffectedCount);
     headline = t({
       id: "trail.entry.headline.editorStep",
       message: `Edited ${editor}: ${keysRemoved} keys removed, ${keysAdded} added, ${mechanismsAssigned} mechanisms assigned, ${touchKeysAffected} touch keys affected`,
@@ -165,7 +188,10 @@ export function DecisionEntryRow({
               })}
             </p>
           ) : impact.state === "captured" ? (
-            <DiffHunkList hunks={impact.hunks} />
+            // One entry per changed file (specs/055-legible-decision-trail
+            // FR-016/FR-018); today's producers only ever attach one, so this
+            // renders the same as before. T027 widens the file set.
+            impact.files.map((file) => <DiffHunkList key={file.path} hunks={file.hunks} />)
           ) : impact.state === "none" ? (
             <p style={noticeStyle}>
               {t({

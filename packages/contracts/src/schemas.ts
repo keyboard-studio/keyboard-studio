@@ -622,10 +622,9 @@ export const DecisionFileChangeSchema = z.object({
 export const DecisionImpactSchema = z.discriminatedUnion("state", [
   z.object({
     state: z.literal("captured"),
-    // Non-empty in practice (contract §3) — the schema does not additionally
-    // enforce min(1) here because a captured-but-empty record is a producer
-    // bug, not an untrusted-input shape parseDecisionRecord must tolerate.
-    files: z.array(DecisionFileChangeSchema),
+    // Non-empty (contract §3): zero changed files is the separate
+    // `{ state: "none" }` variant, never an empty capture.
+    files: z.array(DecisionFileChangeSchema).min(1),
     magnitude: z.object({
       added: z.number().int().min(0),
       removed: z.number().int().min(0),

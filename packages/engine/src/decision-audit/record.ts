@@ -24,6 +24,7 @@ import {
   DecisionEntrySchema,
   makeEmptyDecisionRecord,
   type DecisionEntry,
+  type DecisionFileChange,
   type DecisionImpact,
   type DecisionRecord,
   type DiffHunk,
@@ -58,14 +59,24 @@ function serializeHunk(hunk: DiffHunk): unknown {
   };
 }
 
+function serializeFileChange(change: DecisionFileChange): unknown {
+  return {
+    path: change.path,
+    hunks: change.hunks.map(serializeHunk),
+    magnitude: { added: change.magnitude.added, removed: change.magnitude.removed },
+  };
+}
+
 function serializeImpact(impact: DecisionImpact): unknown {
   switch (impact.state) {
     case "captured":
       return {
         state: impact.state,
-        path: impact.path,
-        hunks: impact.hunks.map(serializeHunk),
+        files: impact.files.map(serializeFileChange),
         magnitude: { added: impact.magnitude.added, removed: impact.magnitude.removed },
+        // Written only when present, same convention as `provenance.source`
+        // below: absent and "solely responsible" are the same fact.
+        ...(impact.sharedWith !== undefined ? { sharedWith: [...impact.sharedWith] } : {}),
       };
     case "none":
       return { state: impact.state };
@@ -87,18 +98,39 @@ function serializeEntry(entry: DecisionEntry): unknown {
           answerType: entry.payload.answerType,
           value: Array.isArray(entry.payload.value) ? [...entry.payload.value] : entry.payload.value,
         }
-      : {
-          kind: entry.payload.kind,
-          actionType: entry.payload.actionType,
-          summary: {
-            keysRemoved: entry.payload.summary.keysRemoved,
-            keysAdded: entry.payload.summary.keysAdded,
-            mechanismsAssigned: entry.payload.summary.mechanismsAssigned,
-            touchKeysAffected: entry.payload.summary.touchKeysAffected,
-            sample: [...entry.payload.summary.sample],
-            sampleTruncated: entry.payload.summary.sampleTruncated,
-          },
-        };
+      : entry.payload.kind === "editor-action"
+        ? {
+            kind: entry.payload.kind,
+            actionType: entry.payload.actionType,
+            summary: {
+              // Optional per specs/055 FR-005a: written only when the producer
+              // actually measured the dimension. `JSON.stringify` drops an
+              // `undefined`-valued property on its own, so an unmeasured count
+              // is simply absent from the serialized form, never a written `0`.
+              keysRemoved: entry.payload.summary.keysRemoved,
+              keysAdded: entry.payload.summary.keysAdded,
+              mechanismsAssigned: entry.payload.summary.mechanismsAssigned,
+              touchKeysAffected: entry.payload.summary.touchKeysAffected,
+              sample: [...entry.payload.summary.sample],
+              sampleTruncated: entry.payload.summary.sampleTruncated,
+            },
+          }
+        : {
+            // base-contribution (specs/055-legible-decision-trail D-11). No
+            // producer writes this payload yet (recordBaseContribution.ts is a
+            // separate task); this branch only has to serialize the shape when
+            // one eventually does.
+            kind: entry.payload.kind,
+            baseId: entry.payload.baseId,
+            baseDisplayName: entry.payload.baseDisplayName,
+            startingKeyCount: entry.payload.startingKeyCount,
+            derivedAxes: [...entry.payload.derivedAxes],
+            inheritedMetadata: entry.payload.inheritedMetadata.map((m) => ({
+              field: m.field,
+              value: m.value,
+            })),
+            instantiationMode: entry.payload.instantiationMode,
+          };
 
   return {
     entryId: entry.entryId,

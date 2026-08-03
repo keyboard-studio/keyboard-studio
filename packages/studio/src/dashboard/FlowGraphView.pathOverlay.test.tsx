@@ -207,8 +207,13 @@ describe("FR-023 — an overlay distinguishes the walked path", () => {
 
 const CAPTURED: DecisionImpact = {
   state: "captured",
-  path: "source/hausa_std.kmn",
-  hunks: [{ oldStart: 4, oldLines: 1, newStart: 4, newLines: 1, lines: ["-+ [K_A] > 'a'", "++ [K_A] > 'ɓ'"] }],
+  files: [
+    {
+      path: "source/hausa_std.kmn",
+      hunks: [{ oldStart: 4, oldLines: 1, newStart: 4, newLines: 1, lines: ["-+ [K_A] > 'a'", "++ [K_A] > 'ɓ'"] }],
+      magnitude: { added: 1, removed: 1 },
+    },
+  ],
   magnitude: { added: 1, removed: 1 },
 };
 

@@ -146,10 +146,11 @@ describe("SC-005 — every captured impact re-applies to produce the shipped tex
       if (impact.state !== "captured") {
         throw new Error(`boundary ${String(i)} was ${impact.state}, expected captured`);
       }
-      // The path names what shipped.
-      expect(impact.path).toBe(PATH);
+      // The path names what shipped. One file today (T027 widens the set).
+      expect(impact.files).toHaveLength(1);
+      expect(impact.files[0]!.path).toBe(PATH);
       // THE ASSERTION: previous boundary + this entry's hunks === this boundary.
-      expect(applyHunks(SESSION[i - 1]!, impact.hunks)).toBe(normalizeEol(SESSION[i]!));
+      expect(applyHunks(SESSION[i - 1]!, impact.files[0]!.hunks)).toBe(normalizeEol(SESSION[i]!));
     }
   });
 
@@ -158,7 +159,7 @@ describe("SC-005 — every captured impact re-applies to produce the shipped tex
     await snapshotter.captureAtBoundary();
     const impact = await snapshotter.captureAtBoundary();
     if (impact?.state !== "captured") throw new Error("expected a captured impact");
-    expect(applyHunks(B0, impact.hunks)).toBe(normalizeEol(B1));
+    expect(applyHunks(B0, impact.files[0]!.hunks)).toBe(normalizeEol(B1));
     expect(impact.magnitude).toEqual({ added: 1, removed: 1 });
   });
 
@@ -167,7 +168,7 @@ describe("SC-005 — every captured impact re-applies to produce the shipped tex
     await snapshotter.captureAtBoundary();
     const impact = await snapshotter.captureAtBoundary();
     if (impact?.state !== "captured") throw new Error("expected a captured impact");
-    expect(applyHunks(B1, impact.hunks)).toBe(normalizeEol(B2));
+    expect(applyHunks(B1, impact.files[0]!.hunks)).toBe(normalizeEol(B2));
     expect(impact.magnitude).toEqual({ added: 0, removed: 1 });
   });
 
@@ -176,7 +177,7 @@ describe("SC-005 — every captured impact re-applies to produce the shipped tex
     await snapshotter.captureAtBoundary();
     const impact = await snapshotter.captureAtBoundary();
     if (impact?.state !== "captured") throw new Error("expected a captured impact");
-    expect(applyHunks(B2, impact.hunks)).toBe(normalizeEol(B3));
+    expect(applyHunks(B2, impact.files[0]!.hunks)).toBe(normalizeEol(B3));
     expect(impact.magnitude).toEqual({ added: 2, removed: 0 });
   });
 
@@ -187,8 +188,8 @@ describe("SC-005 — every captured impact re-applies to produce the shipped tex
     if (impact?.state !== "captured") throw new Error("expected a captured impact");
     // A mid-file rewrite and an end-of-file append are far enough apart not to
     // coalesce, so the applier's multi-hunk ordering is genuinely exercised.
-    expect(impact.hunks.length).toBeGreaterThan(1);
-    expect(applyHunks(B3, impact.hunks)).toBe(normalizeEol(B4));
+    expect(impact.files[0]!.hunks.length).toBeGreaterThan(1);
+    expect(applyHunks(B3, impact.files[0]!.hunks)).toBe(normalizeEol(B4));
   });
 
   it("rejects hunks re-applied to the WRONG baseline", async () => {
@@ -197,7 +198,7 @@ describe("SC-005 — every captured impact re-applies to produce the shipped tex
     await snapshotter.captureAtBoundary();
     const impact = await snapshotter.captureAtBoundary();
     if (impact?.state !== "captured") throw new Error("expected a captured impact");
-    expect(() => applyHunks(B3, impact.hunks)).toThrow();
+    expect(() => applyHunks(B3, impact.files[0]!.hunks)).toThrow();
   });
 });
 
@@ -238,7 +239,7 @@ describe("boundary bookkeeping", () => {
     const impact = await snapshotter.captureAtBoundary();
     if (impact?.state !== "captured") throw new Error("expected a captured impact");
     // Still measured from B0 — nothing was lost and nothing was double-counted.
-    expect(applyHunks(B0, impact.hunks)).toBe(normalizeEol(B1));
+    expect(applyHunks(B0, impact.files[0]!.hunks)).toBe(normalizeEol(B1));
   });
 
   it("re-establishes a baseline after reset() instead of diffing across it", async () => {
@@ -250,7 +251,7 @@ describe("boundary bookkeeping", () => {
     expect(await snapshotter.captureAtBoundary()).toBeNull();
     const impact = await snapshotter.captureAtBoundary();
     if (impact?.state !== "captured") throw new Error("expected a captured impact");
-    expect(applyHunks(B1, impact.hunks)).toBe(normalizeEol(B2));
+    expect(applyHunks(B1, impact.files[0]!.hunks)).toBe(normalizeEol(B2));
   });
 
   it("reads the projection exactly once per boundary", async () => {

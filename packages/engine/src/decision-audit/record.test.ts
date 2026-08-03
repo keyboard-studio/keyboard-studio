@@ -50,8 +50,13 @@ function editorEntry(overrides: Partial<DecisionEntry> = {}): DecisionEntry {
     supersedes: null,
     impact: {
       state: "captured",
-      path: "source/foo.kmn",
-      hunks: [{ oldStart: 1, oldLines: 2, newStart: 1, newLines: 1, lines: [" a", "-b"] }],
+      files: [
+        {
+          path: "source/foo.kmn",
+          hunks: [{ oldStart: 1, oldLines: 2, newStart: 1, newLines: 1, lines: [" a", "-b"] }],
+          magnitude: { added: 0, removed: 1 },
+        },
+      ],
       magnitude: { added: 0, removed: 1 },
     },
     ...overrides,
@@ -247,8 +252,13 @@ describe("shedDecisionDetail", () => {
       recordedAt: 10,
       impact: {
         state: "captured",
-        path: "source/foo.kmn",
-        hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [" a"] }],
+        files: [
+          {
+            path: "source/foo.kmn",
+            hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [" a"] }],
+            magnitude: { added: 0, removed: 0 },
+          },
+        ],
         magnitude: { added: 0, removed: 0 },
       },
     });
@@ -257,14 +267,19 @@ describe("shedDecisionDetail", () => {
       recordedAt: 20,
       impact: {
         state: "captured",
-        path: "source/foo.kmn",
-        hunks: [
+        files: [
           {
-            oldStart: 1,
-            oldLines: 200,
-            newStart: 1,
-            newLines: 200,
-            lines: Array.from({ length: 400 }, (_, i) => `+line ${i} of a very wide hunk payload`),
+            path: "source/foo.kmn",
+            hunks: [
+              {
+                oldStart: 1,
+                oldLines: 200,
+                newStart: 1,
+                newLines: 200,
+                lines: Array.from({ length: 400 }, (_, i) => `+line ${i} of a very wide hunk payload`),
+              },
+            ],
+            magnitude: { added: 400, removed: 0 },
           },
         ],
         magnitude: { added: 400, removed: 0 },

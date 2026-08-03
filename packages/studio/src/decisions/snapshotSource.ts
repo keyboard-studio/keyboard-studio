@@ -87,11 +87,14 @@ export function createSourceSnapshotter(deps: SourceSnapshotterDeps): SourceSnap
 
       const hunks = diffLines(baseline.text, current.text);
       if (hunks.length === 0) return { state: "none" };
+      const magnitude = diffMagnitude(hunks);
+      // One file today (specs/055-legible-decision-trail T027 widens this to
+      // the whole projected VFS); `magnitude` is the aggregate over `files`,
+      // currently identical to the single file's own magnitude.
       return {
         state: "captured",
-        path: current.path,
-        hunks,
-        magnitude: diffMagnitude(hunks),
+        files: [{ path: current.path, hunks, magnitude }],
+        magnitude,
       };
     },
 

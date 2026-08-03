@@ -15,9 +15,14 @@ afterEach(cleanup);
 
 const CAPTURED: DecisionImpact = {
   state: "captured",
-  path: "source/hausa_std.kmn",
-  hunks: [
-    { oldStart: 4, oldLines: 2, newStart: 4, newLines: 3, lines: [" store(&NAME)", "+ 'ɓ' > 'ɓ'"] },
+  files: [
+    {
+      path: "source/hausa_std.kmn",
+      hunks: [
+        { oldStart: 4, oldLines: 2, newStart: 4, newLines: 3, lines: [" store(&NAME)", "+ 'ɓ' > 'ɓ'"] },
+      ],
+      magnitude: { added: 1, removed: 0 },
+    },
   ],
   magnitude: { added: 1, removed: 0 },
 };

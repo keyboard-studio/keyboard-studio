@@ -106,13 +106,16 @@ function deriveCounterfactual(
     const after = emitKmn(next);
     const hunks = diffLines(before, after);
     if (hunks.length === 0) return { state: "none" };
+    const magnitude = diffMagnitude(hunks);
     return {
       state: "captured",
       // The counterfactual is IR-level, so it names the IR's own `.kmn` rather
-      // than claiming a VFS path it did not read.
-      path: `source/${base.header.keyboardId}.kmn`,
-      hunks,
-      magnitude: diffMagnitude(hunks),
+      // than claiming a VFS path it did not read. One file today
+      // (specs/055-legible-decision-trail T027 widens this to the whole
+      // projected VFS); `magnitude` is the aggregate over `files`, currently
+      // identical to the single file's own magnitude.
+      files: [{ path: `source/${base.header.keyboardId}.kmn`, hunks, magnitude }],
+      magnitude,
     };
   } catch {
     // A rejected patch (out-of-`writes` containment) or a throwing `mutate` is a

@@ -19,8 +19,13 @@ import { DECISION_RECORD_VFS_PATH } from "./sidecar.js";
 
 const CAPTURED: DecisionImpact = {
   state: "captured",
-  path: "source/test_kb.kmn",
-  hunks: [{ oldStart: 4, oldLines: 0, newStart: 5, newLines: 2, lines: ["+store(&X) 'y'", "+c"] }],
+  files: [
+    {
+      path: "source/test_kb.kmn",
+      hunks: [{ oldStart: 4, oldLines: 0, newStart: 5, newLines: 2, lines: ["+store(&X) 'y'", "+c"] }],
+      magnitude: { added: 2, removed: 0 },
+    },
+  ],
   magnitude: { added: 2, removed: 0 },
 };
 

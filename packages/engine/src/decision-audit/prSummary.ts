@@ -74,23 +74,39 @@ function plural(count: number, one: string, many: string): string {
 }
 
 /**
- * Describe an editor step by its non-zero counts.
+ * One count's clause, or `undefined` when it contributes nothing to the
+ * sentence.
+ *
+ * `count === undefined` (not measured) and `count === 0` (measured, unchanged)
+ * both produce no clause here, but for different reasons — neither is coerced
+ * into the other. `undefined > 0` would be `false` in JS and silently treat
+ * "not measured" the same as "measured zero", which is exactly the
+ * lumping-together FR-005a forbids, so both are checked explicitly instead of
+ * relying on the numeric comparison alone.
+ */
+function formatCount(count: number | undefined, one: string, many: string): string | undefined {
+  if (count === undefined) return undefined;
+  if (count === 0) return undefined;
+  return plural(count, one, many);
+}
+
+/**
+ * Describe an editor step by its non-zero, measured counts.
  *
  * Counts only — a step that removed three hundred keys says so in one clause
  * rather than listing them (contract §6). Zero-valued categories are dropped so
  * a gallery edit does not report "0 touch keys affected" as though touch had
- * been considered and left alone.
+ * been considered and left alone. An unmeasured category is dropped the same
+ * way (never reported as a number), so "no net change" also covers "nothing
+ * measured" rather than misstating either as the other.
  */
 function formatEditorSummary(summary: EditorActionSummary): string {
-  const parts: string[] = [];
-  if (summary.keysRemoved > 0) parts.push(plural(summary.keysRemoved, "key removed", "keys removed"));
-  if (summary.keysAdded > 0) parts.push(plural(summary.keysAdded, "key added", "keys added"));
-  if (summary.mechanismsAssigned > 0) {
-    parts.push(plural(summary.mechanismsAssigned, "mechanism assigned", "mechanisms assigned"));
-  }
-  if (summary.touchKeysAffected > 0) {
-    parts.push(plural(summary.touchKeysAffected, "touch key affected", "touch keys affected"));
-  }
+  const parts = [
+    formatCount(summary.keysRemoved, "key removed", "keys removed"),
+    formatCount(summary.keysAdded, "key added", "keys added"),
+    formatCount(summary.mechanismsAssigned, "mechanism assigned", "mechanisms assigned"),
+    formatCount(summary.touchKeysAffected, "touch key affected", "touch keys affected"),
+  ].filter((part): part is string => part !== undefined);
   return parts.length === 0 ? "no net change" : parts.join(", ");
 }
 
@@ -100,6 +116,14 @@ function formatDecision(entry: DecisionEntry): string {
 
   if (payload.kind === "editor-action") {
     return `${EDITOR_LABEL[payload.actionType]} (${formatEditorSummary(payload.summary)})`;
+  }
+
+  if (payload.kind === "base-contribution") {
+    // No producer writes this payload yet — recordBaseContribution.ts
+    // (specs/055-legible-decision-trail D-11) is a separate, not-yet-landed
+    // task. This clause only has to describe the shape truthfully once one
+    // does; it is not the final wording for that surface.
+    return `Started from base \`${payload.baseId}\` ("${payload.baseDisplayName}")`;
   }
 
   const value = `"${formatValue(payload.value)}"`;
@@ -136,8 +160,13 @@ function formatEffect(impact: DecisionImpact | null | undefined): string {
   if (impact === null) return "omitted to keep the record within size limits";
 
   switch (impact.state) {
-    case "captured":
-      return `+${impact.magnitude.added} / -${impact.magnitude.removed} lines in \`${impact.path}\``;
+    case "captured": {
+      // `files` is non-empty (contract §3). Joined rather than one-per-row: the
+      // block is one row per decision, and a decision widened to several files
+      // (specs/055-legible-decision-trail T027) still gets one effect cell.
+      const paths = impact.files.map((file) => file.path).join(", ");
+      return `+${impact.magnitude.added} / -${impact.magnitude.removed} lines in \`${paths}\``;
+    }
     case "none":
       return "no source change";
     case "unavailable":

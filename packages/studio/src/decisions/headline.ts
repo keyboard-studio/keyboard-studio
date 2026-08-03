@@ -23,10 +23,14 @@ export type HeadlineSpec =
   | {
       id: "editorStep";
       editor: string;
-      keysRemoved: number;
-      keysAdded: number;
-      mechanismsAssigned: number;
-      touchKeysAffected: number;
+      // Optional per specs/055-legible-decision-trail FR-005/FR-005a: absent
+      // means "not measured" and must render as words, never coerced to a
+      // number. The component (not this selection function) is where that
+      // rendering happens — see DecisionEntryRow.tsx.
+      keysRemoved: number | undefined;
+      keysAdded: number | undefined;
+      mechanismsAssigned: number | undefined;
+      touchKeysAffected: number | undefined;
     };
 
 /**
@@ -70,6 +74,16 @@ export function headlineOf(
       mechanismsAssigned: payload.summary.mechanismsAssigned,
       touchKeysAffected: payload.summary.touchKeysAffected,
     };
+  }
+
+  if (payload.kind === "base-contribution") {
+    // No producer writes this payload yet (recordBaseContribution.ts,
+    // specs/055-legible-decision-trail D-11, is a separate not-yet-landed
+    // task, as is this headline's own catalogue message). Falls back to the
+    // existing "chose" shape so the trail renders something true rather than
+    // an unhandled discriminant; the fallback is intentionally plain rather
+    // than a designed sentence for this payload.
+    return { id: "chose", question: payload.baseId, value: payload.baseDisplayName };
   }
 
   const question = payload.questionId;

@@ -74,8 +74,13 @@ describe("shedDecisionDetail — candidate filter", () => {
       recordedAt: 3,
       impact: {
         state: "captured",
-        path: "source/foo.kmn",
-        hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [" a"] }],
+        files: [
+          {
+            path: "source/foo.kmn",
+            hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [" a"] }],
+            magnitude: { added: 0, removed: 0 },
+          },
+        ],
         magnitude: { added: 0, removed: 0 },
       },
     });
@@ -101,8 +106,13 @@ describe("shedDecisionDetail — candidate filter", () => {
       recordedAt: 10,
       impact: {
         state: "captured",
-        path: "source/foo.kmn",
-        hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [" a"] }],
+        files: [
+          {
+            path: "source/foo.kmn",
+            hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [" a"] }],
+            magnitude: { added: 0, removed: 0 },
+          },
+        ],
         magnitude: { added: 0, removed: 0 },
       },
     });
@@ -122,8 +132,13 @@ describe("shedDecisionDetail — candidate filter", () => {
       recordedAt: 100,
       impact: {
         state: "captured",
-        path: "source/foo.kmn",
-        hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [" a"] }],
+        files: [
+          {
+            path: "source/foo.kmn",
+            hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [" a"] }],
+            magnitude: { added: 0, removed: 0 },
+          },
+        ],
         magnitude: { added: 0, removed: 0 },
       },
     });
@@ -132,8 +147,13 @@ describe("shedDecisionDetail — candidate filter", () => {
       recordedAt: 200,
       impact: {
         state: "captured",
-        path: "source/foo.kmn",
-        hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [" a"] }],
+        files: [
+          {
+            path: "source/foo.kmn",
+            hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [" a"] }],
+            magnitude: { added: 0, removed: 0 },
+          },
+        ],
         magnitude: { added: 0, removed: 0 },
       },
     });
@@ -179,14 +199,19 @@ describe("shedDecisionDetail — candidate filter", () => {
 function bigCapturedImpact() {
   return {
     state: "captured" as const,
-    path: "source/foo.kmn",
-    hunks: [
+    files: [
       {
-        oldStart: 1,
-        oldLines: 200,
-        newStart: 1,
-        newLines: 200,
-        lines: Array.from({ length: 200 }, (_, i) => `+line ${i} of a wide hunk payload`),
+        path: "source/foo.kmn",
+        hunks: [
+          {
+            oldStart: 1,
+            oldLines: 200,
+            newStart: 1,
+            newLines: 200,
+            lines: Array.from({ length: 200 }, (_, i) => `+line ${i} of a wide hunk payload`),
+          },
+        ],
+        magnitude: { added: 200, removed: 0 },
       },
     ],
     magnitude: { added: 200, removed: 0 },

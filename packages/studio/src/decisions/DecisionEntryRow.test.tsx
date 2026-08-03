@@ -101,8 +101,13 @@ describe("the four impact states", () => {
   it("captured — renders the hunks", () => {
     renderExpandedRow({
       state: "captured",
-      path: "source/hausa_std.kmn",
-      hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 2, lines: [" a", "+ 'ɓ'"] }],
+      files: [
+        {
+          path: "source/hausa_std.kmn",
+          hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 2, lines: [" a", "+ 'ɓ'"] }],
+          magnitude: { added: 1, removed: 0 },
+        },
+      ],
       magnitude: { added: 1, removed: 0 },
     });
     const region = screen.getByTestId("decision-entry-impact");
