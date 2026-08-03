@@ -107,6 +107,26 @@ vi.mock("./SignUpPanel.tsx", () => ({
   ),
 }));
 
+// OutputScreen reads the verified GitHub identity here and threads it into
+// ManagedPRSubmitPanel, whose Submit button is gated on it. These specs are
+// about the staleness and projection-warning gates, NOT the identity gate, so a
+// signed-in GitHub session is the right fixture: without it every Submit
+// assertion below would be measuring the identity gate instead. The identity
+// gate has its own coverage in ManagedPRSubmitPanel.test.tsx.
+vi.mock("../hooks/useGitHubAuth.ts", () => ({
+  useGitHubAuth: () => ({
+    status: "verified",
+    token: { accessToken: "gho_test_token", tokenType: "bearer", scope: "public_repo" },
+    verify: { login: "octocat", missingScopes: [] },
+    login: "octocat",
+    canSubmit: true,
+    missingScopes: [],
+    error: null,
+    connect: () => {},
+    disconnect: () => {},
+  }),
+}));
+
 // ---------------------------------------------------------------------------
 // Import components under test AFTER mocks are registered.
 // ---------------------------------------------------------------------------

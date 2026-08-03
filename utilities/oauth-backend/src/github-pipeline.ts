@@ -132,11 +132,11 @@ export function buildManagedPRConfig(
 
 /**
  * Fields common to every `ok: false` shape. Both HTTP edges (server.ts,
- * api/submit/managed-pr.ts) read `branchName` / `retryAfterSeconds` off the
- * union without narrowing on `error` first, so every failure variant --
- * including `invalid_path` below -- carries them (as `undefined` where they
- * don't apply) rather than omitting the keys outright. Omitting a key here
- * would make property access on the union a compile error at both edges for
+ * api/submit/managed-pr.ts) read `branchName` / `retryAfterSeconds` /
+ * `category` off the union without narrowing on `error` first, so every failure
+ * variant -- including `invalid_path` below -- carries them (as `undefined`
+ * where they don't apply) rather than omitting the keys outright. Omitting a key
+ * here would make property access on the union a compile error at both edges for
  * a variant they don't (yet) special-case, not just a runtime no-op.
  */
 type ManagedPRFailureBase = {
@@ -147,6 +147,12 @@ type ManagedPRFailureBase = {
   branchName?: string;
   /** Surfaced via Retry-After on 429. */
   retryAfterSeconds?: number;
+  /**
+   * Surfaced in the 400 `invalid_path` body: the bounded rejection class, and
+   * deliberately the *only* thing said about the offending path — the path
+   * itself is never returned.
+   */
+  category?: PathRejectionCategory;
 };
 
 export type ManagedPRHandlerResult =

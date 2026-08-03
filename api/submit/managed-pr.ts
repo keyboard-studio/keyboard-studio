@@ -178,6 +178,11 @@ export async function runManagedPRHandler(
       {
         error: result.error,
         ...(result.branchName !== undefined ? { branchName: result.branchName } : {}),
+        // `category` is the bounded rejection class ("absolute" | "traversal" |
+        // "metadata" | "malformed") — safe to return where the offending path
+        // itself is not, so the client can explain the refusal without the
+        // response ever echoing a submitted path.
+        ...(result.category !== undefined ? { category: result.category } : {}),
       },
       extraHeaders,
     );

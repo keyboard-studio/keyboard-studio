@@ -466,6 +466,9 @@ export async function buildServer(opts: {
       return reply.status(result.status).send({
         error: result.error,
         ...(result.branchName !== undefined ? { branchName: result.branchName } : {}),
+        // Bounded rejection class only — never the offending path. Mirrors the
+        // serverless edge so the two deployments answer identically.
+        ...(result.category !== undefined ? { category: result.category } : {}),
       });
     }
     return reply.status(200).send(result.data);
