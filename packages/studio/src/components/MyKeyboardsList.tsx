@@ -396,6 +396,7 @@ export function MyKeyboardsList() {
       )}
 
       {entries.length > 0 && (
+        // eslint-disable-next-line jsx-a11y/no-redundant-roles -- not redundant: Safari/VoiceOver drops list semantics from ul with list-style:none; the explicit role restores them
         <ul
           role="list"
           aria-label={t({ id: "profile.myKeyboards.listAriaLabel", message: "Your keyboards" })}

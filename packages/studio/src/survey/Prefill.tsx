@@ -123,6 +123,11 @@ export function Prefill({ identity, base, onConfirm, onBack }: PrefillProps) {
   }
 
   return (
+    /* eslint-disable-next-line jsx-a11y/no-static-element-interactions --
+       the bubbled keydown only ADDS a keyboard capability (Enter-to-advance,
+       see the comment on handleKeyDown); the container is not made
+       pointer-interactive and every control inside stays independently
+       keyboard-operable. */
     <div
       onKeyDown={handleKeyDown}
       style={{

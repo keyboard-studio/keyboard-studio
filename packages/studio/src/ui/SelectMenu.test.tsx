@@ -95,9 +95,12 @@ describe("SelectMenu", () => {
     expect(trigger.style.cursor).toBe("pointer");
   });
 
-  it("aria-required reflects the required prop on the trigger", () => {
+  it("aria-required reflects the required prop on the listbox (the role that supports it)", () => {
     render(<SelectMenu options={OPTIONS} value="a" onChange={() => undefined} required />);
-    expect(screen.getByRole("button").getAttribute("aria-required")).toBe("true");
+    // A plain button does not support aria-required, so the trigger must not carry it.
+    expect(screen.getByRole("button").getAttribute("aria-required")).toBeNull();
+    fireEvent.click(screen.getByRole("button"));
+    expect(screen.getByRole("listbox").getAttribute("aria-required")).toBe("true");
   });
 
   it("mousedown outside the component closes an open list", () => {

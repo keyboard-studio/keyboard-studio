@@ -58,3 +58,57 @@ describe('StatusBar — RemovedMenu combining-mark display', () => {
     expect(screen.queryByText('◌e')).toBeNull();
   });
 });
+
+// Spec 056 Cycle 1 — accessibility contracts for the RemovedMenu trigger:
+// aria-expanded reflects open/closed state, and a document-level Escape key
+// dismisses the panel whether focus is on the trigger or a Restore button
+// inside it.
+describe('StatusBar — RemovedMenu accessibility contracts', () => {
+  const oneRemoved: RemovedItem[] = [
+    { type: 'item', id: 'r1', ch: 'e', keys: ['K_E'] },
+  ];
+
+  it('trigger button aria-expanded toggles false → true → false with open state', () => {
+    render(
+      <StatusBar
+        kept={2}
+        total={3}
+        removedList={oneRemoved}
+        onRestore={vi.fn()}
+        onRestoreAll={vi.fn()}
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: /removed/i });
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(trigger.getAttribute('aria-haspopup')).toBe('true');
+
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('document-level Escape dismisses the open panel', () => {
+    render(
+      <StatusBar
+        kept={2}
+        total={3}
+        removedList={oneRemoved}
+        onRestore={vi.fn()}
+        onRestoreAll={vi.fn()}
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: /removed/i });
+    fireEvent.click(trigger);
+    // Panel open — a Restore All action button becomes visible.
+    expect(screen.getByRole('button', { name: /restore all/i })).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.queryByRole('button', { name: /restore all/i })).toBeNull();
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+});
