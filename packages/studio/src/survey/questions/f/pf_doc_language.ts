@@ -22,7 +22,9 @@ export const definition = {
     "both. If you pick \"both\", write each answer in both languages and the " +
     "help page will present them together.",
   type: "radio" as const,
-  required: true,
+  // Optional (minimum-questions revision): blank means English, so an author who
+  // opts into the battery is never blocked by a question they have no view on.
+  required: false,
   options: [
     { value: "english", label: "English" },
     {
@@ -32,19 +34,17 @@ export const definition = {
     },
     { value: "bilingual", label: "Both — English and {{language_name}}" },
   ],
-  next: "pf_welcome_paragraph",
+  next: "pf_font_guidance",
 } satisfies import("../../types.ts").FlowQuestion;
 
 export function validate(
   value: string | string[] | undefined,
 ): ValidationResult {
   const v = typeof value === "string" ? value : "";
+  // Blank is allowed and means English — the question is optional. The check
+  // below still guards against a value outside the offered options.
   if (v.length === 0) {
-    return {
-      ok: false,
-      code: "required",
-      message: "Please choose a language for the help page.",
-    };
+    return { ok: true };
   }
   if (!OPTION_VALUES.has(v)) {
     return {
@@ -61,10 +61,10 @@ export const fixtures: QuestionModule["fixtures"] = {
     { value: "english", note: "English-only help (the common case)" },
     { value: "target", note: "help written in the keyboard's own language" },
     { value: "bilingual", note: "both, as sil_yi and sil_cameroon_azerty ship" },
+    { value: "", note: "blank is fine — means English" },
+    { value: undefined, note: "undefined is fine (optional)" },
   ],
   invalid: [
-    { value: "", expectedCode: "required" },
-    { value: undefined, expectedCode: "required" },
     { value: "french", expectedCode: "invalid_option", note: "not an offered option" },
   ],
 };

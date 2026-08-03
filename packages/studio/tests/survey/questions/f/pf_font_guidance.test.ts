@@ -11,8 +11,8 @@ describe("pf_font_guidance — definition", () => {
   it("is a text question", () => {
     expect(definition.type).toBe("text");
   });
-  it("routes to pf_usage_tip_1", () => {
-    expect(definition.next).toBe("pf_usage_tip_1");
+  it("routes to pf_usage_tip_2", () => {
+    expect(definition.next).toBe("pf_usage_tip_2");
   });
   it("has help text", () => {
     expect(definition.help_text).toBeTruthy();

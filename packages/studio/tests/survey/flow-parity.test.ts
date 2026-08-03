@@ -162,15 +162,14 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
 
   it("expected question IDs in order", () => {
     expect(modular.questions.map((q) => q.id)).toEqual([
-      // core — always asked
-      "pf_doc_language",
+      // default path
       "pf_welcome_paragraph",
-      "pf_font_guidance",
       "pf_usage_tip_1",
-      "pf_usage_tip_2",
-      // depth gate — "No" routes straight to pf_credits
       "pf_more_detail_gate",
-      // optional battery
+      // opt-in battery (gate = Yes)
+      "pf_doc_language",
+      "pf_font_guidance",
+      "pf_usage_tip_2",
       "pf_scope_variety",
       "pf_provenance_basis",
       "pf_design_rationale",
@@ -183,7 +182,46 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
       "pf_known_limitations",
       "pf_further_reading",
       "pf_project_url",
-      // close — always asked
+      // close — both paths
+      "pf_credits",
+      "pf_contact_info",
+    ]);
+  });
+
+  // The minimum-questions contract. Anything that needs research (which font
+  // covers the repertoire, canonical mark order) or support experience the
+  // author does not have yet must stay OFF this path.
+  it("purpose is the ONLY required question in Phase F", () => {
+    const required = modular.questions
+      .filter((q) => q.required === true)
+      .map((q) => q.id);
+    // pf_more_detail_gate is a single click, not content the author must author.
+    expect(required).toEqual(["pf_welcome_paragraph", "pf_more_detail_gate"]);
+  });
+
+  it("the default path (gate = No) is 5 screens", () => {
+    const index = new Map(modular.questions.map((q) => [q.id, q]));
+    const path: string[] = [];
+    let cur: string | null = modular.questions[0]!.id;
+    while (cur !== null) {
+      path.push(cur);
+      const q = index.get(cur);
+      expect(q, `unresolved step ${cur}`).toBeDefined();
+      const next = q!.next;
+      if (typeof next === "string") {
+        cur = next;
+      } else if (Array.isArray(next)) {
+        // Answer the gate with No — the minimum-friction default.
+        const fallthrough = next.find((r) => r.default === true);
+        cur = fallthrough?.goto ?? null;
+      } else {
+        cur = null;
+      }
+    }
+    expect(path).toEqual([
+      "pf_welcome_paragraph",
+      "pf_usage_tip_1",
+      "pf_more_detail_gate",
       "pf_credits",
       "pf_contact_info",
     ]);

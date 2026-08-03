@@ -11,10 +11,11 @@ describe("pf_usage_tip_2 — definition", () => {
   it("is a text question", () => {
     expect(definition.type).toBe("text");
   });
-  // Phase F documentation revision: tips 3-5 are demoted out of the live flow,
-  // so the chain hands off to the depth gate instead of a third fixed tip slot.
-  it("routes to pf_more_detail_gate", () => {
-    expect(definition.next).toBe("pf_more_detail_gate");
+  // Tips 3-5 are demoted out of the live flow. This second tip now sits inside
+  // the opt-in battery, so it continues into that battery rather than chaining
+  // to a third fixed tip slot. The default path asks for at most one tip.
+  it("routes to pf_scope_variety", () => {
+    expect(definition.next).toBe("pf_scope_variety");
   });
 });
 

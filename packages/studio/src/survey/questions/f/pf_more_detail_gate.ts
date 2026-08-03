@@ -15,18 +15,18 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 
 export const definition = {
   id: "pf_more_detail_gate",
-  prompt: "Do you want to add more documentation sections?",
+  prompt: "Add optional documentation sections?",
   help_text:
-    "You have enough for a working help page. Answering No finishes with " +
-    "credits and contact details. Answering Yes lets you add the sections that " +
-    "well-documented keyboards usually carry: who the keyboard is for, what " +
-    "standard or community decision it follows, example words, troubleshooting, " +
-    "related keyboards, and further reading. Every one of them is optional, and " +
-    "you can leave any of them blank.",
+    "No is a perfectly good answer — you already have a working help page, and " +
+    "answering No finishes with just credits and contact details. Say Yes only " +
+    "if you already know things worth writing down: fonts that render your " +
+    "alphabet, the standard the layout follows, example words, known problems, " +
+    "or related keyboards. These are for information you already have, not " +
+    "research to go and do. You can come back and add them later.",
   type: "bool" as const,
   required: true,
   next: [
-    { condition: "value == 'true'", goto: "pf_scope_variety" },
+    { condition: "value == 'true'", goto: "pf_doc_language" },
     { default: true, goto: "pf_credits" },
   ],
 } satisfies import("../../types.ts").FlowQuestion;

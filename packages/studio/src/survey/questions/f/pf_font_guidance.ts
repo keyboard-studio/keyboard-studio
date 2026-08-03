@@ -32,7 +32,7 @@ export const definition = {
     "if common system fonts are sufficient.",
   type: "text" as const,
   required: false,
-  next: "pf_usage_tip_1",
+  next: "pf_usage_tip_2",
 } satisfies import("../../types.ts").FlowQuestion;
 
 // No validation: required: false; free-text font guidance.

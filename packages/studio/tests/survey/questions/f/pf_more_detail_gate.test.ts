@@ -18,11 +18,13 @@ describe("pf_more_detail_gate — definition", () => {
 });
 
 describe("pf_more_detail_gate — routing", () => {
-  it("Yes opens the optional battery at pf_scope_variety", () => {
-    expect(resolveNext(definition, "true", {})).toBe("pf_scope_variety");
+  it("Yes opens the opt-in battery at pf_doc_language", () => {
+    expect(resolveNext(definition, "true", {})).toBe("pf_doc_language");
   });
 
-  it("No skips the optional battery straight to pf_credits", () => {
+  // The whole point of the gate: everything that needs research or support
+  // experience is skipped, so the default walk is 5 screens.
+  it("No skips the entire battery straight to pf_credits", () => {
     expect(resolveNext(definition, "false", {})).toBe("pf_credits");
   });
 });
