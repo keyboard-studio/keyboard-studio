@@ -37,8 +37,10 @@ import type { Scale, ScriptClass } from "./axes";
 import type { StrategyId } from "./strategy";
 import type { KeyBudget, KeyBudgetBand } from "./keyBudget";
 import type {
+  BaseContribution,
   DecisionAgency,
   DecisionEntry,
+  DecisionFileChange,
   DecisionImpact,
   DecisionPayload,
   DecisionProposalSource,
@@ -587,11 +589,15 @@ export const DecisionProvenanceSchema = z.object({
 
 export const EditorActionTypeSchema = z.enum(["gallery_edit", "mechanism_edit", "touch_edit"]);
 
+// `.optional()`, never `.default(0)` — a default would re-introduce, at the
+// record boundary, exactly the "unmeasured reads as zero" coercion FR-005a
+// forbids (specs/055-legible-decision-trail research D-06). Absent = not
+// measured; present `0` = measured, unchanged.
 export const EditorActionSummarySchema = z.object({
-  keysRemoved: z.number().int().min(0),
-  keysAdded: z.number().int().min(0),
-  mechanismsAssigned: z.number().int().min(0),
-  touchKeysAffected: z.number().int().min(0),
+  keysRemoved: z.number().int().min(0).optional(),
+  keysAdded: z.number().int().min(0).optional(),
+  mechanismsAssigned: z.number().int().min(0).optional(),
+  touchKeysAffected: z.number().int().min(0).optional(),
   sample: z.array(z.string()),
   sampleTruncated: z.boolean(),
 });
@@ -604,15 +610,27 @@ export const DiffHunkSchema = z.object({
   lines: z.array(z.string()),
 });
 
+export const DecisionFileChangeSchema = z.object({
+  path: z.string().min(1),
+  hunks: z.array(DiffHunkSchema),
+  magnitude: z.object({
+    added: z.number().int().min(0),
+    removed: z.number().int().min(0),
+  }),
+});
+
 export const DecisionImpactSchema = z.discriminatedUnion("state", [
   z.object({
     state: z.literal("captured"),
-    path: z.string().min(1),
-    hunks: z.array(DiffHunkSchema),
+    // Non-empty in practice (contract §3) — the schema does not additionally
+    // enforce min(1) here because a captured-but-empty record is a producer
+    // bug, not an untrusted-input shape parseDecisionRecord must tolerate.
+    files: z.array(DecisionFileChangeSchema),
     magnitude: z.object({
       added: z.number().int().min(0),
       removed: z.number().int().min(0),
     }),
+    sharedWith: z.array(z.string().min(1)).optional(),
   }),
   z.object({ state: z.literal("none") }),
   z.object({
@@ -627,6 +645,18 @@ export const DecisionImpactSchema = z.discriminatedUnion("state", [
 // string is a validation failure here, not a surprise downstream.
 const SURVEY_ANSWER_BASE = { kind: z.literal("survey-answer"), questionId: z.string().min(1) };
 
+export const BaseContributionSchema = z.object({
+  kind: z.literal("base-contribution"),
+  baseId: z.string().min(1),
+  baseDisplayName: z.string().min(1),
+  // Absent = could not be measured; `0` is reserved for a genuinely empty
+  // starting layout (specs/055-legible-decision-trail data-model.md §3).
+  startingKeyCount: z.number().int().min(0).optional(),
+  derivedAxes: z.array(z.string()),
+  inheritedMetadata: z.array(z.object({ field: z.string(), value: z.string() })),
+  instantiationMode: z.enum(["new-from-base", "adapt-existing"]),
+});
+
 export const DecisionPayloadSchema = z.union([
   z.object({ ...SURVEY_ANSWER_BASE, answerType: z.literal("char-list"), value: z.array(z.string()) }),
   z.object({ ...SURVEY_ANSWER_BASE, answerType: z.literal("boolean"), value: z.boolean() }),
@@ -640,6 +670,7 @@ export const DecisionPayloadSchema = z.union([
     actionType: EditorActionTypeSchema,
     summary: EditorActionSummarySchema,
   }),
+  BaseContributionSchema,
 ]);
 
 export const DecisionEntrySchema = z.object({
@@ -790,7 +821,13 @@ type _EditorActionSummaryGuard = Expect<
   AssignableTo<z.infer<typeof EditorActionSummarySchema>, EditorActionSummary>
 >;
 type _DiffHunkGuard = Expect<AssignableTo<z.infer<typeof DiffHunkSchema>, DiffHunk>>;
+type _DecisionFileChangeGuard = Expect<
+  AssignableTo<z.infer<typeof DecisionFileChangeSchema>, DecisionFileChange>
+>;
 type _DecisionImpactGuard = Expect<AssignableTo<z.infer<typeof DecisionImpactSchema>, DecisionImpact>>;
+type _BaseContributionGuard = Expect<
+  AssignableTo<z.infer<typeof BaseContributionSchema>, BaseContribution>
+>;
 type _DecisionPayloadGuard = Expect<AssignableTo<z.infer<typeof DecisionPayloadSchema>, DecisionPayload>>;
 type _DecisionEntryGuard = Expect<AssignableTo<z.infer<typeof DecisionEntrySchema>, DecisionEntry>>;
 type _DecisionRecordGuard = Expect<AssignableTo<z.infer<typeof DecisionRecordSchema>, DecisionRecord>>;

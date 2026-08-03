@@ -99,6 +99,14 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-03T02:50:44.682Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T02:59:02.738Z"
     }
   ],
   "coverage": {
@@ -483,7 +491,7 @@
     }
   },
   "telemetryInstanceId": "c7509f96-1e29-4e6f-8a65-690a8a8ad00d",
-  "currentTask": "T003",
+  "currentTask": "T004",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -504,6 +512,14 @@
       "did": "Verified the audit_label lint prerequisite holds with no value authored: content-i18n-lint and content-i18n-freshness both green with fr/flowQuestions.json present",
       "files": [
         "(verification only)"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Reshaped EditorActionSummary (optional counts), DecisionImpact/DecisionFileChange (files+aggregate+sharedWith), DecisionPayload base-contribution member, and DECISION_RECORD_VERSION bump to 2, with the zod mirror and drift guards updated in the same commit",
+      "files": [
+        "packages/contracts/src/decisionRecord.ts",
+        "packages/contracts/src/schemas.ts"
       ]
     }
   }

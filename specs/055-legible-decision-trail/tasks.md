@@ -29,7 +29,7 @@ The contracts change breaks every consumer by design: with the counts optional, 
 
 **Wave 1 — the contract, one commit (interface + zod mirror move together or the drift guards fail the build):**
 
-- [ ] **T004** Reshape the record contract per [record-shape.contract.md](contracts/record-shape.contract.md) §2–§5, landing the interface and its zod mirror **in the same commit**: (a) `EditorActionSummary`'s four counts → `number | undefined`, mirrored with `.optional()` and never `.default(0)`; (b) new `DecisionFileChange`, and `DecisionImpact`'s `"captured"` variant → `files: readonly DecisionFileChange[]` + aggregate `magnitude` + optional `sharedWith`, dropping `path`; (c) `DecisionPayload` gains the `"base-contribution"` member; (d) `DECISION_RECORD_VERSION` → `2` · `packages/contracts/src/decisionRecord.ts` + `packages/contracts/src/schemas.ts`
+- [x] **T004** Reshape the record contract per [record-shape.contract.md](contracts/record-shape.contract.md) §2–§5, landing the interface and its zod mirror **in the same commit**: (a) `EditorActionSummary`'s four counts → `number | undefined`, mirrored with `.optional()` and never `.default(0)`; (b) new `DecisionFileChange`, and `DecisionImpact`'s `"captured"` variant → `files: readonly DecisionFileChange[]` + aggregate `magnitude` + optional `sharedWith`, dropping `path`; (c) `DecisionPayload` gains the `"base-contribution"` member; (d) `DECISION_RECORD_VERSION` → `2` · `packages/contracts/src/decisionRecord.ts` + `packages/contracts/src/schemas.ts`
 
 **⟶ Wait for Wave 1 to finish, then:**
 

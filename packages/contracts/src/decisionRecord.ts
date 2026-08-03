@@ -95,12 +95,18 @@ export type EditorActionType = "gallery_edit" | "mechanism_edit" | "touch_edit";
  * hundred in `keysRemoved` and at most {@link EDITOR_ACTION_SAMPLE_LIMIT}
  * identifiers in `sample`. `sampleTruncated` says so when it bites, so the
  * bound is never silent (spec Edge Cases).
+ *
+ * Every count is optional, and absence means "not measured" — never coerce a
+ * missing producer to `0` (specs/055-legible-decision-trail FR-005/FR-005a,
+ * research D-06). A present `0` means "measured, and unchanged". A consumer
+ * must handle the absent case explicitly; that is the point of the type
+ * being optional rather than defaulted.
  */
 export interface EditorActionSummary {
-  keysRemoved: number;
-  keysAdded: number;
-  mechanismsAssigned: number;
-  touchKeysAffected: number;
+  keysRemoved?: number;
+  keysAdded?: number;
+  mechanismsAssigned?: number;
+  touchKeysAffected?: number;
   /** Bounded sample of affected identifiers — never the full list. */
   sample: readonly string[];
   /** True when `sample` is shorter than the real affected set. */
@@ -137,20 +143,42 @@ export interface DiffHunk {
 export type ImpactUnavailableReason = "lock-gate-dependency" | "no-rederivable-write-path";
 
 /**
+ * One changed file within a captured {@link DecisionImpact}.
+ *
+ * `path` is a VFS path from the same projection that produces the shipped
+ * keyboard, e.g. `source/foo.kmn` (specs/055-legible-decision-trail FR-018).
+ */
+export interface DecisionFileChange {
+  path: string;
+  hunks: readonly DiffHunk[];
+  magnitude: { added: number; removed: number };
+}
+
+/**
  * What a decision did to the source.
  *
  * Three states, all of them positive statements. `"none"` means the decision
  * genuinely changed no source — it is NOT an empty `"captured"`, precisely so
  * the trail can say "changed nothing" instead of rendering a blank diff as if
  * something had failed (spec Edge Cases, FR-011).
+ *
+ * `"captured"` widened from a single file to a set (specs/055-legible-decision-trail
+ * FR-016/FR-018): `files` is never empty — a capture with no changed file is
+ * `{ state: "none" }`, not an empty array. `magnitude` is the aggregate over
+ * `files`, so a consumer that only reads `magnitude` keeps working unchanged.
+ * `sharedWith` names co-decision `entryId`s attributed to the same boundary
+ * capture; absent means this entry is solely responsible, and an entry never
+ * names itself (research D-10).
  */
 export type DecisionImpact =
   | {
       state: "captured";
-      /** VFS path the hunks apply to, e.g. `source/foo.kmn`. */
-      path: string;
-      hunks: readonly DiffHunk[];
+      /** Non-empty: one entry per changed text file. */
+      files: readonly DecisionFileChange[];
+      /** Aggregate over `files`. */
       magnitude: { added: number; removed: number };
+      /** Other entries' `entryId`s attributed to the same boundary capture. */
+      sharedWith?: readonly string[];
     }
   | { state: "none" }
   | { state: "unavailable"; reason: ImpactUnavailableReason };
@@ -173,6 +201,32 @@ export type SurveyAnswerValueFor<K extends AnswerType> = Extract<
 export type SurveyAnswerValue = SurveyAnswer["value"];
 
 /**
+ * What the working copy inherited when it was instantiated, recorded once at
+ * `choose_base` as the baseline every later count is read against
+ * (specs/055-legible-decision-trail FR-030/FR-031/FR-034/FR-035, research D-11).
+ *
+ * `startingKeyCount` follows the same absence convention as the
+ * {@link EditorActionSummary} counts: absent means the inventory could not be
+ * measured, never `0` — `0` is reserved for a genuinely empty starting layout.
+ * `derivedAxes` and `inheritedMetadata[].field` carry codes, not prose; the
+ * trail renders them through the catalog (FR-008).
+ */
+export interface BaseContribution {
+  kind: "base-contribution";
+  baseId: string;
+  baseDisplayName: string;
+  startingKeyCount?: number;
+  derivedAxes: readonly string[];
+  inheritedMetadata: readonly { field: string; value: string }[];
+  /**
+   * The two literals are taken verbatim from `workingCopyStore`'s
+   * `InstantiationMode` (excluding its `null` pre-instantiation state, since
+   * this entry is only ever written once instantiation has happened).
+   */
+  instantiationMode: "new-from-base" | "adapt-existing";
+}
+
+/**
  * What a decision entry is about. `kind` is the discriminant (see the module
  * header, rule 2).
  */
@@ -185,7 +239,8 @@ export type DecisionPayload =
         value: SurveyAnswerValueFor<K>;
       };
     }[AnswerType]
-  | { kind: "editor-action"; actionType: EditorActionType; summary: EditorActionSummary };
+  | { kind: "editor-action"; actionType: EditorActionType; summary: EditorActionSummary }
+  | BaseContribution;
 
 /**
  * One decision, as recorded.
@@ -242,8 +297,15 @@ export const DECISION_RECORD_FORMAT = "keyboard-studio.decision-record" as const
  *
  * A reader that does not recognise this reads what it can and reports the rest
  * as dropped — it never rejects the whole record (contract §5, SC-009).
+ *
+ * Bumped 1 -> 2 for specs/055-legible-decision-trail (research D-01/D-07): a
+ * record whose `version < 2` has every {@link EditorActionSummary} count
+ * normalized to absent on read, and a captured {@link DecisionImpact}'s old
+ * single `path`/`hunks`/`magnitude` lifted into a one-element `files` array.
+ * That normalization is a reader concern (specs/055.../contracts/record-shape.contract.md
+ * §5) — this module only states the version, it does not perform the read.
  */
-export const DECISION_RECORD_VERSION = 1 as const;
+export const DECISION_RECORD_VERSION = 2 as const;
 
 /** Placeholder `stepId` for a decision recorded before any step is known (FR-004). */
 export const PRE_IDENTITY_STEP_ID = "__pre_identity__" as const;
