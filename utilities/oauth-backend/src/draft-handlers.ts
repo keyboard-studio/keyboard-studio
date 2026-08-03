@@ -13,6 +13,8 @@
 import {
   DEFAULT_DRAFT_ID,
   MAX_DRAFT_BYTES,
+  MAX_DRAFTS_PER_USER,
+  MAX_TOTAL_DRAFT_BYTES,
   PutDraftBodySchema,
   type DraftMeta,
   type GetDraftContentResponse,
@@ -20,7 +22,7 @@ import {
   type GetDraftMetaResponse,
   type PutDraftResponse,
 } from "./draft-schemas.js";
-import type { DraftStore } from "./draft-store.js";
+import { measureDraftBytes, type DraftStore } from "./draft-store.js";
 import type { OAuthFetchFn } from "./handlers.js";
 import { parseBearer, verifyGitHubUser, type GitHubUser } from "./verify-github-user.js";
 
@@ -122,6 +124,11 @@ export async function getDraftContent(
  * text so we can measure serialized size against {@link MAX_DRAFT_BYTES} before
  * trusting it — a `draft_too_large` here is a clean 413 rather than a platform
  * body-limit rejection. Returns the stored `savedAt`.
+ *
+ * Two ceilings apply, and they mean different things: `draft_too_large` (413) is
+ * *this* draft exceeding the per-draft limit, `draft_quota_exceeded` (409) is the
+ * caller's *aggregate* over quota. The per-draft check runs first because it
+ * needs no storage round-trip.
  */
 export async function putDraft(
   authHeader: string | null | undefined,
@@ -146,6 +153,29 @@ export async function putDraft(
   if (!parsed.success) return { ok: false, status: 400, error: "invalid_request" };
 
   const meta: DraftMeta = parsed.data.meta;
+
+  // Quota (FR-008), evaluated against what storage would hold *after* this
+  // write. Both figures subtract the row being replaced, so an update is
+  // measured as a delta rather than as an addition:
+  //
+  //   prospectiveBytes = totalBytes - existingBytes + newBytes
+  //   prospectiveCount = draftCount + (this write is an insert ? 1 : 0)
+  //
+  // FR-009 falls out of that subtraction with no special case — re-saving an
+  // existing draft at the same or a smaller size can never push the total up, so
+  // a user sitting at quota can always keep working on what they already have.
+  // A refusal happens before `store.putDraft`, so existing drafts are untouched.
+  const newBytes = measureDraftBytes(parsed.data.draft);
+  const [usage, existing] = await Promise.all([
+    config.store.getUsage(user.id),
+    config.store.getDraftBytes(user.id, meta.draftId),
+  ]);
+  const prospectiveBytes = usage.totalBytes - (existing ?? 0) + newBytes;
+  const prospectiveCount = usage.draftCount + (existing === null ? 1 : 0);
+  if (prospectiveBytes > MAX_TOTAL_DRAFT_BYTES || prospectiveCount > MAX_DRAFTS_PER_USER) {
+    return { ok: false, status: 409, error: "draft_quota_exceeded" };
+  }
+
   await config.store.putDraft(user.id, user.login, meta, parsed.data.draft);
   return { ok: true, status: 200, data: { savedAt: meta.savedAt } };
 }

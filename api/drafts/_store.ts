@@ -23,7 +23,11 @@
 import { put, get, del } from "@vercel/blob";
 import { sql } from "@vercel/postgres";
 import type { DraftMeta } from "../../utilities/oauth-backend/src/draft-schemas.js";
-import type { DraftStore, StoredDraft } from "../../utilities/oauth-backend/src/draft-store.js";
+import type {
+  DraftStore,
+  DraftUsage,
+  StoredDraft,
+} from "../../utilities/oauth-backend/src/draft-store.js";
 
 /** Deterministic per-user-per-draft blob pathname. Overwritten in place on each save. */
 function blobPathname(userId: number, draftId: string): string {
@@ -134,5 +138,33 @@ export class VercelDraftStore implements DraftStore {
       FROM drafts WHERE github_user_id = ${userId}
     `;
     return rows.map(rowToMeta);
+  }
+
+  // Quota read model. One aggregate over the metadata table — no blob reads —
+  // because size_bytes is already written on every upsert above, so the quota
+  // needed no migration. The casts matter: count() and SUM() over a BIGINT-ish
+  // column arrive as strings from node-postgres otherwise, and a string would
+  // silently turn the handler's arithmetic into concatenation.
+  async getUsage(userId: number): Promise<DraftUsage> {
+    const { rows } = await sql`
+      SELECT count(*)::int AS draft_count, COALESCE(SUM(size_bytes), 0)::bigint AS total_bytes
+      FROM drafts WHERE github_user_id = ${userId}
+    `;
+    const row = rows[0];
+    return {
+      draftCount: row === undefined ? 0 : Number(row["draft_count"]),
+      totalBytes: row === undefined ? 0 : Number(row["total_bytes"]),
+    };
+  }
+
+  // null (no row) is distinct from 0 (a row whose payload serializes to nothing)
+  // — the handler reads the difference as insert-vs-update for the count check.
+  async getDraftBytes(userId: number, draftId: string): Promise<number | null> {
+    const { rows } = await sql`
+      SELECT size_bytes FROM drafts
+      WHERE github_user_id = ${userId} AND draft_id = ${draftId}
+    `;
+    const row = rows[0];
+    return row === undefined ? null : Number(row["size_bytes"]);
   }
 }

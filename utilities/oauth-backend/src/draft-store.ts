@@ -64,17 +64,21 @@ export interface DraftStore {
    */
   getUsage(userId: number): Promise<DraftUsage>;
   /**
-   * Stored size of one of the user's drafts, or `0` when it does not exist.
+   * Stored size of one of the user's drafts, or `null` when it does not exist.
    *
    * Separate from {@link getUsage} because the quota subtracts the row being
    * replaced before comparing: `totalBytes - existingBytes + newBytes`. That
    * subtraction is what makes FR-009 fall out with no special case — a user at
    * quota can always re-save in-progress work — and it needs the *per-draft*
-   * figure, which a per-user aggregate cannot supply. Returning `0` for an
-   * absent draft also tells the caller the write is an insert, so the count
-   * check needs no second lookup.
+   * figure, which a per-user aggregate cannot supply.
+   *
+   * `null` rather than `0` for an absent draft, so the same call also answers
+   * insert-vs-update for the count check without a second round trip. A stored
+   * draft can legitimately measure 0 bytes (a payload of `undefined` — `draft`
+   * is `z.unknown()`, so omitting it parses), and conflating that with absent
+   * would count a re-save as an insert.
    */
-  getDraftBytes(userId: number, draftId: string): Promise<number>;
+  getDraftBytes(userId: number, draftId: string): Promise<number | null>;
 }
 
 /**
@@ -121,8 +125,8 @@ export class MemoryDraftStore implements DraftStore {
     return Promise.resolve({ draftCount: userDrafts.size, totalBytes });
   }
 
-  getDraftBytes(userId: number, draftId: string): Promise<number> {
+  getDraftBytes(userId: number, draftId: string): Promise<number | null> {
     const row = this.rows.get(userId)?.get(draftId);
-    return Promise.resolve(row === undefined ? 0 : measureDraftBytes(row.draft));
+    return Promise.resolve(row === undefined ? null : measureDraftBytes(row.draft));
   }
 }
