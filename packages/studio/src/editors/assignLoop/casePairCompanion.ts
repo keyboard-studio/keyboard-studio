@@ -240,8 +240,13 @@ export function useCasePairCompanion(): UseCasePairCompanion {
  * case-shift it, ideally corroborated by the facet classifier), never on a
  * hunch; Cherokee is Unicode-bicameral in the same technical sense and is
  * deliberately NOT listed — it keeps proposing.
+ *
+ * Exported so other case-pair-adjacent proposal paths (e.g.
+ * `placementSeeds.ts`'s S-08 case-pair suggestion fallback) can apply the
+ * SAME suppression without a second copy of the script test — see FR-002
+ * "no second casing path" at the top of this module.
  */
-function isOrthographicallyUnicameral(char: string): boolean {
+export function isOrthographicallyUnicameral(char: string): boolean {
   return /\p{Script=Georgian}/u.test(char);
 }
 

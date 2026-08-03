@@ -14,7 +14,13 @@
 
 import { describe, it, expect } from "vitest";
 import type { PlacementMap } from "@keyboard-studio/contracts";
-import { buildPlacementSeeds, extractSeedEntries, PLACEMENT_SEED_CONFIDENCE_THRESHOLD } from "./placementSeeds.ts";
+import {
+  buildPlacementSeeds,
+  extractSeedEntries,
+  getSuggestionForChar,
+  getSuggestionForCharWithCasePair,
+  PLACEMENT_SEED_CONFIDENCE_THRESHOLD,
+} from "./placementSeeds.ts";
 import fixtureJson from "./__fixtures__/placement-map.sample.json";
 
 // Cast the imported JSON to PlacementMap — the fixture satisfies the shape.
@@ -254,5 +260,97 @@ describe("extractSeedEntries — edge cases", () => {
       seeds = buildPlacementSeeds(fixture, NaN);
     }).not.toThrow();
     expect(seeds!.size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getSuggestionForCharWithCasePair — uppercase case-pair fallback
+// ---------------------------------------------------------------------------
+
+describe("getSuggestionForCharWithCasePair", () => {
+  it("synthesizes an S-08 entry for an uppercase whose lowercase sibling has a direct RALT candidate", () => {
+    // Fixture: U+0259 ə -> S-08, vkey K_E, modifiers ["RALT"], confidence 0.6.
+    // Ə (U+018F) is ə's uppercase counterpart and has no map entry of its own.
+    const entry = getSuggestionForCharWithCasePair("Ə", fixture);
+    expect(entry).not.toBeNull();
+    expect(entry!.strategyId).toBe("S-08");
+    expect(entry!.character).toBe("Ə");
+    expect(entry!.topCandidate.vkey).toBe("K_E");
+    expect(entry!.topCandidate.modifiers).toContain("SHIFT");
+    expect(entry!.topCandidate.modifiers).toContain("RALT");
+  });
+
+  it("carries over the lowercase sibling's other PlacementCandidate fields unchanged", () => {
+    const entry = getSuggestionForCharWithCasePair("Ə", fixture);
+    const sibling = getSuggestionForChar("ə", fixture)!.topCandidate;
+    expect(entry!.topCandidate.mechanism).toBe(sibling.mechanism);
+    expect(entry!.topCandidate.priorSource).toBe(sibling.priorSource);
+    expect(entry!.topCandidate.priorCount).toBe(sibling.priorCount);
+    expect(entry!.topCandidate.confidence).toBe(sibling.confidence);
+  });
+
+  it("returns null for an uppercase whose lowercase sibling has no map entry at all", () => {
+    // "z" is not in the fixture, so "Z" has no sibling to fall back to.
+    expect(getSuggestionForCharWithCasePair("Z", fixture)).toBeNull();
+  });
+
+  it("returns null for an uppercase whose lowercase sibling is S-01 (no RALT), not S-08", () => {
+    // Fixture: U+0253 ɓ -> S-01 (modifiers: []). Ɓ (U+0181) must not fall back.
+    expect(getSuggestionForCharWithCasePair("Ɓ", fixture)).toBeNull();
+  });
+
+  it("leaves a lowercase character's own direct lookup unaffected", () => {
+    // "ə" has its own qualifying entry — must resolve exactly like
+    // getSuggestionForChar, never attempt the case-pair fallback.
+    const direct = getSuggestionForChar("ə", fixture);
+    const withFallback = getSuggestionForCharWithCasePair("ə", fixture);
+    expect(withFallback).toEqual(direct);
+  });
+
+  it("leaves a character with its own qualifying entry unaffected even when it also has a case pair", () => {
+    // Fixture: U+025B ɛ -> S-01 direct entry of its own. Confirm the fallback
+    // path is never reached (S-01 entry returned as-is, not overridden).
+    const direct = getSuggestionForChar("ɛ", fixture);
+    const withFallback = getSuggestionForCharWithCasePair("ɛ", fixture);
+    expect(withFallback).toEqual(direct);
+  });
+
+  it("suppresses the fallback for an orthographically-unicameral (Georgian) case pair", () => {
+    // Custom map: lowercase Mkhedruli ა (U+10D0) has a qualifying direct RALT
+    // (S-08) candidate. Its Unicode-formal uppercase Mtavruli counterpart
+    // Ⴀ/Ა (U+1C90) must NOT receive a synthesized suggestion — Georgian
+    // orthography does not case-alternate (see casePairCompanion.ts).
+    const georgianMap: PlacementMap = {
+      entries: [
+        {
+          codepoint: "U+10D0",
+          candidates: [
+            {
+              vkey: "K_A",
+              modifiers: ["RALT"],
+              mechanism: "direct",
+              priorSource: "confusable",
+              priorCount: 0,
+              confidence: 0.6,
+            },
+          ],
+        },
+      ],
+    };
+    // Sanity: the lowercase entry itself qualifies (so a false "no sibling"
+    // pass would be a false positive for the suppression test).
+    expect(getSuggestionForChar("ა", georgianMap)).not.toBeNull();
+    expect(
+      getSuggestionForCharWithCasePair("Ა", georgianMap),
+    ).toBeNull();
+  });
+
+  it("returns null when char has no case counterpart at all (caseless script)", () => {
+    // Arabic ب has no Lu/Ll case distinction — caseCounterpart returns null.
+    expect(getSuggestionForCharWithCasePair("ب", fixture)).toBeNull();
+  });
+
+  it("returns null for an empty-string char (null-safety)", () => {
+    expect(getSuggestionForCharWithCasePair("", fixture)).toBeNull();
   });
 });

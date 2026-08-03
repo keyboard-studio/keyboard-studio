@@ -41,6 +41,8 @@
 import type { PlacementMap, PlacementCandidate } from "@keyboard-studio/contracts";
 import { topCandidate, strategyForCandidate, parseUPlusNotation, toUPlusNotation } from "@keyboard-studio/contracts";
 import type { StrategyId } from "@keyboard-studio/contracts";
+import { caseCounterpart } from "@keyboard-studio/engine";
+import { isOrthographicallyUnicameral } from "../editors/assignLoop/casePairCompanion.ts";
 
 // ---------------------------------------------------------------------------
 // Confidence threshold
@@ -202,5 +204,93 @@ export function getSuggestionForChar(
     codepoint,
     strategyId: strategyForCandidate(candidate),
     topCandidate: candidate,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Case-pair fallback: uppercase -> lowercase sibling's S-08 RALT candidate
+// ---------------------------------------------------------------------------
+
+/**
+ * Like {@link getSuggestionForChar}, but when `char` has no qualifying
+ * placement-map entry of its own AND `char` is the UPPERCASE half of a case
+ * pair whose LOWERCASE sibling has a direct-mechanism RALT (S-08) candidate,
+ * synthesizes an S-08 suggestion for `char` on the SAME vkey — the shifted
+ * counterpart of the lowercase's RAlt layer (RAlt+Shift).
+ *
+ * Without this fallback, `getSuggestionForChar` returns `null` for the
+ * uppercase sibling because the kbgen placement map only carries an entry
+ * for the codepoint it was seeded for (typically the lowercase form) — the
+ * uppercase codepoint simply has no map entry to look up.
+ *
+ * **No second casing path (spec 051 FR-002).** The only call to
+ * `caseCounterpart` here derives the lowercase sibling to look up in the
+ * map; the synthesized entry's `modifiers` are the sibling's `modifiers`
+ * with `"SHIFT"` added — never a freshly-computed case mapping of anything
+ * else. Every other required {@link PlacementCandidate} field (`vkey`,
+ * `mechanism`, `priorSource`, `priorCount`, `confidence`) is carried over
+ * unchanged from the lowercase sibling's top candidate: there is no
+ * `PriorSource` value that describes "derived from a sibling's placement",
+ * and adding one would be a locked-contract change (`packages/contracts`),
+ * so this reuses the sibling's attribution as the closest honest fit.
+ *
+ * **Orthographic-unicameral suppression.** Skips the fallback (returns
+ * `null`) for scripts where Unicode's formal case-pair mapping does not
+ * correspond to a Shift-layer relationship in ordinary orthographic
+ * practice (currently Georgian) — reuses the ONE predicate
+ * `isOrthographicallyUnicameral` from `casePairCompanion.ts` rather than a
+ * second copy of the script test.
+ *
+ * @param char          The character to look up (typically the currently
+ *                       displayed gallery character).
+ * @param placementMap  The seeder output from kbgen / the survey pipeline.
+ * @param threshold     Confidence threshold below which a candidate is
+ *                       treated as absent. Defaults to
+ *                       {@link PLACEMENT_SEED_CONFIDENCE_THRESHOLD} (0.5).
+ * @param bcp47         Optional BCP47 tag for locale-sensitive case mapping,
+ *                       forwarded to `caseCounterpart` unchanged. Pass
+ *                       `undefined` for "no locale" (never `""` — callers
+ *                       normalize an empty working-copy tag to `undefined`
+ *                       the same way `useCasePairCompanion` does).
+ * @returns A {@link PlacementSeedEntry} for `char`'s own qualifying entry if
+ *          one exists; otherwise a synthesized S-08 entry derived from the
+ *          lowercase sibling's S-08 RALT candidate if one exists; otherwise
+ *          `null`.
+ * @see spec.md §7.3 (S-08 RALT-layer extension)
+ * @see casePairCompanion.ts (the shared case-pair proposal this mirrors on
+ *      the physical-key path)
+ */
+export function getSuggestionForCharWithCasePair(
+  char: string,
+  placementMap: PlacementMap,
+  threshold: number = PLACEMENT_SEED_CONFIDENCE_THRESHOLD,
+  bcp47?: string,
+): PlacementSeedEntry | null {
+  const direct = getSuggestionForChar(char, placementMap, threshold);
+  if (direct !== null) return direct;
+
+  if (isOrthographicallyUnicameral(char)) return null;
+
+  const pair = caseCounterpart(char, bcp47);
+  if (pair === null || pair.direction !== "toLower") return null;
+
+  const lowerEntry = getSuggestionForChar(pair.counterpart, placementMap, threshold);
+  if (lowerEntry === null || lowerEntry.strategyId !== "S-08") return null;
+
+  const lowerCandidate = lowerEntry.topCandidate;
+  const modifiers = lowerCandidate.modifiers.includes("SHIFT")
+    ? [...lowerCandidate.modifiers]
+    : ["SHIFT", ...lowerCandidate.modifiers];
+
+  const synthesizedCandidate: PlacementCandidate = {
+    ...lowerCandidate,
+    modifiers,
+  };
+
+  return {
+    character: char,
+    codepoint: toUPlusNotation(char),
+    strategyId: strategyForCandidate(synthesizedCandidate),
+    topCandidate: synthesizedCandidate,
   };
 }
