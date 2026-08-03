@@ -673,10 +673,40 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         getIrAxes: () => useWorkingCopyStore.getState().irAxes,
         getInstantiationMode: () => useWorkingCopyStore.getState().instantiationMode,
         getRemovalCapabilities: () => useWorkingCopyStore.getState().removalCapabilities,
-        // T025 (specs/055 FR-032/FR-033): wire `resolveProposal` here, seeded
-        // from the base's inherited values, to make `recordSurveyAnswers`'s
-        // existing `"base-derived"` provenance branch reachable. Left absent —
-        // not added by this task.
+        // specs/055 FR-032/FR-033: `resolveProposal` seeded with the base's
+        // inherited values — the SAME three fields `recordBaseContribution`'s
+        // `inheritedMetadataOf` reports above (script/targets/version), read
+        // straight off the instantiated store, never a re-read of the base's
+        // source. This is the wiring `recordSurveyAnswers.ts`'s module header
+        // anticipates: when a recorded answer's value equals one of these, it
+        // was carried from the base, not typed by the author, so
+        // `deriveAnswerProvenance` returns `{ agency: "base-derived", source:
+        // "base" }` instead of falling through to `"hand-set"` — reaching the
+        // already-authored `trail.entry.headline.fromBase` message.
+        //
+        // No new provenance concept (FR-032): this is a lookup over data the
+        // base-contribution recorder already reads, not a second "came from
+        // base" flag. And no mutation when the author later overrides one of
+        // these values (FR-033) — a differing answer simply fails the
+        // value-equality check in `deriveAnswerProvenance` and records as
+        // `"hand-set"`, so the base's own entry (recorded once, above, at
+        // `choose_base` completion) and the author's superseding answer both
+        // stay on the append-only record, exactly as 053 FR-015's supersede
+        // semantics require.
+        resolveProposal: (questionId) => {
+          const base = useWorkingCopyStore.getState().baseKeyboard;
+          if (base === null) return undefined;
+          switch (questionId) {
+            case "script":
+              return { value: base.script, source: "base" };
+            case "targets":
+              return { value: base.targets, source: "base" };
+            case "version":
+              return { value: base.version, source: "base" };
+            default:
+              return undefined;
+          }
+        },
       }),
     [],
   );

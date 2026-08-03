@@ -315,6 +315,46 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-03T04:57:32.358Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T05:08:34.313Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T05:10:16.935Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T05:12:35.017Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T05:14:12.439Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T05:14:49.668Z"
     }
   ],
   "coverage": {
@@ -699,7 +739,7 @@
     }
   },
   "telemetryInstanceId": "c7509f96-1e29-4e6f-8a65-690a8a8ad00d",
-  "currentTask": "T012",
+  "currentTask": "T042",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -956,6 +996,45 @@
       "did": "Rewrote the recording tests onto the production completion path (real working-copy store + each adapter's own onComplete payload) and added a non-zero driver per reporting dimension plus absent-vs-present-zero assertions",
       "files": [
         "packages/studio/src/steps/reducer.decisionRecording.test.ts"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Wired resolveProposal in StudioShell.tsx's createDecisionRecorder call, keyed on questionId script/targets/version against the instantiated baseKeyboard, making deriveAnswerProvenance's base-derived branch reachable",
+      "files": [
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Rendered stageGroups.ts's per-stage roll-ups in DecisionTrailView.tsx (collapsible, default-expanded groups in walked order) and authored the missing base-contribution/survey-summary/stage-name catalog ids in messages.json",
+      "files": [
+        "packages/studio/src/decisions/DecisionTrailView.tsx",
+        "packages/studio/src/locales/en/messages.json"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Rendered the base-contribution headline (all-count, partial-count, and no-count cases) and its expanded detail (derived axes / inherited metadata, each resolved through the catalog with an .unknown fallback), clearing the last typecheck error",
+      "files": [
+        "packages/studio/src/decisions/DecisionEntryRow.tsx",
+        "packages/studio/src/locales/en/messages.json"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Extended the artifact-independence guard to the widened capture: seven-file Track-2 session run with and without recording, byte-identical projection and zip, HISTORY.md normalizer proven comparison-only",
+      "files": [
+        "packages/studio/src/decisions/artifactIndependence.test.ts"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Documented 053 FR-001..FR-028 as delivered by 055; recorded audit_label content/engine ownership split in the 050 catalog contract and docs/i18n-spike.md",
+      "files": [
+        "specs/053-decision-audit/spec.md",
+        "specs/050-flow-question-i18n/contracts/flow-question-catalog-format.md",
+        "docs/i18n-spike.md"
       ]
     }
   }

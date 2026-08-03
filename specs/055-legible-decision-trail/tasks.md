@@ -124,11 +124,11 @@ The contracts change breaks every consumer by design: with the counts optional, 
 **Wave 2 — independent (different files):**
 
 - [x] **T023** [P] Call the baseline recorder from the existing `recordStepCompletion` event at `choose_base` — `StepHost` already fires it **after** `applyStepCompletion`, so the working copy exists by then and no new event or timer is needed (Constitution Article IV) · `packages/studio/src/decisions/createDecisionRecorder.ts` + `packages/studio/src/StudioShell.tsx`
-- [ ] **T024** [P] Render the base-contribution entry, resolving axis ids and metadata field codes through the catalog · `packages/studio/src/decisions/DecisionEntryRow.tsx`
+- [x] **T024** [P] Render the base-contribution entry, resolving axis ids and metadata field codes through the catalog · `packages/studio/src/decisions/DecisionEntryRow.tsx`
 
 **⟶ Wait for Wave 2 to finish, then:**
 
-- [ ] **T025** Wire the unwired `resolveProposal` register with the base's inherited values so `deriveAnswerProvenance` returns `{ agency: "base-derived", source: "base" }` and the already-authored `trail.entry.headline.fromBase` message becomes reachable. This is wiring an existing seam, not a competing provenance concept (FR-032); a later author override supersedes rather than overwrites, so both stay visible (FR-033) · `packages/studio/src/StudioShell.tsx`
+- [x] **T025** Wire the unwired `resolveProposal` register with the base's inherited values so `deriveAnswerProvenance` returns `{ agency: "base-derived", source: "base" }` and the already-authored `trail.entry.headline.fromBase` message becomes reachable. This is wiring an existing seam, not a competing provenance concept (FR-032); a later author override supersedes rather than overwrites, so both stay visible (FR-033) · `packages/studio/src/StudioShell.tsx`
 
 **⟶ Wait for T025 to finish, then:**
 
@@ -193,7 +193,7 @@ This phase is presentation over an unchanged record — cuttable without touchin
 
 **⟶ Wait for Wave 1 to finish, then:**
 
-- [ ] **T037** Render groups with the collapsed one-line account; superseded entries stay in the DOM hidden rather than filtered (053 FR-015), a stage with nothing recorded is omitted or shown as untouched but never as a stage that made changes (FR-025), and `data-testid` values are added, never renamed · `packages/studio/src/decisions/DecisionTrailView.tsx`
+- [x] **T037** Render groups with the collapsed one-line account; superseded entries stay in the DOM hidden rather than filtered (053 FR-015), a stage with nothing recorded is omitted or shown as untouched but never as a stage that made changes (FR-025), and `data-testid` values are added, never renamed · `packages/studio/src/decisions/DecisionTrailView.tsx`
 
 **⟶ Wait for T037 to finish, then:**
 
@@ -211,8 +211,8 @@ This phase is presentation over an unchanged record — cuttable without touchin
 **Wave 1 — independent (different files):**
 
 - [ ] **T040** [P] SC-007 made mechanical: generate the trail headlines and the PR summary from **one** record and assert they agree on stage naming, mentioned dimensions, and counts — including that both skip absent counts and say "not measured" rather than treating `undefined` as falsy alongside `0` (FR-015) · `packages/engine/src/decision-audit/prSummary.test.ts`
-- [ ] **T041** [P] Extend the artifact-independence guard: an identical session with and without recording produces a byte-identical keyboard artifact across the widened capture (FR-007, SC-008 — the capture reads the projection and must never write to it) · `packages/studio/src/decisions/artifactIndependence.test.ts`
-- [ ] **T042** [P] Document the closed gaps: note in the 053 spec folder that its FR-001..FR-028 are now delivered by 055, and record the `audit_label` field's ownership split (content owns values, engine owns plumbing) where the i18n conventions are documented · `specs/053-decision-audit/spec.md` + `docs/` as appropriate
+- [x] **T041** [P] Extend the artifact-independence guard: an identical session with and without recording produces a byte-identical keyboard artifact across the widened capture (FR-007, SC-008 — the capture reads the projection and must never write to it) · `packages/studio/src/decisions/artifactIndependence.test.ts`
+- [x] **T042** [P] Document the closed gaps: note in the 053 spec folder that its FR-001..FR-028 are now delivered by 055, and record the `audit_label` field's ownership split (content owns values, engine owns plumbing) where the i18n conventions are documented · `specs/053-decision-audit/spec.md` + `docs/` as appropriate
 
 **⟶ Wait for Wave 1 to finish, then:**
 
