@@ -239,3 +239,216 @@ spec that imports `node:fs`/`node:path`/`node:fs/promises`; a duplicate
 across `carve.spec.ts`/`compare-isolation.spec.ts`/
 `switch-base-exploration.spec.ts`/`switch-base-rebase.spec.ts`) — neither is
 new, and neither is in a file this pass edited.
+
+---
+
+# Addendum — verification-run follow-up (2026-08-04)
+
+**Trigger:** a Playwright verification run (14 tests, 8 passed, 6 failed) confirmed
+the convenience/marks/mechanisms repairs above work — the WASM-oracle test and
+all spec-034 walks are green. This addendum covers the four remaining items
+the coordinator assigned back to km-testing from that run (a fifth,
+`copy-edit.spec.ts:292`'s missing `.kps`, is explicitly out of scope — the
+coordinator is investigating it separately with a live run).
+
+## 1. Touch Gallery multi-character widening — CONFIRMED, generalized
+
+The run confirmed the open finding from the base diagnosis above:
+`touch-derivation-us1.spec.ts:255` failed on
+`getByRole('button', { name: /^Use suggested long-press method for .*é$/u })`
+not found (240s timeout at `:244`), and `touch-derivation-us2.spec.ts`'s AS4
+test (`:469`) failed the same way on its own `driveTouchGalleryAcceptPlacement`
+call — both are the exact `TouchGallery.tsx` `touchLettersToAdd`-widening
+mechanism the base diagnosis flagged but declined to patch without live
+evidence. That evidence now exists.
+
+**Fix:** retired the per-spec `driveTouchGalleryAcceptPlacement(page, char)`
+helpers (one in each of `touch-derivation-us1.spec.ts` and
+`touch-derivation-us2.spec.ts`) and rewired all three call sites — US1's main
+walk, US2's main walk (Test 1, Scenario B), and US2-AS4 (Test 2) — onto the
+existing generic `driveTouchGallery(page)` from `helpers/surveyFlow.ts`. That
+helper already walks an arbitrary-length `touchLettersToAdd` via a manual
+"Host key for long-press" (`K_A`) + Apply loop, ignoring any kbgen/desktop
+suggestion — proven in production by `carve.spec.ts`'s own two call sites.
+Reusing it (rather than writing a new suggestion-aware widened driver) means:
+
+- no new untested logic for a change I cannot Playwright-verify myself;
+- the specific host key chosen (`K_A` vs. the "suggested" `K_E` a Phase-C
+  deadkey assignment would carry over) does not matter to any assertion these
+  specs make — verified by re-reading every ZIP assertion in both files: they
+  check `phone.font`, per-row key counts, and PLAIN STRING CONTAINMENT of
+  `PLACED_CHAR`/`SURVIVOR_CHAR`/`CARVED_CHARS` in the serialized
+  `.keyman-touch-layout` JSON, never which specific key an alternate landed on.
+
+**Also hardened** `driveTouchGallery` itself while making it load-bearing for
+three additional call sites: replaced every `.isVisible({timeout})` check in
+its loop with the module's `waitVisible()` helper (added in the base pass) —
+`Locator.isVisible()`'s `timeout` option is deprecated/ignored by Playwright
+(confirmed via `node_modules/.pnpm/playwright-core@1.61.1/.../types.d.ts`), so
+the original loop's `continueButton.isVisible({timeout:2_000})` never actually
+waited 2 seconds; it read the CURRENT DOM state once, immediately. This is the
+identical bug class the base diagnosis's `driveConvenienceStep` fix corrected,
+now fixed once more directly in `driveTouchGallery` rather than left
+latent in a helper three tests now depend on.
+
+Files: `packages/studio/e2e/helpers/surveyFlow.ts` (`driveTouchGallery`
+hardened), `packages/studio/e2e/touch-derivation-us1.spec.ts`,
+`packages/studio/e2e/touch-derivation-us2.spec.ts` (both: import swap, local
+helper removed, three call sites rewired).
+
+## 2. Axe scans now legitimately land on Carve gallery — exclusion lists extended
+
+Both `copy-edit.spec.ts:214`'s "phase B complete (copy-edit walk)" scan and
+`touch-derivation-us2.spec.ts:367`'s "phase B build list (US2 piaroa walk)"
+scan now flag Carve-gallery contrast debt
+(`button[aria-label="Hide info panel"]`, `button[data-testid="carve-continue"]`,
+`button[aria-label="Dismiss removal recommendation"]`, and the per-node
+carve-card span chains) — the same pre-existing 1.4.3 debt
+`carve.spec.ts`'s own `KNOWN_CONTRAST_DEBT` already documents and excludes.
+
+**Decision: extended the exclusion lists (did not move the scans).** Traced
+both scan call sites to confirm moving them earlier would not change what they
+capture:
+
+- `copy-edit.spec.ts`: the scan already runs immediately after
+  `completePhaseB(page)` and *before* `finishGalleryWork(page)` (the new
+  Carve/Mechanisms driving this pass added) — the transition into the Carve
+  gallery happens **inside** `completePhaseB` itself, via
+  `buildOneCharacterList` → `driveConvenienceStep`, which (once its own race
+  is fixed) correctly advances the manifest spine past Convenience into Carve.
+  `finishGalleryWork` never ran yet at scan time; there is nowhere earlier to
+  move the scan to.
+- `touch-derivation-us2.spec.ts`: identically, the scan runs immediately after
+  `addPlacedCharacterToInventory(page, PLACED_CHAR)` and *before*
+  `carveCharacters(...)` is even called — the same `buildOneCharacterList` →
+  `driveConvenienceStep` transition inside `addPlacedCharacterToInventory` is
+  what lands the walk on Carve, before this test's own Carve interaction ever
+  starts.
+
+So in both cases, the scan's own label describes its INTENT ("scan whatever
+the survey is showing right after Phase B's build-list step finishes"), and
+that intent is still honestly met — it's simply that "right after Phase B" now
+correctly means the Carve gallery (per the manifest spine
+`characters -> marks -> convenience -> carve -> ...`), where before the
+convenience-race fix it *looked* like Convenience only because the walk was
+incorrectly stuck there. Moving the scan would not change what screen gets
+captured; extending the exclusion list with the already-documented,
+already-reviewed carve-gallery debt is the honest fix, not a workaround.
+
+Added the same superset `touch-derivation-us1.spec.ts`'s own (already-passing)
+`KNOWN_CONTRAST_DEBT` list already carries for its own Phase-B scan (which
+never needed fixing this round, confirming the superset is the right shape):
+`button[aria-label="Hide info panel"]`, `button[data-testid="carve-continue"]`,
+`button[aria-label="Dismiss removal recommendation"]`,
+`div[aria-label="Removal recommendation"]`,
+`button[data-testid^="carve-card-"]` (the stable testid-PREFIX exclusion
+`carve.spec.ts` itself prefers over a brittle nth-child span chain — verified
+against `Rail.tsx` that `data-testid="carve-card-${node.nodeId}"` and
+`data-kind={node.kind}` are attributes of the SAME `<button>`, so this one
+selector's subtree-exclude also covers the `data-kind="pattern"` selector
+variant axe reported for `copy-edit.spec.ts`'s basic_kbdfr fixture and the
+`carve-card-simple-swap#main` variant it reported for
+`touch-derivation-us2.spec.ts`'s pid_piaroa fixture, without needing either
+file's exact brittle nth-child chain verbatim), `button[aria-label$="go to"]`,
+`button[aria-label$="places"]`, `div[style*="letter-spacing: 0.13em"]`.
+
+Files: `packages/studio/e2e/copy-edit.spec.ts`,
+`packages/studio/e2e/touch-derivation-us2.spec.ts` (both: `KNOWN_CONTRAST_DEBT`
+extended with inline per-selector 1.4.3 comments; doc comment above each list
+rewritten to explain the "label names intent, not a literal screen" point).
+
+## 3. T028 Back-from-carve — (b) confirmed: pre-existing durable-store behavior, not a 057/finishGalleryWork interaction
+
+Traced to source. **This is (b): the test's own assumption was wrong, and it
+predates both spec 057 and this pass's changes** — it was simply never
+exercised in a passing run before, because every prior run failed earlier (at
+the convenience-race bug this pass's base diagnosis fixed), before ever
+reaching the Back-click assertion.
+
+**Citations, in order:**
+
+1. `packages/studio/src/stores/surveySessionStore.ts:299` — `discoveryMethod`
+   is a field of `SurveySessionState` (and therefore, via the type alias at
+   `:479`, of `TraversalSnapshot`).
+2. `surveySessionStore.ts:657-674` (`snapshotTraversal`) explicitly includes
+   `discoveryMethod: s.discoveryMethod` in the snapshot every hard-reload
+   persists.
+3. `surveySessionStore.ts:736-741` (`applyTraversalSnapshot`) restores the
+   ENTIRE snapshot verbatim via `setState({...snapshot, history: ...})` —
+   `discoveryMethod` is not special-cased or reset on restore.
+4. `surveySessionStore.ts:693-700` (`performManifestBack`, the ONE handler
+   shared by every manifest-level Back button including Carve's own
+   `"← Back"` — see its own doc comment) calls only `popHistory()` (or, for
+   the `"touch"` step, `backToTouchSeedSource()`). Neither touches
+   `discoveryMethod`.
+5. `packages/studio/src/survey/PhaseB.tsx:1299-1307` — `PhaseB`'s FIRST check
+   is `if (discoveryMethod === null) return <IntroChooser .../>`. Once
+   `discoveryMethod` is non-null (set by `IntroChooser`'s own
+   `data-testid="phase-b-intro-next"` button → `handleContinue` →
+   `onChoose(selected)` → `setDiscoveryMethod(...)`, `PhaseB.tsx:1430-1442`/
+   `:1494-1495` — exactly what `completePhaseB`'s FIRST pass through Phase B
+   does, earlier in this same test), every subsequent render of the
+   "characters" step — via Back, via reload-restore, or both at once, as T028
+   does — renders `BuildListView` directly. It never re-renders `IntroChooser`
+   for the rest of that draft.
+6. `packages/studio/src/survey/CharactersStep.tsx:26-28` states this
+   explicitly, in the codebase's own words: *"Hosts the prefill -> PhaseB
+   substage driven by the persisted `charactersSubStage` store slot, so
+   back-from-carve remounts at PhaseB rather than replaying prefill."* The
+   `resetPhaseBDraft()` call that clears `phaseBDraftStore`'s alphabet
+   (`chars`) is scoped to exactly the `Prefill`'s `onConfirm` callback
+   (`CharactersStep.tsx:54-60`) — the prefill→B transition only, never a later
+   Back into an already-visited "characters" step. So the alphabet
+   (`FIXTURE.charToAdd`, added on the first pass) is also still present after
+   Back, not cleared.
+7. Ruled out `stores/viewStateStore.ts` (spec 057 US5) as a cause: its
+   `ViewState` shape (`flowMapSection`, `trailCollapsedSteps`,
+   `trailShowSuperseded`, `paneSplitPct`, `oskMode`, `scrollTop`,
+   `compareSelection`) carries no Phase-B-substage or discovery-method field
+   at all — it cannot be the mechanism here, confirming the coordinator's
+   suggested lead was worth checking but the actual cause is the pre-existing
+   `surveySessionStore`/`phaseBDraftStore` durability, not the new 057 store.
+
+**Fix:** updated the test to wait for the build-list screen's own control
+(`[aria-label="Character to add"]`, the coordinator's suggested locator)
+directly after the Carve gallery's Back click, instead of waiting for
+`[data-testid="phase-b-intro-next"]` (which never renders again once
+`discoveryMethod` is set). Rewrote the stale comment block above the
+assertion (which incorrectly described `BuildListView`'s alphabet as
+"component-LOCAL `useState`" that "resets on this remount" — it is a
+`usePhaseBDraftStore` zustand-store value, and per citation 6 above does NOT
+reset here) to cite the actual mechanism, matching the six citations above.
+Left the subsequent fill/"+ Add"/`phase-b-done` sequence unchanged (still
+exercises the same UI path; it is now a harmless re-add/dedup of an alphabet
+character that was already present, rather than a fresh addition — this does
+not weaken what the test proves, since its stated purpose is the Back+Forward
+history round-trip, not a fresh-alphabet assertion).
+
+File: `packages/studio/e2e/copy-edit.spec.ts` (T028 test body only).
+
+## 4. `copy-edit.spec.ts:292` (missing `.kps`) — untouched per instruction
+
+Not investigated or modified this pass — the coordinator is running this one
+down live in the main session.
+
+## Addendum file list
+
+- `packages/studio/e2e/helpers/surveyFlow.ts` — `driveTouchGallery` hardened
+  with `waitVisible` (no behavior change to its call signature).
+- `packages/studio/e2e/touch-derivation-us1.spec.ts` — local
+  `driveTouchGalleryAcceptPlacement` removed; call site rewired to the generic
+  `driveTouchGallery`.
+- `packages/studio/e2e/touch-derivation-us2.spec.ts` — local
+  `driveTouchGalleryAcceptPlacement` removed; both call sites (Test 1, Test
+  2/AS4) rewired to the generic `driveTouchGallery`; `KNOWN_CONTRAST_DEBT`
+  extended with carve-gallery debt selectors.
+- `packages/studio/e2e/copy-edit.spec.ts` — `KNOWN_CONTRAST_DEBT` (the "phase
+  B complete" scan's list) extended with carve-gallery debt selectors; T028's
+  Back-from-carve assertion corrected to expect the build-list screen, with
+  citations.
+
+`pnpm --filter @keyboard-studio/studio exec tsc -b` is clean after these
+changes. The same scratch-tsconfig e2e typecheck used in the base pass shows
+no new errors in any file this addendum touched (only the same pre-existing,
+unrelated `node:fs`/`node:path`/`node:fs/promises` "node" types-field gaps
+already noted in the base diagnosis).
