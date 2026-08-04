@@ -122,10 +122,34 @@ This is the same conclusion our own engine already reached internally: `applyDes
 
 **Design consequences.**
 
-- **Suppress is the default offer, deletion is secondary.** When an author wants a key gone, propose suppression (hide in place, geometry preserved) and offer true removal as the explicit alternative with its reflow consequence stated. This also makes US4's "leave a full-width spacer" default consistent rather than a special case.
+- **Suppression is one of three outcomes, not the default — see R3c.** It is the right answer for casing-parallel and modifier twin layers, where muscle memory is the dominant value. On a standalone function layer, removal with width redistribution is the right answer, because suppression buys predictability the author does not need at the cost of touch area they do. US4's "leave a full-width spacer" is therefore the *proposal* for a twin layer, not a global default.
 - **Suppression sets both halves in one action**, and the diagnostics must treat a half-done suppression as a finding: a spacer-class key that kept a rule-bearing id is still live, and a neutralized id left at `sp:0` is an invisible dead key.
 - **A ruleless `T_BLANK` is legitimate, not a defect.** The dead-`T_`-key check already exempts sentinel ids and blank/spacer classes ([contracts/touch-key-rule-join.md](contracts/touch-key-rule-join.md) §5.1) — this idiom is exactly why those exemptions exist, and Cameroon's 70 `T_BLANK` sites are the attested precedent.
 - **The `isSpacerKeyClass` fix matters more than it first appeared.** If authors distinguish blank (9) from spacer (10), a predicate that reads `{8, 10}` mishandles both ends of the idiom: it credits blank keys as producing their keycap text (Cameroon's `T_BLANK` sites carry `" "`, so a space is spuriously credited) while treating interactive deadkey-styled keys as inert.
+
+### R3c — Predictability versus touchable area: an opposed pair, not a default
+
+Recorded from author direction (2026-08-03), correcting R3a's stronger claim that suppression should be the default offer whenever a key is unwanted. The author's own framing: *"my method of blank keys is a solution to improve predictability across layers, but does not give more touchable space"* — and *"some users will want to remove keys to make touch layers simpler."*
+
+These are **two legitimate goals that trade off directly**, and no single default serves both:
+
+| Goal | Mechanism | Positions across layers | Touchable area |
+|---|---|---|---|
+| **Predictability** | suppress in place (blank / spacer + ruleless id) | preserved | **unchanged** — the layer stays as dense as its busiest sibling |
+| **Simplicity / touchability** | remove, then **redistribute** the freed width | deliberately changed | **increased, evenly** |
+| *(neither, usually)* | remove and reflow — Developer's plain delete | keys shift left | marginal and **uneven**: only the row's stretched final key grows |
+
+That third row is worth naming explicitly because it is Developer's only removal behaviour and it is usually the worst of the three: positions move *and* the freed space lands lopsidedly on one key, because the last key in a row absorbs the remainder (see "Geometry, for the record"). Converting removed keys into usable touch area requires a deliberate redistribute step — which is why "Even out row" must be offered *as part of* removal rather than as an unrelated tidy-up action.
+
+**The proposal is derivable from layer kind**, which is what keeps this defaults-first rather than a bare question:
+
+- A layer with a **casing-parallel or modifier twin** — the shift / caps / rightalt variants of one alpha layout — is where muscle memory lives. A character's key should be in the same place whether or not Shift is engaged. Propose **suppress**. The concept already exists in `casePairTouchTarget`'s "casing-parallel layer" ([touchBehavior.ts](../../packages/studio/src/editors/assignLoop/touchBehavior.ts)), and modifier-layer detection exists in [touch-layout.ts](../../utilities/facet-index/touch-layout.ts) (`modifierLayerIds`, `hasSymbolLayer`).
+- A **standalone function layer** — numeric, symbol, an alt-script plane — has no positional correspondence to preserve, so density is pure cost. Propose **remove and redistribute**.
+- **Crowding overrides layer kind.** `MAX_KEYS = { phone: 10, tablet: 13 }` in [check-18-3-keys-per-row.ts](../../packages/keyboard-lint/src/checks/check-18-3-keys-per-row.ts) is the existing threshold, and Developer's own docs advise ten keys per row as the small-device maximum. A row over its limit should be offered redistribution regardless, with the reason stated.
+
+**Consistency within a layer matters more than which option is chosen.** A row with three suppressed keys and two removed ones gets neither benefit: positions have already shifted, so predictability is gone, and the freed area was only partly reclaimed. The studio should surface that mixture rather than let it accumulate — this is a coherence finding in the FR-039 sense, not a correctness one.
+
+**Consequence for R3a.** Suppression remains the mechanism whose *two halves* must be set together, and it remains the right answer for modifier twins. It is no longer claimed as the universal default. Deletion is a first-class outcome, not a fallback.
 
 ### R3b — Modifier keys must be marked active on their own layer
 
@@ -354,7 +378,7 @@ Verified: `builder.xsl` loads only Sentry plus the editor's own modules — **no
 
 Our touch step already renders the real KeymanWeb OSK in its right pane (`OSKFrame` + `useKeyboardArtifact`), so the preview is inherited rather than built. The design consequence is that it must stay **truthful**: the transform currently injects only the touch layout, so a synthesized `T_`-key rule would not type (FR-038). A preview that silently omits the feature's own edits is worse than no preview.
 
-The full mess-prevention set, for the record: live preview (FR-037) · suppress-before-delete so geometry never reflows (FR-029b) · visible row slack (FR-039) · destructive classes rejected at edit time rather than reported (FR-045) · byte-preservation so a small edit stays small (FR-033) · per-edit undo (FR-032) · the coverage gate at Continue (FR-008 via US5).
+The full mess-prevention set, for the record: live preview (FR-037) · a layer-kind-aware proposal among suppress / reflow / redistribute so the geometry consequence is chosen deliberately rather than stumbled into (FR-029f-h, R3c) · visible row slack (FR-039) · destructive classes rejected at edit time rather than reported (FR-045) · byte-preservation so a small edit stays small (FR-033) · per-edit undo (FR-032) · the coverage gate at Continue (FR-008 via US5).
 
 **But do not hide the mode.** The Cameroon case is a primary flow for imported keyboards, so resolve the tension by *proposing* the mode rather than promoting it to a step: on entering the touch stage, if the layout has keys with no reachable output **and** the inventory has unplaced characters, the intro surface leads with "This keyboard has N keys with no letter assigned — assign letters to keys →" and routes into By-key mode. The character-driven walk stays the default product for reseeded keyboards; the by-key route becomes the default *offer* for imported ones. Cost: one additive session field.
 

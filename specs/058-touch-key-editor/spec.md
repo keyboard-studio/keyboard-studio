@@ -92,6 +92,7 @@ Developer hosts a jQuery editor (`developer/src/tike/xml/layoutbuilder/`) in a C
 - Q: Why also change the id, if `sp` already blocks interaction? → A: The blank key's id is set to `T_BLANK`, left **undefined** (no rule), "so that it doesn't trigger the underlying key." `sp` governs rendering and interactivity; the id governs output. Both halves are required.
 - Q: Why suppress rather than delete? → A: **Hiding unused keys allows the remaining keys to show up in their expected positions.** Deletion reflows the row (and silently resizes its stretched final key); suppression preserves geometry.
 - Q: How should modifier keys be typed? → A: **A modifier key must be defined as active when its layer is active** — `sp:2` on the layer it switches to, `sp:1` elsewhere.
+- Q: So is suppression always preferable to deletion? → A: **No.** *"My method of blank keys is a solution to improve predictability across layers, but does not give more touchable space"* — and *"some users will want to remove keys to make touch layers simpler."* Predictability and touchable area are **opposed goals**; the studio offers three outcomes with their trade-offs and proposes from the layer's kind rather than hard-coding one. (This softens the previous answer, which made suppression the universal default.)
 
 ### Needs resolution before `/speckit-plan` closes
 
@@ -171,8 +172,10 @@ The author adds a key to a row, or removes one, using the keyboard or the pointe
 3. **Given** any add or remove, **When** it lands, **Then** the row's remaining slack is shown and "Fill row" / "Even out row" are *offered* — widths are never silently redistributed.
 4. **Given** an import-adapt (Case B) layout, **When** one key is edited, **Then** every untouched key and every platform-level field (including fields our IR does not model, e.g. `font`) is **byte-identical** to the shipped file.
 5. **Given** a key on an alt layer that should not output, **When** the author suppresses it, **Then** one action sets a non-interactive key type **and** neutralizes the id to a ruleless sentinel, the key stops producing anything, and **every other key in the row keeps its position and width**.
-6. **Given** the author instead chooses true deletion, **When** they confirm, **Then** the row-reflow consequence was stated before the choice.
-7. **Given** a frame key whose `nextlayer` names its own containing layer, **When** it is placed or edited, **Then** `sp:2` is proposed automatically, remains editable, and a disagreement between the two is reported.
+6. **Given** the author removes a key, **When** the choice is offered, **Then** all three outcomes appear with their trade-offs — suppress in place, remove and reflow, remove and redistribute — and the proposed one matches the layer's kind (twin layer → suppress; standalone function layer → remove and redistribute).
+7. **Given** a row already over the platform crowding limit, **When** the author removes a key, **Then** redistribution is proposed regardless of layer kind and the over-limit reason is stated.
+8. **Given** a row where some keys were suppressed and others removed, **When** the layer is audited, **Then** the inconsistency is surfaced — that row has lost predictability without fully reclaiming touch area.
+9. **Given** a frame key whose `nextlayer` names its own containing layer, **When** it is placed or edited, **Then** `sp:2` is proposed automatically, remains editable, and a disagreement between the two is reported.
 
 ---
 
@@ -236,7 +239,18 @@ Every touch-layout warning Keyman Developer defers to compile time appears inlin
 - **FR-028**: An author MUST be able to rename a key id, with live validation (syntax, in-layer uniqueness, case collision, reserved prefixes) and complete reference fix-up across the layout, the rules, the node-id map, and the deletion overlay.
 - **FR-029**: An author MUST be able to add and remove keys within a row. Deleting the last key in a row MUST prompt, defaulting to keeping the row.
 - **FR-029a**: An author MUST be able to set a key's **type (`sp`)** across the full legal set (`0` character, `1` frame, `2` active frame, `8` deadkey-styled, `9` blank, `10` spacer). The studio MUST *propose* the appropriate value per context but MUST NOT remove the control. `sp` is an authoring mechanism, not an implementation detail — see [research.md](research.md) R3a.
-- **FR-029b**: The studio MUST offer **suppressing** a key as a single compound action that both sets a non-interactive key type (spacer, or blank when a keycap-shaped hole is wanted) **and** neutralizes the id to a ruleless custom id, because `sp` alone does not stop rule matching. Suppression MUST be the **default offer** when an author wants a key gone, with true deletion offered as the explicit alternative and its row-reflow consequence stated — suppression preserves the row's geometry so the remaining keys stay in their expected positions.
+- **FR-029b**: The studio MUST offer **suppressing** a key as a single compound action that both sets a non-interactive key type (spacer, or blank when a keycap-shaped hole is wanted) **and** neutralizes the id to a ruleless custom id, because `sp` alone does not stop rule matching.
+- **FR-029f**: "Remove this key" MUST resolve to a choice between **three** outcomes, because predictability across layers and touchable area are **opposed goals that cannot both be maximized** (see [research.md](research.md) R3c):
+  1. **Suppress in place** — positions preserved across layers, touchable area unchanged;
+  2. **Remove and reflow** — the row closes up and its stretched final key absorbs the slack unevenly;
+  3. **Remove and redistribute** — the freed width is shared across the remaining keys, converting removed keys into **genuinely larger touch targets**.
+
+  Each option MUST state its trade-off. The studio MUST NOT hard-code one as globally correct.
+- **FR-029g**: The studio MUST **propose** the outcome from the layer's kind, and MUST allow override:
+  - a layer with a **casing-parallel or modifier twin** (shift / caps / rightalt variants of the same alpha layout) → propose **suppress**, because muscle memory across the twins is the dominant value;
+  - a **standalone function layer** (numeric, symbol, an alt-script plane) with no positional correspondence to preserve → propose **remove and redistribute**, because simplicity and target size are the dominant value;
+  - when the row exceeds the platform crowding limit (`phone: 10`, `tablet: 13` — [check-18-3-keys-per-row.ts](../../packages/keyboard-lint/src/checks/check-18-3-keys-per-row.ts)) → propose **remove and redistribute** regardless of layer kind, and say that the row is over the limit.
+- **FR-029h**: The chosen approach SHOULD be applied **consistently within a layer**. A row that mixes suppressed and removed keys achieves neither predictability nor extra touch area, so the studio MUST surface the inconsistency rather than let it accumulate silently.
 - **FR-029c**: A **half-done suppression** MUST be reported: a non-interactive key that kept a rule-bearing id is still live, and a neutralized id left on a producing key type is an invisible dead key.
 - **FR-029d**: A layer-switching key MUST be marked **active (`sp:2`) on the layer it switches to** and `sp:1` elsewhere. The studio MUST propose this automatically from the key's `nextlayer` and its containing layer, MUST keep the value editable, and MUST report a diagnostic when the two disagree (see [research.md](research.md) R3b).
 - **FR-029e**: A ruleless sentinel id used for suppression (e.g. `T_BLANK`) MUST NOT be reported as a dead key — this idiom is why the dead-key exemptions in [contracts/touch-key-rule-join.md](contracts/touch-key-rule-join.md) §5.1 exist.
