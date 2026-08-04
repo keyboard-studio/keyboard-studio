@@ -69,7 +69,7 @@ Developer's key inspector has thirteen fields. Verdicts, with reasons.
 | **Text Unicode** — a second box, bidirectionally synced | **MERGE** | One field accepting a character *or* `U+025B`, with a live reflection line. `lib/charInput.ts`'s `reflectCharInput` and its localized "Type a character directly, or a Unicode value like U+00E9" copy already ship in `KeyPickerField.tsx`. Reuse; do not rebuild two synced boxes. |
 | **Hint** | **DERIVE**, override behind Advanced | Platform `defaultHint` decides the family. **Keep Developer's one genuinely good idea**: the field's *placeholder shows the inferred hint*, so the author sees what they would get without an override. |
 | **Hint Unicode** | **DROP** | Subsumed by the merged character/`U+` field. |
-| **Key Type** — six `sp` values | **SIMPLIFY to three** | "Character key" (0), "Frame key" (1), "Spacer/gap" (10). **`specialActive` (2) is derived** — a frame key on the layer it switches *to* is active — which removes Developer's worst footgun. **Drop** `deadkey` (8): a pure styling signal, and our deadkeys come from patterns. **Drop** `blank` (9): no authoring decision sits behind it. |
+| **Key Type** — six `sp` values | **KEEP, all of them, with a proposed default** | Corrected 2026-08-03 on author direction — see R3a. `sp` is a real authoring control, not a detail to hide: suppressing a key on an alt layer by setting it to **spacer** is an active idiom, and **blank (9) vs spacer (10) is a distinction authors use deliberately**. Expose the full legal set `{0, 1, 2, 8, 9, 10}` with plain-language labels and a *proposed* value per context; never remove the option. `specialActive` (2) gets a proposal (a frame key on the layer it switches *to*) rather than being derived away, which still defuses Developer's footgun without taking the control. |
 | **Modifier** (`key.layer`) | **DERIVE / read-only** | The most confusing field in Developer, and for us it is *computable*: our layer ids are auto-derived from modifier combos (`comboToTouchLayerId`, specs/008 §3c), so the modifier a key should send is the combo its layer flattens from. Show it as a read-only "**Sends:** Shift+K_Q (from the Shift layer)" line, placed visually far from Next Layer. See R4 — the field must still round-trip even though we do not let authors set it. |
 | **ID** — free text, maxlength 64, VK autocomplete, **zero validation** | **KEEP but invert** | This is the §3c anti-pattern. Replace the always-live text box with the current id in mono plus a **Rename…** action whose field is **pre-filled with the proposed id** and validated live. The VK-name table survives as *validation data* (a `K_` id must be a real VK name), not as a substitute for validation. |
 | **Padding Left** | **SIMPLIFY** | "Gap before this key" in half-key steps (none / ½ / 1), plus "Insert spacer key" — which is what `pad` is usually emulating. Numeric entry survives under Advanced. |
@@ -78,6 +78,47 @@ Developer's key inspector has thirteen fields. Verdicts, with reasons.
 | **Gesture Type** (sub-key, read-only) | **KEEP** as a heading | Not a field. |
 | **Default selection** (longpress only) | **KEEP** | A real decision with no defensible auto-answer beyond "first". |
 | per-key `font` / `fontsize` (in the format; Developer hides them) | **DROP** | Stay hidden. |
+
+### R3a — Key suppression: `sp` plus a ruleless id, and why it is not deletion
+
+Recorded from author direction (2026-08-03). This is the idiom that corrects the Key Type row above, and it is a **compound** edit with three distinct jobs. Getting one half right and the other wrong is a silent defect, which is why the studio must offer it as one action rather than as two fields.
+
+**1. `sp` hides the key.** To suppress a key that should not output on an alt layer, set its key type to **spacer** (`sp:10`) — or **blank** (`sp:9`) when a keycap-shaped hole is wanted rather than a gap. Both "block any interaction" per the upstream enum (R2). This is the *rendering and interactivity* half.
+
+**2. A ruleless id stops the output.** Independently, neutralize the id — the author's convention is `T_BLANK`, deliberately left undefined (no `.kmn` rule) "so that it doesn't trigger the underlying key." This is the *output* half, and `sp` does not do it. Three mechanisms have to miss for a key to be truly silent, and a ruleless custom id is what makes all three miss:
+
+- **No rule can match.** Nothing is keyed on `T_BLANK`, so no `.kmn` rule fires. A key that kept its original id (say `K_Q` on a `rightalt` layer) would still match whatever `[RALT K_Q]` rule the keyboard defines — which is precisely the "underlying key" being triggered.
+- **`forUnicodeKeynames` misses**, because the id is not a `U_` id ([contracts/key-id-policy.md](contracts/key-id-policy.md) §1a).
+- **`forBaseKeys` misses**, because a custom id's code is ≥256 (VKDictionary-interned) and therefore outside every `Codes.keyCodes` range that function tests.
+
+Worth knowing precisely: `forBaseKeys` (`keyman/web/src/engine/keyboard/src/defaultRules.ts:189-202`) *also* self-limits to the default and shift layers — any other modifier state returns `null` with the log *"KMW only defines default key output for the 'default' and 'shift' layers!"*. So on a correctly-modifier-tagged alt layer the base fall-through is not the exposure; **rule matching is**. The id neutralization is doing real work regardless, and it is the half that does not depend on the layer being tagged as the author expects.
+
+**3. Hiding preserves geometry — this is why it is not deletion.** Suppressing a key in place keeps the row's key count and widths, so **the remaining keys stay in their expected positions**. Deleting the key would reflow the row and move every key after it, and because the last key in a row is stretched to consume the remainder (see "Geometry, for the record" below), a deletion also silently resizes the row's final key.
+
+This is the same conclusion our own engine already reached internally: `applyDesktopModifications` mints inert `T_removed_<n>` placeholders expressly "so row geometry stays stable", and the carve and touch-method deletion passes neutralize ids to `T_carved_*` / `T_touchdel_*`. **The engine already implements the author's idiom programmatically; the studio simply never exposed it.** Exposing it is most of the work.
+
+**Design consequences.**
+
+- **Suppress is the default offer, deletion is secondary.** When an author wants a key gone, propose suppression (hide in place, geometry preserved) and offer true removal as the explicit alternative with its reflow consequence stated. This also makes US4's "leave a full-width spacer" default consistent rather than a special case.
+- **Suppression sets both halves in one action**, and the diagnostics must treat a half-done suppression as a finding: a spacer-class key that kept a rule-bearing id is still live, and a neutralized id left at `sp:0` is an invisible dead key.
+- **A ruleless `T_BLANK` is legitimate, not a defect.** The dead-`T_`-key check already exempts sentinel ids and blank/spacer classes ([contracts/touch-key-rule-join.md](contracts/touch-key-rule-join.md) §5.1) — this idiom is exactly why those exemptions exist, and Cameroon's 70 `T_BLANK` sites are the attested precedent.
+- **The `isSpacerKeyClass` fix matters more than it first appeared.** If authors distinguish blank (9) from spacer (10), a predicate that reads `{8, 10}` mishandles both ends of the idiom: it credits blank keys as producing their keycap text (Cameroon's `T_BLANK` sites carry `" "`, so a space is spuriously credited) while treating interactive deadkey-styled keys as inert.
+
+### R3b — Modifier keys must be marked active on their own layer
+
+Recorded from author direction (2026-08-03). A layer-switching key must carry **`sp:2` (specialActive)** on the layer it switches *to*, and `sp:1` (special) elsewhere. The Shift key on the `shift` layer is active; the Shift key on `default` is not. This is what makes the OSK show the engaged modifier as engaged.
+
+Cameroon is the attested example: the symbol layer's "back to letters" key is `{"id":"T_LOWER","text":"*abc*","sp":2,"nextlayer":"default"}` — `sp:2` because the symbol layer is the one it is currently *on*, while the same logical key is `sp:1` where it is merely a way in.
+
+**This is a derivable rule, and it stays a proposal rather than a derivation.** The relationship (`key.nextlayer === containing layer` ⇒ active) is computable, so the studio should:
+
+1. **Propose** `sp:2` automatically when a frame key is placed on the layer it targets, and `sp:1` otherwise — so the author never has to think about it and Developer's worst footgun is defused by default;
+2. **Keep the field editable** (R3a's correction), because `sp` is an authoring control;
+3. **Report a live diagnostic** when the two disagree — a frame key whose `nextlayer` names its own containing layer but which is not `sp:2`, or the converse. This is new; Developer has no such check.
+
+**Interaction with check 18.4 — a latent trap, not a present bug.** Verified against [check-18-4-control-key-drift.ts](../../packages/keyboard-lint/src/checks/check-18-4-control-key-drift.ts): that check compares `sp`, width, and position for the same control key across layers using a strict `base.sp !== geometry.sp`, and its documented design decision is that *"asymmetric sp/width IS drift"*. It does **not** false-fire on the modifier alternation today, because its scope is `CONTROL_KEY_IDS = {K_BKSP, K_ENTER}` — neither of which is a layer-switching key, so both legitimately hold constant `sp` across layers.
+
+The trap is for a future extension. Widening `CONTROL_KEY_IDS` to cover layer-switch keys such as `K_SHIFT` — plausible, and arguably desirable for width and position consistency — would make the strict comparison fire on **every correctly-authored `sp:1`/`sp:2` pair**. If that widening ever happens, the `sp` comparison must first be taught to treat the active/inactive pair as equivalent while still catching genuine drift. Left as a note here so the next person to touch that check finds it.
 
 ### Surrounding UI
 
@@ -110,6 +151,8 @@ Developer's editor validates **essentially nothing** — no id syntax check, no 
 | version gates (multi-codepoint `U_` → KM15; flick/multitap → KM17) | Hint/Info | Live, informational |
 | *(Developer has none)* duplicate id within a layer | — | New |
 | *(Developer has none)* orphan `T_` rule | — | New |
+| *(Developer has none)* modifier key not marked active on its own layer (R3b) | — | New |
+| *(Developer has none)* half-done suppression — spacer-class key that kept a rule-bearing id, or a neutralized id left at `sp:0` (R3a) | — | New |
 
 Developer's own id regex, which we adopt (tightening `U_` to grouped hex so it agrees with `decodeUnicodeKeyId`):
 

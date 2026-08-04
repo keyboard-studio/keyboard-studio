@@ -88,6 +88,10 @@ Developer hosts a jQuery editor (`developer/src/tike/xml/layoutbuilder/`) in a C
 - Q: What is the minimum? → A: Redefining key ids (specifically `T_*`), adding and removing keys, and assigning letters to existing `T_*` keys as in the Cameroon keyboard.
 - Q: Must producibility account for these? → A: Yes — explicitly. "The calculations of what is possible to output a character need to take these into account."
 - Q: Clone Developer's interface? → A: No — *streamline* it into our workflow.
+- Q: Is key type (`sp`) an authoring control or an implementation detail? → A: **An authoring control — it must be author-definable.** Choosing not to output a key from an alt layer is done by setting its key type to **spacer**; blank versus spacer is a deliberate distinction. (This reverses an earlier draft that reduced the six values to three — §3c means *propose a good default*, not *remove the option*.)
+- Q: Why also change the id, if `sp` already blocks interaction? → A: The blank key's id is set to `T_BLANK`, left **undefined** (no rule), "so that it doesn't trigger the underlying key." `sp` governs rendering and interactivity; the id governs output. Both halves are required.
+- Q: Why suppress rather than delete? → A: **Hiding unused keys allows the remaining keys to show up in their expected positions.** Deletion reflows the row (and silently resizes its stretched final key); suppression preserves geometry.
+- Q: How should modifier keys be typed? → A: **A modifier key must be defined as active when its layer is active** — `sp:2` on the layer it switches to, `sp:1` elsewhere.
 
 ### Needs resolution before `/speckit-plan` closes
 
@@ -166,6 +170,9 @@ The author adds a key to a row, or removes one, using the keyboard or the pointe
 2. **Given** the author deletes the last key in a row, **When** the deletion is confirmed, **Then** the studio asks whether to remove the row, defaulting to **keeping** it with a full-width spacer (Developer silently deletes the row; that breaks the positional alignment sibling layers depend on).
 3. **Given** any add or remove, **When** it lands, **Then** the row's remaining slack is shown and "Fill row" / "Even out row" are *offered* — widths are never silently redistributed.
 4. **Given** an import-adapt (Case B) layout, **When** one key is edited, **Then** every untouched key and every platform-level field (including fields our IR does not model, e.g. `font`) is **byte-identical** to the shipped file.
+5. **Given** a key on an alt layer that should not output, **When** the author suppresses it, **Then** one action sets a non-interactive key type **and** neutralizes the id to a ruleless sentinel, the key stops producing anything, and **every other key in the row keeps its position and width**.
+6. **Given** the author instead chooses true deletion, **When** they confirm, **Then** the row-reflow consequence was stated before the choice.
+7. **Given** a frame key whose `nextlayer` names its own containing layer, **When** it is placed or edited, **Then** `sp:2` is proposed automatically, remains editable, and a disagreement between the two is reported.
 
 ---
 
@@ -228,6 +235,11 @@ Every touch-layout warning Keyman Developer defers to compile time appears inlin
 - **FR-027**: Rule synthesis MUST be **semantically idempotent** — re-running MUST add nothing, and an equivalent hand-written rule MUST be detected and left untouched rather than duplicated.
 - **FR-028**: An author MUST be able to rename a key id, with live validation (syntax, in-layer uniqueness, case collision, reserved prefixes) and complete reference fix-up across the layout, the rules, the node-id map, and the deletion overlay.
 - **FR-029**: An author MUST be able to add and remove keys within a row. Deleting the last key in a row MUST prompt, defaulting to keeping the row.
+- **FR-029a**: An author MUST be able to set a key's **type (`sp`)** across the full legal set (`0` character, `1` frame, `2` active frame, `8` deadkey-styled, `9` blank, `10` spacer). The studio MUST *propose* the appropriate value per context but MUST NOT remove the control. `sp` is an authoring mechanism, not an implementation detail — see [research.md](research.md) R3a.
+- **FR-029b**: The studio MUST offer **suppressing** a key as a single compound action that both sets a non-interactive key type (spacer, or blank when a keycap-shaped hole is wanted) **and** neutralizes the id to a ruleless custom id, because `sp` alone does not stop rule matching. Suppression MUST be the **default offer** when an author wants a key gone, with true deletion offered as the explicit alternative and its row-reflow consequence stated — suppression preserves the row's geometry so the remaining keys stay in their expected positions.
+- **FR-029c**: A **half-done suppression** MUST be reported: a non-interactive key that kept a rule-bearing id is still live, and a neutralized id left on a producing key type is an invisible dead key.
+- **FR-029d**: A layer-switching key MUST be marked **active (`sp:2`) on the layer it switches to** and `sp:1` elsewhere. The studio MUST propose this automatically from the key's `nextlayer` and its containing layer, MUST keep the value editable, and MUST report a diagnostic when the two disagree (see [research.md](research.md) R3b).
+- **FR-029e**: A ruleless sentinel id used for suppression (e.g. `T_BLANK`) MUST NOT be reported as a dead key — this idiom is why the dead-key exemptions in [contracts/touch-key-rule-join.md](contracts/touch-key-rule-join.md) §5.1 exist.
 - **FR-030**: Per-key `layer` (the modifier override) MUST be preserved through parse and emit so that keys legitimately sharing an id within a layer remain distinguishable and addressable. *(Locked-type change — see Needs resolution.)*
 - **FR-031**: Every key-level edit MUST promote the key's provenance to `hand-set`, or re-propagation will silently overwrite it. Promotion MUST be **address-matched**, not id-matched, so a rename cannot miss and same-id keys on other layers are not promoted incidentally.
 - **FR-032**: Edits MUST enter the existing undo stack as a new entry kind, one entry per committed edit, and MUST be cleared by the existing keep-all / restore-all / reset actions.
@@ -236,7 +248,7 @@ Every touch-layout warning Keyman Developer defers to compile time appears inlin
 
 ### Functional Requirements — live diagnostics (US5)
 
-- **FR-040**: The studio MUST surface, at edit time, the equivalents of Developer's `WARN_TouchLayoutCustomKeyNotDefined` (0x092, with its `nextlayer`/`sp` exemptions), `WARN_TouchLayoutMissingLayer` (0x091), `WARN_TouchLayoutUnidentifiedKey` (0x099), `WARN_TouchLayoutMissingRequiredKeys` (0x093), `WARN_TouchLayoutSpecialLabelOnNormalKey` (0x0A9), and `ERROR_TouchLayoutInvalidIdentifier` (0x05A), plus two checks Developer lacks: duplicate id within a layer, and orphan `T_` rule.
+- **FR-040**: The studio MUST surface, at edit time, the equivalents of Developer's `WARN_TouchLayoutCustomKeyNotDefined` (0x092, with its `nextlayer`/`sp` exemptions), `WARN_TouchLayoutMissingLayer` (0x091), `WARN_TouchLayoutUnidentifiedKey` (0x099), `WARN_TouchLayoutMissingRequiredKeys` (0x093), `WARN_TouchLayoutSpecialLabelOnNormalKey` (0x0A9), and `ERROR_TouchLayoutInvalidIdentifier` (0x05A), plus four checks Developer lacks: duplicate id within a layer, orphan `T_` rule, a modifier key not marked active on its own layer (FR-029d), and a half-done suppression (FR-029c).
 - **FR-041**: Each diagnostic MUST offer at least one concrete fix action.
 - **FR-042**: Diagnostics MUST be computed as **synchronous pure joins with no new timer** (Decision D3 — the 300 ms cycle remains the validation cycle's).
 - **FR-043**: The corresponding Layer C checks MUST be added as **siblings of existing 18.x criteria rows**, adding **no** rows to `criteria.json` (the 148-row count is length-tested, and a prior addition was reverted for exactly this reason).
