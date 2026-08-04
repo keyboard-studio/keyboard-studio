@@ -1,0 +1,79 @@
+# Contract: touch key id minting and validation
+
+Normative for FR-024…FR-029 and FR-045 of [spec.md](../spec.md). Rationale in [research.md](../research.md) R3/R6.
+
+---
+
+## 1. The principle
+
+Keyman Developer's default id for a new key is `T_new_<n>` with no rule — a dead key by construction. The corpus ships **34** of them. Developer can do no better because it has no proposal engine and no access to the `.kmn`; we have both.
+
+Under [spec.md](../../../spec.md) §3c ("Defaults are the product", "no default is a defect"), the studio **proposes a working id and confirms it**. It never presents an empty or sentinel id field, and it never lets a dead key reach the artifact (SC-008).
+
+---
+
+## 2. Minting policy
+
+| Author intent | Minted id | Rules written | Why |
+|---|---|---|---|
+| Single-codepoint output, no guard needed, no case variants | **`U_<HEX>`** | **none** | Keyman derives the output from the id. Simplest possible; zero `.kmn` surface; **cannot go dead**. This is the default. |
+| Multi-codepoint / string output (`FCFA`, a digraph) | `T_<MNEMONIC>` | `+ [T_X] > 'FCFA'` | A `U_` id cannot express a string. |
+| **Combining mark** (General_Category `M*`) | `T_<UPPERHEX>` | guard **+** producing | A `U_` id **self-outputs before any rule can guard it**, so the diablock protection is reachable only via a `T_` id. This is the technical reason behind Cameroon's convention, not a stylistic one — and the AZERTY defect ([research.md](../research.md) R6) is what happens when it is violated. |
+| Case triplication requested | `T_<HEX or MNEMONIC>` | NCAPS / SHIFT+NCAPS / CAPS trio | A `U_` id has one output. |
+| Layer switch or UI key | `T_<MNEMONIC>` | none | `nextlayer` does the work; the key is a frame key. |
+| Gap or blank | `T_SPACER` / `T_BLANK` | none | Matches the corpus sentinels. |
+
+Hex is **uppercase and zero-padded to at least four digits**, matching both Cameroon's convention and our existing `U_` encoder. Mint the `T_<UPPERHEX>` form from a sibling of that encoder so the two forms cannot drift.
+
+The `U_`-by-default rule is not a simplification we invented: Cameroon's own author uses ruleless `U_00A1` / `U_00BF` for the `¡` / `¿` longpresses under rule-backed `T_0021` / `T_003F` keys ([research.md](../research.md) R6). The policy matches what a skilled author already does, and it makes `WARN_TouchLayoutCustomKeyNotDefined` (0x092) **structurally impossible** for keys the studio creates.
+
+### 2.1 Presenting the choice
+
+When both a `U_` and a `T_` path are viable, show the `U_` option **pre-selected** and the `T_` option with the **literal rule text** and the honest reason to prefer it — typically that the same id already appears on N other layers or platforms, so one rule serves all of them. Never present the rule-bearing option as merely "advanced"; for imported keyboards it is often the right answer.
+
+---
+
+## 3. Validation — rejects the mutation, never merely reports
+
+Per FR-045, each of these blocks the edit rather than emitting a finding. Findings are for layouts we did not create; these are for edits we are about to make.
+
+1. **Syntax.** Developer's regex, tightened on `U_` to grouped hex so it agrees with our `U_`-id decoder:
+
+   ```
+   /^((K_[A-Z0-9_?]+)|(T_[^\s\]]+)|(U_[0-9A-F]{4,6}(_[0-9A-F]{4,6})*))$/
+   ```
+
+   `U_` codepoints must lie in `[0x20,0x7F] ∪ [0xA0,0x10FFFF]` and must exclude surrogates. A `K_` id must resolve against one of Keyman's three key-name tables ([research.md](../research.md) R3) — this is where Developer's VK autocomplete table earns its keep as *validation data* rather than as a substitute for validation.
+
+2. **Uniqueness.** No collision with an existing id in the same layer of the same platform, **unless** the new key carries a distinct per-key `layer` override. This is what stops a feature that lets authors add keys from manufacturing the exact ambiguity `touchKeyAddress` documents as unaddressable. (The exemption depends on the contract addition in [touch-key-rule-join.md](touch-key-rule-join.md) §7; without it, reject all in-layer collisions.)
+
+3. **Case.** Reject an id differing only by case from an existing id. `kmcmplib` interns case-insensitively but Developer's validator compares case-sensitively, so such a pair compiles here and warns there — a trap worth closing at the source.
+
+4. **`T_` with no rule.** A `T_` id with zero bindings, no `nextlayer`, and a producing `sp` class is **blocked**, with a proposal pre-filled with the rule we would synthesize ("this key will do nothing — add a rule?"). A dead key must never be creatable.
+
+5. **`U_` with a rule.** Warn that the rule is redundant; offer either dropping the rule or converting the id to `T_`.
+
+6. **Reserved prefixes.** Never mint, and reject as author input: `T_new_*` (Developer's auto-mint), `T_removed_*` (desktop-modification placeholder), `T_carved_*` (carve cascade), `T_touchdel_*` (touch-method deletion), the sentinels `T_BLANK` / `T_SPACER` / `T_NUL` where not intended as sentinels, and the private-use `T_*_MT_SHIFT_TO_{SHIFT,CAPS,DEFAULT}` triple KeymanWeb injects (these deliberately violate the id pattern precisely so authors cannot collide with them).
+
+---
+
+## 4. Rename
+
+The rename field is **pre-filled with the proposed id**, never blank, and validation runs on every keystroke. Before confirming, the dialog states what the rename touches: occurrences in this layer, in other layers, in other platforms, and any `.kmn` rule referencing the old id.
+
+On confirm, the fix-up is complete or the rename does not happen: the key id, every rule keyed on the old id (**producing and guard alike**), the node-id map entries that embed the key id, and any matching address in the deletion overlay.
+
+Two failure modes to avoid explicitly:
+
+- Developer's own layer-rename fix-up iterates the flick map with `forEach` although it is an object, so **flick sub-keys are silently missed**. Handle the flick map as an object.
+- Provenance promotion matches by id across all platforms and layers, so a rename must promote the **old** id before and the **new** id after — or promotion silently misses and re-propagation eats the edit. Prefer an **address-matched** promotion (FR-031).
+
+---
+
+## 5. What the author never types
+
+Per [specs/008-data-flow](../../008-data-flow/spec.md) (*"Layer ids are auto-derived, not author-typed (§3c)… there is no user naming step"*):
+
+- **Layer ids** are derived from modifier combos. The Next Layer field is a **picker over existing layers**, never a text box. The single legitimate naming case — an author-added non-modifier plane — arrives in Increment 3 with a hinted default, **never a blank id**.
+- **Row ids** are regenerated on emit; there is no row-id UI (Developer agrees).
+- **The per-key modifier override** is displayed read-only as "Sends: …", derived from the layer's combo. Increment 1 preserves it but does not author it.

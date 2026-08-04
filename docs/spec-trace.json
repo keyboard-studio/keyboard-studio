@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-08-03",
+  "lastUpdated": "2026-08-04",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -774,6 +774,14 @@
     "specs/055-legible-decision-trail": {
       "title": "Feature Specification: Legible decision trail — every stage reports what it did",
       "hash": "sha256:584aac4859b80265",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/058-touch-key-editor": {
+      "title": "Feature Specification: Key-level touch layout editing",
+      "hash": "sha256:b7d6610ab8e0e3e5",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
