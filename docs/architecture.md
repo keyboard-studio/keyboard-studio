@@ -89,7 +89,7 @@ pick keyboard ──▶ instantiate working copy (Track 1 copy/adapt | Track 2 i
    │
    ├─ validate  (Layer A + B continuous; Layer C hygiene)  ◀── 300 ms debounce, TS + WASM oracle
    │
-   └─▶ output  (VirtualFS → .zip  |  GitHub OAuth fork + PR)
+   └─▶ output  (VirtualFS → .kmp installable  |  → source .zip  |  GitHub OAuth fork + PR)
 ```
 
 Authoritative detail: [`specs/008-data-flow/`](../specs/008-data-flow/spec.md)

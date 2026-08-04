@@ -31,7 +31,11 @@ import {
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { instantiateFromBaseIfConfirmed } from "../lib/confirmRebase.ts";
 import { useWorkingCopyTransform } from "./useWorkingCopyTransform.ts";
-import { serializeWorkingCopy } from "../lib/serializeWorkingCopy.ts";
+import {
+  buildKmpForDownload,
+  buildSourceZipForDownload,
+  OutputBundleError,
+} from "../lib/buildOutputBundle.ts";
 import { useInventoryCoverageGate } from "./useInventoryCoverageGate.ts";
 import type { InventoryCoverageGate } from "../lib/unimplementedInventory.ts";
 
@@ -52,12 +56,26 @@ export interface PreviewArtifact {
   recompile: ReturnType<typeof useKeyboardArtifact>["recompile"];
   diagnostics: CompilerDiagnostic[];
 
-  // Download state
+  // Download state.
+  //
+  // `canDownload` gates BOTH downloads identically — the .kmp is not a laxer
+  // path to an artifact than the .zip, it is the primary one.
   canDownload: boolean;
+  /** The source .zip (secondary). */
   downloading: boolean;
   downloadError: string | null;
   downloadWarnings: string[];
   handleDownload: () => Promise<void>;
+  /** The installable .kmp (primary). */
+  buildingKmp: boolean;
+  kmpError: string | null;
+  /**
+   * Package-compiler and compile diagnostics from a failed .kmp build, so the
+   * screen can say WHY rather than showing a bare failure. The source .zip stays
+   * available throughout — a failed package never dead-ends the author.
+   */
+  kmpDiagnostics: CompilerDiagnostic[];
+  handleDownloadKmp: () => Promise<void>;
 
   // Inventory coverage gate — the same desktop-always/touch-only-if-authored
   // truth StepHost and PhaseFGate compute (lib/unimplementedInventory.ts).
@@ -136,18 +154,51 @@ export function usePreviewArtifact(): PreviewArtifact {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadWarnings, setDownloadWarnings] = useState<string[]>([]);
-  const zipBlobUrlRef = useRef<string | null>(null);
+  const [buildingKmp, setBuildingKmp] = useState(false);
+  const [kmpError, setKmpError] = useState<string | null>(null);
+  const [kmpDiagnostics, setKmpDiagnostics] = useState<CompilerDiagnostic[]>([]);
+  const blobUrlRef = useRef<string | null>(null);
 
-  // Helper: revoke and clear any lingering zip blob URL.
-  const revokeZipUrl = useCallback(() => {
-    if (zipBlobUrlRef.current !== null) {
-      URL.revokeObjectURL(zipBlobUrlRef.current);
-      zipBlobUrlRef.current = null;
+  // Helper: revoke and clear any lingering download blob URL. Shared by both
+  // downloads — one ref, because only one download is ever in flight (each
+  // handler sets its own busy flag and the buttons disable on it).
+  const revokeBlobUrl = useCallback(() => {
+    if (blobUrlRef.current !== null) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
     }
   }, []);
 
-  // Clean up any lingering zip blob URL on unmount.
-  useEffect(() => revokeZipUrl, [revokeZipUrl]);
+  // Clean up any lingering download blob URL on unmount.
+  useEffect(() => revokeBlobUrl, [revokeBlobUrl]);
+
+  // Helper: hand bytes to the browser as a file download.
+  const triggerDownload = useCallback(
+    (bytes: Uint8Array, filename: string, mimeType: string) => {
+      // Coerce to ArrayBuffer to satisfy Blob's strict BlobPart type.
+      const buf = bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength,
+      );
+      const blob = new Blob([buf as ArrayBuffer], { type: mimeType });
+
+      revokeBlobUrl();
+      const url = URL.createObjectURL(blob);
+      blobUrlRef.current = url;
+      try {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } finally {
+        // Revoke after the click tick so the browser can start the download.
+        revokeBlobUrl();
+      }
+    },
+    [revokeBlobUrl],
+  );
 
   // onInstantiate: explicit working-copy instantiation (spec §8 v1.3.0, Track 1).
   // Delegates to instantiateFromBaseIfConfirmed which reads live store state via
@@ -246,10 +297,12 @@ export function usePreviewArtifact(): PreviewArtifact {
     setDownloadError(null);
     setDownloadWarnings([]);
     try {
-      // Serialize via the canonical path: projectWorkingCopyVfs (carve +
-      // assignments + identity) → toZip. Returns null when the working copy
-      // is not instantiated (no baseVfs / baseIr in the store).
-      const result = await serializeWorkingCopy();
+      // The source archive: the canonical projection (carve + assignments +
+      // identity + descriptor) PLUS the compiled build/ artifacts, so the
+      // shipped descriptor's ..\build\<id>.* references resolve and the project
+      // opens cleanly in Keyman Developer. Returns null when the working copy is
+      // not instantiated.
+      const result = await buildSourceZipForDownload();
       if (result === null) {
         setDownloadError("Nothing to download — select a keyboard first.");
         return;
@@ -263,38 +316,52 @@ export function usePreviewArtifact(): PreviewArtifact {
         setDownloadWarnings(result.warnings);
       }
 
-      const { bytes } = result;
-      // Coerce to ArrayBuffer to satisfy Blob constructor's strict BlobPart type.
-      const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-      const blob = new Blob([buf as ArrayBuffer], { type: "application/zip" });
-
-      // Revoke previous zip URL before creating a new one.
-      revokeZipUrl();
-
-      const url = URL.createObjectURL(blob);
-      zipBlobUrlRef.current = url;
-      try {
-        const a = document.createElement("a");
-        a.href = url;
-        // Use the keyboardId + release version from the serializer result
-        // (derived from the store's baseKeyboard.id and baseIr.header.version)
-        // so the filename is always consistent with the content.
-        const downloadId = result.keyboardId;
-        a.download = `${downloadId}-${result.version}.zip`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      } finally {
-        // Revoke after the click tick so the browser has time to start the download.
-        revokeZipUrl();
-      }
+      triggerDownload(result.bytes, result.filename, "application/zip");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Download failed";
       setDownloadError(msg);
     } finally {
       setDownloading(false);
     }
-  }, [stage, revokeZipUrl, coverageGate.blocked]);
+  }, [stage, triggerDownload, coverageGate.blocked]);
+
+  // The installable package — the primary download. Same gates as the zip:
+  // .kmp is the default artifact, not a privileged shortcut past them.
+  const handleDownloadKmp = useCallback(async () => {
+    if (stage.kind !== "ready") return;
+    if (coverageGate.blocked) {
+      setKmpError("Finish every inventory character before downloading.");
+      return;
+    }
+    setBuildingKmp(true);
+    setKmpError(null);
+    setKmpDiagnostics([]);
+    setDownloadWarnings([]);
+    try {
+      const result = await buildKmpForDownload();
+      if (result === null) {
+        setKmpError("Nothing to download — select a keyboard first.");
+        return;
+      }
+      if (result.warnings.length > 0) {
+        devLog.warn("[studio] package projection warnings:", result.warnings);
+        setDownloadWarnings(result.warnings);
+      }
+      // Keyman's own MIME type for a package.
+      triggerDownload(result.bytes, result.filename, "application/octet-stream");
+    } catch (err: unknown) {
+      // Show the real reason and keep the .zip available — never a silent
+      // fallback, and never a dead end.
+      if (err instanceof OutputBundleError) {
+        setKmpError(err.message);
+        setKmpDiagnostics(err.diagnostics);
+      } else {
+        setKmpError(err instanceof Error ? err.message : "Package build failed");
+      }
+    } finally {
+      setBuildingKmp(false);
+    }
+  }, [stage, triggerDownload, coverageGate.blocked]);
 
   return {
     baseKeyboard,
@@ -312,6 +379,10 @@ export function usePreviewArtifact(): PreviewArtifact {
     downloadError,
     downloadWarnings,
     handleDownload,
+    buildingKmp,
+    kmpError,
+    kmpDiagnostics,
+    handleDownloadKmp,
     coverageGate,
     showIdentityWarn,
   };

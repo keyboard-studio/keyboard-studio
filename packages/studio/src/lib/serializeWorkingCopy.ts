@@ -227,11 +227,33 @@ export async function projectWorkingCopyForOutput(
   // `<Language>` display text comes through the overlay like every other identity
   // value, so the zip, the pull request, and the OSK preview cannot disagree
   // about it (FR-004/SC-005).
-  let identityForProjection: IdentityOverlay | null = identity !== null ? {
+  //
+  // NEVER null on the output path. `projectWorkingCopyVfs` step 3.6 — the single
+  // descriptor writer — is gated on `identity !== null`, and Track 1 sets
+  // `identity: null` at instantiation ("no overlay until Phase A completes",
+  // workingCopyStore instantiateFromBase). A Track 1 author who has not yet
+  // named the keyboard therefore got NO `source/<id>.kps` at all, which is fine
+  // for a zip that Keyman Developer would regenerate but fatal for the `.kmp`:
+  // the package compiler has no descriptor to read, so the primary download
+  // could not be built. Verified end-to-end: the .kmp failed with
+  // KM_ERROR_KMP_NO_DESCRIPTOR on the bj_cree_woods walk.
+  //
+  // Passing an overlay that carries only the display name keeps spec 057's
+  // invariant intact — the language tag stays ABSENT, so the writer applies its
+  // own `und` placeholder and never the base keyboard's language (FR-007,
+  // SC-002), which was the whole point of that change. The display name falls
+  // back to the base's, exactly as this function's own `displayName` result
+  // already does, and `showIdentityWarn` on the Output screen is what tells the
+  // author to set a real name and language.
+  //
+  // Routed through the existing single writer rather than generating a
+  // descriptor here: a second writer is the defect package-descriptor/ exists to
+  // prevent.
+  let identityForProjection: IdentityOverlay = identity !== null ? {
     ...(identity.displayName !== undefined ? { displayName: identity.displayName } : {}),
     ...(identity.bcp47 !== undefined ? { bcp47: identity.bcp47 } : {}),
     ...(identity.languageName !== undefined ? { languageName: identity.languageName } : {}),
-  } : null;
+  } : { displayName: baseKeyboard.displayName };
   // Accumulated warnings for the adapt path — merged with projection warnings below.
   const adaptWarnings: string[] = [];
   if (instantiationMode === "adapt-existing") {
@@ -382,23 +404,33 @@ export async function projectWorkingCopyForOutput(
  *
  * @see projectWorkingCopyForOutput — the projection helper (returns the VFS)
  */
+/**
+ * Zip an already-projected VFS, packaging the decision record as studio metadata
+ * (specs/053-decision-audit FR-020).
+ *
+ * The record is read at zip time rather than maintained alongside the
+ * projection: the record that ships is the record as it stands, and the archive
+ * of a session that recorded nothing is unchanged from what it was before the
+ * feature existed.
+ *
+ * Extracted so the download path — which zips a projection that additionally
+ * carries the compiled `build/` artifacts (see lib/buildOutputBundle.ts) — uses
+ * the same serialization and sidecar rule as this one, rather than a second copy
+ * of it.
+ */
+export async function zipProjectedVfs(vfs: VirtualFS): Promise<Uint8Array> {
+  const toZip = await getToZip();
+  const decisionRecord = snapshotDecisionRecord();
+  return toZip(vfs, decisionRecord.entries.length === 0 ? {} : { decisionRecord });
+}
+
 export async function serializeWorkingCopy(): Promise<SerializeWorkingCopyResult | null> {
   const projected = await projectWorkingCopyForOutput();
   if (projected === null) {
     return null;
   }
 
-  // Serialize to zip, packaging the decision record as studio metadata
-  // (specs/053-decision-audit FR-020). Read at download time rather than
-  // maintained alongside the projection: the record that ships is the record as
-  // it stands, and the archive of a session that recorded nothing is unchanged
-  // from what it was before the feature existed.
-  const toZip = await getToZip();
-  const decisionRecord = snapshotDecisionRecord();
-  const bytes = await toZip(
-    projected.vfs,
-    decisionRecord.entries.length === 0 ? {} : { decisionRecord },
-  );
+  const bytes = await zipProjectedVfs(projected.vfs);
 
   return {
     bytes,

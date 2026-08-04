@@ -15,7 +15,8 @@ import { emit } from "../codec/emit.js";
 import { detectBaseLayoutFamily } from "../placement/filters.js";
 import { scaffoldIR, sanitizeDisplayName, kmnStringEscape } from "./scaffold-ir.js";
 import { assetFileExtensions } from "../shared/siblingAssetStores.js";
-import { escapeHtml } from "../shared/escapeHtml.js";
+// The doc stubs own their own escaping now — see ../shared/packageDocs.ts.
+import { welcomeHtm, readmeHtm } from "../shared/packageDocs.js";
 import {
   buildKpsContent,
   type PackageDescriptorIdentity,
@@ -308,11 +309,14 @@ function generateStubs(
     },
     {
       path: `source/welcome.htm`,
-      content: `<html><body><p>Welcome to ${escapeHtml(displayName)}</p></body></html>`,
+      // Shared with the adapt track's output-time stubs — see
+      // ../shared/packageDocs.ts. The descriptor lists both files, so both
+      // tracks must produce them or the .kmp build fails on a missing member.
+      content: welcomeHtm(displayName),
     },
     {
       path: `source/readme.htm`,
-      content: `<html><body><p>${escapeHtml(displayName)} keyboard</p></body></html>`,
+      content: readmeHtm(displayName),
     },
     {
       path: `source/help/${keyboardId}.php`,

@@ -12,6 +12,7 @@ import type {
   ScaffolderService,
   VirtualFS,
   KeyboardIR,
+  CompileResult,
 } from "@keyboard-studio/contracts";
 import type {
   MissingCharSuggestions,
@@ -21,6 +22,9 @@ import type {
   SourcedInventory,
   ExemplarTier,
   ToZipOptions,
+  BuildKmpResult,
+  BuildKmpOptions,
+  KmpBuildArtifacts,
 } from "@keyboard-studio/engine";
 import { charactersInTier } from "@keyboard-studio/engine";
 import { mockBaseBrowser, mockOutputService, mockPatternLibrary, mockScaffolder } from "@keyboard-studio/contracts/mocks";
@@ -105,6 +109,74 @@ export async function getToZip(): Promise<ToZipFn> {
   const { toZip } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
   toZipCache = toZip as ToZipFn;
   return toZipCache;
+}
+
+// Installable package (.kmp) — the PRIMARY download (spec §12). Lazily imports
+// buildKmp from the engine, which in turn lazily imports @keymanapp/kmc-package,
+// so jszip + marked stay out of the studio's entry chunk until an author asks
+// for a package.
+//
+// There is no mock: a .kmp is a real Keyman package built from real compiled
+// artifacts, and a fake one would be an artifact a user could try to install.
+// Under VITE_USE_REAL_ENGINE=false this rejects, and the .kmp button surfaces
+// that through the same error path as any other build failure.
+type BuildKmpFn = (
+  vfs: VirtualFS,
+  keyboardId: string,
+  artifacts: KmpBuildArtifacts,
+  opts?: BuildKmpOptions,
+) => Promise<BuildKmpResult>;
+let buildKmpCache: BuildKmpFn | null = null;
+export async function getBuildKmp(): Promise<BuildKmpFn> {
+  if (!USE_REAL) {
+    throw new Error(
+      "[output] .kmp packaging requires the real engine (VITE_USE_REAL_ENGINE=false)",
+    );
+  }
+  if (buildKmpCache !== null) return buildKmpCache;
+  const { buildKmp } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
+  buildKmpCache = buildKmp as BuildKmpFn;
+  return buildKmpCache;
+}
+
+// The .kmn compile, for the output path. useKeyboardArtifact runs its own
+// compile for the live preview against the PREVIEW vfs; the output path needs a
+// compile against the PROJECTED vfs, which includes assignments and the final
+// keyboard id. Sharing this accessor rather than the preview's stage result is
+// what keeps a package's .kmx and its descriptor built from the same source.
+//
+// This does NOT introduce a second debounce cycle (decision D3): it fires once,
+// on an explicit download click, and produces no live diagnostics.
+type CompileFn = (vfs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
+let compileCache: CompileFn | null = null;
+export async function getCompile(): Promise<CompileFn> {
+  if (!USE_REAL) {
+    throw new Error(
+      "[output] compiling for output requires the real engine (VITE_USE_REAL_ENGINE=false)",
+    );
+  }
+  if (compileCache !== null) return compileCache;
+  const { compile } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
+  compileCache = compile as CompileFn;
+  return compileCache;
+}
+
+// The doc stubs a package descriptor lists but the adapt track lacks. Sync, so
+// it rides the same lazy engine import as the rest of the output path.
+type EnsurePackageFilesFn = (input: {
+  vfs: VirtualFS;
+  displayName: string;
+  copyright?: string;
+  year?: number;
+}) => { created: string[] };
+let ensurePackageFilesCache: EnsurePackageFilesFn | null = null;
+export async function getEnsurePackageFiles(): Promise<EnsurePackageFilesFn> {
+  if (ensurePackageFilesCache !== null) return ensurePackageFilesCache;
+  const { ensurePackageFiles } = await import(
+    /* @vite-ignore */ "@keyboard-studio/engine"
+  );
+  ensurePackageFilesCache = ensurePackageFiles as EnsurePackageFilesFn;
+  return ensurePackageFilesCache;
 }
 
 // GitHubOutputService (verifyToken / publishPR — the OAuth fork+PR path,

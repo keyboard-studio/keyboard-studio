@@ -3,11 +3,11 @@
 //
 // PreviewScreen ("try it"):
 //   - Renders OSK (testid osk-frame) and DiagnosticsPanel.
-//   - Does NOT render a "Download .zip" button.
+//   - Does NOT render any download button.
 //   - Does NOT render SignUpPanel.
 //
 // OutputScreen ("ship it"):
-//   - Renders "Download .zip" button and SignUpPanel.
+//   - Renders both downloads (.kmp primary, source .zip secondary) + SignUpPanel.
 //   - Does NOT render an interactive OSK (no osk-frame testid).
 //   - projection-warning surface (original PreviewShell.test coverage, re-homed here)
 //   - identity-unset warning banner (AC2 + AC4)
@@ -46,6 +46,37 @@ const { mockSerializeResult, mockStage } = vi.hoisted(() => {
 vi.mock("../lib/serializeWorkingCopy.ts", () => ({
   serializeWorkingCopy: () => Promise.resolve(mockSerializeResult.current),
   projectWorkingCopyForOutput: () => Promise.resolve(null),
+  zipProjectedVfs: () => Promise.resolve(new Uint8Array(0)),
+}));
+
+// The download path goes through buildOutputBundle (project -> ensure package
+// files -> compile -> stage build/), which would need the WASM compiler. Mock it
+// at the module boundary and drive both downloads off the same
+// `mockSerializeResult` fixture the zip assertions already use.
+vi.mock("../lib/buildOutputBundle.ts", () => ({
+  buildSourceZipForDownload: () =>
+    Promise.resolve(
+      mockSerializeResult.current === null
+        ? null
+        : {
+            bytes: mockSerializeResult.current.bytes,
+            filename: `${mockSerializeResult.current.keyboardId}-${mockSerializeResult.current.version}.zip`,
+            warnings: mockSerializeResult.current.warnings,
+          },
+    ),
+  buildKmpForDownload: () =>
+    Promise.resolve(
+      mockSerializeResult.current === null
+        ? null
+        : {
+            bytes: mockSerializeResult.current.bytes,
+            filename: `${mockSerializeResult.current.keyboardId}.kmp`,
+            warnings: mockSerializeResult.current.warnings,
+          },
+    ),
+  OutputBundleError: class OutputBundleError extends Error {
+    diagnostics: unknown[] = [];
+  },
 }));
 
 vi.mock("../hooks/useKeyboardArtifact.ts", () => ({
@@ -210,7 +241,15 @@ describe("OutputScreen — route-split AC", () => {
     };
     renderOutputScreen();
     fireEvent.click(screen.getByTestId("base-picker"));
-    expect(screen.getByRole("button", { name: /download/i })).toBeTruthy();
+    // Two downloads now: the installable .kmp (primary) and the source .zip
+    // (secondary). Assert both, and that the .kmp is the one offering an
+    // installable package — a user who wants a keyboard must not have to reason
+    // about which of two archives to pick.
+    expect(screen.getByTestId("emit-download-kmp")).toBeTruthy();
+    expect(screen.getByTestId("emit-download")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /installable keyman package/i }),
+    ).toBeTruthy();
   });
 
   it("renders SignUpPanel after base is picked", () => {
@@ -266,9 +305,13 @@ describe("OutputScreen — output-time touch-layout staleness gate", () => {
       useWorkingCopyStore.setState({ staleSteps: new Set([TOUCH_STEP_ID]) });
     });
 
-    expect(
-      screen.getByRole("button", { name: /download unavailable.*touch layout is out of date/i }),
-    ).toBeTruthy();
+    // BOTH downloads carry the explanation while touch is stale — the .kmp is
+    // the primary artifact, not a laxer path around the gate.
+    const blocked = screen.getAllByRole("button", {
+      name: /download unavailable.*touch layout is out of date/i,
+    });
+    expect(blocked.length).toBe(2);
+    expect((screen.getByTestId("emit-download-kmp") as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("renders a role=alert banner explaining the block when touch is stale", () => {
@@ -345,8 +388,7 @@ describe("OutputScreen — projection warnings", () => {
 
     // Click Download.
     await act(async () => {
-      const btn = screen.getByRole("button", { name: /download/i });
-      fireEvent.click(btn);
+      fireEvent.click(screen.getByTestId("emit-download"));
     });
 
     // No warning region should exist.
@@ -369,8 +411,7 @@ describe("OutputScreen — projection warnings", () => {
     fireEvent.click(screen.getByTestId("base-picker"));
 
     await act(async () => {
-      const btn = screen.getByRole("button", { name: /download/i });
-      fireEvent.click(btn);
+      fireEvent.click(screen.getByTestId("emit-download"));
     });
 
     const region = screen.getByRole("status", { name: /Download projection warnings/i });
@@ -392,7 +433,7 @@ describe("OutputScreen — projection warnings", () => {
     fireEvent.click(screen.getByTestId("base-picker"));
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /download/i }));
+      fireEvent.click(screen.getByTestId("emit-download"));
     });
 
     const region = screen.getByRole("status", { name: /Download projection warnings/i });
@@ -414,7 +455,7 @@ describe("OutputScreen — projection warnings", () => {
     fireEvent.click(screen.getByTestId("base-picker"));
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /download/i }));
+      fireEvent.click(screen.getByTestId("emit-download"));
     });
 
     expect(screen.getByRole("status", { name: /Download projection warnings/i })).toBeTruthy();
@@ -428,7 +469,7 @@ describe("OutputScreen — projection warnings", () => {
     };
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /download/i }));
+      fireEvent.click(screen.getByTestId("emit-download"));
     });
 
     // Warning region should be gone.
@@ -535,7 +576,7 @@ describe("OutputScreen — download filename", () => {
       renderOutputScreen();
       fireEvent.click(screen.getByTestId("base-picker"));
       await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: /download/i }));
+        fireEvent.click(screen.getByTestId("emit-download"));
       });
 
       expect(anchorDownload).toBe("basic_kbdus-2.5.zip");

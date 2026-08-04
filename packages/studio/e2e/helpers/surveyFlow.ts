@@ -180,10 +180,19 @@ export async function driveIdentityLite(
   // <select> — open it, then click the option by its data-value (the
   // underlying script value), not Playwright's selectOption(). Same pattern
   // as driveTouchGallery's host-key picker below.
+  //
+  // The open list is PORTALLED to the end of <body> (see ui/SelectMenu.tsx —
+  // it is deliberately not an in-place absolutely-positioned <ul>), so it is
+  // NOT a descendant of the trigger's parent. Reach it by the id SelectMenu
+  // derives for the listbox (`${id}-listbox`); an `xpath=..` walk from the
+  // trigger silently matches nothing and times out.
   const targetScriptSelect = page.locator("#il_target_script");
   await targetScriptSelect.waitFor({ timeout: 10_000 });
   await targetScriptSelect.click();
-  await targetScriptSelect.locator('xpath=..').locator(`li[data-value="${script}"]`).click();
+  await page
+    .locator("#il_target_script-listbox")
+    .locator(`li[data-value="${script}"]`)
+    .click();
   await surveyAdvance(page).click();
 
   // Robustness check for the phase boundary: identity-lite hands off
@@ -464,7 +473,11 @@ export async function driveTouchGallery(page: Page): Promise<void> {
     // this character still needs the default long-press method + Apply.
     if (await continueButton.isDisabled()) {
       await hostKeySelect.click();
-      await hostKeySelect.locator('xpath=..').locator('li[data-value="K_A"]').click();
+      // The open list is portalled to the end of <body>, so it is not a
+      // descendant of the trigger's parent (see the note in driveIdentityLite).
+      // This picker is located by role rather than id, so target the one
+      // listbox that is open — SelectMenu never has two open at once.
+      await page.locator('ul[role="listbox"] li[data-value="K_A"]').click();
       await applyButton.click();
     }
     await continueButton.click();
