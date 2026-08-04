@@ -2484,6 +2484,72 @@ describe("MechanismGallery — kbgen suggestion gated on the current char's prod
     });
     expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
   });
+
+  it("hides the suggestion for a character already produced by the BASE keyboard (ɛ, badge count >= 1 via signal (a) BASE-DIRECT, no session assignment, not composable, no sequence) — the case the old hasSequenceForChar||isComposable gate missed", async () => {
+    // "ɛ" (U+025B) is produced directly by a base-layer rule (K_Q) — no
+    // session MechanismAssignment, no composition, no recorded sequence. The
+    // OLD gate (`!(hasSequenceForChar || isComposable)`) evaluates to
+    // `!(false || false) === true` for this character, so it would WRONGLY
+    // show the suggestion despite the badge already reading count >= 1 —
+    // exactly the reported bug (ɛ already worked via an existing method, yet
+    // "Suggested: Replace Q with ɛ" still appeared).
+    const ruleQ: IRRule = {
+      nodeId: "r-q",
+      context: [{ kind: "vkey", name: "K_Q", modifiers: [] }],
+      output: [{ kind: "char", value: "ɛ" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [ruleQ],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+
+    // Base-produced characters stay OUT of lettersToAdd (same as the "z" case
+    // in the Done-button tests below) — reach it via the SHOW-ALL strip.
+    seedInventory(["ɛ"]);
+
+    const placementMap = makePlacementMap({
+      bcp47Context: "test",
+      baseLayoutFamily: "QWERTY",
+      entries: [
+        {
+          codepoint: "U+025B", // ɛ
+          candidates: [
+            {
+              vkey: "K_Q",
+              modifiers: [],
+              mechanism: "direct",
+              priorSource: "corpus",
+              priorCount: 5,
+              confidence: 0.9,
+            },
+          ],
+        },
+      ],
+    });
+
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} placementMap={placementMap} />,
+      );
+    });
+
+    fireEvent.click(screen.getByTestId("char-scroll-chip-025B"));
+    await waitFor(() => {
+      expectCurrentChar("ɛ");
+    });
+
+    // Badge already reads count >= 1 (base-direct) — no suggestion may show.
+    expect(screen.queryByText(/Suggested: Replace Q with ɛ/i)).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

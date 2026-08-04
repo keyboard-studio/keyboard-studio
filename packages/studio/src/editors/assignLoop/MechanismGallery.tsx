@@ -3497,32 +3497,23 @@ export function MechanismGallery({
                   [Accept] pre-fills method + key picker; [Change] dismisses the
                   row so the author can select manually. No kbgen data => null =>
                   row is absent and gallery behaves exactly as today.
-                  `currentCharCoveredBySequenceOrComposition` — an ADDITIONAL
-                  gate (bug fix): a character already GREEN via composition
-                  (signal (c)) or via its OWN recorded multi_char_sequence
-                  assignment (a signal (b) SESSION-DIRECT source
-                  `coveredChars` deliberately excludes — see
-                  excludeSequenceMechanisms — so the badge counts it but
-                  `coveredChars` doesn't) must never surface a "suggested"
-                  proposal — there is no single key/method left for a
-                  suggestion to propose. `suggestionDismissed` alone did not
-                  catch either case, since it only tracks explicit
-                  accept/deny or `coveredChars`.
-                  Deliberately NOT the badge's full `count` (which also folds
-                  in signal (a) BASE-DIRECT, `baseOnlyProducedSet`) — that set
-                  is the PRISTINE base only, so in practice this exclusion is
-                  moot for MechanismGallery today, but is kept symmetric with
-                  TouchGallery's matching gate (see that file's own doc
-                  comment for why baseDirect must never gate a suggestion:
-                  its touch equivalent, `baseTouchCoveredSet`, is
-                  session-aware and legitimately includes a character the
-                  "replace"/"longpress" suggestion still needs to prompt
-                  for). */}
+                  Gate is strictly `(currentCharBadge?.count ?? 0) === 0` — the
+                  suggestion shows ONLY when the character has ZERO recorded
+                  implementations. This subsumes every prior partial gate: a
+                  recorded SEQUENCE (signal (b) SESSION-DIRECT via
+                  `hasSequenceForChar`), COMPOSITION (signal (c),
+                  `currentCharBadge?.isComposable`), AND — the case the old
+                  gate missed — BASE-DIRECT coverage (signal (a),
+                  `baseOnlyProducedSet`), e.g. a character the base keyboard
+                  already produces via an existing rule sequence. Any of
+                  those already gives count >= 1, so count === 0 is exactly
+                  "the badge the author sees is still at zero" — the same
+                  signal driving the green/red badge itself
+                  (charMechanisms.ts), so the suggestion and the badge can
+                  never visibly disagree. */}
             {suggestion !== null &&
               !suggestionDismissed &&
-              !(currentChar !== null &&
-                (hasSequenceForChar(sessionAssignments, currentChar) ||
-                  (currentCharBadge?.isComposable ?? false))) && (
+              (currentCharBadge?.count ?? 0) === 0 && (
               <div
                 role="note"
                 aria-label={t({
@@ -3530,19 +3521,12 @@ export function MechanismGallery({
                   message: "Placement suggestion from kbgen seeder",
                 })}
                 style={{
-                  // RED, not green — the suggestion row is suppressed only
-                  // when the current character is already covered via a
-                  // recorded SEQUENCE (`hasSequenceForChar`) or via
-                  // COMPOSITION (`currentCharBadge?.isComposable`), per the
-                  // gate above; base coverage (signal (a) BASE-DIRECT,
-                  // `baseOnlyProducedSet`) intentionally does NOT suppress
-                  // it. So this still reads as "not yet implemented",
-                  // matching the badge's own 0-count colors
-                  // (charMechanisms.ts / CharScrollStrip.tsx's `ERROR_RED` +
-                  // its paired dark-red background) rather than the
-                  // "already green" treatment this row previously kept even
-                  // once suggestions were scoped to uncovered characters
-                  // only.
+                  // RED, not green — the suggestion row only ever renders
+                  // when currentCharBadge's count is 0 (see the gate above),
+                  // so it always reads as "not yet implemented", matching
+                  // the badge's own 0-count colors (charMechanisms.ts /
+                  // CharScrollStrip.tsx's `ERROR_RED` + its paired dark-red
+                  // background).
                   background: ERROR_BG,
                   border: `1px solid ${ERROR_RED}`,
                   borderRadius: 8,
