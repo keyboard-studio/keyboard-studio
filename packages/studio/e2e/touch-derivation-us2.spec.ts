@@ -13,14 +13,21 @@
 //   `useState` default) -> walk the Touch gallery to completion (accepting the
 //   carried-over suggestion for the placed letter satisfies the FR-008 coverage
 //   gate) -> emit the ZIP and assert the derived `source/<id>.keyman-touch-layout`:
-//     - is the COMPACT PHONE PROJECTION (default + shift + numeric layers,
-//       <=10 keys/row — buildCanonicalPhoneLayers's Case A generate-from-scratch
-//       shape, since there is no base layout to start from at all),
+//     - is the GENERATED TABLET PROJECTION — exactly one platform, id
+//       "tablet", carrying default + shift + numeric layers (plus the
+//       "rightalt" secondary layer pid_piaroa's surviving RALT rules produce).
+//       scaffoldTouchLayout's Case A generate-from-scratch shape, since there
+//       is no base layout to start from at all. The platform is "tablet", NOT
+//       "phone": buildCaseASeed (studio/src/lib/buildTouchLayoutJson.ts) is the
+//       codebase's only `platformStyle: "tablet"` caller and the reseed path
+//       routes through it. Commit 8709ff54 introduced that skeleton; these
+//       assertions kept reading `phone` until spec 057 caught up, which made
+//       them VACUOUS rather than failing — see the TouchLayoutJson doc comment,
 //     - contains NEITHER of the N carved characters anywhere in the document,
 //     - contains the M placed character,
 //     - contains at least one UNTOUCHED language-specific base character (proof
 //       this is not a bare QWERTY scaffold — the character survives because it
-//       is still produced by an un-carved desktop rule, landing in the phone
+//       is still produced by an un-carved desktop rule, landing in the tablet
 //       projection's "rightalt" layer — see below),
 //     - and the keyboard compiles (the emit-download gate, same compile-clean
 //       signal carve.spec.ts / copy-edit.spec.ts / touch-derivation-us1.spec.ts
@@ -31,17 +38,22 @@
 //   platform touch layout), explicitly CHOOSE "Reseed from desktop" instead of
 //   accepting the "Import & adapt" default. Asserts the emitted layout is the
 //   DESKTOP PROJECTION, NOT the shipped bambara layout:
-//     - the shipped-layout-only marker `phone.font === "Tahoma"` (present on
-//       bambara's real file — confirmed via a throwaway Node probe, see below)
-//       is ABSENT,
-//     - every row in every phone layer has <=10 keys, which bambara's shipped
-//       file does NOT satisfy (its default/shift rows carry 11 keys each,
-//       confirmed via the same probe) — a reseed necessarily produces the
-//       compact <=10-keys/row scaffold instead (buildTouchLayoutJson.ts Case A:
+//     - the emitted platform key set is exactly ["tablet"], while bambara
+//       ships exactly ["phone"] — so the shipped platform is provably GONE,
+//       not augmented or carried forward (buildTouchLayoutJson.ts Case A:
 //       `const { touchLayout: _stripped, ...rest } = baseIr;` strips the
 //       shipped layout before scaffoldTouchLayout runs — R10 — specifically so
-//       a "reseed" never silently carries the base's own platforms forward).
-//   Also verifies the reseed card's tablet/desktop-drop advisory
+//       a "reseed" never silently carries the base's own platforms forward),
+//     - the shipped-layout-only marker `font === "Tahoma"` (present on
+//       bambara's real file — confirmed via a throwaway Node probe, see below)
+//       is ABSENT.
+//   The platform-key comparison replaced an "every row <=10 keys" check that
+//   was the original discard proof. Once the reseed began emitting a `tablet`
+//   platform that check iterated an empty `touchJson.phone?.layer ?? []` and
+//   asserted nothing at all — and the tablet skeleton's own digit row is 11
+//   keys wide, so it would not have held even when pointed at the real
+//   platform. The key set is both stricter and true.
+//   Also verifies the reseed card's phone/desktop-drop advisory
 //   (TouchSeedSourcePanel.tsx's `hasOtherPlatforms` conditional text) is
 //   correctly ABSENT for bambara, since bambara's shipped touch layout ships
 //   ONLY a "phone" platform — confirmed via the same probe (`Object.keys(d)`
@@ -68,6 +80,13 @@
 
 import { test, expect, type Page } from "playwright/test";
 import { expectNoSeriousAxeViolations } from "./helpers/axe";
+import {
+  GLYPH_KEY_CHIP_DEBT,
+  LINT_CHIP_DEBT,
+  OSK_IFRAME_DEBT,
+  OUTPUT_SCREEN_DEBT,
+  SHARED_CHROME_DEBT,
+} from "./helpers/contrastDebt";
 import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
 import {
@@ -76,6 +95,8 @@ import {
   chooseAdaptTrack,
   confirmPrefill,
   buildOneCharacterList,
+  driveMechanismsGallery,
+  driveTouchGallery,
   driveHelpPhase,
   seedReturningVisitor,
   switchTab,
@@ -153,23 +174,82 @@ const PIAROA_KMN_ZIP_PATH = `source/${PIAROA_BASE_ID}.kmn`;
 const PIAROA_TOUCH_ZIP_PATH = `source/${PIAROA_BASE_ID}.keyman-touch-layout`;
 
 /**
- * Pre-existing 1.4.3 (Contrast Minimum) offenders on the Phase B build-list
- * screen, excluded by selector with the criterion and reason named inline —
- * the same idiom e2e/tab-roundtrip.spec.ts and e2e/decision-deeplink.spec.ts
- * use (KNOWN_CONTRAST_DEBT). This is spec 056's open tracker debt
- * (specs/056-ada-accessibility/wcag-2.2-aa-tracker.md, 1.4.3 is an open
- * `unknown` row), not anything introduced or touched by spec 057 — this
- * fixture's marks/build-list screens are unchanged (see
+ * Pre-existing 1.4.3 (Contrast Minimum) offenders on the screen this scan
+ * actually lands on, excluded by selector with the criterion and reason named
+ * inline — the same idiom e2e/tab-roundtrip.spec.ts and
+ * e2e/decision-deeplink.spec.ts use (KNOWN_CONTRAST_DEBT). This is spec 056's
+ * open tracker debt (specs/056-ada-accessibility/wcag-2.2-aa-tracker.md, 1.4.3
+ * is an open `unknown` row), not anything introduced or touched by spec 057 —
+ * this fixture's marks/build-list/carve screens are unchanged (see
  * specs/057-bulletproof-navigation/evidence/gating-red.md §"Two corrections
  * made to reach a *valid* red").
+ *
+ * The scan label ("phase B build list") names the INTENT — scan whatever the
+ * survey is showing right after `addPlacedCharacterToInventory` finishes —
+ * not a literal Phase-B-only screen: per the manifest spine (characters ->
+ * marks -> convenience -> carve -> ...), that is legitimately the Carve
+ * gallery once the marks/convenience race fix (spec 057 Class-B diagnosis)
+ * lets those steps advance properly instead of stalling on Convenience. The
+ * transition into Carve already happens inside `addPlacedCharacterToInventory`
+ * itself (via `buildOneCharacterList` -> `driveConvenienceStep`), before this
+ * call site is even reached, so extending the exclusion list with the SAME
+ * carve-gallery debt carve.spec.ts's own KNOWN_CONTRAST_DEBT documents is the
+ * honest fix (see specs/057-bulletproof-navigation/reviews/classB-diagnosis.md
+ * addendum) — pid_piaroa's recognized S-01 "Simple swap" carve-card is the
+ * `data-testid="carve-card-simple-swap#main"` instance of the same shared
+ * Rail.tsx button the prefix selector below already covers.
  */
 const KNOWN_CONTRAST_DEBT: readonly string[] = [
-  // 1.4.3 — a lint-finding code badge (LintChip.tsx renders the finding's
-  // code in a <code> element, styled from lint/colors.ts's severity palette)
-  // surfaced for the marks-bearing PLACED_CHAR on this screen.
-  "code",
+  // 1.4.3 — LintChip's code badge. pid_piaroa's own .kmn trips
+  // KM_ERROR_DEPRECATED_STORE (&ETHNOLOGUECODE, illegal since Keyman v10), so
+  // the findings list is populated for the whole walk. Named once in
+  // helpers/contrastDebt.ts, and scoped to the findings list there rather than
+  // excluding every <code> on the page as this entry previously did.
+  ...LINT_CHIP_DEBT,
   // 1.4.3 — ConvenienceCharsStep's "Continue" button.
   'button[data-testid="convenience-continue"]',
+  // 1.4.3 — CarveGallery's info-panel toggle button.
+  'button[aria-label="Hide info panel"]',
+  // 1.4.3 — CarveGallery's footer "Continue" button.
+  'button[data-testid="carve-continue"]',
+  // 1.4.3 — RemovalBanner's dismiss control (assignLoop/parts/RemovalBanner.tsx).
+  'button[aria-label="Dismiss removal recommendation"]',
+  // 1.4.3 — RemovalBanner's own region (its collapsed-strip text sits on the
+  // green-tinted background at a ratio axe flags).
+  'div[aria-label="Removal recommendation"]',
+  // 1.4.3 — Rail's per-node carve-card buttons (assignLoop/parts/Rail.tsx):
+  // the "kept/total"/per-modifier-breakdown spans inside them. Excluded by the
+  // stable testid PREFIX (carve-card-<nodeId> — here "carve-card-simple-swap#main",
+  // the recognized S-01 pattern this fixture's carve targets group into) rather
+  // than the brittle nth-child span chain axe reports for the same button.
+  'button[data-testid^="carve-card-"]',
+  // 1.4.3 — GlyphCell's cross-reference tag chips (assignLoop/parts/
+  // GlyphCell.tsx): "<kind> — go to" / "<kind> — N places".
+  'button[aria-label$="go to"]',
+  'button[aria-label$="places"]',
+  // 1.4.3 — Rail's sticky SectionHeader (assignLoop/parts/Rail.tsx).
+  'div[style*="letter-spacing: 0.13em"]',
+  // 1.4.3 — the per-key glyph chips ("<char> — K_<key>"): the small key-name
+  // span inside each chip. pid_piaroa's base inventory surfaces four of them
+  // on this screen (ä/ö/ü/ñ — K_A/K_O/K_U/K_N) that the bambara walk in
+  // touch-derivation-us1.spec.ts never renders, which is why only this spec
+  // needs the shared group. Same open 1.4.3 tracker debt, already named once
+  // in helpers/contrastDebt.ts rather than re-spelled here.
+  ...GLYPH_KEY_CHIP_DEBT,
+  // 1.4.3 — Rail's SUB-section header (assignLoop/parts/Rail.tsx:226), the
+  // smaller sibling of the sticky SectionHeader excluded just above: the
+  // store-subgroup label ("Unused", from Rail.tsx's storeSub list) rendered at
+  // 9.5px in --app-text-subtle with opacity 0.8. It is a SEPARATE inline-style
+  // signature — letter-spacing .1em, not the .13em the entry above keys on —
+  // so the existing selector never covered it. pid_piaroa's rail renders an
+  // "Unused" subgroup that the bambara walk in touch-derivation-us1.spec.ts
+  // does not, which is why only this spec needs the entry. Rail.tsx is
+  // untouched by spec 057 (verified against `git diff main...HEAD`) and the
+  // token is the open 1.4.3 `unknown` row in
+  // specs/056-ada-accessibility/wcag-2.2-aa-tracker.md. Identified from the
+  // node's own outerHTML, not inferred: ".13em" is not a substring match for
+  // ".1em", so the two entries do not overlap.
+  'div[style*="letter-spacing: 0.1em"]',
 ];
 
 // ---------------------------------------------------------------------------
@@ -261,27 +341,6 @@ async function carveCharacters(
   await page.getByTestId("carve-continue").click();
 }
 
-/** Mechanisms gallery (Phase C, desktop) — place `char`.
- *
- * The forward button only carries data-testid="mechanisms-continue" in the
- * "locked" / "nothing left to add" ForwardButtonSpec branches
- * (MechanismGallery.tsx) — the ordinary per-character branch (used here,
- * since exactly one new character is being placed) sets no testId at all,
- * just an aria-label of "Next character" or "Done". Select it by role/name
- * instead of the testid the "identical" touch-derivation-us1.spec.ts helper
- * uses (same latent bug there, out of scope for this walk). */
-async function driveMechanismsPlaceLetter(page: Page, char: string): Promise<void> {
-  // Spec 046 reorder: the marks series now runs between characters and carve
-  // (driven inside buildOneCharacterList) — nothing marks-related renders here.
-  const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
-  if (await startButton.isVisible().catch(() => false)) {
-    await startButton.click();
-  }
-
-  await page.getByRole("button", { name: `Apply method for ${char}` }).click();
-  await page.getByRole("button", { name: /^(Next character|Done)$/ }).click();
-}
-
 /**
  * touch_seed_source fork step — Scenario B path (spec 035 FR-006/R4): the
  * base ships NO usable touch layout at all, so TouchSeedSourcePanel's
@@ -290,15 +349,42 @@ async function driveMechanismsPlaceLetter(page: Page, char: string): Promise<voi
  * it whenever there is nothing to import-adapt onto). Asserts the default
  * before confirming it — the mirror image of touch-derivation-us1.spec.ts's
  * `confirmImportAdaptDefault`.
+ *
+ * PREVIEW TESTID: the right-hand preview column is an EITHER/OR keyed on the
+ * current selection (TouchSeedSourcePanel.tsx: `selected === "import-adapt" ?
+ * <div data-testid="seed-source-preview"> : <div
+ * data-testid="seed-source-reseed-preview">`), so on this path — where the
+ * default IS reseed — `seed-source-preview` never exists. It is the wrong
+ * handle here; `seed-source-reseed-preview` is the one that renders. This
+ * helper waited on `seed-source-preview` (and on `seed-source-absent-note`,
+ * which lives INSIDE the import-adapt branch) because both were correct when
+ * it was written: the column used to be a single unconditional card holding
+ * the absent-note whenever `preview === null`. Commit 8709ff54 split it in two
+ * and moved the note under import-adapt, which silently invalidated both waits
+ * — the helper had been asserting the reseed card was pressed while waiting
+ * for markup that only renders when it is NOT. `Test 2`'s
+ * `chooseReseedExplicitly` was unaffected because there the default really is
+ * import-adapt.
+ *
+ * The "base ships no touch layout" fact is still surfaced selection-
+ * independently, in the import-adapt card's own body copy
+ * (`editor.touchSeed.importAdaptUnusable`, gated on the same
+ * `hasUsableBaseLayout` the absent-note was), so that is what this now reads
+ * — the Scenario B precondition is still asserted, not merely dropped.
  */
 async function confirmReseedDefault(page: Page): Promise<void> {
-  await expect(page.getByTestId("seed-source-preview")).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByTestId("seed-source-absent-note")).toBeVisible();
-
   const reseed = page.getByTestId("seed-source-reseed");
+  await expect(reseed).toBeVisible({ timeout: 15_000 });
   await expect(reseed).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("seed-source-reseed-preview")).toBeVisible();
+  // The import-adapt-only card is genuinely absent, not merely unselected —
+  // this is what distinguishes the reseed branch from the import-adapt one.
+  await expect(page.getByTestId("seed-source-preview")).toHaveCount(0);
+
   const importAdapt = page.getByTestId("seed-source-import-adapt");
   await expect(importAdapt).toHaveAttribute("aria-pressed", "false");
+  // Scenario B's precondition, in the copy that replaced the absent-note here.
+  await expect(importAdapt).toContainText("There is no base touch layout to import");
 
   await page.getByTestId("seed-source-confirm").click();
 }
@@ -308,14 +394,20 @@ async function confirmReseedDefault(page: Page): Promise<void> {
  * "Import & adapt" default (bambara ships a usable base layout, so that is
  * what the panel initializes to) by clicking "Reseed from desktop" instead.
  *
- * Also asserts the tablet/desktop-drop advisory's absence: bambara's shipped
+ * Also asserts the platform-drop advisory's absence: bambara's shipped
  * `.keyman-touch-layout` ships ONLY a `"phone"` platform (confirmed via a
  * throwaway Node probe over the raw JSON — `Object.keys(parsed)` returns
- * exactly `["phone"]`), so TouchSeedSourcePanel's `hasOtherPlatforms` is
- * false and the reseed card's extra "discards the base's shipped
- * tablet/desktop touch platforms" sentence must NOT render. The advisory has
- * no dedicated data-testid (it is inline text inside the card), so this reads
- * the card's own text content directly.
+ * exactly `["phone"]`), so TouchSeedSourcePanel's `hasOtherPlatforms`
+ * (`platformIds.some((id) => id !== "phone")`) is false and the reseed card's
+ * extra advisory sentence must NOT render. The advisory has no dedicated
+ * data-testid (it is inline text inside the card), so this reads the card's
+ * own text content directly.
+ *
+ * The asserted substring must match `editor.touchSeed.reseedDiscardsPlatforms`
+ * verbatim. It previously read "…shipped tablet/desktop touch platforms",
+ * which appears in no branch of the component — so the negative assertion was
+ * vacuous and would have passed just as happily had the advisory rendered.
+ * The shipped copy says "phone/desktop".
  */
 async function chooseReseedExplicitly(page: Page): Promise<void> {
   await expect(page.getByTestId("seed-source-preview")).toBeVisible({ timeout: 15_000 });
@@ -326,32 +418,13 @@ async function chooseReseedExplicitly(page: Page): Promise<void> {
   const reseed = page.getByTestId("seed-source-reseed");
   await expect(reseed).toHaveAttribute("aria-pressed", "false");
   await expect(reseed).not.toContainText(
-    "discards the base's shipped tablet/desktop touch platforms",
+    "discards the base's shipped phone/desktop touch platforms",
   );
 
   await reseed.click();
   await expect(reseed).toHaveAttribute("aria-pressed", "true");
 
   await page.getByTestId("seed-source-confirm").click();
-}
-
-/** Touch gallery (Phase E) — accepts the carried-over long-press suggestion
- *  for `char`. Identical to touch-derivation-us1.spec.ts's helper (already
- *  parametrized there); the suggestion is generated from the Phase C
- *  mechanism assignment, independent of the Case A/B seed-source choice. */
-async function driveTouchGalleryAcceptPlacement(page: Page, char: string): Promise<void> {
-  const startButton = page.getByRole("button", { name: "Start the touch gallery" });
-  if (await startButton.isVisible().catch(() => false)) {
-    await startButton.click();
-  }
-
-  const acceptButton = page.getByRole("button", {
-    name: new RegExp(`^Use suggested long-press method for .*${char}$`, "u"),
-  });
-  await expect(acceptButton).toBeVisible({ timeout: 15_000 });
-  await acceptButton.click();
-
-  await page.getByTestId("touch-continue").click();
 }
 
 /** Emits the ZIP via the download gate and returns its parsed entries —
@@ -372,11 +445,31 @@ async function emitAndUnzip(page: Page): Promise<Record<string, Uint8Array>> {
   return unzipSync(new Uint8Array(zipBytes));
 }
 
-interface PhoneTouchJson {
-  phone?: {
-    font?: string;
-    layer?: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }>;
-  };
+interface TouchPlatformJson {
+  font?: string;
+  layer?: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }>;
+}
+
+/**
+ * The emitted `.keyman-touch-layout` wire shape, keyed by PLATFORM ID.
+ *
+ * The reseed path emits exactly one platform, `tablet` — `buildCaseASeed`
+ * (studio/src/lib/buildTouchLayoutJson.ts) is the codebase's only caller that
+ * passes `platformStyle: "tablet"` to `scaffoldTouchLayoutWithDiagnostics`,
+ * and that branch returns a single `{ id: "tablet" }` platform
+ * (engine/src/scaffolder/scaffoldTouchLayout.ts, Case A). `phone` appears only
+ * on a shipped or import-adapted layout, which is exactly what makes the
+ * platform key itself the cleanest discriminator for AS4 below.
+ *
+ * This type was `PhoneTouchJson` and both tests read `touchJson.phone`, which
+ * silently became `undefined` when commit 8709ff54 added the tablet reseed
+ * skeleton. Every `for (const layer of touchJson.phone?.layer ?? [])` loop
+ * then iterated an empty array — the assertions inside them were vacuous, not
+ * passing.
+ */
+interface TouchLayoutJson {
+  phone?: TouchPlatformJson;
+  tablet?: TouchPlatformJson;
 }
 
 // ---------------------------------------------------------------------------
@@ -384,7 +477,7 @@ interface PhoneTouchJson {
 // ---------------------------------------------------------------------------
 
 test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B)", () => {
-  test("carved characters vanish, placed letter lands, layout is a compact phone projection, and the keyboard compiles", async ({
+  test("carved characters vanish, placed letter lands, layout is the generated tablet projection, and the keyboard compiles", async ({
     page,
   }) => {
     // Seed the returning-visitor flag before navigation so this fresh
@@ -415,12 +508,36 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     // mechanisms -> touch_seed_source -> touch -> help. The marks series for
     // the accented PLACED_CHAR was driven inside addPlacedCharacterToInventory.
     await carveCharacters(page, PIAROA_CARVED_CHARS, PIAROA_SURVIVOR_CHAR);
-    await driveMechanismsPlaceLetter(page, PLACED_CHAR);
+    // The mechanism gallery's worklist may hold more than just PLACED_CHAR —
+    // see driveMechanismsGallery's doc comment in helpers/surveyFlow.ts; the
+    // shared driver walks whatever is actually there, and PLACED_CHAR's own
+    // landing is proven below from the emitted ZIP.
+    await driveMechanismsGallery(page);
     await confirmReseedDefault(page);
-    await driveTouchGalleryAcceptPlacement(page, PLACED_CHAR);
+    // The touch gallery's own walk list widens for the same reason
+    // lettersToAdd did in Mechanisms (TouchGallery.tsx's touchLettersToAdd
+    // includes every character with a desktop MechanismAssignment, not just
+    // PLACED_CHAR) — see driveMechanismsGallery's doc comment and
+    // specs/057-bulletproof-navigation/reviews/classB-diagnosis.md. The
+    // shared, worklist-size-agnostic driver walks every character with the
+    // default long-press method regardless of count; PLACED_CHAR's own
+    // landing is proven below from the emitted ZIP.
+    await driveTouchGallery(page);
 
     // Accessibility gate (spec 056 FR-003): scan the post-touch-gallery screen.
-    await expectNoSeriousAxeViolations(page, "after touch gallery (US2 piaroa walk)");
+    // 1.4.3 -- glyph chips + LintChip's code badge + shared chrome + OSK
+    // iframe (documented pre-existing contrast debt; see
+    // helpers/contrastDebt.ts). The lint badge is here for the same reason it
+    // is on the build-list scan above: LintSummary is survey-pane chrome, and
+    // pid_piaroa's .kmn keeps a finding in the list for the whole walk.
+    await expectNoSeriousAxeViolations(page, "after touch gallery (US2 piaroa walk)", {
+      exclude: [
+        ...GLYPH_KEY_CHIP_DEBT,
+        ...LINT_CHIP_DEBT,
+        ...SHARED_CHROME_DEBT,
+        ...OSK_IFRAME_DEBT,
+      ],
+    });
 
     await driveHelpPhase(
       page,
@@ -429,7 +546,10 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     );
 
     await page.waitForURL(/#output$/, { timeout: 30_000 });
-    await expectNoSeriousAxeViolations(page, "output screen (US2 piaroa walk)");
+    // 1.4.3 -- the Output screen's documented pre-existing contrast debt.
+    await expectNoSeriousAxeViolations(page, "output screen (US2 piaroa walk)", {
+      exclude: OUTPUT_SCREEN_DEBT,
+    });
 
     const entries = await emitAndUnzip(page);
 
@@ -448,24 +568,36 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     const touchBytes = entries[PIAROA_TOUCH_ZIP_PATH];
     expect(touchBytes, `expected ${PIAROA_TOUCH_ZIP_PATH} in the emitted zip`).toBeDefined();
     const touchText = strFromU8(touchBytes as Uint8Array);
-    const touchJson = JSON.parse(touchText) as PhoneTouchJson;
+    const touchJson = JSON.parse(touchText) as TouchLayoutJson;
 
-    // Compact phone projection: default + shift + numeric layers present
-    // (a "rightalt" fourth layer is also expected here — pid_piaroa's surviving
-    // RALT-modified rule puts it there, see the fixture-choice rationale
-    // above — its presence does not contradict SC-002's "default + shift +
-    // numeric" wording, which describes the always-present trio, not an
-    // exhaustive layer list), every row <=10 keys (buildCanonicalPhoneLayers's
-    // compact-row invariant).
-    const layerIds = touchJson.phone?.layer?.map((l) => l.id) ?? [];
+    // Generated-from-scratch projection: pid_piaroa ships no touch layout at
+    // all, so Case A scaffolds one, and the reseed path's skeleton is the
+    // TABLET one — exactly one platform, id "tablet". Asserting the platform
+    // key set (rather than just reading one key) is what keeps this honest:
+    // the previous `touchJson.phone` reads went undefined-silent when the
+    // tablet skeleton landed, and every assertion under them stopped running.
+    expect(Object.keys(touchJson), "reseed emits exactly one tablet platform").toEqual(["tablet"]);
+
+    // default + shift + numeric layers present. The "rightalt" secondary layer
+    // is also expected here — pid_piaroa's surviving RALT-modified rules put
+    // it there (see the fixture-choice rationale above), and it is where the
+    // survivor character below lives; its presence does not contradict
+    // SC-002's "default + shift + numeric" wording, which names the
+    // always-present trio, not an exhaustive layer list.
+    const layerIds = touchJson.tablet?.layer?.map((l) => l.id) ?? [];
     for (const requiredLayer of ["default", "shift", "numeric"]) {
       expect(layerIds, `expected a "${requiredLayer}" layer`).toContain(requiredLayer);
     }
-    for (const layer of touchJson.phone?.layer ?? []) {
-      for (const row of layer.row) {
-        expect(row.key.length, `layer "${layer.id}" row must have <=10 keys`).toBeLessThanOrEqual(10);
-      }
-    }
+    expect(layerIds, 'surviving RALT rules must produce a "rightalt" layer').toContain("rightalt");
+
+    // NOTE: no "<=10 keys per row" assertion here any more. That was
+    // buildCanonicalPhoneLayers's compact-PHONE-row invariant, and the tablet
+    // skeleton deliberately does not satisfy it — its digit row is 1-0 plus
+    // K_BKSP, 11 keys wide (buildTabletLayers, engine/src/scaffolder/
+    // scaffoldTouchLayout.ts). It was never failing here only because it was
+    // iterating the empty `touchJson.phone?.layer ?? []`. The platform-key
+    // assertion above is the load-bearing "this is the generated skeleton"
+    // proof now; row widths are the skeleton's own business.
 
     // NONE of the N carved characters appear anywhere in the document.
     for (const ch of PIAROA_CARVED_CHARS) {
@@ -497,36 +629,56 @@ test.describe("Touch derivation US2-AS4 — explicit reseed discards a shipped t
     await addPlacedCharacterToInventory(page, PLACED_CHAR);
 
     await carveCharacters(page, BAMBARA_CARVED_CHARS, BAMBARA_SURVIVOR_CHAR);
-    await driveMechanismsPlaceLetter(page, PLACED_CHAR);
+    // The mechanism gallery's worklist may hold more than just PLACED_CHAR —
+    // see driveMechanismsGallery's doc comment in helpers/surveyFlow.ts; the
+    // shared driver walks whatever is actually there, and PLACED_CHAR's own
+    // landing is proven below from the emitted ZIP.
+    await driveMechanismsGallery(page);
     await chooseReseedExplicitly(page);
-    await driveTouchGalleryAcceptPlacement(page, PLACED_CHAR);
+    // Same widened worklist as Test 1 above (bambara's own S-02 assignments
+    // for é AND its worklist siblings all become touch-gallery walk stops) —
+    // the generic driver walks whatever is actually there.
+    await driveTouchGallery(page);
     await driveHelpPhase(page, "Welcome to the Bambara keyboard.", "Type ɛ, ɔ, and ŋ from the freshly reseeded touch layout.");
 
     await page.waitForURL(/#output$/, { timeout: 30_000 });
-    await expectNoSeriousAxeViolations(page, "output screen (US2-AS4 bambara reseed walk)");
+    // 1.4.3 -- the Output screen's documented pre-existing contrast debt.
+    await expectNoSeriousAxeViolations(page, "output screen (US2-AS4 bambara reseed walk)", {
+      exclude: OUTPUT_SCREEN_DEBT,
+    });
 
     const entries = await emitAndUnzip(page);
 
     const touchBytes = entries[BAMBARA_TOUCH_ZIP_PATH];
     expect(touchBytes, `expected ${BAMBARA_TOUCH_ZIP_PATH} in the emitted zip`).toBeDefined();
     const touchText = strFromU8(touchBytes as Uint8Array);
-    const touchJson = JSON.parse(touchText) as PhoneTouchJson;
+    const touchJson = JSON.parse(touchText) as TouchLayoutJson;
+
+    // THE AS4 PROOF: bambara ships exactly one platform, `phone` (confirmed
+    // via a throwaway Node probe over the raw JSON — `Object.keys(parsed)`
+    // returns exactly `["phone"]`). The reseed emits exactly one platform,
+    // `tablet`. So the emitted key set alone proves the shipped layout was
+    // DISCARDED rather than augmented or carried forward: had R10's strip
+    // (`const { touchLayout: _stripped, ...rest } = baseIr`) not run, the
+    // shipped `phone` platform would still be here.
+    expect(Object.keys(touchJson), "reseed must discard the shipped phone platform").toEqual([
+      "tablet",
+    ]);
+    expect(touchJson.phone, "the shipped phone platform must not survive a reseed").toBeUndefined();
 
     // Shipped-layout-only marker ABSENT: bambara's real file carries
-    // `"font": "Tahoma"` at the platform level (confirmed via a throwaway
-    // Node probe over the raw JSON); buildCanonicalPhoneLayers's
-    // generate-from-scratch path never sets `font` at all.
-    expect(touchJson.phone?.font).not.toBe("Tahoma");
+    // `"font": "Tahoma"` at the platform level (same probe); the
+    // generate-from-scratch path never sets `font` at all. Belt-and-braces
+    // behind the platform-key assertion above — and read off the platform
+    // that actually exists, since `touchJson.phone?.font` is now trivially
+    // undefined and would pass no matter what shipped.
+    expect(touchJson.tablet?.font).not.toBe("Tahoma");
 
-    // Every row <=10 keys: bambara's shipped default/shift layers carry 11
-    // keys per row (same probe), which the compact reseed scaffold cannot
-    // produce (buildCanonicalPhoneLayers's compact-row invariant) — this
-    // alone proves the shipped layout was discarded, not merely augmented.
-    for (const layer of touchJson.phone?.layer ?? []) {
-      for (const row of layer.row) {
-        expect(row.key.length, `layer "${layer.id}" row must have <=10 keys`).toBeLessThanOrEqual(10);
-      }
-    }
+    // This pair replaces an "every row <=10 keys" loop that was the original
+    // discard proof. It could no longer prove anything: it iterated
+    // `touchJson.phone?.layer ?? []`, which the tablet reseed leaves empty, so
+    // it ran zero assertions — and the tablet skeleton's own digit row is 11
+    // keys wide, so it would not even hold if pointed at the real platform.
 
     // Belt-and-suspenders: the carved characters are still gone and the
     // placed character still lands, exactly as in touch-derivation-us1.spec.ts.
