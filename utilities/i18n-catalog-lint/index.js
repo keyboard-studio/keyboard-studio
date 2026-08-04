@@ -21,6 +21,11 @@
 //     needs to catch up, which shouldn't block CI/build.
 //   • target locales (fr, …): the KEY SET must match (values legitimately
 //     differ — those are translations) — catches strings not propagated.
+//   • target locales, additionally: the values must not have COLLAPSED into
+//     the English source. Key-set parity is blind to this, because a Crowdin
+//     export of an untranslated project returns source text under every
+//     original key — same keys, no translations left. See
+//     utilities/i18n-collapse-guard.
 //
 // Fix when it fails:  pnpm --filter @keyboard-studio/studio messages:extract
 
@@ -28,6 +33,7 @@ const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { checkEnglishCollapse } = require("../i18n-collapse-guard/index.js");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const STUDIO_DIR = path.join(REPO_ROOT, "packages", "studio");
@@ -36,7 +42,13 @@ const SOURCE_LOCALE = "en";
 const CATALOG_FILE = "messages.json";
 
 const problems = [];
+// `warnings` means "the English moved, re-run messages:extract" — the print
+// block at the bottom prints exactly that remediation. `notes` is a separate
+// channel for "the collapse guard could not check this catalog", which is not
+// staleness and has no remediation. One array for both would print the extract
+// instruction at someone whose only signal needs no action.
 const warnings = [];
+const notes = [];
 
 function readCatalog(file) {
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : null;
@@ -141,6 +153,27 @@ try {
             (extra.length ? ` — stale/extra: ${extra.join(", ")}` : ""),
         );
       }
+
+      // Key-set parity above cannot see a catalog whose keys all survived but
+      // whose VALUES were all replaced by English — the exact shape a Crowdin
+      // export takes when the project holds no translations for this locale.
+      const committedSource = readCatalog(
+        path.join(COMMITTED_DIR, SOURCE_LOCALE, CATALOG_FILE),
+      );
+      if (committedSource !== null) {
+        const collapse = checkEnglishCollapse({
+          en: committedSource,
+          target: committed,
+          locale,
+          catalog: CATALOG_FILE,
+        });
+        if (collapse.problem) problems.push(collapse.problem);
+        // A catalog too small to check is reported rather than passing silently
+        // — see i18n-collapse-guard's "a skip is reported" note. It goes to
+        // `notes`, not `warnings`: nothing is stale, so the extract remediation
+        // does not apply.
+        if (collapse.note) notes.push(collapse.note);
+      }
     }
   }
 
@@ -168,6 +201,14 @@ if (warnings.length > 0) {
   console.warn(
     "\nRun pnpm --filter @keyboard-studio/studio messages:extract to pick these up (not required to pass).",
   );
+}
+
+// Separate header, and no remediation line: a note means a check was declined
+// for being unmeasurable, not that anything is out of date. Printing the
+// extract instruction here would send someone to fix a non-problem.
+if (notes.length > 0) {
+  console.warn("[NOTE] i18n-catalog-lint: collapse guard did not cover every catalog.");
+  for (const n of notes) console.warn("  - " + n);
 }
 
 if (extractionProducedNothing) {

@@ -50,7 +50,7 @@ import { latinDeadkeyAcuteSingle } from "@keyboard-studio/contracts/fixtures";
 import { corpusBackedQwerty } from "@keyboard-studio/contracts/fixtures";
 import type { PatternMatch } from "@keyboard-studio/contracts";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
-import type { MechanismAssignment, IRGroup, IRRule, IRStore } from "@keyboard-studio/contracts";
+import type { MechanismAssignment, IRGroup, IRRule, IRStore, PlacementMap } from "@keyboard-studio/contracts";
 import type { CharContributors } from "@keyboard-studio/engine";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
@@ -2474,7 +2474,7 @@ describe("MechanismGallery — kbgen suggestion gated on the current char's prod
     await waitFor(() => {
       expectCurrentChar("ǯ");
     });
-    expect(screen.queryByText(/Suggested: Right Alt \+ 9 for ǯ/i)).toBeNull();
+    expect(screen.queryByText(/Suggested: RAlt \+ 9 for ǯ/i)).toBeNull();
 
     // "à" — plain uncovered (badge count 0): the SAME placement map's
     // suggestion for it DOES render.
@@ -2492,7 +2492,7 @@ describe("MechanismGallery — kbgen suggestion gated on the current char's prod
     // not the suggestion row's presence. waitFor retries until both have
     // caught up, without weakening what's asserted.
     await waitFor(() => {
-      expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
+      expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
     });
   });
 
@@ -2699,7 +2699,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // synchronous-getByText-after-render pattern hardened elsewhere in this
     // describe block (see the kbgen-suggestion-gated describe above).
     await waitFor(() => {
-      expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
+      expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
     });
 
     // Accept it — records the S-08 assignment and dismisses the row (the
@@ -2708,7 +2708,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
       screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_A for à/i }),
     );
     await waitFor(() => {
-      expect(screen.queryByText(/Suggested: Right Alt \+ A for à/i)).toBeNull();
+      expect(screen.queryByText(/Suggested: RAlt \+ A for à/i)).toBeNull();
     });
 
     // Advance to "é" — its own (not-yet-resolved) suggestion row shows.
@@ -2718,7 +2718,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
       fireEvent.click(nextBtn);
     });
     await waitFor(() => {
-      expect(screen.getByText(/Suggested: Right Alt \+ E for é/i)).toBeTruthy();
+      expect(screen.getByText(/Suggested: RAlt \+ E for é/i)).toBeTruthy();
     });
 
     // Navigate back to "à" without resolving é's suggestion. Scoped via
@@ -2733,7 +2733,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     });
 
     // The already-accepted suggestion for "à" must NOT re-render its card.
-    expect(screen.queryByText(/Suggested: Right Alt \+ A for à/i)).toBeNull();
+    expect(screen.queryByText(/Suggested: RAlt \+ A for à/i)).toBeNull();
   });
 
   it("a suggestion row REAPPEARS after Skip (unlike Accept/Deny) — Skip resolves nothing", async () => {
@@ -2756,7 +2756,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // synchronous-getByText-after-render pattern hardened elsewhere in this
     // describe block.
     await waitFor(() => {
-      expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
+      expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
     });
 
     // Skip it — no accept/deny, no assignment recorded.
@@ -2775,8 +2775,260 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // reappear — Skip resolved nothing. (If `skippedChars` were reintroduced
     // to suppress the row, this assertion would fail.)
     await waitFor(() => {
-      expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
+      expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// kbgen suggestion row — uppercase case-pair fallback
+//
+// The placement map only carries an entry for ƒ (U+0192), the LOWERCASE
+// letter — Ƒ (U+0191) has no map entry of its own. Without the case-pair
+// fallback (getSuggestionForCharWithCasePair), Ƒ would get no suggestion at
+// all. With it, Ƒ gets a synthesized S-08 suggestion on the SAME vkey
+// (K_F) at the RAlt+Shift layer — the shifted counterpart of ƒ's RAlt layer.
+// ---------------------------------------------------------------------------
+
+const ffHookPlacementMap: PlacementMap = {
+  entries: [
+    {
+      codepoint: "U+0192",
+      candidates: [
+        {
+          vkey: "K_F",
+          modifiers: ["RALT"],
+          mechanism: "direct",
+          priorSource: "phonetic",
+          priorCount: 0,
+          confidence: 0.6,
+        },
+      ],
+    },
+  ],
+};
+
+describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fallback", () => {
+  it("navigating to the uppercase sibling shows a RAlt+Shift suggestion row", async () => {
+    seedInventory(["Ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffHookPlacementMap}
+        />,
+      );
+    });
+
+    expectCurrentChar("Ƒ");
+    expect(
+      screen.getByText(/Suggested: Shift\+RAlt \+ F for Ƒ/i),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", {
+        name: /Accept suggestion: Shift\+RAlt \+ K_F for Ƒ/i,
+      }),
+    ).toBeTruthy();
+  });
+
+  it("accepting it records a modifier_as_layer_switch mechanism with altgrKeyList \"[SHIFT RALT K_F]\"", async () => {
+    seedInventory(["Ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffHookPlacementMap}
+        />,
+      );
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Accept suggestion: Shift\+RAlt \+ K_F for Ƒ/i,
+      }),
+    );
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.mechanisms[0]?.patternId).toBe(
+      "modifier_as_layer_switch",
+    );
+    expect(assignments[0]?.mechanisms[0]?.strategyId).toBe("S-08");
+    // The exact emitted string — textually distinct from the lowercase ƒ's
+    // own "[RALT K_F]" (no collision on the same key/layer).
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
+      "[SHIFT RALT K_F]",
+    );
+    expect(
+      assignments[0]?.mechanisms[0]?.slotValues?.["altgrOutputList"],
+    ).toBe("Ƒ");
+  });
+
+  it("the lowercase ƒ itself still gets its own direct RALT suggestion (unaffected by the fallback)", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffHookPlacementMap}
+        />,
+      );
+    });
+
+    expectCurrentChar("ƒ");
+    expect(screen.getByText(/Suggested: RAlt \+ F for ƒ/i)).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_F for ƒ/i }),
+    );
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
+      "[RALT K_F]",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Case-pair companion — ralt-layer proposal, raised right after ACCEPTING
+// the lowercase S-08 RAlt suggestion (not on a separate navigation to the
+// uppercase sibling — see handleSuggestionAccept).
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion accept)", () => {
+  it("accepting the lowercase ƒ RAlt suggestion raises the companion banner for Ƒ", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffHookPlacementMap}
+        />,
+      );
+    });
+
+    expectCurrentChar("ƒ");
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Accept suggestion: RAlt \+ K_F for ƒ/i,
+      }),
+    );
+
+    expect(screen.getByText(/has an uppercase form, Ƒ/i)).toBeTruthy();
+  });
+
+  it("confirming records a modifier_as_layer_switch mechanism for Ƒ with altgrKeyList \"[SHIFT RALT K_F]\"", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffHookPlacementMap}
+        />,
+      );
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Accept suggestion: RAlt \+ K_F for ƒ/i,
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Map Ƒ to the Shift\+RAlt layer of K_F/i,
+      }),
+    );
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    const companion = assignments.find((a) => a.target === "Ƒ");
+    expect(companion).toBeDefined();
+    expect(companion?.mechanisms[0]?.patternId).toBe(
+      "modifier_as_layer_switch",
+    );
+    expect(companion?.mechanisms[0]?.strategyId).toBe("S-08");
+    expect(companion?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
+      "[SHIFT RALT K_F]",
+    );
+    expect(companion?.mechanisms[0]?.slotValues?.["altgrOutputList"]).toBe(
+      "Ƒ",
+    );
+
+    // Prompt is dismissed after confirm.
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+
+  it("does NOT raise the companion banner when accepting a suggestion for an already-uppercase char", async () => {
+    seedInventory(["Ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffHookPlacementMap}
+        />,
+      );
+    });
+
+    expectCurrentChar("Ƒ");
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Accept suggestion: Shift\+RAlt \+ K_F for Ƒ/i,
+      }),
+    );
+
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+
+  it("stale-guard: confirming a ralt-layer companion whose base assignment vanished via an unaudited mutation path records nothing", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffHookPlacementMap}
+        />,
+      );
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Accept suggestion: RAlt \+ K_F for ƒ/i,
+      }),
+    );
+    expect(screen.getByText(/has an uppercase form, Ƒ/i)).toBeTruthy();
+
+    // Simulate a hypothetical future mutation path that touches
+    // sessionAssignments WITHOUT going through handleRemoveCovered /
+    // handleRemoveMechanism (which proactively dismiss the banner) — direct
+    // store mutation bypassing the component's own handlers entirely, the
+    // same technique the physical and combo stale-guard tests above use. The
+    // component's pendingCompanion state is untouched by this, so the banner
+    // remains visible in the DOM, exercising the confirm-time staleness
+    // re-check in handleCompanionConfirm's "ralt-layer" branch
+    // (`sessionAssignments.includes(pendingCompanion.baseAssignment)`) rather
+    // than any removal-time dismissal.
+    await act(async () => {
+      useWorkingCopyStore.getState().recordAssignments([]);
+    });
+    expect(screen.getByText(/has an uppercase form, Ƒ/i)).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Map Ƒ to the Shift\+RAlt layer of K_F/i,
+      }),
+    );
+
+    // Nothing was recorded for the counterpart — the stale proposal was
+    // dismissed, not applied.
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments.find((a) => a.target === "Ƒ")).toBeUndefined();
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
   });
 });
 

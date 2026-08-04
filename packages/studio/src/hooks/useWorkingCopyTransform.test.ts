@@ -18,7 +18,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
+import { makeTestIR, basicKbdus, silEuroLatin } from "@keyboard-studio/contracts/fixtures";
 import type { Pattern } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
@@ -339,6 +339,122 @@ describe("useWorkingCopyTransform — effectiveKeyboardId (Track 1 identity rena
     ]);
     const { effectiveKeyboardId } = result.current!(vfs, "basic_kbdus");
     expect(effectiveKeyboardId).toBeUndefined();
+  });
+});
+
+describe("useWorkingCopyTransform — previewedBaseId gate (bug F4)", () => {
+  // Regression coverage: commit base A (basic_kbdus), carve a node off it, then
+  // preview a DIFFERENT candidate base B (sil_euro_latin) before confirming any
+  // switch. Without the previewedBaseId gate, the transform below would project
+  // base A's deletedNodeIds (its own IR's node ids) onto base B's freshly-fetched
+  // VFS — a cross-base projection that left the candidate base's compile pipeline
+  // unable to reach "ready" (the only escape was "Start over"). With the gate,
+  // the transform is null while previewing B, so B's pipeline never receives A's
+  // stale carve overlay and compiles cleanly.
+  it("returns null when previewedBaseId differs from the store's instantiated base", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBase(); // instantiates basic_kbdus (base A)
+    act(() => {
+      useWorkingCopyStore.getState().deleteNode("rule#0"); // carve on base A
+    });
+    expect(useWorkingCopyStore.getState().deletedNodeIds.size).toBeGreaterThan(0);
+
+    // Preview candidate base B (sil_euro_latin) — a different id.
+    const { result } = renderHook(() =>
+      useWorkingCopyTransform({ previewedBaseId: silEuroLatin.id }),
+    );
+    expect(result.current).toBeNull();
+  });
+
+  it("still returns a transform when previewedBaseId matches the store's base (re-preview of the committed base)", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBase(); // instantiates basic_kbdus
+    act(() => {
+      useWorkingCopyStore.getState().deleteNode("rule#0");
+    });
+    const { result } = renderHook(() =>
+      useWorkingCopyTransform({ previewedBaseId: basicKbdus.id }),
+    );
+    expect(result.current).not.toBeNull();
+    expect(typeof result.current).toBe("function");
+  });
+
+  it("still returns a transform when previewedBaseId matches the store's base and the carve is empty (legacy no-op case)", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBase(); // instantiates basic_kbdus; no deletions made — deletedNodeIds is empty.
+    expect(useWorkingCopyStore.getState().deletedNodeIds.size).toBe(0);
+    const { result } = renderHook(() =>
+      useWorkingCopyTransform({ previewedBaseId: basicKbdus.id }),
+    );
+    // Matching id + empty carve is the legacy (pre-F4) behavior: a transform
+    // is still returned (there is nothing to gate away — an empty carve is
+    // not "another base's overlay", it is simply no overlay yet).
+    expect(result.current).not.toBeNull();
+    expect(typeof result.current).toBe("function");
+  });
+
+  it("does not gate when previewedBaseId is omitted (existing callers unaffected)", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBase();
+    act(() => {
+      useWorkingCopyStore.getState().deleteNode("rule#0");
+    });
+    const { result } = renderHook(() => useWorkingCopyTransform());
+    expect(result.current).not.toBeNull();
+  });
+
+  it("warns once (dev-only) when previewedBaseId is omitted while a transform is built, and not when it is supplied", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    seedBase();
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+
+    // Omitted — should warn exactly once even across re-renders (deletedKey change).
+    const { result, rerender } = renderHook(() => useWorkingCopyTransform());
+    result.current!(vfs, "basic_kbdus");
+    act(() => {
+      useWorkingCopyStore.getState().deleteNode("rule#0");
+    });
+    rerender();
+    result.current!(vfs, "basic_kbdus");
+    const omittedWarnings = warnSpy.mock.calls.filter((c) =>
+      String(c[0]).includes("previewedBaseId was omitted"),
+    );
+    expect(omittedWarnings.length).toBe(1);
+
+    warnSpy.mockClear();
+
+    // Supplied explicitly — no F4-footgun warning.
+    const { result: result2 } = renderHook(() =>
+      useWorkingCopyTransform({ previewedBaseId: basicKbdus.id }),
+    );
+    result2.current!(vfs, "basic_kbdus");
+    const omittedWarnings2 = warnSpy.mock.calls.filter((c) =>
+      String(c[0]).includes("previewedBaseId was omitted"),
+    );
+    expect(omittedWarnings2.length).toBe(0);
+
+    warnSpy.mockRestore();
+  });
+
+  it("recovers a transform once previewedBaseId returns to matching the committed base", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBase();
+    act(() => {
+      useWorkingCopyStore.getState().deleteNode("rule#0");
+    });
+    const { result, rerender } = renderHook(
+      ({ previewedBaseId }: { previewedBaseId: string | null }) =>
+        useWorkingCopyTransform({ previewedBaseId }),
+      { initialProps: { previewedBaseId: silEuroLatin.id } },
+    );
+    expect(result.current).toBeNull();
+    // The author returns to previewing the already-committed base A.
+    rerender({ previewedBaseId: basicKbdus.id });
+    expect(result.current).not.toBeNull();
+    expect(typeof result.current).toBe("function");
   });
 });
 

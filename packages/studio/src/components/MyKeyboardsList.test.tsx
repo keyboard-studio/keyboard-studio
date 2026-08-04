@@ -21,7 +21,7 @@ import { cleanup, screen, fireEvent, waitFor, within } from "@testing-library/re
 import { render } from "../test/renderWithI18n.tsx";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { BaseKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
-import { MyKeyboardsList } from "./MyKeyboardsList.tsx";
+import { MyKeyboardsList, mergeProjectEntries } from "./MyKeyboardsList.tsx";
 import { useGitHubAuth, type UseGitHubAuthResult } from "../hooks/useGitHubAuth.ts";
 import { listServerDrafts, type ServerDraftMeta } from "../lib/serverDraftStore.ts";
 import { navigateTo } from "../lib/navigate.ts";
@@ -31,6 +31,7 @@ import {
   deleteProject,
   resumeProject,
   saveDraft,
+  PENDING_PROJECT_KEY,
 } from "../lib/draftPersistence.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
@@ -416,6 +417,50 @@ describe("MyKeyboardsList — signed-in merge/dedupe", () => {
       expect(screen.getAllByTestId("my-keyboards-card")).toHaveLength(1);
       expect(screen.getByText("Submitted")).toBeTruthy();
     });
+  });
+
+  // Defense-in-depth against a phantom "Untitled keyboard" card (review
+  // finding 2): the reserved pending slot holds pre-instantiation progress,
+  // never a project. startCloudSync refuses to push it, so a pending-slot
+  // server row means some other write path leaked one — the merge must not
+  // render it regardless.
+  it("never renders a cloud row for the reserved PENDING_PROJECT_KEY slot", async () => {
+    mockGitHubAuth({ status: "connected", token: signedInToken(), login: "octocat" });
+    seedLocalIndex([{ projectKey: "kbd_real", savedAt: 1_000, label: "Real Project", status: "draft" }]);
+    mockedListServerDrafts.mockResolvedValue([
+      serverMeta({ draftId: PENDING_PROJECT_KEY, label: "", savedAt: 2_000 }),
+      serverMeta({ draftId: "kbd_cloud", label: "Cloud Project", savedAt: 3_000 }),
+    ]);
+
+    render(<MyKeyboardsList />);
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId("my-keyboards-card")).toHaveLength(2);
+    });
+    expect(screen.getByText("Real Project")).toBeTruthy();
+    expect(screen.getByText("Cloud Project")).toBeTruthy();
+  });
+
+  it("mergeProjectEntries drops a PENDING_PROJECT_KEY cloud row while keeping the rest", () => {
+    const merged = mergeProjectEntries(
+      [
+        {
+          projectKey: "kbd_real",
+          savedAt: 1_000,
+          activeStepId: "carve",
+          label: "Real",
+          langTag: null,
+          status: "draft",
+          prUrl: null,
+        },
+      ],
+      [
+        serverMeta({ draftId: PENDING_PROJECT_KEY, label: "", savedAt: 9_000 }),
+        serverMeta({ draftId: "kbd_cloud", label: "Cloud", savedAt: 2_000 }),
+      ],
+    );
+
+    expect(merged.map((e) => e.projectKey)).toEqual(["kbd_cloud", "kbd_real"]);
   });
 });
 

@@ -62,7 +62,18 @@ export function AddTouchAdapter({ onComplete, onBack }: EditorStepProps) {
     onComplete({ assignments, baseIr, baseVfs, mods, seedSource });
   }
 
-  // TouchGallery requires onBack — the manifest must supply it for this step.
-  // If absent (misconfigured manifest), fall back to a no-op so the UI doesn't crash.
+  // TouchGallery requires onBack (its own prop is non-optional — it never
+  // gates its Back button's render on onBack's presence, unlike
+  // MechanismGallery). StepHost only ever omits `onBack` from EditorStepProps
+  // when there is genuinely nothing to back into (F7 defect 2,
+  // expectedBackTarget in stores/surveySessionStore.ts) — and for the "touch"
+  // step specifically that function always returns a target (the
+  // touch_seed_source chooser never no-ops), so `onBack` is provably always
+  // defined here in normal operation. The `?? (() => undefined)` fallback is
+  // therefore pure type-level defense against a genuinely misconfigured
+  // manifest (a step wired to AddTouchAdapter without id "touch"), not a
+  // reachable silent-no-op path — kept rather than removed only because
+  // TypeScript can't otherwise satisfy TouchGallery's required prop from
+  // EditorStepProps's optional one.
   return <TouchGallery onComplete={handleComplete} onBack={onBack ?? (() => undefined)} />;
 }

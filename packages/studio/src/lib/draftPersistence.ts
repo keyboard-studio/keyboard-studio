@@ -325,8 +325,15 @@ function buildServerMeta(
  * - version mismatch (VR-1) — not resumable under this build's envelope.
  * - malformed / unparseable (VR-3) — no trustworthy row to synthesize.
  * - `workingCopy` not really instantiated (VR-2) — `loadDraft` refuses these,
- *   so a card for one would render a Resume button that does nothing. Note
- *   `saveDraft`'s own VR-2 guard means main never writes such a record.
+ *   so a card for one would render a Resume button that does nothing.
+ *   `saveDraft` CAN now write such a record (the F6 pending-slot relaxation,
+ *   `PENDING_PROJECT_KEY` + `hasPendingProgress()`), but that write never
+ *   reaches the index in the first place — `saveDraft` gates its
+ *   `upsertIndexEntry` call to real project keys — so this scan still never
+ *   encounters an uninstantiated `ks.draft.<key>.v1` record with a real key
+ *   to adopt: the only uninstantiated record on disk is the pending slot
+ *   itself, and its key (`PENDING_PROJECT_KEY`) is excluded from the index by
+ *   the same rule, not by this scan reaching it and skipping it.
  *
  * Idempotent: a second call adopts nothing, because the first gave every
  * record an index row. Adopted rows land as `status: "draft"` / `prUrl: null`
@@ -403,12 +410,42 @@ export function listDrafts(): ProjectIndexEntry[] {
 // ---------------------------------------------------------------------------
 
 /**
+ * F6 fix: whether the CURRENT survey-session state has meaningful
+ * pre-instantiation progress worth persisting under the reserved
+ * `PENDING_PROJECT_KEY` slot (identity answers, an in-progress base preview,
+ * or any forward movement off the very first step). Mirrors
+ * `draftAutosave.ts`'s `hasMeaningfulProgress` gate for the same reason that
+ * module has one: a pristine, untouched survey must not leave behind a
+ * resumable-but-empty draft record.
+ *
+ * Deliberately does NOT consult the working-copy store — by construction this
+ * is only ever consulted from `saveDraft`'s pending-key branch, which already
+ * runs only when the working copy is NOT instantiated.
+ */
+function hasPendingProgress(): boolean {
+  const session = useSurveySessionStore.getState();
+  return (
+    session.identityResult !== null ||
+    session.history.length > 0 ||
+    session.activeStepId !== "identity" ||
+    session.localBase !== null
+  );
+}
+
+/**
  * Save the current working copy + traversal state as this project's durable
  * draft.
  *
  * Guard (VR-2): no-op when the working copy is not really instantiated
  * (`instantiationMode === null`) or has no working IR yet (`ir === null`) — a
- * guest who has not picked a keyboard has nothing worth persisting.
+ * guest who has not picked a keyboard has nothing worth persisting — UNLESS
+ * `projectKey` is the reserved `PENDING_PROJECT_KEY` slot AND there is
+ * meaningful pre-instantiation progress (`hasPendingProgress`) — F6 fix
+ * (docs/design-notes/switch-base-popup-behavior-log.md): identity answers and
+ * an un-confirmed base preview (wizard levels L1/L2) are real authoring
+ * progress that would otherwise never reach `main.tsx`'s silent boot-restore,
+ * which resolves its project key from THIS module's own `ks.draft.active`
+ * pointer and therefore never learns about progress persisted anywhere else.
  *
  * FROZEN guard (US3a): a project already recorded as `status: "submitted"`
  * (see `recordProjectSubmission`) is read-only — this is a no-op, so an
@@ -423,8 +460,13 @@ export function saveDraft(projectKey: string): void {
   if (isProjectFrozen(projectKey)) return;
 
   const wc = useWorkingCopyStore.getState();
-  if (wc.instantiationMode === null || wc.ir === null) {
-    return; // VR-2
+  const isInstantiated = wc.instantiationMode !== null && wc.ir !== null;
+  // Pending-slot progress written past this guard still never reaches the
+  // "My keyboards" index — see the `projectKey !== PENDING_PROJECT_KEY` gate
+  // around the `upsertIndexEntry` call below — so this relaxation is scoped
+  // to the record + active pointer only, deliberately.
+  if (!isInstantiated && (projectKey !== PENDING_PROJECT_KEY || !hasPendingProgress())) {
+    return; // VR-2 (relaxed for the pending slot per the F6 doc comment above)
   }
 
   const session = useSurveySessionStore.getState();
@@ -465,8 +507,18 @@ export function saveDraft(projectKey: string): void {
     localStorage.setItem(draftKey(projectKey), JSON.stringify(envelope));
     setActiveProjectKey(projectKey);
     // Keep the "My keyboards" index in lockstep with every successful write —
-    // see the module note above the index primitives.
-    upsertIndexEntry(buildIndexEntry(projectKey, envelope, existingStatusOverrides(projectKey)));
+    // see the module note above the index primitives — but ONLY for a real
+    // project key. `PENDING_PROJECT_KEY` is deliberately excluded: it is a
+    // pre-instantiation slot (an author who has only answered the identity
+    // question has no keyboard yet), and `MyKeyboardsList` is the index's
+    // exclusive consumer — an index row for it would render a phantom
+    // "Untitled keyboard" card with nothing real to resume into. Boot-resume
+    // of the pending slot is unaffected: it resolves via the
+    // `ks.draft.active` pointer (`setActiveProjectKey` above), never via this
+    // index.
+    if (projectKey !== PENDING_PROJECT_KEY) {
+      upsertIndexEntry(buildIndexEntry(projectKey, envelope, existingStatusOverrides(projectKey)));
+    }
   } catch {
     // VR-4: quota/security failure — skip silently, author keeps working.
   }
@@ -485,6 +537,22 @@ let _draftRestoredThisBoot = false;
 /** Reader for the module-level "restored this boot" flag — see above. */
 export function wasDraftRestoredThisBoot(): boolean {
   return _draftRestoredThisBoot;
+}
+
+/**
+ * The `savedAt` timestamp of the draft envelope `loadDraft()` restored THIS
+ * boot, or `null` if `wasDraftRestoredThisBoot()` is false. Set alongside
+ * `_draftRestoredThisBoot` (same restore, same lifetime — before React
+ * mounts, stable across StrictMode's double-invoked mount effects) so a
+ * caller can compare freshness against some OTHER draft source (e.g.
+ * StudioShell's cloud-restore offer — F5 fix) without re-reading
+ * localStorage itself; this module already parsed the envelope once.
+ */
+let _restoredDraftSavedAt: number | null = null;
+
+/** Reader for the module-level "restored draft's savedAt" value — see above. */
+export function restoredDraftSavedAt(): number | null {
+  return _restoredDraftSavedAt;
 }
 
 /**
@@ -515,7 +583,11 @@ function discardCorruptDraft(projectKey: string): void {
  * - VR-1: a version mismatch is removed and treated as absent (discard, not
  *   migrate).
  * - VR-2: a draft with no real instantiation is treated as absent (left in
- *   place — not removed; nothing to migrate away from).
+ *   place — not removed; nothing to migrate away from) — UNLESS `projectKey`
+ *   is the reserved `PENDING_PROJECT_KEY` slot, whose whole point (F6 fix) is
+ *   a resumable record with no working copy yet; that case restores the
+ *   working-copy store to its (already-empty) snapshot shape and the
+ *   survey-session traversal normally.
  * - G-1/G-5: on success, patches the SAME single working-copy store and the
  *   SAME single survey-session store — never constructs a second working
  *   copy — then returns true so the caller can resume at
@@ -549,11 +621,12 @@ export function loadDraft(projectKey: string): boolean {
     if (
       envelope.workingCopy === null ||
       typeof envelope.workingCopy !== "object" ||
-      envelope.workingCopy.instantiationMode === null
+      (envelope.workingCopy.instantiationMode === null && projectKey !== PENDING_PROJECT_KEY)
     ) {
       // VR-2: "no real work" (or the field is missing/wrong-shaped) — ignored
       // (not removed; mirrors the sessionStorage snapshot guard's semantics
-      // of "nothing worth restoring").
+      // of "nothing worth restoring"). The pending slot is the one deliberate
+      // exception (F6 fix) — see the doc comment above.
       return false;
     }
 
@@ -632,6 +705,7 @@ export function loadDraft(projectKey: string): boolean {
     }
 
     _draftRestoredThisBoot = true;
+    _restoredDraftSavedAt = envelope.savedAt;
     return true;
   } catch {
     // VR-3: malformed/wrong-shaped/corrupt (or a throw from
@@ -1093,6 +1167,14 @@ export function startCloudSync(getToken: () => string | null): () => void {
 
     const projectKey = resolveActiveProjectKey();
     if (projectKey === null || isProjectFrozen(projectKey)) return;
+    // The reserved pending slot is a LOCAL-ONLY holding pen for
+    // pre-instantiation progress (see PENDING_PROJECT_KEY / hasPendingProgress
+    // above). It is deliberately excluded from the local project index, and it
+    // must be excluded from the cloud push for the same reason: a pushed
+    // pending record comes back through listServerDrafts() and merges into "My
+    // keyboards" as a phantom "Untitled keyboard" card. Promotion to the real
+    // project key (promotePendingAutosave) is what makes a draft cloud-eligible.
+    if (projectKey === PENDING_PROJECT_KEY) return;
 
     let raw: string | null;
     try {

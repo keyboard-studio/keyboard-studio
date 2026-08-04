@@ -1,21 +1,22 @@
-// casePairCompanion — the ONE case-pair proposal shared by all three
-// placement mechanisms (physical key, cased combo / dead key, touch).
+// casePairCompanion — the ONE case-pair proposal shared by all placement
+// mechanisms (physical key, cased combo / dead key, touch, RAlt-layer).
 //
 // When an author places a lowercase cased letter, its uppercase counterpart
 // almost always belongs on the casing-parallel slot: the Shift/Caps of the
-// same physical key, the uppercase form of the same combo, or the shift layer
-// of the same touch layer. Per the defaults-first principle (spec v1.3.1 §3c,
+// same physical key, the uppercase form of the same combo, the shift layer
+// of the same touch layer, or the SHIFT-added variant of the same held-
+// modifier (RAlt) layer. Per the defaults-first principle (spec v1.3.1 §3c,
 // "Defaults are the product") the studio PROPOSES that pairing and the author
 // confirms or dismisses it — never a silent auto-insert.
 //
-// Why this is a module and not three copies:
+// Why this is a module and not one copy per mechanism:
 //   - FR-002 "no second casing path". `propose` is the sole caller of the
 //     engine's `caseCounterpart` on this path, and `CasePairProposalInput` is
 //     the proposal type MINUS `counterpart` — so a caller structurally cannot
 //     smuggle in a locally-derived capital. "Zero new toUpperCase() on the
 //     proposal path" is then a reviewable property, not a convention.
 //   - FR-011 "the interaction reads identically regardless of mechanism".
-//     One hook, one banner (CasePairProposalBanner.tsx), three consumers.
+//     One hook, one banner (CasePairProposalBanner.tsx), every consumer.
 //
 // The hook NEVER records anything. Each gallery owns its apply path and its
 // confirm handler; this module only decides whether a pairing exists and
@@ -29,8 +30,9 @@ import type {
   MechanismAssignment,
   MechanismRef,
 } from "@keyboard-studio/contracts";
-import { caseCounterpart } from "@keyboard-studio/engine";
+import { caseCounterpart, type ModifierToken } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { isOrthographicallyUnicameral } from "../../lib/casePairSuppression.ts";
 import type { TouchLayerId } from "./touchBehavior.ts";
 
 // ---------------------------------------------------------------------------
@@ -96,10 +98,37 @@ interface ComboProposalParts {
 interface TouchProposalParts {
   mechanism: "touch";
   hostKey: string;
-  /** Layer the parallel placement targets — always `casePairTouchLayer(editingLayer)`. */
+  /** Layer the parallel placement targets — always `casePairTouchTarget`'s
+   *  output for the combo being edited (the editing combo plus SHIFT). */
   targetLayer: TouchLayerId;
+  /** Human-readable name for `targetLayer` ("Shift", "Shift+RAlt", …), from
+   *  the same combo the layer id flattens from. Carried on the proposal rather
+   *  than derived in the banner because a flattened layer id cannot be
+   *  labelled back — and because the banner must NAME the target: the touch
+   *  case-pair layer is no longer always the plain shift layer, so a fixed
+   *  "the shift layer" phrase would misdescribe every compound target. */
+  targetLayerLabel: string;
   /** Identity (object reference) of the touch mechanism ref this was raised for. */
   baseRef: MechanismRef;
+}
+
+/**
+ * PATTERN_RALT / S-08 (`modifier_as_layer_switch`): the lowercase letter is
+ * placed on a modifier-held layer (typically RAlt) of `vkey`. The natural
+ * counterpart slot is the SAME vkey with `SHIFT` added to `baseModifiers` —
+ * e.g. a lowercase on `[RALT K_F]` proposes its uppercase on
+ * `[SHIFT RALT K_F]`. Distinct from `PhysicalProposalParts` (which targets
+ * the base/no-modifier layer's Shift companion) because the base placement
+ * here already carries one or more held modifiers of its own.
+ */
+interface RaltLayerProposalParts {
+  mechanism: "ralt-layer";
+  vkey: string;
+  /** The lowercase placement's own modifiers (e.g. `["RALT"]`) — never
+   *  includes `SHIFT` itself; the confirm handler adds it. */
+  baseModifiers: ModifierToken[];
+  /** Identity (object reference) of the assignment this was raised for. */
+  baseAssignment: MechanismAssignment;
 }
 
 /**
@@ -118,6 +147,7 @@ export type CasePairProposal = CasePairProposalCommon & {
         parallelCombo: CasePairCombo;
       })
     | TouchProposalParts
+    | RaltLayerProposalParts
   );
 
 /** What a caller passes to `propose` — the proposal minus everything the hook
@@ -137,7 +167,12 @@ export type CasePairProposalInput = CasePairProposalCommon & {
    * Never stored on the resulting proposal — it is an input-time gate only.
    */
   alreadyProduced?: (counterpart: string) => boolean;
-} & (PhysicalProposalParts | ComboProposalParts | TouchProposalParts);
+} & (
+  | PhysicalProposalParts
+  | ComboProposalParts
+  | TouchProposalParts
+  | RaltLayerProposalParts
+);
 
 export interface UseCasePairCompanion {
   /** The pending proposal, or null. At most one at a time. */
@@ -230,20 +265,6 @@ export function useCasePairCompanion(): UseCasePairCompanion {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Scripts where Unicode's Lu/Ll case-pair machinery reports a formal
- * uppercase mapping that does NOT correspond to a Shift-layer relationship in
- * ordinary orthographic practice. Currently Georgian only — see the comment
- * at the `propose` call site for the corpus evidence. Add a script here only
- * on the same kind of evidence (a real keyboard whose Shift layer doesn't
- * case-shift it, ideally corroborated by the facet classifier), never on a
- * hunch; Cherokee is Unicode-bicameral in the same technical sense and is
- * deliberately NOT listed — it keeps proposing.
- */
-function isOrthographicallyUnicameral(char: string): boolean {
-  return /\p{Script=Georgian}/u.test(char);
-}
 
 /**
  * Case-shift a combo's input side through `caseCounterpart`, leaving the

@@ -23,6 +23,8 @@ from pathlib import Path
 
 # The sibling module's filename has a hyphen, so it can't be a normal import.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import companion_config as cc  # noqa: E402
+
 wc = importlib.import_module("write-context")
 
 
@@ -130,6 +132,7 @@ def derive(feature_dir: Path, by: str = "derive") -> Path | None:
 
 
 def main() -> int:
+    cc.configure_stdio()
     parser = argparse.ArgumentParser(
         description="Reconstruct a feature's .spec-context.json from on-disk artifacts."
     )

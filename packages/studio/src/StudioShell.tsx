@@ -24,10 +24,14 @@ import {
   deriveProjectKeyFromWorkingCopy,
   discardActiveDraft,
   installDraftAutosave,
-  // Aliased: dev's draftAutosave engine (below) also exports a startCloudSync;
-  // both engines coexist post-merge, so both syncs run under distinct names.
+  clearDraft as clearPersistenceDraft,
+  // Aliased: dev's draftAutosave engine (below) also exports a startCloudSync
+  // AND a PENDING_PROJECT_KEY; both engines coexist post-merge, so every
+  // shared name runs under a distinct alias on this side.
   startCloudSync as startPersistenceCloudSync,
+  PENDING_PROJECT_KEY as DRAFT_PERSISTENCE_PENDING_KEY,
   wasDraftRestoredThisBoot,
+  restoredDraftSavedAt,
 } from "./lib/draftPersistence.ts";
 import { useGitHubAuth } from "./hooks/useGitHubAuth.ts";
 import { type RouteId } from "./lib/navigate.ts";
@@ -94,6 +98,7 @@ import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
 import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
 import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
+import { useSurveyBrowserHistorySync } from "./hooks/useSurveyBrowserHistorySync.ts";
 
 // Offer the resume banner only once per page load — on the first SurveyView
 // mount in this JS context, not on same-session route remounts (navigating away
@@ -319,13 +324,18 @@ function NavBar({ active, outputBlocked = false, outputBlockedTitle }: NavBarPro
 // Side effects on step completion are all dispatched through applyStepCompletion()
 // (steps/reducer.ts) — editors are pure (FR-011, R4).
 //
-// Double-instantiation guard (P1 fix):
+// Double-instantiation guard (P1 fix) / re-instantiation on genuine base
+// switch (F1 fix):
 //   setScaffoldSpec() causes a second compile run whose onInstantiate callback
 //   re-captures the artifact into pendingArtifactRef; the commit effect's
 //   doCommit (below) would then run the choose_base side effect
-//   (applyStepCompletion("choose_base", ...)) a second time. An
-//   instantiatedRef flag prevents that side effect from running more than once
-//   per session; it resets on start-over.
+//   (applyStepCompletion("choose_base", ...)) a second time for the SAME base.
+//   An `instantiatedForBaseIdRef` (id-aware, not a plain boolean) prevents
+//   that repeat from running more than once per base id, while still allowing
+//   a confirm for a genuinely DIFFERENT base id later in the same session to
+//   re-run the side effect — see docs/design-notes/switch-base-popup-behavior-log.md
+//   (F1). Resets to null on start-over; set to the restored base's id on
+//   résumé (handleResumeDraft).
 // ---------------------------------------------------------------------------
 
 const SURVEY_DIVIDER_WIDTH = 6;
@@ -431,12 +441,30 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // The localStorage draft (lib/draftAutosave.ts) is unaffected either way: it
   // lives in localStorage, not the store — the resume banner below reads it and
   // only applyDraft() (on Resume) hydrates the store.
+  // Flipped to true at the end of the reset/restore effect below — passed to
+  // useSurveyBrowserHistorySync as a live ordering guard (DEV-only): if a
+  // future edit reorders the two calls (or hoists the sync hook above this
+  // effect), that hook's own mount effect finds this still `false` and fails
+  // loud instead of silently tagging the browser entry with a stale
+  // activeStepId. See useSurveyBrowserHistorySync.ts's doc comment on the
+  // param.
+  const resetOrRestoreSettledRef = useRef(false);
   useEffect(() => {
     if (!wasDraftRestoredThisBoot()) {
       useSurveySessionStore.getState().reset();
     }
+    resetOrRestoreSettledRef.current = true;
     // Intentionally empty deps: runs exactly once on mount.
   }, []);
+
+  // F7 fix — browser Back/Forward integration for the survey wizard (see
+  // hooks/useSurveyBrowserHistorySync.ts for the full design + sync
+  // invariant). MUST be called after the reset/restore effect immediately
+  // above: its own mount effect reads the store's activeStepId to tag the
+  // current browser entry, and needs that effect's decision (reset vs.
+  // restored) already settled. resetOrRestoreSettledRef makes that ordering
+  // requirement a live DEV-mode check rather than declaration-order-only.
+  useSurveyBrowserHistorySync(resetOrRestoreSettledRef);
 
   // ---------------------------------------------------------------------------
   // Resume-draft banner + autosave (localStorage draft; lib/draftAutosave.ts).
@@ -452,8 +480,23 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // offer and invocation 2 (the kept value) see it already consumed → the banner
   // would silently never appear in `pnpm dev` / e2e. So read the flag here and
   // mark it consumed in the mount effect below instead.
+  //
+  // F5 fix (docs/design-notes/switch-base-popup-behavior-log.md): also
+  // suppressed once `wasDraftRestoredThisBoot()` is true. That flag means
+  // `main.tsx`'s pre-mount `draftPersistence.loadDraft()` has ALREADY
+  // silently restored the freshest working-copy + traversal snapshot into
+  // these SAME stores this boot. `loadDraftMeta()` here reads the OTHER,
+  // independent draft engine (`lib/draftAutosave.ts`, coarser 1000ms debounce,
+  // installed earlier at first mount) — its record can legitimately be
+  // STALER than the one already applied. Offering a second "Resume" for an
+  // already-resumed session invites clicking it and silently regressing the
+  // wizard to that staler step (F5's exact symptom); a session that was NOT
+  // silently restored (a real "resume this later" localStorage-only session
+  // predating draftPersistence's pending-slot support, or one on another
+  // device/browser) is unaffected — `wasDraftRestoredThisBoot()` is false
+  // there, so this banner still offers normally.
   const [resumeMeta, setResumeMeta] = useState<DraftMeta | null>(() =>
-    resumeOfferConsumed ? null : loadDraftMeta(),
+    resumeOfferConsumed || wasDraftRestoredThisBoot() ? null : loadDraftMeta(),
   );
 
   // Cloud-restore offer (signed-in only): a server-backed draft found on load —
@@ -510,6 +553,19 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       if (cancelled || serverMeta === null) return;
       // Don't surprise an author who began working while the fetch was in flight.
       if (buildStudioDraft() !== null) return;
+      // F5 fix (freshness comparison, not blanket suppression):
+      // `wasDraftRestoredThisBoot()` means draftPersistence's boot-time
+      // `loadDraft()` already silently restored a local draft into these
+      // SAME stores this boot. That local restore can be STALER than a
+      // genuinely newer cloud draft (a cross-device save discovered on this
+      // boot) — so this offer is suppressed only when the just-restored
+      // local draft is AT LEAST AS FRESH as the cloud one; a strictly newer
+      // cloud draft is still offered. `restoredDraftSavedAt()` reads the
+      // envelope draftPersistence already parsed (no local restore this
+      // boot → null → the comparison never suppresses, same as before this
+      // fix for a fresh session).
+      const localSavedAt = restoredDraftSavedAt();
+      if (localSavedAt !== null && localSavedAt >= serverMeta.savedAt) return;
       setCloudResume(serverMetaToDraftMeta(serverMeta));
     });
     return () => {
@@ -539,15 +595,23 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const setValidatorFindings = useWorkingCopyStore((s) => s.setValidatorFindings);
 
   // ---------------------------------------------------------------------------
-  // P1 fix: double-instantiation guard.
+  // P1 fix (double-instantiation guard) + F1 fix (id-aware re-instantiation).
   //
   // For Track 1 (copy), setScaffoldSpec() causes a second compile run whose
-  // onInstantiate fires applyStepCompletion("choose_base")/instantiate a second
-  // time. The rebase-guard in instantiateFromBaseIfConfirmed may no-op the
-  // second call, but edit-state-dependent behavior is non-deterministic.
-  // Gate: the R3 side effect fires exactly once per session; reset on start-over.
+  // onInstantiate re-fires for the SAME base already committed. Originally
+  // gated by a plain boolean ("fire the R3 side effect at most once per
+  // session"), which also — as an unwanted side effect — made it impossible to
+  // ever re-instantiate for a genuinely DIFFERENT base chosen later in the same
+  // session (F1: docs/design-notes/switch-base-popup-behavior-log.md). The gate
+  // is now id-aware: it records WHICH base id doCommit has already committed,
+  // so a second settle for that SAME id (P1) is still a no-op, but a confirm
+  // for a DIFFERENT id (F1, after the synchronous rebase-confirm gate in
+  // BaseResolutionAdapter.onConfirm has already run) proceeds and re-runs
+  // doCommit's body. Null before any commit; reset to null on start-over; set
+  // to the restored base's id on résumé (see handleResumeDraft) so a résumé
+  // over an already-instantiated copy does not re-trigger doCommit either.
   // ---------------------------------------------------------------------------
-  const instantiatedRef = useRef<boolean>(false);
+  const instantiatedForBaseIdRef = useRef<string | null>(null);
 
   // ---------------------------------------------------------------------------
   // Preview-before-commit (choose_base step): the compile pipeline may settle
@@ -555,7 +619,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // several bases first). `onInstantiate` below only CAPTURES the settled
   // artifact here; the actual instantiation (`doCommit`) is deferred until
   // `baseConfirmed` flips true, via the effect that follows `onInstantiate`.
-  // Cleared alongside `instantiatedRef` on start-over.
+  // Cleared alongside `instantiatedForBaseIdRef` on start-over.
   // ---------------------------------------------------------------------------
   const pendingArtifactRef = useRef<{
     base: BaseKeyboard;
@@ -577,6 +641,62 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       autosaveTeardownRef.current = null;
     };
     // Teardown-on-unmount only; the ref itself is stable.
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // F6 fix (docs/design-notes/switch-base-popup-behavior-log.md): install the
+  // SAME durable-draft autosave for PRE-instantiation progress — wizard levels
+  // L1 (identity-lite) / L2 (an un-confirmed base preview) — under the
+  // reserved `DRAFT_PERSISTENCE_PENDING_KEY` slot. Before this, the autosave
+  // installer ran only from `doCommit` (i.e. only once a base was CONFIRMED),
+  // so a refresh before that point had nothing for `main.tsx`'s silent
+  // boot-time restore (`draftPersistence.loadDraft`, resolved via THIS
+  // module's own `ks.draft.active` pointer) to find — identity answers and an
+  // in-progress base preview were lost outright.
+  //
+  // Skipped when a real project key is ALREADY derivable at mount — a résumé
+  // (or an L3+ durable draft main.tsx already restored pre-mount) means the
+  // working copy is instantiated before this component ever renders, and
+  // `doCommit`'s own install (below) owns the real-project subscription for
+  // that case. Guarded on `autosaveTeardownRef.current === null` so
+  // StrictMode's double-invoked mount effect (no cleanup is returned; the ref
+  // itself is the idempotency guard, mirroring `instantiatedForBaseIdRef`'s
+  // pattern in this same file) never installs two overlapping subscriptions.
+  // `doCommit`'s existing teardown-then-reinstall
+  // (`autosaveTeardownRef.current?.()`) is what PROMOTES this pending
+  // subscription to the real one the moment the author actually confirms a
+  // base — see doCommit's cleanup of the abandoned pending record below.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (autosaveTeardownRef.current !== null) return;
+    if (deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState()) !== null) return;
+    autosaveTeardownRef.current = installDraftAutosave(DRAFT_PERSISTENCE_PENDING_KEY);
+    // Runs once on mount; deriveProjectKeyFromWorkingCopy/installDraftAutosave
+    // are stable module-level imports, and the refs are stable by construction.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * F6 fix — shared "promote the pending autosave to a real project key"
+   * step. Reads the CURRENT working-copy state via getState() (stable
+   * escape hatch, matching every other imperative read in this component) so
+   * it can be called from both `doCommit` (a genuine base confirm) and
+   * `handleResumeDraft` (a résumé via the OTHER draft engine's banner — see
+   * that handler's own call site below for why it needs this too: résumé
+   * pre-seeds `instantiatedForBaseIdRef` specifically so `doCommit` never
+   * fires for the restored base, so nothing else would ever promote the
+   * pending subscription away from `DRAFT_PERSISTENCE_PENDING_KEY` for that
+   * path without this). No-ops when no real project key is derivable yet
+   * (nothing to promote to).
+   */
+  const promotePendingAutosave = useCallback(() => {
+    const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    if (projectKey === null) return;
+    autosaveTeardownRef.current?.();
+    autosaveTeardownRef.current = installDraftAutosave(projectKey);
+    if (projectKey !== DRAFT_PERSISTENCE_PENDING_KEY) {
+      clearPersistenceDraft(DRAFT_PERSISTENCE_PENDING_KEY);
+    }
   }, []);
 
   // ---------------------------------------------------------------------------
@@ -681,8 +801,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         });
       },
       resolveBaseTouchJson: (vfs) => resolveBaseTouchJson(vfs),
-      instantiateFromBaseIfConfirmed: (base, opts) =>
-        instantiateFromBaseIfConfirmed(base, opts),
+      instantiateFromBaseIfConfirmed: (base, opts, options) =>
+        instantiateFromBaseIfConfirmed(base, opts, options),
       // spec-014 mutate seam (T014): read/write the working-copy carve IR for
       // the reducer's path-scoped mutate() apply. Read via getState() (stable,
       // no re-render churn); write via the OVERLAY-PRESERVING setWorkingIR action.
@@ -723,17 +843,22 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // applyStepCompletion("choose_base", ...), which routes Track 2 →
   // instantiateFromExisting, Track 1/default → instantiateFromBaseIfConfirmed.
   //
-  // instantiatedRef still gates this to fire exactly once per session — a
-  // second compile triggered by setScaffoldSpec (or a second confirm click)
-  // will not re-run the instantiate side effect (P1 fix).
+  // instantiatedForBaseIdRef gates this to fire at most once PER BASE ID: a
+  // second compile settle for the SAME base (setScaffoldSpec's re-compile, or
+  // a second confirm click on an unchanged base) is a no-op (P1 fix); a
+  // confirm for a DIFFERENT base id proceeds and re-runs the body below (F1
+  // fix). The rebase-confirm question itself is NOT asked here — by the time
+  // this runs, BaseResolutionAdapter.onConfirm has already resolved it
+  // synchronously (confirmRebaseTo); the `skipRebaseConfirm: true` passed to
+  // applyStepCompletion below tells the reducer not to ask a second time.
   // ---------------------------------------------------------------------------
   const doCommit = useCallback(
     (
       base: BaseKeyboard,
       { vfs, ir, removalCapabilities }: { vfs: VirtualFS; ir: KeyboardIR | null; removalCapabilities: Map<string, RemovalCapability> },
     ) => {
-      if (instantiatedRef.current) return;
-      instantiatedRef.current = true;
+      if (instantiatedForBaseIdRef.current === base.id) return;
+      instantiatedForBaseIdRef.current = base.id;
 
       // Spec 034's VR-5 used to call `replaceActiveDraftIfDifferentProject`
       // here: picking a new base DELETED the previously active project's
@@ -767,7 +892,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       const track = useSurveySessionStore.getState().selectedTrack;
       applyStepCompletion(
         "choose_base",
-        { base, vfs, ir, removalCapabilities, track: track ?? null },
+        { base, vfs, ir, removalCapabilities, track: track ?? null, skipRebaseConfirm: true },
         reducerDepsRef.current,
       );
 
@@ -776,19 +901,25 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // store state via getState() (identity.keyboardId falls back to
       // baseKeyboard.id — see draftPersistence.ts) so this resolves immediately
       // for both tracks, even before Track 1's Phase A sets a custom keyboardId.
-      // `instantiatedRef` above already guards this whole callback body to run
-      // at most once per mount, so `autosaveTeardownRef.current` is always null
-      // here; the `?.()` is defensive, not load-bearing.
-      const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
-      if (projectKey !== null) {
-        autosaveTeardownRef.current?.();
-        autosaveTeardownRef.current = installDraftAutosave(projectKey);
-      }
+      // F1 fix: `instantiatedForBaseIdRef` above only guards against a REPEAT
+      // commit for the SAME base id — a genuine base switch (a different id)
+      // reaches this point with a real prior autosave subscription still
+      // live, so `autosaveTeardownRef.current` is NO LONGER always null here;
+      // the `?.()` teardown-then-reinstall below is load-bearing (not
+      // defensive) for that case — it tears down the OLD project's autosave
+      // subscription before installing the NEW project's, so edits after a
+      // switch autosave under the new project key, not the abandoned one.
+      // F6 fix: promote pending -> real (see promotePendingAutosave's doc
+      // comment). Replaces the old inline "teardown + installDraftAutosave"
+      // pair with the shared helper so `handleResumeDraft` (below) can reuse
+      // the exact same promotion logic for its own résumé path.
+      promotePendingAutosave();
     },
     // Same escape hatch as the pre-preview-before-commit onInstantiate: all
     // reads are via getState()/reducerDepsRef.current (stable refs), not
     // React state, so an empty dep array is intentional here too.
-    [],
+    // promotePendingAutosave is itself an empty-deps useCallback (stable).
+    [promotePendingAutosave],
   );
 
   // ---------------------------------------------------------------------------
@@ -833,8 +964,17 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   // Working-copy transform — projects carve + assignments + identity into the OSK.
   // surveyPatternMap is empty until Phase C completes; null patternMap → skip assignments.
+  //
+  // previewedBaseId: localBase.id — bug F4. `localBase` drives the compile
+  // pipeline below (preview-before-commit) and can differ from the store's
+  // already-instantiated `baseKeyboard` when the author previews a candidate
+  // replacement base without having confirmed the switch yet. Passing it lets
+  // useWorkingCopyTransform suppress the carve/identity overlay for a
+  // candidate base it doesn't belong to, instead of projecting the committed
+  // base's carve deletions onto the candidate's freshly-fetched VFS.
   const workingCopyTransform = useWorkingCopyTransform({
     patternMap: surveyPatternMap.size > 0 ? surveyPatternMap : null,
+    previewedBaseId: localBase?.id ?? null,
   });
 
   // Use localBase (immediately updated on selection) to drive the pipeline.
@@ -844,23 +984,33 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // ---------------------------------------------------------------------------
   // Single-instantiation effect (preview-before-commit).
   //
-  // Runs `doCommit` at most once, and only once BOTH are true:
+  // Runs `doCommit` once BOTH are true:
   //   - the author has confirmed (`baseConfirmed`, set by
-  //     BaseResolutionAdapter's onConfirm — see editors/adapters/panelAdapters.tsx)
+  //     BaseResolutionAdapter's onConfirm — see editors/adapters/panelAdapters.tsx,
+  //     which has already synchronously resolved any rebase-confirm question
+  //     via confirmRebaseTo BEFORE flipping baseConfirmed — F1 fix)
   //   - the compile pipeline has actually settled for THAT SAME base
   //     (`pendingArtifactRef`, filled by `onInstantiate` above).
   //
-  // Confirm is now gated on `previewStatus === "ready"` in BaseResolution's
-  // commit button, so in practice `baseConfirmed` only flips true once the
-  // pipeline has already settled — the ref is already populated by the time
-  // this effect sees `baseConfirmed`. The `artifactStage`-triggered re-run
-  // (waiting for the ref to be filled after confirm) is retained purely as a
-  // defensive fallback, not a load-bearing path. The `art.base.id === lb.id`
-  // check guards against a stale ref from a PREVIOUS preview surviving a fast
+  // "At most once" is now per-base-id, not per-mount: `doCommit` itself
+  // early-returns via `instantiatedForBaseIdRef` when the settled artifact's
+  // base id has already been committed (P1's repeat-settle case), but
+  // proceeds — and re-instantiates — for a genuinely different confirmed base
+  // id (F1). This effect's own job is unchanged: hand `doCommit` whatever
+  // settled artifact matches the currently confirmed base, whenever that
+  // becomes true, in either order.
+  //
+  // Confirm is gated on `previewStatus === "ready"` in BaseResolution's commit
+  // button, so in practice `baseConfirmed` only flips true once the pipeline
+  // has already settled — the ref is already populated by the time this
+  // effect sees `baseConfirmed`. The `artifactStage`-triggered re-run (waiting
+  // for the ref to be filled after confirm) is retained purely as a defensive
+  // fallback, not a load-bearing path. The `art.base.id === lb.id` check
+  // guards against a stale ref from a PREVIOUS preview surviving a fast
   // re-preview.
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (!baseConfirmed || instantiatedRef.current) return;
+    if (!baseConfirmed) return;
     const art = pendingArtifactRef.current;
     const lb = useSurveySessionStore.getState().localBase;
     if (art && lb && art.base.id === lb.id) {
@@ -908,8 +1058,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // ---------------------------------------------------------------------------
   // Start over — reset session store first (clears all traversal slots + history),
   // then reset the working-copy store and local component state.
-  // Ordering: session.reset() before instantiatedRef.current = false so the
-  // guard is clear before any re-instantiation can fire (research D-R5).
+  // Ordering: session.reset() before instantiatedForBaseIdRef.current = null so
+  // the guard is clear before any re-instantiation can fire (research D-R5).
   // ---------------------------------------------------------------------------
   function handleStartOver() {
     // T024 (spec 034 US3, research D5, G-3): clear the durable draft (and the
@@ -921,6 +1071,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
     sessionReset();
     resetSurvey();
+    instantiatedForBaseIdRef.current = null;
     // Spec 053: start-over is an explicit "throw it away", and that includes the
     // decision trail — carrying the abandoned keyboard's decisions into the next
     // one would attribute them to a keyboard that never made them. The source
@@ -928,8 +1079,16 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // fresh one instead of diffing against the abandoned keyboard's text.
     useDecisionLogStore.getState().reset();
     snapshotterRef.current.reset();
-    instantiatedRef.current = false;
     pendingArtifactRef.current = null;
+    // F6 fix: re-arm the pre-instantiation pending autosave for the NEXT
+    // attempt in this SAME mount. The mount-time effect that installs it only
+    // ever runs once (empty deps — see its own comment), so a start-over
+    // without this would leave the second attempt's L1/L2 progress
+    // unpersisted until doCommit's own install fires again at that attempt's
+    // base-confirm. Installed against the freshly-reset stores above, so its
+    // synchronous initial save is a correct no-op (hasPendingProgress() is
+    // false immediately after reset).
+    autosaveTeardownRef.current = installDraftAutosave(DRAFT_PERSISTENCE_PENDING_KEY);
     // sessionReset() calls reset() which already clears charactersSubStage to
     // "prefill" (spec 027 Stage 4 — the store slot is the authoritative owner).
     // sessionReset() also clears baseConfirmed back to false via INITIAL_STATE.
@@ -953,9 +1112,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Resume banner handlers.
   //
   // Resume: restore both stores from the saved draft, then mark the working copy
-  // as already instantiated so the compile pipeline's onInstantiate does not
-  // re-run instantiateFromBase over the restored copy (which would pop the
-  // rebase-confirm dialog / risk discarding restored survey answers).
+  // as already instantiated FOR THE RESTORED BASE so the compile pipeline's
+  // onInstantiate does not re-run instantiateFromBase over the restored copy
+  // (which would pop the rebase-confirm dialog / risk discarding restored
+  // survey answers — F1/F2). Reads the restored base id back from the
+  // just-patched workingCopyStore rather than hardcoding `true`, so a LATER
+  // genuine switch to a DIFFERENT base (in the same session, after resume)
+  // still re-instantiates normally (F1 fix — see instantiatedForBaseIdRef).
   // Discard: drop the draft and continue fresh.
   // Either way, clearing resumeMeta hides the banner and starts autosave.
   // ---------------------------------------------------------------------------
@@ -975,8 +1138,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         // the shared transport (see serverDraftStore.ts's ServerDraftPayload).
         void loadServerDraftContent<StudioDraft>(accessToken, draftId).then((draft) => {
           if (applyStudioDraft(draft)) {
-            instantiatedRef.current = true;
+            instantiatedForBaseIdRef.current = useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
             setActiveProject(draftId);
+            // F6 fix: promote the pending durable-draft autosave (draftPersistence
+            // engine) to this now-restored real project — instantiatedForBaseIdRef
+            // above is set specifically so doCommit never fires for this base, so
+            // nothing else would ever perform this promotion for a résumé via
+            // THIS (the other, draftAutosave) engine's banner otherwise.
+            promotePendingAutosave();
           }
           setResumeMeta(null);
           setCloudResume(null);
@@ -985,7 +1154,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       }
     }
     if (applyDraft()) {
-      instantiatedRef.current = true;
+      instantiatedForBaseIdRef.current = useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
+      // F6 fix: same promotion as the cloud branch above.
+      promotePendingAutosave();
     }
     setResumeMeta(null);
     setCloudResume(null);
@@ -1059,7 +1230,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   //
   // The host handles done/unsupported terminals and the unknown-id error panel.
   // SurveyView retains: resizable panes, OSK right pane, validator, oskMode,
-  // pattern-map effect, instantiatedRef, onInstantiate (FR-009).
+  // pattern-map effect, instantiatedForBaseIdRef, onInstantiate (FR-009).
   // ---------------------------------------------------------------------------
 
   const stepHost = (

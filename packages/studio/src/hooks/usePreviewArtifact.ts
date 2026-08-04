@@ -167,7 +167,7 @@ export function usePreviewArtifact(): PreviewArtifact {
   // discarding the survey answers and leaving nothing valid to submit. So skip
   // entirely when the store already holds a working copy for this same base;
   // only genuinely NEW bases picked via this screen's own picker fall through to
-  // instantiate. Mirrors StudioShell's instantiatedRef gate, keyed on the store
+  // instantiate. Mirrors StudioShell's instantiatedForBaseIdRef gate, keyed on the store
   // (survives this screen's own mount/unmount) rather than a per-mount ref.
   const onInstantiate = useCallback<OnInstantiateCallback>((base, { vfs, ir, removalCapabilities }) => {
     const current = useWorkingCopyStore.getState().baseKeyboard;
@@ -177,7 +177,16 @@ export function usePreviewArtifact(): PreviewArtifact {
 
   // Working-copy transform — projects carve + identity layers into the pick-base
   // OSK. Returns null when the working copy is not yet instantiated.
-  const workingCopyTransform = useWorkingCopyTransform();
+  //
+  // previewedBaseId: this screen's own local `baseKeyboard` picker state (bug
+  // F4) — it can point at a candidate base the author is previewing that
+  // differs from the store's already-instantiated base (e.g. re-visiting the
+  // picker after a base was committed and carved). Without this, the
+  // candidate base's compile would receive the committed base's carve
+  // overlay (node ids that don't belong to it) and never reach "ready".
+  const workingCopyTransform = useWorkingCopyTransform({
+    previewedBaseId: baseKeyboard?.id ?? null,
+  });
 
   const activeSpec = pickerMode === "scaffold" ? scaffoldSpec : null;
   const { stage, retry, recompile } = useKeyboardArtifact(

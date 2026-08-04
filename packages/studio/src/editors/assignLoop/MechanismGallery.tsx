@@ -104,7 +104,10 @@ import {
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
 import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
 import type { PlacementSeedEntry } from "../../survey/placementSeeds.ts";
-import { getSuggestionForChar } from "../../survey/placementSeeds.ts";
+import {
+  getSuggestionForCharWithCasePair,
+  PLACEMENT_SEED_CONFIDENCE_THRESHOLD,
+} from "../../survey/placementSeeds.ts";
 import {
   KEY_OPTIONS,
   ALL_PICKABLE_KEYS,
@@ -1815,13 +1818,51 @@ export function MechanismGallery({
   // kbgen placement suggestion for the current character (null when no map or
   // no qualifying candidate). Memoized against currentChar + placementMap so it
   // only recomputes on actual input changes, not on unrelated re-renders.
+  //
+  // getSuggestionForCharWithCasePair additionally falls back to a synthesized
+  // S-08 suggestion for an UPPERCASE letter whose LOWERCASE case-pair sibling
+  // has a direct RALT (S-08) candidate — the uppercase then gets a RAlt+Shift
+  // suggestion on the same vkey instead of no suggestion at all. Same "" ->
+  // undefined bcp47 normalization useCasePairCompanion applies (an identity
+  // with an empty tag is "no locale", not "the empty locale").
+  const suggestionBcp47 =
+    identity?.bcp47 !== undefined && identity.bcp47 !== ""
+      ? identity.bcp47
+      : undefined;
   const suggestion = useMemo(
     (): PlacementSeedEntry | null =>
       placementMap !== undefined && currentChar !== null
-        ? getSuggestionForChar(currentChar, placementMap)
+        ? getSuggestionForCharWithCasePair(
+            currentChar,
+            placementMap,
+            PLACEMENT_SEED_CONFIDENCE_THRESHOLD,
+            suggestionBcp47,
+          )
         : null,
-    [currentChar, placementMap],
+    [currentChar, placementMap, suggestionBcp47],
   );
+
+  // Canonicalized modifier combo for the S-08 suggestion row's display text +
+  // aria-labels — derived from the candidate's OWN modifiers (never a
+  // hardcoded "RAlt"), so a case-pair fallback candidate's
+  // ["SHIFT","RALT"] renders as "Shift+RAlt". Falls back to bare RALT when
+  // the candidate carries no modifiers, mirroring handleSuggestionAccept's
+  // write-path fallback. Canonicalization can only throw for a mutually-
+  // exclusive combo (structurally unreachable for a seeder/fallback
+  // candidate); the catch keeps a display-only computation from ever
+  // crashing the gallery.
+  const suggestionComboTokens = useMemo<ModifierToken[]>(() => {
+    if (suggestion === null || suggestion.strategyId !== "S-08") return [];
+    const modifiers = suggestion.topCandidate.modifiers;
+    const tokens = (
+      modifiers.length > 0 ? modifiers : ["RALT"]
+    ) as ModifierToken[];
+    try {
+      return canonicalizeCombo(tokens);
+    } catch {
+      return tokens;
+    }
+  }, [suggestion]);
 
   // Whole-inventory leave-warning (soft gate) — computed from the SAME
   // MechanismAssignment map + lettersToAdd scope this gallery already uses
@@ -1953,6 +1994,12 @@ export function MechanismGallery({
     if (suggestion === null || currentChar === null) return;
     const { vkey } = suggestion.topCandidate;
     let assignment: MechanismAssignment;
+    // Set only by the S-08 branch below, to the LOWERCASE placement's own
+    // modifiers (never including SHIFT — see the guard there) — carries the
+    // ralt-layer companion's propose() call outside the branch so it fires
+    // AFTER recordAssignments below, once `assignment` is the exact object
+    // the proposal must reference (FR-008 identity guard).
+    let raltCompanionModifiers: ModifierToken[] | null = null;
     if (suggestion.strategyId === "S-01") {
       const cp =
         currentChar
@@ -1974,6 +2021,35 @@ export function MechanismGallery({
         source: "user",
       };
     } else if (suggestion.strategyId === "S-08") {
+      // Build from the candidate's OWN modifiers — never hardcode RALT.
+      // Mirrors the manual S-08 write path below (comboToKeySpec /
+      // canonicalizeCombo), so an uppercase case-pair fallback candidate
+      // (placementSeeds.ts's getSuggestionForCharWithCasePair, which supplies
+      // ["SHIFT","RALT"]) emits "[SHIFT RALT vkey]" rather than colliding with
+      // the lowercase's "[RALT vkey]". Falls back to bare RALT when the
+      // candidate carries no modifiers — today's kbgen seeder emits a direct
+      // S-08 candidate with modifiers: ["RALT"], but an empty list is guarded
+      // defensively rather than assumed.
+      const candidateModifiers = suggestion.topCandidate.modifiers;
+      // PlacementCandidate.modifiers are documented Keyman modifier tokens
+      // (placementMap.ts) — asserted rather than re-typed here, same as the
+      // manual S-08 badge label's `parts as ModifierToken[]` above.
+      const tokens = (
+        candidateModifiers.length > 0 ? candidateModifiers : ["RALT"]
+      ) as ModifierToken[];
+      let altgrKeyList: string;
+      try {
+        altgrKeyList = comboToKeySpec(canonicalizeCombo(tokens), vkey);
+      } catch {
+        // canonicalizeCombo only throws for a mutually-exclusive combo — a
+        // malformed kbgen/case-pair candidate should not crash the gallery;
+        // dismiss the suggestion rather than record a broken assignment.
+        markSuggestionResolved(currentChar);
+        devLog.warn(
+          `[MechanismGallery] handleSuggestionAccept: invalid modifier combo ${JSON.stringify(candidateModifiers)} for S-08 suggestion — dismissing`,
+        );
+        return;
+      }
       assignment = {
         scope: "individual",
         target: currentChar,
@@ -1983,13 +2059,28 @@ export function MechanismGallery({
             patternId: PATTERN_RALT,
             strategyId: "S-08",
             slotValues: {
-              altgrKeyList: `[RALT ${vkey}]`,
+              altgrKeyList,
               altgrOutputList: currentChar,
             },
           },
         ],
         source: "user",
       };
+      // Case-pair companion proposal (spec v1.3.1 §3c — propose-then-confirm)
+      // for the RAlt-layer counterpart, raised right after the author accepts
+      // THIS suggestion — the flow the user actually takes, rather than
+      // waiting for them to separately navigate to the uppercase character
+      // (which today only gets its OWN suggestion row via
+      // getSuggestionForCharWithCasePair, not this propose-then-confirm
+      // banner). Only when `tokens` has no SHIFT of its own: a candidate that
+      // already carries SHIFT is itself the uppercase case-pair fallback
+      // (placementSeeds.ts), so IT is the companion — proposing a further
+      // companion for it would double up. `useCasePairCompanion`'s own
+      // `caseCounterpart` direction check (toUpper only) independently
+      // suppresses this for an already-uppercase `currentChar`.
+      if (!tokens.includes("SHIFT")) {
+        raltCompanionModifiers = tokens;
+      }
     } else {
       markSuggestionResolved(currentChar);
       devLog.warn(
@@ -1999,6 +2090,33 @@ export function MechanismGallery({
     }
     recordAssignments([...sessionAssignments, assignment]);
     markSuggestionResolved(currentChar);
+    if (raltCompanionModifiers !== null) {
+      proposeCompanion({
+        mechanism: "ralt-layer",
+        originalChar: currentChar,
+        vkey,
+        baseModifiers: raltCompanionModifiers,
+        baseAssignment: assignment,
+        // "Counterpart already placed" (spec §Edge Cases): redundant if the
+        // counterpart already has a PATTERN_RALT mechanism whose altgrKeyList
+        // names this same vkey — mirrors the manual S-08 write path's
+        // word-boundary match on kmnRules (see the "Assign to a key" card's
+        // alreadyProduced above), applied to altgrKeyList instead.
+        alreadyProduced: (counterpart) =>
+          sessionAssignments.some(
+            (a) =>
+              a.target === counterpart &&
+              a.mechanisms.some((m) => {
+                const keyList = m.slotValues?.["altgrKeyList"];
+                return (
+                  m.patternId === PATTERN_RALT &&
+                  typeof keyList === "string" &&
+                  new RegExp(`\\b${vkey}\\b`).test(keyList)
+                );
+              }),
+          ),
+      });
+    }
     resetMethodState();
   }, [
     suggestion,
@@ -2007,6 +2125,7 @@ export function MechanismGallery({
     recordAssignments,
     resetMethodState,
     markSuggestionResolved,
+    proposeCompanion,
   ]);
 
   // Change: dismiss the suggestion row; pickers stay blank for manual selection.
@@ -2356,6 +2475,22 @@ export function MechanismGallery({
           // Guarded anyway: skip recording rather than crashing the gallery.
           return;
         }
+        // No ralt-layer case-pair companion proposal here (unlike the
+        // suggestion-accept path's handleSuggestionAccept, which does raise
+        // one). This "Assign to a key" card lets the author pick ANY combo of
+        // up to four ModifierTokens — chosenTokens may already include SHIFT
+        // (e.g. the author manually building the SHIFT+RALT companion
+        // itself), or be an unrelated combo (e.g. CTRL+ALT) that carries no
+        // case-pair meaning at all. Unlike the suggestion-accept path — whose
+        // candidate is always a kbgen-seeded, RALT-only lowercase placement,
+        // so "this base placement's own modifiers, plus SHIFT" is always a
+        // sound companion to propose — there is no reliable signal here that
+        // chosenTokens IS a lowercase case-pair's RALT layer rather than an
+        // arbitrary combo. Proposing unconditionally would misfire (double
+        // SHIFT, or a nonsensical companion for CTRL+ALT). Scope cut, not a
+        // defect: a future pass could special-case chosenTokens === ["RALT"]
+        // specifically, but that is a narrower rule than exists today for any
+        // other manual-apply companion.
         assignment = {
           scope: "individual",
           target: currentChar,
@@ -2529,6 +2664,52 @@ export function MechanismGallery({
 
     if (pendingCompanion.mechanism === "combo") {
       confirmComboCompanion(pendingCompanion);
+      return;
+    }
+
+    if (pendingCompanion.mechanism === "ralt-layer") {
+      // Stale-proposal guard — same rule as the physical branch below (FR-008):
+      // the assignment this was raised for must still be present, by reference.
+      if (!sessionAssignments.includes(pendingCompanion.baseAssignment)) {
+        clearCompanion();
+        return;
+      }
+      // The companion's modifiers are the lowercase placement's own modifiers
+      // with SHIFT added — the SAME comboToKeySpec/canonicalizeCombo builder
+      // the manual S-08 write path and the suggestion-accept fix use, so the
+      // emitted altgrKeyList shape can never drift between the three call
+      // sites. canonicalizeCombo only throws for a mutually-exclusive combo —
+      // structurally unreachable here since baseModifiers was itself already
+      // a valid, applied combo — but guarded the same defensive way as the
+      // other write paths rather than assumed.
+      let altgrKeyList: string;
+      try {
+        altgrKeyList = comboToKeySpec(
+          canonicalizeCombo([...pendingCompanion.baseModifiers, "SHIFT"]),
+          pendingCompanion.vkey,
+        );
+      } catch {
+        clearCompanion();
+        return;
+      }
+      const companionAssignment: MechanismAssignment = {
+        scope: "individual",
+        target: pendingCompanion.counterpart,
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_RALT,
+            strategyId: "S-08",
+            slotValues: {
+              altgrKeyList,
+              altgrOutputList: pendingCompanion.counterpart,
+            },
+          },
+        ],
+        source: "user",
+      };
+      recordAssignments([...sessionAssignments, companionAssignment]);
+      clearCompanion();
       return;
     }
 
@@ -3552,15 +3733,25 @@ export function MechanismGallery({
                     );
                     const charOrEmpty =
                       currentChar !== null ? displayChar(currentChar) : "";
-                    return suggestion.strategyId === "S-01"
-                      ? t({
-                          id: "editor.assignLoop.suggestion.replaceText",
-                          message: `Suggested: Replace ${keyName} with ${charOrEmpty}`,
-                        })
-                      : t({
-                          id: "editor.assignLoop.suggestion.raltText",
-                          message: `Suggested: Right Alt + ${keyName} for ${charOrEmpty}`,
-                        });
+                    if (suggestion.strategyId === "S-01") {
+                      return t({
+                        id: "editor.assignLoop.suggestion.replaceText",
+                        message: `Suggested: Replace ${keyName} with ${charOrEmpty}`,
+                      });
+                    }
+                    // S-08: derive the label from the candidate's OWN
+                    // modifiers (never hardcode "Right Alt") — reuses the
+                    // shared per-token label table + "+"-joined formatting
+                    // (modifierTokenLabel.ts) rather than a second copy, so a
+                    // case-pair fallback candidate's ["SHIFT","RALT"] renders
+                    // "Shift+RAlt" instead of the plain-RAlt lowercase text.
+                    const modifierLabel = formatModifierCombo(
+                      suggestionComboTokens,
+                    );
+                    return t({
+                      id: "editor.assignLoop.suggestion.raltText",
+                      message: `Suggested: ${modifierLabel} + ${keyName} for ${charOrEmpty}`,
+                    });
                   })()}
                 </p>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -3576,7 +3767,7 @@ export function MechanismGallery({
                           })
                         : t({
                             id: "editor.assignLoop.suggestion.acceptRaltAriaLabel",
-                            message: `Accept suggestion: RAlt + ${suggestion.topCandidate.vkey} for ${currentChar}`,
+                            message: `Accept suggestion: ${formatModifierCombo(suggestionComboTokens)} + ${suggestion.topCandidate.vkey} for ${currentChar}`,
                           })
                     }
                     style={{

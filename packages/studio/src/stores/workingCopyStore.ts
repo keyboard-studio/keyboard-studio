@@ -664,13 +664,13 @@ function seedIrAxesFromBaseIr(
  *    phaseResults) exactly as they stood. This guards against setScaffoldSpec()
  *    triggering a second compile whose onInstantiate would otherwise re-apply
  *    this call's (possibly different/default) removalCapabilities and reset
- *    the carve overlay for no reason — see StudioShell's instantiatedRef
+ *    the carve overlay for no reason — see StudioShell's instantiatedForBaseIdRef
  *    comment. The mode conjunct matters because a SAME-id call can also arrive
  *    from a genuine Track switch: e.g. the working copy was instantiated via
  *    the OTHER track for keyboard X, and the user then independently
  *    re-selects keyboard X via a different entry point (e.g. the
  *    Preview/Output screen's own base picker — usePreviewArtifact runs its own
- *    decoupled pipeline, outside the main survey's instantiatedRef gate — see
+ *    decoupled pipeline, outside the main survey's instantiatedForBaseIdRef gate — see
  *    confirmRebase.ts / instantiateFromBaseIfConfirmed), which fires the
  *    action for the same id but the OTHER mode. An id-only guard would wrongly
  *    no-op and strand the working copy in the old track/identity mode instead

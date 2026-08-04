@@ -2,10 +2,10 @@
 
 **Feature**: [../spec.md](../spec.md) · **Data model**: [../data-model.md](../data-model.md)
 
-This is the interface the three placement mechanisms share so FR-011 ("the interaction reads
+This is the interface the four placement mechanisms share so FR-011 ("the interaction reads
 identically regardless of mechanism") holds structurally rather than by convention. Consumers are
-`MechanismGallery` (physical + S-02 dead key), `SequenceBuilderPanel` (S-03, via a callback into
-MechanismGallery's hook), and `TouchGallery`.
+`MechanismGallery` (physical + S-02 dead key + RAlt-layer), `SequenceBuilderPanel` (S-03, via a
+callback into MechanismGallery's hook), and `TouchGallery`.
 
 ## `useCasePairCompanion` — the hook
 
@@ -61,7 +61,7 @@ interface CasePairProposalBannerProps {
 |---|---|
 | Structure | `role="note"`, one prompt line, Confirm + Dismiss buttons — the existing MechanismGallery banner (L2966–3050), lifted verbatim including its styling. |
 | i18n | Keeps the shipped ids `editor.assignLoop.companion.ariaLabel`, `.prompt`, `.confirmButton`, `.declineButton`, `.confirmAriaLabel`, `.declineAriaLabel`. Ids are permanent handles — reuse, do not rename (spec §18 / i18n conventions). |
-| Per-mechanism wording | The prompt names the parallel slot ("the shift layer of the same key" / "the uppercase combo" / "the shift layer"). New mechanism-specific ids are additive: `editor.assignLoop.companion.prompt.combo`, `.prompt.touch`. The physical id keeps its current message so its existing translations survive. |
+| Per-mechanism wording | The prompt names the parallel slot ("the shift layer of the same key" / "the uppercase combo" / "the shift layer" / "the Shift+RAlt layer of the same key"). New mechanism-specific ids are additive: `editor.assignLoop.companion.prompt.combo`, `.prompt.touch`, `.prompt.raltLayer`. The physical id keeps its current message so its existing translations survive. |
 | No new controls | No "apply to all", no third button (spec Out of scope: bulk actions). |
 
 ## Confirm contracts, per mechanism
@@ -98,9 +98,31 @@ input side and output side both case-shifted through `caseCounterpart`:
 ### Touch (FR-005)
 
 Appends a touch ref for `counterpart` via `appendMechanismToChar`, carrying the same `hostKey` and
-`layer: targetLayer` (`casePairTouchLayer(editingLayer)`). Because the counterpart is a different
+`layer: targetLayer` (`casePairTouchTarget(editingCombo, isComboInUse).layer`). Because the counterpart is a different
 character, this creates its own `charTouch` entry and cannot interact with the source character's
 `touch_inherited` exclusivity rules.
+
+### RAlt layer (S-08, `modifier_as_layer_switch`)
+
+Raised only from `handleSuggestionAccept`'s S-08 branch — when the author accepts the seeded
+`modifier_as_layer_switch` (RAlt) suggestion for a lowercase cased letter, not from the "Assign to a
+key" card's manual RAlt combo picker, which has no reliable signal that an arbitrary chosen combo is a
+lowercase case-pair's RAlt layer rather than an unrelated combo (see the comment at that call site).
+`baseModifiers` is the lowercase placement's own modifiers (e.g. `["RALT"]`) and never includes
+`SHIFT` itself — the confirm handler adds it:
+
+- Builds `altgrKeyList` via `comboToKeySpec(canonicalizeCombo([...baseModifiers, "SHIFT"]), vkey)` —
+  the same builder the manual S-08 write path and the suggestion-accept fix use, so the emitted shape
+  can never drift between call sites.
+- Appends a new `MechanismAssignment` targeting `counterpart`, with one `PATTERN_RALT` / `S-08`
+  mechanism whose `slotValues` are `{ altgrKeyList, altgrOutputList: counterpart }` — e.g. a lowercase
+  on `[RALT K_F]` proposing its uppercase records `[SHIFT RALT K_F]`.
+- "Counterpart already placed" is checked via `alreadyProduced`: redundant if `counterpart` already
+  has a `PATTERN_RALT` mechanism whose `altgrKeyList` names this same `vkey`.
+- Stale-base guard: same FR-008 identity check as the physical branch — if `baseAssignment` is no
+  longer present in the session assignments, `clearCompanion()` and record nothing.
+- See `RaltLayerProposalParts` and the `mechanism === "ralt-layer"` branch of `handleCompanionConfirm`
+  in `casePairCompanion.ts` / `MechanismGallery.tsx`.
 
 ## Dismiss contract
 
@@ -119,5 +141,7 @@ character, this creates its own `charTouch` entry and cannot interact with the s
 | Combo confirm records the parallel ref; trigger/indicator unchanged | `MechanismGallery.test.tsx`, `SequenceBuilderPanel.test.tsx` |
 | Multi-char sequence content raises nothing | `SequenceBuilderPanel.test.tsx` |
 | Touch confirm records `layer: "shift"` for the counterpart | `TouchGallery.test.tsx` |
+| RAlt-layer confirm records a `PATTERN_RALT`/`S-08` assignment with `altgrKeyList` = `[SHIFT RALT <vkey>]` | `MechanismGallery.test.tsx` |
+| RAlt-layer: "already produced" suppresses a redundant proposal | `MechanismGallery.test.tsx` |
 | Confirm applies to the raising placement when a character has multiple mechanisms | `MechanismGallery.test.tsx` |
 | Stale base (removed before confirm) records nothing | `MechanismGallery.test.tsx` |

@@ -9,7 +9,7 @@ studio-local UI state or a new **slot value** on an existing `MechanismRef`.
 
 ## 1. `CasePairProposal` (new, studio-local)
 
-The spec's "Case-pair suggestion" entity. A discriminated union over the three mechanisms, so the
+The spec's "Case-pair suggestion" entity. A discriminated union over the four mechanisms, so the
 mechanism-specific apply data is type-checked rather than optional-everything.
 
 **Location**: `packages/studio/src/editors/assignLoop/casePairCompanion.ts`
@@ -39,10 +39,22 @@ type CasePairProposal =
   | (CasePairProposalCommon & {
       mechanism: "touch";
       hostKey: string;
-      /** Layer the parallel placement targets — casePairTouchLayer(editingLayer). */
+      /** Layer the parallel placement targets — casePairTouchTarget(editingCombo, isComboInUse).layer. */
       targetLayer: TouchLayerId;
+      /** Human-readable name for that layer ("Shift", "Shift+RAlt") — labelled
+       *  from the same combo the id flattens from, so the banner can NAME the
+       *  target. The layer is not always the shift layer. */
+      targetLayerLabel: string;
       /** Identity of the touch mechanism ref this was raised for. */
       baseRef: MechanismRef;
+    })
+  | (CasePairProposalCommon & {
+      mechanism: "ralt-layer";
+      vkey: string;
+      /** The lowercase placement's own modifiers (e.g. ["RALT"]) — never
+       *  includes SHIFT itself; the confirm handler adds it. */
+      baseModifiers: ModifierToken[];
+      baseAssignment: MechanismAssignment;
     });
 ```
 
@@ -54,7 +66,9 @@ type CasePairProposal =
 | `counterpart` | **Only** from `caseCounterpart(originalChar, bcp47)` with `direction === "toUpper"`. A `null` result means no proposal is constructed (FR-002). |
 | `capsHandling` | Physical only. From `planShiftAssignment(ir, "main", vkey).capsHandling`. Selects the confirm branch (research R10). |
 | `baseAssignment` / `baseRef` | Object identity, never target/index (FR-008). A proposal whose base object is no longer present in the assignment list is **stale**: dismiss silently, record nothing. |
-| `targetLayer` | Touch only. Always `casePairTouchLayer(editingLayer)`; never a literal. |
+| `targetLayer` | Touch only. Always `casePairTouchTarget(editingCombo, isComboInUse).layer` — the edited layer's modifier combo **plus SHIFT**, keyed on the combo and not on the flattened layer id; never a literal. |
+| `targetLayerLabel` | Touch only. `touchLayerComboLabel` of the same target's combo. The banner names the target layer, which is `shift` only when the base layer was being edited. |
+| `baseModifiers` | RAlt-layer only. The lowercase placement's own `ModifierToken`s (e.g. `["RALT"]`), captured at the moment the S-08 suggestion is accepted. Never includes `SHIFT` — the confirm handler adds it when building the parallel `altgrKeyList`. |
 
 ### Lifecycle
 
@@ -74,8 +88,13 @@ persistence, so no stale dismissal state.
 1. `caseCounterpart` returns `null`, or `direction !== "toUpper"` (FR-002, uppercase→lowercase is out of scope).
 2. Physical: `!shiftLayerAllowed` (mnemonic layout) or the apply targeted the shift layer already (FR-010).
 3. Combo: the input side is not a single cased character with a non-null counterpart (research R4).
-4. Touch: no counterpart, or `casePairTouchLayer(editingLayer)` returns `null`.
-5. Any mechanism: the counterpart is **already produced on the parallel slot** (spec Edge Cases).
+4. Touch: no counterpart, or `casePairTouchTarget(editingCombo, isComboInUse)` returns `null` — the edited layer already carries SHIFT/CAPS, or its combo-plus-SHIFT is a combo this keyboard never uses.
+5. RAlt-layer: raised only from the S-08 suggestion-accept path (never the manual "Assign to a key"
+   RAlt combo picker, which has no reliable signal that an arbitrary chosen combo is a lowercase
+   case-pair's RAlt layer); suppressed when `baseModifiers` already includes `SHIFT`.
+6. Any mechanism: the counterpart is **already produced on the parallel slot** (spec Edge Cases) — for
+   RAlt-layer, this means `counterpart` already has a `PATTERN_RALT` mechanism whose `altgrKeyList`
+   names the same `vkey`.
 
 ---
 

@@ -275,3 +275,62 @@ describe("useCasePairCompanion — Georgian suppression", () => {
     expect(proposal?.counterpart).toBe("Θ");
   });
 });
+
+describe("useCasePairCompanion — ralt-layer proposal", () => {
+  beforeEach(() => {
+    useWorkingCopyStore.getState().setIdentity(null);
+  });
+
+  /** Raise a ralt-layer proposal for `char` and return { raised, proposal }. */
+  function proposeRaltLayer(
+    char: string,
+    opts?: { alreadyProduced?: (counterpart: string) => boolean },
+  ) {
+    const { result } = renderHook(() => useCasePairCompanion());
+    let raised = false;
+    act(() => {
+      raised = result.current.propose({
+        mechanism: "ralt-layer",
+        originalChar: char,
+        vkey: "K_F",
+        baseModifiers: ["RALT"],
+        baseAssignment: baseAssignment(char),
+        alreadyProduced: opts?.alreadyProduced,
+      });
+    });
+    return { raised, proposal: result.current.proposal };
+  }
+
+  it("proposing for a lowercase char yields a proposal whose counterpart is the uppercase, carrying vkey + baseModifiers", () => {
+    // ƒ (U+0192) -> Ƒ (U+0191).
+    const { raised, proposal } = proposeRaltLayer("ƒ");
+    expect(raised).toBe(true);
+    expect(proposal?.mechanism).toBe("ralt-layer");
+    expect(proposal?.originalChar).toBe("ƒ");
+    expect(proposal?.counterpart).toBe("Ƒ");
+    if (proposal?.mechanism === "ralt-layer") {
+      expect(proposal.vkey).toBe("K_F");
+      expect(proposal.baseModifiers).toEqual(["RALT"]);
+    }
+  });
+
+  it("raises nothing for a Georgian-style (orthographically unicameral) char", () => {
+    const { raised, proposal } = proposeRaltLayer("ა");
+    expect(raised).toBe(false);
+    expect(proposal).toBeNull();
+  });
+
+  it("raises nothing for the toLower direction (an already-uppercase char)", () => {
+    const { raised, proposal } = proposeRaltLayer("Ƒ");
+    expect(raised).toBe(false);
+    expect(proposal).toBeNull();
+  });
+
+  it("raises nothing when the counterpart is already produced", () => {
+    const { raised, proposal } = proposeRaltLayer("ƒ", {
+      alreadyProduced: () => true,
+    });
+    expect(raised).toBe(false);
+    expect(proposal).toBeNull();
+  });
+});
