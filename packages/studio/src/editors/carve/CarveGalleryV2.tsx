@@ -68,6 +68,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const removalCapabilities = useWorkingCopyStore((s) => s.removalCapabilities);
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const confirmedInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  // Target-language display name (e.g. "Russian"), sourced the same way Phase A's
+  // identity resolution already populates it — used only for the optional
+  // cross-script-Latin group's "...for a {name}-only keyboard" copy (RemovalBanner).
+  const identityDisplayName = useWorkingCopyStore((s) => s.identity?.displayName);
   const isItemDeleted = useWorkingCopyStore((s) => s.isItemDeleted);
   // Subscribed PURELY to force a re-render when the set mutates —
   // isItemDeleted above is a stable `(id) => get().deletedItemIds.has(id)`
@@ -263,6 +267,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
       <RemovalBanner
         recommended={recommended}
         languageLabel={identityBcp47 ?? 'your target language'}
+        languageDisplayName={identityDisplayName}
         onRemoveSelected={handleRemoveSelectedRecommended}
       />
 

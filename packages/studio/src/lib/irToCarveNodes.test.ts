@@ -2527,20 +2527,23 @@ describe('recommendedRemovalChars', () => {
     });
   });
 
-  // #526 fix 1: a non-Latin target's base ASCII Latin alphabet (desktop
-  // base-layout fall-through, spec 040) must never be recommended for
-  // removal — it's the OS default a bare base-layer key falls through to,
-  // not a surplus character the author added.
-  describe('cross-script ASCII Latin fall-through guard (#526 fix 1)', () => {
-    it('does NOT recommend surplus ASCII Latin on a Cyrillic (ru-Cyrl, explicit script subtag) target', () => {
+  // Post-#526 follow-on (product decision): a non-Latin target's base ASCII
+  // Latin alphabet (desktop base-layout fall-through, spec 040) is no longer
+  // hard-excluded from removal recommendations — it is tagged
+  // `reason: 'cross-script-latin'` and surfaced as a separate, optional,
+  // low-priority group instead (the banner's job), rather than silently kept.
+  describe('cross-script ASCII Latin fall-through — optional, low-priority group (#526 follow-on)', () => {
+    it('recommends surplus ASCII Latin on a Cyrillic (ru-Cyrl, explicit script subtag) target, tagged cross-script-latin', () => {
       const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
 
       const result = recommendedRemovalChars({ ir, needed: new Set(['q']), bcp47: 'ru-Cyrl' });
 
-      expect(result.map((r) => r.ch)).not.toContain('y');
+      const row = result.find((r) => r.ch === 'y');
+      expect(row).toBeDefined();
+      expect(row?.reason).toBe('cross-script-latin');
     });
 
-    it('does NOT recommend surplus ASCII Latin on a bare "ru" target once langtags has resolved its Cyrillic default script (no explicit script subtag — exercises the getLoadedLangtags() fallback)', async () => {
+    it('recommends surplus ASCII Latin on a bare "ru" target once langtags has resolved its Cyrillic default script (no explicit script subtag — exercises the getLoadedLangtags() fallback), tagged cross-script-latin', async () => {
       // Preload the module synchronously the same way the survey's IdentityLite
       // step already does before an author reaches Carve, so
       // getLoadedLangtags() inside targetScriptIsLatin resolves non-null here.
@@ -2549,33 +2552,60 @@ describe('recommendedRemovalChars', () => {
 
       const result = recommendedRemovalChars({ ir, needed: new Set(['q']), bcp47: 'ru' });
 
-      expect(result.map((r) => r.ch)).not.toContain('y');
+      const row = result.find((r) => r.ch === 'y');
+      expect(row).toBeDefined();
+      expect(row?.reason).toBe('cross-script-latin');
     });
 
-    it('STILL recommends a surplus ASCII Latin letter on a Latin (bfd-Latn) target — no regression', () => {
+    it('STILL recommends a surplus ASCII Latin letter on a Latin (bfd-Latn) target — no regression, and no cross-script-latin tag', () => {
       const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
 
       const result = recommendedRemovalChars({ ir, needed: new Set(['q']), bcp47: 'bfd-Latn' });
 
-      expect(result.map((r) => r.ch)).toContain('y');
+      const row = result.find((r) => r.ch === 'y');
+      expect(row).toBeDefined();
+      expect(row?.reason).toBeUndefined();
     });
 
-    it('STILL recommends surplus ASCII Latin when bcp47 is unknown/empty — fail-open unchanged', () => {
+    it('STILL recommends surplus ASCII Latin when bcp47 is unknown/empty — fail-open unchanged, no tag', () => {
       const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
 
       const result = recommendedRemovalChars({ ir, needed: new Set(['q']), bcp47: '' });
 
-      expect(result.map((r) => r.ch)).toContain('y');
+      const row = result.find((r) => r.ch === 'y');
+      expect(row).toBeDefined();
+      expect(row?.reason).toBeUndefined();
     });
 
-    it('mirrors the same guard in annotateRemovalRecommendations — a group producing only ASCII Latin is "none" on a Cyrillic target', () => {
+    it('the primary (non-optional) subset excludes cross-script-latin rows — the banner-split contract', () => {
+      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+      const result = recommendedRemovalChars({ ir, needed: new Set(['q']), bcp47: 'ru-Cyrl' });
+      const primary = result.filter((r) => r.reason !== 'cross-script-latin');
+
+      expect(primary.map((r) => r.ch)).not.toContain('y');
+    });
+
+    it('mirrors the same signal in annotateRemovalRecommendations — a group producing only ASCII Latin is "high" (not suppressed) on a Cyrillic target, tagged recommendationReason', () => {
       const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
       const nodes = toRailNodes(ir);
 
       const result = annotateRemovalRecommendations(nodes, ir, new Set(['q']), null, 'ru-Cyrl');
 
       const group = result.find((n) => n.kind === 'group');
-      expect(group?.recommendation).toBe('none');
+      expect(group?.recommendation).toBe('high');
+      expect(group?.recommendationReason).toBe('cross-script-latin');
+    });
+
+    it('does NOT tag recommendationReason on a Latin (bfd-Latn) target — no regression', () => {
+      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+      const nodes = toRailNodes(ir);
+
+      const result = annotateRemovalRecommendations(nodes, ir, new Set(['q']), null, 'bfd-Latn');
+
+      const group = result.find((n) => n.kind === 'group');
+      expect(group?.recommendation).toBe('high');
+      expect(group?.recommendationReason).toBeUndefined();
     });
   });
 });
