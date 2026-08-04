@@ -90,10 +90,17 @@ export {
   buildComboKeyMap,
   addableTouchLayerTokens,
   optionsForTouchLayerSlot,
+  TOUCH_LAYER_PRECEDENCE_ORDER,
 } from "./modifierCombos.js";
 export type { ModifierToken } from "./modifierCombos.js";
 
-export { touchKeyAddress, touchSubKeyAddress, touchFlickAddress } from "./touchKeyAddress.js";
+export {
+  touchKeyAddress,
+  touchSubKeyAddress,
+  touchFlickAddress,
+  parseTouchKeyAddress,
+} from "./touchKeyAddress.js";
+export type { TouchKeyAddressParts } from "./touchKeyAddress.js";
 
 export { enumerateTouchMethodsForChar } from "./enumerateTouchMethodsForChar.js";
 export type { TouchMethodDescriptor } from "./enumerateTouchMethodsForChar.js";
@@ -108,7 +115,12 @@ export type {
   ApplyTouchKeycapRemovalsToRawJsonResult,
 } from "./applyTouchKeycapRemovalsToVfs.js";
 
-export { resolveKeyAddress, resolveSubKeyEntry, applyFieldSemantics } from "./keyEditOps.js";
+export {
+  resolveKeyAddress,
+  resolveSubKeyEntry,
+  applyFieldSemantics,
+  declaredOperationOutput,
+} from "./keyEditOps.js";
 export type {
   KeyEditOperation,
   KeyEditOperationBase,
@@ -138,6 +150,9 @@ export type {
   ApplyKeyEditsToLayoutResult,
   ReplayKeyEditOverlayResult,
 } from "./applyKeyEditsToLayout.js";
+
+export { applyKeyEditsToVfs } from "./applyKeyEditsToVfs.js";
+export type { ApplyKeyEditsToVfsResult } from "./applyKeyEditsToVfs.js";
 
 export { decomposeLayerId, groupLayerFamilies } from "./layerFamilies.js";
 export type {

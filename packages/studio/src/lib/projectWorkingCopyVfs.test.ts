@@ -11,14 +11,32 @@
 //   8. Assignments skipped when there are no physical assignments.
 //   9. VFS is mutated in-place (same object reference before/after).
 //  10. Caller-supplied `getPattern` resolver is forwarded to applyAssignmentsToVfs.
+//  11. (spec 058 T052) Key edit overlay projection: step 1.7 (layout half) and
+//      its rule-half sibling run after step 1.6 and before step 2; an empty
+//      overlay leaves both `.keyman-touch-layout` and `.kmn` byte-identical;
+//      a pass failure in either half is reported as a warning and does not
+//      abort the chain; a `set` op preserves every untouched key and
+//      platform-level field the IR does not model (Case B, SC-006).
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
+import type { KeyEditOperation } from "@keyboard-studio/engine";
+
+// `touchKeyAddress` itself is not imported here (a static top-level value
+// import of the mocked "@keyboard-studio/engine" module would force the
+// vi.mock factory below to run during THIS file's own ESM link phase,
+// before the spy `const`s it references have been initialized — a
+// `ReferenceError`, not a hoisting quirk to work around). The
+// "<platform>:<layerId>:<keyId>" format is a stable, documented wire
+// format (touchKeyAddress.ts), so it is safe to build inline here.
+function touchKeyAddress(platform: string, layerId: string, keyId: string): string {
+  return `${platform}:${layerId}:${keyId}`;
+}
 
 // ---------------------------------------------------------------------------
-// Spy on the three engine functions
+// Spy on the engine functions this projection calls
 // ---------------------------------------------------------------------------
 
 const applyCarveToVfsSpy = vi.fn(
@@ -26,25 +44,52 @@ const applyCarveToVfsSpy = vi.fn(
     warnings: [] as string[],
   }),
 );
+/** Records the order the projection invokes touchKeycapRemovals / keyEdits /
+ *  assignments in — the T052 "1.7 runs after 1.6 and before 2" obligation. */
+const callOrder: string[] = [];
 const applyAssignmentsToVfsSpy = vi.fn(
-  (_vfs: unknown, _id: string, _a: unknown, _fn: unknown) => ({
-    kmn: "c mock",
-    warnings: [] as string[],
-  }),
+  (_vfs: unknown, _id: string, _a: unknown, _fn: unknown) => {
+    callOrder.push("assignments");
+    return { kmn: "c mock", warnings: [] as string[] };
+  },
 );
 const applyIdentityStubMutationSpy = vi.fn(
   (_vfs: unknown, _id: string, _identity: unknown): void => {
     /* no-op */
   },
 );
+// Passthrough-by-default spies (real implementation, wired below once the
+// module is first resolved) — unlike the three above, these two need their
+// REAL behaviour for the ordering/correctness tests, while still letting
+// individual tests override with `.mockImplementationOnce` to simulate a
+// pass failure without touching every other test in this file.
+const applyTouchKeycapRemovalsToVfsSpy = vi.fn();
+const applyKeyEditsToVfsSpy = vi.fn();
+/** Passthrough-by-default spy on `emitKmn`, so the rule-half-failure test can
+ *  force a single throw from inside projectWorkingCopyVfs's own try/catch
+ *  without touching the (many) other tests in this file that rely on a real
+ *  .kmn re-emit (id-rename, etc.). */
+const emitKmnSpy = vi.fn();
 
 vi.mock("@keyboard-studio/engine", async (importOriginal) => {
   const original = await importOriginal<typeof import("@keyboard-studio/engine")>();
+  applyTouchKeycapRemovalsToVfsSpy.mockImplementation((...args: Parameters<typeof original.applyTouchKeycapRemovalsToVfs>) => {
+    callOrder.push("touchKeycapRemovals");
+    return original.applyTouchKeycapRemovalsToVfs(...args);
+  });
+  applyKeyEditsToVfsSpy.mockImplementation((...args: Parameters<typeof original.applyKeyEditsToVfs>) => {
+    callOrder.push("keyEdits");
+    return original.applyKeyEditsToVfs(...args);
+  });
+  emitKmnSpy.mockImplementation((...args: Parameters<typeof original.emitKmn>) => original.emitKmn(...args));
   return {
     ...original,
     applyCarveToVfs: applyCarveToVfsSpy,
     applyAssignmentsToVfs: applyAssignmentsToVfsSpy,
     applyIdentityStubMutation: applyIdentityStubMutationSpy,
+    applyTouchKeycapRemovalsToVfs: applyTouchKeycapRemovalsToVfsSpy,
+    applyKeyEditsToVfs: applyKeyEditsToVfsSpy,
+    emitKmn: emitKmnSpy,
   };
 });
 
@@ -80,10 +125,12 @@ function makeTouchAssignment(patternId: string): MechanismAssignment {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  callOrder.length = 0;
 });
 
 afterEach(() => {
   vi.clearAllMocks();
+  callOrder.length = 0;
 });
 
 // ---------------------------------------------------------------------------
@@ -657,5 +704,342 @@ group(main) using keys
     const kmn = renamed?.content as string;
     expect(kmn).toContain("store(&KEYBOARDVERSION) '2.3'");
     expect(kmn).not.toContain("store(&KEYBOARDVERSION) '1.0'");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 058 T052 — key edit overlay projection (step 1.7 layout half + the
+// rule-half sibling). Uses the REAL applyKeyEditsToVfs / parseKmn / emitKmn
+// (the mock above passes them through by default), not canned mocks, so
+// these tests exercise genuine Case B splicing and genuine .kmn re-emit.
+// ---------------------------------------------------------------------------
+
+const KEY_EDIT_KMN = `store(&VERSION) '10.0'
+store(&NAME) 'Test'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+group(main) using keys
++ [T_A] > 'a'
++ [T_B] > 'b'
+`;
+
+/** A touch layout with a platform-level field (`font`) the IR does not
+ *  model, and two keys — used by the "untouched key + platform field
+ *  survives" (SC-006) test. */
+function makeKeyEditTouchLayoutJson(): string {
+  return JSON.stringify({
+    phone: {
+      font: "Arial",
+      layer: [
+        {
+          id: "default",
+          row: [
+            {
+              id: 1,
+              key: [
+                { id: "T_A", text: "A", sp: 0 },
+                { id: "T_B", text: "B", sp: 0 },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  });
+}
+
+function makeKeyEditVfs() {
+  return createVirtualFS([
+    { path: "source/test_kb.kmn", content: KEY_EDIT_KMN, isBinary: false },
+    {
+      path: "source/test_kb.keyman-touch-layout",
+      content: makeKeyEditTouchLayoutJson(),
+      isBinary: false,
+    },
+  ]);
+}
+
+describe("projectWorkingCopyVfs — key edit overlay: empty overlay is a no-op", () => {
+  it("leaves .keyman-touch-layout and .kmn byte-identical when keyEditOps is empty", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = makeKeyEditVfs();
+    const beforeTouch = vfs.get("source/test_kb.keyman-touch-layout")?.content;
+    const beforeKmn = vfs.get("source/test_kb.kmn")?.content;
+
+    const { warnings } = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+      keyEditOps: [],
+    });
+
+    expect(vfs.get("source/test_kb.keyman-touch-layout")?.content).toBe(beforeTouch);
+    expect(vfs.get("source/test_kb.kmn")?.content).toBe(beforeKmn);
+    expect(applyKeyEditsToVfsSpy).not.toHaveBeenCalled();
+    expect(warnings.some((w) => w.includes("key edit"))).toBe(false);
+  });
+
+  it("is also a no-op when keyEditOps is omitted entirely", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = makeKeyEditVfs();
+    const beforeTouch = vfs.get("source/test_kb.keyman-touch-layout")?.content;
+    const beforeKmn = vfs.get("source/test_kb.kmn")?.content;
+
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+      // keyEditOps intentionally omitted
+    });
+
+    expect(vfs.get("source/test_kb.keyman-touch-layout")?.content).toBe(beforeTouch);
+    expect(vfs.get("source/test_kb.kmn")?.content).toBe(beforeKmn);
+    expect(applyKeyEditsToVfsSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("projectWorkingCopyVfs — key edit overlay: ordering (step 1.7 after 1.6, before step 2)", () => {
+  it("invokes touch-method deletions, then key edits, then assignments, in that order", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = makeKeyEditVfs();
+    const setOp: KeyEditOperation = {
+      seq: 1,
+      kind: "set",
+      address: touchKeyAddress("phone", "default", "T_B"),
+      fields: { text: "Z" },
+    };
+
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      // Non-empty so step 1.6 actually fires (targets a DIFFERENT key than
+      // the one the set op touches, so both passes have real work to do).
+      deletedTouchKeyIds: new Set([touchKeyAddress("phone", "default", "T_A")]),
+      keyEditOps: [setOp],
+      assignments: [makePhysicalAssignment("p")],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
+    expect(callOrder).toEqual(["touchKeycapRemovals", "keyEdits", "assignments"]);
+  });
+
+  it("an address step 1.6 already neutralized does not resolve at step 1.7 — proving the order, not just recording it", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = makeKeyEditVfs();
+    // Both the deletion overlay AND the key-edit overlay target the SAME key
+    // (T_A). If 1.6 really runs before 1.7, T_A's id is already neutralized
+    // to T_touchdel_* by the time 1.7 resolves its address, so the `set` op
+    // must fail to resolve (a warning, not a silent apply) and T_A's text
+    // must stay dropped (never becomes "NEW").
+    const setOp: KeyEditOperation = {
+      seq: 1,
+      kind: "set",
+      address: touchKeyAddress("phone", "default", "T_A"),
+      fields: { text: "NEW" },
+    };
+
+    const { warnings } = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      deletedTouchKeyIds: new Set([touchKeyAddress("phone", "default", "T_A")]),
+      keyEditOps: [setOp],
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
+    expect(warnings.some((w) => w.includes("does not resolve"))).toBe(true);
+
+    const layout = JSON.parse(
+      vfs.get("source/test_kb.keyman-touch-layout")?.content as string,
+    ) as { phone: { layer: [{ row: [{ key: Array<Record<string, unknown>> }] }] } };
+    const keys = layout.phone.layer[0].row[0].key;
+    const neutralized = keys.find((k) => String(k.id).startsWith("T_touchdel_"));
+    expect(neutralized).toBeDefined();
+    expect(neutralized?.text).toBeUndefined();
+  });
+});
+
+describe("projectWorkingCopyVfs — key edit overlay: pass failure is reported and does not abort the chain", () => {
+  it("layout-half failure: warns and still runs step 2 (assignments)", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    applyKeyEditsToVfsSpy.mockImplementationOnce(() => {
+      throw new Error("boom-layout");
+    });
+    const vfs = makeKeyEditVfs();
+    const setOp: KeyEditOperation = {
+      seq: 1,
+      kind: "set",
+      address: touchKeyAddress("phone", "default", "T_A"),
+      fields: { text: "NEW" },
+    };
+
+    const { warnings } = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      keyEditOps: [setOp],
+      assignments: [makePhysicalAssignment("p")],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
+    expect(warnings.some((w) => w.includes("key edit layout projection skipped"))).toBe(true);
+    expect(warnings.some((w) => w.includes("boom-layout"))).toBe(true);
+    // The chain was not aborted: step 2 still ran.
+    expect(applyAssignmentsToVfsSpy).toHaveBeenCalled();
+  });
+
+  it("rule-half failure: warns and still runs step 2 (assignments), leaving .kmn untouched", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    emitKmnSpy.mockImplementationOnce(() => {
+      throw new Error("boom-rule");
+    });
+    const vfs = makeKeyEditVfs();
+    const beforeKmn = vfs.get("source/test_kb.kmn")?.content;
+    const renameOp: KeyEditOperation = {
+      seq: 1,
+      kind: "rename",
+      address: touchKeyAddress("phone", "default", "T_A"),
+      toId: "T_A_RENAMED",
+    };
+
+    const { warnings } = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      keyEditOps: [renameOp],
+      assignments: [makePhysicalAssignment("p")],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
+    expect(warnings.some((w) => w.includes("key edit rule projection skipped"))).toBe(true);
+    expect(warnings.some((w) => w.includes("boom-rule"))).toBe(true);
+    expect(vfs.get("source/test_kb.kmn")?.content).toBe(beforeKmn);
+    // The chain was not aborted: step 2 still ran.
+    expect(applyAssignmentsToVfsSpy).toHaveBeenCalled();
+  });
+});
+
+describe("projectWorkingCopyVfs — key edit overlay: rename rewrites the vkey binding (rule half)", () => {
+  it("rewrites `[T_A]` to the new id in every rule bound to it, and re-emits the .kmn", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = makeKeyEditVfs();
+    const renameOp: KeyEditOperation = {
+      seq: 1,
+      kind: "rename",
+      address: touchKeyAddress("phone", "default", "T_A"),
+      toId: "T_ALPHA",
+    };
+
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      keyEditOps: [renameOp],
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
+    const kmn = vfs.get("source/test_kb.kmn")?.content as string;
+    expect(kmn).toContain("T_ALPHA");
+    expect(kmn).not.toMatch(/\[\s*T_A\s*\]/);
+    // The other rule (bound to T_B) is untouched.
+    expect(kmn).toContain("T_B");
+
+    // The LAYOUT half also renamed T_A -> T_ALPHA in the same projection.
+    const layout = JSON.parse(
+      vfs.get("source/test_kb.keyman-touch-layout")?.content as string,
+    ) as { phone: { layer: [{ row: [{ key: Array<Record<string, unknown>> }] }] } };
+    const ids = layout.phone.layer[0].row[0].key.map((k) => k.id);
+    expect(ids).toContain("T_ALPHA");
+    expect(ids).not.toContain("T_A");
+  });
+
+  it("does not touch the .kmn when the overlay carries no rename op", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = makeKeyEditVfs();
+    const beforeKmn = vfs.get("source/test_kb.kmn")?.content;
+    const setOp: KeyEditOperation = {
+      seq: 1,
+      kind: "set",
+      address: touchKeyAddress("phone", "default", "T_B"),
+      fields: { text: "Z" },
+    };
+
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      keyEditOps: [setOp],
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
+    expect(vfs.get("source/test_kb.kmn")?.content).toBe(beforeKmn);
+  });
+});
+
+describe("projectWorkingCopyVfs — key edit overlay: Case B fidelity (SC-006)", () => {
+  it("editing one key leaves every untouched key and platform-level field (e.g. font) structurally identical", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = makeKeyEditVfs();
+    const setOp: KeyEditOperation = {
+      seq: 1,
+      kind: "set",
+      address: touchKeyAddress("phone", "default", "T_A"),
+      fields: { text: "EDITED" },
+    };
+
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      keyEditOps: [setOp],
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
+    const layout = JSON.parse(
+      vfs.get("source/test_kb.keyman-touch-layout")?.content as string,
+    ) as {
+      phone: { font: string; layer: [{ row: [{ key: Array<Record<string, unknown>> }] }] };
+    };
+
+    // Platform-level field the IR does not model at all — must survive
+    // verbatim, since this pass never round-trips through TouchLayoutIR.
+    expect(layout.phone.font).toBe("Arial");
+
+    const keys = layout.phone.layer[0].row[0].key;
+    const editedKey = keys.find((k) => k.id === "T_A");
+    const untouchedKey = keys.find((k) => k.id === "T_B");
+
+    expect(editedKey?.text).toBe("EDITED");
+    // Untouched key is structurally identical to the shipped file.
+    expect(untouchedKey).toEqual({ id: "T_B", text: "B", sp: 0 });
   });
 });

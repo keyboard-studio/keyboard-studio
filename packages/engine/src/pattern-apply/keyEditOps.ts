@@ -171,6 +171,42 @@ export type KeyEditOperation =
   | RemoveSubKeyOp;
 
 // ---------------------------------------------------------------------------
+// Declared output (spec 058 T060 / FR-033b)
+// ---------------------------------------------------------------------------
+
+/**
+ * The character an operation DECLARES as its own new `output`, straight from
+ * its own fields — no layout lookup, no resolver. `undefined` (never `""`)
+ * when the operation carries no declared output of its own.
+ *
+ * Exactly three of the seven kinds ever author `output` directly:
+ * - `add` — a brand-new key's `key.output`;
+ * - `set` / `setSubKey` — a patch that happens to touch `fields.output`.
+ *
+ * The other four — `rename`, `remove`, `suppress`, `removeSubKey` — name an
+ * EXISTING key or sub-entry by address/sub-ref only; they never repeat its
+ * content, so this function returns `undefined` for them even though the key
+ * they touch may well produce a character. That gap is deliberate: this
+ * function answers "what does the OPERATION ITSELF say", not "what does the
+ * key it addresses produce" — the latter needs the layout the operation
+ * resolves against, which is outside an operation-log module's own domain
+ * (see the studio's `keyEditOrphanReport.ts`, which falls back to this
+ * function first — cheap, no layout needed — before doing that resolution
+ * for the four kinds it cannot answer).
+ */
+export function declaredOperationOutput(op: KeyEditOperation): string | undefined {
+  switch (op.kind) {
+    case "add":
+      return op.key.output;
+    case "set":
+    case "setSubKey":
+      return op.fields.output;
+    default:
+      return undefined;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // The shared resolver
 // ---------------------------------------------------------------------------
 

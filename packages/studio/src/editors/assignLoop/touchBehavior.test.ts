@@ -11,7 +11,12 @@
 
 import { describe, it, expect } from "vitest";
 import type { ModifierToken } from "@keyboard-studio/engine";
-import { casePairTouchTarget, promoteKeyToHandSet } from "./touchBehavior.ts";
+import { touchKeyAddress } from "@keyboard-studio/engine";
+import {
+  casePairTouchTarget,
+  promoteKeyAtAddressToHandSet,
+  promoteKeyToHandSet,
+} from "./touchBehavior.ts";
 import type { TouchLayoutIR } from "@keyboard-studio/contracts";
 
 /** Availability predicate over an explicit list of combos "in use". */
@@ -139,5 +144,163 @@ describe("promoteKeyToHandSet", () => {
     const out = promoteKeyToHandSet(layout, "K_NOPE");
     expect(out).toEqual(layout);
     expect(out).not.toBe(layout);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// promoteKeyAtAddressToHandSet — the address-matched by-key-edit counterpart
+// (spec 058 T059 / FR-031). `promoteKeyToHandSet` stays id-matched/
+// all-platforms/all-layers; this path matches ONE address only.
+// ---------------------------------------------------------------------------
+
+describe("promoteKeyAtAddressToHandSet", () => {
+  // Same id ("K_A") recurs on the phone's shift layer AND on the tablet's
+  // default layer — a legitimate .keyman-touch-layout shape (touchKeyAddress.ts's
+  // module doc), and exactly the shape `promoteKeyToHandSet` (id-matched) would
+  // incidentally re-tag everywhere. This fixture proves the address-matched
+  // path does not.
+  const multiLayout: TouchLayoutIR = {
+    platforms: [
+      {
+        id: "phone",
+        layers: [
+          {
+            id: "default",
+            rows: [
+              {
+                keys: [
+                  { nodeId: "n1", id: "K_A", text: "a", provenance: "physical-suggested" },
+                  { nodeId: "n2", id: "K_B", text: "b", provenance: "base-derived" },
+                ],
+              },
+            ],
+          },
+          {
+            id: "shift",
+            rows: [
+              { keys: [{ nodeId: "n3", id: "K_A", text: "A", provenance: "physical-suggested" }] },
+            ],
+          },
+        ],
+      },
+      {
+        id: "tablet",
+        layers: [
+          {
+            id: "default",
+            rows: [
+              { keys: [{ nodeId: "n4", id: "K_A", text: "a", provenance: "physical-suggested" }] },
+            ],
+          },
+        ],
+      },
+    ],
+    nodeIds: [],
+  };
+
+  const findKey = (out: TouchLayoutIR, platform: string, layerId: string, keyId: string) =>
+    out.platforms
+      .find((p) => p.id === platform)!
+      .layers.find((l) => l.id === layerId)!
+      .rows[0]!.keys.find((k) => k.id === keyId)!;
+
+  it("promotes only the addressed key", () => {
+    const address = touchKeyAddress("phone", "default", "K_A");
+    const out = promoteKeyAtAddressToHandSet(multiLayout, address);
+
+    expect(findKey(out, "phone", "default", "K_A").provenance).toBe("hand-set");
+  });
+
+  it("does not promote the same-id key on another layer", () => {
+    const address = touchKeyAddress("phone", "default", "K_A");
+    const out = promoteKeyAtAddressToHandSet(multiLayout, address);
+
+    // phone/shift's K_A is a different key at a different address; it must
+    // still read as whatever it was, not swept up by the id match.
+    expect(findKey(out, "phone", "shift", "K_A").provenance).toBe("physical-suggested");
+  });
+
+  it("does not promote the same-id key on another platform", () => {
+    const address = touchKeyAddress("phone", "default", "K_A");
+    const out = promoteKeyAtAddressToHandSet(multiLayout, address);
+
+    expect(findKey(out, "tablet", "default", "K_A").provenance).toBe("physical-suggested");
+  });
+
+  it("does not disturb a different key id in the same row", () => {
+    const address = touchKeyAddress("phone", "default", "K_A");
+    const out = promoteKeyAtAddressToHandSet(multiLayout, address);
+
+    expect(findKey(out, "phone", "default", "K_B").provenance).toBe("base-derived");
+  });
+
+  it("survives a rename: the caller re-addresses at the NEW id and still finds the key", () => {
+    // Simulate the caller's contract: after a rename op, the address is built
+    // from the post-rename id, not the pre-rename one. Renamed layout: phone/
+    // default's K_A became K_RENAMED.
+    const renamed: TouchLayoutIR = {
+      ...multiLayout,
+      platforms: multiLayout.platforms.map((platform) =>
+        platform.id !== "phone"
+          ? platform
+          : {
+              ...platform,
+              layers: platform.layers.map((layer) =>
+                layer.id !== "default"
+                  ? layer
+                  : {
+                      ...layer,
+                      rows: layer.rows.map((row) => ({
+                        keys: row.keys.map((k) => (k.id === "K_A" ? { ...k, id: "K_RENAMED" } : k)),
+                      })),
+                    },
+              ),
+            },
+      ),
+    };
+
+    const staleAddress = touchKeyAddress("phone", "default", "K_A");
+    const staleResult = promoteKeyAtAddressToHandSet(renamed, staleAddress);
+    // The stale (pre-rename) address no longer resolves — a no-op clone, not
+    // a miss silently promoting nothing while claiming success.
+    expect(findKey(staleResult, "phone", "default", "K_RENAMED").provenance).toBe(
+      "physical-suggested",
+    );
+
+    const freshAddress = touchKeyAddress("phone", "default", "K_RENAMED");
+    const freshResult = promoteKeyAtAddressToHandSet(renamed, freshAddress);
+    expect(findKey(freshResult, "phone", "default", "K_RENAMED").provenance).toBe("hand-set");
+  });
+
+  it("returns an unchanged clone for an unresolvable address (unknown platform)", () => {
+    const address = touchKeyAddress("desktop", "default", "K_A");
+    const out = promoteKeyAtAddressToHandSet(multiLayout, address);
+    expect(out).toEqual(multiLayout);
+    expect(out).not.toBe(multiLayout);
+  });
+
+  it("returns an unchanged clone for a malformed address string", () => {
+    const out = promoteKeyAtAddressToHandSet(multiLayout, "not-an-address");
+    expect(out).toEqual(multiLayout);
+  });
+
+  it("is idempotent and does not mutate the input", () => {
+    const address = touchKeyAddress("phone", "default", "K_A");
+    const once = promoteKeyAtAddressToHandSet(multiLayout, address);
+    const twice = promoteKeyAtAddressToHandSet(once, address);
+    expect(twice).toEqual(once);
+    expect(multiLayout.platforms[0]!.layers[0]!.rows[0]!.keys[0]!.provenance).toBe(
+      "physical-suggested",
+    );
+  });
+
+  it("contrasts with promoteKeyToHandSet: the id-matched helper DOES fan out across layers/platforms", () => {
+    // This is the exact incidental-promotion behavior FR-031 says is wrong for
+    // a by-key edit — asserted here as a contrast so the two helpers' differing
+    // semantics stay pinned against each other, not just independently.
+    const out = promoteKeyToHandSet(multiLayout, "K_A");
+    expect(findKey(out, "phone", "default", "K_A").provenance).toBe("hand-set");
+    expect(findKey(out, "phone", "shift", "K_A").provenance).toBe("hand-set");
+    expect(findKey(out, "tablet", "default", "K_A").provenance).toBe("hand-set");
   });
 });
