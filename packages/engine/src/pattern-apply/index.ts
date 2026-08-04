@@ -108,3 +108,43 @@ export type {
   ApplyTouchKeycapRemovalsToRawJsonResult,
 } from "./applyTouchKeycapRemovalsToVfs.js";
 
+export { resolveKeyAddress, resolveSubKeyEntry, applyFieldSemantics } from "./keyEditOps.js";
+export type {
+  KeyEditOperation,
+  KeyEditOperationBase,
+  SetKeyOp,
+  RenameKeyOp,
+  AddKeyOp,
+  RemoveKeyOp,
+  SuppressKeyOp,
+  SetSubKeyOp,
+  RemoveSubKeyOp,
+  EditableKeySp,
+  EditableKeyFields,
+  NewKeySpec,
+  SubKeyRef,
+  AddressableKeyLike,
+  AddressableLayoutLike,
+  ResolvedKeyLocation,
+  SubKeyLocation,
+  KeyEditOverlay,
+} from "./keyEditOps.js";
+
+export { applyKeyEditsToRawJson } from "./applyKeyEditsToRawJson.js";
+export type { ApplyKeyEditsToRawJsonResult } from "./applyKeyEditsToRawJson.js";
+
+export { applyKeyEditsToLayout, replayKeyEditOverlay } from "./applyKeyEditsToLayout.js";
+export type {
+  ApplyKeyEditsToLayoutResult,
+  ReplayKeyEditOverlayResult,
+} from "./applyKeyEditsToLayout.js";
+
+export { decomposeLayerId, groupLayerFamilies } from "./layerFamilies.js";
+export type {
+  ParsedLayerId,
+  FreeformLayerId,
+  LayerIdDecomposition,
+  LayerFamily,
+  LayerFamilyGrouping,
+} from "./layerFamilies.js";
+
