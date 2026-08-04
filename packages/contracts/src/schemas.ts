@@ -214,6 +214,11 @@ export const TouchKeyIRSchema: z.ZodType<LooseOptional<TouchKeyIR>> = z.lazy(() 
     hint: z.string().optional(),
     output: z.string().optional(),
     nextlayer: z.string().optional(),
+    // Per-key modifier override and longpress preselect (spec 058 FR-030).
+    // Both are plain wire fields the parser previously dropped; `layer` is
+    // additionally what disambiguates a duplicate key id within one layer.
+    layer: z.string().optional(),
+    default: z.boolean().optional(),
     sk: z.array(TouchKeyIRSchema).optional(),
     // Explicit per-direction shape (not Object.fromEntries) so the inferred
     // output keeps the literal direction keys, matching the contract's
@@ -779,6 +784,22 @@ type _OutputFormGuard = Expect<AssignableTo<z.infer<typeof OutputFormSchema>, Ou
 type _KeyBudgetBandGuard = Expect<AssignableTo<z.infer<typeof KeyBudgetBandSchema>, KeyBudgetBand>>;
 type _KeyBudgetGuard = Expect<AssignableTo<z.infer<typeof KeyBudgetSchema>, KeyBudget>>;
 type _TouchKeyIRGuard = Expect<AssignableTo<z.infer<typeof TouchKeyIRSchema>, TouchKeyIR>>;
+// LIMIT OF THE COMPILE-TIME GUARD, stated because it is not obvious and was
+// verified empirically (spec 058 T008): for `TouchKeyIRSchema` specifically,
+// NO compile-time alias here can catch an ADDITIVE optional field the schema
+// omits. Two effects compound —
+//   1. the explicit `z.ZodType<LooseOptional<TouchKeyIR>>` annotation the
+//      self-recursive `z.lazy()` requires makes `z.infer<typeof
+//      TouchKeyIRSchema>` resolve to the ANNOTATION, not to the `z.object({…})`
+//      literal, so the literal's real key set is erased before any guard sees
+//      it; and
+//   2. structural assignability ignores a missing `?:` member in both
+//      directions anyway, so even an un-annotated comparison would pass.
+// Deleting `layer:` from the object literal above therefore typechecks clean
+// while zod's default strip behaviour silently drops the field at every parse
+// boundary. The guard for these fields is consequently a RUNTIME one — see the
+// "additive optional fields survive a parse" suite in schemas.touch.test.ts,
+// which is the assertion that fails if the schema and the interface drift apart.
 // TouchLayoutIR is guarded on its `platforms` slice (the touch-key + provenance
 // payload — the spec-014 durability target). `nodeIds` is intentionally not run
 // through DeepStripUndefined: that helper rewrites the `[string, IRNodeRef]`

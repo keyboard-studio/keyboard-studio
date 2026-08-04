@@ -29,7 +29,11 @@
  * @see specs/035-mobile-touch-derivation/contracts/simplification.md
  */
 
-import type { TouchLayoutIR, TouchCoverageResult } from "@keyboard-studio/contracts";
+import type {
+  TouchCoverageOptions,
+  TouchCoverageResult,
+  TouchLayoutIR,
+} from "@keyboard-studio/contracts";
 import { augmentWithComposable, computeTouchCoverage } from "@keyboard-studio/contracts";
 
 export type { TouchCoverageResult } from "@keyboard-studio/contracts";
@@ -40,12 +44,22 @@ export type { TouchCoverageResult } from "@keyboard-studio/contracts";
  * from chars that are directly reachable.
  *
  * Pure: no mutation of `layout`/`inventory`, no I/O.
+ *
+ * @param options - The spec 058 coverage options, threaded straight through to
+ *   `computeTouchCoverage`. Note WHERE in this function they take effect: the
+ *   rule-index credit is applied by the inner call, **before**
+ *   `augmentWithComposable` runs. That order is the point, not an accident — a
+ *   combining mark credited by the join then feeds composability, so a
+ *   precomposed inventory char whose mark only became reachable via a `.kmn` rule
+ *   is folded out of `uncovered` too. Applying the index after augmentation would
+ *   lose that compounding entirely.
  */
 export function touchCoverage(
   layout: TouchLayoutIR,
   inventory: readonly string[],
+  options: TouchCoverageOptions = {},
 ): TouchCoverageResult {
-  const { uncovered } = computeTouchCoverage(layout, inventory);
+  const { uncovered } = computeTouchCoverage(layout, inventory, options);
   const uncoveredSet = new Set(uncovered);
 
   // Directly-covered chars, NFC-normalized — matches the NFC form

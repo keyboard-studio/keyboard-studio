@@ -3,8 +3,8 @@
   "specName": "058-touch-key-editor",
   "branch": "058-touch-key-editor",
   "selectedAt": "2026-08-04T01:11:58.804Z",
-  "currentStep": "plan",
-  "status": "planned",
+  "currentStep": "implement",
+  "status": "implementing",
   "history": [
     {
       "step": "specify",
@@ -40,6 +40,48 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-08-04T11:54:26.069Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-04T12:02:15.456Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-04T12:02:15.462Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-04T12:02:15.469Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T12:12:21.482Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T12:15:46.808Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-04T12:19:33.402Z"
     }
   ],
   "decisions": [
@@ -68,6 +110,12 @@
       "decision": "Layer-id decomposition returns a CANONICAL token set, documented as canonical-not-round-trip; lift TOUCH_LAYER_PRECEDENCE_ORDER rather than re-deriving it",
       "why": "comboToTouchLayerId is not injective - TOUCH_ID_FRAGMENT maps both ALT and LALT to the fragment alt - so no true inverse exists. Canonical form is sufficient because family grouping only asks which layer ids share a plane.",
       "rejected": "A true inverse of comboToTouchLayerId, which is impossible without an arbitrary chirality policy choice"
+    },
+    {
+      "decision": "{decision:The three joined 18.6 codes (KM_LINT_TOUCH_KEY_NO_RULE, KM_LINT_TOUCH_RULE_ORPHAN, KM_HINT_TOUCH_KEY_ID_CASE) land in check-18-6-touch-coverage.ts, NOT check-18-6-inventory-coverage.ts,why:check-18-6-inventory-coverage.ts opens with if (ir.origin !== scaffolded) return [] - and Phase 3 T027 relies on that guard as the reason adopting the reachability view there is safe. Both SC-002 canaries (sil_cameroon_qwerty/azerty) are IMPORTED keyboards, so behind that guard the dead-key and orphan checks would never fire and SC-002 would be unsatisfiable while the task list looked correct. The touch-coverage 18.6 module has no origin guard and is the precedent the join contract 5.1 itself cites.,rejected:Hosting them in check-18-6-inventory-coverage.ts as the first draft of tasks.md did (T034/T037/T038), which contradicts T027 in the same module}"
+    },
+    {
+      "decision": "{decision:SC-002 corpus canaries are hosted in packages/studio, not packages/keyboard-lint,why:@keymanapp/keyboard-lint has zero node:fs usage anywhere in src - every one of its tests uses inline fixtures - and studio is the only package that depends on it, so the established KEYBOARDS_ROOT + fs.existsSync skip-if-absent pattern has a home there. The SC-001 coverage canary stays in engine, which already reads the corpus.,rejected:A disk-reading canary test inside keyboard-lint, which would be the first fs-touching test in that package}"
     }
   ],
   "approach": "Land a touch key<->rule join in packages/contracts first (Layer C cannot import engine), which fixes the coverage arithmetic with zero UI change and is the prerequisite primitive for everything else. Then build key-level editing as a second MODE of the existing touch step (no manifest churn): an ordered key-edit operation log applied through the existing single-writer projection chain as a raw-JSON layout pass plus a new .kmn rule pass, with a net-new ARIA grid, and eight edit-time diagnostics computed as synchronous pure joins on the existing findings surface.",
@@ -75,6 +123,672 @@
     "plan": {
       "summary": "Plan + data-model + a fourth contract (key-edit-overlay) written; four codebase findings correct spec assumptions and are recorded as research.md R10",
       "key_finding": "The working IR (store.ir) never reaches the artifact and TouchGallery bypasses the projection chain entirely, so BOTH halves of a key edit (layout and .kmn rules) need explicit projection passes - the spec assumed the .kmn half was inherited from mark-guard synthesis, which itself does not reach the artifact"
+    },
+    "tasks": {
+      "summary": "{summary:130 tasks across 10 phases: Setup (6 helper lifts) -> Foundational (the sec-18 TouchKeyIR change, the rule join, the sp-class correction) -> US1 the arithmetic, ships alone with zero UI change -> Layer C checks, calibrated before the editor can mint new defects -> editing foundation (overlay, two appliers, two projection passes, grid, mode selector) -> US2/US3/US4 in parallel -> US5 diagnostics -> Polish. Verification pass fixed three defects: the joined 18.6 codes were hosted behind a scaffolded-only origin guard that made SC-002 unsatisfiable, a corpus canary was placed in a package with no fs access, and the freeform-silence lock named only one of the two corpora its contract requires.,key_finding:Two ordering edges are load-bearing and not template artifacts: the Layer C checks must precede the editor or calibration measures our own output, and the editing foundation depends on US1 join so it cannot be hoisted into Foundational}",
+      "key_finding": "Two ordering edges are load-bearing and not template artifacts: the Layer C checks must precede the editor or calibration measures our own output, and the editing foundation depends on US1 join so it cannot be hoisted into Foundational"
     }
-  }
+  },
+  "telemetryInstanceId": "62a167c1-ab4b-476c-a62b-04b791be08d5",
+  "coverage": {
+    "FR-001": {
+      "title": "A canonical touch key to rule join MUST live in packages/contracts and index rules by struck key id (T_, U_, and K_)",
+      "tasks": [
+        "T013",
+        "T014",
+        "T015"
+      ]
+    },
+    "FR-002": {
+      "title": "The join MUST classify each binding role and credit production only for producing rules",
+      "tasks": [
+        "T014",
+        "T016"
+      ]
+    },
+    "FR-003": {
+      "title": "The join MUST normalize ids case-insensitively while retaining every as-written spelling",
+      "tasks": [
+        "T014",
+        "T016",
+        "T038"
+      ]
+    },
+    "FR-004": {
+      "title": "The join MUST reuse the exported collectFromElements walk rather than re-deriving output collection",
+      "tasks": [
+        "T014",
+        "T016"
+      ]
+    },
+    "FR-005": {
+      "title": "computeTouchCoverage MUST credit a key with what its producing rules emit; additive, byte-identical when absent",
+      "tasks": [
+        "T022",
+        "T025"
+      ],
+      "tests": [
+        "packages/contracts/src/touch-coverage.test.ts"
+      ]
+    },
+    "FR-006": {
+      "title": "Touch coverage MUST additively credit a U+25CC-stripped keycap only when the remainder is non-empty and all combining marks",
+      "tasks": [
+        "T023",
+        "T025"
+      ]
+    },
+    "FR-007": {
+      "title": "All four callers of touch coverage MUST be migrated in the same change, including the TouchGallery direct call",
+      "tasks": [
+        "T026",
+        "T027",
+        "T028",
+        "T029"
+      ]
+    },
+    "FR-008": {
+      "title": "A reachability-aware producibility view MUST be added alongside buildProducedSet, whose semantics MUST NOT change",
+      "tasks": [
+        "T020",
+        "T021",
+        "T024"
+      ],
+      "tests": [
+        "packages/contracts/src/ir/reachableProducedSet.test.ts"
+      ]
+    },
+    "FR-009": {
+      "title": "Reachability MUST treat K_ as always reachable and T_/U_ as reachable only on a default-reachable layer; no layout means all reachable",
+      "tasks": [
+        "T020",
+        "T024"
+      ]
+    },
+    "FR-010": {
+      "title": "Each producibility view MUST document its adopter list; the facet index MUST be regenerated and asserted unchanged",
+      "tasks": [
+        "T020",
+        "T021",
+        "T031"
+      ]
+    },
+    "FR-011": {
+      "title": "useInventoryDiff MUST be extended with a third producedButUnreachable array, not switched",
+      "tasks": [
+        "T030"
+      ]
+    },
+    "FR-012": {
+      "title": "isSpacerKeyClass MUST be corrected to 9 and 10 with a deadkey predicate, isolated, with a keys-per-row recount",
+      "tasks": [
+        "T017",
+        "T018",
+        "T019"
+      ]
+    },
+    "FR-020": {
+      "title": "The studio MUST provide a key grid following the ARIA grid pattern with per-key annotations",
+      "tasks": [
+        "T063",
+        "T064"
+      ]
+    },
+    "FR-020a": {
+      "title": "The grid MUST be a single Tab stop using roving tabindex with a never-stranded fallback",
+      "tasks": [
+        "T064"
+      ]
+    },
+    "FR-020b": {
+      "title": "Selection MUST be separate from editing; Enter or F2 enters the inspector, Escape returns to the cell",
+      "tasks": [
+        "T065",
+        "T070"
+      ]
+    },
+    "FR-020c": {
+      "title": "Vertical navigation MUST be geometry-based, landing on the key whose span contains the current key centre",
+      "tasks": [
+        "T065"
+      ]
+    },
+    "FR-020d": {
+      "title": "Arrow navigation MUST NOT wrap between layers or platforms; a layer switch preserves row and column",
+      "tasks": [
+        "T065"
+      ]
+    },
+    "FR-020e": {
+      "title": "The grid MUST provide a find-by-value path to selection: by id, by produced character, or by no-output filter",
+      "tasks": [
+        "T071"
+      ]
+    },
+    "FR-020f": {
+      "title": "role=grid MUST be added to SKIP_SELECTOR in useCharCycleKeys or the pane handler eats the arrows",
+      "tasks": [
+        "T069"
+      ]
+    },
+    "FR-020g": {
+      "title": "Selecting a key by clicking the live OSK preview is out of scope; selection is grid-side only",
+      "tasks": [
+        "T072"
+      ]
+    },
+    "FR-020h": {
+      "title": "The studio MUST present two visually distinct keyboard surfaces with two different verbs: the grid edits, the OSK tests",
+      "tasks": [
+        "T072"
+      ]
+    },
+    "FR-020i": {
+      "title": "The grid MUST render RTL layouts mirrored with logical Home and End, direction resolved per layer",
+      "tasks": [
+        "T066"
+      ]
+    },
+    "FR-020j": {
+      "title": "The grid MUST NOT mount every key of every layer; window the layer rail and defer offscreen rows",
+      "tasks": [
+        "T067"
+      ]
+    },
+    "FR-020k": {
+      "title": "After a remove, suppress, or row action, focus MUST land on the nearest surviving cell, never document.body",
+      "tasks": [
+        "T068"
+      ]
+    },
+    "FR-021": {
+      "title": "The design is mouse-first with complete keyboard coverage; drag-and-drop stays a pointer enhancement",
+      "tasks": [
+        "T065",
+        "T111"
+      ]
+    },
+    "FR-022": {
+      "title": "The grid MUST render proportional 100-unit geometry and make row slack visible with explicit fill actions",
+      "tasks": [
+        "T064",
+        "T100"
+      ]
+    },
+    "FR-023": {
+      "title": "The studio MUST NOT ship a device-photo presentation chooser; the live OSK is the rendering truth",
+      "tasks": [
+        "T072"
+      ]
+    },
+    "FR-024": {
+      "title": "An author MUST be able to assign a character to an existing key with the keycap and id proposed",
+      "tasks": [
+        "T085"
+      ]
+    },
+    "FR-025": {
+      "title": "Id minting MUST follow the key-id policy; T_new_ ids MUST NEVER be minted",
+      "tasks": [
+        "T079"
+      ]
+    },
+    "FR-026": {
+      "title": "A combining-mark assignment MUST propose a guard rule as a contiguous guard-then-producing pair",
+      "tasks": [
+        "T081"
+      ]
+    },
+    "FR-027": {
+      "title": "Rule synthesis MUST be semantically idempotent; an equivalent hand-written rule is left untouched",
+      "tasks": [
+        "T080",
+        "T084"
+      ]
+    },
+    "FR-027a": {
+      "title": "When opaqueFragmentCount is above zero, synthesis MUST downgrade to warn-and-confirm before writing",
+      "tasks": [
+        "T082"
+      ]
+    },
+    "FR-028": {
+      "title": "An author MUST be able to rename a key id with live validation and complete reference fix-up",
+      "tasks": [
+        "T090",
+        "T091",
+        "T092"
+      ]
+    },
+    "FR-029": {
+      "title": "An author MUST be able to add and remove keys; deleting the last key in a row prompts, defaulting to keep",
+      "tasks": [
+        "T094",
+        "T099"
+      ]
+    },
+    "FR-029a": {
+      "title": "An author MUST be able to set key type sp across the full legal set; the studio proposes but never removes the control",
+      "tasks": [
+        "T096"
+      ]
+    },
+    "FR-029b": {
+      "title": "Suppressing MUST be one compound action that sets a non-interactive type AND neutralizes the id",
+      "tasks": [
+        "T095"
+      ]
+    },
+    "FR-029c": {
+      "title": "A half-done suppression MUST be reported in both directions",
+      "tasks": [
+        "T101"
+      ]
+    },
+    "FR-029d": {
+      "title": "A layer-switching key MUST be sp 2 on the layer it switches to and sp 1 elsewhere, proposed and editable",
+      "tasks": [
+        "T102"
+      ]
+    },
+    "FR-029e": {
+      "title": "A ruleless sentinel id used for suppression MUST NOT be reported as a dead key",
+      "tasks": [
+        "T034",
+        "T101"
+      ]
+    },
+    "FR-029f": {
+      "title": "Remove this key MUST resolve to three outcomes, each stating its trade-off; none hard-coded as correct",
+      "tasks": [
+        "T097"
+      ]
+    },
+    "FR-029g": {
+      "title": "The studio MUST propose the removal outcome from layer kind, with a crowding-limit override",
+      "tasks": [
+        "T098"
+      ]
+    },
+    "FR-029h": {
+      "title": "A row mixing suppressed and removed keys MUST have the inconsistency surfaced",
+      "tasks": [
+        "T103"
+      ]
+    },
+    "FR-030": {
+      "title": "Per-key layer MUST be preserved through parse and emit and MUST supersede the containing layer in Sends displays",
+      "tasks": [
+        "T008",
+        "T009",
+        "T010",
+        "T012",
+        "T070"
+      ]
+    },
+    "FR-031": {
+      "title": "Every key-level edit MUST promote provenance to hand-set via a new address-matched path beside the id-matched one",
+      "tasks": [
+        "T059"
+      ]
+    },
+    "FR-032": {
+      "title": "Edits MUST enter the existing undo stack as a new entry kind, cleared by keep-all, restore-all, and reset",
+      "tasks": [
+        "T057"
+      ]
+    },
+    "FR-033": {
+      "title": "Key-level edits MUST reach the artifact through the existing single-writer chain as step 1.7 after step 1.6",
+      "tasks": [
+        "T050",
+        "T091"
+      ]
+    },
+    "FR-033a": {
+      "title": "The key edit overlay MUST be an ordered operation log, not a keyed snapshot",
+      "tasks": [
+        "T044",
+        "T048",
+        "T049"
+      ]
+    },
+    "FR-033b": {
+      "title": "Overlay operations whose addresses no longer resolve MUST be reported, never silently dropped",
+      "tasks": [
+        "T060"
+      ]
+    },
+    "FR-033c": {
+      "title": "The overlay and the mode-selector state MUST join the persisted working-copy shape",
+      "tasks": [
+        "T058"
+      ]
+    },
+    "FR-034": {
+      "title": "The editor MUST NOT require knowing Case A from Case B, MUST state provenance honestly, and MUST render existing platforms",
+      "tasks": [
+        "T077"
+      ]
+    },
+    "FR-035": {
+      "title": "Key-level editing MUST be a mode of the existing touch step, presented as an APG tabs pattern owned by the gallery",
+      "tasks": [
+        "T072"
+      ]
+    },
+    "FR-036": {
+      "title": "On entry the studio MUST propose the by-key mode only when unreachable-output keys and unplaced characters coexist",
+      "tasks": [
+        "T073"
+      ]
+    },
+    "FR-036a": {
+      "title": "The mode selector MUST be a lossless view toggle, not a branch, with state in the working-copy store",
+      "tasks": [
+        "T056",
+        "T078"
+      ]
+    },
+    "FR-036b": {
+      "title": "Toggling MUST preserve both modes in-progress state; neither may be cleared as a side effect",
+      "tasks": [
+        "T078"
+      ]
+    },
+    "FR-036c": {
+      "title": "Context MUST carry across the toggle in both directions, with multi-key badging and cycling",
+      "tasks": [
+        "T074"
+      ]
+    },
+    "FR-036d": {
+      "title": "Both modes MUST report one shared derived set of progress figures that cannot disagree",
+      "tasks": [
+        "T075"
+      ]
+    },
+    "FR-036e": {
+      "title": "Either mode MUST be able to complete the step; Continue gates on coverage, never on the active view",
+      "tasks": [
+        "T120"
+      ]
+    },
+    "FR-036f": {
+      "title": "An edit that invalidates a by-character assignment MUST warn at the moment of the edit, naming the character",
+      "tasks": [
+        "T088"
+      ]
+    },
+    "FR-036g": {
+      "title": "Undo MUST remain one chronological stack across both modes and MUST state what it will undo",
+      "tasks": [
+        "T076"
+      ]
+    },
+    "FR-037": {
+      "title": "The live OSK preview MUST remain available throughout key-level editing, updating on every committed edit",
+      "tasks": [
+        "T053",
+        "T054"
+      ]
+    },
+    "FR-038": {
+      "title": "The preview MUST be truthful for every edit: preview and artifact identity through the same emission",
+      "tasks": [
+        "T053",
+        "T054",
+        "T055"
+      ]
+    },
+    "FR-039": {
+      "title": "The studio MUST make layout coherence visible rather than merely legal",
+      "tasks": [
+        "T100",
+        "T118"
+      ]
+    },
+    "FR-040": {
+      "title": "The eight edit-time diagnostics MUST surface, with 0x05A routed to rejection and Layer A-prime, sharing one implementation",
+      "tasks": [
+        "T043",
+        "T114",
+        "T118"
+      ],
+      "tests": [
+        "packages/engine/src/validator/layer-a-prime-touch-ids.test.ts"
+      ]
+    },
+    "FR-041": {
+      "title": "Each diagnostic MUST offer at least one concrete fix action",
+      "tasks": [
+        "T115"
+      ]
+    },
+    "FR-042": {
+      "title": "Diagnostics MUST be synchronous pure joins with no new timer, composed into the single findings surface",
+      "tasks": [
+        "T114",
+        "T122"
+      ]
+    },
+    "FR-043": {
+      "title": "Layer C additions MUST be findings from existing 18.x check modules, adding no rows to criteria.json",
+      "tasks": [
+        "T034",
+        "T035",
+        "T036",
+        "T037",
+        "T038",
+        "T039"
+      ],
+      "tests": [
+        "packages/keyboard-lint/src/checks/check-18-6-joined.test.ts"
+      ]
+    },
+    "FR-044": {
+      "title": "The engine MUST return structured findings; all user-facing copy MUST be composed and localized in the studio",
+      "tasks": [
+        "T113",
+        "T116"
+      ]
+    },
+    "FR-045": {
+      "title": "Validation that would create an invalid state MUST reject the mutation rather than emit a finding",
+      "tasks": [
+        "T118"
+      ]
+    },
+    "FR-050": {
+      "title": "New UI MUST conform to docs/accessibility.md including the APG grid pattern and no colour-only information",
+      "tasks": [
+        "T064",
+        "T117",
+        "T123"
+      ]
+    },
+    "FR-051": {
+      "title": "All new strings MUST use the i18n id convention and land in the English catalog",
+      "tasks": [
+        "T127"
+      ]
+    },
+    "FR-052": {
+      "title": "This feature MUST NOT introduce touch-first authoring or any reverse touch-to-physical derivation",
+      "tasks": [
+        "T130"
+      ]
+    },
+    "FR-060": {
+      "title": "Disabling or removing a key MUST enumerate its linked outputs and warn before the edit commits",
+      "tasks": [
+        "T104"
+      ]
+    },
+    "FR-061": {
+      "title": "The warning MUST distinguish characters that become unreachable from those still available elsewhere",
+      "tasks": [
+        "T105"
+      ]
+    },
+    "FR-062": {
+      "title": "Characters that lose their last mechanism MUST return to the unplaced worklist and be offered for re-placement",
+      "tasks": [
+        "T106"
+      ]
+    },
+    "FR-063": {
+      "title": "The studio MUST model a layer family, decomposing a layer id into plane plus modifier combo",
+      "tasks": [
+        "T061"
+      ]
+    },
+    "FR-064": {
+      "title": "An edit that breaks positional parallelism within a family MUST complain loudly",
+      "tasks": [
+        "T107"
+      ]
+    },
+    "FR-065": {
+      "title": "Where a family-breaking edit is intended, the studio MUST offer to apply it across the family with per-layer content",
+      "tasks": [
+        "T108"
+      ]
+    },
+    "FR-067": {
+      "title": "A layer id the decomposition cannot parse MUST be treated as its own freeform plane, never a family member",
+      "tasks": [
+        "T061",
+        "T062",
+        "T109"
+      ]
+    },
+    "FR-068": {
+      "title": "Frame and layer-switch keys are exempt on sp, nextlayer, id, and keycap; position and width MUST still be checked",
+      "tasks": [
+        "T110"
+      ]
+    },
+    "SC-001": {
+      "title": "All fourteen sil_cameroon_qwerty combining-mark characters read as covered and the gate does not block",
+      "tasks": [
+        "T032"
+      ]
+    },
+    "SC-002": {
+      "title": "The sil_cameroon_azerty orphan rule is reported exactly once and qwerty produces zero dead-key findings",
+      "tasks": [
+        "T042"
+      ],
+      "tests": [
+        "packages/studio/src/lib/touchDiagnostics.corpus.test.ts"
+      ]
+    },
+    "SC-003": {
+      "title": "docs/keyboard-facet-index.json is byte-identical after regeneration",
+      "tasks": [
+        "T031"
+      ]
+    },
+    "SC-004": {
+      "title": "A keyboard-only assign completes in at most 12 discrete actions with no modal detour and types in the preview",
+      "tasks": [
+        "T089"
+      ]
+    },
+    "SC-005": {
+      "title": "A rename across three layers and two rules orphans nothing and the emitted keyboard compiles clean",
+      "tasks": [
+        "T093"
+      ]
+    },
+    "SC-006": {
+      "title": "Editing one key leaves untouched files byte-identical and untouched keys and platform fields structurally identical",
+      "tasks": [
+        "T052",
+        "T112"
+      ]
+    },
+    "SC-007": {
+      "title": "Every one of the eight diagnostics is reachable in the UI with a working fix, none needing a compile",
+      "tasks": [
+        "T121"
+      ]
+    },
+    "SC-008": {
+      "title": "No key the studio creates is ever dead; a dead T_ key cannot reach the artifact",
+      "tasks": [
+        "T125"
+      ]
+    },
+    "SC-009": {
+      "title": "The new grid passes an automated accessibility scan with no serious violations in roving-tabindex state",
+      "tasks": [
+        "T123"
+      ]
+    },
+    "SC-010": {
+      "title": "No new debounce timer exists anywhere in the feature, enforced by a fake-timer behavioral spec",
+      "tasks": [
+        "T122"
+      ]
+    },
+    "SC-011": {
+      "title": "Switching modes N times in any order loses no state and the shared progress figures never disagree",
+      "tasks": [
+        "T078",
+        "T124"
+      ]
+    },
+    "FR-066": {
+      "title": "Distinct planes are freeform - symbol/emoji/numeric/alt-script planes MUST NOT be subject to cross-plane parallelism complaints; within-plane modifier families MAY be checked at a softer severity",
+      "tasks": [
+        "T061",
+        "T062",
+        "T109"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "Phase 1 helper lifts + address parser round-trip",
+      "command": "pnpm --filter @keyboard-studio/engine test src/pattern-apply/touchKeyAddress.test.ts src/pattern-apply/mark-guards.test.ts",
+      "result": "40 passed"
+    },
+    {
+      "what": "TouchKeyIR.layer + subkey default drift guard is a RUNTIME guard (compile-time alias is masked by the z.ZodType annotation) - verified by deleting the schema field",
+      "command": "delete layer: from schemas.ts; pnpm --filter @keyboard-studio/contracts typecheck (passes, so no compile guard) then test src/schemas.touch.test.ts",
+      "result": "typecheck clean; 2 runtime tests failed - guard bites at runtime only"
+    },
+    {
+      "what": "Full workspace suite after locked-type change + isSpacerKeyClass correction to {9,10}",
+      "command": "pnpm -r test",
+      "result": "8449 passed / 2 skipped across 7 packages, 0 failures"
+    },
+    {
+      "what": "SC-003 facet index byte-identical after the joined view landed",
+      "command": "npx tsx --tsconfig utilities/facet-index/tsconfig.json utilities/facet-index/cli.ts --check --classified-only",
+      "result": "exit 0, 927 keyboards / 30 facets, artifact unchanged"
+    },
+    {
+      "what": "SC-001 canary on real sil_cameroon_qwerty: 14 T_-keyed combining marks",
+      "command": "pnpm --filter @keyboard-studio/engine test src/pattern-apply/touchCoverage.test.ts",
+      "result": "17 passed; 14 uncovered with neither credit, 0 with rule index alone, 0 with strip alone"
+    },
+    {
+      "what": "SC-002 corpus canary: exactly one orphan finding on sil_cameroon_azerty, zero dead-key findings on sil_cameroon_qwerty",
+      "command": "pnpm --filter @keyboard-studio/studio test src/lib/touchDiagnostics.corpus.test.ts",
+      "result": "6 passed on the real corpus; near-miss U_ bypass message verified against the real file"
+    },
+    {
+      "what": "Full workspace gate after Phases 1-4 (setup, foundational, US1, Layer C checks)",
+      "command": "pnpm typecheck; pnpm -r test",
+      "result": "7 packages typecheck clean; 8581 tests passed / 2 skipped, 0 failures"
+    },
+    {
+      "what": "Repo lint gate (eslint + depcruise + 8 custom checkers) at the Phase 4 checkpoint",
+      "command": "pnpm lint",
+      "result": "all GREEN including depcruise (contracts-cannot-import-engine boundary holds) and facet-index-lint"
+    }
+  ]
 }
