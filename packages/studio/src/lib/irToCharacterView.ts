@@ -12,8 +12,8 @@
 import type { KeyboardIR, RemovalCapability, StoreItem } from '@keyboard-studio/contracts';
 import { buildProducedSet } from '@keyboard-studio/contracts';
 import { collectCharContributors, isParallelIndexFanOut, isPlusSeparator } from '@keyboard-studio/engine';
-import type { CharContributors } from '@keyboard-studio/engine';
-import { toRailNodes, invisibleCharLabel, keySequenceLabel, vkeyLabel, isTouchOnlyVkeyName, displayChar, charProducers, isNotAForwardTypingPath } from './irToCarveNodes.ts';
+import type { CharContributors, CharNormalizationForm } from '@keyboard-studio/engine';
+import { toRailNodes, invisibleCharLabel, keySequenceLabel, desktopVkeyLabel, displayChar, charProducers, isNotAForwardTypingPath } from './irToCarveNodes.ts';
 import type { CharProducer } from './irToCarveNodes.ts';
 
 // ---------------------------------------------------------------------------
@@ -186,13 +186,19 @@ export function irToCharacterView(
   removalCapabilities: Map<string, RemovalCapability>,
   confirmedInventory: ReadonlySet<string>,
   recommendedChars: ReadonlySet<string>,
+  form: CharNormalizationForm = 'NFC',
 ): CharacterCell[] {
   const nodes = toRailNodes(ir, removalCapabilities);
   const seen = new Map<string, CharacterCell>();
 
   const consider = (rawCh: string, keys: string[], source: CharacterSource, strategy: string | undefined) => {
     const stripped = rawCh.startsWith('◌') ? rawCh.slice(1) : rawCh;
-    const ch = stripped.normalize('NFC');
+    // Normalize to the marks-series output form so this cell's `ch` matches
+    // members of the caller's `confirmedInventory`/`recommendedChars` sets —
+    // both already normalized to the same form by useCarveNeededSet. Default
+    // NFC keeps the pre-form-threading behaviour (and every unit test that
+    // omits the argument) unchanged.
+    const ch = stripped.normalize(form);
     if (ch.length === 0 || PLACEHOLDER_CHARS.has(ch)) return;
     if (seen.has(ch)) return;
 
@@ -306,11 +312,7 @@ function sequenceShapeCells(ir: KeyboardIR): { ch: string; keys: string[] }[] {
   const baseSlotLabel = (item: StoreItem | undefined): string | undefined => {
     if (item === undefined) return undefined;
     if (item.kind === 'char') return displayChar(item.value);
-    // Touch-only vkey id (T_xxxx): no physical desktop key behind it — never
-    // render it as a desktop step (#1399 follow-on; mirrors irToCarveNodes.ts's
-    // desktopVkeyLabel, kept as a small local duplicate per this function's own
-    // doc comment above).
-    if (item.kind === 'vkey') return isTouchOnlyVkeyName(item.name) ? undefined : (vkeyLabel(item.name) ?? item.name);
+    if (item.kind === 'vkey') return desktopVkeyLabel(item.name);
     return undefined;
   };
 

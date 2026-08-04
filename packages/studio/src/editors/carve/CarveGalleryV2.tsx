@@ -8,7 +8,7 @@
 // cascades through the SAME workingCopyStore actions CarveGallery already
 // uses (cascadeDelete/cascadeRestore) — no new write path.
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
 import { recommendedRemovalChars, displayChar } from '../../lib/irToCarveNodes.ts';
 import {
@@ -19,7 +19,7 @@ import type { CharacterCell, CharacterGroup } from '../../lib/irToCharacterView.
 import { RemovalBanner } from '../assignLoop/parts/RemovalBanner.tsx';
 import { KeySeq } from '../assignLoop/parts/KeySeq.tsx';
 import { UndoIcon } from '../assignLoop/parts/carveShared.tsx';
-import { neededCharsForLanguage } from '../../lib/services.ts';
+import { useCarveNeededSet } from '../../hooks/useCarveNeededSet.ts';
 
 interface CarveGalleryV2Props {
   onComplete: () => void;
@@ -67,47 +67,57 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const ir = useWorkingCopyStore((s) => s.ir);
   const removalCapabilities = useWorkingCopyStore((s) => s.removalCapabilities);
   const confirmedInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
-  const identityBcp47 = useWorkingCopyStore((s) => s.identity?.bcp47);
+  const retainedConvenienceChars = useWorkingCopyStore((s) => s.session.retainedConvenienceChars);
   const isItemDeleted = useWorkingCopyStore((s) => s.isItemDeleted);
   const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
   const cascadeRestore = useWorkingCopyStore((s) => s.cascadeRestore);
   const restoreAll = useWorkingCopyStore((s) => s.restoreAll);
   const keepAll = useWorkingCopyStore((s) => s.keepAll);
 
+  // Shared with the pre-carve convenience question and CarveGallery (V1) via
+  // useCarveNeededSet — the ONE derivation of "what does this orthography
+  // need?" so the two carve surfaces cannot drift. Threading `form` from the
+  // marks-series output-form decision is what lets a decomposed (NFD)
+  // keyboard's produced vs. needed comparison actually match.
+  const {
+    neededSet: orthographyNeededSet,
+    form: carveNormalizationForm,
+    bcp47: identityBcp47,
+    hasSignal,
+  } = useCarveNeededSet();
+
   const confirmedInventorySet = useMemo(
-    () => new Set(confirmedInventory.map((ch) => ch.normalize('NFC'))),
-    [confirmedInventory],
+    () => new Set(confirmedInventory.map((ch) => ch.normalize(carveNormalizationForm))),
+    [confirmedInventory, carveNormalizationForm],
   );
 
-  // Same async CLDR-driven "needed characters" resolution as CarveGallery —
-  // see that file's identical effect for the full rationale.
-  const [neededChars, setNeededChars] = useState<Set<string> | null>(null);
-  useEffect(() => {
-    setNeededChars(null);
-    if (!identityBcp47) return;
-    let cancelled = false;
-    neededCharsForLanguage(identityBcp47)
-      .then((result) => { if (!cancelled) setNeededChars(result); })
-      .catch(() => { if (!cancelled) setNeededChars(null); });
-    return () => { cancelled = true; };
-  }, [identityBcp47]);
+  // Base characters the author chose to KEEP at the pre-carve convenience
+  // question — mirrors CarveGallery.tsx. Their whole purpose is to be shielded
+  // from removal recommendations here.
+  const retainedSet = useMemo(
+    () => new Set((retainedConvenienceChars ?? []).map((ch) => ch.normalize(carveNormalizationForm))),
+    [retainedConvenienceChars, carveNormalizationForm],
+  );
 
+  // Both members are already normalized to `carveNormalizationForm`.
   const neededSet = useMemo(
-    () => (neededChars ? new Set([...neededChars, ...confirmedInventorySet]) : confirmedInventorySet),
-    [neededChars, confirmedInventorySet],
+    () => (retainedSet.size === 0
+      ? orthographyNeededSet
+      : new Set([...orthographyNeededSet, ...retainedSet])),
+    [orthographyNeededSet, retainedSet],
   );
 
   const recommended = useMemo(
-    () => (ir && (confirmedInventorySet.size > 0 || neededChars !== null)
-      ? recommendedRemovalChars({ ir, needed: neededSet, bcp47: identityBcp47 })
+    () => (ir && hasSignal
+      ? recommendedRemovalChars({ ir, needed: neededSet, bcp47: identityBcp47, form: carveNormalizationForm })
       : []),
-    [ir, confirmedInventorySet, neededChars, neededSet, identityBcp47],
+    [ir, hasSignal, neededSet, identityBcp47, carveNormalizationForm],
   );
   const recommendedCharSet = useMemo(() => new Set(recommended.map((r) => r.ch)), [recommended]);
 
   const cells = useMemo(
-    () => (ir ? irToCharacterView(ir, removalCapabilities, confirmedInventorySet, recommendedCharSet) : []),
-    [ir, removalCapabilities, confirmedInventorySet, recommendedCharSet],
+    () => (ir ? irToCharacterView(ir, removalCapabilities, confirmedInventorySet, recommendedCharSet, carveNormalizationForm) : []),
+    [ir, removalCapabilities, confirmedInventorySet, recommendedCharSet, carveNormalizationForm],
   );
 
   const handleRemoveSelectedRecommended = useCallback((selected: typeof recommended) => {
@@ -123,7 +133,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
 
   const [selectedCh, setSelectedCh] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [groupBy] = useState<GroupBy>('category');
+  // Category grouping is the only mode exposed today. `groupCharacterCells`
+  // still supports `'source'` (covered by irToCharacterView.test.ts); a UI
+  // toggle can flip this to state whenever it lands.
+  const groupBy: GroupBy = 'category';
 
   const toggleCell = useCallback((cell: CharacterCell) => {
     if (!characterCellIsToggleable(cell)) return;

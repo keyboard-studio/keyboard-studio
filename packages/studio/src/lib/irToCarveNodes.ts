@@ -1191,7 +1191,7 @@ export function isTouchOnlyVkeyName(name: string): boolean {
  * previously did `vkeyLabel(name) ?? name` for a context/store-item vkey
  * feeding a rendered "how it's typed" step or floor uses this instead.
  */
-function desktopVkeyLabel(name: string): string | undefined {
+export function desktopVkeyLabel(name: string): string | undefined {
   if (isTouchOnlyVkeyName(name)) return undefined;
   return vkeyLabel(name) ?? name;
 }
@@ -1305,6 +1305,11 @@ function findDeadkeyTrigger(ir: KeyboardIR, dkId: number): { el: ContextElement;
       const out = rule.output[0];
       if (el === undefined || (el.kind !== 'vkey' && el.kind !== 'char')) continue;
       if (out === undefined || out.kind !== 'deadkey' || out.id !== dkId) continue;
+      // Touch-only (T_xxxx) vkeys are not a desktop "how it's typed" step
+      // (§ desktopVkeyLabel): admit them and this can shadow a genuine
+      // desktop trigger for the same deadkey, forcing the whole sequence to
+      // an honest-but-empty `undefined`.
+      if (el.kind === 'vkey' && isTouchOnlyVkeyName(el.name)) continue;
       candidates.push({ el, rule });
     }
   }
@@ -1549,7 +1554,7 @@ function storeConditionOutcome(storeRef: string, ir: KeyboardIR, negate: boolean
   return { kind: 'text', text: `when it ${verb} certain letters` };
 }
 
-/** Shared per-slot base label (mirrors expandParallelStoreRule's faithfulBaseLabel / irToCharacterView's sequenceShapeCells baseSlotLabel — small, intentional duplication rather than a cross-file refactor of either, per #1399 scope). */
+/** Shared per-slot base label — vkeys go through `desktopVkeyLabel` so touch-only ids are filtered out. Callers: expandParallelStoreRule's faithfulBaseLabel path and irToCharacterView's sequenceShapeCells all share the same underlying resolution now. */
 function slotItemLabel(item: StoreItem | undefined): string | undefined {
   if (item === undefined) return undefined;
   if (item.kind === 'char') return displayChar(item.value);
