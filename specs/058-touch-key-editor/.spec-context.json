@@ -3,8 +3,8 @@
   "specName": "058-touch-key-editor",
   "branch": "058-touch-key-editor",
   "selectedAt": "2026-08-04T01:11:58.804Z",
-  "currentStep": "specify",
-  "status": "specified",
+  "currentStep": "plan",
+  "status": "planned",
   "history": [
     {
       "step": "specify",
@@ -12,9 +12,69 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-08-04T03:31:50.014Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T11:46:48.109Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T11:51:36.567Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T11:52:46.963Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-04T11:54:26.069Z"
     }
   ],
   "decisions": [
-    "§18 locked-type change ratified 2026-08-03: take both TouchKeyIR.layer and the subkey default field in one contracts change (sign-off recorded in docs/spec-signoff.md)"
-  ]
+    "§18 locked-type change ratified 2026-08-03: take both TouchKeyIR.layer and the subkey default field in one contracts change (sign-off recorded in docs/spec-signoff.md)",
+    {
+      "decision": "Give useWorkingCopyTransform an optional live-layout override and have TouchGallery consume it, replacing its local bypass transform",
+      "why": "TouchGallery builds its own vfsTransform that injects only touchLayoutJson and never calls projectWorkingCopyVfs, so the touch preview shows no carve, identity, or keycap-label projection - a second partial writer. FR-038 requires preview/artifact identity.",
+      "rejected": "Routing TouchGallery at useWorkingCopyTransform as-is (the hook reads the STORE touchLayoutJson, written only at step commit, so the live preview would regress to last-committed); and extending the local transform to apply the overlay itself (a second partial writer, exactly what FR-033 forbids)"
+    },
+    {
+      "decision": "Rule synthesis lands as its own .kmn projection pass (parse VFS .kmn -> apply ensure/remove/rename -> re-emit), beside the raw-JSON layout overlay pass",
+      "why": "The working IR (store.ir, written via setWorkingIR) is never emitted into the artifact - projectWorkingCopyVfs takes baseIr and mutates the VFS .kmn through passes. applyMarkGuards only calls setWorkingIR, so the spec assumption that synthesized rules already travel the .kmn emit path is false. Without its own pass, US2 rule-bearing assignment is a silent no-op in both preview and zip.",
+      "rejected": "Writing synthesized rules to the working IR via setWorkingIR (the mark-guards approach), verified not to reach the artifact at all"
+    },
+    {
+      "decision": "Do NOT bump DurableDraft DRAFT_VERSION; add the overlay and mode state as optional WorkingCopySnapshot fields with tolerant fallback reads",
+      "why": "VR-1 discards a version-mismatched draft rather than migrating it, so a bump would throw away every author in-progress keyboard. Both prior additive fields (phaseBDraft, decisionRecord) set the precedent: optional field, tolerant read, no bump. This supersedes FR-033c parenthetical. Also: there is no PersistedFields type - it is WorkingCopySnapshot.",
+      "rejected": "Bumping DRAFT_VERSION as FR-033c literally says, which would discard in-progress drafts to add an overlay field"
+    },
+    {
+      "decision": "Build the key grid from the APG grid spec directly, copying CharScrollStrip roving-tabindex fallback and selection-centred windowing; correct docs/accessibility.md in the same feature",
+      "why": "role=grid/gridcell/aria-colindex have ZERO occurrences in packages/. The character-map grid that docs/accessibility.md names as audited against the APG grid pattern is a flex-wrap of plain buttons with no roles and every cell its own Tab stop. The doc makes a false conformance claim about our own code.",
+      "rejected": "Treating CharacterMapPane as the grid template - it is an accessible button group, not a grid"
+    },
+    {
+      "decision": "Layer-id decomposition returns a CANONICAL token set, documented as canonical-not-round-trip; lift TOUCH_LAYER_PRECEDENCE_ORDER rather than re-deriving it",
+      "why": "comboToTouchLayerId is not injective - TOUCH_ID_FRAGMENT maps both ALT and LALT to the fragment alt - so no true inverse exists. Canonical form is sufficient because family grouping only asks which layer ids share a plane.",
+      "rejected": "A true inverse of comboToTouchLayerId, which is impossible without an arbitrary chirality policy choice"
+    }
+  ],
+  "approach": "Land a touch key<->rule join in packages/contracts first (Layer C cannot import engine), which fixes the coverage arithmetic with zero UI change and is the prerequisite primitive for everything else. Then build key-level editing as a second MODE of the existing touch step (no manifest churn): an ordered key-edit operation log applied through the existing single-writer projection chain as a raw-JSON layout pass plus a new .kmn rule pass, with a net-new ARIA grid, and eight edit-time diagnostics computed as synchronous pure joins on the existing findings surface.",
+  "step_summaries": {
+    "plan": {
+      "summary": "Plan + data-model + a fourth contract (key-edit-overlay) written; four codebase findings correct spec assumptions and are recorded as research.md R10",
+      "key_finding": "The working IR (store.ir) never reaches the artifact and TouchGallery bypasses the projection chain entirely, so BOTH halves of a key edit (layout and .kmn rules) need explicit projection passes - the spec assumed the .kmn half was inherited from mark-guard synthesis, which itself does not reach the artifact"
+    }
+  }
 }

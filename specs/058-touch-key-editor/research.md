@@ -527,3 +527,74 @@ Two subtleties that only appear once toggling is free:
 `applyMutatePatch`'s containment check compares only the **common prefix** and accepts containment in either direction, and its leaf collection treats an array as a leaf. So a patch at `touchLayout.platforms` already passes against the existing `TOUCH_WRITES` declaration — meaning row and layer rewrites would pass M3 **today**. The work Increment 3 needs is therefore *declaration honesty* (adding explicit row/layer paths), not an enforcement unlock, and nobody should treat M3 as the row-level guard. What is genuinely **not** authorized is a leaf at `touchLayout.platforms[i].layers[j].id`, which any new-layer patch necessarily writes.
 
 Increment 1 does not go through `applyMutatePatch` for layout edits at all — the overlay is a raw-JSON pass at projection time, which is what gives Case B byte-preservation for free on both cases. Its only IR writes are the provenance promotion and the optional synthesized rule.
+
+---
+
+## R10. Plan-phase findings — where the code disagrees with this document
+
+Recorded during `/speckit.plan` (2026-08-04) from a direct read of the attachment points. Everything above was written from the spec side; this section is written from the code side, and it corrects the places where the two disagree. **Where R10 contradicts an earlier section of this document or a named FR, R10 is the later measurement and wins**; each entry names what must change.
+
+### R10.1 The touch preview bypasses the projection chain entirely (FR-038)
+
+**Finding.** [TouchGallery.tsx](../../packages/studio/src/editors/assignLoop/TouchGallery.tsx) builds its own `vfsTransform` (~line 1654) that does exactly one thing: `vfs.set(source/<id>.keyman-touch-layout, touchLayoutJson)`. It never calls `projectWorkingCopyVfs`. So the touch step's OSK preview today shows **no carve projection, no identity rewrite, and no keycap labels** — it is a touch-layout-only view. Three of the five `VfsTransform` call sites (`usePreviewArtifact`, `StudioShell`, `MechanismGallery`) go through `useWorkingCopyTransform` and therefore through the chain; `TouchGallery` and `TouchSeedSourcePanel` do not.
+
+**And the obvious fix is wrong.** Routing `TouchGallery` at `useWorkingCopyTransform` as-is would *regress* the preview: that hook reads the **store's** `touchLayoutJson`, which is written only by the reducer at step commit ([reducer.ts](../../packages/studio/src/steps/reducer.ts) lines 406/420/425), whereas the gallery's local value is a live in-progress memo recomputed on every edit. The store field is stale-until-Continue by design.
+
+**Decision.** Give `useWorkingCopyTransform` an **optional live-layout override** (the in-progress `touchLayoutJson` plus the key-edit overlay) and have `TouchGallery` consume the hook with that override in place of its local transform. One projection implementation, live freshness preserved, and the incidental divergence above closes as a side effect. The override must also be folded into the hook's primitive memo key (its dep array is primitive-keyed — `deletedKey`, `assignmentsKey`, … — so a new overlay that is not in that key will not refresh the preview).
+
+**Rejected.** (a) Consume the store field — regresses the live preview to last-committed. (b) Extend the gallery's local transform to apply the overlay itself — a second partial writer, precisely what FR-033's single-writer requirement exists to prevent.
+
+### R10.2 The working IR never reaches the artifact — so rule synthesis needs its own pass
+
+**Finding, and it invalidates a stated assumption.** [spec.md](spec.md) §Assumptions says *"synthesized rules already travel [the `.kmn` emit path] via existing assignment and mark-guard synthesis."* Half of that is false. `store.ir` — the working IR, written through `setWorkingIR` ([workingCopyStore.ts](../../packages/studio/src/stores/workingCopyStore.ts):798) — is **never emitted into the artifact**. `projectWorkingCopyVfs` takes `baseIr` and mutates the VFS's `.kmn` through passes (`applyAssignmentsToVfs`, the carve passes, and step 4's `parseKmn` → `resetIdentity` → `emitKmn`, which parses *from the VFS*). That step-4 call is the only `emitKmn` in the projection. Assignments reach the artifact because `applyAssignmentsToVfs` is a VFS pass; **`applyMarkGuards` does not**, because it only calls `setWorkingIR` ([reducer.ts](../../packages/studio/src/steps/reducer.ts):357).
+
+**Decision.** Rule synthesis lands as its own **projection pass** beside the touch-layout overlay — parse the VFS `.kmn`, apply `ensure` / `remove` / `rename` through the engine API, re-emit — so both halves of a key edit reach preview and zip through the one chain. Writing synthesized rules to the working IR alone would make US2's rule-bearing assignment path a silent no-op in the artifact: exactly the failure FR-038 was written to prevent, one layer deeper than FR-038 describes it.
+
+**Out of scope, recorded so it is not mistaken for a 058 regression:** mark-guard synthesis not reaching the artifact is a pre-existing gap in spec 046's seam, not something this feature introduces or fixes. It wants its own `bug(studio)` issue.
+
+### R10.3 `DurableDraft` must NOT be version-bumped (corrects FR-033c)
+
+**Finding.** FR-033c says the overlay joins the persisted shape *"with the `DurableDraft` version bump that implies"*. The repo's ratified precedent is the opposite. `DRAFT_VERSION = 1` ([draftPersistence.ts](../../packages/studio/src/lib/draftPersistence.ts):74) and VR-1 **discards** a version-mismatched draft — it never migrates. Both prior additive fields (`phaseBDraft`, `decisionRecord` in [draftTypes.ts](../../packages/studio/src/lib/draftTypes.ts)) landed as **optional fields with a tolerant fallback read and no bump**, with the recorded reason: a bump *"would throw away every existing author's in-progress keyboard … the wrong trade by a wide margin."*
+
+**Decision.** Add the key-edit overlay and the mode-selector state as optional fields with tolerant reads in `prepareWorkingCopySnapshot`; `DRAFT_VERSION` stays `1`. FR-033c's parenthetical is superseded.
+
+**Also corrected:** there is no `PersistedFields` type. The type FR-033c means is **`WorkingCopySnapshot`** ([persistWorkingCopy.ts](../../packages/studio/src/lib/persistWorkingCopy.ts):88), derived as `Omit<WorkingCopyData, …>`, so a new field is compiler-forced through `snapshotWorkingCopyData` / `prepareWorkingCopySnapshot` / `applyWorkingCopySnapshot` in lockstep. A new **action** must additionally be added to `WorkingCopyData`'s `Omit` list, and any new `Set` or `Map` re-created in all four reset paths (`INITIAL_STATE`, `reset`, `instantiateFromBase`, `instantiateFromExisting`).
+
+### R10.4 There is no ARIA grid in this codebase, and our own a11y doc says there is
+
+**Finding.** `role="grid"`, `role="gridcell"`, `aria-colindex`, `aria-rowindex`, and `aria-activedescendant` have **zero occurrences** anywhere in `packages/`. The "character-map grid" that [docs/accessibility.md](../../docs/accessibility.md) (rule 3, and the APG reference line) names as *audited against the APG grid pattern* is [CharacterMapPane.tsx](../../packages/studio/src/survey/CharacterMapPane.tsx) — a flex-wrap of plain `<button>` cells with `aria-label` / `aria-pressed`, **no roles, no roving tabindex, and every cell its own Tab stop**. It is a good accessible *button group*; it is not a grid, and it is not a template for one.
+
+**Decision.** Build the grid from the APG grid pattern directly. The two idioms worth copying are both in [CharScrollStrip.tsx](../../packages/studio/src/editors/assignLoop/parts/CharScrollStrip.tsx): the roving-tabindex fallback (`hasSelectedVisible`, ~lines 253-256 and 355-369 — `isTabbable = isSelected || (!hasSelectedVisible && index === 0)`) for FR-020a, and the **selection-centred** window (`MAX_VISIBLE_CHIPS = 300`, ~lines 66 and 239-248 — a `useMemo`, deliberately not stateful, so unrelated re-renders do not reset scroll) for FR-020j. Also worth copying: that strip has *no* keydown handler of its own, and its focus-follow effect feature-detects `scrollIntoView` (jsdom lacks it) and only calls `.focus()` when focus is already inside the strip.
+
+**And correct the doc.** `docs/accessibility.md` makes a conformance claim about our own code that the code does not support. Fix it in this feature — either by narrowing the claim to the widgets that genuinely are audited (`SelectMenu`, `MultiSelect`, `RadioGroup`) or by pointing the grid row at the new grid once it lands. A false conformance claim in the house a11y rules is worse than a missing one.
+
+### R10.5 Six helpers are private or absent — lifting them is prerequisite work, not tidy-up
+
+Each of these is named in a contract document as though it exists or is reachable. None is.
+
+| Needed | Actual state | Consequence |
+|---|---|---|
+| `isPlusSeparator` in contracts | Exported from [engine/src/shared/rule-shape.ts](../../packages/engine/src/shared/rule-shape.ts):24, **structurally typed** (no IR import) | Pure move into contracts, re-exported from its engine home; no call site changes. The structural typing is what makes it free. |
+| `extractRuleVkey` | **Private**, [modifierCombos.ts](../../packages/engine/src/pattern-apply/modifierCombos.ts):445 — and it does **not** filter plus-separators | The join's §2.1 rule ("first vkey after filtering plus-separators") is *stronger* than the existing implementation. Write the join's own; do not assume parity. |
+| `entryGroupOf` | **Private**, [mark-guards.ts](../../packages/engine/src/pattern-apply/mark-guards.ts):51 | Must be lifted before synthesis can resolve the entry group. |
+| `insertBeforeTerminalRules` | **Private**, mark-guards.ts:61, no sibling anywhere | The join contract's "lifted to a shared location so the two synthesizers cannot diverge" is a required task. |
+| `TOUCH_LAYER_PRECEDENCE_ORDER` | **Private**, modifierCombos.ts:326 | Export it rather than re-deriving the order in the decomposition. |
+| A touch-key address **parser** | **Does not exist** — only the three builders ([touchKeyAddress.ts](../../packages/engine/src/pattern-apply/touchKeyAddress.ts):39/44/55) | Net-new, and it belongs beside the builders so format and parser cannot drift. |
+
+Two related traps. `TouchLayoutIR.nodeIds` is minted for main keys and `sk` sub-keys **only** — never `multitap` or `flick` ([parseTouchLayout.ts](../../packages/contracts/src/parseTouchLayout.ts):221/224) — so an operation addressing a multitap or flick node cannot resolve through `nodeIds` and must go through the address resolver. And `NodeIdMinter` restarts its per-kind counter on **every call** (`engine/src/shared/node-ids.ts`), so ids are deterministic per invocation but not stable across passes — which is why the applier-twin test compares modulo node ids.
+
+### R10.6 The decomposition cannot be a true inverse
+
+**Finding.** `comboToTouchLayerId` is **not injective**: its private `TOUCH_ID_FRAGMENT` table maps both `ALT` and `LALT` to the fragment `"alt"` (modifierCombos.ts:279). So no function can recover the original token set from a layer id string.
+
+**Decision.** The decomposition returns a **canonical** token set (`"alt"` maps back to `ALT`), documented as canonical-not-round-trip. This is sufficient for FR-063: family grouping keys on plane plus canonical token set, and a family's members are the ids sharing a plane — a question the canonical form answers exactly. [contracts/layer-families.md](contracts/layer-families.md) §2's "recovers `{ plane, tokens }`" should be read as canonical tokens.
+
+### R10.7 Smaller corrections, for accuracy
+
+- **`TouchLayerIR` / `TouchPlatformIR` do not exist.** `TouchLayoutIR`'s platforms, layers, and rows are inline anonymous types ([keyboard-ir.ts](../../packages/contracts/src/keyboard-ir.ts)); only `TouchKeyIR` and `TouchLayoutIR` are named. New code that wants to name a layer must destructure or introduce the alias deliberately.
+- **`computeTouchCoverage` has no options bag today** — it is strictly `(layout, inventory)`, two positional arguments, at all four call sites. The join threads in as an optional **third** argument.
+- **`SPACER_SP_VALUES` is module-private with exactly one read.** The `{8,10}` to `{9,10}` correction is one line plus three `isSpacerKeyClass` consumers: [check-18-3-keys-per-row.ts](../../packages/keyboard-lint/src/checks/check-18-3-keys-per-row.ts) (the recount), and `isBlankPlaceholder` in [applyTouchAssignmentsToRawJson.ts](../../packages/engine/src/pattern-apply/applyTouchAssignmentsToRawJson.ts) — where the correction makes the "is this slot free" answer *stricter* about `sp:8` and *looser* about `sp:9`, changing placeholder-promotion behaviour. That file's existing test is the canary for the recount.
+- **Fold the join into the engine wrapper between the coverage call and `augmentWithComposable`** ([touchCoverage.ts](../../packages/engine/src/pattern-apply/touchCoverage.ts), ~lines 55-57) — so a mark credited by the join then feeds composability, which is the compounding the join contract asks for.
+- **`lintContext.ts` is the lint registry** — there is no registry class. A new check is three manual edits (import, invocation, re-export) plus a `LintContext` field if it needs new input. `_shared.ts`'s `walkTouchKeys` does **not** descend into `sk` / `multitap` / `flick`, so the dead-key check must descend itself.
+- **0x05A placement.** The nearest precedent is [validator/checks/identifiers.ts](../../packages/engine/src/validator/checks/identifiers.ts) (`KM_ERROR_INVALID_IDENTIFIER`, `layer: "A"`, runs inside the debounce path). Per FR-040, author-typed ids are handled by edit-time rejection with no finding at all; imported ids get a new function in [layer-a-prime.ts](../../packages/engine/src/validator/layer-a-prime.ts) spread into `runImportFidelityParseChecks`, coded `KM_ERROR_*` per that file's own namespace rule. Nothing is added to Layer C.
+- **`useCharCycleKeys`'s allowlist needs two entries, not one.** FR-020f names `[role="grid"]`. The mode selector is an APG **tabs** pattern (FR-035) and a tab strip consumes ArrowLeft / ArrowRight too; `[role="tablist"]` is equally absent from that enumerated list. Both go in, or the pane handler swallows the arrows of both new widgets.
