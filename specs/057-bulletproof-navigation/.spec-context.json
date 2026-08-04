@@ -427,6 +427,158 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-03T23:53:39.023Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:17:01.927Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T057",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:17:02.237Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T058",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:17:02.568Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T059",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:17:02.882Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T060",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:17:03.227Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T061",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:17:03.553Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T062",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:17:04.011Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:08.404Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:08.745Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:09.134Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:09.506Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:09.856Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:10.270Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:10.710Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:11.116Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:11.516Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T063",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:11.944Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T064",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:12.383Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T065",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:12.835Z"
     }
   ],
   "telemetryInstanceId": "469b61c6-c778-40d3-b978-3516ec818e69",
@@ -506,6 +658,11 @@
       "decision": "Q3 REVERSED: FR-041 s stated precedence wins (scaffoldSpec -> identity patch -> baseKeyboard -> null); research D-8 corrected, and T015 widened to converge BOTH shipped draft engines",
       "why": "km-doc found research D-8 examined the wrong function. There are two coexisting draft engines. draftPersistence.ts:477-481 - the engine behind the My keyboards cards, imported at MyKeyboardsList.tsx:51 - already implements FR-041 s order verbatim, comment included (verified directly). draftAutosave.deriveLabel:180-187 is the outlier. So the blast-radius argument that carried the original decision was backwards: conforming deriveLabel renames NOTHING on the cards; its only reader is ResumeDraftBanner.tsx:90, and only when identityResult disagrees with scaffoldSpec, a case with zero test coverage. Spec 047 settles it independently - it describes the label as derived from workingCopy.identity (the identity patch), not survey.identityResult.",
       "rejected": "Keeping the shipped draftAutosave order and treating FR-041 s parenthetical as a loose paraphrase - it was quoting real shipped code all along."
+    },
+    {
+      "decision": "progressDots derives upcoming stages by walking ctx.manifest forward and asking resolveLocation about each step, rather than importing dashboard/manifestProjection.ts as FR-049b words it",
+      "why": "Verified against .dependency-cruiser.cjs: the decisions-layer rule forbids decisions/ -> dashboard/ at severity error, with no type-only exception. manifestProjection is a 1:1 projection of steps/manifest.ts and adds no derived ordering, so reading ctx.manifest reads the same array. FR-049b forbids a SECOND derivation of the projected path; path-scoping, row growth and tail-shrink all fall out of resolveLocation here rather than being re-derived, so the intent holds while the layer rule stays intact.",
+      "rejected": "Importing dashboard/manifestProjection.ts as the FR literally says - it is a hard depcruise error; and relaxing the layer rule to permit it, which trades an architectural boundary for a wording match."
     }
   ],
   "step_summaries": {
@@ -940,7 +1097,7 @@
       "what": "{\"check\": \"draftPersistence.ts:477-481 implements FR-041 order verbatim and MyKeyboardsList.tsx:51 imports from draftPersistence, not draftAutosave\", \"how\": \"grep imports + sed the label computation in both engines\", \"result\": \"confirmed - km-doc finding stands; research D-8 blast-radius claim was backwards\"}"
     }
   ],
-  "currentTask": "T070",
+  "currentTask": "T065",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1261,11 +1418,154 @@
         "CLAUDE.md",
         "docs/architecture.md"
       ]
+    },
+    "T056": {
+      "status": "DONE",
+      "did": "Flow Map selected section reads/writes viewStateStore.flowMapSection via initialSection/onSectionChange props (dashboard/ may not import stores/), wired from StudioShell",
+      "files": [
+        "packages/studio/src/dashboard/DashboardView.tsx",
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T057": {
+      "status": "DONE",
+      "did": "Decision trail per-stage collapse set and replaced-decisions toggle read/write the store via props, wired from StudioShell",
+      "files": [
+        "packages/studio/src/decisions/DecisionTrailView.tsx",
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T058": {
+      "status": "DONE",
+      "did": "useResizablePanes gained an onChange notification so a caller can persist the split into session view state without the hook learning about the store",
+      "files": [
+        "packages/studio/src/hooks/useResizablePanes.ts"
+      ]
+    },
+    "T059": {
+      "status": "DONE",
+      "did": "Backed the OSK desktop/touch toggle with viewStateStore.oskMode on the Studio surface; Compare was already wired through useCompareArtifact",
+      "files": [
+        "packages/studio/src/StudioShell.tsx",
+        "packages/studio/src/hooks/useCompareArtifact.ts"
+      ]
+    },
+    "T060": {
+      "status": "DONE",
+      "did": "Added useScrollRestoration keyed by a stable pane id (never an index) and wired it into the flow map and decision trail",
+      "files": [
+        "packages/studio/src/hooks/useScrollRestoration.ts",
+        "packages/studio/src/hooks/useScrollRestoration.test.ts"
+      ]
+    },
+    "T061": {
+      "status": "DONE",
+      "did": "Called viewStateStore.reset() from exactly the two existing start-over paths — handleStartOver and WelcomeScreen I am new",
+      "files": [
+        "packages/studio/src/StudioShell.tsx",
+        "packages/studio/src/components/WelcomeScreen.tsx"
+      ]
+    },
+    "T062": {
+      "status": "DONE",
+      "did": "Integration test: every restorable control survives a route change and is cleared by start-over, with compile and validateWithOracle spied and asserted zero-called across the whole file (FR-053)",
+      "files": [
+        "packages/studio/src/stores/viewStateRestoration.test.tsx"
+      ]
+    },
+    "T047": {
+      "status": "DONE",
+      "did": "Unit-tested the row derivation: revision collapse via effectiveEntries, PRE_IDENTITY exclusion, editor-action exclusion, truncated-record safety, path-scoping, growth on a track flip and tail re-projection",
+      "files": [
+        "packages/studio/src/decisions/progressDots.test.ts"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "Assembled the journey row: completed dots from effectiveEntries filtered to survey-answer, upcoming stage dots resolved through resolveLocation against ctx.manifest (see the recorded FR-049b decision), each carrying its location, localized label and pre-resolved LocationResolution",
+      "files": [
+        "packages/studio/src/decisions/progressDots.ts"
+      ]
+    },
+    "T049": {
+      "status": "DONE",
+      "did": "Added the footer message ids plus twelve footer.stage.* ids, since Step.title in the manifest is unlocalized plain English and FR-048 requires every footer string go through the catalog",
+      "files": [
+        "packages/studio/src/decisions/progressDots.ts",
+        "packages/studio/src/components/StudioFooter.tsx"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "Built one mark as a real button with its label as accessible name, hover as a shortcut not the mechanism, and question/stage/current classes differing by shape and size as well as colour",
+      "files": [
+        "packages/studio/src/components/ProgressDot.tsx"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "Built the footer landmark: project name via deriveProjectLabel, the dot row, jumpToLocation as the ONE activation path, and a role=status live region surfacing refusal reasons",
+      "files": [
+        "packages/studio/src/components/StudioFooter.tsx"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "Mounted the footer in StudioShell as a flex sibling after the content; it returns null when there is no project to name, so it is absent rather than an empty shell without a route-by-route conditional",
+      "files": [
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "Overflow handled by a horizontally scrollable row keeping every mark reachable with no page-body overflow",
+      "files": [
+        "packages/studio/src/components/StudioFooter.tsx"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "Wrote the footer E2E covering composition, shape distinction, row growth, gated-dot refusal and keyboard-only activation",
+      "files": [
+        "packages/studio/e2e/footer-progress.spec.ts"
+      ]
+    },
+    "T055": {
+      "status": "DONE",
+      "did": "Accessibility test: every dot focusable and named, Enter and Space both activate, aria-current on the current dot, upcoming dots announce not-yet-reached, current-dot activation inert",
+      "files": [
+        "packages/studio/src/components/StudioFooter.a11y.test.tsx"
+      ]
+    },
+    "T063": {
+      "status": "DONE",
+      "did": "Added the current dot class sourced from traversal state rather than the decision record",
+      "files": [
+        "packages/studio/src/decisions/progressDots.ts"
+      ]
+    },
+    "T064": {
+      "status": "DONE",
+      "did": "Rendered the current marker with a non-colour cue, an accessible name identifying the current position, and a hard no-op on activation so it is never a jump target to itself",
+      "files": [
+        "packages/studio/src/components/ProgressDot.tsx"
+      ]
+    },
+    "T065": {
+      "status": "DONE",
+      "did": "Tested that a jump back leaves the dots ahead of the landing point present — jumpToStep truncates history, so those stages return to beyond-gate and re-enter the upcoming row",
+      "files": [
+        "packages/studio/src/decisions/progressDots.test.ts"
+      ]
     }
   },
   "concerns": [
     {
       "note": "src/hooks/useValidator.test.ts failed once under the full `pnpm -r test` run (VALIDATOR_ERROR_FINDING injection case) and passed on its own and on an immediate full re-run. Pre-existing flake, not introduced by this feature, but it can turn a clean gate red intermittently.",
+      "step": "implement"
+    },
+    {
+      "note": "FR-060/FR-062 question-level accuracy of the current-position dot holds only right after a trail deep-link arrival (read from peekPendingJump). For ordinary forward walking inside a multi-question step such as characters, no store exposes which question is on screen, so the current dot degrades to stage granularity. Closing this needs a runtime change in the survey runner, outside this feature scope.",
       "step": "implement"
     }
   ]

@@ -55,6 +55,7 @@ import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
 import { FlowMapView } from "./dashboard/DashboardView.tsx";
 import { runCompleteness } from "./dashboard/completeness.ts";
 import { CompareScreen } from "./components/CompareScreen.tsx";
+import { StudioFooter } from "./components/StudioFooter.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
@@ -1684,6 +1685,13 @@ export function StudioShell() {
         })}
       />
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{content}</div>
+      {/* Spec 057 US4/US6 (T052, FR-040): the narrow journey footer. Mounted
+          unconditionally rather than per-route because `StudioFooter` returns
+          null whenever `deriveProjectLabel` has nothing to name — so it is
+          ABSENT, not an empty shell, on Welcome and wherever there is no
+          project yet (Q6). A route-by-route conditional here would be a second
+          place to keep that rule, and the two would drift. */}
+      <StudioFooter />
     </div>
   );
 }

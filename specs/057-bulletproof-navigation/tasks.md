@@ -197,32 +197,32 @@ This phase builds the strip with completed and upcoming marks. The current-posit
 
 ### Tests
 
-- [ ] **T047** [US4] Unit-test the row derivation against fixtures: completed dots from a record *including a revision* (exactly one dot — `effectiveEntries` collapses the chain), `PRE_IDENTITY_STEP_ID` entries producing no dot, a truncated record yielding dots only for surviving entries, look-ahead from a fixture projected path, path-scoping (nothing off-path in any class), row growth when an optional question is reached, and tail re-projection when a branch resolves without removing completed dots (FR-042, FR-049) · `packages/studio/src/decisions/progressDots.test.ts`
+- [x] **T047** [US4] Unit-test the row derivation against fixtures: completed dots from a record *including a revision* (exactly one dot — `effectiveEntries` collapses the chain), `PRE_IDENTITY_STEP_ID` entries producing no dot, a truncated record yielding dots only for surviving entries, look-ahead from a fixture projected path, path-scoping (nothing off-path in any class), row growth when an optional question is reached, and tail re-projection when a branch resolves without removing completed dots (FR-042, FR-049) · `packages/studio/src/decisions/progressDots.test.ts`
 
 ### Implementation
 
 **⟶ Wait for T047, then — independent (different files):**
 
-- [ ] **T048** [P] [US4] Assemble the journey row: completed dots from `effectiveEntries(record.entries)` filtered to `payload.kind === "survey-answer"` in record order, upcoming-stage dots **read** from `dashboard/manifestProjection.ts` rather than re-derived (FR-049b), each dot carrying its `location`, its localized `label` via `createLookupQuestionLabel`, and a pre-resolved `LocationResolution` (FR-042, FR-049) · `packages/studio/src/decisions/progressDots.ts`
-- [ ] **T049** [P] [US4] Add `footer.ariaLabel`, `footer.project.label`, `footer.dot.completed.ariaLabel`, `footer.dot.current.ariaLabel`, `footer.dot.upcoming.ariaLabel`, `footer.overflow.label`. The upcoming name must announce "not yet reached"; the current name must read as "you are here", not as completed progress. No `breadcrumb.*` id set — the footer **is** the breadcrumb (FR-048, Q7) · `packages/studio/src/locales/en/messages.json`, `packages/studio/src/locales/fr/messages.json`
+- [x] **T048** [P] [US4] Assemble the journey row: completed dots from `effectiveEntries(record.entries)` filtered to `payload.kind === "survey-answer"` in record order, upcoming-stage dots **read** from `dashboard/manifestProjection.ts` rather than re-derived (FR-049b), each dot carrying its `location`, its localized `label` via `createLookupQuestionLabel`, and a pre-resolved `LocationResolution` (FR-042, FR-049) · `packages/studio/src/decisions/progressDots.ts`
+- [x] **T049** [P] [US4] Add `footer.ariaLabel`, `footer.project.label`, `footer.dot.completed.ariaLabel`, `footer.dot.current.ariaLabel`, `footer.dot.upcoming.ariaLabel`, `footer.overflow.label`. The upcoming name must announce "not yet reached"; the current name must read as "you are here", not as completed progress. No `breadcrumb.*` id set — the footer **is** the breadcrumb (FR-048, Q7) · `packages/studio/src/locales/en/messages.json`, `packages/studio/src/locales/fr/messages.json`
 
 **⟶ Wait for T049, then:**
 
-- [ ] **T050** [US4] Build one mark as a real `<button type="button">` with its label as accessible name, hover revealing the same label as a shortcut rather than the mechanism, question and stage classes differing by **size or shape as well as colour**, non-text contrast ≥ 3:1 and a visible focus indicator (FR-043, FR-044, FR-046) · `packages/studio/src/components/ProgressDot.tsx`
+- [x] **T050** [US4] Build one mark as a real `<button type="button">` with its label as accessible name, hover revealing the same label as a shortcut rather than the mechanism, question and stage classes differing by **size or shape as well as colour**, non-text contrast ≥ 3:1 and a visible focus indicator (FR-043, FR-044, FR-046) · `packages/studio/src/components/ProgressDot.tsx`
 
 **⟶ Wait for T048 and T050, then:**
 
-- [ ] **T051** [US4] Build the footer landmark: `<footer>` with `footer.ariaLabel`, the project name via `deriveProjectLabel`, and the dot row; activating a reached dot calls `jumpToLocation` — the same primitive as the trail's deep links, not a second one — and an upcoming dot behind a gate is refused with its `beyond-gate` reason. Styled from existing theme tokens, no new hard-coded colours (FR-040, FR-041, FR-045) · `packages/studio/src/components/StudioFooter.tsx`
+- [x] **T051** [US4] Build the footer landmark: `<footer>` with `footer.ariaLabel`, the project name via `deriveProjectLabel`, and the dot row; activating a reached dot calls `jumpToLocation` — the same primitive as the trail's deep links, not a second one — and an upcoming dot behind a gate is refused with its `beyond-gate` reason. Styled from existing theme tokens, no new hard-coded colours (FR-040, FR-041, FR-045) · `packages/studio/src/components/StudioFooter.tsx`
 
 **⟶ Wait for T051, then — independent (different files):**
 
-- [ ] **T052** [P] [US4] Mount the footer on every tab where a project exists; absent — not an empty shell — on Welcome and wherever there is no project to name (FR-040, Q6, US4 scenario 5) · `packages/studio/src/StudioShell.tsx`
-- [ ] **T053** [P] [US4] Handle overflow: when the mark count exceeds the available width the row degrades legibly with every mark still reachable, no silent truncation and no horizontal overflow of the page body (FR-047) · `packages/studio/src/components/StudioFooter.tsx`
+- [x] **T052** [P] [US4] Mount the footer on every tab where a project exists; absent — not an empty shell — on Welcome and wherever there is no project to name (FR-040, Q6, US4 scenario 5) · `packages/studio/src/StudioShell.tsx`
+- [x] **T053** [P] [US4] Handle overflow: when the mark count exceeds the available width the row degrades legibly with every mark still reachable, no silent truncation and no horizontal overflow of the page body (FR-047) · `packages/studio/src/components/StudioFooter.tsx`
 
 **⟶ Wait for T052 and T053, then — independent (different files):**
 
-- [ ] **T054** [P] [US4] E2E: assert the row's full composition against a scripted walk, that question and stage dots differ by size or shape, that a revision adds no dot, that reaching an optional question appends one, that an upcoming dot behind a gate is refused with a reason, and drive the footer **keyboard-only** (Tab to a dot, assert its accessible name, activate with Enter) asserting arrival · `packages/studio/e2e/footer-progress.spec.ts`
-- [ ] **T055** [P] [US4] Accessibility test: every dot reachable by Tab, named on focus, activated by both Enter and Space, focus visible, and `expectNoSeriousAxeViolations` clean on every tab with the footer present (SC-010) · `packages/studio/src/components/StudioFooter.a11y.test.tsx`
+- [x] **T054** [P] [US4] E2E: assert the row's full composition against a scripted walk, that question and stage dots differ by size or shape, that a revision adds no dot, that reaching an optional question appends one, that an upcoming dot behind a gate is refused with a reason, and drive the footer **keyboard-only** (Tab to a dot, assert its accessible name, activate with Enter) asserting arrival · `packages/studio/e2e/footer-progress.spec.ts`
+- [x] **T055** [P] [US4] Accessibility test: every dot reachable by Tab, named on focus, activated by both Enter and Space, focus visible, and `expectNoSeriousAxeViolations` clean on every tab with the footer present (SC-010) · `packages/studio/src/components/StudioFooter.a11y.test.tsx`
 
 **Checkpoint**: US4 is independently functional and testable — the strip shows where the author has been and what is ahead, and is fully operable by keyboard alone.
 
@@ -238,16 +238,16 @@ This phase builds the strip with completed and upcoming marks. The current-posit
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T056** [P] [US5] Read and write the selected section from `viewStateStore.flowMapSection` instead of component `useState` (FR-050) · `packages/studio/src/dashboard/DashboardView.tsx`
-- [ ] **T057** [P] [US5] Read and write the per-stage collapse set and the replaced-decisions toggle from the store (FR-050) · `packages/studio/src/decisions/DecisionTrailView.tsx`
-- [ ] **T058** [P] [US5] Back the pane split with `viewStateStore.paneSplitPct`, clamped to each screen's existing `minPct`/`maxPct` on read so a stale value cannot produce an unusable split (FR-050) · `packages/studio/src/hooks/useResizablePanes.ts`
-- [ ] **T059** [P] [US5] Back the OSK desktop/touch toggle with `viewStateStore.oskMode` on both the Studio and Compare surfaces (FR-050) · `packages/studio/src/StudioShell.tsx`, `packages/studio/src/components/CompareScreen.tsx`
-- [ ] **T060** [P] [US5] Restore each scrollable pane's scroll offset from `viewStateStore.scrollTop`, keyed by a stable pane identifier rather than an array index (FR-050) · `packages/studio/src/hooks/useScrollRestoration.ts`
+- [x] **T056** [P] [US5] Read and write the selected section from `viewStateStore.flowMapSection` instead of component `useState` (FR-050) · `packages/studio/src/dashboard/DashboardView.tsx`
+- [x] **T057** [P] [US5] Read and write the per-stage collapse set and the replaced-decisions toggle from the store (FR-050) · `packages/studio/src/decisions/DecisionTrailView.tsx`
+- [x] **T058** [P] [US5] Back the pane split with `viewStateStore.paneSplitPct`, clamped to each screen's existing `minPct`/`maxPct` on read so a stale value cannot produce an unusable split (FR-050) · `packages/studio/src/hooks/useResizablePanes.ts`
+- [x] **T059** [P] [US5] Back the OSK desktop/touch toggle with `viewStateStore.oskMode` on both the Studio and Compare surfaces (FR-050) · `packages/studio/src/StudioShell.tsx`, `packages/studio/src/components/CompareScreen.tsx`
+- [x] **T060** [P] [US5] Restore each scrollable pane's scroll offset from `viewStateStore.scrollTop`, keyed by a stable pane identifier rather than an array index (FR-050) · `packages/studio/src/hooks/useScrollRestoration.ts`
 
 **⟶ Wait for Wave 1 to finish, then — independent (different files):**
 
-- [ ] **T061** [P] [US5] Call `viewStateStore.reset()` from exactly the two existing start-over paths — `handleStartOver()` and WelcomeScreen's "I'm new" — so view state clears with the session it belongs to (FR-052) · `packages/studio/src/StudioShell.tsx`, `packages/studio/src/components/WelcomeScreen.tsx`
-- [ ] **T062** [P] [US5] Integration test: every restorable control survives a route change and is cleared by start-over, and restoring view state triggers **no** compile and **no** validation run (FR-053, SC-011) · `packages/studio/src/stores/viewStateRestoration.test.tsx`
+- [x] **T061** [P] [US5] Call `viewStateStore.reset()` from exactly the two existing start-over paths — `handleStartOver()` and WelcomeScreen's "I'm new" — so view state clears with the session it belongs to (FR-052) · `packages/studio/src/StudioShell.tsx`, `packages/studio/src/components/WelcomeScreen.tsx`
+- [x] **T062** [P] [US5] Integration test: every restorable control survives a route change and is cleared by start-over, and restoring view state triggers **no** compile and **no** validation run (FR-053, SC-011) · `packages/studio/src/stores/viewStateRestoration.test.tsx`
 
 **Checkpoint**: US5 is independently functional and testable — every tab returns to how the author left it, for this session only.
 
@@ -263,15 +263,15 @@ This phase builds the strip with completed and upcoming marks. The current-posit
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T063** [P] [US6] Add the `current` dot class to the row, sourced from **traversal state** rather than the decision record so it is per-question accurate inside a step whose answers are not yet recorded; position is read from the location model, never re-derived from the rendered component tree (FR-042, FR-060, FR-062) · `packages/studio/src/decisions/progressDots.ts`
+- [x] **T063** [P] [US6] Add the `current` dot class to the row, sourced from **traversal state** rather than the decision record so it is per-question accurate inside a step whose answers are not yet recorded; position is read from the location model, never re-derived from the rendered component tree (FR-042, FR-060, FR-062) · `packages/studio/src/decisions/progressDots.ts`
 
 **⟶ Wait for T063, then:**
 
-- [ ] **T064** [US6] Render the current marker with a non-colour cue as well as colour, an accessible name identifying the current question, and **no** jump target to itself (FR-046, FR-060, FR-061) · `packages/studio/src/components/ProgressDot.tsx`
+- [x] **T064** [US6] Render the current marker with a non-colour cue as well as colour, an accessible name identifying the current question, and **no** jump target to itself (FR-046, FR-060, FR-061) · `packages/studio/src/components/ProgressDot.tsx`
 
 **⟶ Wait for T064, then:**
 
-- [ ] **T065** [US6] Test: the marker moves when the author jumps back, and the dots ahead of the landing point are still present — a jump is navigation, not a truncation of progress (FR-063, US6 scenario 3) · `packages/studio/src/decisions/progressDots.test.ts`
+- [x] **T065** [US6] Test: the marker moves when the author jumps back, and the dots ahead of the landing point are still present — a jump is navigation, not a truncation of progress (FR-063, US6 scenario 3) · `packages/studio/src/decisions/progressDots.test.ts`
 
 **Checkpoint**: US6 is independently functional and testable — the strip carries orientation and progress in one surface.
 
