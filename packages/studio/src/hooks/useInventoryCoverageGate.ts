@@ -30,7 +30,12 @@ export function useInventoryCoverageGate(): InventoryCoverageGate {
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
   const confirmedInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
-  const { lettersToAdd } = useInventoryDiff();
+  // producedSet is the SAME session-aware (base + this session's physical
+  // assignments, composability-augmented) set MechanismGallery/TouchGallery
+  // derive their own coverage from — reused here (not re-derived) so the
+  // hard gate can never disagree with what the galleries show as covered
+  // (shaped-bug fix, diacritic-implementability).
+  const { lettersToAdd, producedSet } = useInventoryDiff();
 
   const desktopAssignments = useMemo(
     () => selectDesktopAssignments(phaseResults),
@@ -44,7 +49,8 @@ export function useInventoryCoverageGate(): InventoryCoverageGate {
         lettersToAdd,
         touchLayoutJson,
         confirmedInventory,
+        desktopProducedSet: producedSet,
       }),
-    [desktopAssignments, lettersToAdd, touchLayoutJson, confirmedInventory],
+    [desktopAssignments, lettersToAdd, touchLayoutJson, confirmedInventory, producedSet],
   );
 }

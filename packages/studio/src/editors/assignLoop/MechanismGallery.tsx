@@ -49,6 +49,7 @@ import {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   type CSSProperties,
 } from "react";
 import type { I18n } from "@lingui/core";
@@ -65,13 +66,10 @@ import type {
   PlacementWorklist,
   RemovalCapability,
 } from "@keyboard-studio/contracts";
-import {
-  toUPlusNotation,
-  isDecomposableAccented,
-  buildProducedSet,
-} from "@keyboard-studio/contracts";
+import { toUPlusNotation, buildProducedSet } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { collate } from "../../survey/collation.ts";
+import { collateInventory } from "../../survey/collation.ts";
+import { nfcDedup } from "../../survey/charNormUtils.ts";
 import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
 import { getPatternLibraryService } from "../../lib/services.ts";
 import { displayChar } from "../../lib/irToCarveNodes.ts";
@@ -125,6 +123,7 @@ import {
   type CasePairProposal,
 } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
+import { isGatedAccentCompositionCandidate } from "./siblingAccents.ts";
 import {
   appendNotDeletableSuffix,
   composeContributorLabel,
@@ -133,10 +132,11 @@ import {
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
-import { usePositionalCharNav } from "./usePositionalCharNav.ts";
+import { usePositionalCharNav, nearestSurvivingChar, indexOfChar } from "./usePositionalCharNav.ts";
 import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
+import { getProducerBadge, allCharsCovered } from "./parts/charMechanisms.ts";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
 import {
@@ -172,6 +172,7 @@ import {
   galleryConfigStyle as configStyle,
   galleryCardStyle as cardStyle,
 } from "../../lib/galleryTheme.ts";
+import { ERROR_RED, ERROR_BG } from "../../ui/theme.ts";
 import {
   PATTERN_SEQUENCE,
   PATTERN_DEADKEY,
@@ -884,6 +885,13 @@ function MethodChooser({
                       })),
                     ];
                     return (
+                      // key={index} intentionally kept: a raltTokens slot's
+                      // identity IS its position (onRaltTokenChange/
+                      // handleRemoveRaltSlot both address slots by index, and
+                      // two slots can hold the identical value, e.g. two
+                      // empty "" slots, so no content-derived key would be
+                      // stable/unique here either) — not the array-index
+                      // anti-pattern this sweep otherwise targets.
                       <div
                         key={index}
                         style={{
@@ -1338,20 +1346,11 @@ export function MechanismGallery({
     (s) => s.markGalleryIntroSeen,
   );
 
-  const { lettersToAdd: inventoryLettersToAdd, alreadyProduced } =
-    useInventoryDiff();
-
-  // Display-only set for CharScrollStrip's badge (criterion 18.6 SHOW-ALL):
-  // characters the base keyboard already produces render the green
-  // produces->=1 badge via CharScrollStrip's `inheritedChars` (same contract
-  // TouchGallery's `detectedChars` already uses) even though they carry no
-  // MechanismAssignment of their own. lettersToAdd itself (the coverage/gate
-  // denominator, criterion 18.6) is NEVER widened — see the locked constraint
-  // on lettersToAdd above.
-  const alreadyProducedSet = useMemo(
-    () => new Set(alreadyProduced),
-    [alreadyProduced],
-  );
+  const {
+    lettersToAdd: inventoryLettersToAdd,
+    producedSet: sessionProducedSet,
+    rawProducedSet: sharedRawProducedSet,
+  } = useInventoryDiff();
 
   // Collated display order (spec 047 FR-007's default-ICU comparator, reused
   // — not reinvented; see survey/collation.ts): puts a lowercase letter
@@ -1362,24 +1361,52 @@ export function MechanismGallery({
   // check — both order-independent, so reordering here is safe. The
   // canonical `confirmedInventory` (rawInventory) is left untouched; only
   // this display-local derivation is sorted.
+  //
+  // `collateInventory` (not bare `collate`) — a bare combining mark added to
+  // the inventory (e.g. a lone U+0308 combining diaeresis, added ahead of a
+  // precomposed target like "ӝ") otherwise collates to ICU position 0 under
+  // `collate()`'s root comparator, inserting a phantom "first" walk entry and
+  // shifting every other character's index (the walk/nav indexing bug this
+  // fix addresses). `collateInventory` partitions letters/stacks (ICU order)
+  // from bare marks (raw code-point order, trailing) before returning —
+  // see survey/collation.ts.
+  //
+  // `nfcDedup([], rawInventory)` — same fix as TouchGallery's matching
+  // `inventory` derivation (see that file for the full rationale): a walk
+  // entry can appear in confirmedInventory as BOTH its precomposed form
+  // (e.g. "ӝ" U+04DD) and its canonically-equivalent decomposed form (e.g.
+  // "ж"+combining-diaeresis) — distinct JS strings that would otherwise
+  // surface as two separate walk stops for what is visually one character.
+  // Deduping (and displaying the NFC form) here — not in confirmedInventory
+  // itself, which stays untouched — keeps this gallery's walk consistent
+  // with TouchGallery's. NFD stacks with no precomposed codepoint
+  // (Africanist multi-mark sequences) round-trip through NFC unchanged
+  // (NFC(x) is not always length 1), so this never folds two genuinely
+  // different characters together.
   const inventory = useMemo(
-    () => collate(rawInventory),
+    () => collateInventory(nfcDedup([], rawInventory)),
     [rawInventory],
   );
 
-  // The BASE (pre-augmentWithComposable) produced set — same derivation
-  // useInventoryDiff() itself starts from before augmenting, NOT
-  // alreadyProducedSet above (which is already augmented — the composable
-  // membership test the badge uses). Feeds collectCompositionMethod below:
-  // composition must stay strictly ONE level, so it needs the un-augmented
-  // set to decide "is this composable from what's DIRECTLY produced", never
-  // "from what's already-composable". `excludeBackspaceCorrections: true` —
-  // SAME option useInventoryDiff() passes — so a char reachable ONLY via a
-  // backspace-correction store rule (e.g. the SIL Cameroon Â shape) is not
-  // wrongly treated as directly produced here either; without this, the
-  // early-out in collectCompositionMethod (`baseProduced.has(targetChar)`)
-  // would suppress the real "A + ◌̂ → Â" composition row.
-  const baseProducedSet = useMemo(
+  // This session's physical (desktop) assignments — feeds baseProducedSet
+  // below (session-aware coverage) and mechanismAssignments further down.
+  // Declared once, early, so both can share it.
+  const sessionAssignments = useMemo(
+    () => selectDesktopAssignments(phaseResults),
+    [phaseResults],
+  );
+
+  // BASE-DIRECT signal (a) of the 3-signal producer badge (charMechanisms.ts's
+  // getProducerBadge) — the PRISTINE base-only produced set: no session
+  // assignments folded in at all, no `augmentWithComposable`. Contrast with
+  // `baseProducedSet` below, which DOES fold in this session's physical
+  // assignments (feeds signal (c), COMPOSITION) — the two are deliberately
+  // different sets. `excludeBackspaceCorrections: true` matches every other
+  // base-produced-set caller in this file (see `baseProducedSet` below) so a
+  // char reachable only via a backspace-correction rule is not wrongly
+  // counted as directly produced here either. Memoized on `baseIr` alone —
+  // this never reacts to session assignments, same as `lettersToAdd`.
+  const baseOnlyProducedSet = useMemo(
     () =>
       baseIr !== null
         ? buildProducedSet(baseIr, { excludeBackspaceCorrections: true })
@@ -1387,39 +1414,81 @@ export function MechanismGallery({
     [baseIr],
   );
 
+  // The BASE (pre-augmentWithComposable) SESSION-AWARE produced set — this
+  // session's physical assignments folded into the base, but never itself run
+  // through `augmentWithComposable`. This is the badge's signal (c)
+  // (COMPOSITION) input — `preAugmentSessionAwareSet` — AND
+  // `collectCompositionMethod` below's own input: composition must stay
+  // strictly ONE level, so it needs the un-augmented set to decide "is this
+  // composable from what's DIRECTLY produced [this session]", never "from
+  // what's already-composable". Contrast with `baseOnlyProducedSet` above
+  // (no session assignments at all — signal (a)). `excludeBackspaceCorrections:
+  // true` — SAME option useInventoryDiff() passes — so a char reachable ONLY
+  // via a backspace-correction store rule (e.g. the SIL Cameroon Â shape) is
+  // not wrongly treated as directly produced here either; without this, the
+  // early-out in collectCompositionMethod (`baseProduced.has(targetChar)`)
+  // would suppress the real "A + ◌̂ → Â" composition row.
+  //
+  // `buildSessionProducedSet` (not bare `buildProducedSet(baseIr, ...)`) —
+  // shaped-bug fix (diacritic-implementability): this session's physical
+  // assignments are injected into the base .kmn (applyAssignments), reparsed,
+  // and the produced set is rebuilt from that preview IR, so a mark produced
+  // as a rule-output byproduct THIS session (e.g. a deadkey's bare
+  // combining-diaeresis output) is visible to collectCompositionMethod
+  // immediately — not just after the working copy is serialized. See
+  // packages/engine/src/pattern-apply/sessionProducedSet.ts.
+  //
+  // Perf dedup (km-synthesis): this is the SAME round-trip useInventoryDiff()
+  // already computes internally (identical baseIr/sessionAssignments/
+  // getPatternByIdSync inputs — sessionAssignments here is
+  // selectDesktopAssignments(phaseResults), same as useInventoryDiff.ts's own
+  // derivation) to produce its pre-augment set — reuse that hook's
+  // `rawProducedSet` rather than re-running `buildSessionProducedSet` a
+  // second time per render.
+  const baseProducedSet = sharedRawProducedSet;
+
   // Spec 046 worklist filter (FR-020): a composed unit whose marks are ALL
   // productive mark keys is reachable via base key + mark key — it needs no
   // whole-unit placement of its own, so it leaves the walk. Everything else
   // (plain bases, own-letter units, the productive marks themselves) keeps its
   // flat-inventory walk entry. No worklist (or an empty one) ⇒ identity.
   //
-  // The worklist-filtered result is then collated (same `collate` helper as
-  // `inventory` above) before being returned — this is the list
+  // The worklist-filtered result is then collated (same `collateInventory`
+  // helper as `inventory` above) before being returned — this is the list
   // usePositionalCharNav's `list` walks and the "first uncovered" default
   // below reads, so sorting it puts a lowercase letter immediately before
   // its uppercase counterpart in the Back/Next walk too. The SET of
   // characters (the coverage/gate denominator, criterion 18.6) is never
   // widened or narrowed by this — only its order changes.
+  //
+  // `nfcDedup([], inventoryLettersToAdd)` — same duplicate-walk-entry fix as
+  // `inventory` above: `inventoryLettersToAdd` (from useInventoryDiff.ts)
+  // carries confirmedInventory's raw, un-deduped entries (it NFC-normalizes
+  // only for its own produced-set lookup, then pushes the original raw
+  // string), so a decomposed/precomposed pair not yet produced would
+  // otherwise both survive into this walk's denominator as two stops for one
+  // grapheme. Deduping here — this gallery's own walk list, not the shared
+  // hook — keeps it consistent with `inventory` and with TouchGallery's
+  // matching `touchLettersToAdd`.
   const lettersToAdd = useMemo(() => {
-    let filtered = inventoryLettersToAdd;
+    const deduped = nfcDedup([], inventoryLettersToAdd);
+    let filtered = deduped;
     if (worklist !== undefined && worklist.markUnits.length > 0) {
       const productiveMarks = new Set(worklist.markUnits.map((u) => u.mark));
-      filtered = inventoryLettersToAdd.filter((c) => {
+      filtered = deduped.filter((c) => {
         const units = [...c.normalize("NFD")];
         if (units.length < 2) return true;
         const marks = units.slice(1);
         return !marks.every((m) => productiveMarks.has(m));
       });
     }
-    return collate(filtered);
+    return collateInventory(filtered);
   }, [inventoryLettersToAdd, worklist]);
 
   // Read Phase C assignments directly (not the merged session.assignments view)
   // so multiple methods per character are preserved.
-  const sessionAssignments = useMemo(
-    () => selectDesktopAssignments(phaseResults),
-    [phaseResults],
-  );
+  // (sessionAssignments itself is declared earlier, alongside baseProducedSet
+  // above, so both can share the one derivation.)
 
   // sessionAssignments with sequence assignments/mechanisms excluded — see
   // excludeSequenceMechanisms above. This gallery's whole covered/applied view
@@ -1455,6 +1524,18 @@ export function MechanismGallery({
     [lettersToAdd, sessionAssignments],
   );
 
+  // Whole-inventory "every character is implemented" check (bug fix) — built
+  // on the SAME 3-signal getProducerBadge computation the CharScrollStrip
+  // badge uses, over the FULL SHOW-ALL `inventory` list (not just
+  // lettersToAdd — a base-produced char must count as covered too). Feeds
+  // the forward-button spec below: when true, the Done button is always
+  // rendered regardless of currentChar/walk membership (see that spec's
+  // top-priority branch).
+  const allCovered = useMemo(
+    () => allCharsCovered(inventory, sessionAssignments, "physical", baseOnlyProducedSet, baseProducedSet),
+    [inventory, sessionAssignments, baseOnlyProducedSet, baseProducedSet],
+  );
+
   // One-time intro splash — shown on first entry to the desktop gallery so the
   // move into the authoring flow is explicit. The store flag persists "seen"
   // across unmount/remount (e.g. navigating to the touch gallery and back), so
@@ -1465,17 +1546,35 @@ export function MechanismGallery({
   // Only advances when the user clicks "Next character →" or "Skip".
   const [currentChar, setCurrentChar] = useState<string | null>(null);
   const lettersKey = lettersToAdd.join("\0");
+  // Previous run's lettersToAdd — feeds nearestSurvivingChar's "where was this
+  // character before the reflow" lookup below. Updated at the end of the
+  // effect (not via a separate render), so it always holds the list the LAST
+  // sync ran against, not the list mid-render.
+  const prevLettersToAddRef = useRef<readonly string[]>(lettersToAdd);
   useEffect(() => {
     setCurrentChar((prev) => {
-      // Keep current char if it's still in the list (e.g., inventory refresh).
-      if (prev !== null && lettersToAdd.includes(prev)) return prev;
-      // Pick the first uncovered char, or the very first if all covered.
-      return (
-        lettersToAdd.find((c) => !coveredChars.has(c)) ??
-        lettersToAdd[0] ??
-        null
-      );
+      // Keep current char if it's still in the list (e.g., inventory
+      // refresh) — by NFC identity (indexOfChar), not raw equality, so a
+      // representation change (e.g. collateInventory's NFC-dedup) doesn't
+      // spuriously look like a removal.
+      if (prev !== null && indexOfChar(lettersToAdd, prev) !== -1) return prev;
+      if (prev === null) {
+        // First-ever pick — prefer the first UNCOVERED char over strict
+        // position 0.
+        return (
+          lettersToAdd.find((c) => !coveredChars.has(c)) ??
+          lettersToAdd[0] ??
+          null
+        );
+      }
+      // `prev` was removed by this reflow — fall back to the NEAREST
+      // surviving neighbor (shaped-bug fix, walk-order/indexing) rather than
+      // jumping to "first uncovered"/list[0], which can be arbitrarily far
+      // from where the author was in a long inventory. See
+      // usePositionalCharNav.ts's `nearestSurvivingChar` doc comment.
+      return nearestSurvivingChar(prevLettersToAddRef.current, prev, lettersToAdd);
     });
+    prevLettersToAddRef.current = lettersToAdd;
     // Intentionally omit coveredChars — only re-run when the
     // inventory list itself changes, not when methods are applied.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1713,6 +1812,21 @@ export function MechanismGallery({
     return altFamily ?? "RALT";
   }, [modifierPool]);
 
+  // The current character's 3-signal producer badge (charMechanisms.ts's
+  // getProducerBadge) — the SAME computation CharScrollStrip's own badge and
+  // the SHOW-ALL floor-row check (existingMethodContributors below) use,
+  // with the SAME 4 trailing args this gallery already passes to
+  // CharScrollStrip (baseOnlyProducedSet, baseProducedSet). Hoisted here so
+  // the suggestion gate below (currentCharBadge?.count ?? 0) === 0 and the
+  // floor-row check share one computation rather than each re-deriving it.
+  const currentCharBadge = useMemo(
+    () =>
+      currentChar !== null
+        ? getProducerBadge(currentChar, sessionAssignments, "physical", baseOnlyProducedSet, baseProducedSet)
+        : null,
+    [currentChar, sessionAssignments, baseOnlyProducedSet, baseProducedSet],
+  );
+
   // kbgen placement suggestion for the current character (null when no map or
   // no qualifying candidate). Memoized against currentChar + placementMap so it
   // only recomputes on actual input changes, not on unrelated re-renders.
@@ -1772,9 +1886,15 @@ export function MechanismGallery({
   // for coveredChars, via the shared unimplementedDesktopChars helper (do not
   // fork this definition — see lib/unimplementedInventory.ts). Non-empty only
   // when at least one character in lettersToAdd resolves to zero mechanisms.
+  // `sessionProducedSet` (useInventoryDiff's session-aware, composability-
+  // folded produced set) is threaded through here too — WITHOUT it, this
+  // legacy gate could disagree with the badge (getProducerBadge) about a
+  // character that is only covered by composition this session, firing a
+  // spurious "still unimplemented" warning on a Done click the badge itself
+  // already reports as green. See useInventoryDiff.ts / unimplementedInventory.ts.
   const unimplementedChars = useMemo(
-    () => unimplementedDesktopChars(sessionAssignments, lettersToAdd),
-    [sessionAssignments, lettersToAdd],
+    () => unimplementedDesktopChars(sessionAssignments, lettersToAdd, sessionProducedSet),
+    [sessionAssignments, lettersToAdd, sessionProducedSet],
   );
   const [showUnimplementedWarning, setShowUnimplementedWarning] =
     useState(false);
@@ -1871,14 +1991,19 @@ export function MechanismGallery({
   useEffect(() => {
     clearCompanion();
     resetMethodState();
-    if (currentChar !== null && isDecomposableAccented(currentChar)) {
+    // Abugida-safe gate — shared predicate; see siblingAccents.ts for the
+    // reasoning (also used by TouchGallery's longpress suggestion memo).
+    if (
+      currentChar !== null &&
+      isGatedAccentCompositionCandidate(currentChar, axes.scriptClass)
+    ) {
       // §3c defaults-first: for a decomposable accented letter the natural method
       // is deadkey (S-02) — propose-then-confirm. resetMethodState sets "swap"
       // unconditionally, so override here after the reset.
       setDeadkeyBaseLetter([...currentChar.normalize("NFD")][0] ?? "");
       setMethod("deadkey");
     }
-  }, [currentChar, resetMethodState, clearCompanion]);
+  }, [currentChar, resetMethodState, clearCompanion, axes.scriptClass]);
 
   // ---------------------------------------------------------------------------
   // Suggestion row handlers
@@ -3019,16 +3144,15 @@ export function MechanismGallery({
     }
 
     // SHOW-ALL floor (criterion 18.6-adjacent invariant): currentChar is
-    // GREEN (a member of the augmented alreadyProducedSet the CharScrollStrip
-    // badge uses) but, after everything above, still has zero rows — an
-    // unrecognized-shape producer collectCharContributors couldn't attribute
-    // at all. Append one truthful, no-arrow floor row rather than leave the
-    // section empty under a green badge.
-    if (
-      currentChar !== null &&
-      rows.length === 0 &&
-      alreadyProducedSet.has(currentChar)
-    ) {
+    // GREEN (getProducerBadge's count >= 1 — the SAME 3-signal computation
+    // CharScrollStrip's badge uses, see charMechanisms.ts) but, after
+    // everything above, still has zero rows — an unrecognized-shape producer
+    // collectCharContributors couldn't attribute at all. Append one truthful,
+    // no-arrow floor row rather than leave the section empty under a green
+    // badge. Reuses the hoisted `currentCharBadge` (declared above, near the
+    // suggestion gate) rather than a second getProducerBadge call for the
+    // same character — one computation, two readers.
+    if (currentChar !== null && rows.length === 0 && (currentCharBadge?.count ?? 0) > 0) {
       rows.push({
         id: `unattributed:${currentChar}`,
         label: appendNotDeletableSuffix(
@@ -3056,7 +3180,7 @@ export function MechanismGallery({
     i18n,
     currentChar,
     baseProducedSet,
-    alreadyProducedSet,
+    currentCharBadge,
   ]);
 
   const handleRemoveExistingMethod = useCallback(
@@ -3240,7 +3364,24 @@ export function MechanismGallery({
   // disabled and no completion button rendered) is unreachable.
   const doneLabel = t({ id: "editor.assignLoop.doneButton", message: "Done" });
   const forwardButton: ForwardButtonSpec | null =
-    locked && onComplete !== undefined
+    // TOP PRIORITY (bug fix): once every inventory character has count >= 1
+    // (allCovered, the SAME badge computation CharScrollStrip/currentCharBadge
+    // use), the Done button is ALWAYS rendered — regardless of currentChar or
+    // its walk (lettersToAdd) membership. Previously this button was hidden
+    // entirely for a currentChar outside lettersToAdd (e.g. an
+    // already-produced character reached via the SHOW-ALL CharScrollStrip),
+    // which could strand an author who had, in fact, finished every
+    // character — there was no visible way to advance. Falls through to the
+    // existing branches unchanged whenever any character is still count 0.
+    allCovered && onComplete !== undefined
+      ? {
+          label: doneLabel,
+          onClick: handleForwardComplete,
+          testId: "mechanisms-continue",
+          disabled: false,
+          style: forwardBtnStyle,
+        }
+      : locked && onComplete !== undefined
       ? {
           label: t({
             id: "editor.assignLoop.continueButton",
@@ -3498,11 +3639,13 @@ export function MechanismGallery({
         {/* Character scroll strip — horizontal, SHOW-ALL of the confirmed
               inventory (criterion 18.6), not just lettersToAdd: an author
               should be able to see and inspect every character, including
-              ones the base keyboard already produces, not only the ones
-              still needing a method. `inheritedChars` feeds alreadyProduced
-              into CharScrollStrip's badge so those chips still show the
-              green produces->=1 badge (mirrors TouchGallery's
-              detectedChars). Selecting a chip goes through
+              ones already produced (directly by the base, or composable
+              from this session's own assignments), not only the ones
+              still needing a method. `baseDirectSet`/`preAugmentSessionAwareSet`
+              feed the 3-signal producer badge (charMechanisms.ts's
+              getProducerBadge) so those chips still show the green
+              produces->=1 badge (mirrors TouchGallery's matching props).
+              Selecting a chip goes through
               handleSelectDisplayChar (not handleSelectChar, which is gated
               on lettersToAdd) so an already-produced chip is still
               selectable — see handleSelectDisplayChar's own doc comment and
@@ -3516,7 +3659,8 @@ export function MechanismGallery({
             onSelectChar={handleSelectDisplayChar}
             assignments={sessionAssignments}
             modality="physical"
-            inheritedChars={alreadyProducedSet}
+            baseDirectSet={baseOnlyProducedSet}
+            preAugmentSessionAwareSet={baseProducedSet}
           />
         )}
 
@@ -3569,8 +3713,24 @@ export function MechanismGallery({
                   qualifying placement candidate exists and hasn't been dismissed.
                   [Accept] pre-fills method + key picker; [Change] dismisses the
                   row so the author can select manually. No kbgen data => null =>
-                  row is absent and gallery behaves exactly as today. */}
-            {suggestion !== null && !suggestionDismissed && (
+                  row is absent and gallery behaves exactly as today.
+                  Gate is strictly `(currentCharBadge?.count ?? 0) === 0` — the
+                  suggestion shows ONLY when the character has ZERO recorded
+                  implementations. This subsumes every prior partial gate: a
+                  recorded SEQUENCE (signal (b) SESSION-DIRECT via
+                  `hasSequenceForChar`), COMPOSITION (signal (c),
+                  `currentCharBadge?.isComposable`), AND — the case the old
+                  gate missed — BASE-DIRECT coverage (signal (a),
+                  `baseOnlyProducedSet`), e.g. a character the base keyboard
+                  already produces via an existing rule sequence. Any of
+                  those already gives count >= 1, so count === 0 is exactly
+                  "the badge the author sees is still at zero" — the same
+                  signal driving the green/red badge itself
+                  (charMechanisms.ts), so the suggestion and the badge can
+                  never visibly disagree. */}
+            {suggestion !== null &&
+              !suggestionDismissed &&
+              (currentCharBadge?.count ?? 0) === 0 && (
               <div
                 role="note"
                 aria-label={t({
@@ -3578,8 +3738,14 @@ export function MechanismGallery({
                   message: "Placement suggestion from kbgen seeder",
                 })}
                 style={{
-                  background: "#0d2218",
-                  border: "1px solid #238636",
+                  // RED, not green — the suggestion row only ever renders
+                  // when currentCharBadge's count is 0 (see the gate above),
+                  // so it always reads as "not yet implemented", matching
+                  // the badge's own 0-count colors (charMechanisms.ts /
+                  // CharScrollStrip.tsx's `ERROR_RED` + its paired dark-red
+                  // background).
+                  background: ERROR_BG,
+                  border: `1px solid ${ERROR_RED}`,
                   borderRadius: 8,
                   padding: "10px 14px",
                   display: "flex",
@@ -3591,7 +3757,7 @@ export function MechanismGallery({
                   style={{
                     margin: 0,
                     fontSize: 12,
-                    color: "#56d364",
+                    color: ERROR_RED,
                     fontFamily: FONT,
                     fontWeight: 600,
                   }}
@@ -3754,7 +3920,7 @@ export function MechanismGallery({
                   .filter(
                     (a) => a.scope === "individual" && a.target === currentChar,
                   )
-                  .map((a, i) => {
+                  .map((a) => {
                     const ref = a.mechanisms[0];
                     const label =
                       ref !== undefined
@@ -3762,9 +3928,21 @@ export function MechanismGallery({
                         : a.mechanisms
                             .map((m) => methodLabel(m, i18n))
                             .join(", ");
+                    // Stable content-identity key (not array index) — a
+                    // removal reflows this filtered list, and an index key
+                    // would rebind React's reconciliation to the WRONG chip
+                    // (e.g. a mid-list removal making the last chip disappear
+                    // instead of the clicked one, or transferring hover/focus
+                    // state onto an unrelated chip). Every mechanism this
+                    // gallery can record carries a patternId + slotValues
+                    // (see applyAssignments.ts's own `mechanismKey`), so the
+                    // full mechanisms list serializes to a unique key.
+                    const chipKey = a.mechanisms
+                      .map((m) => `${m.patternId}::${JSON.stringify(m.slotValues ?? {})}`)
+                      .join("|");
                     return (
                       <HoverDangerChip
-                        key={i}
+                        key={chipKey}
                         onClick={() => handleRemoveMechanism(a)}
                         disabled={locked}
                         ariaLabel={t({

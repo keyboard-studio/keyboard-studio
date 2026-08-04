@@ -1112,6 +1112,444 @@ describe("TouchGallery — character-scroll-strip producer badge (integration)",
 });
 
 // ---------------------------------------------------------------------------
+// Compose marker (CharScrollStrip Part 1, 3-signal count model) — integration
+// coverage for the TOUCH modality specifically.
+//
+// MechanismGallery.test.tsx already pins the compose marker's render-level
+// contract (data-testid `char-scroll-badge-compose-<HEX>`) for the desktop/
+// physical path. The touch path is MORE complex — its composition signal
+// (`directTouchProducedSet`, charMechanisms.ts's `getProducerBadge` signal
+// (c) input) folds a cross-modality union of `desktopDirectProducedSet`
+// (this session's desktop physical assignments, via
+// `selectDesktopAssignments`) and this session's own touch coverage (via
+// `computeTouchCoverage(layoutForLintAndGate, inventory)`) — see the
+// `directTouchProducedSet` memo's own doc comment in TouchGallery.tsx. That
+// fold had no render-level pin before this suite. Seeds touch assignments
+// directly via `setTouchDraft` (the same store-seed precedent the rest of
+// this file uses, e.g. the "does NOT set ... touch_inherited" test above)
+// rather than driving the method-chooser UI twice — the fixture under test is
+// the composability FOLD, not the Apply flow itself (already covered by the
+// "Producer-count badge" suite above).
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — character-scroll-strip compose marker (integration)", () => {
+  it("a composable-only touch character (ǯ, reachable only via NFD composition of its own-key-produced ʒ + combining caron) shows the compose marker, badged 1", async () => {
+    seedStore({ withInventory: ["ʒ", "̌", "ǯ"] });
+    const ezhAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "touch",
+      mechanisms: [{ patternId: "touch_key_replace", slotValues: { hostKey: "K_Z", char: "ʒ", layer: "default" } }],
+      source: "user",
+    };
+    const caronAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "̌",
+      modality: "touch",
+      mechanisms: [{ patternId: "touch_key_replace", slotValues: { hostKey: "K_QUOTE", char: "̌", layer: "default" } }],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [
+        ["ʒ", ezhAssignment],
+        ["̌", caronAssignment],
+      ],
+      suggestionResolvedChars: [],
+    });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    // ǯ (U+01EF): no own-key touch assignment — its NFD components (ʒ,
+    // combining caron) are BOTH directly touch-produced this session, so it
+    // badges GREEN 1 via composition alone, with the compose marker present.
+    expect(within(strip).getByTestId("char-scroll-badge-compose-01EF")).toBeTruthy();
+    expect(within(strip).getByTestId("char-scroll-badge-01EF").textContent).toBe("1");
+  });
+
+  it("a plain own-key touch character (ʒ, not NFD-decomposable) shows NO compose marker", async () => {
+    seedStore({ withInventory: ["ʒ", "̌", "ǯ"] });
+    const ezhAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "touch",
+      mechanisms: [{ patternId: "touch_key_replace", slotValues: { hostKey: "K_Z", char: "ʒ", layer: "default" } }],
+      source: "user",
+    };
+    const caronAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "̌",
+      modality: "touch",
+      mechanisms: [{ patternId: "touch_key_replace", slotValues: { hostKey: "K_QUOTE", char: "̌", layer: "default" } }],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [
+        ["ʒ", ezhAssignment],
+        ["̌", caronAssignment],
+      ],
+      suggestionResolvedChars: [],
+    });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    // ʒ (U+0292) itself has its own touch key and is not NFD-decomposable, so
+    // composition can never fire for it — marker ABSENT, badge reflects the
+    // direct assignment only (1), not inflated by a phantom composition bonus.
+    expect(within(strip).queryByTestId("char-scroll-badge-compose-0292")).toBeNull();
+    expect(within(strip).getByTestId("char-scroll-badge-0292").textContent).toBe("1");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suggestion card — gated on the current character's producer badge (bug
+// fix: a char already GREEN purely via composition must not ALSO show a
+// stale "suggested" proposal card).
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — suggestion card gated on the current char's producer badge", () => {
+  it("hides the suggestion for a composition-covered character (ǯ, badge isComposable) and shows it for a plain uncovered character (x) with its own desktop assignment, in the same session", async () => {
+    seedStore({ withInventory: ["ʒ", "̌", "ǯ", "x"] });
+
+    // Desktop (Phase C, physical) assignments for BOTH "ǯ" and "x" — each has
+    // its own simple_swap mechanism, so the suggestion computation's `da`
+    // branch fires for both, proposing a "replace" card (extractMechanismHostKey).
+    const zhCaronDesktopAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "ǯ",
+      modality: "physical",
+      mechanisms: [{ patternId: "simple_swap", slotValues: { kmnRules: "+ [K_9] > 'ǯ'" } }],
+      source: "user",
+    };
+    const xDesktopAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "x",
+      modality: "physical",
+      mechanisms: [{ patternId: "simple_swap", slotValues: { kmnRules: "+ [K_X] > 'x'" } }],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      assignments: [zhCaronDesktopAssignment, xDesktopAssignment],
+    });
+
+    // "ʒ" and the bare combining caron each have their OWN explicit touch
+    // key (same fixture shape as the compose-marker suite above) — this
+    // makes "ǯ" composable (both its NFD components are directly
+    // touch-produced this session) even though "ǯ" itself has no touch
+    // assignment of its own.
+    const ezhTouchAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "touch",
+      mechanisms: [{ patternId: "touch_key_replace", slotValues: { hostKey: "K_Z", char: "ʒ", layer: "default" } }],
+      source: "user",
+    };
+    const caronTouchAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "̌",
+      modality: "touch",
+      mechanisms: [{ patternId: "touch_key_replace", slotValues: { hostKey: "K_QUOTE", char: "̌", layer: "default" } }],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [
+        ["ʒ", ezhTouchAssignment],
+        ["̌", caronTouchAssignment],
+      ],
+      suggestionResolvedChars: [],
+    });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+
+    // "ǯ" — composable (badge isComposable, no own touch assignment): the
+    // desktop assignment WOULD otherwise raise a "replace" suggestion card,
+    // but it must NOT render.
+    fireEvent.click(within(strip).getByTestId("char-scroll-chip-01EF"));
+    await waitFor(() => {
+      expectCurrentChar("ǯ");
+    });
+    expect(screen.queryByText(/Suggested: replace/i)).toBeNull();
+
+    // "x" — plain (not NFD-decomposable, no composability): the SAME kind of
+    // desktop-assignment-derived suggestion DOES render.
+    fireEvent.click(within(strip).getByTestId("char-scroll-chip-0078"));
+    await waitFor(() => {
+      expectCurrentChar("x");
+    });
+    expect(screen.getByText(/Suggested: replace/i)).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Forward button — forced visible/enabled once the whole inventory is
+// covered, even when currentChar is outside touchLettersToAdd's walk (bug
+// fix).
+// ---------------------------------------------------------------------------
+
+/**
+ * Seed a base that SHIPS a `.keyman-touch-layout` file producing
+ * `shippedChar` (same shape as `seedWithShippedTouchLayout` above — a
+ * character detected purely via the SEED layout, with NO desktop assignment
+ * of its own, is the one reliable way to land a character outside
+ * `touchLettersToAdd`'s walk: `desktopSuggestionTargets` keeps ANY character
+ * with an actionable Phase C suggestion in the walk regardless of detection,
+ * so a detected-but-suggestion-free character is the only kind that actually
+ * leaves it — see touchLettersToAdd's own doc comment), plus a Phase C
+ * desktop assignment for `swappedChar` (mirrored onto the touch seed too,
+ * badging it covered via signal (a) with zero explicit touch action), plus
+ * an optional third, wholly UNCOVERED character for the negative case.
+ */
+function seedShippedPlusSwapped(opts: {
+  shippedChar: string;
+  swappedChar: string;
+  extraUncoveredChar?: string;
+}) {
+  const shippedLayoutJson = JSON.stringify({
+    phone: {
+      layer: [
+        {
+          id: "default",
+          row: [{ id: 1, key: [{ id: "T_shipped", output: opts.shippedChar }] }],
+        },
+      ],
+    },
+  });
+  const vfs = createVirtualFS([
+    { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    { path: "source/basic_kbdus.keyman-touch-layout", content: shippedLayoutJson, isBinary: false },
+  ]);
+  const ir = makeTestIR([]);
+  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+  const swapAssignment: MechanismAssignment = {
+    scope: "individual",
+    target: opts.swappedChar,
+    modality: "physical",
+    mechanisms: [
+      {
+        patternId: "simple_swap",
+        strategyId: "S-01",
+        slotValues: { kmnRules: `+ [K_X] > '${opts.swappedChar}'` },
+      },
+    ],
+    source: "user",
+  };
+  useWorkingCopyStore.getState().recordPhase({
+    phase: "B",
+    answers: [],
+    confirmedInventory: [
+      opts.swappedChar,
+      opts.shippedChar,
+      ...(opts.extraUncoveredChar !== undefined ? [opts.extraUncoveredChar] : []),
+    ],
+  });
+  useWorkingCopyStore.getState().recordPhase({
+    phase: "C",
+    answers: [],
+    assignments: [swapAssignment],
+  });
+  useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
+  useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
+}
+
+// ---------------------------------------------------------------------------
+// touchBaseDirectSet — LIVE base-direct signal (a) regression (P1 bug fix,
+// km-validator finding: "touch base-direct staleness"). Before the fix,
+// `baseTouchCoveredSet` (signal (a)'s source, frozen at `detectionSeedLayout`
+// — which deliberately EXCLUDES this session's own `charTouch` edits, see
+// that memo's own doc comment) kept a seed-only character reading covered
+// FOREVER, even once a "replace" action this session overwrote the touch
+// key that used to be its only producer — disagreeing with the live
+// completion gate (`handleContinue`'s own
+// `touchCoverage(layoutForLintAndGate, ...)`, which correctly saw the
+// overwrite). Symptom: the badge stayed GREEN and Done stayed FORCE-SHOWN,
+// but a Done click still got refused/nagged by the live gate. The fix
+// sources signal (a) from `touchBaseDirectSet` (LIVE, derived from
+// `directTouchProducedSet` — itself built from `layoutForLintAndGate`, which
+// DOES bake in every `charTouch` edit) so all three (badge, Done visibility,
+// live gate) agree.
+//
+// This suite's mocked `buildTouchLayoutJson` (see this file's own module
+// header) rebuilds the rendered layer purely from `assignments` once ANY
+// edit exists — it does not model "which specific physical key a replace
+// overwrote" the way the real engine does. That is a harness limitation,
+// not a gap in the property under test: it still proves the intended
+// contract — signal (a) reacting LIVE to a same-session touch edit, vs. the
+// old frozen set which never reacted to one at all — and the two assertions
+// below (the seed-only character's badge, and the Done button's visibility)
+// both flip against a reverted (frozen) `baseTouchCoveredSet` source, so this
+// is a genuine regression pin, not a tautology.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — touch base-direct signal (a) is LIVE, not frozen (P1 regression)", () => {
+  it("a character reachable ONLY via a seed touch key reads UNCOVERED (badge 0) and Done is NOT force-shown once this session's 'replace' action overwrites a touch key — agreeing with the live completion gate", async () => {
+    // "€" is reachable ONLY via the SHIPPED seed key — no Phase C desktop
+    // assignment of its own, so it is excluded from touchLettersToAdd's walk
+    // entirely (entry-parity fix) and starts covered purely via signal (a)
+    // BASE-DIRECT.
+    const shippedLayoutJson = JSON.stringify({
+      phone: {
+        layer: [
+          {
+            id: "default",
+            row: [{ id: 1, key: [{ id: "K_1", output: "€" }] }],
+          },
+        ],
+      },
+    });
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+      { path: "source/basic_kbdus.keyman-touch-layout", content: shippedLayoutJson, isBinary: false },
+    ]);
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "B",
+      answers: [],
+      // "中" has no desktop assignment and is not present anywhere in the
+      // seed — suggestion kind "none" (same fixture the "Producer-count
+      // badge" suite above uses), so it is the walk's only entry.
+      confirmedInventory: ["€", "中"],
+    });
+    useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
+    useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expectCurrentChar("中");
+    const stripBefore = screen.getByTestId("char-scroll-strip");
+    // "€" starts GREEN (1) — covered purely via the seed, zero session edits.
+    expect(within(stripBefore).getByTestId("char-scroll-badge-20AC").textContent).toBe("1");
+    // "中" starts RED (0) — the walk's own uncovered target.
+    expect(within(stripBefore).getByTestId("char-scroll-badge-4E2D").textContent).toBe("0");
+
+    // Drive the real "Replace a key" method (manual chooser, mirrors the
+    // "Producer-count badge" suite's longpress flow above) to record a
+    // touch_key_replace mechanism for "中" this session.
+    const replaceCard = screen.queryByText(/Replace a key/i);
+    expect(replaceCard).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(replaceCard!);
+    });
+    const hostKeySelect = screen.getByLabelText(/Host key to replace/i);
+    await changeSelectMenu(hostKeySelect, "K_1");
+    const applyBtn = screen.queryAllByRole("button").find(
+      (b) => b.textContent?.trim() === "Apply method",
+    ) ?? null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    // (i) "€"'s badge must now read UNCOVERED (0) — its only producer (the
+    // seed key) was live-overwritten this session; the frozen
+    // `baseTouchCoveredSet` this fix replaces never saw that overwrite.
+    await waitFor(() => {
+      const badgeAfter = within(screen.getByTestId("char-scroll-strip")).getByTestId(
+        "char-scroll-badge-20AC",
+      );
+      expect(badgeAfter.textContent).toBe("0");
+    });
+    // "中" is now covered by its own new key (signal (b) SESSION-DIRECT) —
+    // NOT double-counted with the now-live signal (a) (see touchBaseDirectSet's
+    // own doc comment for why the two stay disjoint).
+    expect(
+      within(screen.getByTestId("char-scroll-strip")).getByTestId("char-scroll-badge-4E2D")
+        .textContent,
+    ).toBe("1");
+
+    // (ii) Whole-inventory coverage must agree: "€" reads uncovered, so
+    // `allCharsCovered` is false and Done is NOT force-shown for a currentChar
+    // OUTSIDE the walk (touchLettersToAdd) — matching the live completion
+    // gate rather than disagreeing with it. Navigate to "€" itself (its
+    // walk-excluded SHOW-ALL chip) — "中" being the walk's own last/only
+    // entry would otherwise show its own ordinary walk-completion Done
+    // regardless of "€", which is not the property under test here (see the
+    // "Done button forced visible" suite below for that ALLCOVERED-forced
+    // case specifically).
+    fireEvent.click(within(screen.getByTestId("char-scroll-strip")).getByTestId(
+      "char-scroll-chip-20AC",
+    ));
+    await waitFor(() => {
+      expectCurrentChar("€");
+    });
+    expect(screen.queryByTestId("touch-continue")).toBeNull();
+  });
+});
+
+describe("TouchGallery — Done button forced visible when the whole inventory is covered", () => {
+  it("shows an ENABLED Done button when every inventory character has count >= 1, even navigated to an already-detected character outside touchLettersToAdd (previously hidden)", async () => {
+    // "x" carries a desktop swap assignment (mirrored onto the touch seed —
+    // badge count via signal (a), and it stays IN touchLettersToAdd as an
+    // actionable suggestion target). "€" is detected purely via the SHIPPED
+    // touch layout, with no desktop assignment of its own — it is excluded
+    // from touchLettersToAdd's walk entirely (entry-parity fix), the exact
+    // scenario that previously hid the forward button. Both are already
+    // covered (count >= 1) with zero explicit author action.
+    seedShippedPlusSwapped({ shippedChar: "€", swappedChar: "x" });
+
+    const onComplete = vi.fn();
+    await act(async () => {
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+    });
+
+    expectCurrentChar("x");
+
+    // Navigate to "€" via the SHOW-ALL strip — outside touchLettersToAdd.
+    fireEvent.click(screen.getByTestId("char-scroll-chip-20AC"));
+    await waitFor(() => {
+      expectCurrentChar("€");
+    });
+
+    // The Done button is FORCED visible and enabled — the whole inventory
+    // (both "x" and "€") is covered per the producer badge, even though
+    // currentChar ("€") is outside touchLettersToAdd's walk. (The completion
+    // round-trip itself — whether clicking Done actually calls onComplete —
+    // is FR-008's own gate, re-deriving coverage from this file's mocked
+    // `buildTouchLayoutJson`, which does not reflect shipped/mirrored
+    // content; that gate is exercised by its own existing test suite, not
+    // this one — the property under test here is button visibility/state.)
+    const doneBtn = screen.getByTestId("touch-continue");
+    expect(doneBtn.textContent).toMatch(/Done/i);
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it("does NOT force-show the Done button when at least one character is still count === 0, even when navigated to an already-detected character outside touchLettersToAdd", async () => {
+    // Same "x"/"€" pair as above, PLUS "w" — wholly uncovered (no shipped
+    // layout entry, no desktop assignment, no touch config at all) — so the
+    // inventory is NOT fully covered.
+    seedShippedPlusSwapped({ shippedChar: "€", swappedChar: "x", extraUncoveredChar: "w" });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // Navigate to "€" — detected-only, outside touchLettersToAdd.
+    fireEvent.click(screen.getByTestId("char-scroll-chip-20AC"));
+    await waitFor(() => {
+      expectCurrentChar("€");
+    });
+
+    // Not fully covered ("w" is still count 0) — the forward button stays
+    // hidden entirely, exactly as before this fix.
+    expect(screen.queryByTestId("touch-continue")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // UsesSequencesCard (Part 3) — integration coverage.
 //
 // UsesSequencesCard.tsx (packages/studio/src/editors/assignLoop/parts/) has
@@ -1687,6 +2125,57 @@ describe("TouchGallery — heading", () => {
     const h1 = screen.getByRole("heading", { level: 1 });
     expect(h1.textContent).toMatch(/Touch Gallery/i);
     expect(h1.textContent).toMatch(/Touch/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Abugida-safe gate + empty-hostkey guard on the decomposable-accented
+// longpress auto-suggestion (km-domain ruling / km-triage finding #3)
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — abugida gate and empty-hostkey guard on the longpress auto-suggestion", () => {
+  it("does NOT offer a longpress auto-suggestion for a decomposable char when scriptClass is abugida", async () => {
+    // "ä" (a + U+0308, Mn) is predicate-matching and has a Latin base — with
+    // no gate this always suggests longpress (see the "Latin base" case
+    // below); with scriptClass = abugida the suggestion must not fire.
+    seedStore({ withInventory: ["ä"] });
+    useWorkingCopyStore.getState().setIrAxes({ scriptClass: "abugida" });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expect(screen.queryByText(/Suggested: long-press/i)).toBeNull();
+    // Falls straight to the method chooser instead of a suggestion card.
+    expect(screen.queryByText(/How to reach it on touch/i)).not.toBeNull();
+  });
+
+  it("skips the longpress suggestion (no vacuous card) when the derived host key is empty (non-Latin base)", async () => {
+    // "ӝ" (ж U+0436 + U+0308 Mn) decomposes to a Cyrillic base letter, which
+    // the `/^[a-zA-Z]$/` host-key extraction cannot map to a K_ key — before
+    // this guard the component fell back to rendering "Suggested: long-press
+    // a key to reach...", a vacuous card naming no real target key.
+    seedStore({ withInventory: ["ӝ"] });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expect(screen.queryByText(/Suggested: long-press/i)).toBeNull();
+    expect(screen.queryByText(/Suggested: long-press a key to reach/i)).toBeNull();
+    // Falls straight to the method chooser — no vacuous suggestion card.
+    expect(screen.queryByText(/How to reach it on touch/i)).not.toBeNull();
+  });
+
+  it("still offers the longpress auto-suggestion for a decomposable char with a Latin base (scriptClass alphabetic / undefined)", async () => {
+    seedStore({ withInventory: ["ä"] });
+    useWorkingCopyStore.getState().setIrAxes({ scriptClass: "alphabetic" });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expect(screen.queryByText(/Suggested: long-press/i)).not.toBeNull();
   });
 });
 
