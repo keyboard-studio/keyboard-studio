@@ -462,7 +462,10 @@ type Method = "sequence" | "deadkey" | "swap";
 // to a non-empty token (generic ALT, or RALT once the keyboard already uses
 // a chiral alt token — see raltDefaultToken), mirroring the pre-merge
 // "Layer + key" card's always-prefilled first slot; every slot added after
-// that starts unselected ("") — Apply is disabled until it is filled or
+// that defaults to the first still-available modifier token (per
+// optionsForRaltSlot's earlier-slot exclusions) that the keyboard already
+// uses elsewhere, else falls back to unselected ("") — see
+// handleAddRaltSlot. Apply is disabled until an unselected slot is filled or
 // removed (see canApply / handleRemoveRaltSlot, which now allows removing
 // all the way back to zero).
 const MAX_RALT_SLOTS = 4;
@@ -2095,11 +2098,19 @@ export function MechanismGallery({
       if (prev.length >= MAX_RALT_SLOTS) return prev;
       // The FIRST layer added defaults to raltDefaultToken (mirrors the
       // pre-merge "Layer + key" card, which always started with one
-      // pre-filled slot) — every slot added after that starts unselected
-      // ("") until the author picks one (canApply blocks Apply meanwhile).
-      return [...prev, prev.length === 0 ? raltDefaultToken : ""];
+      // pre-filled slot). Every slot added after that defaults to the first
+      // still-available option (per optionsForRaltSlot's earlier-slot
+      // exclusions) that the keyboard already uses elsewhere — modifierPool
+      // leads with SHIFT, so this surfaces Shift automatically once Shift is
+      // in use. If none of the available options are in use, the slot falls
+      // back to unselected ("") until the author picks one (canApply blocks
+      // Apply meanwhile).
+      if (prev.length === 0) return [...prev, raltDefaultToken];
+      const available = optionsForRaltSlot(modifierPool, prev, prev.length);
+      const inUseDefault = available.find((tok) => modifierTokensInUse.has(tok));
+      return [...prev, inUseDefault ?? ""];
     });
-  }, [raltDefaultToken]);
+  }, [raltDefaultToken, modifierPool, modifierTokensInUse]);
 
   const handleRemoveRaltSlot = useCallback((index: number) => {
     // No minimum — the combined card's zero-layer state is valid (a plain

@@ -2880,7 +2880,14 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
     await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), "K_E");
     fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
-    await changeSelectMenu(screen.getByLabelText(/Layer 2 for layer-switch combo/i), "SHIFT");
+    // Fallback path: with nothing in use, the second slot starts unselected
+    // ("") — the author must pick before Apply. Locks in the else-branch of
+    // handleAddRaltSlot's in-use default.
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLElement;
+    expect(selectMenuValue(secondLayerSelect)).toBe("");
+    await changeSelectMenu(secondLayerSelect, "SHIFT");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for Ε/i }));
 
     const assignments = useWorkingCopyStore
@@ -2894,6 +2901,39 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     );
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrOutputList"]).toBe(
       "Ε",
+    );
+  });
+
+  it("defaults the SECOND layer slot to SHIFT when Shift is already in use elsewhere in the working IR", async () => {
+    // Slot 1 still defaults to the alt-family token (raltDefaultToken is
+    // untouched by this change). The SECOND slot is what should now auto-fill
+    // instead of starting unselected: seed SHIFT as already "in use" via an
+    // unrelated K_W rule, then confirm the author never has to touch the
+    // Layer 2 dropdown themselves for it to read SHIFT.
+    instantiateWithModifiersInUse("K_W", ["SHIFT"]);
+    seedInventory(["Ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), "K_E");
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+
+    // Pre-filled with SHIFT — no explicit changeSelectMenu call for slot 2.
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLElement;
+    expect(selectMenuValue(secondLayerSelect)).toBe("SHIFT");
+
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for Ε/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
+      "[SHIFT ALT K_E]",
     );
   });
 
