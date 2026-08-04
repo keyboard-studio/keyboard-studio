@@ -4,6 +4,17 @@
   "branch": "058-touch-key-editor",
   "selectedAt": "2026-08-04T01:11:58.804Z",
   "currentStep": "specify",
-  "status": "draft",
-  "history": []
+  "status": "specified",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-04T03:31:50.014Z"
+    }
+  ],
+  "decisions": [
+    "§18 locked-type change ratified 2026-08-03: take both TouchKeyIR.layer and the subkey default field in one contracts change (sign-off recorded in docs/spec-signoff.md)"
+  ]
 }
