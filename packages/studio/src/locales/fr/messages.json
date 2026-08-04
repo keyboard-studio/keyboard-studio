@@ -761,6 +761,7 @@
   "output.submit.intro": "Indiquez votre nom et votre e-mail pour l’attribution, confirmez la déclaration de droit d’auteur, puis soumettez. Nous gérons la partie technique.",
   "survey.characterMapPane.tier.punctuation": "Ponctuation et symboles",
   "dashboard.flowMap.drillDownsDescription": "Parcours de questions accrochés comme détails indexés par registre sous l’étape de manifeste<0> {stepId}</0>.",
+  "editor.assignLoop.charScroll.badgeComposeClause": "",
   "osk.frame.status.ready": "",
   "survey.marks.outputForm.recommendedTag": "recommandé",
   "editor.assignLoop.removalBanner.checklistAriaLabel": "Caractères recommandés à supprimer",

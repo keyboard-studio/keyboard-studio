@@ -761,6 +761,7 @@
   "output.submit.intro": "Provide your name and email for attribution, confirm the copyright statement, and submit. We handle the technical side.",
   "survey.characterMapPane.tier.punctuation": "Punctuation & symbols",
   "dashboard.flowMap.drillDownsDescription": "Question flows hung as registry-keyed drill-downs under the manifest<0> {stepId}</0> step.",
+  "editor.assignLoop.charScroll.badgeComposeClause": "reachable by composing {components}",
   "osk.frame.status.ready": "Ready — pick a keyboard",
   "survey.marks.outputForm.recommendedTag": "recommended",
   "editor.assignLoop.removalBanner.checklistAriaLabel": "Recommended characters to remove",
