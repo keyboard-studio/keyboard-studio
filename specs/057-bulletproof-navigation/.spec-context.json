@@ -579,6 +579,78 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-04T00:27:12.835Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:55.721Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:55.974Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:56.210Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:56.450Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:56.708Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:56.957Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:57.214Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T071",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:57.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T072",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:57.727Z"
     }
   ],
   "telemetryInstanceId": "469b61c6-c778-40d3-b978-3516ec818e69",
@@ -1097,7 +1169,7 @@
       "what": "{\"check\": \"draftPersistence.ts:477-481 implements FR-041 order verbatim and MyKeyboardsList.tsx:51 imports from draftPersistence, not draftAutosave\", \"how\": \"grep imports + sed the label computation in both engines\", \"result\": \"confirmed - km-doc finding stands; research D-8 blast-radius claim was backwards\"}"
     }
   ],
-  "currentTask": "T065",
+  "currentTask": "T072",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1556,6 +1628,71 @@
       "did": "Tested that a jump back leaves the dots ahead of the landing point present — jumpToStep truncates history, so those stages return to beyond-gate and re-enter the upcoming row",
       "files": [
         "packages/studio/src/decisions/progressDots.test.ts"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "Tested the row affordance: reachable renders a jump control, unreachable renders the reason in place of a link, and mounting the trail resolves no impact",
+      "files": [
+        "packages/studio/src/decisions/DecisionEntryRow.test.tsx"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Reused the shared trail.jump.unreachable.* vocabulary via unreachableReasonLabel rather than defining a second copy, plus the jump label",
+      "files": [
+        "packages/studio/src/decisions/DecisionEntryRow.tsx"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Added the jump affordance to each trail row built from the stepId and questionId the entry already carries, with returnTo set to the trail; unreachable rows render the pre-resolved reason",
+      "files": [
+        "packages/studio/src/decisions/DecisionEntryRow.tsx",
+        "packages/studio/src/decisions/DecisionTrailView.tsx",
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "Implemented revise-and-return in StepHost with an explicit continue-from-here alternative; full-layout gallery steps are excluded to preserve the spec 028 chrome-by-layout contract",
+      "files": [
+        "packages/studio/src/components/StepHost.tsx"
+      ]
+    },
+    "T044": {
+      "status": "DONE",
+      "did": "Integration test driving the same edit through an ordinary walk and through a deep link, asserting one new entry linked to the one it replaces and identical staleness outcomes",
+      "files": [
+        "packages/studio/src/decisions/deepLinkRevision.test.tsx"
+      ]
+    },
+    "T045": {
+      "status": "DONE",
+      "did": "E2E: walk, open Decisions, activate a jump, assert arrival with the recorded value, revise, assert return to the trail and exactly one supersession",
+      "files": [
+        "packages/studio/e2e/decision-deeplink.spec.ts"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "Tested that a first-time visitor's deep link is held across the welcome gate rather than discarded, for step-scoped and bare-route links, with nothing held for a malformed hash, and honoured on exit subject to the ordinary reachability rules",
+      "files": [
+        "packages/studio/src/StudioShell.test.tsx"
+      ]
+    },
+    "T071": {
+      "status": "DONE",
+      "did": "Ran pnpm lint green: eslint 0 errors, depcruise clean over 938 modules, and i18n-catalog-lint / content-i18n-lint / the collapse guard all pass with the retired and added ids",
+      "files": [
+        "(no file change)"
+      ]
+    },
+    "T072": {
+      "status": "DONE",
+      "did": "Ran pnpm typecheck and pnpm -r test green: 8568 tests across all packages, 0 failures",
+      "files": [
+        "(no file change)"
       ]
     }
   },

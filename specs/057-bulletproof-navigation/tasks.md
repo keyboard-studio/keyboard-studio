@@ -160,28 +160,28 @@ Written to encode the *new* contract — these files currently encode the old on
 
 ### Tests
 
-- [ ] **T039** [US3] Test the row's affordance: a reachable entry renders a jump control, an unreachable one renders the reason in place of a link, and mounting the trail resolves no impact (FR-030, FR-035, FR-036) · `packages/studio/src/decisions/DecisionEntryRow.test.tsx`
+- [x] **T039** [US3] Test the row's affordance: a reachable entry renders a jump control, an unreachable one renders the reason in place of a link, and mounting the trail resolves no impact (FR-030, FR-035, FR-036) · `packages/studio/src/decisions/DecisionEntryRow.test.tsx`
 
 ### Implementation
 
 **⟶ Wait for T039, then — independent (different files):**
 
-- [ ] **T040** [P] [US3] Add `trail.jump.label` and one `trail.jump.unreachable.*` id per `UnreachableReason`; these are shared by the trail and the footer's upcoming dots (FR-035, FR-045, FR-048) · `packages/studio/src/locales/en/messages.json`, `packages/studio/src/locales/fr/messages.json`
+- [x] **T040** [P] [US3] Add `trail.jump.label` and one `trail.jump.unreachable.*` id per `UnreachableReason`; these are shared by the trail and the footer's upcoming dots (FR-035, FR-045, FR-048) · `packages/studio/src/locales/en/messages.json`, `packages/studio/src/locales/fr/messages.json`
 - [x] **T041** [P] [US3] Hold the requested `Location` in a module-level pending slot before the welcome gate's `replaceState` to `#welcome`, and consume it in `leaveWelcome` through `jumpToLocation` so reachability rules apply; keep the `replaceState` itself, which exists to avoid the same-value-hash soft-lock (FR-015, D-10) · `packages/studio/src/StudioShell.tsx`
 
 **⟶ Wait for T040, then:**
 
-- [ ] **T042** [US3] Add the jump affordance to each trail row, built from the `stepId` and `payload.questionId` the entry already carries; call `jumpToLocation` with `returnTo` set to the trail location, and render the pre-resolved reason instead of a dead control when unreachable (FR-030, FR-031, FR-035, FR-036) · `packages/studio/src/decisions/DecisionEntryRow.tsx`
+- [x] **T042** [US3] Add the jump affordance to each trail row, built from the `stepId` and `payload.questionId` the entry already carries; call `jumpToLocation` with `returnTo` set to the trail location, and render the pre-resolved reason instead of a dead control when unreachable (FR-030, FR-031, FR-035, FR-036) · `packages/studio/src/decisions/DecisionEntryRow.tsx`
 
 **⟶ Wait for T042, then:**
 
-- [ ] **T043** [US3] Implement revise-and-return: confirming an answer reached by deep link returns the author to the `returnTo` location with staleness re-propagated through the existing mechanism, and offers an explicit "continue from here instead" — not a prompt on every revision (FR-032, FR-033, FR-034, Q3) · `packages/studio/src/components/StepHost.tsx`
+- [x] **T043** [US3] Implement revise-and-return: confirming an answer reached by deep link returns the author to the `returnTo` location with staleness re-propagated through the existing mechanism, and offers an explicit "continue from here instead" — not a prompt on every revision (FR-032, FR-033, FR-034, Q3) · `packages/studio/src/components/StepHost.tsx`
 
 **⟶ Wait for T043, then — independent (different files):**
 
-- [ ] **T044** [P] [US3] Integration test: deep link → revise → supersede → staleness, asserting exactly one new entry linked to the one it replaces and the same steps marked stale as the ordinary walk would (SC-008) · `packages/studio/src/decisions/deepLinkRevision.test.tsx`
-- [ ] **T045** [P] [US3] E2E: complete a walk, open Decisions, activate the link on an early answer, assert arrival on that question with the recorded value present, change it, assert the trail shows the supersession and dependent steps went stale; call `expectNoSeriousAxeViolations` · `packages/studio/e2e/decision-deeplink.spec.ts`
-- [ ] **T046** [P] [US3] Test that a first-time visitor opening a shared deep link lands on the requested location after the welcome screen rather than the default landing route (SC-012) · `packages/studio/src/StudioShell.test.tsx`
+- [x] **T044** [P] [US3] Integration test: deep link → revise → supersede → staleness, asserting exactly one new entry linked to the one it replaces and the same steps marked stale as the ordinary walk would (SC-008) · `packages/studio/src/decisions/deepLinkRevision.test.tsx`
+- [x] **T045** [P] [US3] E2E: complete a walk, open Decisions, activate the link on an early answer, assert arrival on that question with the recorded value present, change it, assert the trail shows the supersession and dependent steps went stale; call `expectNoSeriousAxeViolations` · `packages/studio/e2e/decision-deeplink.spec.ts`
+- [x] **T046** [P] [US3] Test that a first-time visitor opening a shared deep link lands on the requested location after the welcome screen rather than the default landing route (SC-012) · `packages/studio/src/StudioShell.test.tsx`
 
 **Checkpoint**: US3 is independently functional and testable — any recorded decision reaches its decision point, or a stated reason, in one activation.
 
@@ -291,8 +291,8 @@ Cross-cutting: fold a tab round trip into the long walks so position survival is
 
 **⟶ Wait for Wave 1 to finish, then — independent (different files):**
 
-- [ ] **T071** [P] Run `pnpm lint` and confirm `i18n-catalog-lint`, `content-i18n-lint` and the collapse guard pass with the retired and added ids, with no target-locale catalog claiming a translation for a retired id (FR-073) · no file change — record in the evidence file
-- [ ] **T072** [P] Run `pnpm typecheck` and `pnpm -r test` green · no file change — record in the evidence file
+- [x] **T071** [P] Run `pnpm lint` and confirm `i18n-catalog-lint`, `content-i18n-lint` and the collapse guard pass with the retired and added ids, with no target-locale catalog claiming a translation for a retired id (FR-073) · no file change — record in the evidence file
+- [x] **T072** [P] Run `pnpm typecheck` and `pnpm -r test` green · no file change — record in the evidence file
 
 **⟶ Wait for T071 and T072, then:**
 
