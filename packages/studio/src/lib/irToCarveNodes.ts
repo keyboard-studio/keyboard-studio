@@ -1191,7 +1191,7 @@ export function isTouchOnlyVkeyName(name: string): boolean {
  * previously did `vkeyLabel(name) ?? name` for a context/store-item vkey
  * feeding a rendered "how it's typed" step or floor uses this instead.
  */
-function desktopVkeyLabel(name: string): string | undefined {
+export function desktopVkeyLabel(name: string): string | undefined {
   if (isTouchOnlyVkeyName(name)) return undefined;
   return vkeyLabel(name) ?? name;
 }
@@ -1309,9 +1309,17 @@ function findDeadkeyTrigger(ir: KeyboardIR, dkId: number): { el: ContextElement;
     }
   }
   if (candidates.length === 0) return undefined;
+  // Prefer a genuine desktop trigger over a touch-only one (T_xxxx) — a
+  // deadkey can legitimately have BOTH a desktop and a touch-only trigger
+  // rule, and filtering this out BEFORE the unshifted-preference search below
+  // ensures the touch-only trigger never shadows a resolvable desktop chord.
+  // Falls back to the full candidate list when EVERY trigger is touch-only,
+  // preserving prior behavior for that case.
+  const desktopCandidates = candidates.filter((c) => c.el.kind !== 'vkey' || !isTouchOnlyVkeyName(c.el.name));
+  const pool = desktopCandidates.length > 0 ? desktopCandidates : candidates;
   // Prefer the unshifted vkey trigger (mirrors s02's pickPrimaryTrigger).
-  const unshifted = candidates.find((c) => c.el.kind === 'vkey' && c.el.modifiers.length === 0);
-  return unshifted ?? candidates[0];
+  const unshifted = pool.find((c) => c.el.kind === 'vkey' && c.el.modifiers.length === 0);
+  return unshifted ?? pool[0];
 }
 
 // ---------------------------------------------------------------------------
@@ -1549,7 +1557,7 @@ function storeConditionOutcome(storeRef: string, ir: KeyboardIR, negate: boolean
   return { kind: 'text', text: `when it ${verb} certain letters` };
 }
 
-/** Shared per-slot base label (mirrors expandParallelStoreRule's faithfulBaseLabel / irToCharacterView's sequenceShapeCells baseSlotLabel — small, intentional duplication rather than a cross-file refactor of either, per #1399 scope). */
+/** Shared per-slot base label (mirrors expandParallelStoreRule's faithfulBaseLabel / irToCharacterView's sequenceShapeCells baseSlotLabel — all three route their vkey case through the exported `desktopVkeyLabel` so the touch-only-vkey check lives in exactly one place). */
 function slotItemLabel(item: StoreItem | undefined): string | undefined {
   if (item === undefined) return undefined;
   if (item.kind === 'char') return displayChar(item.value);

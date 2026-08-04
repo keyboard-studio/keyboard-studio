@@ -8,7 +8,7 @@
 // cascades through the SAME workingCopyStore actions CarveGallery already
 // uses (cascadeDelete/cascadeRestore) — no new write path.
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
 import { recommendedRemovalChars, displayChar } from '../../lib/irToCarveNodes.ts';
 import {
@@ -19,7 +19,7 @@ import type { CharacterCell, CharacterGroup } from '../../lib/irToCharacterView.
 import { RemovalBanner } from '../assignLoop/parts/RemovalBanner.tsx';
 import { KeySeq } from '../assignLoop/parts/KeySeq.tsx';
 import { UndoIcon } from '../assignLoop/parts/carveShared.tsx';
-import { neededCharsForLanguage } from '../../lib/services.ts';
+import { useCarveNeededSet } from '../../hooks/useCarveNeededSet.ts';
 
 interface CarveGalleryV2Props {
   onComplete: () => void;
@@ -66,44 +66,69 @@ function isCellDiscarded(cell: CharacterCell, isItemDeleted: (id: string) => boo
 export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const ir = useWorkingCopyStore((s) => s.ir);
   const removalCapabilities = useWorkingCopyStore((s) => s.removalCapabilities);
+  const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const confirmedInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
-  const identityBcp47 = useWorkingCopyStore((s) => s.identity?.bcp47);
   const isItemDeleted = useWorkingCopyStore((s) => s.isItemDeleted);
+  // Subscribed PURELY to force a re-render when the set mutates —
+  // isItemDeleted above is a stable `(id) => get().deletedItemIds.has(id)`
+  // reference, so Zustand's Object.is comparison never re-renders on its
+  // own. Mirrors CarveGallery.tsx's identical subscription.
+  const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
   const cascadeRestore = useWorkingCopyStore((s) => s.cascadeRestore);
   const restoreAll = useWorkingCopyStore((s) => s.restoreAll);
   const keepAll = useWorkingCopyStore((s) => s.keepAll);
 
+  // irToCharacterView's `confirmedInventory` param drives ONLY the "in your
+  // alphabet" (inAlpha) flag and is documented NFC-normalized regardless of
+  // the marks-series output form (see that function's doc comment) — a
+  // different concern from the needed-set derivation below, which DOES need
+  // form-awareness, so this NFC normalization is intentional, not the bug
+  // the needed-set machinery below was.
   const confirmedInventorySet = useMemo(
     () => new Set(confirmedInventory.map((ch) => ch.normalize('NFC'))),
     [confirmedInventory],
   );
 
-  // Same async CLDR-driven "needed characters" resolution as CarveGallery —
-  // see that file's identical effect for the full rationale.
-  const [neededChars, setNeededChars] = useState<Set<string> | null>(null);
-  useEffect(() => {
-    setNeededChars(null);
-    if (!identityBcp47) return;
-    let cancelled = false;
-    neededCharsForLanguage(identityBcp47)
-      .then((result) => { if (!cancelled) setNeededChars(result); })
-      .catch(() => { if (!cancelled) setNeededChars(null); });
-    return () => { cancelled = true; };
-  }, [identityBcp47]);
+  // Shared needed-set derivation — the SAME hook and call-site
+  // shape as CarveGallery.tsx (the rule/node Rail view), so the two carve
+  // surfaces never compute a different "needed" answer for the same working
+  // copy. See useCarveNeededSet's header doc for the full rationale.
+  const {
+    neededSet: orthographyNeededSet,
+    form: carveNormalizationForm,
+    bcp47: identityBcp47,
+    hasSignal,
+  } = useCarveNeededSet();
 
+  // Base characters the author chose to KEEP at the pre-carve convenience
+  // question — mirrors CarveGallery.tsx's identical retainedSet union (see
+  // that file's comment for the full rationale). useCarveNeededSet
+  // deliberately excludes these (see its header doc), so the gallery unions
+  // them on top at this call site, same as CarveGallery does.
+  const retainedConvenienceChars = useWorkingCopyStore((s) => s.session.retainedConvenienceChars);
+  const retainedSet = useMemo(
+    () => new Set((retainedConvenienceChars ?? []).map((ch) => ch.normalize(carveNormalizationForm))),
+    [retainedConvenienceChars, carveNormalizationForm],
+  );
   const neededSet = useMemo(
-    () => (neededChars ? new Set([...neededChars, ...confirmedInventorySet]) : confirmedInventorySet),
-    [neededChars, confirmedInventorySet],
+    () => (retainedSet.size === 0
+      ? orthographyNeededSet
+      : new Set([...orthographyNeededSet, ...retainedSet])),
+    [orthographyNeededSet, retainedSet],
   );
 
   const recommended = useMemo(
-    () => (ir && (confirmedInventorySet.size > 0 || neededChars !== null)
-      ? recommendedRemovalChars({ ir, needed: neededSet, bcp47: identityBcp47 })
+    () => (instantiationMode !== null && hasSignal && ir
+      ? recommendedRemovalChars({ ir, needed: neededSet, bcp47: identityBcp47, form: carveNormalizationForm })
       : []),
-    [ir, confirmedInventorySet, neededChars, neededSet, identityBcp47],
+    [ir, instantiationMode, hasSignal, neededSet, identityBcp47, carveNormalizationForm],
   );
-  const recommendedCharSet = useMemo(() => new Set(recommended.map((r) => r.ch)), [recommended]);
+  // irToCharacterView's internal lookup key is always NFC-normalized
+  // (irToCharacterView.ts) — recommended[].ch is normalized to `form` (NFD on
+  // base-plus-mark output), so this set must be re-normalized to NFC or the
+  // membership test there silently never matches on NFD keyboards.
+  const recommendedCharSet = useMemo(() => new Set(recommended.map((r) => r.ch.normalize('NFC'))), [recommended]);
 
   const cells = useMemo(
     () => (ir ? irToCharacterView(ir, removalCapabilities, confirmedInventorySet, recommendedCharSet) : []),
@@ -123,7 +148,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
 
   const [selectedCh, setSelectedCh] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [groupBy] = useState<GroupBy>('category');
+  const [groupBy, setGroupBy] = useState<GroupBy>('category');
 
   const toggleCell = useCallback((cell: CharacterCell) => {
     if (!characterCellIsToggleable(cell)) return;
@@ -158,7 +183,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
       if (!isCellDiscarded(cell, isItemDeleted)) k += 1;
     }
     return { kept: k, total: cells.length };
-  }, [cells, isItemDeleted]);
+  }, [cells, isItemDeleted, deletedItemIds]);
   const removedCount = total - kept;
 
   const filteredCells = useMemo(() => {
@@ -256,6 +281,50 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
             padding: '7px 11px',
           }}
         />
+        {/* Grouping toggle — native fieldset/radio group so "Group by" is a
+            real programmatic label and the two options are keyboard-operable
+            and screen-reader-announced without any custom ARIA state.
+            Deliberately a raw fieldset rather than the ui/RadioGroup.tsx
+            primitive: RadioGroup's OPTION_ROW_STYLE stacks options vertically
+            with a 44px touch hit-target and per-row margin, which would blow
+            out this compact inline status-strip layout (radios sit inline,
+            side by side, next to the search box and Restore-all button).
+            The two radios still carry ks-focus-ring below, so this call site
+            matches the app-wide focus treatment without the primitive. */}
+        <fieldset
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 10, margin: 0, padding: '5px 10px',
+            border: '1px solid var(--app-border-strong)', borderRadius: 8, background: 'var(--app-surface-2)',
+          }}
+        >
+          <legend style={{ font: '600 10.5px var(--app-font)', letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--app-text-subtle)', padding: '0 6px 0 0' }}>
+            Group by
+          </legend>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, font: '600 12px var(--app-font)', color: groupBy === 'category' ? 'var(--app-accent-text)' : 'var(--app-text-muted)', cursor: 'pointer' }}>
+            <input
+              type="radio"
+              className="ks-focus-ring"
+              name="carve-v2-group-by"
+              value="category"
+              checked={groupBy === 'category'}
+              onChange={() => setGroupBy('category')}
+            />
+            Category
+          </label>
+          <label
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, font: '600 12px var(--app-font)', color: groupBy === 'source' ? 'var(--app-accent-text)' : 'var(--app-text-muted)', cursor: 'pointer' }}
+          >
+            <input
+              type="radio"
+              className="ks-focus-ring"
+              name="carve-v2-group-by"
+              value="source"
+              checked={groupBy === 'source'}
+              onChange={() => setGroupBy('source')}
+            />
+            Source
+          </label>
+        </fieldset>
         <button
           onClick={restoreAll}
           disabled={removedCount === 0}

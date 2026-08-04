@@ -13,7 +13,7 @@ import type { KeyboardIR, RemovalCapability, StoreItem } from '@keyboard-studio/
 import { buildProducedSet } from '@keyboard-studio/contracts';
 import { collectCharContributors, isParallelIndexFanOut, isPlusSeparator } from '@keyboard-studio/engine';
 import type { CharContributors } from '@keyboard-studio/engine';
-import { toRailNodes, invisibleCharLabel, keySequenceLabel, vkeyLabel, isTouchOnlyVkeyName, displayChar, charProducers, isNotAForwardTypingPath } from './irToCarveNodes.ts';
+import { toRailNodes, invisibleCharLabel, keySequenceLabel, desktopVkeyLabel, displayChar, charProducers, isNotAForwardTypingPath } from './irToCarveNodes.ts';
 import type { CharProducer } from './irToCarveNodes.ts';
 
 // ---------------------------------------------------------------------------
@@ -306,11 +306,12 @@ function sequenceShapeCells(ir: KeyboardIR): { ch: string; keys: string[] }[] {
   const baseSlotLabel = (item: StoreItem | undefined): string | undefined => {
     if (item === undefined) return undefined;
     if (item.kind === 'char') return displayChar(item.value);
-    // Touch-only vkey id (T_xxxx): no physical desktop key behind it — never
-    // render it as a desktop step (#1399 follow-on; mirrors irToCarveNodes.ts's
-    // desktopVkeyLabel, kept as a small local duplicate per this function's own
-    // doc comment above).
-    if (item.kind === 'vkey') return isTouchOnlyVkeyName(item.name) ? undefined : (vkeyLabel(item.name) ?? item.name);
+    // Vkey case (including the touch-only T_xxxx exclusion — no physical
+    // desktop key behind it, never rendered as a desktop step) routes through
+    // the shared irToCarveNodes.ts helper so the touch-only check lives in
+    // exactly one place (mirrors slotItemLabel / expandParallelStoreRule's
+    // faithfulBaseLabel there).
+    if (item.kind === 'vkey') return desktopVkeyLabel(item.name);
     return undefined;
   };
 
