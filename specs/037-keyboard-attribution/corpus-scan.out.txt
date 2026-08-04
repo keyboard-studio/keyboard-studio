@@ -1,0 +1,113 @@
+========================================================================
+LICENSE.md — release tier
+========================================================================
+total files:                 920
+  0 copyright lines:         0   <-- parser must handle
+  1 copyright line:          920
+  2+ copyright lines:        0   <-- already multi-holder
+non-MIT body:                0
+
+--- 'license body is a constant'? distinct bodies (copyright stripped) ---
+distinct normalised bodies:  2
+   917 files  hash 45d7a2068eec  len 1042  e.g. release/a/adiga_danef/LICENSE.md
+     3 files  hash 30096f8b3909  len 1043  e.g. release/b/bangla_joy/LICENSE.md
+
+--- marker style ---
+    597  ©
+    316  (c)
+      7  (C)
+
+--- year style ---
+    720  range (2016-2021)
+    197  single year
+      2  NO YEAR
+      1  comma list (2016, 2019)
+
+--- top 15 holders (as written) ---
+    280  'SIL International'
+    152  'SIL Global'
+     52  "FirstVoices, SIL International,  First Peoples' Cultural Foundation"
+     38  'Rehmat Aziz Chitrali'
+     32  'FirstVoices, SIL International. Portions   Chris Harvey'
+     14  'cathaylab'
+     14  'Geʾez Frontier Foundation'
+     13  'Joshua Wong'
+     11  'Bill Jancewicz'
+      7  'sanskritdocuments.org'
+      6  'Ilham Nurwansah'
+      6  'Enabling Languages'
+      6  'Galaxie Software and SIL Global'
+      5  '3ubaidUrRe7man'
+      5  "FirstVoices, First Peoples' Cultural Council"
+
+--- SIL naming split ---
+    280  'SIL International'
+    152  'SIL Global'
+     52  "FirstVoices, SIL International,  First Peoples' Cultural Foundation"
+     32  'FirstVoices, SIL International. Portions   Chris Harvey'
+      6  'Galaxie Software and SIL Global'
+      5  "FirstVoices, SIL Global,  First Peoples' Cultural Foundation"
+      4  'thamizha.com and SIL Global'
+      3  'SIL Cameroon'
+      3  'SIL Ethiopia'
+      3  'SIL Mali'
+      2  "FirstVoices, SIL International,  First Peoples' Cultural Foundation,  Chris Harvey"
+      2  'Pirurvik Center and SIL International'
+
+--- multi-holder examples (the fork chain the proposal targets) ---
+
+--- files with NO copyright line ---
+
+========================================================================
+.kmn store(&COPYRIGHT) — release tier
+========================================================================
+total .kmn:                  924
+  with COPYRIGHT store:      922
+  without:                   2
+  marker style:
+      648  ©
+      253  (c)
+       16  bare 'Copyright'
+        5  (C)
+  year style:
+      556  NO YEAR
+      293  range (2016-2021)
+       70  single year
+        2  comma list (2016, 2019)
+        1  multiple years (2)
+  samples:
+    '© 2022 Haroon Showgan'
+    '© Samar'
+    '© HemantaGogoi Ngi Mon'
+    'Copyright © dcshci lab'
+    'Copyright © SIL Global'
+    '© The PanLex Project of The Long Now Foundation'
+
+--- LICENSE.md holder vs .kmn COPYRIGHT: do they agree? ---
+  agree:      891
+  DISAGREE:   22
+  no license pair: 9
+    release/b/balochi_phonetic
+      LICENSE: ['SIL Global']
+      .kmn:    '© SIL International'
+    release/basic/basic_kbda1
+      LICENSE: ['SIL International']
+      .kmn:    '(c) 2009-2025 SIL Global'
+    release/basic/basic_kbda2
+      LICENSE: ['SIL International']
+      .kmn:    '(c) 2009-2025 SIL Global'
+    release/basic/basic_kbda3
+      LICENSE: ['SIL International']
+      .kmn:    '(c) 2009-2025 SIL Global'
+    release/e/ekwtamil99uni
+      LICENSE: ['thamiza.com and SIL International']
+      .kmn:    '© thamizha.com'
+    release/e/ekwtamil99uni
+      LICENSE: ['thamiza.com and SIL International']
+      .kmn:    '© thamizha.com and SIL International'
+
+========================================================================
+other tiers (context)
+========================================================================
+legacy LICENSE.md:       9  (non-MIT: 0)
+experimental LICENSE.md: 102  (non-MIT: 0)
