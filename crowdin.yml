@@ -34,20 +34,32 @@ files:
   # ── Tier A — Studio UI chrome (engine team; spec §12) ──────────────────────
   - source: "/packages/studio/src/locales/en/messages.json"
     translation: "/packages/studio/src/locales/%locale%/messages.json"
-    # Keep untranslated keys in downloaded files. Every key must exist in every
-    # locale file so the loader is stable; the runtime falls back to the English
-    # source via the explicit id, so an untranslated target value is harmless,
-    # not a gap to prune.
+    # Untranslated keys download as EMPTY VALUES with the key still present --
+    # which is what both the loader and the repo already want. Crowdin's JSON
+    # export keeps the key and empties the value under this setting; removing
+    # untranslated keys outright is NOT the default and has to be requested from
+    # Crowdin support (crowdin-cli FAQ). The runtime falls back to the English
+    # source via the explicit id, so an empty target value is harmless, not a
+    # gap to prune.
     #
-    # CAUTION -- this does NOT mean untranslated keys arrive as empty strings.
-    # Crowdin returns the SOURCE TEXT for a string it has no translation for.
-    # So if the project holds no translations for a locale, the downloaded
-    # catalog is 100% English under a byte-identical key set, and every
-    # key-set-parity check passes while the translations are gone. An empty
-    # value is what the REPO uses to mean "not translated yet"; it is not what
-    # a download produces. utilities/i18n-collapse-guard exists to catch this
-    # and is wired into both catalog lints.
-    skip_untranslated_strings: false
+    # This was `false` until the first end-to-end sync was attempted, on the
+    # belief that `true` would DROP untranslated keys and break key-set parity.
+    # It does not. What `false` actually does is return the SOURCE TEXT for every
+    # untranslated string -- so a locale with no translations downloads as 100%
+    # English under a byte-identical key set, passing every key-set-parity check
+    # while the translations are gone. That is the round-trip's original defect,
+    # measured, not hypothetical: utilities/i18n-collapse-guard was added to
+    # catch it and is wired into both catalog lints. `true` removes the cause;
+    # the guard stays as the net.
+    #
+    # It also fixes two narrower faults `false` produced. A catalog with NO
+    # translations yet (content/i18n/fr/{adaptationQuestions,patterns}.json) came
+    # back 100% English and tripped the collapse guard -- a true reading of the
+    # bytes, but the catalog was never translated rather than wiped. And the 237
+    # deliberately-empty values in fr/messages.json came back as English text,
+    # drifting the repo away from its own "empty means untranslated" convention
+    # on the first successful sync.
+    skip_untranslated_strings: true
     # %locale% (not %two_letters_code%) so a region-specific target (pt-BR,
     # zh-CN) gets its own directory instead of colliding with its base
     # language — adding ONE OF THOSE is then a SUPPORTED_LOCALES entry +
@@ -79,12 +91,13 @@ files:
   # target locale needs its own mapping entry; see the Tier A comment above).
   - source: "/content/i18n/en/*.json"
     translation: "/content/i18n/%locale%/%original_file_name%"
-    # Same rationale as Tier A, and the same caution: every key must exist in
-    # every locale file for a stable resolveContentString lookup, and an empty
-    # target value falls back to the English value already in hand
-    # (contentI18n.ts), not a gap. But an untranslated string DOWNLOADS as the
-    # English source text, not as an empty value -- see the Tier A note above.
-    skip_untranslated_strings: false
+    # Same rationale as Tier A: every key stays present for a stable
+    # resolveContentString lookup, and an empty target value falls back to the
+    # English value already in hand (contentI18n.ts), not a gap. See the Tier A
+    # note above for why this is `true` rather than `false` -- `false` returns
+    # English source text for every untranslated string, which is what made the
+    # first download look like a wipe.
+    skip_untranslated_strings: true
     languages_mapping:
       locale:
         en: "en"
