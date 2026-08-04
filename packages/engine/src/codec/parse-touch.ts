@@ -42,7 +42,20 @@ function emitKey(key: TouchKeyIR): EmittedKey {
   if (key.width !== undefined) out["width"] = String(key.width);
   if (key.pad !== undefined) out["pad"] = String(key.pad);
   if (key.nextlayer !== undefined) out["nextlayer"] = key.nextlayer;
-  if (key.layerAnnotation !== undefined) out["layer"] = key.layerAnnotation;
+  // Both `layer` fields round-trip through the same wire property: the parser
+  // (parseTouchLayout.ts) sets `layerAnnotation` (lenient free-text display
+  // hint) and `layer` (validated per-key modifier override, spec 058 FR-030)
+  // from the same raw `"layer"` value, so post-parse they always agree.
+  // `layer` is the load-bearing field (duplicate-key-id disambiguation), so
+  // prefer it; fall back to `layerAnnotation` for IR built without going
+  // through the parser. `default` is emitted as a real JSON boolean, not a
+  // string, matching the file format (unlike `sp`/`width`/`pad`).
+  if (key.layer !== undefined) {
+    out["layer"] = key.layer;
+  } else if (key.layerAnnotation !== undefined) {
+    out["layer"] = key.layerAnnotation;
+  }
+  if (key.default !== undefined) out["default"] = key.default;
   if (key.sk !== undefined && key.sk.length > 0) {
     out["sk"] = key.sk.map(emitKey);
   }

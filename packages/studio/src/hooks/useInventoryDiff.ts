@@ -50,10 +50,14 @@
 //     design (see above).
 //   - producedSet (session-aware) is additionally memoized on this session's
 //     physical assignments (selectDesktopAssignments(phaseResults)).
-//   - Both are computed with `excludeBackspaceCorrections: true` so a char
-//     reachable ONLY via a backspace-correction rule (e.g. a composed-char
-//     store entry only reached by `+ [K_BKSP] > ...`) is not wrongly counted
-//     as directly produced.
+//   - orphanedSet (spec 058 FR-011, see below) is memoized on baseIr ONLY —
+//     same static-base-only treatment as baseProducedSetForWalk, since it
+//     answers a question purely about the base's own rules/layout, not this
+//     session's assignments.
+//   - Both produced sets are computed with `excludeBackspaceCorrections: true`
+//     so a char reachable ONLY via a backspace-correction rule (e.g. a
+//     composed-char store entry only reached by `+ [K_BKSP] > ...`) is not
+//     wrongly counted as directly produced.
 //   - NFC normalization: both produced sets are already NFC (buildProducedSet's
 //     own contract); each confirmedInventory entry is NFC-normalized here
 //     before lookup so a decomposed inventory entry (e.g. "é") correctly
@@ -82,8 +86,25 @@
 // lettersToAdd === inventory (full alphabet) and alreadyProduced === [] — the
 // gallery behaves exactly as it did before the diff was wired.
 
+// Spec 058 FR-011 — the third array, and why this hook is EXTENDED rather than
+// switched to the reachability-aware view.
+//
+// `buildReachableProducedSet` would move a character produced only by an
+// unreachable rule out of `alreadyProduced` and into `lettersToAdd`. That is
+// arguably "more correct", and it is still the wrong change to make here: it
+// would silently increase author workload on the ~205 corpus bases that carry an
+// orphan rule, and it would move the §18.6 coverage denominator underneath a
+// figure authors and tests both read. So `lettersToAdd` / `alreadyProduced`
+// arithmetic is UNTOUCHED, and the honest delta is surfaced as a third array the
+// UI can explain in its own words: "the base declares a rule for X but no key
+// reaches it."
+
 import { useMemo } from "react";
-import { augmentWithComposable, buildProducedSet } from "@keyboard-studio/contracts";
+import {
+  augmentWithComposable,
+  buildProducedSet,
+  buildReachableProducedSet,
+} from "@keyboard-studio/contracts";
 import { buildSessionProducedSet } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { lowercaseFirst } from "../lib/caseOrder.ts";
@@ -121,6 +142,21 @@ export interface InventoryDiff {
    * before).
    */
   rawProducedSet: ReadonlySet<string>;
+  /**
+   * Inventory characters the base's RULES produce but that no reachable key can
+   * actually type (spec 058 FR-011) — the honest delta between the two
+   * producibility views.
+   *
+   * A strict SUBSET of `alreadyProduced`: these characters still count as
+   * produced for every existing arithmetic, deliberately, so adding this array
+   * moved no author's workload and no coverage denominator. It exists so the UI
+   * can say what is true — the base declares a rule for this character but no
+   * key reaches it — instead of the author discovering it at compile time.
+   *
+   * Empty when the base has no touch layout, because then nothing is
+   * layout-unreachable.
+   */
+  producedButUnreachable: string[];
 }
 
 /**
@@ -183,18 +219,39 @@ export function useInventoryDiff(): InventoryDiff {
     [baseIr, inventory, rawProducedSet],
   );
 
+  // The orphaned delta (spec 058 FR-011), memoized SEPARATELY on baseIr ONLY
+  // so the frozen lettersToAdd/alreadyProduced arithmetic above stays
+  // visibly independent of it, and so it stays STATIC (base-only) the same
+  // way baseProducedSetForWalk does — this is a question about the base's
+  // own rules/layout, not this session's assignments. Same options as the
+  // plain call, so the two views are asked the same question and differ only
+  // in reachability.
+  const orphanedSet = useMemo<Set<string>>(
+    () =>
+      baseIr !== null
+        ? buildReachableProducedSet(baseIr, { excludeBackspaceCorrections: true }).orphaned
+        : new Set<string>(),
+    [baseIr],
+  );
+
   return useMemo<InventoryDiff>(() => {
     if (baseIr === null) {
+      // The baseIr-null fallback must return ALL FIVE fields (FR-011 added
+      // producedButUnreachable): a caller destructuring it here would
+      // otherwise read `undefined` before instantiation and throw on
+      // `.length`.
       return {
         lettersToAdd: lowercaseFirst(inventory),
         alreadyProduced: [],
         producedSet,
         rawProducedSet,
+        producedButUnreachable: [],
       };
     }
 
     const lettersToAdd: string[] = [];
     const alreadyProduced: string[] = [];
+    const producedButUnreachable: string[] = [];
 
     for (const raw of inventory) {
       // NFC-normalize the inventory entry before lookup. producedSet is already
@@ -206,6 +263,11 @@ export function useInventoryDiff(): InventoryDiff {
         // inventory character as the author entered it, while the lookup used
         // the normalized form.
         alreadyProduced.push(raw);
+        // ADDITIVE: also reported as unreachable when the ONLY thing producing it
+        // is an unreachable-key rule. Note this does NOT remove it from
+        // `alreadyProduced` — that is precisely the point of extending rather
+        // than switching (see the note at the top of this file).
+        if (orphanedSet.has(nfc)) producedButUnreachable.push(raw);
       } else {
         lettersToAdd.push(raw);
       }
@@ -216,6 +278,7 @@ export function useInventoryDiff(): InventoryDiff {
       alreadyProduced,
       producedSet,
       rawProducedSet,
+      producedButUnreachable,
     };
-  }, [baseIr, baseProducedSetForWalk, producedSet, rawProducedSet, inventory]);
+  }, [baseIr, baseProducedSetForWalk, producedSet, rawProducedSet, orphanedSet, inventory]);
 }

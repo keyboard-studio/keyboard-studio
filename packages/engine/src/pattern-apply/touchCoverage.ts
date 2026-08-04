@@ -41,7 +41,11 @@
  * @see specs/035-mobile-touch-derivation/contracts/simplification.md
  */
 
-import type { TouchLayoutIR, TouchCoverageResult } from "@keyboard-studio/contracts";
+import type {
+  TouchCoverageOptions,
+  TouchCoverageResult,
+  TouchLayoutIR,
+} from "@keyboard-studio/contracts";
 import { augmentWithComposable, computeTouchCoverage } from "@keyboard-studio/contracts";
 
 export type { TouchCoverageResult } from "@keyboard-studio/contracts";
@@ -51,19 +55,29 @@ export type { TouchCoverageResult } from "@keyboard-studio/contracts";
  * directly reachable OR composable (canonical-NFD, one level, no recursion)
  * from chars that are directly reachable OR in `additionalProduced`.
  *
+ * Pure: no mutation of `layout`/`inventory`/`additionalProduced`, no I/O.
+ *
+ * @param options - The spec 058 coverage options, threaded straight through to
+ *   `computeTouchCoverage`. Note WHERE in this function they take effect: the
+ *   rule-index credit is applied by the inner call, **before**
+ *   `augmentWithComposable` runs. That order is the point, not an accident — a
+ *   combining mark credited by the join then feeds composability, so a
+ *   precomposed inventory char whose mark only became reachable via a `.kmn` rule
+ *   is folded out of `uncovered` too. Applying the index after augmentation would
+ *   lose that compounding entirely.
  * @param additionalProduced - Optional session-produced-glyph set (NFC),
  *   e.g. from `buildSessionProducedSet` over this session's desktop physical
- *   assignments — folded into `covered` before the composability check. See
- *   the module doc comment.
- *
- * Pure: no mutation of `layout`/`inventory`/`additionalProduced`, no I/O.
+ *   assignments — folded into `covered` before the composability check (same
+ *   before-augmentation ordering rationale as `options` above). See the
+ *   module doc comment.
  */
 export function touchCoverage(
   layout: TouchLayoutIR,
   inventory: readonly string[],
+  options: TouchCoverageOptions = {},
   additionalProduced?: ReadonlySet<string>,
 ): TouchCoverageResult {
-  const { uncovered } = computeTouchCoverage(layout, inventory);
+  const { uncovered } = computeTouchCoverage(layout, inventory, options);
   const uncoveredSet = new Set(uncovered);
 
   // Directly-covered chars, NFC-normalized — matches the NFC form

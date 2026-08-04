@@ -81,6 +81,7 @@ import {
   isDecomposableAccented,
   formatUncoveredTouchMessage,
   computeTouchCoverage,
+  buildTouchKeyRuleIndex,
 } from "@keyboard-studio/contracts";
 import type { DesktopModifications, ModifierToken } from "@keyboard-studio/engine";
 import {
@@ -1489,7 +1490,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // useInventoryDiff.ts and
   // packages/engine/src/pattern-apply/sessionProducedSet.ts). Used ONLY by
   // `handleContinue`'s completion-GATE re-check below (touchCoverage's
-  // `additionalProduced` parameter), so a touch inventory char composable
+  // `additionalProduced` parameter, now the 4th positional argument — the
+  // 3rd is `coverageOptions` below), so a touch inventory char composable
   // only because its combining-mark component was assigned a DESKTOP deadkey
   // this session (e.g. "ж" + a session-assigned diaeresis deadkey composing
   // "ӝ") doesn't block completion. Deliberately NOT threaded into
@@ -1501,6 +1503,30 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // (caught by this fix's own regression pass).
   const { producedSet: desktopProducedSet, rawProducedSet: desktopRawProducedSet } =
     useInventoryDiff();
+
+  // The touch key <-> rule join (spec 058 FR-005/FR-007). Threaded into ALL
+  // THREE coverage call sites in this component — `detectedChars`, the FR-008
+  // `handleContinue` gate, and `baseTouchCoveredSet` — because leaving any one on
+  // the unjoined path is exactly the split-brain the join exists to end: the
+  // badge would say a mark key is covered while the gate refused to let the
+  // author continue, or vice versa.
+  //
+  // Memoized on `baseIr` alone: the store never mutates it in place (it replaces
+  // the slot), so reference equality is a correct dependency, and the index is a
+  // pure function of the IR's rules and stores.
+  const touchRuleIndex = useMemo(
+    () => (baseIr !== null ? buildTouchKeyRuleIndex(baseIr) : undefined),
+    [baseIr],
+  );
+  // One options object, shared by all three call sites, so they cannot drift on
+  // which options they pass. `handleContinue` below additionally passes
+  // `desktopProducedSet` (session-aware, see above) as touchCoverage's 4th
+  // positional `additionalProduced` argument — this options object stays the
+  // 3rd.
+  const coverageOptions = useMemo(
+    () => (touchRuleIndex !== undefined ? { ruleIndex: touchRuleIndex } : {}),
+    [touchRuleIndex],
+  );
 
   // Draft persistence — read on mount; write on every charTouch change.
   const touchDraft = useWorkingCopyStore((s) => s.touchDraft);
@@ -1831,7 +1857,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const detectedChars = useMemo<Set<string>>(() => {
     if (detectionSeedLayout === null) return new Set<string>();
     try {
-      const { uncovered } = touchCoverage(detectionSeedLayout, inventory);
+      const { uncovered } = touchCoverage(detectionSeedLayout, inventory, coverageOptions);
       const uncoveredSet = new Set(uncovered);
       return new Set(inventory.filter((c) => !uncoveredSet.has(c)));
     } catch (err) {
@@ -1841,7 +1867,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // inventoryKey is the stable primitive proxy for `inventory` (declared
     // above, before this memo) — same precedent as touchKey/modsDepsKey.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detectionSeedLayout, inventoryKey]);
+  }, [detectionSeedLayout, inventoryKey, coverageOptions]);
 
   // Characters with an ACTIONABLE Phase C desktop suggestion — a Phase C
   // physical assignment whose mechanism extractMechanismHostKey can turn into
@@ -2019,7 +2045,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // walk's own (deliberately static) `detectedChars`/`touchLettersToAdd`.
   const handleContinue = useCallback(() => {
     if (layoutForLintAndGate !== null) {
-      const { uncovered } = touchCoverage(layoutForLintAndGate, inventory, desktopProducedSet);
+      const { uncovered } = touchCoverage(
+        layoutForLintAndGate,
+        inventory,
+        coverageOptions,
+        desktopProducedSet,
+      );
       if (uncovered.length > 0) {
         setUncoveredMessage(
           uncovered.map((c) => formatUncoveredTouchMessage(c)).join("; "),
@@ -2030,7 +2061,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       }
     }
     finalizeCompletion();
-  }, [layoutForLintAndGate, inventory, desktopProducedSet, finalizeCompletion]);
+  }, [
+    layoutForLintAndGate,
+    inventory,
+    coverageOptions,
+    desktopProducedSet,
+    finalizeCompletion,
+  ]);
 
   // Positional Back/Next/Skip/Previous navigation + suggestion-dismissal
   // tracking — shared with MechanismGallery via usePositionalCharNav so the
@@ -2126,7 +2163,11 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const baseTouchCoveredSet = useMemo<Set<string>>(() => {
     if (detectionSeedLayout === null) return new Set<string>();
     try {
-      const { uncovered } = computeTouchCoverage(detectionSeedLayout, inventory);
+      const { uncovered } = computeTouchCoverage(
+        detectionSeedLayout,
+        inventory,
+        coverageOptions,
+      );
       const uncoveredSet = new Set(uncovered);
       return new Set(
         inventory

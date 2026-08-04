@@ -126,6 +126,29 @@ export interface TouchKeyIR {
    * annotation only as a cheap, best-effort surface.
    */
   layerAnnotation?: string;
+  /**
+   * Per-key modifier override from .keyman-touch-layout `layer` (spec 058
+   * FR-030). Names the modifier state this ONE key emits under, superseding the
+   * containing layer's id for that key alone — so a key sitting on the
+   * `default` layer can legitimately send its `shift` output.
+   *
+   * Load-bearing for two things beyond display: it is what disambiguates a real
+   * corpus layout carrying the same key id twice within one layer (the
+   * duplicate-id check's third exemption), and any "Sends:" display that reads
+   * the containing layer instead of this field is wrong for exactly the keys
+   * where the field exists.
+   *
+   * Distinct from {@link layerAnnotation} above: that field is a lenient,
+   * best-effort display hint; this one is validated, load-bearing routing data.
+   * Both are populated from the same wire property.
+   */
+  layer?: string;
+  /**
+   * Longpress preselect from .keyman-touch-layout `default` (spec 058 FR-030).
+   * Meaningful only on a sub-key: marks which entry of the parent's `sk[]` menu
+   * is preselected when the longpress menu opens.
+   */
+  default?: boolean;
   /** Sub-keys (longpress menu). */
   sk?: TouchKeyIR[];
   /** Directional gesture map (compass directions). */
@@ -133,7 +156,11 @@ export interface TouchKeyIR {
   /** Rapid successive taps cycling through characters. */
   multitap?: TouchKeyIR[];
   /**
-   * Key class from .keyman-touch-layout `sp` (0 letter, 1 special, 2 active-special, 8 spacer).
+   * Key class from .keyman-touch-layout `sp` (0 letter, 1 special, 2
+   * active-special, 8 deadkey, 9 blank, 10 spacer) — the upstream
+   * `TouchLayoutKeySp` enum, whose tail is `deadkey=8, blank=9, spacer=10`.
+   * (This comment previously said `8 spacer`, which is where the spacer-class
+   * predicate's `{8,10}` came from; the corrected set is `{9,10}`.)
    * The wire format encodes this as a JSON string (e.g. `"sp": "1"`); the IR normalizes it to a number.
    */
   sp?: number;

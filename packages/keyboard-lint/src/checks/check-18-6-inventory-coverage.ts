@@ -30,8 +30,27 @@
 // it is reachable. Reviewers should treat a finding on a keyboard with raw store
 // items as a possible false positive.
 
+// SPEC 058 FR-007/FR-008: this check adopts the REACHABILITY-AWARE view.
+//
+// It is the one Layer C consumer for which that switch is safe by construction,
+// and the two scope guards below are exactly why. The check only runs on a
+// SCAFFOLDED IR with no opaque fragments — a keyboard *we* generated. On such a
+// keyboard an orphan `T_` rule (a rule keyed on an id no key carries) can only be
+// our own bug, and it becomes a live possibility the moment rule synthesis ships
+// and a later edit deletes the key while leaving its rule behind. There is zero
+// legacy-corpus fallout: every corpus keyboard is `imported`, and the committed
+// `docs/keyboard-facet-index.json` never runs on a scaffolded IR.
+//
+// The consequence worth stating: a character produced ONLY by an unreachable rule
+// now reports as uncovered here, where before it silently counted as covered. That
+// is the intended behaviour change — the author could not type it either way, and
+// previously nothing said so.
+//
+// The plain `buildProducedSet` view stays frozen for every other consumer; see
+// both module headers in contracts for the normative adopter list.
+
 import type { LintFinding, KeyboardIR, LinguistInventory } from "@keyboard-studio/contracts";
-import { linguistInventoryChars, buildProducedSet } from "@keyboard-studio/contracts";
+import { linguistInventoryChars, buildReachableProducedSet } from "@keyboard-studio/contracts";
 
 /**
  * Check that every character in the linguist inventory is emittable by the keyboard.
@@ -60,7 +79,12 @@ export function checkInventoryCoverage(
   // test suite passes with this change — the only affected behavior is the bug case
   // where a keyboard emitting [base, combining] as two char elements now correctly
   // produces the NFC-precomposed form in the set instead of the two raw codepoints.
-  const emittable = buildProducedSet(ir);
+  //
+  // Spec 058: the REACHABLE half of the reachability-aware view. A rule keyed on
+  // a touch key id no key carries produces nothing an author can type, so it does
+  // not count as coverage here. See the note at the top of this file for why this
+  // check — and only this check — can safely adopt that view.
+  const { reachable: emittable } = buildReachableProducedSet(ir);
 
   // Supplement: also add individual raw char values so standalone combining marks
   // that appear in the inventory are recognized even when emitted alone.

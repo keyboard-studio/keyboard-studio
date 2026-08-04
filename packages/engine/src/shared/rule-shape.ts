@@ -2,7 +2,16 @@
  * Small rule-output-shape predicates shared across engine submodules
  * (pattern-apply, recognizer) that need to recognize the same IR shapes
  * without creating a directional dependency between those submodules.
+ *
+ * `isPlusSeparator` now LIVES IN CONTRACTS and is re-exported here so every
+ * existing engine and studio call site is unchanged. It moved because the
+ * contracts-layer touch key↔rule join and `@keymanapp/keyboard-lint` both need
+ * it and neither can import engine; the predicate is structurally typed, so the
+ * move carries no IR coupling with it. Import it from either home — they are
+ * the same function.
  */
+
+export { isPlusSeparator } from "@keyboard-studio/contracts";
 
 /**
  * True when a rule's ENTIRE output is exactly one `{kind:"deadkey"}` element.
@@ -11,16 +20,4 @@
  */
 export function isDeadkeyOnlyOutput(rule: { output: { kind: string }[] }): boolean {
   return rule.output.length === 1 && rule.output[0]?.kind === "deadkey";
-}
-
-/**
- * True for the codec's synthetic keystroke-boundary separator — the `+`
- * token the parser inserts as a `{kind:"raw", text:"+"}` context element to
- * mark where pre-context ends and the matched keystroke begins (see
- * emit.ts's `hasInlinePlus`). It is a codec/round-trip artifact, not a real
- * kmcmplib context item, so shape/pairing predicates that count or resolve
- * context positions must exclude it first.
- */
-export function isPlusSeparator(el: { kind: string; text?: string }): boolean {
-  return el.kind === "raw" && el.text?.trim() === "+";
 }

@@ -60,3 +60,75 @@ export function touchFlickAddress(
 ): string {
   return `${touchKeyAddress(platform, layerId, keyId)}:flick:${direction}`;
 }
+
+/**
+ * The decomposed parts of an address built by any of the three builders above.
+ *
+ * `sub` is absent for a main-key address. For a sub-entry, `sub.kind` names
+ * which collection the entry lives in and `sub.id` is the `sk`/`multitap`
+ * sub-key id or the `flick` direction, exactly as it appeared in the address.
+ */
+export interface TouchKeyAddressParts {
+  platform: string;
+  layerId: string;
+  keyId: string;
+  sub?: { kind: "sk" | "multitap" | "flick"; id: string };
+}
+
+const SUB_KINDS = new Set(["sk", "multitap", "flick"]);
+
+/**
+ * Parse an address back into its parts — the inverse of the three builders.
+ *
+ * Returns `undefined`, and NEVER throws, for anything that is not a
+ * well-formed address. Callers replaying an operation log against a
+ * re-derived layout hit unresolvable input as a matter of course, and an
+ * exception there would turn a reportable orphan into a crash.
+ *
+ * ## Why this is not a naive `split(":")`
+ *
+ * Key ids are not constrained to be colon-free — the `T_*` id grammar accepts
+ * any run of non-whitespace, and nothing in the `.keyman-touch-layout` schema
+ * forbids a colon inside an id. Platform ids and layer ids, by contrast, come
+ * from fixed vocabularies (`phone`/`tablet`/`desktop`; layer ids built from the
+ * modifier-combo fragments) and never contain a colon in any shipped corpus
+ * file. So the parse is anchored from BOTH ends:
+ *
+ *   - the first two colon-delimited fields are the platform and the layer;
+ *   - a trailing `:<sub-kind>:<sub-id>` is recognized only when the field two
+ *     from the end is exactly `sk`, `multitap`, or `flick`;
+ *   - everything in between is the key id, colons and all.
+ *
+ * The residual ambiguity is a key id whose own text ends in `:sk:<something>`.
+ * That is pinned as parsing to a sub-entry, matching what the builders would
+ * produce for the shorter id — the addresses are genuinely equal strings, so no
+ * parser can separate them, and the sub-entry reading is the one the deletion
+ * overlay and the edit overlay both intend.
+ */
+export function parseTouchKeyAddress(address: string): TouchKeyAddressParts | undefined {
+  if (typeof address !== "string" || address.length === 0) return undefined;
+
+  const fields = address.split(":");
+  // Minimum well-formed shape is platform:layer:key — three non-empty fields.
+  if (fields.length < 3) return undefined;
+
+  let sub: TouchKeyAddressParts["sub"];
+  let keyFields = fields.slice(2);
+
+  if (keyFields.length >= 3) {
+    const kind = keyFields[keyFields.length - 2];
+    if (kind !== undefined && SUB_KINDS.has(kind)) {
+      const subId = keyFields[keyFields.length - 1] ?? "";
+      if (subId.length === 0) return undefined;
+      sub = { kind: kind as "sk" | "multitap" | "flick", id: subId };
+      keyFields = keyFields.slice(0, -2);
+    }
+  }
+
+  const platform = fields[0] ?? "";
+  const layerId = fields[1] ?? "";
+  const keyId = keyFields.join(":");
+  if (platform.length === 0 || layerId.length === 0 || keyId.length === 0) return undefined;
+
+  return sub ? { platform, layerId, keyId, sub } : { platform, layerId, keyId };
+}
