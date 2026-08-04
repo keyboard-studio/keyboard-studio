@@ -331,6 +331,31 @@ Why:
 - **Single-writer survives.** The reducer's touch case is the only place `buildTouchLayoutJson` runs. A separate step would need its own writer.
 - A step placed *after* the touch lock would be editing a locked surface.
 
+### "Before the character walk" and "inside the touch step" are not in conflict
+
+The natural question is whether key-level editing happens *during* the touch gallery or *before* it. For an imported keyboard the answer wants to be "before" — the keys already exist and merely lack letters, so walking characters first asks the wrong question. But "before" does not require a separate step. The mode selector plus the intro proposal (below) gives the ordering inside the existing step:
+
+```
+enter touch step  ->  seed resolved (Case A reseed / Case B import-adapt)
+                  ->  intro proposal, only when the condition holds:
+                      "This keyboard has N keys with no letter assigned"
+                  ->  BY KEY       fix the key inventory: assign letters,
+                                   suppress unused keys, rename ids, set types
+                                   (live OSK + diagnostics throughout)
+                  ->  BY CHARACTER walk whatever inventory characters remain unplaced
+                  ->  Continue     coverage gate (FR-008)
+```
+
+For a Case B import the author lands in by-key first and never wastes character-walk effort on keys that already exist. For a Case A reseed the character walk stays the default and by-key is the escape hatch. Same step, same writer, same preview pane, no manifest churn.
+
+### The preview is the mess-prevention mechanism, and Developer could not have it
+
+Verified: `builder.xsl` loads only Sentry plus the editor's own modules — **no KeymanWeb engine**. Developer's Design view is a bespoke DOM rendering over a device photo (`builder.prepareLayer`), so nothing in that editor shows real engine behaviour; seeing it means compiling and moving to a different surface. That, not a weak field set, is why freeform key editing in Developer feels hazardous: consequences are invisible until compile.
+
+Our touch step already renders the real KeymanWeb OSK in its right pane (`OSKFrame` + `useKeyboardArtifact`), so the preview is inherited rather than built. The design consequence is that it must stay **truthful**: the transform currently injects only the touch layout, so a synthesized `T_`-key rule would not type (FR-038). A preview that silently omits the feature's own edits is worse than no preview.
+
+The full mess-prevention set, for the record: live preview (FR-037) · suppress-before-delete so geometry never reflows (FR-029b) · visible row slack (FR-039) · destructive classes rejected at edit time rather than reported (FR-045) · byte-preservation so a small edit stays small (FR-033) · per-edit undo (FR-032) · the coverage gate at Continue (FR-008 via US5).
+
 **But do not hide the mode.** The Cameroon case is a primary flow for imported keyboards, so resolve the tension by *proposing* the mode rather than promoting it to a step: on entering the touch stage, if the layout has keys with no reachable output **and** the inventory has unplaced characters, the intro surface leads with "This keyboard has N keys with no letter assigned — assign letters to keys →" and routes into By-key mode. The character-driven walk stays the default product for reseeded keyboards; the by-key route becomes the default *offer* for imported ones. Cost: one additive session field.
 
 ### A note on the declared-writes guard
