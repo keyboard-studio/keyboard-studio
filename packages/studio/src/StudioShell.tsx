@@ -34,7 +34,7 @@ import {
   restoredDraftSavedAt,
 } from "./lib/draftPersistence.ts";
 import { useGitHubAuth } from "./hooks/useGitHubAuth.ts";
-import { type RouteId } from "./lib/navigate.ts";
+import { navigateTo, type RouteId } from "./lib/navigate.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
@@ -58,6 +58,7 @@ import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { LocaleSwitcher } from "./components/LocaleSwitcher.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
+import { UnfinishedGalleryIndicator } from "./components/UnfinishedGalleryIndicator.tsx";
 import { AccountControl } from "./components/AccountControl.tsx";
 import { hasVisited } from "./lib/firstVisit.ts";
 import { manifest, validateManifestShape } from "./steps/manifest.ts";
@@ -233,9 +234,27 @@ interface NavBarProps {
   outputBlocked?: boolean;
   /** Tooltip / aria explanation shown while outputBlocked is true. */
   outputBlockedTitle?: string;
+  /**
+   * Persistent self-serve "go finish unreviewed defaults" indicator (see
+   * components/UnfinishedGalleryIndicator.tsx) — computed once in
+   * StudioShell from the same `useInventoryCoverageGate()` hook that already
+   * feeds `outputBlocked` above, so the two signals can never disagree.
+   * 0 hides the corresponding half of the indicator.
+   */
+  unfinishedDesktopCount: number;
+  unfinishedTouchCount: number;
+  /** Routes back to the named gallery and switches to the #survey route. */
+  onNavigateToUnfinishedGallery: (target: "mechanisms" | "touch") => void;
 }
 
-function NavBar({ active, outputBlocked = false, outputBlockedTitle }: NavBarProps) {
+function NavBar({
+  active,
+  outputBlocked = false,
+  outputBlockedTitle,
+  unfinishedDesktopCount,
+  unfinishedTouchCount,
+  onNavigateToUnfinishedGallery,
+}: NavBarProps) {
   const { i18n: activeI18n } = useLingui();
   return (
     <nav
@@ -286,9 +305,18 @@ function NavBar({ active, outputBlocked = false, outputBlockedTitle }: NavBarPro
         })}
       </div>
 
-      {/* Right group — locale switcher (all routes) + account control
-          (hidden on the welcome route) */}
+      {/* Right group — unfinished-gallery return indicator (hidden on
+          welcome, same as the account control below — nothing to return to
+          before a keyboard exists) + locale switcher (all routes) + account
+          control (hidden on the welcome route) */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        {active !== "welcome" && (
+          <UnfinishedGalleryIndicator
+            desktopCount={unfinishedDesktopCount}
+            touchCount={unfinishedTouchCount}
+            onNavigate={onNavigateToUnfinishedGallery}
+          />
+        )}
         <LocaleSwitcher />
         {active !== "welcome" && <AccountControl />}
       </div>
@@ -1464,9 +1492,35 @@ export function StudioShell() {
   // still applies regardless of how #output was reached). This is purely so
   // the block is visible on the tab itself before the click. Same shared hook
   // (hooks/useInventoryCoverageGate.ts) as StepHost/PhaseFGate/OutputScreen —
-  // do not re-derive the desktop-always/touch-only-if-authored booleans here.
+  // do not re-derive the desktop-always/touch-only-if-applicable booleans
+  // here. Also feeds the persistent "unreviewed defaults" nav indicator
+  // below (components/UnfinishedGalleryIndicator.tsx) — one hook call, two
+  // consumers of the same result, so the tab dimming and the indicator's
+  // counts can never disagree.
   // ---------------------------------------------------------------------------
-  const outputNavBlocked = useInventoryCoverageGate().blocked;
+  const coverageGate = useInventoryCoverageGate();
+  const outputNavBlocked = coverageGate.blocked;
+  const unfinishedDesktopCount = coverageGate.blockedOnDesktop
+    ? coverageGate.unimplementedDesktop.length
+    : 0;
+  const unfinishedTouchCount = coverageGate.blockedOnTouch
+    ? coverageGate.unimplementedTouch.length
+    : 0;
+  const sessionBackToUnfinishedGallery = useSurveySessionStore((s) => s.backToUnfinishedGallery);
+  // A BACK action (backToUnfinishedGallery), not the forward-push `advance` —
+  // mirrors OutputScreen.tsx's handleGoToGallery / PhaseFGate.tsx's
+  // handleGoBack exactly (see backToUnfinishedGallery's own docstring for the
+  // P0 history-corruption regression a forward-push here would reproduce).
+  // Also switches routes to #survey — unlike those two call sites, this
+  // indicator is reachable from ANY route (Preview, Output, Decisions, Flow
+  // Map), not just from inside the survey wizard itself.
+  const handleNavigateToUnfinishedGallery = useCallback(
+    (target: "mechanisms" | "touch") => {
+      sessionBackToUnfinishedGallery(target);
+      navigateTo("survey");
+    },
+    [sessionBackToUnfinishedGallery],
+  );
 
   // ---------------------------------------------------------------------------
   // Decision trail (spec 053 US1). Same arrangement as completenessReport above:
@@ -1594,6 +1648,9 @@ export function StudioShell() {
           id: "studio.nav.outputBlocked.title",
           message: "Finish every inventory character before you can access Output",
         })}
+        unfinishedDesktopCount={unfinishedDesktopCount}
+        unfinishedTouchCount={unfinishedTouchCount}
+        onNavigateToUnfinishedGallery={handleNavigateToUnfinishedGallery}
       />
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{content}</div>
     </div>
