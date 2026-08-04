@@ -25,7 +25,7 @@ import { getToZip, getPatternLibraryService } from "./services.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
-import { bumpKeyboardVersion, stageAdaptHistory } from "@keyboard-studio/engine";
+import { bumpKeyboardVersion, generateStubs, stageAdaptHistory } from "@keyboard-studio/engine";
 import { readVfsText } from "./vfsText.ts";
 import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
 
@@ -270,6 +270,30 @@ export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyF
   // useKeyboardArtifact's compile-id derivation reading from the same
   // contract instead of two hand-maintained copies of the same rule.
   const resolvedKeyboardId = effectiveKeyboardId ?? keyboardId;
+
+  // 5b. Track 1 (new-from-base) output-only completion: fill in any scaffold
+  //     stub files the working copy never received — most importantly the
+  //     `.kps` package. fetchKeyboardSourceToVfs deliberately never writes the
+  //     base's .kps into the VFS (it references compiled ../build/* artifacts),
+  //     and whether the SCAFFOLDED artifact (which does carry a generated .kps)
+  //     ever replaces the open-base VFS in the store is a compile-settle race
+  //     the commit seam intentionally runs only once per base id
+  //     (StudioShell's instantiatedForBaseIdRef). A downloaded keyboard must
+  //     be a submittable directory regardless of which artifact won (spec §12),
+  //     so complete it here. generateStubs only fills MISSING entries — every
+  //     fetched or projected file is left untouched. Scoped to new-from-base:
+  //     Track 2 (adapt-existing) imports a real keyboard whose package
+  //     fidelity is its own concern — a freshly generated stub .kps would
+  //     silently mask the original package's metadata there.
+  if (instantiationMode === "new-from-base") {
+    generateStubs(
+      clonedVfs,
+      resolvedKeyboardId,
+      identity?.displayName ?? baseKeyboard.displayName,
+      identity?.bcp47 !== undefined ? [identity.bcp47] : (baseKeyboard.languages ?? []),
+      version,
+    );
+  }
 
   // 6. Merge the adapt-path warnings (HISTORY/.kps staging) with the projection
   //    warnings. Both output paths (zip + PR) surface the same set.

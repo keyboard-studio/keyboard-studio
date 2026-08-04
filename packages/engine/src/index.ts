@@ -104,7 +104,7 @@ export type { RecognizerRule, MatchResult, RecognizeResult } from "./recognizer/
 export { isParallelIndexFanOut } from "./recognizer/rules/parallel-index-fanout.js";
 
 // Issue #19 — scaffolder (template-cleanup pipeline).
-export { createScaffolderService, renameFilesInVfs } from "./scaffolder/index.js";
+export { createScaffolderService, renameFilesInVfs, generateStubs } from "./scaffolder/index.js";
 export { scaffoldIR, resetIdentity } from "./scaffolder/scaffold-ir.js";
 export {
   scaffoldTouchLayout,
