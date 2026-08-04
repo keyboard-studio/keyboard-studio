@@ -2992,6 +2992,151 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
 });
 
 // ---------------------------------------------------------------------------
+// Ranked suggestion row — up to 2 distinct-strategy chips for one codepoint
+// (getRankedSuggestionsForChar). ƒ U+0192 attested by BOTH a corpus deadkey
+// (S-02, baseLetter "f") and a corpus RALT candidate (S-08) — the gallery
+// must render both chips, each independently acceptable, with one shared
+// Deny dismissing the whole row.
+// ---------------------------------------------------------------------------
+
+const ffRankedPlacementMap: PlacementMap = {
+  entries: [
+    {
+      codepoint: "U+0192",
+      candidates: [
+        {
+          vkey: "K_QUOTE",
+          modifiers: [],
+          mechanism: "deadkey",
+          priorSource: "corpus",
+          priorCount: 6,
+          confidence: 0.7,
+          baseLetter: "f",
+        },
+        {
+          vkey: "K_F",
+          modifiers: ["RALT"],
+          mechanism: "direct",
+          priorSource: "corpus",
+          priorCount: 4,
+          confidence: 0.6,
+        },
+      ],
+    },
+  ],
+};
+
+describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, same codepoint)", () => {
+  it("renders both chips, each with its own Accept button", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffRankedPlacementMap}
+        />,
+      );
+    });
+
+    expectCurrentChar("ƒ");
+    expect(screen.getByText(/Suggested: Deadkey → f for ƒ/i)).toBeTruthy();
+    expect(screen.getByText(/Suggested: RAlt \+ F for ƒ/i)).toBeTruthy();
+
+    // One shared Deny for the whole row, two independent Accept buttons
+    // (each named by its own aria-label, per mechanism).
+    expect(
+      screen.getByRole("button", {
+        name: /Accept suggestion: deadkey via base letter f for ƒ/i,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_F for ƒ/i }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getAllByRole("button")
+        .filter((b) => b.textContent?.trim() === "Accept"),
+    ).toHaveLength(2);
+    expect(
+      screen.getByRole("button", { name: /Deny suggestion/i }),
+    ).toBeTruthy();
+  });
+
+  it("accepting the S-02 (deadkey) chip records a deadkey_single_tap mechanism using the corpus baseLetter and the studio's default trigger key", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffRankedPlacementMap}
+        />,
+      );
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Accept suggestion: deadkey via base letter f for ƒ/i,
+      }),
+    );
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments).toHaveLength(1);
+    const mech = assignments[0]?.mechanisms[0];
+    expect(mech?.patternId).toBe(PATTERN_DEADKEY);
+    expect(mech?.strategyId).toBe("S-02");
+    expect(mech?.slotValues?.["baseLetters"]).toBe("f");
+    expect(mech?.slotValues?.["accentedForms"]).toBe("ƒ");
+    // Corpus triggers are deliberately not imposed — the studio's own
+    // default trigger key (K_COLON) is used, not the corpus candidate's vkey
+    // (K_QUOTE, which is only ever a display-only host label for THIS
+    // candidate's own placement, not a trigger-key attestation).
+    expect(mech?.slotValues?.["triggerKey"]).toBe("K_COLON");
+  });
+
+  it("accepting the S-08 (RAlt) chip still works independently of the S-02 chip", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffRankedPlacementMap}
+        />,
+      );
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_F for ƒ/i }),
+    );
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.mechanisms[0]?.patternId).toBe(
+      "modifier_as_layer_switch",
+    );
+    expect(assignments[0]?.mechanisms[0]?.strategyId).toBe("S-08");
+  });
+
+  it("Deny dismisses the whole row — both chips disappear, revisiting the char doesn't reshow it", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffRankedPlacementMap}
+        />,
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Deny suggestion/i }));
+    expect(screen.queryByText(/Suggested:/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Case-pair companion — ralt-layer proposal, raised right after ACCEPTING
 // the lowercase S-08 RAlt suggestion (not on a separate navigation to the
 // uppercase sibling — see handleSuggestionAccept).
