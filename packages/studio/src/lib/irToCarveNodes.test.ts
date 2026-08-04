@@ -34,6 +34,7 @@ import {
 } from './irToCarveNodes.ts';
 import { _setContentCatalogForTesting, _resetContentI18nForTesting } from './contentI18n.ts';
 import { collectCharContributors, parseSlotId, isPlusSeparator, deriveCarveNeededSet } from '@keyboard-studio/engine';
+import { loadLangtags } from './langtagsDefaults.ts';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -2525,6 +2526,58 @@ describe('recommendedRemovalChars', () => {
       expect(result.map((r) => r.ch)).toEqual(['y']);
     });
   });
+
+  // #526 fix 1: a non-Latin target's base ASCII Latin alphabet (desktop
+  // base-layout fall-through, spec 040) must never be recommended for
+  // removal — it's the OS default a bare base-layer key falls through to,
+  // not a surplus character the author added.
+  describe('cross-script ASCII Latin fall-through guard (#526 fix 1)', () => {
+    it('does NOT recommend surplus ASCII Latin on a Cyrillic (ru-Cyrl, explicit script subtag) target', () => {
+      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+      const result = recommendedRemovalChars({ ir, needed: new Set(['q']), bcp47: 'ru-Cyrl' });
+
+      expect(result.map((r) => r.ch)).not.toContain('y');
+    });
+
+    it('does NOT recommend surplus ASCII Latin on a bare "ru" target once langtags has resolved its Cyrillic default script (no explicit script subtag — exercises the getLoadedLangtags() fallback)', async () => {
+      // Preload the module synchronously the same way the survey's IdentityLite
+      // step already does before an author reaches Carve, so
+      // getLoadedLangtags() inside targetScriptIsLatin resolves non-null here.
+      await loadLangtags();
+      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+      const result = recommendedRemovalChars({ ir, needed: new Set(['q']), bcp47: 'ru' });
+
+      expect(result.map((r) => r.ch)).not.toContain('y');
+    });
+
+    it('STILL recommends a surplus ASCII Latin letter on a Latin (bfd-Latn) target — no regression', () => {
+      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+      const result = recommendedRemovalChars({ ir, needed: new Set(['q']), bcp47: 'bfd-Latn' });
+
+      expect(result.map((r) => r.ch)).toContain('y');
+    });
+
+    it('STILL recommends surplus ASCII Latin when bcp47 is unknown/empty — fail-open unchanged', () => {
+      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+      const result = recommendedRemovalChars({ ir, needed: new Set(['q']), bcp47: '' });
+
+      expect(result.map((r) => r.ch)).toContain('y');
+    });
+
+    it('mirrors the same guard in annotateRemovalRecommendations — a group producing only ASCII Latin is "none" on a Cyrillic target', () => {
+      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+      const nodes = toRailNodes(ir);
+
+      const result = annotateRemovalRecommendations(nodes, ir, new Set(['q']), null, 'ru-Cyrl');
+
+      const group = result.find((n) => n.kind === 'group');
+      expect(group?.recommendation).toBe('none');
+    });
+  });
 });
 
 
@@ -2582,6 +2635,41 @@ describe('recommendedRemovalChars — form parameter (spec: base-plus-mark drive
     const result = recommendedRemovalChars({ ir, needed: new Set([DECOMPOSED]), form: 'NFD' });
 
     expect(result.map((r) => r.ch)).toEqual(['y']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// recommendedRemovalChars — combining marks implied by a needed grapheme
+// (#526 fix 3) are shielded even when only the composed grapheme, not the
+// bare mark itself, is a literal `needed` member.
+// ---------------------------------------------------------------------------
+
+describe('recommendedRemovalChars — needed-implied combining mark guard (#526 fix 3)', () => {
+  it('does NOT recommend a bare combining mark literal implied by a needed precomposed grapheme', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule-mark', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: '́' }] }], // bare combining acute
+      }],
+    });
+
+    // 'á' (U+00E1) NFD-decomposes to 'a' + U+0301 — the mark is implied.
+    const result = recommendedRemovalChars({ ir, needed: new Set(['á']) });
+
+    expect(result.map((r) => r.ch)).not.toContain('́');
+  });
+
+  it('still recommends a combining mark NOT implied by any needed grapheme', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule-mark', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: '̃' }] }], // bare combining tilde — unrelated to 'á'
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['á']) }); // implies only U+0301, not U+0303
+
+    expect(result.map((r) => r.ch)).toContain('̃');
   });
 });
 
@@ -3349,6 +3437,28 @@ describe('recommendedRemovalChars — paired proposal rows (spec 051 FR-014)', (
 
     expect(result.map((r) => r.ch)).toContain('ʒ');
     expect(result.find((r) => r.ch === 'ʒ')?.caseGroup).toBeUndefined();
+  });
+
+  it("merges BOTH case-group members' contributors into the folded survivor row (#526 fix 2 — cascadeDelete must drop both cases, not just the survivor's)", () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule-lower', context: [{ kind: 'vkey', name: 'K_1', modifiers: [] }], output: [{ kind: 'char', value: 'ǝ' }] },
+          { nodeId: 'rule-upper', context: [{ kind: 'vkey', name: 'K_2', modifiers: [] }], output: [{ kind: 'char', value: 'Ǝ' }] },
+        ],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result).toHaveLength(1);
+    const row = result[0];
+    expect(row?.ch).toBe('ǝ'); // lowercase survivor
+    expect(row?.caseGroup).toEqual(['Ǝ', 'ǝ']);
+    // Both producing rules must be present, not just the lowercase survivor's own.
+    expect(row?.contributors.ruleNodeIds).toEqual(expect.arrayContaining(['rule-lower', 'rule-upper']));
+    expect(row?.contributors.ruleNodeIds).toHaveLength(2);
   });
 });
 

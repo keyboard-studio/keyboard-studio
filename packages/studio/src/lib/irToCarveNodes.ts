@@ -11,13 +11,15 @@ import type {
   RemovalCapability,
   StoreItem,
 } from '@keyboard-studio/contracts';
-import { buildProducedSet } from '@keyboard-studio/contracts';
+import { buildProducedSet, scriptSubtagOf } from '@keyboard-studio/contracts';
 import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, buildProducerIndex, isCharCoveredForLocale, collectCharContributors, isPlusSeparator, parseSlotId, isCombiningMarkChar } from '@keyboard-studio/engine';
 import type { ProducerIndex } from '@keyboard-studio/engine';
-import type { StoreSlotBlockReason, StoreSlotEditMode, StoreAnalysis, CharContributors, CharNormalizationForm } from '@keyboard-studio/engine';
+import type { StoreSlotBlockReason, StoreSlotEditMode, StoreAnalysis, CharContributors, ContributorDescriptor, CharNormalizationForm } from '@keyboard-studio/engine';
 import type { I18n } from '@lingui/core';
 import { resolveContentString } from './contentI18n.ts';
 import { caseGroupFor, caseTrimSet } from './carveCasePairs.ts';
+import { primarySubtag } from './suggestBase.ts';
+import { getLoadedLangtags } from './langtagsDefaults.ts';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 
 // ---------------------------------------------------------------------------
@@ -2036,6 +2038,60 @@ function isAlwaysKeepCategory(ch: string): boolean {
 }
 
 /**
+ * True iff `ch` is a plain ASCII Latin letter (U+0041-005A / U+0061-007A).
+ * Narrower than \p{L} on purpose — a Latin-script letter OUTSIDE this range
+ * (e.g. 'ǝ' U+01DD) is a genuine authored character, never a base-layout
+ * fall-through, and stays eligible for the ordinary surplus check below.
+ */
+function isAsciiLatinLetter(ch: string): boolean {
+  return /^[A-Za-z]$/.test(ch);
+}
+
+/**
+ * True when the target BCP47 tag's effective script is Latin: an explicit
+ * script subtag wins (`scriptSubtagOf`, contracts); otherwise falls back to
+ * the langtags default script for the tag's primary language subtag, read
+ * via `getLoadedLangtags()` (lib/langtagsDefaults.ts) rather than a static
+ * import of `@keyboard-studio/engine/langtags` — that module's generated
+ * data file is large, and the studio deliberately keeps it out of static
+ * bundles (FR-011/SC-005), lazy-loading it once during the survey's language
+ * step instead. By the time an author reaches Carve they have necessarily
+ * already picked a target language (IdentityLite), which has already
+ * resolved this same module, so `getLoadedLangtags()` is synchronously
+ * non-null in the overwhelming common case; the `null` fallback (module not
+ * yet loaded) folds into the same "assume Latin" fail-open below as an
+ * absent/unknown `bcp47` — conservative, never a spurious shield.
+ */
+function targetScriptIsLatin(bcp47: string | null | undefined): boolean {
+  if (!bcp47) return true;
+  const explicit = scriptSubtagOf(bcp47);
+  if (explicit !== undefined) return explicit.toLowerCase() === 'latn';
+  const primary = primarySubtag(bcp47);
+  const defaultScript = getLoadedLangtags()?.getLanguageDefaults(primary)?.defaultScript ?? 'Latn';
+  return defaultScript.toLowerCase() === 'latn';
+}
+
+/**
+ * True iff `ch` is a base ASCII Latin letter surfacing ONLY because of
+ * desktop base-layout fall-through (spec 040) on a keyboard whose TARGET
+ * script is not Latin — e.g. a Russian (Cyrillic) keyboard whose base layer
+ * leaves un-named keys to fall through to the OS default `kbdus`, so the
+ * whole `a-z`/`A-Z` alphabet shows up as "produced" even though the author
+ * never authored a rule for it. On a non-Latin target this is never a
+ * genuine surplus character the author added, so it is hard-excluded from
+ * removal recommendations — the same severity as `isAlwaysKeepCategory` —
+ * rather than merely soft-flagged.
+ *
+ * Deliberately a SEPARATE disjunct at each call site rather than folded into
+ * `isAlwaysKeepCategory` above: that guard is target-agnostic by design (a
+ * Latin letter normalizes to General_Category L, not N/P/S), so a
+ * script-aware exclusion does not belong inside it.
+ */
+function isBasicLatinCrossScriptFallthrough(ch: string, bcp47: string | null | undefined): boolean {
+  return isAsciiLatinLetter(ch) && !targetScriptIsLatin(bcp47);
+}
+
+/**
  * Produced output characters for a single node — the `.ch` of every glyph
  * (group/pattern) or every store chip (store). Raw fragments produce nothing
  * displayable, so they always resolve to an empty set (→ 'none').
@@ -2441,7 +2497,9 @@ export function annotateRemovalRecommendations(
     if (produced.size === 0) return { ...node, recommendation: 'none' };
 
     for (const ch of produced) {
-      if (isNeeded(ch) || isAlwaysKeepCategory(ch)) return { ...node, recommendation: 'none' };
+      if (isNeeded(ch) || isAlwaysKeepCategory(ch) || isBasicLatinCrossScriptFallthrough(ch, bcp47)) {
+        return { ...node, recommendation: 'none' };
+      }
     }
 
     if (node.kind === 'store') {
@@ -2534,6 +2592,107 @@ export function isSimpleRemovableRule(rule: IRRule): boolean {
   const out = rule.output[0];
   if (out === undefined || out.kind !== 'char') return false;
   return true;
+}
+
+/**
+ * Merge multiple already-computed `CharContributors` records (each from an
+ * independent `collectCharContributors(ir, ch)` call) into one — used by the
+ * case-pair fold below (FR-014) so a folded survivor row's `contributors`
+ * cascade EVERY case-group member's producers, not just the survivor's own.
+ *
+ * Without this, `cascadeDelete(contributors.ruleNodeIds, contributors.storeSlotIds)`
+ * on a folded row (e.g. the `a`+`A` pair, survivor `a`) only removed the
+ * lowercase's rules/slots, silently leaving the uppercase producer intact
+ * (#526 diagnosed bug — `handleRemoveSelectedRecommended` in CarveGalleryV2.tsx
+ * passes a folded row's `contributors` straight through, unaware it's a fold).
+ *
+ * `ruleNodeIds`/`storeSlotIds`/`storeSlots`/`locations`/`blocked` are unioned
+ * with de-duplication (a rule or slot named by more than one record's
+ * contributor list is only cascaded once). `descriptors` is re-sliced and
+ * re-concatenated in lockstep with the deduped arrays so the index-parallel
+ * invariant `collectCharContributors` documents (one descriptor per
+ * ruleNodeIds entry, then one per storeSlots entry, then one per blocked
+ * entry, in that order) still holds for the merged record.
+ */
+function mergeCharContributors(records: readonly CharContributors[]): CharContributors {
+  const first = records[0];
+  if (first === undefined) {
+    return { targetChar: '', ruleNodeIds: [], storeSlotIds: [], storeSlots: [], locations: [], blocked: [], descriptors: [] };
+  }
+
+  const ruleNodeIds: string[] = [];
+  const ruleDescriptors: ContributorDescriptor[] = [];
+  const seenRules = new Set<string>();
+
+  const storeSlotIds: string[] = [];
+  const storeSlots: CharContributors['storeSlots'] = [];
+  const storeSlotDescriptors: ContributorDescriptor[] = [];
+  const seenSlots = new Set<string>();
+
+  const locations: CharContributors['locations'] = [];
+  const seenLocations = new Set<string>();
+
+  const blocked: CharContributors['blocked'] = [];
+  const blockedDescriptors: ContributorDescriptor[] = [];
+  const seenBlocked = new Set<string>();
+
+  for (const rec of records) {
+    // Re-slice this record's own descriptors back into its three per-array
+    // views (mirrors MechanismGallery.tsx's existing slicing convention for
+    // the same index-parallel contract) so each descriptor can travel with
+    // the id/slot/blocked-entry it describes through the dedup below.
+    // `descriptors` defensively defaults to `[]` — real `collectCharContributors`
+    // output always includes it, but this function also runs over test-double
+    // CharContributors fixtures (e.g. CarveGallery.test.tsx's emptyContributors)
+    // that omit it since those tests never assert on descriptors.
+    const recDescriptors = rec.descriptors ?? [];
+    const ruleDescs = recDescriptors.slice(0, rec.ruleNodeIds.length);
+    const slotDescs = recDescriptors.slice(rec.ruleNodeIds.length, rec.ruleNodeIds.length + rec.storeSlots.length);
+    const blockedDescs = recDescriptors.slice(rec.ruleNodeIds.length + rec.storeSlots.length);
+
+    rec.ruleNodeIds.forEach((id, i) => {
+      if (seenRules.has(id)) return;
+      seenRules.add(id);
+      ruleNodeIds.push(id);
+      const d = ruleDescs[i];
+      if (d !== undefined) ruleDescriptors.push(d);
+    });
+
+    rec.storeSlots.forEach((slot, i) => {
+      if (seenSlots.has(slot.slotId)) return;
+      seenSlots.add(slot.slotId);
+      storeSlots.push(slot);
+      storeSlotIds.push(slot.slotId);
+      const d = slotDescs[i];
+      if (d !== undefined) storeSlotDescriptors.push(d);
+    });
+
+    for (const loc of rec.locations) {
+      const key = `${loc.kind}|${loc.nodeId}|${loc.label}`;
+      if (seenLocations.has(key)) continue;
+      seenLocations.add(key);
+      locations.push(loc);
+    }
+
+    rec.blocked.forEach((b, i) => {
+      const key = `${b.reason}|${b.label}`;
+      if (seenBlocked.has(key)) return;
+      seenBlocked.add(key);
+      blocked.push(b);
+      const d = blockedDescs[i];
+      if (d !== undefined) blockedDescriptors.push(d);
+    });
+  }
+
+  return {
+    targetChar: first.targetChar,
+    ruleNodeIds,
+    storeSlotIds,
+    storeSlots,
+    locations,
+    blocked,
+    descriptors: [...ruleDescriptors, ...storeSlotDescriptors, ...blockedDescriptors],
+  };
 }
 
 /** A single recommended-removal character for the CarveGallery banner checklist. */
@@ -2637,6 +2796,23 @@ export function recommendedRemovalChars(args: {
   const { ir, needed: rawNeeded, bcp47, form = 'NFC', blockCandidateChars = new Set<string>() } = args;
   if (rawNeeded.size === 0) return [];
   const needed = new Set([...rawNeeded].map((ch) => ch.normalize(form)));
+  // #526 fix 3: shield combining marks IMPLIED by a needed grapheme — e.g. if
+  // the orthography needs precomposed 'á', the bare combining acute U+0301
+  // must not be flagged surplus just because 'á' itself (not U+0301) is the
+  // literal `needed` member. NFD-decompose every needed member and fold any
+  // combining mark it contains back into `needed` (re-normalized to `form`),
+  // so BOTH the surplus gate below and `coordinatedDropHitsNeededChar` (which
+  // also reads `needed`) see it as needed. Canonical NFD — never NFKD — to
+  // match the normalization discipline the rest of this comparison seam
+  // uses. Idempotent, and shields only marks actually implied by a needed
+  // char; a mark absent from every needed grapheme's NFD expansion is
+  // untouched. No separate deadkey handling is needed here — a true deadkey
+  // OUTPUT resolves through a dropped `‹dk›` placeholder, not a literal mark.
+  for (const n of [...needed]) {
+    for (const cp of n.normalize('NFD')) {
+      if (isCombining(cp)) needed.add(cp.normalize(form));
+    }
+  }
 
   const produced = new Set([...buildProducedSet(ir)].map((ch) => ch.normalize(form)));
   // Normalized to `form` for the same reason `produced`/`needed` are — the
@@ -2669,6 +2845,7 @@ export function recommendedRemovalChars(args: {
   for (const ch of candidateChars) {
     if (isCharCoveredForLocale(ch, needed, bcp47 ?? '', form)) continue; // needed — not a candidate
     if (isAlwaysKeepCategory(ch)) continue; // digit/punctuation/symbol — never a removal candidate
+    if (isBasicLatinCrossScriptFallthrough(ch, bcp47)) continue; // ASCII Latin base-layout fall-through on a non-Latin target — never a removal candidate
 
     const contributors = collectCharContributors(ir, ch);
 
@@ -2726,6 +2903,11 @@ export function recommendedRemovalChars(args: {
   // uppercase. `caseTrimSet` is the one implementation of the retire rule
   // (carveCasePairs.ts); this asks it rather than re-deriving the condition here.
   const resultChs = new Set(results.map((r) => r.ch));
+  // Lookup for the contributors-merge below — every caseGroup member (survivor
+  // and folded-away alike) is, by construction, a member of `results` (see the
+  // `resultChs.has(...)` checks the fold below runs before adding anything to
+  // a group), so this map always has an entry for each group member.
+  const resultsByCh = new Map(results.map((r) => [r.ch, r]));
   const foldedAway = new Set<string>(); // chars absorbed into another row's paired proposal
   const retainedUppers = new Set<string>(); // uppercase kept alive by a surviving referent
   const caseGroupBySurvivor = new Map<string, string[]>();
@@ -2776,6 +2958,18 @@ export function recommendedRemovalChars(args: {
     .filter((r) => !foldedAway.has(r.ch) && !retainedUppers.has(r.ch))
     .map((r) => {
       const caseGroup = caseGroupBySurvivor.get(r.ch);
-      return caseGroup === undefined ? r : { ...r, caseGroup };
+      if (caseGroup === undefined) return r;
+      // #526 fix 2: a folded row's `contributors` must cascade EVERY
+      // case-group member's producers, not just the survivor's own — merge
+      // in each OTHER member's already-computed CharContributors (from
+      // `results`, built via collectCharContributors above) so removing this
+      // one row drops both cases, not just the survivor's.
+      const memberContributors = caseGroup
+        .map((c) => resultsByCh.get(c)?.contributors)
+        .filter((c): c is CharContributors => c !== undefined);
+      const contributors = mergeCharContributors(
+        memberContributors.length > 0 ? memberContributors : [r.contributors],
+      );
+      return { ...r, caseGroup, contributors };
     });
 }
