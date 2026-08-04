@@ -1008,6 +1008,18 @@ export interface CarveNode {
    * Undefined on nodes produced directly by toRailNodes() before annotation runs.
    */
   recommendation?: 'high' | 'medium' | 'none' | undefined;
+  /**
+   * Present only when `recommendation === 'high'` AND every character this
+   * node produces is a cross-script ASCII Latin base-layout fall-through
+   * char (`isBasicLatinCrossScriptFallthrough`) — e.g. a Russian keyboard's
+   * un-adapted `a-z` group. Such a node is still 'high' (not suppressed —
+   * product decision, post-#526 follow-on), but the rail/grid should treat
+   * it as an OPTIONAL, low-priority suggestion (mirrors
+   * `RecommendedRemovalChar.reason === 'cross-script-latin'` at the
+   * character-level banner signal) rather than the ordinary "safe to
+   * remove" recommendation. Undefined for every ordinary 'high' node.
+   */
+  recommendationReason?: 'cross-script-latin' | undefined;
 }
 
 /**
@@ -2077,15 +2089,22 @@ function targetScriptIsLatin(bcp47: string | null | undefined): boolean {
  * script is not Latin — e.g. a Russian (Cyrillic) keyboard whose base layer
  * leaves un-named keys to fall through to the OS default `kbdus`, so the
  * whole `a-z`/`A-Z` alphabet shows up as "produced" even though the author
- * never authored a rule for it. On a non-Latin target this is never a
- * genuine surplus character the author added, so it is hard-excluded from
- * removal recommendations — the same severity as `isAlwaysKeepCategory` —
- * rather than merely soft-flagged.
+ * never authored a rule for it.
  *
- * Deliberately a SEPARATE disjunct at each call site rather than folded into
- * `isAlwaysKeepCategory` above: that guard is target-agnostic by design (a
- * Latin letter normalizes to General_Category L, not N/P/S), so a
- * script-aware exclusion does not belong inside it.
+ * Product decision (post-#526 follow-on): this is NOT a hard-exclude. An
+ * author may genuinely want to keep ASCII Latin around for URLs/code/English
+ * loanwords on a non-Latin keyboard, or may want a strictly single-script
+ * keyboard and remove it. So a char for which this predicate is true is left
+ * to flow through the ordinary surplus/allowlist/coordinated-drop guard
+ * chain like any other candidate; if it survives, callers tag it
+ * `reason: 'cross-script-latin'` rather than excluding it, so the UI can
+ * surface it as a separate, optional, low-priority removal group instead of
+ * silently keeping it or mixing it into the primary recommendation.
+ *
+ * Deliberately a SEPARATE disjunct/tag at each call site rather than folded
+ * into `isAlwaysKeepCategory` above: that guard is target-agnostic by design
+ * (a Latin letter normalizes to General_Category L, not N/P/S), so a
+ * script-aware signal does not belong inside it.
  */
 function isBasicLatinCrossScriptFallthrough(ch: string, bcp47: string | null | undefined): boolean {
   return isAsciiLatinLetter(ch) && !targetScriptIsLatin(bcp47);
@@ -2455,6 +2474,15 @@ function isStructuralExclusion(node: CarveNode, ir: KeyboardIR, ownedNodeIds: Se
  * apples" carve-gallery comparison. `needed`'s members are re-normalized
  * here rather than trusted as already-`form`-normalized, since callers may
  * pass sets built against the default NFC assumption.
+ *
+ * Cross-script ASCII Latin fall-through (`isBasicLatinCrossScriptFallthrough`,
+ * post-#526 follow-on) is no longer a hard exclude here: a char that only
+ * qualifies on that ground still runs through the ordinary surplus/dependency
+ * checks below. A node ends up 'high' with `recommendationReason:
+ * 'cross-script-latin'` when EVERY character it produces is such a
+ * fall-through char (see CarveNode.recommendationReason) — the rail/grid can
+ * use that to present it as an optional, low-priority suggestion rather than
+ * the ordinary "safe to remove" one, instead of suppressing it outright.
  */
 export function annotateRemovalRecommendations(
   nodes: CarveNode[],
@@ -2497,7 +2525,7 @@ export function annotateRemovalRecommendations(
     if (produced.size === 0) return { ...node, recommendation: 'none' };
 
     for (const ch of produced) {
-      if (isNeeded(ch) || isAlwaysKeepCategory(ch) || isBasicLatinCrossScriptFallthrough(ch, bcp47)) {
+      if (isNeeded(ch) || isAlwaysKeepCategory(ch)) {
         return { ...node, recommendation: 'none' };
       }
     }
@@ -2524,7 +2552,16 @@ export function annotateRemovalRecommendations(
     // that exists only to support a mechanism the author didn't select in
     // Phase C survey answers) once that mechanism-selection data is threaded
     // through to the carve step.
-    return { ...node, recommendation: 'high' };
+    //
+    // Cross-script ASCII Latin fall-through (post-#526 follow-on): a node
+    // whose EVERY produced character is such a fall-through char (on a
+    // non-Latin target) is still 'high' — never suppressed — but tagged so
+    // the rail/grid can present it as an optional, low-priority suggestion
+    // rather than the ordinary "safe to remove" one.
+    const allCrossScriptLatin = [...produced].every((ch) => isBasicLatinCrossScriptFallthrough(ch, bcp47));
+    return allCrossScriptLatin
+      ? { ...node, recommendation: 'high', recommendationReason: 'cross-script-latin' }
+      : { ...node, recommendation: 'high' };
   });
 }
 
@@ -2717,8 +2754,22 @@ export interface RecommendedRemovalChar {
    * change. A higher-confidence signal than the plain surplus check — the UI
    * may use it to present the row with stronger wording — but it does NOT
    * change which guards ran; see `recommendedRemovalChars`'s doc.
+   *
+   * `'cross-script-latin'` (post-#526 follow-on, product decision) — present
+   * when `ch` is a base ASCII Latin letter surfacing only via desktop
+   * base-layout fall-through on a non-Latin target
+   * (`isBasicLatinCrossScriptFallthrough`). Previously such characters were
+   * hard-excluded from this function's results entirely; now they run through
+   * the SAME surplus/allowlist/coordinated-drop guards as any other candidate
+   * and, if they survive, are tagged rather than excluded — so the banner UI
+   * can surface them as a separate, optional, low-priority removal group
+   * (e.g. "keep the Latin alphabet for URLs/code, or remove it for a
+   * single-script keyboard") instead of silently keeping or removing them.
+   * If a char would otherwise qualify for `'blocked-combination'` too,
+   * `'cross-script-latin'` wins — it is the display-grouping signal the
+   * banner splits on.
    */
-  reason?: "blocked-combination";
+  reason?: "blocked-combination" | "cross-script-latin";
 }
 
 /**
@@ -2759,6 +2810,14 @@ export interface RecommendedRemovalChar {
  *      Cameroon `word`-store over-coarse-guard bug — `word` self-feeds the
  *      whole Latin alphabet AND a needed Greek letter, so the old guard
  *      shielded every Latin letter).
+ *
+ * Cross-script ASCII Latin fall-through (`isBasicLatinCrossScriptFallthrough`,
+ * post-#526 follow-on product decision) is NOT a 4th exclude guard — a char
+ * that only qualifies on that ground still runs through guards 1-3 above like
+ * any other candidate. If it survives, it is tagged `reason:
+ * 'cross-script-latin'` in the pushed row rather than being dropped, so the
+ * banner UI can offer it as a separate, optional, low-priority removal group
+ * instead of silently keeping it.
  *
  * Returns [] when `needed` is empty — no signal at all yet (mirrors
  * annotateRemovalRecommendations's "no default is a defect until we're
@@ -2845,7 +2904,11 @@ export function recommendedRemovalChars(args: {
   for (const ch of candidateChars) {
     if (isCharCoveredForLocale(ch, needed, bcp47 ?? '', form)) continue; // needed — not a candidate
     if (isAlwaysKeepCategory(ch)) continue; // digit/punctuation/symbol — never a removal candidate
-    if (isBasicLatinCrossScriptFallthrough(ch, bcp47)) continue; // ASCII Latin base-layout fall-through on a non-Latin target — never a removal candidate
+    // Cross-script ASCII Latin fall-through (post-#526 follow-on) is no
+    // longer excluded here — it flows through the same guards below as any
+    // other candidate and, if it survives, is tagged `reason:
+    // 'cross-script-latin'` rather than dropped (see the push below).
+    const crossScriptLatin = isBasicLatinCrossScriptFallthrough(ch, bcp47);
 
     const contributors = collectCharContributors(ir, ch);
 
@@ -2881,10 +2944,18 @@ export function recommendedRemovalChars(args: {
 
     if (!allSimple || dependsOnNeeded) continue;
 
+    // `crossScriptLatin` wins over `blocked-combination` when both apply — it
+    // is the display-grouping signal the banner splits on (see
+    // RecommendedRemovalChar.reason).
+    const reason = crossScriptLatin
+      ? ('cross-script-latin' as const)
+      : blockCandidates.has(ch)
+        ? ('blocked-combination' as const)
+        : undefined;
     results.push({
       ch,
       contributors,
-      ...(blockCandidates.has(ch) ? { reason: 'blocked-combination' as const } : {}),
+      ...(reason !== undefined ? { reason } : {}),
     });
   }
 
