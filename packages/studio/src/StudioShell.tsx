@@ -916,6 +916,25 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       if (instantiatedForBaseIdRef.current === base.id) return;
       instantiatedForBaseIdRef.current = base.id;
 
+      // REBASE draft migration (F1's last seam). A non-null key here means the
+      // working copy is STILL INSTANTIATED under another project key at the
+      // moment of a new commit — which only the rebase path produces: start-over
+      // resets the stores before the next pick, a résumé pre-seeds
+      // `instantiatedForBaseIdRef` so doCommit never fires, and a fresh boot has
+      // nothing instantiated. On that path the author has already accepted
+      // "Switching base keyboards will discard your current edits" (or had
+      // none to discard), so the record under the OLD key is precisely the
+      // discarded state — leaving it behind strands a phantom card in "My
+      // keyboards" for a base the author rejected. This is a MIGRATION of the
+      // one project's draft key, not a clear-on-switch: spec 047's SC-001
+      // ("start keyboard B, keyboard A survives") concerns two projects, and
+      // every two-project path leaves this key null. Cleared AFTER the
+      // instantiation + promotion below succeed, so a failed commit never
+      // deletes the only copy of the author's work.
+      const rebasedFromProjectKey = deriveProjectKeyFromWorkingCopy(
+        useWorkingCopyStore.getState(),
+      );
+
       // Spec 034's VR-5 used to call `replaceActiveDraftIfDifferentProject`
       // here: picking a new base DELETED the previously active project's
       // draft, because the studio could hold only one draft at a time and a
@@ -970,6 +989,19 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // pair with the shared helper so `handleResumeDraft` (below) can reuse
       // the exact same promotion logic for its own résumé path.
       promotePendingAutosave();
+
+      // Complete the rebase migration (see rebasedFromProjectKey above): the
+      // new key's record + index row exist as of promotePendingAutosave's
+      // synchronous install-time save, so removing the old key's record and
+      // row now is a rename, never a gap. Same-key commits (P1 repeat settle
+      // never reaches here; F2 refresh re-commit derives the same key) are
+      // no-ops by the inequality guard.
+      const projectKeyAfterCommit = deriveProjectKeyFromWorkingCopy(
+        useWorkingCopyStore.getState(),
+      );
+      if (rebasedFromProjectKey !== null && rebasedFromProjectKey !== projectKeyAfterCommit) {
+        clearPersistenceDraft(rebasedFromProjectKey);
+      }
     },
     // Same escape hatch as the pre-preview-before-commit onInstantiate: all
     // reads are via getState()/reducerDepsRef.current (stable refs), not
