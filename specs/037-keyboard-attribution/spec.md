@@ -4,7 +4,10 @@
 
 **Created**: 2026-08-04
 
-**Status**: Draft — **six decisions needed before planning** (see Open Questions)
+**Status**: Planned — the six Open Questions are **resolved as PROPOSED decisions** in
+[research.md](research.md) (D1–D6). **D4** (`LICENSE.md` vs `.kmn` precedence) and **D5**
+(unparseable base license blocks emission) are legal/UX calls worth a deliberate ruling before
+implementation; the other four follow from corpus evidence.
 
 **Governing docs**: [spec.md](../../spec.md) §12 (working-copy spine), §16 (out of scope). Publication is [024](../024-option-a-github-app/spec.md); this feature supplies the attribution that publication carries.
 
@@ -30,13 +33,20 @@ Current emission, all in [scaffolder/index.ts](../../packages/engine/src/scaffol
 | Artifact | Today | Shipped-corpus norm |
 |---|---|---|
 | `LICENSE.md` | `Copyright © ${yyyy} ${displayName}` — **displayName is the keyboard's name, not a person** | 920/920 carry a real holder |
-| `.kmn` header | `NAME / VERSION / KEYBOARDVERSION / TARGETS` — **no `COPYRIGHT`** | 922/924 have `store(&COPYRIGHT)` |
+| `.kmn` header | the scaffolder's **stub template** writes `NAME / VERSION / KEYBOARDVERSION / TARGETS` and no `COPYRIGHT` — but see D8 below | 922/924 have `store(&COPYRIGHT)` |
 | `.kps` `<Info>` | `<Name>` + `<Description>` only | 917/918 have `<Copyright>`; 442 have `<Author>` |
 
 **The stub writer is write-if-absent** (`if (vfs.get(stub.path) === undefined)`), so a base's
 `LICENSE.md` would survive if present — but **nothing fetches it**. `scaffolder/index.ts:351`
 is the only `LICENSE.md` reference in the codebase outside tests and lint fixtures. Nothing
 reads, parses, or merges it.
+
+**The IR already models copyright (D8).** `IRHeader.copyright` is a required field
+([keyboard-ir.ts:158](../../packages/contracts/src/keyboard-ir.ts)); `parse.ts:980` populates it
+from `store(&COPYRIGHT)` and `emit.ts:268` writes the store back. So the `.kmn` gap is confined
+to the scaffolder's stub template, and a **base-derived** keyboard may already preserve the
+original `COPYRIGHT` through parse → emit. Verifying that is step 3 of
+[plan.md](plan.md#implementation-order) — it changes how much of US2 remains.
 
 **GitHub identity is nearly free.** `verifyToken`
 ([output/github.ts:156](../../packages/engine/src/output/github.ts)) already calls `/user`
@@ -227,8 +237,9 @@ stored in the working copy rather than read live from the auth session at emit t
   placeholder, underscore-run holders, and lines with no holder token.
 - **FR-014**: Parser and renderer MUST be covered by a fixture table **harvested from
   keymanapp/keyboards**, not hand-invented, including every shape listed in Edge Cases.
-- **FR-015** *(pending OQ-6)*: Behaviour for a guest with no GitHub session MUST be defined —
-  either a required typed author name or a defined holder-less outcome.
+- **FR-015** *(resolved by D6)*: A guest with no GitHub session MUST supply an author name
+  before emission. No placeholder holder may be emitted — that is how the corpus's own
+  `Copyright (c) YYYY _____________________` file came to exist.
 
 ### Key Entities
 
@@ -290,25 +301,34 @@ stored in the working copy rather than read live from the auth session at emit t
 
 ## Open Questions
 
-**All six block planning. Each is a policy call the tool cannot infer.**
+**All six are now RESOLVED as proposed decisions in [research.md](research.md) (D1–D6).** They
+are retained here as the questions of record, each annotated with its resolution. Overturning
+any of them changes only the corresponding decision, not the spec.
 
-- **OQ-1 — Is the copyright holder the individual, the organisation, or both?** The corpus does
+- **Resolution summary** — D1: one free-text holder + separate author name. D2: year derived at
+  emit. D3: inherited holders precede the current author, year-less first with a stable sort.
+  D4: `LICENSE.md` authoritative, never merged. D5: unparseable base license blocks emission,
+  with a manual-entry escape hatch, on both paths. D6: guests must type an author name.
+- **Still worth a deliberate ruling**: **D4** is a legal-interpretation call, and **D5** is the
+  one decision that can stop a user finishing a walk.
+
+- **OQ-1 [RESOLVED → D1]** — Is the copyright holder the individual, the organisation, or both? The corpus does
   all three: `Rehmat Aziz Chitrali` (individual), `SIL Global` (org),
   `FirstVoices, SIL International, First Peoples' Cultural Foundation` (several), and
   `Galaxie Software and SIL Global` (joint). Does the studio ask for one free-text holder, or
   model author and holder separately?
-- **OQ-2 — Which year?** Scaffold time, or first publish? A keyboard scaffolded in December and
+- **OQ-2 [RESOLVED → D2]** — Which year? Scaffold time, or first publish? A keyboard scaffolded in December and
   published in January gets the wrong year under the current `new Date()` approach.
-- **OQ-3 — Where do year-less holders sort?** FR-009 orders by earliest year, but 2 corpus
+- **OQ-3 [RESOLVED → D3]** — Where do year-less holders sort? FR-009 orders by earliest year, but 2 corpus
   `LICENSE.md` lines and 556 `.kmn` values carry no year. First, last, or preserve source order?
-- **OQ-4 — When `LICENSE.md` and `.kmn` disagree, which wins?** 22 real cases. Proposal:
+- **OQ-4 [RESOLVED → D4, ruling advised]** — When `LICENSE.md` and `.kmn` disagree, which wins? 22 real cases. Proposal:
   `LICENSE.md` is authoritative because it is the legal notice and always carries a year more
   often — but this needs ratifying.
-- **OQ-5 — Unparseable base license: hard block or warn-and-proceed?** FR-010 forbids silently
+- **OQ-5 [RESOLVED → D5, ruling advised]** — Unparseable base license: hard block or warn-and-proceed? FR-010 forbids silently
   stripping. Does that mean blocking publish outright, or emitting with a review flag? Note the
   PR path ([024](../024-option-a-github-app/spec.md)) and the ZIP path may warrant different
   answers.
-- **OQ-6 — Guest with no GitHub session** (the ZIP path needs no OAuth): is a typed author name
+- **OQ-6 [RESOLVED → D6]** — Guest with no GitHub session (the ZIP path needs no OAuth): is a typed author name
   required before download, or may `LICENSE.md` ship with a placeholder? A placeholder risks
   reproducing the corpus's own `Copyright (c) YYYY ______` bug.
 
