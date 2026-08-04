@@ -79,6 +79,22 @@ export interface FlowStepDeps {
    * each mount starts with an empty string and re-entry resets correctly.
    */
   displayNameRef: { current: string };
+  /**
+   * The session's currently-recorded track choice, or `null` before the
+   * author has ever chosen one. Spec 057 FR-031: a step reached by deep link
+   * (or by walking Back into it) must show the currently-recorded answer, not
+   * an empty field — trackOptions.seeds.getSeedValue reads this to seed
+   * track_choice's radio group on arrival (flowStepOptions.tsx).
+   */
+  selectedTrack: "copy" | "adapt" | null;
+  /**
+   * The session's currently-recorded scaffold spec (display name + keyboard
+   * id), or `null` before the author has ever committed the project_name
+   * step. Spec 057 FR-031: mirrors `selectedTrack` above for project_name's
+   * two questions — projectNameOptions.seeds.getSeedValue prefers this over
+   * the identity-derived default once it is set (flowStepOptions.tsx).
+   */
+  scaffoldSpec: { keyboardId: string; displayName: string } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -173,6 +189,8 @@ export function makeFlowStepComponent<Extracted>(
     const setSelectedTrack = useSurveySessionStore((s) => s.setSelectedTrack);
     const setScaffoldSpec = useSurveySessionStore((s) => s.setScaffoldSpec);
     const setStoreIdentity = useWorkingCopyStore((s) => s.setIdentity);
+    const selectedTrack = useSurveySessionStore((s) => s.selectedTrack);
+    const scaffoldSpec = useSurveySessionStore((s) => s.scaffoldSpec);
 
     // Unconditional hook call (hooks must not be conditional). When the flow
     // does not use findings, the derived record is computed but ignored below.
@@ -196,6 +214,8 @@ export function makeFlowStepComponent<Extracted>(
       setIdentity: setStoreIdentity,
       findingsByQuestionId,
       displayNameRef,
+      selectedTrack,
+      scaffoldSpec,
     };
 
     // Context derived from current deps.
