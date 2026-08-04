@@ -2482,7 +2482,18 @@ describe("MechanismGallery — kbgen suggestion gated on the current char's prod
     await waitFor(() => {
       expectCurrentChar("à");
     });
-    expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
+    // Wrapped in waitFor (not a bare synchronous getByText) — the suggestion
+    // row's gate (suggestion/currentCharBadge/suggestionDismissed) recomputes
+    // in the same render as the chip's aria-pressed flip, but under
+    // full-suite load a second, effect-driven re-render (the per-char
+    // method-state reset effect a few lines above in the component) can
+    // still be settling when a bare synchronous query runs immediately after
+    // the first waitFor resolves — this only asserts the chip's selection,
+    // not the suggestion row's presence. waitFor retries until both have
+    // caught up, without weakening what's asserted.
+    await waitFor(() => {
+      expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
+    });
   });
 
   it("hides the suggestion for a character already produced by the BASE keyboard (ɛ, badge count >= 1 via signal (a) BASE-DIRECT, no session assignment, not composable, no sequence) — the case the old hasSequenceForChar||isComposable gate missed", async () => {
@@ -2684,8 +2695,12 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
       );
     });
 
-    // Suggestion row shows for "à".
-    expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
+    // Suggestion row shows for "à". Wrapped in waitFor — same fragile
+    // synchronous-getByText-after-render pattern hardened elsewhere in this
+    // describe block (see the kbgen-suggestion-gated describe above).
+    await waitFor(() => {
+      expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
+    });
 
     // Accept it — records the S-08 assignment and dismisses the row (the
     // dismissal is also implied by coveredChars once accepted).
@@ -2737,8 +2752,12 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
       );
     });
 
-    // Suggestion row shows for "à".
-    expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
+    // Suggestion row shows for "à". Wrapped in waitFor — same fragile
+    // synchronous-getByText-after-render pattern hardened elsewhere in this
+    // describe block.
+    await waitFor(() => {
+      expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
+    });
 
     // Skip it — no accept/deny, no assignment recorded.
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
@@ -2755,7 +2774,9 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // Unlike the accept/deny case above, the suggestion row for "à" MUST
     // reappear — Skip resolved nothing. (If `skippedChars` were reintroduced
     // to suppress the row, this assertion would fail.)
-    expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
+    });
   });
 });
 
