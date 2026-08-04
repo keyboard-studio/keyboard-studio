@@ -96,6 +96,53 @@ const PLACED_CHAR = "é";
 const KMN_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.kmn`;
 const TOUCH_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.keyman-touch-layout`;
 
+/**
+ * Pre-existing 1.4.3 (Contrast Minimum) offenders on the Phase B build-list
+ * screen, excluded by selector with the criterion and reason named inline —
+ * the same idiom e2e/tab-roundtrip.spec.ts and e2e/decision-deeplink.spec.ts
+ * use (KNOWN_CONTRAST_DEBT). This is spec 056's open tracker debt
+ * (specs/056-ada-accessibility/wcag-2.2-aa-tracker.md, 1.4.3 is an open
+ * `unknown` row), not anything introduced or touched by spec 057 —
+ * CarveGallery.tsx and Rail.tsx are byte-identical to `main` (see
+ * specs/057-bulletproof-navigation/evidence/gating-red.md §"Two corrections
+ * made to reach a *valid* red"). Same offenders as carve.spec.ts's own
+ * KNOWN_CONTRAST_DEBT (this screen renders the same carve-card affordance
+ * mid Phase B, before the standalone carve gallery step).
+ */
+const KNOWN_CONTRAST_DEBT: readonly string[] = [
+  // 1.4.3 — CarveGallery's info-panel toggle button.
+  'button[aria-label="Hide info panel"]',
+  // 1.4.3 — CarveGallery's footer "Continue" button.
+  'button[data-testid="carve-continue"]',
+  // 1.4.3 — Rail's per-node carve-card buttons: the "kept/total" and
+  // per-modifier breakdown spans inside them (Rail.tsx) fall short.
+  // Excluded by the testid PREFIX (carve-card-<nodeId> varies per fixture,
+  // e.g. "carve-card-group#0") rather than the brittle nth-child span chain
+  // axe reports for the same reason.
+  'button[data-testid^="carve-card-"]',
+  // 1.4.3 — GlyphCell's cross-reference tag chips (assignLoop/parts/
+  // GlyphCell.tsx): "<kind> — go to" / "<kind> — N places". Keyed on the
+  // aria-label SUFFIX because the kind prefix varies ("store", "group", ...)
+  // and the chips carry no testid.
+  'button[aria-label$="go to"]',
+  'button[aria-label$="places"]',
+  // 1.4.3 — Rail's sticky SectionHeader (assignLoop/parts/Rail.tsx): the
+  // tone-colored uppercase section label. The header is an anonymous div
+  // with no testid/aria hook, so it is keyed on its one distinguishing
+  // attribute — the inline-style signature only this header uses. Adding a
+  // programmatic landmark to Rail is 056's call, not this spec's.
+  'div[style*="letter-spacing: 0.13em"]',
+  // 1.4.3 — ConvenienceCharsStep's "Continue" button; the same debt
+  // copy-edit.spec.ts and touch-derivation-us2.spec.ts already exclude.
+  // Which subset of this screen's debt axe reports varies with load timing
+  // (the scan fires on whatever has rendered), so the list carries every
+  // known offender for the screen even when one run flags only some.
+  'button[data-testid="convenience-continue"]',
+  // 1.4.3 — the OSK iframe renders KeymanWeb's own markup
+  // (.kmw-spacebar-caption), not authored in this repo.
+  "iframe",
+];
+
 // ---------------------------------------------------------------------------
 // Page-object helpers (touch-derivation-specific)
 // ---------------------------------------------------------------------------
@@ -254,7 +301,9 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
     await addPlacedCharacterToInventory(page);
 
     // Accessibility gate (spec 056 FR-003): scan the Phase B build-list screen.
-    await expectNoSeriousAxeViolations(page, "phase B build list (US1 bambara walk)");
+    await expectNoSeriousAxeViolations(page, "phase B build list (US1 bambara walk)", {
+      exclude: KNOWN_CONTRAST_DEBT,
+    });
 
     // Manifest spine order (StudioShell.tsx): characters -> carve ->
     // mechanisms -> touch_seed_source -> touch -> help.

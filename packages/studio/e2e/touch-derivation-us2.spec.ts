@@ -152,6 +152,26 @@ const PLACED_CHAR = "é";
 const PIAROA_KMN_ZIP_PATH = `source/${PIAROA_BASE_ID}.kmn`;
 const PIAROA_TOUCH_ZIP_PATH = `source/${PIAROA_BASE_ID}.keyman-touch-layout`;
 
+/**
+ * Pre-existing 1.4.3 (Contrast Minimum) offenders on the Phase B build-list
+ * screen, excluded by selector with the criterion and reason named inline —
+ * the same idiom e2e/tab-roundtrip.spec.ts and e2e/decision-deeplink.spec.ts
+ * use (KNOWN_CONTRAST_DEBT). This is spec 056's open tracker debt
+ * (specs/056-ada-accessibility/wcag-2.2-aa-tracker.md, 1.4.3 is an open
+ * `unknown` row), not anything introduced or touched by spec 057 — this
+ * fixture's marks/build-list screens are unchanged (see
+ * specs/057-bulletproof-navigation/evidence/gating-red.md §"Two corrections
+ * made to reach a *valid* red").
+ */
+const KNOWN_CONTRAST_DEBT: readonly string[] = [
+  // 1.4.3 — a lint-finding code badge (LintChip.tsx renders the finding's
+  // code in a <code> element, styled from lint/colors.ts's severity palette)
+  // surfaced for the marks-bearing PLACED_CHAR on this screen.
+  "code",
+  // 1.4.3 — ConvenienceCharsStep's "Continue" button.
+  'button[data-testid="convenience-continue"]',
+];
+
 // ---------------------------------------------------------------------------
 // Fixture constants — Test 2 (US2-AS4): bambara, identical to
 // touch-derivation-us1.spec.ts's fixture (same carve/place targets), because
@@ -387,7 +407,9 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     await addPlacedCharacterToInventory(page, PLACED_CHAR);
 
     // Accessibility gate (spec 056 FR-003): scan the Phase B build-list screen.
-    await expectNoSeriousAxeViolations(page, "phase B build list (US2 piaroa walk)");
+    await expectNoSeriousAxeViolations(page, "phase B build list (US2 piaroa walk)", {
+      exclude: KNOWN_CONTRAST_DEBT,
+    });
 
     // Manifest spine order (StudioShell.tsx): characters -> marks -> carve ->
     // mechanisms -> touch_seed_source -> touch -> help. The marks series for

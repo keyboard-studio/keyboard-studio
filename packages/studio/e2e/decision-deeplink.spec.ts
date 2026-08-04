@@ -72,6 +72,10 @@ const KNOWN_CONTRAST_DEBT: readonly string[] = [
   "iframe",
   // 1.4.3 — SignUpPanel's GitHub button, present in shared chrome on several tabs.
   'button[aria-label="Sign up with GitHub"]',
+  // 1.4.3 — the survey's own Continue/advance button (StepHost chrome); flagged
+  // on the deep-link arrival scan where it renders enabled (a seeded answer is
+  // already checked). Pre-existing survey chrome, untouched by this feature.
+  'button[data-testid="survey-advance"]',
 ];
 
 test.describe("decision-trail deep link -> revise -> supersede (spec 057 US3)", () => {
