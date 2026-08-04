@@ -1,8 +1,8 @@
-# Crowdin Tier A `download translations` (spec 046 T038). Scheduled half of
-# the round-trip: pulls whatever translators have completed in the Crowdin
-# project for packages/studio/src/locales/*/messages.json, pushes to a
-# dedicated branch, and opens a PR against main. That PR goes through the
-# normal merge gate (CI + km-triage/review) like any other PR -- the
+# Crowdin `download translations` (spec 046 T038). Scheduled half of the
+# round-trip: pulls whatever translators have completed in the Crowdin project
+# for every file group in crowdin.yml, pushes to a dedicated branch, and opens
+# a PR against main. That PR goes through the normal merge gate (CI +
+# km-triage/review) like any other PR -- the
 # `chore(process):` title is a deliberate opt-in to the triage's pre-approved
 # process-only bypass (see .claude/agents/km-triage skill, Pre-filter D), since
 # a translated-value-only diff has no code surface for the review crew to
@@ -12,6 +12,11 @@
 # this repo the moment a translation completes) is a Crowdin-side integration
 # outside this repo's config; add a repository_dispatch trigger here if that
 # gets wired up later. workflow_dispatch covers on-demand runs meanwhile.
+#
+# Scope note: this was Tier A only when written, but crowdin.yml gained its
+# Tier B block (content/i18n/en/*.json) in 2026-07, so this job now syncs both
+# tiers -- five source catalogs, not one. Anything reasoning about its blast
+# radius should read crowdin.yml, not this header.
 #
 # Requires the repo setting "Allow GitHub Actions to create and approve pull
 # requests" (Settings > Actions > General) -- the job's own contents/pull-
@@ -43,7 +48,11 @@ jobs:
           upload_translations: false
           download_translations: true
           push_translations: true
-          skip_untranslated_strings: false
+          # Must match crowdin.yml -- this action input overrides the config
+          # file, so leaving it `false` here would silently undo the setting
+          # there. See the long note in crowdin.yml for why it is `true`:
+          # `false` returns English source text for every untranslated string.
+          skip_untranslated_strings: true
           create_pull_request: true
           localization_branch_name: l10n_crowdin_action
           pull_request_title: "chore(process): sync Crowdin translations"
