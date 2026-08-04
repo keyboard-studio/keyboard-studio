@@ -2289,6 +2289,45 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
       "[RALT K_F]",
     );
   });
+
+  it("suppresses the suggestion row when the top placement candidate is CAPS-based", async () => {
+    // CAPS is a case/state modifier, not a layer an author reaches for, so a
+    // "Caps + key" recommendation must not be surfaced as a suggestion. The
+    // candidate below would otherwise render an S-08 suggestion row (same
+    // shape as ffHookPlacementMap's RALT candidate); the CAPS token must
+    // suppress it entirely. CAPS remains selectable as a manual layer pick —
+    // that path is covered by the layer-picker tests above and is untouched.
+    const capsPlacementMap: PlacementMap = {
+      entries: [
+        {
+          codepoint: "U+03B5",
+          candidates: [
+            {
+              vkey: "K_E",
+              modifiers: ["RALT", "CAPS"],
+              mechanism: "direct",
+              priorSource: "phonetic",
+              priorCount: 0,
+              confidence: 0.9,
+            },
+          ],
+        },
+      ],
+    };
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={capsPlacementMap}
+        />,
+      );
+    });
+
+    expectCurrentChar("ε");
+    // No suggestion row at all for a CAPS-carrying candidate.
+    expect(screen.queryByText(/Suggested:/i)).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

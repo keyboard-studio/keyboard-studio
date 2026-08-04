@@ -1727,18 +1727,23 @@ export function MechanismGallery({
     identity?.bcp47 !== undefined && identity.bcp47 !== ""
       ? identity.bcp47
       : undefined;
-  const suggestion = useMemo(
-    (): PlacementSeedEntry | null =>
-      placementMap !== undefined && currentChar !== null
-        ? getSuggestionForCharWithCasePair(
-            currentChar,
-            placementMap,
-            PLACEMENT_SEED_CONFIDENCE_THRESHOLD,
-            suggestionBcp47,
-          )
-        : null,
-    [currentChar, placementMap, suggestionBcp47],
-  );
+  const suggestion = useMemo((): PlacementSeedEntry | null => {
+    if (placementMap === undefined || currentChar === null) return null;
+    const raw = getSuggestionForCharWithCasePair(
+      currentChar,
+      placementMap,
+      PLACEMENT_SEED_CONFIDENCE_THRESHOLD,
+      suggestionBcp47,
+    );
+    // Never surface a CAPS-based placement as a *suggestion*: CAPS is a
+    // case/state modifier, not a layer an author reaches for, so a "Caps + key"
+    // recommendation surprises more than it helps. This suppresses only the
+    // suggestion row (and its accept button) for a CAPS-carrying candidate —
+    // CAPS stays fully available as a manual layer pick (computeModifierPool
+    // still offers it in every dropdown) and everywhere else is untouched.
+    if (raw !== null && raw.topCandidate.modifiers.includes("CAPS")) return null;
+    return raw;
+  }, [currentChar, placementMap, suggestionBcp47]);
 
   // Canonicalized modifier combo for the S-08 suggestion row's display text +
   // aria-labels — derived from the candidate's OWN modifiers (never a
