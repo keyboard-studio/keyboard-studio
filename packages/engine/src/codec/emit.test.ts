@@ -1070,4 +1070,47 @@ describe("range re-collapse on emit (spec 042)", () => {
     expect(line).toContain("U+0303");
     expect(line).toContain("dk(003d)");
   });
+
+  // kmcmplib (19.0.240-alpha) crashes with a wasm memory-access-out-of-bounds
+  // when a single store declaration carries 8+ `X .. Y` ranges and the file
+  // also uses option-store statements — bisected against bj_cree_woods, whose
+  // Eastern-Finals store re-collapses to 12 ranges (7 compile, 8 crash,
+  // per-store). See KMCMPLIB_STORE_RANGE_BUDGET in emit.ts. A store that
+  // would exceed the budget must emit fully explicit instead.
+  it("does NOT re-collapse a store that would exceed the per-store range budget (kmcmplib crash guard)", () => {
+    // 8 separate ascending runs of 3 non-ASCII codepoints, gaps between runs.
+    const runs: string[] = [];
+    for (let r = 0; r < 8; r++) {
+      const base = 0x1401 + r * 8;
+      runs.push(
+        `U+${base.toString(16).toUpperCase().padStart(4, "0")} .. U+${(base + 2)
+          .toString(16)
+          .toUpperCase()
+          .padStart(4, "0")}`,
+      );
+    }
+    const { ir } = parse(kmnWithStore(`store(cef) ${runs.join(" ")}`), "budget");
+    const out = emit(ir);
+    const line = storeLine(out, "cef");
+    expect(line).not.toContain("..");
+    // Endpoints survive as explicit items (codepoints or quoted chars).
+    expect(line).toContain(String.fromCodePoint(0x1401));
+    expect(line).toContain(String.fromCodePoint(0x1401 + 7 * 8 + 2));
+  });
+
+  it("keeps re-collapse for a store at exactly the range budget (7 ranges)", () => {
+    const runs: string[] = [];
+    for (let r = 0; r < 7; r++) {
+      const base = 0x1401 + r * 8;
+      runs.push(
+        `U+${base.toString(16).toUpperCase().padStart(4, "0")} .. U+${(base + 2)
+          .toString(16)
+          .toUpperCase()
+          .padStart(4, "0")}`,
+      );
+    }
+    const { ir } = parse(kmnWithStore(`store(cef) ${runs.join(" ")}`), "budget7");
+    const out = emit(ir);
+    expect(storeLine(out, "cef")).toContain("..");
+  });
 });

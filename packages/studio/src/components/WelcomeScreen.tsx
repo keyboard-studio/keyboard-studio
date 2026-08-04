@@ -15,6 +15,8 @@ import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { markVisited } from "../lib/firstVisit.ts";
+import { consumePendingWelcomeLocation, jumpToLocation } from "../lib/jumpToLocation.ts";
+import { useViewStateStore } from "../stores/viewStateStore.ts";
 import { discardActiveDraft } from "../lib/draftPersistence.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -64,8 +66,21 @@ export function WelcomeScreen() {
   // redirects out to a provider and back to the app root) or "I'm new". Mark
   // the browser as visited synchronously first, so the first-visit gate does
   // not bounce the author back here on the OAuth return or a later reload.
+  //
+  // Spec 057 FR-015 (D-9): a first-time visitor who followed a shared deep
+  // link had their requested location rewritten away by the gate. The gate now
+  // holds it (setPendingWelcomeLocation, StudioShell's hashToRoute); here it is
+  // consumed through `jumpToLocation`, so the SAME reachability rules apply as
+  // to any other jump — a link naming a step of a project this visitor does not
+  // have degrades to the tab rather than landing them somewhere impossible.
+  // With no held location, `go()` runs and the default landing is unchanged.
   const leaveWelcome = (go: () => void) => {
     markVisited();
+    const requested = consumePendingWelcomeLocation();
+    if (requested !== null) {
+      jumpToLocation(requested);
+      return;
+    }
     go();
   };
 
@@ -167,6 +182,10 @@ export function WelcomeScreen() {
               discardActiveDraft();
               useSurveySessionStore.getState().reset();
               useWorkingCopyStore.getState().reset();
+              // Spec 057 FR-052: view state clears with the session. This and
+              // StudioShell's handleStartOver are the only two places a reset
+              // belongs — the same two the survey-session reset above lives in.
+              useViewStateStore.getState().reset();
               leaveWelcome(() => navigateTo("survey"));
             }}
             style={{

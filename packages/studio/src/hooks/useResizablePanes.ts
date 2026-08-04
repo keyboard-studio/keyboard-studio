@@ -1,7 +1,7 @@
 // useResizablePanes — drag-to-resize two-pane layout hook.
 //
 // Encapsulates the pointer-event drag logic shared by SurveyView and
-// PreviewShell: a container ref, left-pane percentage state, and the
+// the two-pane screens: a container ref, left-pane percentage state, and the
 // three pointer callbacks (down/move/up) plus cleanup.
 //
 // Usage:
@@ -23,6 +23,16 @@ export interface ResizablePanesOptions {
   maxPct: number;
   /** Initial left-pane width as a percentage. */
   initPct: number;
+  /**
+   * Called with each new percentage as the author drags (spec 057 FR-050).
+   *
+   * The hook keeps owning the drag; this is a notification, not a controlled
+   * value, so a caller can persist the split into session view state without
+   * the hook learning about that store. Purely presentational by contract —
+   * FR-053 forbids a view-state write reaching a compile or a validator run,
+   * and a callback the caller supplies is where that stays checkable.
+   */
+  onChange?: (pct: number) => void;
 }
 
 export interface ResizablePanesResult {
@@ -38,11 +48,19 @@ export function useResizablePanes({
   minPct,
   maxPct,
   initPct,
+  onChange,
 }: ResizablePanesOptions): ResizablePanesResult {
   const [leftPct, setLeftPct] = useState(initPct);
 
   const dragRef = useRef<{ startX: number; startPct: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Held in a ref so a caller may pass an inline lambda without restarting the
+  // pointer-move subscription on every render.
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   const onPointerMove = useCallback(
     (e: PointerEvent) => {
@@ -52,6 +70,7 @@ export function useResizablePanes({
       const deltaPct = ((e.clientX - dragRef.current.startX) / containerW) * 100;
       const next = Math.min(maxPct, Math.max(minPct, dragRef.current.startPct + deltaPct));
       setLeftPct(next);
+      onChangeRef.current?.(next);
     },
     [minPct, maxPct],
   );

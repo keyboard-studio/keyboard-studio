@@ -1,0 +1,35 @@
+
+Running 1 test using 1 worker
+
+  ✘  1 e2e\tab-roundtrip.spec.ts:77:3 › tab round trip preserves the author's position (spec 057 US1) › mid-walk position, history and Phase B alphabet survive every tab round trip (38.8s)
+
+
+  1) e2e\tab-roundtrip.spec.ts:77:3 › tab round trip preserves the author's position (spec 057 US1) › mid-walk position, history and Phase B alphabet survive every tab round trip 
+
+    Error: returned from #preview to a different step
+
+    expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('prefill-confirm')
+    Expected: visible
+    Timeout: 20000ms
+    Error: element(s) not found
+
+    Call log:
+      - returned from #preview to a different step with timeout 20000ms
+      - waiting for getByTestId('prefill-confirm')
+
+
+      113 |       // dropped the walk back to identity-lite, so #il_language_english is
+      114 |       // showing instead and this assertion is the red one.
+    > 115 |       await expect(prefillConfirm, `returned from #${tab} to a different step`).toBeVisible({
+          |                                                                                 ^
+      116 |         timeout: 20_000,
+      117 |       });
+      118 |       await expect(page.locator("#il_language_english")).toHaveCount(0);
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\tab-roundtrip.spec.ts:115:81
+
+    Error Context: test-results\tab-roundtrip-tab-round-tr-65c93-urvive-every-tab-round-trip\error-context.md
+
+  1 failed
+    e2e\tab-roundtrip.spec.ts:77:3 › tab round trip preserves the author's position (spec 057 US1) › mid-walk position, history and Phase B alphabet survive every tab round trip 

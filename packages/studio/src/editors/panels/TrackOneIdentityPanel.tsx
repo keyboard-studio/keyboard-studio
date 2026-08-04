@@ -2,7 +2,7 @@
 // from a base). Lets the author set the display name and keyboard id before
 // downloading.
 //
-// Placement: rendered in PreviewShell's left pane when
+// Placement: rendered in OutputScreen's left pane when
 // instantiationMode === "new-from-base", below the scaffold mode toggle and
 // above the KMN editor. Hidden (or made read-only) for Track 2
 // (adapt-existing) because identity is preserved from the loaded keyboard.

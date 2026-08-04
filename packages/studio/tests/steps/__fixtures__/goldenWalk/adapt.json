@@ -33,7 +33,9 @@
       "advance",
       "setCharactersSubStage"
     ],
-    "workingCopyMutations": [],
+    "workingCopyMutations": [
+      "recordPhase"
+    ],
     "navigateTo": []
   },
   {
