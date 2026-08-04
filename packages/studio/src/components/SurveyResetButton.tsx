@@ -1,10 +1,18 @@
-// SurveyResetButton — small floating "Reset" control pinned to the corner of
-// the survey route. Clicking it swaps to an inline "Are you sure?" + Yes
+// SurveyResetButton — the "Reset" control in the NavBar's top-right corner,
+// rendered while a survey is mounted. Clicking it opens an "Are you sure?" + Yes
 // confirmation (inline warning tied to the button, not a browser dialog — no
 // window.confirm in this repo). Yes fires onReset, which the caller wires to
 // the full start-over path (store resets + draft discard). Because that path
 // clears working-copy edits directly instead of re-instantiating over them,
 // it never routes through the "Switching base keyboards…" rebase confirm.
+//
+// It sits in the nav bar rather than floating over the survey pane: as a
+// viewport-fixed chip it overlapped whatever occupied the bottom-left corner,
+// which on a scrolled-to-bottom step is the Back button of every step's nav row.
+//
+// The confirmation is an absolutely-positioned popover anchored below-right of
+// the trigger (the same shape AccountControl's dropdown uses), so arming it
+// cannot reflow the sibling nav controls the way an inline swap would.
 //
 // The armed state disarms on Escape or on any pointer-down outside the
 // control, so a stray click can't leave a live "Yes" button around.
@@ -19,42 +27,55 @@ interface SurveyResetButtonProps {
 }
 
 const CONTAINER_STYLE: CSSProperties = {
-  position: "fixed",
-  left: 16,
-  bottom: 16,
-  zIndex: 50,
-  display: "flex",
+  // Anchor for the confirm popover below; the nav bar's right group lays this
+  // out like any other control.
+  position: "relative",
+  display: "inline-flex",
   alignItems: "center",
-  gap: 8,
-  padding: "6px 10px",
-  background: BG_CARD,
-  border: `1px solid ${BORDER}`,
-  borderRadius: 6,
   fontFamily: FONT,
 };
 
 const RESET_BTN_STYLE: CSSProperties = {
-  padding: 0,
+  padding: "5px 12px",
   background: "transparent",
-  border: "none",
+  border: `1px solid ${BORDER}`,
+  borderRadius: 6,
   color: TEXT_DIM,
-  fontSize: 12,
+  fontSize: 13,
   cursor: "pointer",
   fontFamily: "inherit",
+  whiteSpace: "nowrap",
+};
+
+/** Confirm popover — below-right of the trigger, above the survey content. */
+const CONFIRM_PANEL_STYLE: CSSProperties = {
+  position: "absolute",
+  top: "calc(100% + 6px)",
+  right: 0,
+  zIndex: 200,
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "8px 10px",
+  background: BG_CARD,
+  border: `1px solid ${BORDER}`,
+  borderRadius: 8,
+  boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
 };
 
 const CONFIRM_TEXT_STYLE: CSSProperties = {
   color: TEXT_DIM,
-  fontSize: 12,
+  fontSize: 13,
+  whiteSpace: "nowrap",
 };
 
 const YES_BTN_STYLE: CSSProperties = {
-  padding: "2px 12px",
+  padding: "3px 12px",
   background: "transparent",
   border: `1px solid ${ERROR_RED}`,
   borderRadius: 6,
   color: ERROR_RED,
-  fontSize: 12,
+  fontSize: 13,
   cursor: "pointer",
   fontFamily: "inherit",
 };
@@ -87,12 +108,30 @@ export function SurveyResetButton({ onReset }: SurveyResetButtonProps) {
 
   return (
     <div ref={containerRef} style={CONTAINER_STYLE} data-testid="survey-reset">
-      {confirming ? (
-        <>
-          <span style={CONFIRM_TEXT_STYLE}>Are you sure?</span>
+      {/* The trigger stays mounted while armed — it anchors the popover, and a
+          second click closes the confirmation the same way Escape does. */}
+      <button
+        type="button"
+        data-testid="survey-reset-arm"
+        aria-label="Reset survey"
+        aria-expanded={confirming}
+        className="ks-focus-ring ks-hit-target"
+        style={RESET_BTN_STYLE}
+        onClick={() => setConfirming((armed) => !armed)}
+      >
+        Reset
+      </button>
+      {confirming && (
+        <div style={CONFIRM_PANEL_STYLE}>
+          {/* role="alert" announces the question on arm — the popover carries no
+              dialog semantics, so focus is left where the author put it. */}
+          <span role="alert" style={CONFIRM_TEXT_STYLE}>
+            Are you sure?
+          </span>
           <button
             type="button"
             data-testid="survey-reset-yes"
+            className="ks-focus-ring ks-hit-target"
             style={YES_BTN_STYLE}
             onClick={() => {
               setConfirming(false);
@@ -101,17 +140,7 @@ export function SurveyResetButton({ onReset }: SurveyResetButtonProps) {
           >
             Yes
           </button>
-        </>
-      ) : (
-        <button
-          type="button"
-          data-testid="survey-reset-arm"
-          aria-label="Reset survey"
-          style={RESET_BTN_STYLE}
-          onClick={() => setConfirming(true)}
-        >
-          Reset
-        </button>
+        </div>
       )}
     </div>
   );

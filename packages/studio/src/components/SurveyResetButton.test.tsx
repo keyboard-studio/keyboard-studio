@@ -1,7 +1,7 @@
-// Tests for SurveyResetButton — the floating corner Reset control on the
-// survey route. Verifies the two-step arm/confirm flow: Reset arms an inline
-// "Are you sure?" + Yes (no browser dialog), Yes fires onReset exactly once,
-// and Escape / outside pointer-down disarm without firing.
+// Tests for SurveyResetButton — the Reset control in the NavBar's top-right
+// corner. Verifies the two-step arm/confirm flow: Reset arms an "Are you sure?"
+// + Yes popover (no browser dialog), Yes fires onReset exactly once, and a
+// second trigger click / Escape / outside pointer-down disarm without firing.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
@@ -29,6 +29,20 @@ describe("SurveyResetButton", () => {
     expect(onReset).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("Are you sure?")).toBeNull();
     expect(screen.getByTestId("survey-reset-arm")).toBeTruthy();
+  });
+
+  it("a second click on the trigger disarms without firing onReset", () => {
+    const onReset = vi.fn();
+    render(<SurveyResetButton onReset={onReset} />);
+
+    const trigger = screen.getByTestId("survey-reset-arm");
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.click(trigger);
+    expect(onReset).not.toHaveBeenCalled();
+    expect(screen.queryByText("Are you sure?")).toBeNull();
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("Escape disarms without firing onReset", () => {
