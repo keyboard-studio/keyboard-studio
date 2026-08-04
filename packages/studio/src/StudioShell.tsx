@@ -39,7 +39,7 @@ import {
 import { useGitHubAuth } from "./hooks/useGitHubAuth.ts";
 import { type RouteId } from "./lib/navigate.ts";
 import { parseLocation } from "./lib/location.ts";
-import { setPendingWelcomeLocation } from "./lib/jumpToLocation.ts";
+import { liveResolveContext, setPendingWelcomeLocation } from "./lib/jumpToLocation.ts";
 import { readPaneSplitPct, useViewStateStore } from "./stores/viewStateStore.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
@@ -374,7 +374,12 @@ function NavBar({ active, outputBlocked = false, outputBlockedTitle }: NavBarPro
 const SURVEY_DIVIDER_WIDTH = 6;
 const SURVEY_LEFT_MIN_PCT = 25;
 const SURVEY_LEFT_MAX_PCT = 65;
-const SURVEY_LEFT_INIT_PCT = 45;
+// The survey pane's INITIAL split now lives in stores/viewStateStore.ts's
+// INITIAL_SPLIT_PCT (spec 057 US5) — the split is session view state, so its
+// starting value belongs with the slot that holds it rather than as a second
+// constant here that could drift from it. The min/max above stay: they are
+// this screen's layout bounds, and `readPaneSplitPct` clamps against them on
+// every read.
 
 // ---------------------------------------------------------------------------
 // ActiveStepId — imported from surveySessionStore (the traversal vocabulary
@@ -1652,6 +1657,14 @@ export function StudioShell() {
           onToggleStage={toggleTrailStage}
           initialShowSuperseded={trailShowSuperseded}
           onShowSupersededChange={setTrailShowSuperseded}
+          // Spec 057 FR-035: pre-resolve each row's jump target so an entry
+          // whose target is unreachable states the reason INSTEAD of offering
+          // a link that fails on activation. Composed from the exported
+          // `liveResolveContext()` rather than assembled here, so a row can
+          // never disagree with `jumpToLocation` about whether its own jump
+          // is possible. Read at render time — a pure, store-free computation
+          // that resolves no impact (FR-036 is about impact, not location).
+          resolveCtx={liveResolveContext()}
         />
       );
       break;

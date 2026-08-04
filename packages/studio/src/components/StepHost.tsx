@@ -31,6 +31,7 @@
 //   remain in SurveyView. StepHost only decides which container a step renders into.
 
 import type { ReactNode, CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { Trans } from "@lingui/react/macro";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import {
@@ -50,6 +51,8 @@ import {
 } from "../steps/reducer.ts";
 import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
 import { navigateTo } from "../lib/navigate.ts";
+import { peekPendingJump, clearPendingJump, jumpToLocation } from "../lib/jumpToLocation.ts";
+import type { Location } from "../lib/location.ts";
 import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
 import type { SurveyContext } from "../steps/types.ts";
 import { ACCENT, ERROR_RED, TEXT_DIM, BORDER } from "../ui/theme.ts";
@@ -81,6 +84,25 @@ export interface StepHostProps {
   onStartOver: () => void;
   /** Optional: shared survey context to pass as EditorStepProps.ctx. */
   ctx?: SurveyContext;
+}
+
+// ---------------------------------------------------------------------------
+// Deep-link revise-and-return (spec 057 FR-032/FR-033/FR-034, Q3, T043).
+//
+// `jumpToLocation` parks a jump's request in a module-level pending slot
+// (see lib/jumpToLocation.ts's own header) precisely because a jump can only
+// NAME a step — this component is "the step runner" that module's docstring
+// says decides what arriving there means. `targetStepId` is captured
+// alongside `returnTo` so the affordance below is gated to the ONE step the
+// jump actually targeted: backing up further before confirming, or
+// continuing normally after choosing "continue from here instead" (both of
+// which change `activeStepId` without a new jump), must not carry a stale
+// "confirming returns you to Decisions" banner onto an unrelated step.
+// ---------------------------------------------------------------------------
+
+interface DeepLinkArrival {
+  readonly targetStepId: ActiveStepId;
+  readonly returnTo: Location;
 }
 
 // ---------------------------------------------------------------------------
@@ -120,6 +142,35 @@ const START_OVER_BTN_STYLE: CSSProperties = {
   fontFamily: "inherit",
 };
 
+const DEEP_LINK_BANNER_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  padding: "8px 12px",
+  marginBottom: 8,
+  border: `1px solid ${BORDER}`,
+  borderRadius: 6,
+  fontSize: 13,
+};
+
+const DEEP_LINK_BANNER_TEXT_STYLE: CSSProperties = {
+  margin: 0,
+  color: TEXT_DIM,
+};
+
+const DEEP_LINK_CONTINUE_BUTTON_STYLE: CSSProperties = {
+  padding: "4px 10px",
+  background: "transparent",
+  border: `1px solid ${BORDER}`,
+  borderRadius: 6,
+  color: ACCENT,
+  fontSize: 12,
+  cursor: "pointer",
+  fontFamily: "inherit",
+  whiteSpace: "nowrap",
+};
+
 // ---------------------------------------------------------------------------
 // StepHost
 // ---------------------------------------------------------------------------
@@ -148,6 +199,46 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   // must not be blocked on touch.
   // ---------------------------------------------------------------------------
   const allCharactersImplemented = !useInventoryCoverageGate().blocked;
+
+  // ---------------------------------------------------------------------------
+  // Deep-link revise-and-return (spec 057 FR-032/FR-033/FR-034, Q3).
+  //
+  // Captured with a non-destructive PEEK into component state, not the
+  // destructive `consumePendingJump` — StrictMode's development-only double
+  // render invokes a `useState` lazy initializer twice (see main.tsx's
+  // <StrictMode>), and peeking twice returns the same value where consuming
+  // twice would lose it on the second call. The module slot is then cleared
+  // in a plain effect, mirroring StudioShell.tsx's `resumeOfferConsumed`
+  // idiom: setting/clearing a flag twice under StrictMode's mount/cleanup/
+  // mount is harmless, unlike calling a destructive consumer twice would be.
+  //
+  // This only needs to run once: a decision-trail deep link always arrives
+  // from a DIFFERENT route (`#trail`), so the hash round trip that lands on
+  // `#survey` always mounts a fresh SurveyView/StepHost — there is no
+  // continuously-mounted-StepHost case where a second jump could land on an
+  // already-open survey without an intervening mount.
+  const [deepLinkArrival] = useState<DeepLinkArrival | null>(() => {
+    const pending = peekPendingJump();
+    return pending?.returnTo !== undefined
+      ? { targetStepId: activeStepId, returnTo: pending.returnTo }
+      : null;
+  });
+
+  useEffect(() => {
+    clearPendingJump();
+  }, []);
+
+  // FR-034: the choice is explicit, not a prompt on every revision — the
+  // banner stays up until the author either confirms (returning them, per
+  // Q3's default) or picks this to keep walking forward from the revised
+  // point instead.
+  const [continueFromHere, setContinueFromHere] = useState(false);
+
+  // Gated to the step the jump actually targeted — see the DeepLinkArrival
+  // comment above the interface for why this isn't just "a jump happened
+  // this mount".
+  const isDeepLinkTarget =
+    deepLinkArrival !== null && activeStepId === deepLinkArrival.targetStepId;
 
   // ---------------------------------------------------------------------------
   // Terminal: done — survey-complete panel
@@ -233,6 +324,27 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   // outer variables across function boundaries).
   const resolvedStep = step;
 
+  // Revise-and-return is SUPPRESSED on `layout:"full"` steps (carve,
+  // mechanisms, touch, touch_seed_source) — not merely visually, but
+  // functionally: `isDeepLinkTarget` alone is not enough to fire it.
+  //
+  // Why: the full-screen chrome contract (spec 028 FR-002/R4, guarded by
+  // tests/steps/stepHost.renderSmoke.test.tsx) requires the step component's
+  // DIRECT parent to be the `height:100%/overflow:hidden` div with NOTHING
+  // else interposed — that div is what the four galleries size themselves
+  // against. Fitting the banner into that box without breaking the contract
+  // would mean overlaying it (position:absolute) atop gallery chrome none of
+  // these four components were built expecting, which is a real risk across
+  // four complex, un-audited components for a feature this narrow. FR-034's
+  // OTHER half stays intact either way: FR-030's jump to an editor-action
+  // stage (DecisionEntryRow.tsx, T042) still lands the author there — what's
+  // deferred is only the "return to Decisions on confirm, with an explicit
+  // opt-out" behaviour for these four steps, which fall back to the ordinary
+  // forward walk instead, same as arriving any other way. A survey-answer
+  // deep link (the common case) is unaffected — no manifest question step is
+  // `layout:"full"`.
+  const revisableViaDeepLink = isDeepLinkTarget && resolvedStep.layout !== "full";
+
   // ---------------------------------------------------------------------------
   // Centralized onComplete — the generic completion path (contract §2).
   // No per-step conditional: only STEPS_WITH_APPLY_COMPLETION gates the reducer.
@@ -288,6 +400,21 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     //    Used by adapt-track and project_name to match pre-Stage-5 handler ordering.
     if (outcome.setCharactersSubStage !== undefined) {
       setCharactersSubStage(outcome.setCharactersSubStage);
+    }
+
+    // 5b. Revise-and-return (spec 057 FR-032/FR-033/FR-034, Q3's default).
+    //
+    // Everything above this line already ran exactly as it would for an
+    // ORDINARY revisit reached by walking Back rather than by a deep link:
+    // recordStepCompletion appended the superseding entry through the
+    // existing append-only path (FR-032), and applyStepCompletion/
+    // sessionAdvance already re-propagated whatever the existing staleness
+    // machinery re-propagates for this step (FR-033). This block decides
+    // NOTHING about the record or about staleness — only where the author
+    // lands next, which is the one thing FR-034 asks this component to add.
+    if (revisableViaDeepLink && deepLinkArrival !== null && !continueFromHere) {
+      jumpToLocation(deepLinkArrival.returnTo);
+      return;
     }
 
     // 6. Navigate to output when help completes.
@@ -349,11 +476,48 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     />
   );
 
+  // FR-034/Q3: shown exactly while the author is on the step a decision-trail
+  // jump targeted and has not already opted out of the return. `role="note"`
+  // rather than a live region — this is present from the moment the step
+  // renders, not an update an assistive-technology user needs announced.
+  // Never rendered on a `layout:"full"` step — see `revisableViaDeepLink`'s
+  // own comment above for why.
+  const deepLinkReturnBanner =
+    revisableViaDeepLink && !continueFromHere ? (
+      <div role="note" data-testid="step-deep-link-return-banner" style={DEEP_LINK_BANNER_STYLE}>
+        <p style={DEEP_LINK_BANNER_TEXT_STYLE}>
+          <Trans id="step.deepLinkReturn.notice">
+            You jumped here from Decisions to revise this answer. Confirming
+            will take you back there.
+          </Trans>
+        </p>
+        <button
+          type="button"
+          data-testid="step-deep-link-continue-instead"
+          style={DEEP_LINK_CONTINUE_BUTTON_STYLE}
+          onClick={() => setContinueFromHere(true)}
+        >
+          <Trans id="step.deepLinkReturn.continueButton">Continue from here instead</Trans>
+        </button>
+      </div>
+    ) : null;
+
   if (resolvedStep.layout === "full") {
+    // UNCHANGED from before this feature — deliberately. The step
+    // component's DIRECT parent stays this exact div (contract:
+    // tests/steps/stepHost.renderSmoke.test.tsx's chrome-by-layout guard);
+    // `revisableViaDeepLink` is already false here (its own gate excludes
+    // "full"), so `deepLinkReturnBanner` above is always null on this path
+    // and there is nothing to interpose.
     return <div style={{ height: "100%", overflow: "hidden" }}>{content}</div>;
   }
 
   // Pane layout: return the content directly; SurveyView renders it inside the
   // left-pane <section> element.
-  return content;
+  return (
+    <>
+      {deepLinkReturnBanner}
+      {content}
+    </>
+  );
 }

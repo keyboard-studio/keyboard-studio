@@ -27,6 +27,7 @@ import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore, snapshotTraversal } from "./stores/surveySessionStore.ts";
+import { consumePendingWelcomeLocation, jumpToLocation } from "./lib/jumpToLocation.ts";
 import { snapshotWorkingCopyData } from "./lib/persistWorkingCopy.ts";
 import type { OnInstantiateCallback, Stage } from "./hooks/useKeyboardArtifact.ts";
 
@@ -2437,5 +2438,106 @@ describe("SurveyView — a reset happens only on an explicit start-over (spec 05
     expect(useSurveySessionStore.getState().activeStepId).toBe("identity");
     expect(useSurveySessionStore.getState().history).toEqual([]);
     expect(useSurveySessionStore.getState().identityResult).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 057 US3 / FR-015 (T046, SC-012) — a shared deep link survives the
+// first-visit gate.
+//
+// Defect D-9: `hashToRoute` forces a genuine newcomer onto `#welcome` and
+// rewrites the address bar to match, DISCARDING whatever location was
+// requested. That rewrite is load-bearing (without it, "I'm new"'s
+// `navigateTo("survey")` would be a same-value hash assignment firing zero
+// hashchange events, soft-locking the visitor on welcome), so the fix is not
+// to remove it but to hold the requested location across it — see
+// `setPendingWelcomeLocation` / `consumePendingWelcomeLocation` in
+// lib/jumpToLocation.ts, consumed by WelcomeScreen's `leaveWelcome`.
+//
+// The location is consumed THROUGH `jumpToLocation`, so the ordinary
+// reachability rules apply: a link naming a step of a project this visitor
+// does not have degrades to the tab rather than landing them somewhere
+// impossible. Both halves are asserted below.
+// ---------------------------------------------------------------------------
+
+describe("StudioShell — a first-time visitor's deep link survives the welcome gate", () => {
+  it("holds a step-scoped location across the gate instead of discarding it", async () => {
+    window.location.hash = "#survey/characters";
+    localStorage.clear(); // pristine browser: a genuine newcomer
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    // Forced onto welcome, and the hash normalized — unchanged behaviour.
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(window.location.hash).toBe("#welcome");
+
+    // ...but the requested location was HELD rather than dropped. Consuming it
+    // is what `leaveWelcome` does; asserting it here proves the gate captured
+    // it, which is the half D-9 got wrong.
+    const held = consumePendingWelcomeLocation();
+    expect(held).toEqual({ route: "survey", step: "characters" });
+  });
+
+  it("holds a bare route location too, so an ordinary shared #trail link is not lost", async () => {
+    window.location.hash = "#trail";
+    localStorage.clear();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(consumePendingWelcomeLocation()).toEqual({ route: "trail" });
+  });
+
+  it("holds nothing when the visitor arrived with no deep link at all", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    // Nothing to honour — `leaveWelcome` falls through to the default landing,
+    // exactly as before this feature.
+    expect(consumePendingWelcomeLocation()).toBeNull();
+  });
+
+  it("holds nothing for a malformed hash — a parse failure is not a location", async () => {
+    window.location.hash = "#survey//characters";
+    localStorage.clear();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(consumePendingWelcomeLocation()).toBeNull();
+  });
+
+  it("honours the held location on exit, subject to the ordinary reachability rules", async () => {
+    // A step-scoped link with NO project instantiated degrades to the tab
+    // (`no-project`) rather than landing the visitor inside a wizard that has
+    // nothing to be somewhere in. That is `jumpToLocation` doing its job — the
+    // gate does not get its own reachability rules (FR-015 defers to FR-013).
+    window.location.hash = "#survey/characters";
+    localStorage.clear();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    const held = consumePendingWelcomeLocation();
+    expect(held).not.toBeNull();
+
+    const outcome = jumpToLocation(held!);
+    expect(outcome).toMatchObject({
+      kind: "degraded",
+      at: { route: "survey" },
+      reason: "no-project",
+    });
   });
 });

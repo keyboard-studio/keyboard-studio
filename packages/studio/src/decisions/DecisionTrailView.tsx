@@ -27,6 +27,7 @@ import {
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { DecisionEntryRow } from "./DecisionEntryRow.tsx";
+import type { ResolveContext } from "../lib/resolveLocation.ts";
 import { buildStageGroups, type StageGroup } from "./stageGroups.ts";
 import { formatClauseList, stageActionLabel } from "./stageText.ts";
 import type { HeadlineDimension } from "./headline.ts";
@@ -39,6 +40,19 @@ export interface DecisionTrailViewProps {
   droppedCount?: number;
   /** Resolve one entry's impact. Called only when a row is expanded. */
   resolveImpact: (entry: DecisionEntry) => DecisionImpact | null;
+  /**
+   * Live reachability context for the rows' jump affordances (spec 057
+   * FR-035). Composed by StudioShell for the same layer reason as `record`
+   * and `resolveImpact`: `decisions/` may not import `stores/`, and the
+   * context needs a traversal snapshot and whether a project exists.
+   *
+   * Optional, and load-bearing when absent: without it a row offers the jump
+   * optimistically and `jumpToLocation` still resolves live at click time,
+   * so the jump is never wrong — the author just learns an entry is
+   * unreachable on activation rather than before it. Passing it is what
+   * turns FR-035's "state the reason in place of a link" on.
+   */
+  resolveCtx?: ResolveContext;
   /**
    * The per-stage collapse set restored from last session (view state — spec
    * 057 US5, FR-050, data-model.md ViewState.trailCollapsedSteps). Read ONCE
@@ -123,6 +137,7 @@ export function DecisionTrailView({
   record,
   droppedCount = 0,
   resolveImpact,
+  resolveCtx,
   initialCollapsedSteps,
   onToggleStage,
   initialShowSuperseded,
@@ -480,6 +495,7 @@ export function DecisionTrailView({
                             superseded={superseded}
                             hidden={superseded && !showSuperseded}
                             resolveImpact={resolveImpact}
+                            {...(resolveCtx !== undefined ? { resolveCtx } : {})}
                           />
                         );
                       })}

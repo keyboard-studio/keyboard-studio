@@ -105,8 +105,15 @@ export function consumePendingWelcomeLocation(): Location | null {
 /**
  * The live resolution context. Composed here, where the stores are reachable,
  * so `resolveLocation` itself stays pure and unit-testable against fixtures.
+ *
+ * Exported because the decision trail needs the SAME context to pre-resolve
+ * its rows' jump targets (FR-035: state the reason in place of a link, rather
+ * than a link that fails on activation). `decisions/` may not import `stores/`,
+ * so StudioShell composes it and passes it down — and it must be this
+ * function, not a second one assembled there, or a row could disagree with the
+ * jump it offers about whether that jump is possible.
  */
-function liveContext(): ResolveContext {
+export function liveResolveContext(): ResolveContext {
   return {
     manifest,
     questionRegistry,
@@ -123,7 +130,7 @@ function liveContext(): ResolveContext {
  *             (FR-034); it is NOT consumed by this function.
  */
 export function jumpToLocation(loc: Location, opts?: JumpOptions): JumpOutcome {
-  const resolution = resolveLocation(loc, liveContext());
+  const resolution = resolveLocation(loc, liveResolveContext());
 
   if (resolution.kind === "unreachable") {
     // Nothing is written: not the traversal target, not the hash. A refusal
