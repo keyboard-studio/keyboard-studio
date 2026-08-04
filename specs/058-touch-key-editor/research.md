@@ -455,6 +455,24 @@ Our touch step already renders the real KeymanWeb OSK in its right pane (`OSKFra
 
 The full mess-prevention set, for the record: live preview (FR-037) · a layer-kind-aware proposal among suppress / reflow / redistribute so the geometry consequence is chosen deliberately rather than stumbled into (FR-029f-h, R3c) · visible row slack (FR-039) · destructive classes rejected at edit time rather than reported (FR-045) · byte-preservation so a small edit stays small (FR-033) · per-edit undo (FR-032) · the coverage gate at Continue (FR-008 via US5).
 
+### Two lenses, not two workflows
+
+Author direction (2026-08-03): *"I don't think the user will know what they want to do until they play with it a bit."* That settles the character of the mode selector — it is a **view toggle, never a fork**. An author who must commit to a mode before understanding the problem will pick wrong, and any friction on the return trip converts that wrong pick into abandoned work.
+
+Consequences, specified as FR-036a-g:
+
+- **Free and lossless both ways.** No confirm, nothing discarded, nothing to redo. Both modes' drafts (`touchDraft` for the character walk, the key-edit overlay for the grid) persist across the toggle. Both already persist through the draft store, so the requirement is mostly *not* to wire a reset to the mode change — worth stating because that is exactly the tidy-up someone adds later.
+- **Context carries in both directions.** From character `ɛ` to by-key, reveal and select the key(s) producing it (or the candidates when unplaced); from a key back to by-character, land on a character it produces. This is what makes the two views lenses on one layout instead of parallel workflows, and `enumerateTouchMethodsForChar` already implements the harder direction.
+- **One set of numbers.** "Characters still unplaced" and "keys with no letter" are two projections of the same state, both live. Independently maintained counters that can disagree would make both untrustworthy.
+- **Either mode completes the step.** Continue is gated on coverage, not on the active view.
+
+Two subtleties that only appear once toggling is free:
+
+- **Cross-mode invalidation must warn immediately.** Assign `ɛ` to a longpress on `K_E` in the character walk, then suppress `K_E` in the grid: the FR-008 gate catches it at Continue, which is far too late to be actionable. The suppression needs to name the affected character at the moment of the edit — which means the key-level diagnostics must see the by-character assignments, not just the layout.
+- **Undo is one chronological stack, and must say so.** After a mode switch the next undo may target work from the other view. That is the correct behaviour for a single working copy, but only if the affordance names what it will undo; a silent cross-mode undo reads as a bug.
+
+**The exploration surface already exists.** The OSK preview is live in both modes and is typed on, so the loop is: poke the preview, notice something wrong, fix it in whichever view fits, poke again — available from the moment the step opens, before any mode decision. That, rather than the toggle itself, is what lets an author discover what they want.
+
 **But do not hide the mode.** The Cameroon case is a primary flow for imported keyboards, so resolve the tension by *proposing* the mode rather than promoting it to a step: on entering the touch stage, if the layout has keys with no reachable output **and** the inventory has unplaced characters, the intro surface leads with "This keyboard has N keys with no letter assigned — assign letters to keys →" and routes into By-key mode. The character-driven walk stays the default product for reseeded keyboards; the by-key route becomes the default *offer* for imported ones. Cost: one additive session field.
 
 ### A note on the declared-writes guard
