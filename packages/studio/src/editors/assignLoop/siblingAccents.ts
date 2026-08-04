@@ -53,8 +53,37 @@
 // dependency directly into this pure placement generator remains a scope
 // decision for whichever caller owns the copy, not this module.
 
-import { isDecomposableAccented } from "@keyboard-studio/contracts";
+import {
+  isDecomposableAccented,
+  type ScriptClass,
+} from "@keyboard-studio/contracts";
 import { isUppercaseLetter } from "../../lib/caseOrder.ts";
+
+// Abugida-safe gate (km-domain ruling): `isDecomposableAccented` is Mn-only
+// (see charUtils.ts) so it no longer matches a Devanagari-style matra
+// syllable (Mc), but it STILL matches consonant+virama (virama is Mn and
+// General_Category-universal, not abugida-specific) — so the predicate alone
+// is insufficient to distinguish the Latin/Cyrillic/Greek/Hebrew/Arabic
+// "accent + base" pattern this gate exists for from an abugida's
+// matra/virama placement mechanism, which is a DIFFERENT mechanism entirely.
+// Gate on `scriptClass !== "abugida"` in addition to the predicate. Do NOT
+// gate on "abjad" — an abjad's optional-vowel-mark mechanism is not this
+// abugida-specific concern. `scriptClass === undefined` (axes not yet
+// populated) FAILS OPEN — the caller's pre-existing behavior applies rather
+// than blocking on an unresolved axis.
+/**
+ * Whether `char` is a candidate for the shared "decomposable accented
+ * character" gate used by both the desktop deadkey auto-default
+ * (MechanismGallery's reset effect) and the touch longpress suggestion
+ * (TouchGallery's suggestion-kind memo). See the module-level comment above
+ * for the abugida-safe reasoning.
+ */
+export function isGatedAccentCompositionCandidate(
+  char: string,
+  scriptClass: ScriptClass | undefined,
+): boolean {
+  return isDecomposableAccented(char) && scriptClass !== "abugida";
+}
 
 export type SiblingAccentLayer = "default" | "shift";
 

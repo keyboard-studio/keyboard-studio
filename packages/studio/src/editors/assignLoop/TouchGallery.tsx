@@ -137,6 +137,7 @@ import {
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
 import {
   siblingAccentPlacements,
+  isGatedAccentCompositionCandidate,
   type SiblingAccentPlacement,
 } from "./siblingAccents.ts";
 import {
@@ -2475,13 +2476,9 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       return { kind: "none" };
     }
 
-    // Abugida-safe gate (km-domain ruling) — same reasoning as
-    // MechanismGallery's deadkey auto-default (see that file's reset effect):
-    // `isDecomposableAccented` is Mn-only so it no longer matches a matra
-    // syllable (Mc), but it still matches consonant+virama (virama is Mn),
-    // so the predicate alone doesn't exclude abugida mechanisms. Fail-open
-    // (keep suggesting) when `axes.scriptClass` is not yet populated.
-    if (isDecomposableAccented(currentChar) && axes.scriptClass !== "abugida") {
+    // Abugida-safe gate — shared predicate; see siblingAccents.ts for the
+    // reasoning (also used by MechanismGallery's deadkey auto-default).
+    if (isGatedAccentCompositionCandidate(currentChar, axes.scriptClass)) {
       const nfd = currentChar.normalize("NFD");
       const baseLetter = [...nfd][0] ?? "";
       let hk = "";

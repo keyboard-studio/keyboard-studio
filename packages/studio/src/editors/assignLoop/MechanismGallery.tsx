@@ -66,11 +66,7 @@ import type {
   PlacementWorklist,
   RemovalCapability,
 } from "@keyboard-studio/contracts";
-import {
-  toUPlusNotation,
-  isDecomposableAccented,
-  buildProducedSet,
-} from "@keyboard-studio/contracts";
+import { toUPlusNotation, buildProducedSet } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { collateInventory } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
@@ -127,6 +123,7 @@ import {
   type CasePairProposal,
 } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
+import { isGatedAccentCompositionCandidate } from "./siblingAccents.ts";
 import {
   appendNotDeletableSuffix,
   composeContributorLabel,
@@ -1978,21 +1975,11 @@ export function MechanismGallery({
   useEffect(() => {
     clearCompanion();
     resetMethodState();
-    // Abugida-safe gate (km-domain ruling): `isDecomposableAccented` is Mn-
-    // only (see charUtils.ts) so it no longer matches a Devanagari-style
-    // matra syllable (Mc), but it STILL matches consonant+virama (virama is
-    // Mn and General_Category-universal, not abugida-specific) — so the
-    // predicate alone is insufficient. Gate the deadkey auto-default off
-    // when the survey has determined this keyboard is for an abugida
-    // script; matra/virama placement is an abugida-specific mechanism, not
-    // the Latin/Cyrillic/Hebrew/Arabic "accent + base" deadkey pattern this
-    // default is for. `axes.scriptClass === undefined` (axes not yet
-    // populated) FAILS OPEN — keep the pre-existing auto-default behavior
-    // rather than block on an unresolved axis. Do NOT gate on "abjad".
+    // Abugida-safe gate — shared predicate; see siblingAccents.ts for the
+    // reasoning (also used by TouchGallery's longpress suggestion memo).
     if (
       currentChar !== null &&
-      isDecomposableAccented(currentChar) &&
-      axes.scriptClass !== "abugida"
+      isGatedAccentCompositionCandidate(currentChar, axes.scriptClass)
     ) {
       // §3c defaults-first: for a decomposable accented letter the natural method
       // is deadkey (S-02) — propose-then-confirm. resetMethodState sets "swap"
