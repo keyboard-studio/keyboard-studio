@@ -77,6 +77,18 @@ test.describe("browser Back mid-survey (F7)", () => {
     await switchTab(page, "survey");
     await expect(page.getByTestId("prefill-confirm")).toBeVisible({ timeout: 20_000 });
 
+    // Unwind the two untagged entries the round trip pushed. Each hash-route
+    // change is a browser entry carrying no ksStep of ours (state === null),
+    // and the bridge's listener returns early on those — so both pops are
+    // no-ops in the store by construction (see useSurveyBrowserHistorySync.ts,
+    // rule 3 "THE TAB-SWITCH ENTRY ITSELF"). This restores the browser pointer
+    // to the pre-round-trip entry WITHOUT mutating the wizard — which is
+    // exactly the precondition FR-017 wants the native Back sequence below
+    // run against.
+    await page.goBack();
+    await page.goBack();
+    await expect(page.getByTestId("prefill-confirm")).toBeVisible({ timeout: 20_000 });
+
     // One physical Back: characters -> track. The track radio choice
     // reappears (its own onComplete re-fires chooseAdaptTrack forward again
     // below to confirm the walk is genuinely reversible, not just "some
