@@ -2845,9 +2845,10 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
 //
 // The placement map only carries an entry for ƒ (U+0192), the LOWERCASE
 // letter — Ƒ (U+0191) has no map entry of its own. Without the case-pair
-// fallback (getSuggestionForCharWithCasePair), Ƒ would get no suggestion at
-// all. With it, Ƒ gets a synthesized S-08 suggestion on the SAME vkey
-// (K_F) at the RAlt+Shift layer — the shifted counterpart of ƒ's RAlt layer.
+// fallback (getRankedSuggestionsForChar's case-pair inheritance), Ƒ would get
+// no suggestion at all. With it, Ƒ gets a synthesized S-08 suggestion on the
+// SAME vkey (K_F) at the RAlt+Shift layer — the shifted counterpart of ƒ's
+// RAlt layer.
 // ---------------------------------------------------------------------------
 
 const ffHookPlacementMap: PlacementMap = {

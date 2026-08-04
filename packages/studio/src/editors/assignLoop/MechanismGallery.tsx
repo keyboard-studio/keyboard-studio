@@ -3883,7 +3883,7 @@ export function MechanismGallery({
                     });
                     acceptAriaLabel = t({
                       id: "editor.assignLoop.suggestion.acceptSwapAriaLabel",
-                      message: `Accept suggestion: assign ${currentChar} to ${entry.topCandidate.vkey}`,
+                      message: `Accept suggestion: assign ${charOrEmpty} to ${entry.topCandidate.vkey}`,
                     });
                   } else if (entry.strategyId === "S-08") {
                     // Derive the label from the candidate's OWN modifiers
@@ -3899,7 +3899,7 @@ export function MechanismGallery({
                     });
                     acceptAriaLabel = t({
                       id: "editor.assignLoop.suggestion.acceptRaltAriaLabel",
-                      message: `Accept suggestion: ${modifierLabel} + ${entry.topCandidate.vkey} for ${currentChar}`,
+                      message: `Accept suggestion: ${modifierLabel} + ${entry.topCandidate.vkey} for ${charOrEmpty}`,
                     });
                   } else {
                     // S-02: corpus-attested deadkey/store-index — named by
@@ -3912,7 +3912,7 @@ export function MechanismGallery({
                     });
                     acceptAriaLabel = t({
                       id: "editor.assignLoop.suggestion.acceptDeadkeyAriaLabel",
-                      message: `Accept suggestion: deadkey via base letter ${baseLetter} for ${currentChar}`,
+                      message: `Accept suggestion: deadkey via base letter ${baseLetter} for ${charOrEmpty}`,
                     });
                   }
 
