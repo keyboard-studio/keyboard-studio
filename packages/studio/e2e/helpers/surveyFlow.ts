@@ -116,6 +116,24 @@ async function isConditionalQuestionPresent(
 }
 
 /**
+ * Locator equivalent of {@link isConditionalQuestionPresent}: waits UP TO
+ * `timeout` for `locator` to become visible, resolving `true`/`false` rather
+ * than throwing. Deliberately NOT `locator.isVisible({timeout})` — Playwright
+ * deprecated and ignores that option (isVisible always reads the CURRENT DOM
+ * state with no wait at all), which is exactly the kind of false "it's not
+ * there" read that made driveConvenienceStep race against a late render (see
+ * that helper's doc comment). Every presence check in this module that needs
+ * to survive a genuine render/recompute delay should use this, not
+ * `.isVisible({timeout})`.
+ */
+async function waitVisible(locator: Locator, timeout: number): Promise<boolean> {
+  return locator
+    .waitFor({ state: "visible", timeout })
+    .then(() => true)
+    .catch(() => false);
+}
+
+/**
  * Drive the identity-lite step to completion (spec 036 language-identify flow).
  *
  * Question order (spec 030 US3, spec 036):
@@ -357,12 +375,34 @@ export async function buildOneCharacterList(
  * letter is pre-checked, so clicking Continue accepts the proposal — which is
  * what the walks want, since a kept letter is simply shielded from carve's
  * removal recommendations rather than changing the flow.
+ *
+ * Race-proof by construction (spec 057 Class-B diagnosis — see
+ * specs/057-bulletproof-navigation/reviews/classB-diagnosis.md): the gate is
+ * COMPUTED from a recompute that can legitimately land several seconds after
+ * this helper starts polling (observed live: right after a mid-walk tab round
+ * trip stresses the same recompute). A short "not visible yet" read is proof
+ * only that the screen hasn't rendered YET, not that the gate skipped it —
+ * treating the two as the same thing is what let the walk return early while
+ * the app was still sitting on "Keep these letters for convenience?", timing
+ * out downstream on the NEXT landmark it never reached. Races the step's own
+ * control against the one landmark that ALWAYS follows it on the spine
+ * (carve — see steps/manifest.ts), and only clicks Continue if the
+ * convenience screen is the one that actually showed.
  */
 export async function driveConvenienceStep(page: Page): Promise<void> {
   const continueBtn = page.getByTestId("convenience-continue");
-  const visible = await continueBtn.isVisible({ timeout: 5_000 }).catch(() => false);
-  if (!visible) return; // gate skipped the question
-  await continueBtn.click();
+  const carveGallery = page.getByTestId("carve-gallery");
+  await Promise.race([
+    continueBtn.waitFor({ state: "visible", timeout: 20_000 }),
+    carveGallery.waitFor({ state: "visible", timeout: 20_000 }),
+  ]).catch(() => {
+    // Neither landmark showed within the combined window — fall through to
+    // the direct check below, which reports the real state; a genuinely
+    // stuck walk still fails loudly at the caller's own subsequent wait.
+  });
+  if (await continueBtn.isVisible().catch(() => false)) {
+    await continueBtn.click();
+  }
 }
 
 /**
@@ -377,14 +417,29 @@ export async function driveConvenienceStep(page: Page): Promise<void> {
  * proposal and advances, and the last one completes the step. The station
  * count varies with the alphabet (at most 5, SC-006), so this loops rather
  * than assuming a fixed count.
+ *
+ * Race-proof by construction — the same hardening as driveConvenienceStep
+ * above (see its doc comment): races the step's own control against the
+ * landmarks that follow it on the spine (the convenience step's control, or —
+ * if that is ALSO gated away — the carve gallery itself), rather than trusting
+ * a fixed-timeout absence read to mean "the S0 gate skipped this".
  */
 export async function driveMarksSeries(page: Page): Promise<void> {
   const continueBtn = page.getByTestId("marks-continue");
+  const nextLandmarks = [
+    page.getByTestId("convenience-continue"),
+    page.getByTestId("carve-gallery"),
+  ];
   for (let i = 0; i < 6; i++) {
-    const visible = await continueBtn
-      .isVisible({ timeout: i === 0 ? 5_000 : 2_000 })
-      .catch(() => false);
-    if (!visible) return; // gate skipped the series, or it just completed
+    const timeout = i === 0 ? 20_000 : 5_000;
+    await Promise.race([
+      continueBtn.waitFor({ state: "visible", timeout }),
+      ...nextLandmarks.map((l) => l.waitFor({ state: "visible", timeout })),
+    ]).catch(() => {
+      // Nothing showed within the combined window — fall through to the
+      // direct visibility check below.
+    });
+    if (!(await continueBtn.isVisible().catch(() => false))) return; // skipped, or just completed
     await continueBtn.click();
   }
 }
@@ -408,6 +463,116 @@ export async function confirmMechanismsEmpty(page: Page): Promise<void> {
 
   await expect(page.getByText("No new characters to add.")).toBeVisible({ timeout: 15_000 });
   await page.getByTestId("mechanisms-continue").click();
+}
+
+/**
+ * Mechanism Gallery (Phase C) — walks EVERY character in the gallery's
+ * lettersToAdd worklist to completion, however many it holds.
+ *
+ * Before spec 046/#1411 landed, a Phase B build-list walk placing ONE new
+ * letter (e.g. "é") meant exactly one character to configure here, and the
+ * per-spec `driveMechanismsPlaceLetter` helpers (now retired — see
+ * specs/057-bulletproof-navigation/reviews/classB-diagnosis.md) could name it
+ * directly and click its "Apply method for é" button. That assumption no
+ * longer holds: an accepted marks-series proposal (spec 046) puts the
+ * DECOMPOSED combining mark into this same worklist alongside the letter, and
+ * the case-pair uppercase companion (#1411) adds the uppercase counterpart
+ * too — a one-character placement can now widen to a 3-character walk here,
+ * and the FIRST uncovered character in collation order need not be the one
+ * the spec fixture named. Hard-coding "click Apply for THIS char" against
+ * that widened, reordered list is what hung (evidence: touch-derivation-us2's
+ * AS4 test waited 240s for "Apply method for é" because the gallery opened on
+ * the combining mark instead).
+ *
+ * This driver instead walks whatever is actually there:
+ *   - dismisses the one-time intro splash ("Start the mechanism gallery"),
+ *   - handles the empty-diff exit ("No new characters to add.") — a
+ *     marks-free alphabet on a base that already produces everything added
+ *     leaves nothing to place here at all, and this is a clean no-op for that
+ *     case (mirrors confirmMechanismsEmpty's shape above);
+ *   - otherwise, for each character in turn: if the generic "Apply method for
+ *     X" button is already enabled (the §3c decomposable-accented deadkey
+ *     default is Apply-ready with zero field edits, and so — for the SAME
+ *     reason — is its uppercase counterpart), click it directly; otherwise
+ *     (e.g. a bare combining mark, whose default "Assign to a key" method
+ *     starts with no physical key chosen, so Apply starts disabled) falls
+ *     back to "Type a sequence" with a synthetic, per-character-unique
+ *     (content, indicator) pair. A sequence-only mechanism satisfies the same
+ *     coverage gate a real key assignment would (hasSequenceForChar /
+ *     uncoveredTargets both count it — see MechanismGallery.tsx's canGoNext
+ *     and lib/unimplementedInventory.ts) without ever colliding with a real
+ *     physical-key rule the base keyboard, or an earlier iteration of this
+ *     same loop, already owns — the synthetic content string embeds the
+ *     character's own codepoint, so no two iterations can ever share a
+ *     (content, indicator) pair.
+ *   - advances via "Next character"/"Done" until the gallery completes.
+ *
+ * Does not name or return which character was which — callers that need to
+ * prove a SPECIFIC placed letter landed correctly do so from the emitted
+ * output (the .kmn/.keyman-touch-layout ZIP contents), not from an assertion
+ * made mid-gallery.
+ */
+export async function driveMechanismsGallery(page: Page): Promise<void> {
+  // NOTE: Locator.isVisible()'s `timeout` option is deprecated/ignored by
+  // Playwright — it never actually waits, only reads the CURRENT DOM state.
+  // Every presence check below that needs to survive a real render/recompute
+  // delay uses waitFor({state:"visible", timeout}) instead (see waitVisible),
+  // the same mistake driveConvenienceStep's race fix exists to correct.
+  const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
+  if (await waitVisible(startButton, 5_000)) {
+    await startButton.click();
+  }
+
+  // Empty-diff exit vs. the ordinary per-character walk: race the two
+  // possible landmarks with a generous combined window, rather than checking
+  // one first and treating its absence as proof the other applies (a check
+  // that doesn't itself wait can't tell "not rendered yet" from "never
+  // will" — see waitVisible's doc comment). Either the empty-diff notice or
+  // the per-character forward button becoming visible resolves the race;
+  // then read which one is ACTUALLY present.
+  const emptyNotice = page.getByText("No new characters to add.");
+  const forwardButton = page.getByRole("button", { name: /^(Next character|Done)$/ });
+  const applyButton = page.getByRole("button", { name: /^Apply method for / });
+  await Promise.race([
+    waitVisible(emptyNotice, 15_000),
+    waitVisible(forwardButton, 15_000),
+  ]);
+  if (await waitVisible(emptyNotice, 500)) {
+    await page.getByTestId("mechanisms-continue").click();
+    return;
+  }
+
+  for (let guard = 0; guard < 50; guard++) {
+    const stillPresent = await waitVisible(forwardButton, 8_000);
+    if (!stillPresent) return; // the gallery has completed (onComplete fired)
+
+    if (await waitVisible(applyButton, 2_000)) {
+      if (!(await applyButton.isDisabled())) {
+        await applyButton.click();
+      } else {
+        // The default method isn't Apply-ready (e.g. a bare combining mark's
+        // "Assign to a key" default has no physical key chosen yet) — fall
+        // back to "Type a sequence" with a synthetic, collision-free pair.
+        const ariaLabel = (await applyButton.getAttribute("aria-label")) ?? "";
+        const currentChar = ariaLabel.replace(/^Apply method for /, "");
+        const contentToken =
+          "zzq" +
+          [...currentChar]
+            .map((cp) => (cp.codePointAt(0) ?? 0).toString(16))
+            .join("");
+
+        await page.getByRole("button", { name: "Type a sequence" }).click();
+        await page.getByTestId("sequences-content").fill(contentToken);
+        await page.getByTestId("sequences-indicator").fill("j");
+        await page.getByTestId("sequences-apply").click();
+      }
+    }
+
+    await forwardButton.click();
+  }
+  throw new Error(
+    "driveMechanismsGallery: did not complete within the expected character count",
+  );
 }
 
 /**
@@ -436,15 +601,28 @@ export async function confirmMechanismsEmpty(page: Page): Promise<void> {
  *
  * It also has a one-time intro splash ("Start the touch gallery"), dismissed
  * first.
+ *
+ * Now load-bearing for a widened worklist (spec 057 Class-B diagnosis — see
+ * specs/057-bulletproof-navigation/reviews/classB-diagnosis.md): a desktop
+ * MechanismAssignment on ANY character (not just the one letter a spec
+ * fixture names) makes that character a `desktopSuggestionTargets` entry and
+ * therefore a touch-gallery walk stop (TouchGallery.tsx's `touchLettersToAdd`).
+ * This driver already walks however many stops there are — unlike the
+ * retired per-spec `driveTouchGalleryAcceptPlacement` helpers, which
+ * hard-coded "accept the suggestion for THIS char, then click touch-continue
+ * once" and hung when the gallery opened on a different character first.
+ * Uses `waitVisible` (not `.isVisible({timeout})`, which Playwright ignores —
+ * see that helper's doc comment) so a genuine render/recompute delay between
+ * characters is never misread as "the gallery already completed".
  */
 export async function driveTouchGallery(page: Page): Promise<void> {
   const seedConfirm = page.getByTestId("seed-source-confirm");
-  if (await seedConfirm.isVisible({ timeout: 5_000 }).catch(() => false)) {
+  if (await waitVisible(seedConfirm, 5_000)) {
     await seedConfirm.click();
   }
 
   const startButton = page.getByRole("button", { name: "Start the touch gallery" });
-  if (await startButton.isVisible().catch(() => false)) {
+  if (await waitVisible(startButton, 5_000)) {
     await startButton.click();
   }
 
@@ -455,7 +633,7 @@ export async function driveTouchGallery(page: Page): Promise<void> {
   const applyButton = page.getByRole("button", { name: /^Apply touch method for/ });
 
   for (let guard = 0; guard < 200; guard++) {
-    const stillPresent = await continueButton.isVisible({ timeout: 2_000 }).catch(() => false);
+    const stillPresent = await waitVisible(continueButton, 8_000);
     if (!stillPresent) return;
 
     // canGoNext (gates continueButton) requires the character to already be
