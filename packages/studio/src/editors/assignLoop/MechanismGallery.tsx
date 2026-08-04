@@ -470,6 +470,14 @@ type Method = "sequence" | "deadkey" | "swap";
 // all the way back to zero).
 const MAX_RALT_SLOTS = 4;
 
+// Modifier tokens that stay selectable in the layer-combo dropdowns but are
+// never used as the auto-default for a newly-added slot (see
+// handleAddRaltSlot). CAPS is reported as "in use" by collectModifierTokensInUse
+// for any keyboard carrying routine CAPS/NCAPS case-handling rules, but it is a
+// case/state modifier rather than a layer an author reaches for — auto-filling
+// it would surprise. (NCAPS is never in the pool at all — see computeModifierPool.)
+const AUTO_DEFAULT_EXCLUDED: ReadonlySet<ModifierToken> = new Set(["CAPS"]);
+
 /**
  * Per-family dropdown option pool, derived once per keyboard from the
  * modifier tokens already in use elsewhere in the IR. Product rule: default
@@ -2099,15 +2107,21 @@ export function MechanismGallery({
       // The FIRST layer added defaults to raltDefaultToken (mirrors the
       // pre-merge "Layer + key" card, which always started with one
       // pre-filled slot). Every slot added after that defaults to the first
-      // still-available option (per optionsForRaltSlot's earlier-slot
+      // still-available LAYER modifier (per optionsForRaltSlot's earlier-slot
       // exclusions) that the keyboard already uses elsewhere — modifierPool
       // leads with SHIFT, so this surfaces Shift automatically once Shift is
-      // in use. If none of the available options are in use, the slot falls
-      // back to unselected ("") until the author picks one (canApply blocks
-      // Apply meanwhile).
+      // in use. CAPS is excluded from the auto-default (AUTO_DEFAULT_EXCLUDED):
+      // collectModifierTokensInUse reports it from routine CAPS/NCAPS
+      // case-handling rules, but CAPS is a case/state modifier rather than a
+      // layer an author reaches for, so auto-filling it surprises more than it
+      // helps — it stays a selectable dropdown option, just never the default.
+      // If no eligible option is in use, the slot falls back to unselected ("")
+      // until the author picks one (canApply blocks Apply meanwhile).
       if (prev.length === 0) return [...prev, raltDefaultToken];
       const available = optionsForRaltSlot(modifierPool, prev, prev.length);
-      const inUseDefault = available.find((tok) => modifierTokensInUse.has(tok));
+      const inUseDefault = available.find(
+        (tok) => !AUTO_DEFAULT_EXCLUDED.has(tok) && modifierTokensInUse.has(tok),
+      );
       return [...prev, inUseDefault ?? ""];
     });
   }, [raltDefaultToken, modifierPool, modifierTokensInUse]);

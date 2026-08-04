@@ -2937,6 +2937,32 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     );
   });
 
+  it("never auto-fills the SECOND slot with CAPS, even when CAPS is the only in-use modifier", async () => {
+    // CAPS is reported as "in use" by any keyboard with routine CAPS/NCAPS
+    // case-handling rules, but it is a case/state modifier rather than a layer
+    // — it must NOT auto-fill the second slot (that would surprise). It stays
+    // selectable in the dropdown; the author picks it explicitly if they want.
+    instantiateWithModifiersInUse("K_W", ["CAPS"]);
+    seedInventory(["Ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), "K_E");
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLElement;
+    // Not auto-filled with CAPS — stays unselected until the author picks.
+    expect(selectMenuValue(secondLayerSelect)).toBe("");
+    // ...but CAPS is still offered as an explicit choice.
+    const optionValues = await selectMenuOptionValues(secondLayerSelect);
+    expect(optionValues).toContain("CAPS");
+  });
+
   it("unifies an author's Ctrl + (chiral) Alt pick to the generic [CTRL ALT K_E] (#defect: AltGr not working)", async () => {
     // The author picks slot 1 = Ctrl, slot 2 = an alt-family token — the
     // exact "Ctrl+Alt" selection reported as not working. A mixed
