@@ -66,7 +66,7 @@ import { createStudioDecisionRecorder } from "./decisions/createStudioDecisionRe
 import { createSourceSnapshotter } from "./decisions/snapshotSource.ts";
 import { useDecisionLogStore } from "./decisions/decisionLogStore.ts";
 import { DecisionTrailView } from "./decisions/DecisionTrailView.tsx";
-import { resolveImpact } from "./decisions/impact.ts";
+import { resolveImpact, resolveImpactAsync } from "./decisions/impact.ts";
 import { buildPathOverlay } from "./dashboard/pathOverlay.ts";
 import { projectWorkingCopyForOutput } from "./lib/serializeWorkingCopy.ts";
 import { StepHost } from "./components/StepHost.tsx";
@@ -1494,6 +1494,30 @@ export function StudioShell() {
     [impactDeps],
   );
 
+  // spec 057 FR-009/FR-010: the async resolver, for a decision recorded before a
+  // working copy existed. It re-derives the effect by projecting the working copy
+  // twice through `projectWorkingCopyForOutput` — the SAME function the download zip
+  // and the pull-request path use, and the same one `readProjectedFiles` above
+  // delegates to. That is FR-010, not a convenience: both sides of the comparison
+  // must come from the function that produces the shipped keyboard, or the trail can
+  // disagree with the artifact (SC-005).
+  //
+  // Passed as a FUNCTION for the same reason `resolveEntryImpact` is: mounting the
+  // trail resolves nothing, and expanding one row resolves exactly that row.
+  const asyncImpactDeps = useMemo(
+    () => ({
+      ...impactDeps,
+      project: projectWorkingCopyForOutput,
+      hasWorkingCopy: () => useWorkingCopyStore.getState().baseVfs !== null,
+      getRecord: () => useDecisionLogStore.getState().record,
+    }),
+    [impactDeps],
+  );
+  const resolveEntryImpactAsync = useCallback(
+    (entry: DecisionEntry) => resolveImpactAsync(entry, asyncImpactDeps),
+    [asyncImpactDeps],
+  );
+
   // ---------------------------------------------------------------------------
   // Flow-map walked path (spec 053 US3, FR-023/FR-026). Projected HERE, where the
   // record is reachable, and passed into FlowMapView as a prop — `dashboard/` has
@@ -1563,6 +1587,7 @@ export function StudioShell() {
           record={decisionRecord}
           droppedCount={decisionDroppedCount}
           resolveImpact={resolveEntryImpact}
+          resolveImpactAsync={resolveEntryImpactAsync}
         />
       );
       break;

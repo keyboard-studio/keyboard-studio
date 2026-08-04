@@ -651,28 +651,38 @@ function advanceToB() {
 /**
  * Drive from "identity" to "carve".
  * New order (issue #508): prefill → B → carve — phaseB-complete lands on carve
- * via the marks step's S0 auto-skip (spec 046; marks-free test alphabet).
+ * via the marks step's S0 auto-skip (spec 046; marks-free test alphabet) and the
+ * convenience step's own skip.
+ *
+ * ASYNC since spec 057. The convenience step deliberately holds its gate until
+ * the CLDR/SLDR exemplar lookup settles, and `useCarveNeededSet` only settles
+ * synchronously when there is NO language to look up. Track 1 now carries the
+ * author's composed BCP47 tag into the working copy (FR-001) — which is the point
+ * of that feature — so the lookup genuinely runs and the walk past B is genuinely
+ * asynchronous. Awaiting the landing stage is what that costs; asserting
+ * synchronously here would only pass while Track 1 had no language at all.
  */
-function advanceToCarve() {
+async function advanceToCarve() {
   advanceToB();
   fireEvent.click(screen.getByTestId("phaseB-complete"));
+  await screen.findByTestId("stage-carve");
 }
 
 /** Drive from "identity" to "mechanisms". */
-function advanceToMechanisms() {
-  advanceToCarve();
+async function advanceToMechanisms() {
+  await advanceToCarve();
   fireEvent.click(screen.getByTestId("carve-complete"));
 }
 
 /** Drive from "identity" to "touch_seed_source" (the seed-source fork chooser). */
-function advanceToTouchSeedSource() {
-  advanceToMechanisms();
+async function advanceToTouchSeedSource() {
+  await advanceToMechanisms();
   fireEvent.click(screen.getByTestId("mechanisms-complete"));
 }
 
 /** Drive from "identity" to "F". */
-function advanceToF() {
-  advanceToTouchSeedSource();
+async function advanceToF() {
+  await advanceToTouchSeedSource();
   // touch_seed_source fork (spec 035 R4/R12, no choice recorded yet on a fresh
   // walk) renders the mocked TouchSeedSourcePanel chooser; confirming it lands
   // on the real "touch" step (mocked TouchGallery stub, "e-complete").
@@ -733,7 +743,9 @@ describe("SurveyView — B → carve transition", () => {
 
     fireEvent.click(screen.getByTestId("phaseB-complete"));
 
-    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+    // Async landing: the convenience step waits on the exemplar lookup now that
+    // Track 1 carries a language tag (spec 057) — see advanceToCarve.
+    expect(await screen.findByTestId("stage-carve")).toBeTruthy();
     expect(screen.queryByTestId("stage-B")).toBeNull();
   });
 });
@@ -748,7 +760,7 @@ describe("SurveyView — carve → mechanisms transition", () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToCarve();
+    await advanceToCarve();
     expect(screen.getByTestId("stage-carve")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("carve-complete"));
@@ -773,7 +785,7 @@ describe("SurveyView — mechanisms → F transition", () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToMechanisms();
+    await advanceToMechanisms();
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
     // mechanisms → touch_seed_source fork (spec 035 R4/R12)
@@ -824,7 +836,7 @@ describe("SurveyView — touch_seed_source suppresses the outer OSK pane (P0 fix
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToTouchSeedSource();
+    await advanceToTouchSeedSource();
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
 
     // The outer, persistent right-pane OSKFrame is mocked to unconditionally
@@ -874,12 +886,15 @@ describe("SurveyView — carve → B back-navigation", () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToCarve();
+    await advanceToCarve();
     expect(screen.getByTestId("stage-carve")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("carve-back"));
 
-    expect(screen.getByTestId("stage-B")).toBeTruthy();
+    // The back-pop crosses the convenience step, which re-runs its exemplar
+    // lookup on re-entry and stays transparent in the direction of travel — so
+    // the landing is async in both directions (spec 057; see advanceToCarve).
+    expect(await screen.findByTestId("stage-B")).toBeTruthy();
     expect(screen.queryByTestId("stage-carve")).toBeNull();
     // Confirm it did NOT go to prefill (the old pre-#508 behavior).
     expect(screen.queryByTestId("stage-prefill")).toBeNull();
@@ -896,7 +911,7 @@ describe("SurveyView — F → E back-navigation", () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToF();
+    await advanceToF();
     expect(screen.getByTestId("stage-F")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("phaseF-back"));
@@ -918,7 +933,7 @@ describe("SurveyView — mechanisms → carve back-navigation", () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToMechanisms();
+    await advanceToMechanisms();
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("mechanisms-back"));
@@ -1647,7 +1662,7 @@ describe("SurveyView — PhaseF done navigates to #output", () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToF();
+    await advanceToF();
     expect(screen.getByTestId("stage-F")).toBeTruthy();
 
     // Fire PhaseF completion.
@@ -1672,7 +1687,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
     });
 
     // Advance to the fork, confirm it, then reach Phase E (touch).
-    advanceToTouchSeedSource();
+    await advanceToTouchSeedSource();
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
     fireEvent.click(screen.getByTestId("seed-source-complete"));
     expect(screen.getByTestId("stage-E")).toBeTruthy();
@@ -1691,7 +1706,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToTouchSeedSource();
+    await advanceToTouchSeedSource();
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
     fireEvent.click(screen.getByTestId("seed-source-complete"));
     fireEvent.click(screen.getByTestId("e-back"));
@@ -1712,7 +1727,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
     });
 
     // Advance to Phase E.
-    advanceToTouchSeedSource();
+    await advanceToTouchSeedSource();
     fireEvent.click(screen.getByTestId("seed-source-complete"));
     expect(screen.getByTestId("stage-E")).toBeTruthy();
 
@@ -1811,9 +1826,9 @@ describe("SurveyView — adapt-track carve → B back-navigation (SC-002 parity)
     fireEvent.click(screen.getByTestId("prefill-confirm"));
     expect(screen.getByTestId("stage-B")).toBeTruthy();
 
-    // Advance through PhaseB to carve.
+    // Advance through PhaseB to carve (async landing — see advanceToCarve).
     fireEvent.click(screen.getByTestId("phaseB-complete"));
-    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+    expect(await screen.findByTestId("stage-carve")).toBeTruthy();
 
     // carve-back must re-enter PhaseB (not prefill).
     fireEvent.click(screen.getByTestId("carve-back"));
@@ -1868,7 +1883,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     _mockTouchEAssignmentsRef.current = [longpressAssignment];
 
     // Navigate through the fork, then fire the TouchGallery complete button.
-    advanceToMechanisms();
+    await advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
     // The touch_seed_source chooser is shown next (spec 035 R4/R12, no choice
     // recorded on a fresh walk) — NOT the real "touch" step, so
@@ -1901,7 +1916,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     // setTouchLayoutJson(null) rather than attempting to build a layout.
     _mockTouchEAssignmentsRef.current = [];
 
-    advanceToMechanisms();
+    await advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
 
     // Confirming touch_seed_source (spec 035 R4/R12 fork; no choice recorded
@@ -1936,7 +1951,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     // Empty assignments — no real touch edits were made.
     _mockTouchEAssignmentsRef.current = [];
 
-    advanceToMechanisms();
+    await advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
 
     // Confirming touch_seed_source (spec 035 R4/R12 fork; no choice recorded
@@ -1970,7 +1985,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     // Zero Phase E edits — the row that would emit nothing under import-adapt.
     _mockTouchEAssignmentsRef.current = [];
 
-    advanceToMechanisms();
+    await advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
 
@@ -2098,7 +2113,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     // test alphabet has no marks, so the S0 gate auto-completes the marks
     // step without rendering and the walk lands directly on carve.
     fireEvent.click(screen.getByTestId("phaseB-complete"));
-    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+    expect(await screen.findByTestId("stage-carve")).toBeTruthy();
 
     // → mechanisms
     fireEvent.click(screen.getByTestId("carve-complete"));
@@ -2144,7 +2159,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     // phaseB-complete must land on carve (via the marks step's S0 auto-skip
     // — the marks-free test alphabet completes marks without rendering).
     fireEvent.click(screen.getByTestId("phaseB-complete"));
-    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+    expect(await screen.findByTestId("stage-carve")).toBeTruthy();
     expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
   });
 
@@ -2153,7 +2168,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToMechanisms();
+    await advanceToMechanisms();
 
     // lockDesktop should not have been called yet.
     expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);

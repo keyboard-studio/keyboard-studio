@@ -564,11 +564,18 @@ group(main) using keys
       expect(kps).toContain("..\\build\\my_keyboard.kvk");
     });
 
-    it("threads base.languages into <Languages>, falling back to 'und' when absent", async () => {
+    // spec 057: the descriptor declares exactly ONE language, so the scaffolder's
+    // placeholder threads `base.languages[0]` rather than the whole list. Emitting
+    // every base tag is what let a Bambara keyboard on a French base ship declaring
+    // `fr` — and the base's language is a placeholder here in any case: the output
+    // projection's step 3.6 replaces this block with the AUTHOR's tag before
+    // anything ships (FR-001). The `und` fallback is unchanged.
+    it("threads base.languages[0] into <Languages>, falling back to 'und' when absent", async () => {
       const withLang: BaseKeyboard = { ...baseKeyboard, languages: ["ak", "en"] };
       const kpsLang = await scaffoldKps(BASE_KMN, withLang, "kb_lang");
       expect(kpsLang).toContain('<Language ID="ak">');
-      expect(kpsLang).toContain('<Language ID="en">');
+      expect(kpsLang.match(/<Language\b/g)).toHaveLength(1);
+      expect(kpsLang).not.toContain('<Language ID="en">');
 
       const kpsUnd = await scaffoldKps(BASE_KMN, baseKeyboard, "kb_und");
       expect(kpsUnd).toContain('<Language ID="und">');

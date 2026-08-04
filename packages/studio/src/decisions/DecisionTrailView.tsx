@@ -38,6 +38,15 @@ export interface DecisionTrailViewProps {
   droppedCount?: number;
   /** Resolve one entry's impact. Called only when a row is expanded. */
   resolveImpact: (entry: DecisionEntry) => DecisionImpact | null;
+  /**
+   * Async resolver, forwarded verbatim to each row (spec 057). Optional: absent, the
+   * rows use `resolveImpact` alone, which is how the fixture-driven renders and every
+   * existing test drive this view.
+   *
+   * Passed DOWN as a function, never called here — this view resolves nothing, which
+   * is what keeps FR-011/SC-006 true when a hundred rows mount.
+   */
+  resolveImpactAsync?: (entry: DecisionEntry) => Promise<DecisionImpact | null>;
 }
 
 const containerStyle: React.CSSProperties = {
@@ -100,6 +109,7 @@ export function DecisionTrailView({
   record,
   droppedCount = 0,
   resolveImpact,
+  resolveImpactAsync,
 }: DecisionTrailViewProps) {
   const { t, i18n } = useLingui();
   // FR-015: superseded entries stay in the DOM as history, collapsed by default so
@@ -437,6 +447,7 @@ export function DecisionTrailView({
                             superseded={superseded}
                             hidden={superseded && !showSuperseded}
                             resolveImpact={resolveImpact}
+                            {...(resolveImpactAsync !== undefined ? { resolveImpactAsync } : {})}
                           />
                         );
                       })}

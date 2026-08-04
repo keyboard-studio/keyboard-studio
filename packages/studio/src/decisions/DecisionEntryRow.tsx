@@ -17,11 +17,20 @@
 //                  diff region, which reads as a failure (spec Edge Cases).
 //   unavailable -> the localized reason. The studio cannot isolate this change and
 //                  says so, rather than implying the decision did nothing. The
-//                  two reasons (`lock-gate-dependency` / `no-rederivable-write-path`)
-//                  render distinct prose from each other AND from "none" (FR-020).
+//                  three reasons (`lock-gate-dependency`, `no-rederivable-write-path`,
+//                  `no-working-copy-yet`) each render distinct prose, from each other
+//                  AND from "none" (FR-020; spec 057 FR-012). Each gets an EXPLICIT
+//                  arm — a new reason absorbed into a trailing else would render as
+//                  the old, now-false message.
 //   shed        -> `impact` is null: the detail existed and was dropped to fit the
 //                  save budget. Distinct from "never captured" because the author
 //                  can act on it (a shorter session keeps its detail).
+//
+// Resolution may be ASYNC (spec 057): attributing a decision recorded before a
+// working copy existed means projecting the working copy twice and diffing, which is
+// async because pattern resolution is. `useEntryImpact` owns that, and a stored
+// capture still resolves synchronously so a long-recorded fact never flickers
+// through the pending state.
 //
 // The `data-testid` values here are the contract (trail-ui.contract.md §2);
 // renaming one breaks tests.
@@ -34,6 +43,7 @@ import { headlineFor, type HeadlineDimension, type QuestionName } from "./headli
 import { createLookupQuestionLabel } from "./lookupQuestionLabel.ts";
 import { formatClauseList, stageActionLabel } from "./stageText.ts";
 import { DiffHunkList } from "../ui/DiffHunkList.tsx";
+import { useEntryImpact } from "./useEntryImpact.ts";
 import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 
 export interface DecisionEntryRowProps {
@@ -53,6 +63,16 @@ export interface DecisionEntryRowProps {
    * Returns `null` when the entry's detail was shed.
    */
   resolveImpact: (entry: DecisionEntry) => DecisionImpact | null;
+  /**
+   * Async resolver for an entry whose effect must be re-derived by projecting the
+   * working copy (spec 057 FR-009). Optional: when absent the row falls back to
+   * `resolveImpact` alone, which is what every existing test and the fixture-driven
+   * renders rely on.
+   *
+   * Also called ONLY on expand — `useEntryImpact` gates on that, so passing this
+   * does not make mounting the trail compute anything (FR-011, SC-006).
+   */
+  resolveImpactAsync?: (entry: DecisionEntry) => Promise<DecisionImpact | null>;
 }
 
 const rowStyle: React.CSSProperties = {
@@ -75,11 +95,22 @@ const expandButtonStyle: React.CSSProperties = {
 
 const noticeStyle: React.CSSProperties = { margin: 0, color: TEXT_DIM };
 
+/**
+ * Stand-in resolver for when no async resolver was supplied.
+ *
+ * Never actually called — `useEntryImpact` is passed `expanded && asyncEnabled`,
+ * which is false in exactly that case. It exists because the hook must be called
+ * unconditionally and its resolver parameter is required; a module-level constant
+ * also keeps the hook's dependency identity stable across renders.
+ */
+const NEVER_RESOLVES = async (): Promise<DecisionImpact | null> => null;
+
 export function DecisionEntryRow({
   entry,
   superseded,
   hidden = false,
   resolveImpact,
+  resolveImpactAsync,
 }: DecisionEntryRowProps) {
   const { t, i18n } = useLingui();
   const [expanded, setExpanded] = useState(false);
@@ -477,7 +508,24 @@ export function DecisionEntryRow({
   // counterfactual should reflect the IR as it is now rather than as it was the
   // first time this row happened to be opened. Never called for a
   // base-contribution entry — see `baseContributionDetail` above.
-  const impact = expanded && !isBaseContribution ? resolveImpact(entry) : null;
+  //
+  // `useEntryImpact` must be called unconditionally (hooks rule), so the gating
+  // lives in its arguments: with `expanded` false, or with no async resolver, it
+  // runs nothing. When an async resolver IS supplied it owns resolution entirely,
+  // including the synchronous stored-capture case — routing that through the sync
+  // resolver as well would ask the same question twice.
+  const asyncEnabled = resolveImpactAsync !== undefined && !isBaseContribution;
+  const asyncResolution = useEntryImpact(
+    entry,
+    expanded && asyncEnabled,
+    resolveImpactAsync ?? NEVER_RESOLVES,
+  );
+  const impact = asyncEnabled
+    ? asyncResolution.impact
+    : expanded && !isBaseContribution
+      ? resolveImpact(entry)
+      : null;
+  const impactPending = asyncEnabled && asyncResolution.pending;
 
   // Derived from the entry's own id (unique per row), never rendered as text —
   // an `id` attribute is not author-facing content, so this is FR-008-clean
@@ -529,6 +577,16 @@ export function DecisionEntryRow({
         <div data-testid="decision-entry-impact" id={impactRegionId} style={{ marginTop: 4 }}>
           {baseContributionDetail !== null ? (
             baseContributionDetail
+          ) : impactPending ? (
+            // The one transient state. Only ever reached for an entry whose effect
+            // has to be re-derived by projecting (spec 057); a stored capture
+            // resolves on the first render and never passes through here.
+            <p style={noticeStyle} data-testid="decision-entry-impact-pending">
+              {t({
+                id: "trail.entry.impact.pending",
+                message: "Working out what this decision changed…",
+              })}
+            </p>
           ) : impact === null ? (
             // `resolveImpact` returns null only for a shed entry — the detail was
             // captured once and then dropped, which is a different statement from
@@ -576,6 +634,19 @@ export function DecisionEntryRow({
                 id: "trail.entry.impact.unavailable.lockGate",
                 message:
                   "This decision sits behind a step that has since been locked, so its effect can no longer be shown on its own.",
+              })}
+            </p>
+          ) : impact.reason === "no-working-copy-yet" ? (
+            // FR-012's whole requirement: its OWN words, distinct from both other
+            // unavailability messages AND from "changed nothing". This decision has a
+            // write path and did reach the artifact — there is simply no keyboard yet
+            // to project, and the author can fix that by choosing a base. Falling into
+            // the trailing branch below would tell them the opposite.
+            <p style={noticeStyle}>
+              {t({
+                id: "trail.entry.impact.unavailable.noWorkingCopyYet",
+                message:
+                  "This decision was made before a keyboard existed to change, so its effect cannot be shown yet. Choose a base keyboard and it will appear here.",
               })}
             </p>
           ) : (

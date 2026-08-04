@@ -20,7 +20,10 @@
 // pretending the differ preserves `\r`.
 
 import { describe, expect, it, vi } from "vitest";
-import { DecisionImpactSchema } from "@keyboard-studio/contracts";
+import { DecisionImpactSchema, createVirtualFS } from "@keyboard-studio/contracts";
+// spec 057 US4-3 / SC-007: the boundary account and the counterfactual account of
+// the same descriptor must not contradict each other, so both are exercised here.
+import { resolveIdentityCounterfactual } from "./counterfactualProjection.ts";
 import type { DiffHunk, VirtualFSEntry } from "@keyboard-studio/contracts";
 import {
   createSourceSnapshotter,
@@ -655,5 +658,175 @@ describe("FR-017a — the HISTORY.md date stamp", () => {
     );
     expect(impact.files.map((file) => file.path)).toEqual([readmePath]);
     expect(impact.magnitude).toEqual({ added: 1, removed: 1 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// US4 (spec 057 T037) — revising the language keeps both answers on the record
+// ---------------------------------------------------------------------------
+//
+// Two mechanisms now describe the same descriptor: the boundary capture (this
+// module) and the counterfactual (counterfactualProjection.ts). US4-3 / SC-007
+// require them not to contradict each other. They cannot be made byte-identical —
+// they answer different questions ("what changed at this boundary?" vs. "what would
+// be different if this answer were absent?") — but they must agree on WHICH FILE
+// changed and on the direction of the change, which is what an author reads.
+
+describe("US4 — a post-instantiation language revision (spec 057)", () => {
+  /**
+   * The descriptor as spec 057's writer emits it — with a `<Languages>` block, which
+   * `KPS_V1` above predates (053's fixture only needed `<Info><Name>`).
+   */
+  function descriptorDeclaring(tag: string): string {
+    return [
+      '<?xml version="1.0" encoding="utf-8"?>',
+      "<Package>",
+      "  <Info>",
+      "    <Name>Hausa</Name>",
+      "    <Version>1.0</Version>",
+      "  </Info>",
+      "  <Keyboards>",
+      "    <Keyboard>",
+      "      <Languages>",
+      `        <Language ID="${tag}">Hausa</Language>`,
+      "      </Languages>",
+      "    </Keyboard>",
+      "  </Keyboards>",
+      "</Package>",
+    ].join("\n");
+  }
+
+  /** The descriptor before and after the author revises their language code. */
+  const KPS_LANG_HA = descriptorDeclaring("ha");
+  const KPS_LANG_HA_LATN = descriptorDeclaring("ha-Latn");
+  /** What the base's descriptor declared before the author answered at all. */
+  const KPS_LANG_BASE = descriptorDeclaring("fr");
+
+  it("has a language line to revise in the first place", () => {
+    // Guards the three constants above: fixtures that did not actually differ in
+    // their declared language would make every assertion below vacuously true.
+    expect(KPS_LANG_HA).toContain('<Language ID="ha">Hausa</Language>');
+    expect(KPS_LANG_HA_LATN).toContain('<Language ID="ha-Latn">Hausa</Language>');
+    expect(KPS_LANG_HA_LATN).not.toBe(KPS_LANG_HA);
+    expect(KPS_LANG_BASE).not.toBe(KPS_LANG_HA);
+  });
+
+  // US4-1: an ordinary boundary capture. The revision needs no special mechanism —
+  // by the time it happens a working copy exists, which is the only thing the
+  // identity stage originally lacked.
+  it("is captured at the stage boundary like any other post-instantiation change", async () => {
+    const impact = await capturedAcross(
+      [textEntry(PATH, B1), textEntry(KPS_PATH, KPS_LANG_HA)],
+      [textEntry(PATH, B1), textEntry(KPS_PATH, KPS_LANG_HA_LATN)],
+    );
+    expect(impact.files.map((file) => file.path)).toEqual([KPS_PATH]);
+    expect(impact.magnitude).toEqual({ added: 1, removed: 1 });
+  });
+
+  it("attributes the change to the descriptor and to nothing else", async () => {
+    const impact = await capturedAcross(
+      [
+        textEntry(PATH, B1),
+        textEntry(KPS_PATH, KPS_LANG_HA),
+        textEntry(HISTORY_PATH, HISTORY_AUG_02),
+      ],
+      [
+        textEntry(PATH, B1),
+        textEntry(KPS_PATH, KPS_LANG_HA_LATN),
+        textEntry(HISTORY_PATH, HISTORY_AUG_02),
+      ],
+    );
+    // The `.kmn` is untouched: the codec does not serialize the descriptor's
+    // language, which is why the pre-057 `.kmn`-only comparison found nothing.
+    expect(impact.files.map((file) => file.path)).toEqual([KPS_PATH]);
+  });
+
+  it("re-applies to produce the revised descriptor exactly (SC-005)", async () => {
+    const impact = await capturedAcross(
+      [textEntry(PATH, B1), textEntry(KPS_PATH, KPS_LANG_HA)],
+      [textEntry(PATH, B1), textEntry(KPS_PATH, KPS_LANG_HA_LATN)],
+    );
+    const file = impact.files.find((f) => f.path === KPS_PATH)!;
+    expect(normalizeEol(applyHunks(KPS_LANG_HA, file.hunks))).toBe(
+      normalizeEol(KPS_LANG_HA_LATN),
+    );
+  });
+
+  // US4-3 / SC-007: the two accounts of the same descriptor agree. The boundary
+  // capture compares "before the revision" with "after"; the counterfactual compares
+  // "with the answer" against "without it". Different questions, same file, same
+  // direction — an author reading both must not find them contradicting.
+  it("agrees with the counterfactual account of the same descriptor", async () => {
+    const boundary = await capturedAcross(
+      [textEntry(PATH, B1), textEntry(KPS_PATH, KPS_LANG_HA)],
+      [textEntry(PATH, B1), textEntry(KPS_PATH, KPS_LANG_HA_LATN)],
+    );
+
+    const counterfactual = await resolveIdentityCounterfactual("bcp47", "ha-Latn", "ha", {
+      project: vi.fn(async (opts) => ({
+        vfs: createVirtualFS([
+          { path: PATH, content: B1, isBinary: false },
+          {
+            path: KPS_PATH,
+            content:
+              opts?.identityOverride?.bcp47 === "ha-Latn" ? KPS_LANG_HA_LATN : KPS_LANG_HA,
+            isBinary: false,
+          },
+        ]),
+        keyboardId: "hausa_std",
+        displayName: "Hausa",
+        version: "1.0",
+        warnings: [],
+      })),
+    });
+
+    expect(counterfactual?.state).toBe("captured");
+    if (counterfactual?.state !== "captured") return;
+
+    // Same file named by both.
+    expect(counterfactual.files.map((f) => f.path)).toEqual(boundary.files.map((f) => f.path));
+    // Same direction: `ha-Latn` is the added side in both accounts, `ha` the removed
+    // side. A reversed counterfactual would tell the author their revision undid
+    // itself.
+    for (const account of [boundary, counterfactual]) {
+      const lines = account.files
+        .find((f) => f.path === KPS_PATH)!
+        .hunks.flatMap((h) => h.lines);
+      expect(lines.some((l) => l.startsWith("+") && l.includes('ID="ha-Latn"'))).toBe(true);
+      expect(lines.some((l) => l.startsWith("-") && l.includes('ID="ha"'))).toBe(true);
+    }
+    // Same magnitude: one line replaced, on both accounts.
+    expect(counterfactual.magnitude).toEqual(boundary.magnitude);
+  });
+
+  // US4-2: the superseded original stays on the record. That is the decision log's
+  // own supersede semantics (053 FR-015) — this test pins that a revision does not
+  // make the FIRST answer's captured change disappear, because each boundary keeps
+  // its own capture.
+  it("leaves the original answer's capture intact rather than rewriting it", async () => {
+    const { snapshotter } = scriptedSnapshotter([
+      // Instantiation baseline: the base's language.
+      [textEntry(PATH, B1), textEntry(KPS_PATH, KPS_LANG_BASE)],
+      // The author's first answer.
+      [textEntry(PATH, B1), textEntry(KPS_PATH, KPS_LANG_HA)],
+      // Their revision.
+      [textEntry(PATH, B1), textEntry(KPS_PATH, KPS_LANG_HA_LATN)],
+    ]);
+
+    expect(await snapshotter.captureAtBoundary()).toBeNull(); // baseline only
+    const first = await snapshotter.captureAtBoundary();
+    const revision = await snapshotter.captureAtBoundary();
+
+    // Two captures, each describing its own step, neither overwriting the other.
+    expect(first?.state).toBe("captured");
+    expect(revision?.state).toBe("captured");
+    if (first?.state !== "captured" || revision?.state !== "captured") return;
+    const firstLines = first.files[0]!.hunks.flatMap((h) => h.lines);
+    const revisionLines = revision.files[0]!.hunks.flatMap((h) => h.lines);
+    expect(firstLines.some((l) => l.startsWith("+") && l.includes('ID="ha"'))).toBe(true);
+    expect(revisionLines.some((l) => l.startsWith("+") && l.includes('ID="ha-Latn"'))).toBe(true);
+    // The revision's capture describes only the revision — it does not re-narrate
+    // the first answer as though it had just happened.
+    expect(revisionLines.some((l) => l.includes('ID="fr"'))).toBe(false);
   });
 });

@@ -634,7 +634,14 @@ export const DecisionImpactSchema = z.discriminatedUnion("state", [
   z.object({ state: z.literal("none") }),
   z.object({
     state: z.literal("unavailable"),
-    reason: z.enum(["lock-gate-dependency", "no-rederivable-write-path"]),
+    // Mirrors ImpactUnavailableReason. `no-working-copy-yet` is spec 057 FR-012:
+    // a decision recorded before instantiation, whose effect is not yet
+    // resolvable rather than permanently unavailable.
+    reason: z.enum([
+      "lock-gate-dependency",
+      "no-rederivable-write-path",
+      "no-working-copy-yet",
+    ]),
   }),
 ]);
 

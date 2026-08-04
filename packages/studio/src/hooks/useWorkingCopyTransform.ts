@@ -198,6 +198,9 @@ export function useWorkingCopyTransform(
   const identityDisplayName = identity?.displayName ?? null;
   const identityKeyboardId = identity?.keyboardId ?? null;
   const identityBcp47 = identity?.bcp47 ?? null;
+  // spec 057: the descriptor's <Language> display text. Forwarded so the OSK
+  // preview sees the same package descriptor the zip does (FR-004/SC-005).
+  const identityLanguageName = identity?.languageName ?? null;
 
   return useMemo<VfsTransform | null>(() => {
     // No baseIr → carve step cannot run. The transform is not usable yet.
@@ -246,11 +249,13 @@ export function useWorkingCopyTransform(
       // in-place mutation of `vfs`; projectWorkingCopyVfs also mutates in-place.
       const hasDisplayName = identityDisplayName !== null;
       const hasBcp47 = identityBcp47 !== null && identityBcp47 !== "";
+      const hasLanguageName = identityLanguageName !== null && identityLanguageName !== "";
       const identityArg =
-        hasDisplayName || hasBcp47
+        hasDisplayName || hasBcp47 || hasLanguageName
           ? ({
               ...(hasDisplayName ? { displayName: identityDisplayName } : {}),
               ...(hasBcp47 ? { bcp47: identityBcp47 } : {}),
+              ...(hasLanguageName ? { languageName: identityLanguageName } : {}),
             } as import("../lib/projectWorkingCopyVfs").IdentityOverlay)
           : null;
 
@@ -288,6 +293,7 @@ export function useWorkingCopyTransform(
     identityDisplayName,
     identityKeyboardId,
     identityBcp47,
+    identityLanguageName,
     patternMap,
     touchLayoutJson,
   ]);
