@@ -1,5 +1,6 @@
-import type { PlacementMap, PlacementEntry } from "@keyboard-studio/contracts";
+import type { PlacementMap, PlacementEntry, PlacementCandidate } from "@keyboard-studio/contracts";
 import type { PlacementPriorsJSON } from "./model.js";
+import { isStandardKey } from "./filters.js";
 
 /**
  * The MAJOR version of `placement-priors.json` this loader understands
@@ -25,22 +26,64 @@ function majorVersionOf(version: string): number | null {
 const MIN_PRIOR_COUNT = 2;
 
 /**
- * Only standard physical keys (K_A–K_Z, K_0–K_9, punctuation K_*) are
- * meaningful suggestions in the gallery key-picker.  Touch-layout virtual
- * keys (T_*) and other non-K_* names are custom to specific keyboards and
- * cannot be shown as actionable suggestions.
- */
-function isStandardKey(vkey: string): boolean {
-  return vkey.startsWith("K_");
-}
-
-/**
  * NCAPS (NumLock-equivalent modifier) is idiomatic in Myanmar/Ethiopic
  * keyboards but is not a modifier a Latin-script keyboard author would use.
  * Exclude any candidate that requires NCAPS to be in any modifier position.
  */
 function hasNcapsModifier(modifiers: string[]): boolean {
   return modifiers.includes("NCAPS");
+}
+
+/**
+ * Coarse mechanism CLASS a candidate belongs to, for the class-retention
+ * policy below: `"direct"` (S-01/S-08) is one class; `"deadkey"` and
+ * `"store-index"` (both S-02) are pooled into a single `"deadkeyFamily"`
+ * class — they are the two `.kmn` shapes the same S-02 strategy card can
+ * take, not two independent mechanisms. `"opaque"` candidates never reach
+ * `placement-priors.json` (see `emitPlacementMap`/`deadkey.ts`), so they have
+ * no class here.
+ */
+type MechClass = "direct" | "deadkeyFamily";
+
+function mechClassOf(mechanism: PlacementCandidate["mechanism"]): MechClass | null {
+  if (mechanism === "direct") return "direct";
+  if (mechanism === "deadkey" || mechanism === "store-index") return "deadkeyFamily";
+  return null;
+}
+
+/**
+ * Class-retention policy (P0 fix): `MIN_PRIOR_COUNT` alone can strip EVERY
+ * candidate of a mechanism class (`"direct"` vs the deadkey/store-index
+ * family) for a codepoint, even though the raw corpus DID attest that class
+ * — e.g. a well-attested S-02 deadkey candidate alongside a single-keyboard
+ * S-08 RALT candidate. Silently dropping the RALT candidate regresses a
+ * placement the v1 seeder used to suggest.
+ *
+ * Given `eligible` (candidates that already pass the standard-key / NCAPS
+ * shape filters, priorCount not yet applied) and `qualified` (the same list
+ * after the `priorCount >= MIN_PRIOR_COUNT` filter), return the additional
+ * candidates to retain: for each mechanism class attested in `eligible` but
+ * with zero survivors in `qualified`, the single best (highest `priorCount`,
+ * ties broken by `eligible`'s existing order) candidate of that class.
+ *
+ * Does not fire for a class that already has a `qualified` survivor — the
+ * policy exists to prevent total loss of a class, not to pad an
+ * already-represented one.
+ */
+function retainedByClass(
+  eligible: PlacementCandidate[],
+  qualified: PlacementCandidate[],
+): PlacementCandidate[] {
+  const retained: PlacementCandidate[] = [];
+  for (const cls of ["direct", "deadkeyFamily"] as const) {
+    const classEligible = eligible.filter((c) => mechClassOf(c.mechanism) === cls);
+    if (classEligible.length === 0) continue;
+    const hasSurvivor = qualified.some((c) => mechClassOf(c.mechanism) === cls);
+    if (hasSurvivor) continue;
+    const best = classEligible.reduce((a, b) => (b.priorCount > a.priorCount ? b : a));
+    retained.push(best);
+  }
+  return retained;
 }
 
 /**
@@ -84,26 +127,51 @@ export function corpusPriorsToPlacementMap(priors: PlacementPriorsJSON): Placeme
     const cp = parseInt(hexKey, 16);
     if (cp <= 0x007f) continue;
 
-    // Drop single-keyboard outliers, non-physical keys, and NCAPS candidates.
-    const qualified = entry.placements.filter(
-      (c) =>
-        c.priorCount >= MIN_PRIOR_COUNT &&
-        isStandardKey(c.vkey) &&
-        !hasNcapsModifier(c.modifiers),
+    // Drop non-physical keys and NCAPS candidates (priorCount is checked
+    // separately below, per the class-retention policy).
+    const eligible = entry.placements.filter(
+      (c) => isStandardKey(c.vkey) && !hasNcapsModifier(c.modifiers),
     );
-    if (qualified.length === 0) continue;
+    if (eligible.length === 0) continue;
+
+    // Drop single-keyboard outliers.
+    const qualified = eligible.filter((c) => c.priorCount >= MIN_PRIOR_COUNT);
+
+    // Class-retention (P0 fix): a mechanism class attested in `eligible` that
+    // lost ALL its candidates to the MIN_PRIOR_COUNT filter keeps its single
+    // best candidate, so a low-support-but-corpus-attested mechanism (e.g. an
+    // S-08 RALT candidate alongside a well-attested S-02 deadkey one) doesn't
+    // vanish entirely — see `retainedByClass`.
+    const retained = retainedByClass(eligible, qualified);
+    const survivors = [...qualified, ...retained];
+    if (survivors.length === 0) continue;
 
     // Sort by priorCount descending.
-    const sorted = [...qualified].sort((a, b) => b.priorCount - a.priorCount);
-    const totalCount = sorted.reduce((sum, c) => sum + c.priorCount, 0);
+    const sorted = [...survivors].sort((a, b) => b.priorCount - a.priorCount);
 
-    // Per-codepoint renormalization: confidence = priorCount / totalCount.
-    // A strict majority (> 0.5) is required by the gallery threshold, so a
-    // suggestion fires only when one placement has more corpus votes than all
-    // others combined.
+    // Per-codepoint renormalization: confidence = priorCount / totalCount,
+    // where totalCount is the sum of `qualified` (genuinely-attested)
+    // priorCounts only — a `retained` candidate never dilutes the confidence
+    // of the class(es) that actually cleared MIN_PRIOR_COUNT. A strict
+    // majority (> 0.5) is required by the gallery threshold, so a suggestion
+    // fires only when one placement has more corpus votes than all other
+    // QUALIFIED others combined.
+    //
+    // A `retained` candidate's own confidence is scored relative to
+    // MIN_PRIOR_COUNT instead (priorCount / MIN_PRIOR_COUNT, capped at 1) —
+    // it reflects how close its low support came to the qualifying bar,
+    // deliberately never inflated to parity with a qualified candidate's
+    // renormalized confidence (which is always 1 when it is the codepoint's
+    // sole qualified candidate).
+    const retainedSet = new Set(retained);
+    const qualifiedTotalCount = qualified.reduce((sum, c) => sum + c.priorCount, 0);
     const renormalized = sorted.map((c) => ({
       ...c,
-      confidence: totalCount > 0 ? c.priorCount / totalCount : 0,
+      confidence: retainedSet.has(c)
+        ? Math.min(1, c.priorCount / MIN_PRIOR_COUNT)
+        : qualifiedTotalCount > 0
+          ? c.priorCount / qualifiedTotalCount
+          : 0,
     }));
 
     entries.push({

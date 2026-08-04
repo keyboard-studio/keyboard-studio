@@ -25,6 +25,7 @@
 
 import type { TouchLayoutIR, TouchKeyIR, TouchPlacementEntry } from "@keyboard-studio/contracts";
 import { decodeUnicodeKeyId, isSpacerKeyClass, toUPlusNotation } from "@keyboard-studio/contracts";
+import { isStandardKey } from "./filters.js";
 
 export type TouchLayerClass = "default" | "shift" | "other";
 
@@ -35,11 +36,6 @@ export interface TouchHostObservation {
   /** Virtual key name of the MAIN key the longpress hangs off of. */
   vkey: string;
   layerClass: TouchLayerClass;
-}
-
-/** Only standard physical keys are meaningful touch-host suggestions — mirrors corpus-loader's isStandardKey. */
-function isStandardKey(vkey: string): boolean {
-  return vkey.startsWith("K_");
 }
 
 function layerClassFor(layerId: string): TouchLayerClass {

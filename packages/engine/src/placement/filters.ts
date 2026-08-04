@@ -28,6 +28,23 @@ export const US_UNSHIFTED: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// Candidate-shape filters (shared by corpus-loader and touch-mining)
+// ---------------------------------------------------------------------------
+
+/**
+ * Only standard physical keys (K_A–K_Z, K_0–K_9, punctuation K_*) are
+ * meaningful suggestions in the gallery key-picker.  Touch-layout virtual
+ * keys (T_*) and other non-K_* names are custom to specific keyboards and
+ * cannot be shown as actionable suggestions.
+ *
+ * Shared by `corpus-loader.ts` (physical-key candidates) and
+ * `touch-mining.ts` (longpress host vkeys) — do not re-duplicate this check.
+ */
+export function isStandardKey(vkey: string): boolean {
+  return vkey.startsWith("K_");
+}
+
+// ---------------------------------------------------------------------------
 // Keyboard-level filters
 // ---------------------------------------------------------------------------
 

@@ -608,7 +608,18 @@ function buildMarkdown(sorted: ScanReport[], opaque: OpaqueEntry[]): string {
 /**
  * Normalize a git remote URL (SSH or HTTPS github.com form) to an
  * `<org>/<repo>` label. Returns null if the URL doesn't match a recognized
- * github.com remote shape. Mirrors facet-index's normalizer.
+ * remote shape. Mirrors facet-index's normalizer.
+ *
+ * **Local git-mirror-proxy fallback.** A checkout's `origin` is not always a
+ * literal `github.com` URL: a sandboxed CI harness can rewrite it to a local
+ * relay that preserves the upstream `<org>/<repo>` path under a literal
+ * `git/` segment (e.g.
+ * `http://local_proxy@127.0.0.1:41729/git/keyboard-studio/keyboards`). When
+ * the github.com-specific patterns above don't match, recognize that one
+ * additional shape — deliberately narrow (requires the literal `/git/`
+ * marker) so an unrelated non-github host (e.g. a genuine gitlab.com remote)
+ * still falls through to `null` (→ `"unknown/unknown"`) rather than being
+ * guessed at.
  */
 export function normalizeGithubRemote(remoteUrl: string): string | null {
   const trimmed = remoteUrl.trim();
@@ -617,6 +628,10 @@ export function normalizeGithubRemote(remoteUrl: string): string | null {
   if (m) return `${m[1]}/${m[2]}`;
   // git@github.com:<org>/<repo>(.git)
   m = /^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(trimmed);
+  if (m) return `${m[1]}/${m[2]}`;
+  // http(s)://[user@]host[:port]/git/<org>/<repo>(.git) — local mirror-proxy
+  // fallback (see docstring above).
+  m = /^https?:\/\/(?:[^/@]+@)?[^/]+\/git\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(trimmed);
   if (m) return `${m[1]}/${m[2]}`;
   return null;
 }
