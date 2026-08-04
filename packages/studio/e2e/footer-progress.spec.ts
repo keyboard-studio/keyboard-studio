@@ -40,10 +40,19 @@ const currentDot = (page: Page) => footer(page).locator('[data-progress-dot-kind
  * Known-pre-existing 1.4.3 (Contrast Minimum) offenders on the survey screen,
  * excluded exactly as tab-roundtrip.spec.ts does — this feature does not
  * touch them, and 1.4.3 is an open `unknown` row in
- * [specs/056-ada-accessibility/wcag-2.2-aa-tracker.md].
+ * [specs/056-ada-accessibility/wcag-2.2-aa-tracker.md]. PhaseB.tsx is
+ * byte-identical to `main` (see
+ * specs/057-bulletproof-navigation/evidence/gating-red.md §"Two corrections
+ * made to reach a *valid* red").
  */
 const KNOWN_CONTRAST_DEBT: readonly string[] = [
   'div[aria-label="Keyboard source mode"]',
+  // 1.4.3 — PhaseB's intro "Continue" button, on the characters step.
+  'button[data-testid="phase-b-intro-next"]',
+  // 1.4.3 — the OSK iframe renders KeymanWeb's own markup
+  // (.kmw-spacebar-caption), which this repo does not author and cannot
+  // restyle from here.
+  "iframe",
 ];
 
 test.describe("footer progress row (spec 057 US4/US6)", () => {
@@ -68,16 +77,21 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
     await expect(footer(page)).toBeVisible({ timeout: 20_000 });
     await expect(footer(page)).toContainText(/./); // some project name text present
 
+    // ---- Completed dots grow as the walk answers questions -----------------
+    // identity-lite alone answers several questions (English name, autonym,
+    // code, script) before reaching the track step.
+    const completedAfterIdentity = await completedDots(page).count();
+    expect(completedAfterIdentity).toBeGreaterThan(0);
+
+    // Answering the track question ("Authoring approach") appends its dot —
+    // the growth half of FR-042/FR-061, measured across a question the
+    // decision record actually captures as a `survey-answer` entry.
     await chooseAdaptTrack(page);
 
     const prefillConfirm = page.getByTestId("prefill-confirm");
     await expect(prefillConfirm).toBeVisible({ timeout: 30_000 });
-
-    // ---- Completed dots grow as the walk answers questions -----------------
-    // identity-lite alone answers several questions (English name, autonym,
-    // code, script) before reaching the prefill screen.
-    const completedAfterIdentity = await completedDots(page).count();
-    expect(completedAfterIdentity).toBeGreaterThan(0);
+    const completedAfterTrack = await completedDots(page).count();
+    expect(completedAfterTrack).toBeGreaterThan(completedAfterIdentity);
 
     // ---- Question and stage dots differ by SHAPE, not colour alone --------
     // (FR-046). Completed/current dots are circles (borderRadius: 50%);
@@ -115,10 +129,16 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
       exclude: KNOWN_CONTRAST_DEBT,
     });
 
-    // ---- Reaching an optional/conditional question appends its dot --------
-    // (FR-049c). Building a one-character alphabet with a combining mark
-    // ("é") makes the marks series render — a question the row did not
-    // previously carry a dot for.
+    // ---- The characters/marks phase cannot append QUESTION dots ------------
+    // The row's completed dots come from `survey-answer` decision entries
+    // (progressDots.ts, FR-042/FR-063). Phase B's alphabet confirmation and
+    // the marks series both report `answers: []` by design — their decisions
+    // travel as `confirmedInventory` / `marksWorklist` payloads, not question
+    // answers (survey/marks/MarksSeriesStep.tsx `seriesResult`), so there is
+    // no entry for a dot to grow from. FR-049c's "optional question appends
+    // its dot" is therefore asserted on the track question above (a recorded
+    // survey-answer); walking the characters phase here only carries the test
+    // forward to the dot-jump assertions below and must NOT shrink the row.
     const completedBeforeMarks = await completedDots(page).count();
     await buildOneCharacterList(page, "é");
     // MechanismGallery / carve now follow; wait for a stable landmark rather
@@ -128,7 +148,7 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
       .waitFor({ timeout: 20_000 })
       .catch(() => undefined);
     const completedAfterMarks = await completedDots(page).count();
-    expect(completedAfterMarks).toBeGreaterThan(completedBeforeMarks);
+    expect(completedAfterMarks).toBeGreaterThanOrEqual(completedBeforeMarks);
 
     // ---- Keyboard-only: Tab to a completed dot, read its name, arrive ------
     const firstCompleted = completedDots(page).first();
@@ -141,6 +161,16 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
     // not rewrite the tab-level hash (intra-wizard position is store state,
     // not a second router — CLAUDE.md's navigateTo() convention), so the
     // proof is the DOM, exactly as tab-roundtrip.spec.ts asserts arrival.
-    await expect(page.locator("#il_language_english")).toBeVisible({ timeout: 15_000 });
+    //
+    // STEP-level arrival, not question-level: identity is a MULTI-question
+    // step, and no shared store records which sub-question such a step was
+    // showing (progressDots.ts's "current question architecture gap";
+    // decision-deeplink.spec.ts targets a single-question step for the same
+    // reason). A jump therefore guarantees landing on the identity STEP —
+    // the flow picks which of its questions to render — so the arrival
+    // landmark is the step's own heading, not a specific question input.
+    await expect(
+      page.getByRole("heading", { name: /identify your language/i }),
+    ).toBeVisible({ timeout: 15_000 });
   });
 });
