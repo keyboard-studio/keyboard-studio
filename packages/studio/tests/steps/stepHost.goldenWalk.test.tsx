@@ -701,7 +701,7 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
 /**
  * Drive the full copy-track walk.
  * identity -> choose_base -> track(copy) -> project_name ->
- * characters(prefill->B) -> carve -> mechanisms ->
+ * characters(prefill->B) -> punctuation -> carve -> mechanisms ->
  * touch_seed_source -> touch -> help -> done
  *
  * S-03 sequences build inline in the Mechanism Gallery's method chooser (the
@@ -723,6 +723,10 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "project_name", testId: "project-name-next" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
     { stepId: "characters/B", testId: "phaseB-complete" },
+    // The punctuation page (between marks and convenience) has no skip gate —
+    // the walk accepts it empty. marks/convenience auto-skip around it, so
+    // their advances fold into the neighbouring step windows.
+    { stepId: "punctuation", testId: "punctuation-done" },
     { stepId: "carve", testId: "carve-complete" },
     { stepId: "mechanisms", testId: "mechanisms-complete" },
     { stepId: "touch_seed_source", testId: "seed-source-complete", async: true },
@@ -734,7 +738,7 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
 /**
  * Drive the full adapt-track walk.
  * identity -> choose_base -> track(adapt) ->
- * characters(prefill->B) -> carve -> mechanisms ->
+ * characters(prefill->B) -> punctuation -> carve -> mechanisms ->
  * touch_seed_source -> touch -> help -> done
  * project_name MUST NOT appear. See driveCopyTrack's docstring for why
  * touch_seed_source appears (spec 035 R4/R12 fork memory) and why there is no
@@ -747,6 +751,8 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     { stepId: "track", testId: "track-adapt" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
     { stepId: "characters/B", testId: "phaseB-complete" },
+    // See driveCopyTrack — the ungated punctuation page, accepted empty.
+    { stepId: "punctuation", testId: "punctuation-done" },
     { stepId: "carve", testId: "carve-complete" },
     { stepId: "mechanisms", testId: "mechanisms-complete" },
     { stepId: "touch_seed_source", testId: "seed-source-complete", async: true },

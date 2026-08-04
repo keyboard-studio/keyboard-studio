@@ -460,14 +460,15 @@ describe("FR-025 — a stage nothing was recorded for is never shown as one that
     renderTrail(walkedRecord());
 
     // The manifest also holds track, project_name, characters, marks,
-    // convenience, touch_seed_source, help and package; none of them was
-    // walked, so none of them may appear at all.
+    // punctuation, convenience, touch_seed_source, help and package; none of
+    // them was walked, so none of them may appear at all.
     const shown = stepIdsOf();
     for (const untouched of [
       "track",
       "project_name",
       "characters",
       "marks",
+      "punctuation",
       "convenience",
       "touch_seed_source",
       "help",
