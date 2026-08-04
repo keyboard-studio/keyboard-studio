@@ -183,7 +183,63 @@ The trap is for a future extension. Widening `CONTROL_KEY_IDS` to cover layer-sw
 | **Code (raw JSON) view** | **DROP** | Developer needs it as an escape hatch from its own unvalidated editor. We ship a real compile and a downloadable package. |
 | **Undo** — whole-document snapshots, 100 deep, coalesced per focus session | **ADOPT the coalescing, not the mechanism** | Commit-on-blur/Enter reproduces the useful behaviour; our overlay is small and pure, so a per-edit inverse is cheaper and exact. |
 
-### R3d — Selecting a key
+### R3d — The proposed UI, mouse-first
+
+**The problem to solve first: two keyboard-shaped surfaces.** The OSK preview is a KeymanWeb iframe and **cannot be made selectable** — a click there types the key (FR-020g). So an editable representation has to exist *alongside* it, which means the author sees two pictures of the same keyboard. Developer never had this problem because it had only a mock; we have a mock *and* a true renderer.
+
+Resolved by giving them different verbs, different headers, and deliberately different visual treatment:
+
+- **EDIT KEYS** — the schematic grid. Flat, shows key ids and diagnostic badges, click to select. This is where things change.
+- **PREVIEW** — the real OSK, rendered as the end user sees it. Already interactive; **you type on it to test**. It is never a selection surface.
+
+By-key mode replaces the touch step's left pane; the existing right-pane OSK stays where it is.
+
+```
+┌ TOUCH ──────────────────────────────────────────────────────────────────────┐
+│  ○ By character   ● By key                                   [ Continue → ] │
+├────────────┬─────────────────────────────────────────────┬──────────────────┤
+│ LAYERS     │ EDIT KEYS · rightalt                        │ PREVIEW          │
+│            │                                             │                  │
+│ default  ✓ │  ┌────┬────┬────┬────┬────┬────┬────┐       │ ┌──────────────┐ │
+│ shift    ✓ │  │ ə  │ ɛ  │ ɔ  │ ŋ  │    │    │    │       │ │  (real OSK)  │ │
+│▸rightalt 12│  │U_259│U_25B│U_254│U_14B│T_BL│T_BL│T_BL│    │ │              │ │
+│ caps     ✓ │  └────┴────┴────┴────┴────┴────┴────┘       │ │ type here to │ │
+│ symbol   3 │  ┌────┬────┬────┬────┬────┬────┐            │ │ test it      │ │
+│            │  │ ◌̀ •│ ◌́ •│ ◌̂ •│ ◌̃ •│ ⚠  │    │  <- hover │ └──────────────┘ │
+│ FIND       │  └────┴────┴────┴──┬─┴────┴────┘     shows   │   phone ▾        │
+│ [ ɛ      ] │                 (+)⋯(+)               (+)⋯   │                  │
+│            │                                             │                  │
+│ ☑ no letter│  ┌─ SELECTED KEY ──────────────────────┐    │                  │
+│    (12)    │  │ Keycap  [ɛ      ]  ɛ  U+025B        │    │                  │
+│ ☐ suppressed│ │ Id       U_025B         [ Rename… ] │    │                  │
+│            │  │ Type    [ Character key    ▾ ]      │    │                  │
+│            │  │ Goes to [ (none)           ▾ ]      │    │                  │
+│            │  │ Sends:  RAlt + K_E  (from rightalt) │    │                  │
+│            │  │ ⚠ types nothing  [ Assign… ][ Fix ] │    │                  │
+│            │  └─────────────────────────────────────┘    │                  │
+└────────────┴─────────────────────────────────────────────┴──────────────────┘
+```
+
+**Mouse-first action inventory** (keyboard equivalents in R3e):
+
+| Mouse | Result |
+|---|---|
+| Click a layer in the left rail | Grid shows that layer; the badge counts keys needing attention |
+| **Click a key** | Selects it — selection ring on the key, inspector below populates |
+| **Hover a key** | Reveals `(+)` on each edge (add before / after) and `⋯`; tooltip gives the id and what the key types |
+| **Right-click a key** | Context menu: Assign a character… · Rename id… · Suppress · Remove… · Add key before/after · Duplicate |
+| **Double-click** a key that has a "Goes to" layer | Navigates to that layer — Developer's behaviour, kept because it is genuinely good |
+| Drag a key | Reorder within the row |
+| Drag a key's right edge | Resize width, live, with the row slack updating |
+| Click **Assign a character…** | Opens the panel: inventory characters as clickable chips, the character map, and a type-it field |
+| Click a `⚠` badge | Scrolls the inspector to that finding, with its fix button |
+| Type on the **preview** | Tests the keyboard. Selects nothing. |
+
+**The left rail is the find surface.** Ticking `☑ no letter (12)` dims everything else in the grid, so the US2 worklist becomes twelve highlighted keys to click through in order. This is why find-by-value (FR-020e) is not a convenience: on an 8-layer, 394-key layout it is the main way an author reaches the key they mean.
+
+**Hover-revealed `(+)`/`⋯` is Developer's wedge idea, kept deliberately.** The wedges were the right *mouse* affordance; their faults were being the only route and being unlabeled. A right-click menu plus keyboard shortcuts fix both without giving up the fast path.
+
+### R3e — Selecting a key
 
 Developer's selection model is pointer-first: click a key, and floating wedge buttons reposition themselves around it. Its only non-spatial route is a "Press any key to select it on the keyboard" dialog that matches the pressed physical key against the standard VK table — clever for a desktop-shaped layout, useless for a `T_`-keyed one. There is no find, no filter, and no keyboard navigation of the grid itself.
 
