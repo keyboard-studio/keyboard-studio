@@ -151,6 +151,49 @@ That third row is worth naming explicitly because it is Developer's only removal
 
 **Consequence for R3a.** Suppression remains the mechanism whose *two halves* must be set together, and it remains the right answer for modifier twins. It is no longer claimed as the universal default. Deletion is a first-class outcome, not a fallback.
 
+### R3f — Layer families, and the collateral of removing a key
+
+Author direction (2026-08-03), and it supersedes R3c's looser "layer kind" heuristic with a real structural model: *"complain loudly if the user tries to make a change to one layer that conflicts with the placement of keys on other similar layers (shift, Caps, RAlt, Alt, Ctrl, RAlt Ctrl, etc.) but symbol or emoji layers are likely to be freeform."*
+
+**The grid is not editing one layer. It is editing a family of parallel layers.** A layer id decomposes as `[<plane>-]<modifier-combo>`, absent plane meaning the base alphabetic plane:
+
+| Plane | Family members (Cameroon) |
+|---|---|
+| alphabetic | `default`, `shift`, `caps`, `rightalt`, `rightalt-shift`, `rightalt-caps` |
+| symbol | `symbol`, `symbol-caps` |
+
+Parallelism is expected **within** a family and not **across** planes. That is precisely the invariant the author's blank-key method exists to protect, and the one thing an author cannot verify by eye across eight layers — which is why it earns a loud complaint rather than a quiet hint.
+
+**This is new machinery.** [modifierCombos.ts](../../packages/engine/src/pattern-apply/modifierCombos.ts) gives only the forward direction: `comboToTouchLayerId(tokens)` emits `"rightalt-shift"` or `"default"`. There is **no inverse and no plane concept** — `symbol-caps` is not something `comboToTouchLayerId` can produce, since `symbol` is not a `ModifierToken`. The decomposition, the family grouping, and the parallelism comparison all have to be built.
+
+**Fail silent on layouts we do not understand.** An unparseable layer id becomes its own freeform plane, never a family member (FR-067). Imported keyboards name layers arbitrarily — `gff_amharic` has 53 layers named after Ethiopic consonants, `fv_southern_carrier` has 35 — and a decomposition that guessed at those would emit a wave of false complaints. Silence is the correct failure mode for a heuristic that drives a *loud* warning.
+
+#### The bottom-row exception makes the check property-scoped
+
+Author direction: *"sometimes the modifier keys will change appropriately on the bottom row."* Correct, and it means parallelism cannot be compared key-wholesale. For frame and layer-switch keys, some properties **must** vary across the family:
+
+| Property | Across a family | Why |
+|---|---|---|
+| `sp` | **varies by design** | `1`/`2` alternation — the Shift key is active on `shift`, inactive on `default` (R3b) |
+| `nextlayer` | **varies by design** | from `default` you go *to* `shift`; from `shift` you come *back* |
+| `id`, keycap `text` | **may vary** | Cameroon uses `T_LOWER` on `symbol`, `T_UPPER` on `symbol-caps`, `T_CAPS` as a `K_SHIFT` multitap child — equivalent jobs, different ids at the same position |
+| **position, width** | **must stay parallel** | a Shift key that moves or resizes between layers is real drift |
+
+So the exemption is **property-scoped, not key-scoped**, and it is keyed on the key being a frame/layer-switch key rather than on a row index (the bottom row is a convention, not a rule). This is also exactly the property split [check-18-4](../../packages/keyboard-lint/src/checks/check-18-4-control-key-drift.ts) would need before its `CONTROL_KEY_IDS` could be widened past `K_BKSP`/`K_ENTER` — see the latent-trap note in R3b.
+
+#### Collateral: what a removal actually discards
+
+A key is a small tree, and the keycap shows only its root. Removing or suppressing it discards the key's own output **plus every longpress, flick, and multitap sub-key beneath it** — outputs the author cannot see on the grid. Cameroon is the worked case: suppressing `T_0021` also destroys the `U_00A1` (`¡`) longpress under it, and `T_003F` hides `U_00BF` (`¿`) the same way.
+
+Two refinements that decide whether the warning gets read or dismissed:
+
+1. **Separate "becomes unreachable" from "still available elsewhere"** (FR-061). The author's own example — deleting the apostrophe key because punctuation now lives on a symbol layer — discards nothing in practice. A warning that cannot tell that from real loss trains the author to click through it. Coverage already knows the difference; the warning must use it.
+2. **Re-place, don't just report** (FR-062). Characters that lose their *last* mechanism return to the unplaced worklist, count toward the shared progress figures (FR-036d), and are offered for placement. "These letters will need to be re-placed" is a workflow obligation, not a notice.
+
+#### Cross-layer deletion
+
+Removing the apostrophe key means removing it from every layer of its family, not clicking through six layers. So removal MUST offer family-wide scope as the *proposed* action (FR-065), first showing every affected layer with its per-layer content — the same position may hold a different character on `shift` than on `default`, and the collateral differs per layer too.
+
 ### R3b — Modifier keys must be marked active on their own layer
 
 Recorded from author direction (2026-08-03). A layer-switching key must carry **`sp:2` (specialActive)** on the layer it switches *to*, and `sp:1` (special) elsewhere. The Shift key on the `shift` layer is active; the Shift key on `default` is not. This is what makes the OSK show the engaged modifier as engaged.
