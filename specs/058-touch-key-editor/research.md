@@ -60,6 +60,29 @@ Separately, `TouchKeyIR.sp`'s doc comment in [keyboard-ir.ts](../../packages/con
 
 ## R3. Field-by-field streamlining verdict
 
+### The rule that generates these verdicts *(read before changing any of them)*
+
+An earlier draft of this document cut Developer's six `sp` values to three and was reversed on author direction (R3a). The failure was not the individual call but the absence of a stated rule, so here it is:
+
+> **Mechanism is kept; ceremony is cut.**
+>
+> **Mechanism** = anything that changes what the keyboard *does* — every value the file format can express. Keep all of it and add a *proposed default*. §3c "defaults are the product" licenses **proposing** a value, never **removing** the ability to set one. If a verdict makes something the format can express unreachable in our UI, the verdict is wrong.
+>
+> **Ceremony** = what the author must know, remember, and keep in sync to operate the tool. Cut freely.
+
+Four cuts follow from that rule, and they are the only legitimate kinds:
+
+1. **Collapse duplicate input surfaces.** Two boxes for typing one value is ceremony (Text + Text Unicode; Hint + Hint Unicode). One field that accepts either form loses nothing.
+2. **Change presentation, not reach.** Presets up front with numeric entry under Advanced (width, padding). Every value stays reachable at Developer's own bounds.
+3. **Remove workarounds for gaps Developer has and we do not.** The device-photo chooser exists because Developer has no live OSK; the raw JSON view exists because its editor validates nothing; `T_new_<n>` exists because it has no proposal engine; the templates and KVK import exist because it cannot derive from `.kmn` rules. Fix the cause and the workaround is not a loss.
+4. **Drop what violates a locked decision of ours.** Free-text layer names (specs/008 — layer ids are auto-derived), and platform/layer deep-copy on add (silently duplicates a layer's whole key set).
+
+And one addition that is not subtraction, and is where most of the value is: **make compound edits single actions.** Suppression is two fields in Developer that must agree (R3a); active-modifier typing is a field you must remember (R3b); assigning a letter spans a keycap, an id, and a `.kmn` rule across two files and two tools. Each becomes one action with a proposal, and a disagreement between the halves becomes a finding rather than a compile-time surprise.
+
+Scored against that rule, the inspector below keeps **11 of 13 fields**, merges 2 pure duplicates, and drops **no capability at all**; everything genuinely dropped is outside the inspector and falls under cut 3 or 4. Deferred items (flicks, multitap, rows, layers — R8) are a schedule statement, not a capability statement.
+
+
+
 Developer's key inspector has thirteen fields. Verdicts, with reasons.
 
 | Developer field | Verdict | Reason / replacement |
