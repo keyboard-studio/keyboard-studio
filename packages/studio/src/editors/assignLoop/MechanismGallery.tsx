@@ -462,10 +462,21 @@ type Method = "sequence" | "deadkey" | "swap";
 // to a non-empty token (generic ALT, or RALT once the keyboard already uses
 // a chiral alt token — see raltDefaultToken), mirroring the pre-merge
 // "Layer + key" card's always-prefilled first slot; every slot added after
-// that starts unselected ("") — Apply is disabled until it is filled or
+// that defaults to the first still-available modifier token (per
+// optionsForRaltSlot's earlier-slot exclusions) that the keyboard already
+// uses elsewhere, else falls back to unselected ("") — see
+// handleAddRaltSlot. Apply is disabled until an unselected slot is filled or
 // removed (see canApply / handleRemoveRaltSlot, which now allows removing
 // all the way back to zero).
 const MAX_RALT_SLOTS = 4;
+
+// Modifier tokens that stay selectable in the layer-combo dropdowns but are
+// never used as the auto-default for a newly-added slot (see
+// handleAddRaltSlot). CAPS is reported as "in use" by collectModifierTokensInUse
+// for any keyboard carrying routine CAPS/NCAPS case-handling rules, but it is a
+// case/state modifier rather than a layer an author reaches for — auto-filling
+// it would surprise. (NCAPS is never in the pool at all — see computeModifierPool.)
+const AUTO_DEFAULT_EXCLUDED: ReadonlySet<ModifierToken> = new Set(["CAPS"]);
 
 /**
  * Per-family dropdown option pool, derived once per keyboard from the
@@ -1716,18 +1727,23 @@ export function MechanismGallery({
     identity?.bcp47 !== undefined && identity.bcp47 !== ""
       ? identity.bcp47
       : undefined;
-  const suggestion = useMemo(
-    (): PlacementSeedEntry | null =>
-      placementMap !== undefined && currentChar !== null
-        ? getSuggestionForCharWithCasePair(
-            currentChar,
-            placementMap,
-            PLACEMENT_SEED_CONFIDENCE_THRESHOLD,
-            suggestionBcp47,
-          )
-        : null,
-    [currentChar, placementMap, suggestionBcp47],
-  );
+  const suggestion = useMemo((): PlacementSeedEntry | null => {
+    if (placementMap === undefined || currentChar === null) return null;
+    const raw = getSuggestionForCharWithCasePair(
+      currentChar,
+      placementMap,
+      PLACEMENT_SEED_CONFIDENCE_THRESHOLD,
+      suggestionBcp47,
+    );
+    // Never surface a CAPS-based placement as a *suggestion*: CAPS is a
+    // case/state modifier, not a layer an author reaches for, so a "Caps + key"
+    // recommendation surprises more than it helps. This suppresses only the
+    // suggestion row (and its accept button) for a CAPS-carrying candidate —
+    // CAPS stays fully available as a manual layer pick (computeModifierPool
+    // still offers it in every dropdown) and everywhere else is untouched.
+    if (raw !== null && raw.topCandidate.modifiers.includes("CAPS")) return null;
+    return raw;
+  }, [currentChar, placementMap, suggestionBcp47]);
 
   // Canonicalized modifier combo for the S-08 suggestion row's display text +
   // aria-labels — derived from the candidate's OWN modifiers (never a
@@ -2095,11 +2111,25 @@ export function MechanismGallery({
       if (prev.length >= MAX_RALT_SLOTS) return prev;
       // The FIRST layer added defaults to raltDefaultToken (mirrors the
       // pre-merge "Layer + key" card, which always started with one
-      // pre-filled slot) — every slot added after that starts unselected
-      // ("") until the author picks one (canApply blocks Apply meanwhile).
-      return [...prev, prev.length === 0 ? raltDefaultToken : ""];
+      // pre-filled slot). Every slot added after that defaults to the first
+      // still-available LAYER modifier (per optionsForRaltSlot's earlier-slot
+      // exclusions) that the keyboard already uses elsewhere — modifierPool
+      // leads with SHIFT, so this surfaces Shift automatically once Shift is
+      // in use. CAPS is excluded from the auto-default (AUTO_DEFAULT_EXCLUDED):
+      // collectModifierTokensInUse reports it from routine CAPS/NCAPS
+      // case-handling rules, but CAPS is a case/state modifier rather than a
+      // layer an author reaches for, so auto-filling it surprises more than it
+      // helps — it stays a selectable dropdown option, just never the default.
+      // If no eligible option is in use, the slot falls back to unselected ("")
+      // until the author picks one (canApply blocks Apply meanwhile).
+      if (prev.length === 0) return [...prev, raltDefaultToken];
+      const available = optionsForRaltSlot(modifierPool, prev, prev.length);
+      const inUseDefault = available.find(
+        (tok) => !AUTO_DEFAULT_EXCLUDED.has(tok) && modifierTokensInUse.has(tok),
+      );
+      return [...prev, inUseDefault ?? ""];
     });
-  }, [raltDefaultToken]);
+  }, [raltDefaultToken, modifierPool, modifierTokensInUse]);
 
   const handleRemoveRaltSlot = useCallback((index: number) => {
     // No minimum — the combined card's zero-layer state is valid (a plain

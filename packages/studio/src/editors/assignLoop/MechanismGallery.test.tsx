@@ -2289,6 +2289,45 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
       "[RALT K_F]",
     );
   });
+
+  it("suppresses the suggestion row when the top placement candidate is CAPS-based", async () => {
+    // CAPS is a case/state modifier, not a layer an author reaches for, so a
+    // "Caps + key" recommendation must not be surfaced as a suggestion. The
+    // candidate below would otherwise render an S-08 suggestion row (same
+    // shape as ffHookPlacementMap's RALT candidate); the CAPS token must
+    // suppress it entirely. CAPS remains selectable as a manual layer pick —
+    // that path is covered by the layer-picker tests above and is untouched.
+    const capsPlacementMap: PlacementMap = {
+      entries: [
+        {
+          codepoint: "U+03B5",
+          candidates: [
+            {
+              vkey: "K_E",
+              modifiers: ["RALT", "CAPS"],
+              mechanism: "direct",
+              priorSource: "phonetic",
+              priorCount: 0,
+              confidence: 0.9,
+            },
+          ],
+        },
+      ],
+    };
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={capsPlacementMap}
+        />,
+      );
+    });
+
+    expectCurrentChar("ε");
+    // No suggestion row at all for a CAPS-carrying candidate.
+    expect(screen.queryByText(/Suggested:/i)).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -2880,7 +2919,14 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
     await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), "K_E");
     fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
-    await changeSelectMenu(screen.getByLabelText(/Layer 2 for layer-switch combo/i), "SHIFT");
+    // Fallback path: with nothing in use, the second slot starts unselected
+    // ("") — the author must pick before Apply. Locks in the else-branch of
+    // handleAddRaltSlot's in-use default.
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLElement;
+    expect(selectMenuValue(secondLayerSelect)).toBe("");
+    await changeSelectMenu(secondLayerSelect, "SHIFT");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for Ε/i }));
 
     const assignments = useWorkingCopyStore
@@ -2895,6 +2941,65 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrOutputList"]).toBe(
       "Ε",
     );
+  });
+
+  it("defaults the SECOND layer slot to SHIFT when Shift is already in use elsewhere in the working IR", async () => {
+    // Slot 1 still defaults to the alt-family token (raltDefaultToken is
+    // untouched by this change). The SECOND slot is what should now auto-fill
+    // instead of starting unselected: seed SHIFT as already "in use" via an
+    // unrelated K_W rule, then confirm the author never has to touch the
+    // Layer 2 dropdown themselves for it to read SHIFT.
+    instantiateWithModifiersInUse("K_W", ["SHIFT"]);
+    seedInventory(["Ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), "K_E");
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+
+    // Pre-filled with SHIFT — no explicit changeSelectMenu call for slot 2.
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLElement;
+    expect(selectMenuValue(secondLayerSelect)).toBe("SHIFT");
+
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for Ε/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
+      "[SHIFT ALT K_E]",
+    );
+  });
+
+  it("never auto-fills the SECOND slot with CAPS, even when CAPS is the only in-use modifier", async () => {
+    // CAPS is reported as "in use" by any keyboard with routine CAPS/NCAPS
+    // case-handling rules, but it is a case/state modifier rather than a layer
+    // — it must NOT auto-fill the second slot (that would surprise). It stays
+    // selectable in the dropdown; the author picks it explicitly if they want.
+    instantiateWithModifiersInUse("K_W", ["CAPS"]);
+    seedInventory(["Ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), "K_E");
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLElement;
+    // Not auto-filled with CAPS — stays unselected until the author picks.
+    expect(selectMenuValue(secondLayerSelect)).toBe("");
+    // ...but CAPS is still offered as an explicit choice.
+    const optionValues = await selectMenuOptionValues(secondLayerSelect);
+    expect(optionValues).toContain("CAPS");
   });
 
   it("unifies an author's Ctrl + (chiral) Alt pick to the generic [CTRL ALT K_E] (#defect: AltGr not working)", async () => {
