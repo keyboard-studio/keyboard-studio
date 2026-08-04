@@ -40,6 +40,7 @@ import { useGitHubAuth } from "./hooks/useGitHubAuth.ts";
 import { type RouteId } from "./lib/navigate.ts";
 import { parseLocation } from "./lib/location.ts";
 import { setPendingWelcomeLocation } from "./lib/jumpToLocation.ts";
+import { readPaneSplitPct, useViewStateStore } from "./stores/viewStateStore.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
@@ -605,9 +606,26 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     };
   }, [githubToken, resumeMeta]);
 
-  const [oskMode, setOskMode] = useState<OskMode>("desktop");
-  const { containerRef, leftPct, onPointerDown } =
-    useResizablePanes({ minPct: SURVEY_LEFT_MIN_PCT, maxPct: SURVEY_LEFT_MAX_PCT, initPct: SURVEY_LEFT_INIT_PCT });
+  // Spec 057 US5 (FR-050): the OSK mode and the pane split are VIEW state, not
+  // authoring state — they had been component `useState`, which the route
+  // unmount destroyed on every tab switch. Backed by the session-scoped
+  // viewStateStore they survive the round trip and die on reload (Q9), and
+  // neither read nor write can reach a compile or a validator run (FR-053).
+  const oskMode = useViewStateStore((s) => s.oskMode.survey);
+  const setSurveyOskMode = useViewStateStore((s) => s.setOskMode);
+  const setOskMode = useCallback(
+    (mode: OskMode) => setSurveyOskMode("survey", mode),
+    [setSurveyOskMode],
+  );
+  const setPaneSplitPct = useViewStateStore((s) => s.setPaneSplitPct);
+  const { containerRef, leftPct, onPointerDown } = useResizablePanes({
+    minPct: SURVEY_LEFT_MIN_PCT,
+    maxPct: SURVEY_LEFT_MAX_PCT,
+    // Clamped on READ, so a split stored under a different layout can never
+    // produce an unusable pane here.
+    initPct: readPaneSplitPct("survey", SURVEY_LEFT_MIN_PCT, SURVEY_LEFT_MAX_PCT),
+    onChange: (pct) => setPaneSplitPct("survey", pct),
+  });
 
   // Sync localBase when the prop changes (e.g. after a start-over that sets a new base).
   // localBase lives in the session store; we update it when the working-copy's baseKeyboard
@@ -1110,6 +1128,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // baseline goes too, so the first boundary of the new session establishes a
     // fresh one instead of diffing against the abandoned keyboard's text.
     useDecisionLogStore.getState().reset();
+    // Spec 057 FR-052: view state clears with the session it belongs to. This
+    // is one of exactly TWO places a reset is legitimate (the other is
+    // WelcomeScreen's "I'm new") — the same two the survey-session store's own
+    // reset lives in. Leaving a prior project's collapsed stages, pane splits
+    // and Compare selection behind would make the next keyboard open in a
+    // layout the author never chose for it.
+    useViewStateStore.getState().reset();
     snapshotterRef.current.reset();
     pendingArtifactRef.current = null;
     // F6 fix: re-arm the pre-instantiation pending autosave for the NEXT
@@ -1501,6 +1526,19 @@ export function StudioShell() {
   const outputNavBlocked = useInventoryCoverageGate().blocked;
 
   // ---------------------------------------------------------------------------
+  // Per-tab view state (spec 057 US5, FR-050). Read HERE rather than in the
+  // views themselves: `dashboard/` and `decisions/` have no `stores/` import
+  // (the depcruise layer rules), so these follow the same prop route
+  // `completenessReport`, `axisFills` and `pathOverlay` already take.
+  // ---------------------------------------------------------------------------
+  const flowMapSection = useViewStateStore((s) => s.flowMapSection);
+  const setFlowMapSection = useViewStateStore((s) => s.setFlowMapSection);
+  const trailCollapsedSteps = useViewStateStore((s) => s.trailCollapsedSteps);
+  const toggleTrailStage = useViewStateStore((s) => s.toggleTrailStage);
+  const trailShowSuperseded = useViewStateStore((s) => s.trailShowSuperseded);
+  const setTrailShowSuperseded = useViewStateStore((s) => s.setTrailShowSuperseded);
+
+  // ---------------------------------------------------------------------------
   // Decision trail (spec 053 US1). Same arrangement as completenessReport above:
   // read the stores here, pass plain values down, so decisions/ needs no store
   // import and the trail is renderable against a fixture record.
@@ -1586,6 +1624,14 @@ export function StudioShell() {
           axisFills={axisFills}
           {...(pathOverlay !== undefined ? { pathOverlay } : {})}
           resolveAlternative={resolveStepAlternative}
+          // Spec 057 US5 (FR-050): the selected section is view state. It
+          // arrives as a read-once initial value plus a change notification —
+          // the same shape `useResizablePanes` takes — because `dashboard/`
+          // may not import `stores/` (the depcruise dashboard-layer rule), so
+          // the store is read HERE and passed down exactly as
+          // `completeness`/`axisFills`/`pathOverlay` already are.
+          initialSection={flowMapSection}
+          onSectionChange={setFlowMapSection}
         />
       );
       break;
@@ -1598,6 +1644,13 @@ export function StudioShell() {
           record={decisionRecord}
           droppedCount={decisionDroppedCount}
           resolveImpact={resolveEntryImpact}
+          // Spec 057 US5 (FR-050): per-stage collapse and the replaced-
+          // decisions toggle are view state, read here for the same
+          // layer-boundary reason as the flow map's section above.
+          initialCollapsedSteps={trailCollapsedSteps}
+          onToggleStage={toggleTrailStage}
+          initialShowSuperseded={trailShowSuperseded}
+          onShowSupersededChange={setTrailShowSuperseded}
         />
       );
       break;

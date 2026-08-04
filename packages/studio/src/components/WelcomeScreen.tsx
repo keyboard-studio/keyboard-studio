@@ -16,6 +16,7 @@ import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { markVisited } from "../lib/firstVisit.ts";
 import { consumePendingWelcomeLocation, jumpToLocation } from "../lib/jumpToLocation.ts";
+import { useViewStateStore } from "../stores/viewStateStore.ts";
 import { discardActiveDraft } from "../lib/draftPersistence.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -181,6 +182,10 @@ export function WelcomeScreen() {
               discardActiveDraft();
               useSurveySessionStore.getState().reset();
               useWorkingCopyStore.getState().reset();
+              // Spec 057 FR-052: view state clears with the session. This and
+              // StudioShell's handleStartOver are the only two places a reset
+              // belongs — the same two the survey-session reset above lives in.
+              useViewStateStore.getState().reset();
               leaveWelcome(() => navigateTo("survey"));
             }}
             style={{
