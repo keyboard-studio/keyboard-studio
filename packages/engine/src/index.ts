@@ -255,9 +255,68 @@ export type { CarveNeededSet, DeriveCarveNeededSetArgs } from "./marks/carve-nee
 export { applyMarkGuards, MARKS_GUARD_GROUP, MARKS_UNWRAP_FROM_STORE, MARKS_UNWRAP_TO_STORE } from "./pattern-apply/mark-guards.js";
 export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
 
+// spec 058 — key-level touch layout edit overlay: step 1.7 of
+// projectWorkingCopyVfs (the layout half, Case B) plus the shared address
+// parser its rule-half sibling pass reuses (contracts/key-edit-overlay.md).
+export { applyKeyEditsToVfs, parseTouchKeyAddress } from "./pattern-apply/index.js";
+export type {
+  ApplyKeyEditsToVfsResult,
+  TouchKeyAddressParts,
+  KeyEditOperation,
+  RenameKeyOp,
+} from "./pattern-apply/index.js";
+
+// spec 058 T059 — the studio-side address-matched provenance promotion path
+// (touchBehavior.ts's promoteKeyAtAddressToHandSet) reuses this SAME resolver
+// rather than re-deriving platform/layer/row traversal a third time
+// (contracts/key-edit-overlay.md §5).
+export { resolveKeyAddress } from "./pattern-apply/index.js";
+export type { AddressableLayoutLike, ResolvedKeyLocation } from "./pattern-apply/index.js";
+
+// spec 058 T060 — re-derivation resilience (FR-033b): `resolveSubKeyEntry`
+// lets a studio-side correlation pass (keyEditOrphanReport.ts) resolve an
+// orphaned setSubKey/removeSubKey's sub-entry against the layout the
+// overlay was originally authored against, the same way `resolveKeyAddress`
+// resolves the main key; `declaredOperationOutput` answers the cheap,
+// layout-free half of "what character did this operation carry" for the
+// three op kinds that author `output` directly.
+export { resolveSubKeyEntry, declaredOperationOutput } from "./pattern-apply/index.js";
+
+// spec 058 T048/T063 — overlay replay is how a studio-side surface folds the
+// overlay into an *effective* layout to project from (the key grid's view
+// model, the preview's live-layout override). Case A's applier is exported
+// beside it because replay is a thin wrapper over that loop.
+export { applyKeyEditsToLayout, replayKeyEditOverlay } from "./pattern-apply/index.js";
+export type {
+  ApplyKeyEditsToLayoutResult,
+  ReplayKeyEditOverlayResult,
+} from "./pattern-apply/index.js";
+
+// spec 058 T061 — layer-family decomposition and grouping (FR-063/FR-067).
+// Studio-facing because "family order" is what orders layers in the key grid's
+// context-carry (T074) and in the parallelism complaints (T107-T110). Without
+// this export those surfaces duplicate the decomposition grammar, which is
+// exactly the drift layer-families.md exists to prevent.
+export {
+  decomposeLayerId,
+  groupLayerFamilies,
+  // The total order over ModifierToken that family-internal sorting needs.
+  // `comboToTouchLayerId` cannot substitute: its id fragments are lossy for
+  // the chiral pairs (both LALT and ALT render as "alt"), so per-chirality
+  // precedence is unrecoverable from the id-building surface alone.
+  TOUCH_LAYER_PRECEDENCE_ORDER,
+} from "./pattern-apply/index.js";
+export type {
+  ParsedLayerId,
+  FreeformLayerId,
+  LayerIdDecomposition,
+  LayerFamily,
+  LayerFamilyGrouping,
+} from "./pattern-apply/index.js";
+
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
 export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, describeStorePairing, analyzeStores, storeRoleOf, buildProducerIndex, parseSlotId, makeSlotId, collectCharContributors, collectCompositionMethod, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap, addableTouchLayerTokens, optionsForTouchLayerSlot, isPlusSeparator, touchKeyAddress, touchSubKeyAddress, touchFlickAddress, enumerateTouchMethodsForChar, applyTouchKeycapRemovalsToLayout, applyTouchKeycapRemovalsToRawJson, applyTouchKeycapRemovalsToVfs, buildSessionProducedSet } from "./pattern-apply/index.js";
-export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, DesktopModifications, ApplyDesktopModificationsResult, ApplyDesktopModificationsToRawJsonResult, PropagateDesktopLayersToTouchResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, StorePairingDescription, StoreAnalysis, StoreRole, ProducerIndex, CharContributors, ContributorDescriptor, ShiftAssignmentPlan, ModifierToken, TouchMethodDescriptor, ApplyTouchKeycapRemovalsResult, ApplyTouchKeycapRemovalsToRawJsonResult } from "./pattern-apply/index.js";
+export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, DesktopModifications, ApplyDesktopModificationsResult, ApplyDesktopModificationsToRawJsonResult, PropagateDesktopLayersToTouchResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, StorePairingDescription, StoreAnalysis, StoreRole, ProducerIndex, CharContributors, ContributorDescriptor, ShiftAssignmentPlan, ModifierToken, TouchMethodDescriptor, ApplyTouchKeycapRemovalsResult, ApplyTouchKeycapRemovalsToRawJsonResult, KeyEditOverlay } from "./pattern-apply/index.js";
 
 // Facet-transform (spec 039): switch a base's source-construction facet value on
 // the working copy — propose-then-confirm, KeyboardIR copy-return, gated commit.

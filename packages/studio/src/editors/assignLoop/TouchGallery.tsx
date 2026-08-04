@@ -60,8 +60,10 @@ import {
   useEffect,
   useMemo,
   useCallback,
+  useId,
   useRef,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import type { I18n } from "@lingui/core";
 import { msg, plural } from "@lingui/core/macro";
@@ -82,8 +84,13 @@ import {
   formatUncoveredTouchMessage,
   computeTouchCoverage,
   buildTouchKeyRuleIndex,
+  isSpacerKeyClass,
 } from "@keyboard-studio/contracts";
-import type { DesktopModifications, ModifierToken } from "@keyboard-studio/engine";
+import type {
+  DesktopModifications,
+  ModifierToken,
+  KeyEditOperation,
+} from "@keyboard-studio/engine";
 import {
   parseTouchLayout,
   touchCoverage,
@@ -99,6 +106,8 @@ import {
   addableTouchLayerTokens,
   optionsForTouchLayerSlot,
   caseCounterpart,
+  replayKeyEditOverlay,
+  parseTouchKeyAddress,
 } from "@keyboard-studio/engine";
 import type { TouchMethodDescriptor } from "@keyboard-studio/engine";
 import {
@@ -127,7 +136,20 @@ import { ErrorText } from "../../ui/index.ts";
 import {
   useWorkingCopyStore,
   type BulkAccentGroup,
+  type TouchEditorMode,
+  type UndoEntry,
 } from "../../stores/workingCopyStore.ts";
+import {
+  buildKeyGridViewModel,
+  type KeyGridCellViewModel,
+  type KeyGridViewModel,
+} from "./keyGrid/keyGridViewModel.ts";
+import {
+  KeyGrid,
+  type KeyGridPlatformTab,
+  type KeyGridProvenance,
+} from "./keyGrid/KeyGrid.tsx";
+import { useGridNav } from "./keyGrid/useGridNav.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { collateInventory } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
@@ -160,10 +182,8 @@ import {
 } from "./existingMethodLabels.ts";
 import { isMutateSeamEnabled } from "../../flags/mutateFlag.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
-import type {
-  ScaffoldSpec,
-  VfsTransform,
-} from "../../hooks/useKeyboardArtifact.ts";
+import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
+import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
@@ -260,6 +280,115 @@ function dirArrow(dir: string): string {
   if (dir === "e") return "→"; // right
   if (dir === "w") return "←"; // left
   return dir;
+}
+
+// ---------------------------------------------------------------------------
+// Key mode (spec 058 T072/T073/T075) — shared helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * `K_SPACE` is the one established scaffold convention
+ * (`scaffoldTouchLayout.ts`'s `buildLetterKey`/row builders) that legitimately
+ * carries no `text`/`output` of its own and does not use the asterisk
+ * convention every other functional key (`*Shift*`, `*BkSp*`, `*Enter*`, …)
+ * uses — the space bar's output is a KMW base-keystroke identity, not
+ * something a `.kmn` rule or a scaffolded `output` field ever states. Excluded
+ * by id rather than by the asterisk check below, which does not apply to it.
+ */
+const KEY_MODE_NON_LETTER_ALLOWLIST = new Set(["K_SPACE"]);
+
+/**
+ * A cell counts as "no reachable output" (FR-036, FR-036d) when it is not a
+ * non-interactive spacer/blank (`isSpacerKeyClass`), not a functional keycap
+ * (the established `*Shift*`/`*BkSp*`/… asterisk convention `touch-
+ * coverage.ts`'s own `collectKeyChars` push() already excludes on), not the
+ * one allow-listed space-bar id above, AND `producedChars` — the SAME
+ * single-source production semantics `keyGridViewModel.ts` derives and the
+ * grid itself renders from — is empty. Reusing that exact field (rather than
+ * re-deriving "does this key produce anything") is what keeps this predicate
+ * and the grid's own display from ever disagreeing.
+ */
+function isNoOutputLetterCell(cell: KeyGridCellViewModel): boolean {
+  if (isSpacerKeyClass(cell.sp)) return false;
+  if (cell.keycap.startsWith("*")) return false;
+  if (KEY_MODE_NON_LETTER_ALLOWLIST.has(cell.id)) return false;
+  return cell.producedChars.length === 0;
+}
+
+/** Localized label for a `.keyman-touch-layout` platform id (T072's key-mode
+ * platform tabs). Takes an optional i18n + resolves via msg()/resolveMessage()
+ * — see touchMechanismLabel's doc comment just below for why a bare `t`
+ * parameter would break Lingui's static extraction here. */
+function touchModePlatformLabel(id: string, i18n?: I18n): string {
+  if (id === "phone") {
+    return resolveMessage(
+      i18n,
+      msg({ id: "editor.assignLoop.touch.keyMode.platform.phone", message: "Phone" }),
+    );
+  }
+  if (id === "tablet") {
+    return resolveMessage(
+      i18n,
+      msg({ id: "editor.assignLoop.touch.keyMode.platform.tablet", message: "Tablet" }),
+    );
+  }
+  if (id === "desktop") {
+    return resolveMessage(
+      i18n,
+      msg({
+        id: "editor.assignLoop.touch.keyMode.platform.desktop",
+        message: "Desktop touch",
+      }),
+    );
+  }
+  return id;
+}
+
+/**
+ * Structured description of what the top of the shared `undoStack` (spec 058
+ * FR-036g — ONE chronological stack across both touch-step modes) is about to
+ * undo. Deliberately data-only (no localized strings): the caller builds the
+ * actual accessible label via `t()` calls in its own `useLingui()` scope (see
+ * `touchMechanismLabel`'s doc comment on why a helper cannot own that part).
+ *
+ * `null` when the stack is empty, or (for a `'k'` entry) when the referenced
+ * op has already been evicted from `keyEditOps` — an ordinary "nothing to
+ * describe" outcome, never a crash (matches `parseTouchKeyAddress`'s own
+ * never-throw convention).
+ */
+export type UndoTargetDescription =
+  | { kind: "node"; id: string }
+  | { kind: "item"; id: string }
+  | { kind: "touchKey"; keyId: string }
+  | { kind: "batch"; count: number }
+  | { kind: "keyEdit"; keyId: string; opKind: KeyEditOperation["kind"] }
+  | null;
+
+export function describeUndoTarget(
+  entry: UndoEntry | undefined,
+  keyEditOps: readonly KeyEditOperation[],
+): UndoTargetDescription {
+  if (entry === undefined) return null;
+  switch (entry.k) {
+    case "n":
+      return { kind: "node", id: entry.id };
+    case "i":
+      return { kind: "item", id: entry.id };
+    case "batch":
+      return { kind: "batch", count: entry.nodeIds.length + entry.itemIds.length };
+    case "t": {
+      const parts = parseTouchKeyAddress(entry.id);
+      return { kind: "touchKey", keyId: parts?.keyId ?? entry.id };
+    }
+    case "k": {
+      const op = keyEditOps.find((o) => o.seq === entry.seq);
+      if (op === undefined) return null;
+      const parts = parseTouchKeyAddress(op.address);
+      return { kind: "keyEdit", keyId: parts?.keyId ?? op.address, opKind: op.kind };
+    }
+    default:
+      return null;
+  }
 }
 
 /** Produce a human-readable label for a single configured mechanism chip.
@@ -1419,6 +1548,33 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     useShallow((s) => s.session.axes as Partial<DiscoveryAxisVector>),
   );
 
+  // The committed key-level touch layout edit overlay (spec 058) — read here
+  // so it can be threaded into useWorkingCopyTransform's liveLayoutOverride
+  // below (T054), folded into the key-mode grid's effective layout (T072),
+  // and read for the undo affordance's description (T076).
+  const keyEditOverlay = useWorkingCopyStore((s) => s.keyEditOverlay);
+
+  // Touch step mode selector (T072, FR-035/FR-036a) — a view toggle over the
+  // SAME step, never a branch: switching modes never clears touchDraft or
+  // keyEditOverlay (FR-036b — enforced by NOT wiring either to this switch).
+  const touchEditorMode = useWorkingCopyStore((s) => s.touchEditorMode);
+  const setTouchEditorMode = useWorkingCopyStore((s) => s.setTouchEditorMode);
+
+  // Undo affordance (T076, FR-036g) — ONE chronological stack across both
+  // modes. `undoDelete` already dispatches correctly per entry kind
+  // (including the 'k' key-edit kind this feature added) — reused as-is, not
+  // re-implemented here.
+  const undoStack = useWorkingCopyStore((s) => s.undoStack);
+  const undoDelete = useWorkingCopyStore((s) => s.undoDelete);
+
+  // Shared id linking the mode tablist's tabs (`aria-controls`) to whichever
+  // pane content is currently mounted — only one of characterModeContent/
+  // keyModeContent is ever in the DOM at a time, so reusing one id is safe.
+  const leftPaneId = useId();
+  const modeTabRefs = useRef<Map<TouchEditorMode, HTMLButtonElement>>(
+    new Map(),
+  );
+
   // spec 035 R3/R11 — the carve overlay + Phase C assignments feed
   // deriveDesktopModifications (mods memo below); touchSeedSource feeds the
   // R11 emission matrix. Read here (not inline in the memo) so the mods/
@@ -1788,22 +1944,235 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     return detectionSeedLayout;
   }, [touchLayoutJson, detectionSeedLayout]);
 
-  // VFS transform: inject the derived touch layout whenever touchLayoutJson
-  // is non-null (the R11 matrix above already decided emission — reseed
-  // always, import-adapt only when mods/edits warrant it). When
-  // touchLayoutJson is null — either the R11 matrix said "don't emit" or the
-  // emit pipeline failed — leave the VFS untouched so KMW renders its own
-  // polished native default (or the keyboard's shipped .keyman-touch-layout
-  // file is used verbatim, a byte-preserving no-op).
-  const vfsTransform = useMemo<VfsTransform>(
-    () => (vfs, kbId) => {
-      if (touchLayoutJson !== null) {
-        vfs.set(`source/${kbId}.keyman-touch-layout`, touchLayoutJson);
+  // ---------------------------------------------------------------------------
+  // Key mode (spec 058 T072/T073/T075) — the effective layout the schematic
+  // grid renders from, and the ONE shared set of progress figures both touch-
+  // step modes report (FR-036d).
+  // ---------------------------------------------------------------------------
+
+  // Fold the committed key-edit overlay onto the SAME effective layout the
+  // FR-008 completion gate audits (layoutForLintAndGate) — never a second,
+  // independently-folded copy. This is what lets the key-mode grid, the
+  // shared progress figures below, and the completion gate all agree on one
+  // truth about the layout's current state.
+  const effectiveKeyModeLayout = useMemo<TouchLayoutIR | null>(() => {
+    if (layoutForLintAndGate === null) return null;
+    if (keyEditOverlay.ops.length === 0) return layoutForLintAndGate;
+    try {
+      return replayKeyEditOverlay(layoutForLintAndGate, keyEditOverlay).layout;
+    } catch (err) {
+      devLog.error(
+        "[TouchGallery] effectiveKeyModeLayout overlay replay failed:",
+        err,
+      );
+      return layoutForLintAndGate;
+    }
+  }, [layoutForLintAndGate, keyEditOverlay]);
+
+  // ONE derived source (FR-036d): "characters still unplaced" and "keys with
+  // no letter" are two projections of the SAME effectiveKeyModeLayout +
+  // inventory — never two independently maintained counters. The keys-with-
+  // no-output scan reuses buildKeyGridViewModel (the exact function the grid
+  // itself renders cells from), so this count can never disagree with what
+  // the grid displays.
+  const keyGridProgress = useMemo<{
+    unplacedChars: readonly string[];
+    keysWithNoOutput: readonly string[];
+  }>(() => {
+    if (effectiveKeyModeLayout === null || touchRuleIndex === undefined) {
+      return { unplacedChars: inventory, keysWithNoOutput: [] };
+    }
+    const { uncovered } = touchCoverage(
+      effectiveKeyModeLayout,
+      inventory,
+      coverageOptions,
+    );
+    const keysWithNoOutput: string[] = [];
+    for (const platform of effectiveKeyModeLayout.platforms) {
+      for (const layer of platform.layers) {
+        const vm = buildKeyGridViewModel({
+          layout: effectiveKeyModeLayout,
+          ruleIndex: touchRuleIndex,
+          platform: platform.id,
+          layerId: layer.id,
+        });
+        if (vm === undefined) continue;
+        for (const row of vm.rows) {
+          for (const cell of row.keys) {
+            if (isNoOutputLetterCell(cell)) keysWithNoOutput.push(cell.address);
+          }
+        }
       }
-      return { warnings: [] };
-    },
-    [touchLayoutJson],
+    }
+    return { unplacedChars: uncovered, keysWithNoOutput };
+  }, [effectiveKeyModeLayout, touchRuleIndex, inventory, coverageOptions]);
+
+  // T073 (FR-036): propose the by-key mode ONLY when BOTH hold — the
+  // effective layout has keys with no reachable output AND the inventory
+  // still has unplaced characters. Neither alone is the "import fix-up"
+  // scenario this exists for: keys-with-no-output but nothing unplaced means
+  // the layout is already covering everything some other way; unplaced
+  // characters with no broken keys is the ordinary character-walk case.
+  const shouldProposeKeyMode =
+    keyGridProgress.keysWithNoOutput.length > 0 &&
+    keyGridProgress.unplacedChars.length > 0;
+
+  // Propose-then-confirm (spec v1.3.1 §3c) — never a silent jump. Dismissal
+  // is component-local (not persisted): this is a one-time nudge on entry,
+  // not durable working-copy state, so a remount (e.g. back-navigation to
+  // Phase C and forward again) is free to re-offer it if the condition still
+  // holds.
+  const [keyModeProposalDismissed, setKeyModeProposalDismissed] =
+    useState(false);
+
+  // Platform catalog for the key-mode grid's platform tabs (T077 already
+  // renders the tablist; this just supplies the catalog from the effective
+  // layout for the currently-mounted mode's grid).
+  const keyModePlatforms = useMemo<KeyGridPlatformTab[]>(() => {
+    if (effectiveKeyModeLayout === null) return [];
+    return effectiveKeyModeLayout.platforms.map((p) => ({
+      id: p.id,
+      label: touchModePlatformLabel(p.id, i18n),
+    }));
+  }, [effectiveKeyModeLayout, i18n]);
+
+  const [activeKeyPlatformId, setActiveKeyPlatformId] = useState<
+    string | null
+  >(null);
+  const [activeKeyLayerId, setActiveKeyLayerId] = useState<string>("default");
+  const [selectedKeyAddress, setSelectedKeyAddress] = useState<string | null>(
+    null,
   );
+
+  // Repair the active platform whenever the catalog changes (layout just
+  // loaded, or the previously-active platform id no longer exists) — falls
+  // back to the first platform rather than stranding the grid unselected.
+  useEffect(() => {
+    if (keyModePlatforms.length === 0) return;
+    setActiveKeyPlatformId((prev) =>
+      prev !== null && keyModePlatforms.some((p) => p.id === prev)
+        ? prev
+        : (keyModePlatforms[0]?.id ?? null),
+    );
+  }, [keyModePlatforms]);
+
+  const activeKeyPlatformEntry = useMemo(
+    () =>
+      effectiveKeyModeLayout?.platforms.find(
+        (p) => p.id === activeKeyPlatformId,
+      ),
+    [effectiveKeyModeLayout, activeKeyPlatformId],
+  );
+
+  // Repair the active layer the same way, scoped to the active platform's
+  // own layer catalog — prefers "default" (present on every real layout),
+  // else the platform's first layer.
+  useEffect(() => {
+    if (activeKeyPlatformEntry === undefined) return;
+    setActiveKeyLayerId((prev) =>
+      activeKeyPlatformEntry.layers.some((l) => l.id === prev)
+        ? prev
+        : (activeKeyPlatformEntry.layers.find((l) => l.id === "default")
+            ?.id ??
+            activeKeyPlatformEntry.layers[0]?.id ??
+            "default"),
+    );
+  }, [activeKeyPlatformEntry]);
+
+  const keyModeViewModel = useMemo<KeyGridViewModel | undefined>(() => {
+    if (
+      effectiveKeyModeLayout === null ||
+      touchRuleIndex === undefined ||
+      activeKeyPlatformId === null
+    ) {
+      return undefined;
+    }
+    return buildKeyGridViewModel({
+      layout: effectiveKeyModeLayout,
+      ruleIndex: touchRuleIndex,
+      platform: activeKeyPlatformId,
+      layerId: activeKeyLayerId,
+    });
+  }, [
+    effectiveKeyModeLayout,
+    touchRuleIndex,
+    activeKeyPlatformId,
+    activeKeyLayerId,
+  ]);
+
+  // Stable empty view model so useGridNav (a hook — cannot be called
+  // conditionally) always has a valid argument even before a real one exists.
+  const emptyKeyGridViewModel = useMemo<KeyGridViewModel>(
+    () => ({ platform: "", layerId: "", direction: "ltr", rows: [] }),
+    [],
+  );
+
+  const handleSelectKeyCell = useCallback((cell: KeyGridCellViewModel) => {
+    setSelectedKeyAddress(cell.address);
+  }, []);
+
+  const keyModeGridNav = useGridNav({
+    viewModel: keyModeViewModel ?? emptyKeyGridViewModel,
+    onSelectCell: handleSelectKeyCell,
+  });
+
+  // FR-034's honest provenance statement — the same resolvedSeedSource this
+  // gallery already threads through buildTouchLayoutJson/deriveSeedLayout
+  // above, not a second detection.
+  const keyModeProvenance: KeyGridProvenance =
+    resolvedSeedSource === "reseed-from-desktop"
+      ? "derived-from-base"
+      : "imported-existing";
+
+  // T076 (FR-036g): the undo affordance's description, derived from the top
+  // of the SAME shared undoStack `undoDelete` pops from.
+  const undoTargetDescription = useMemo(
+    () =>
+      describeUndoTarget(undoStack[undoStack.length - 1], keyEditOverlay.ops),
+    [undoStack, keyEditOverlay],
+  );
+
+  // ---------------------------------------------------------------------------
+  // ONE call site for a mode switch (T074 seam — do not scatter
+  // setTouchEditorMode calls across the tab click handler, the tablist's
+  // keyboard handler, and the propose-banner's accept button).
+  //
+  // FR-036c (T074, useModeContextCarry.ts — a sibling task, not implemented
+  // here) needs to select/reveal the producing key(s) when switching
+  // character->key, and land on a produced character when switching
+  // key->character. Every mode switch in this file — tab click, tab
+  // Left/Right/Home/End, and the T073 propose-banner's "Switch to key view" —
+  // already routes through this one function, so that hook has exactly one
+  // place to wrap (or this function can be extended in place) rather than
+  // three independent call sites that could drift.
+  // ---------------------------------------------------------------------------
+  const handleSwitchTouchEditorMode = useCallback(
+    (mode: TouchEditorMode) => {
+      setTouchEditorMode(mode);
+    },
+    [setTouchEditorMode],
+  );
+
+  // VFS transform: the shared working-copy projection factory (T054), NOT a
+  // hand-rolled local transform. The previous local `vfsTransform` here
+  // injected only `touchLayoutJson` directly into the VFS and never called
+  // projectWorkingCopyVfs — so the touch preview showed no carve, no
+  // identity, and no keycap-label projection (a preview-identity gap, R10.2:
+  // the preview and the emitted artifact disagreed). useWorkingCopyTransform
+  // runs the full projection order (carve -> key-edit overlay -> assignments
+  // -> layer propagation -> identity), with the touch layout half supplied
+  // via `liveLayoutOverride` — this gallery's own in-progress
+  // `touchLayoutJson` (derived above from `charTouch`, ahead of the Phase E
+  // commit that would otherwise write it to the store) plus the committed
+  // key-edit overlay ops. previewedBaseId is intentionally omitted: this is
+  // a post-commit gallery with no candidate-base picker of its own (see the
+  // hook's own previewedBaseId doc comment).
+  const vfsTransform = useWorkingCopyTransform({
+    liveLayoutOverride: {
+      touchLayoutJson,
+      keyEditOps: keyEditOverlay.ops,
+    },
+  });
 
   const { stage, retry } = useKeyboardArtifact(
     baseKeyboard,
@@ -3706,12 +4075,20 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // ArrowLeft/ArrowRight cycles the character no matter which control inside
   // the pane currently has focus — a plain native keydown bubbles up to here
   // regardless of the focused descendant. See useCharCycleKeys.ts.
-  const leftContent = (
+  //
+  // Renamed from the original `leftContent` (T072): this is now specifically
+  // the by-character mode's pane content. `leftContent` itself (declared
+  // further down) picks between this and `keyModeContent` per
+  // `touchEditorMode` — a view swap, not a fork (FR-036a/b): neither this
+  // component's state nor the store's touchDraft/keyEditOverlay is cleared by
+  // the swap.
+  const characterModeContent = (
     /* eslint-disable-next-line jsx-a11y/no-static-element-interactions --
        the bubbled keydown only ADDS a keyboard capability (ArrowLeft/Right
        character cycling regardless of focused descendant, per the comment
        above); the pane is not made pointer-interactive. */
     <div
+      id={leftPaneId}
       onKeyDown={handlePaneKeyDown}
       style={{
         display: "flex",
@@ -3787,6 +4164,65 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           baseDirectSet={touchBaseDirectSet}
           preAugmentSessionAwareSet={directTouchProducedSet}
         />
+      )}
+
+      {/* T073 (FR-036): propose — never silently route into — the by-key mode
+          when the effective layout has keys with no reachable output AND the
+          inventory still has unplaced characters (the "imported keyboard
+          needs fixing up before the character walk" case). Distinct button
+          copy from the shared Accept/Deny suggestion-card pair below (never
+          "Accept"/"Deny") so this banner cannot be picked up by a query aimed
+          at the per-character suggestion card. Dismissing (either button)
+          hides the banner for the rest of this mount; switching modes is
+          free and lossless either way (FR-036a), so declining costs nothing. */}
+      {shouldProposeKeyMode && !keyModeProposalDismissed && (
+        <ProposalCard
+          ariaLabel={t({
+            id: "editor.assignLoop.touch.keyModeProposal.ariaLabel",
+            message: "Suggestion: switch to the by-key view",
+          })}
+          message={
+            <Trans id="editor.assignLoop.touch.keyModeProposal.message">
+              Some keys on this touch layout don&rsquo;t produce anything yet,
+              and there are still characters to place. Fixing the keys
+              directly may be faster than going character by character.
+            </Trans>
+          }
+        >
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => {
+                handleSwitchTouchEditorMode("key");
+                setKeyModeProposalDismissed(true);
+              }}
+              aria-label={t({
+                id: "editor.assignLoop.touch.keyModeProposal.acceptAriaLabel",
+                message: "Switch to the by-key view",
+              })}
+              data-testid="touch-key-mode-proposal-accept"
+              style={suggestionAcceptBtnStyle}
+            >
+              <Trans id="editor.assignLoop.touch.keyModeProposal.accept">
+                Switch to key view
+              </Trans>
+            </button>
+            <button
+              type="button"
+              onClick={() => setKeyModeProposalDismissed(true)}
+              aria-label={t({
+                id: "editor.assignLoop.touch.keyModeProposal.declineAriaLabel",
+                message: "Stay on the by-character view",
+              })}
+              data-testid="touch-key-mode-proposal-decline"
+              style={suggestionDenyBtnStyle}
+            >
+              <Trans id="editor.assignLoop.touch.keyModeProposal.decline">
+                Stay on characters
+              </Trans>
+            </button>
+          </div>
+        </ProposalCard>
       )}
 
       {/* All-caught-up state — every inventory character is already reachable
@@ -4558,44 +4994,388 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   );
 
   // ---------------------------------------------------------------------------
+  // Key mode (T072) — the editable schematic grid surface. FR-020h/FR-035:
+  // this MUST read as visually and verbally distinct from the live OSK
+  // preview beside it (labelled "for editing" here vs. "for testing" on the
+  // preview pane below) so the two keyboard-shaped surfaces never look like
+  // two ways to do the same thing. Wrapped in the SAME onKeyDown/style shell
+  // characterModeContent uses, so the pane-level ArrowLeft/Right char-cycle
+  // handler (useCharCycleKeys) still correctly skips past the grid — its
+  // SKIP_SELECTOR already excludes `[role="grid"]`.
+  const keyModeContent = (
+    /* eslint-disable-next-line jsx-a11y/no-static-element-interactions --
+       same bubbled-keydown rationale as characterModeContent above; this
+       pane is not made pointer-interactive. */
+    <div
+      id={leftPaneId}
+      onKeyDown={handlePaneKeyDown}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        padding: "24px 20px",
+        overflowY: "auto",
+        boxSizing: "border-box",
+        height: "100%",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label={t({
+            id: "editor.assignLoop.touch.keyMode.backAriaLabel",
+            message: "Back to mechanisms",
+          })}
+          data-testid="touch-key-mode-back"
+          style={ghostBtn}
+        >
+          <Trans id="editor.assignLoop.touch.keyMode.backButton">
+            ← Back
+          </Trans>
+        </button>
+        <button
+          type="button"
+          onClick={handleContinue}
+          data-testid="touch-key-mode-continue"
+          style={headerBtnStyle}
+        >
+          <Trans id="editor.assignLoop.touch.keyMode.continueButton">
+            Continue
+          </Trans>
+        </button>
+      </div>
+
+      {/* The "for editing" verb (FR-020h) — an editable SCHEMATIC layout, not
+          a rendered keyboard you type on. */}
+      <p
+        style={{
+          margin: 0,
+          fontSize: 12,
+          fontWeight: 600,
+          color: TEXT_DIM,
+          fontFamily: FONT,
+          textTransform: "uppercase",
+          letterSpacing: "0.05em",
+        }}
+      >
+        <Trans id="editor.assignLoop.touch.keyMode.editingLabel">
+          Editable layout — for editing
+        </Trans>
+      </p>
+
+      {keyModeViewModel !== undefined ? (
+        <KeyGrid
+          viewModel={keyModeViewModel}
+          selectedAddress={selectedKeyAddress}
+          onSelectCell={handleSelectKeyCell}
+          onKeyDown={keyModeGridNav.handleKeyDown}
+          label={t({
+            id: "editor.assignLoop.touch.keyMode.gridAriaLabel",
+            message: `Editable touch key layout — ${{ layer: activeKeyLayerId }} layer`,
+          })}
+          platforms={keyModePlatforms}
+          {...(activeKeyPlatformId !== null
+            ? { activePlatformId: activeKeyPlatformId }
+            : {})}
+          onPlatformChange={(platformId) => setActiveKeyPlatformId(platformId)}
+          provenance={keyModeProvenance}
+        />
+      ) : (
+        <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM, fontFamily: FONT }}>
+          <Trans id="editor.assignLoop.touch.keyMode.notReady">
+            The key layout isn&rsquo;t ready yet.
+          </Trans>
+        </p>
+      )}
+    </div>
+  );
+
+  // T072: a view swap, not a fork — touchEditorMode selects which mode's
+  // pane content renders; neither mode's in-progress state is touched by
+  // the swap itself (FR-036a/b).
+  const leftContent =
+    touchEditorMode === "key" ? keyModeContent : characterModeContent;
+
+  // ---------------------------------------------------------------------------
   // Two-pane layout (via the shared AssignLoopShell)
   // ---------------------------------------------------------------------------
 
+  // T072 (FR-035): the mode selector as an APG tabs pattern — two tabs, one
+  // surface. Automatic activation (Left/Right/Home/End move AND select,
+  // wrapping) mirrors KeyGrid.tsx's own platform-tablist pattern (T077) —
+  // the one existing tabs precedent in this codebase.
+  const touchModeTabs: ReadonlyArray<{ id: TouchEditorMode; label: string }> =
+    [
+      {
+        id: "character",
+        label: t({
+          id: "editor.assignLoop.touch.mode.characterTab",
+          message: "By character",
+        }),
+      },
+      {
+        id: "key",
+        label: t({
+          id: "editor.assignLoop.touch.mode.keyTab",
+          message: "By key",
+        }),
+      },
+    ];
+
+  const handleModeTabsKeyDown = (
+    e: ReactKeyboardEvent<HTMLDivElement>,
+  ): void => {
+    const activeIndex = touchModeTabs.findIndex(
+      (tab) => tab.id === touchEditorMode,
+    );
+    let nextIndex: number;
+    switch (e.key) {
+      case "ArrowRight":
+        nextIndex =
+          activeIndex === -1 ? 0 : (activeIndex + 1) % touchModeTabs.length;
+        break;
+      case "ArrowLeft":
+        nextIndex =
+          activeIndex === -1
+            ? 0
+            : (activeIndex - 1 + touchModeTabs.length) % touchModeTabs.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = touchModeTabs.length - 1;
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+    const next = touchModeTabs[nextIndex];
+    if (!next) return;
+    handleSwitchTouchEditorMode(next.id);
+    modeTabRefs.current.get(next.id)?.focus();
+  };
+
+  // T076 (FR-036g): the undo affordance names what it is about to undo —
+  // never a bare "Undo" once the stack is non-empty — since after a mode
+  // switch the next undo may target the OTHER mode's work (a 't' touch-
+  // method deletion made in character mode vs. a 'k' key edit made in key
+  // mode). Each branch is its own literal `t({id, message})` call (not a
+  // dynamically-assembled template) so Lingui's static extractor sees every
+  // variant.
+  let undoAffordanceLabel: string = t({
+    id: "editor.assignLoop.touch.undo.nothingToUndo",
+    message: "Nothing to undo",
+  });
+  if (undoTargetDescription !== null) {
+    switch (undoTargetDescription.kind) {
+      case "node":
+        undoAffordanceLabel = t({
+          id: "editor.assignLoop.touch.undo.node",
+          message: `Undo removing ${{ id: undoTargetDescription.id }}`,
+        });
+        break;
+      case "item":
+        undoAffordanceLabel = t({
+          id: "editor.assignLoop.touch.undo.item",
+          message: `Undo removing ${{ id: undoTargetDescription.id }}`,
+        });
+        break;
+      case "batch":
+        undoAffordanceLabel = t({
+          id: "editor.assignLoop.touch.undo.batch",
+          message: plural(undoTargetDescription.count, {
+            one: "Undo removing # item",
+            other: "Undo removing # items",
+          }),
+        });
+        break;
+      case "touchKey":
+        undoAffordanceLabel = t({
+          id: "editor.assignLoop.touch.undo.touchKey",
+          message: `Undo deleting the touch method on ${{ id: undoTargetDescription.keyId }}`,
+        });
+        break;
+      case "keyEdit":
+        undoAffordanceLabel = t({
+          id: "editor.assignLoop.touch.undo.keyEdit",
+          message: `Undo the ${{ opKind: undoTargetDescription.opKind }} edit on ${{ id: undoTargetDescription.keyId }}`,
+        });
+        break;
+    }
+  }
+
+  // T075 (FR-036d): ONE shared set of progress figures, both derived from
+  // keyGridProgress above — never two independently maintained counters.
+  // Visible regardless of touchEditorMode (headerExtras renders once, above
+  // whichever pane content is currently mounted).
+  const unplacedCharsLabel = t({
+    id: "editor.assignLoop.touch.progress.unplacedChars",
+    message: plural(keyGridProgress.unplacedChars.length, {
+      one: "# character still unplaced",
+      other: "# characters still unplaced",
+    }),
+  });
+  const keysWithNoOutputLabel = t({
+    id: "editor.assignLoop.touch.progress.keysWithNoOutput",
+    message: plural(keyGridProgress.keysWithNoOutput.length, {
+      one: "# key with no letter",
+      other: "# keys with no letter",
+    }),
+  });
+
   const headerExtras = (
     <>
-      {totalChars > 0 && (
+      {/* eslint-disable-next-line jsx-a11y/interactive-supports-focus -- same
+          roving-tabindex model as KeyGrid.tsx's own platform tablist (T077):
+          DOM focus lives on the individual role="tab" buttons (each with its
+          own managed tabIndex below), never on this tablist container, which
+          intentionally carries no tabIndex of its own. */}
+      <div
+        role="tablist"
+        aria-label={t({
+          id: "editor.assignLoop.touch.modeTabsAriaLabel",
+          message: "Touch editing view",
+        })}
+        data-testid="touch-mode-tabs"
+        onKeyDown={handleModeTabsKeyDown}
+        style={{ display: "flex", gap: 4, flexShrink: 0 }}
+      >
+        {touchModeTabs.map((tab) => {
+          const isActive = tab.id === touchEditorMode;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              ref={(el) => {
+                if (el) modeTabRefs.current.set(tab.id, el);
+                else modeTabRefs.current.delete(tab.id);
+              }}
+              aria-selected={isActive}
+              aria-controls={leftPaneId}
+              tabIndex={isActive ? 0 : -1}
+              data-testid={`touch-mode-tab-${tab.id}`}
+              onClick={() => handleSwitchTouchEditorMode(tab.id)}
+              style={{
+                padding: "4px 10px",
+                background: isActive ? "#0d2840" : "transparent",
+                border: `1px solid ${isActive ? ACCENT : BORDER}`,
+                borderRadius: 6,
+                color: isActive ? TEXT_MAIN : TEXT_DIM,
+                fontSize: 12,
+                fontWeight: isActive ? 600 : 400,
+                cursor: "pointer",
+                fontFamily: FONT,
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <button
+        type="button"
+        onClick={undoDelete}
+        disabled={undoStack.length === 0}
+        aria-label={undoAffordanceLabel}
+        title={undoAffordanceLabel}
+        data-testid="touch-undo-button"
+        style={{
+          ...ghostBtn,
+          opacity: undoStack.length === 0 ? 0.5 : 1,
+          cursor: undoStack.length === 0 ? "default" : "pointer",
+          flexShrink: 0,
+        }}
+      >
+        <Trans id="editor.assignLoop.touch.undo.label">Undo</Trans>
+      </button>
+
+      {/* T075 (FR-036d) — ONE shared, derived set of progress figures, live in
+          both modes. aria-live (not role="status", which the coverage line
+          above already claims uniquely per-pane) so a screen reader hears an
+          update without a second competing status region. */}
+      <div
+        aria-live="polite"
+        data-testid="touch-shared-progress"
+        style={{
+          display: "flex",
+          gap: 12,
+          fontSize: 12,
+          color: TEXT_DIM,
+          fontFamily: FONT,
+          flexShrink: 0,
+        }}
+      >
+        <span data-testid="touch-progress-unplaced">{unplacedCharsLabel}</span>
+        <span data-testid="touch-progress-no-output-keys">
+          {keysWithNoOutputLabel}
+        </span>
+      </div>
+
+      {touchEditorMode === "character" ? (
+        <>
+          {totalChars > 0 && (
+            <span
+              aria-label={t({
+                id: "editor.assignLoop.touch.characterCounterAriaLabel",
+                message: `Character ${{ n: currentIdx + 1 }} of ${{ total: totalChars }}`,
+              })}
+              style={{
+                fontSize: 12,
+                color: TEXT_DIM,
+                fontFamily: FONT,
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}
+            >
+              <Trans id="editor.assignLoop.touch.characterCounter">
+                Character {Math.max(currentIdx + 1, 1)} of {totalChars}
+              </Trans>
+            </span>
+          )}
+          <span
+            style={{
+              fontSize: 13,
+              color: TEXT_DIM,
+              fontFamily: FONT,
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
+            <Trans id="editor.assignLoop.touch.headerDescription">
+              For each character, choose how it appears on the touch keyboard.
+              Your desktop layout is locked — these apply to phone and tablet
+              only.
+            </Trans>
+          </span>
+        </>
+      ) : (
         <span
-          aria-label={t({
-            id: "editor.assignLoop.touch.characterCounterAriaLabel",
-            message: `Character ${{ n: currentIdx + 1 }} of ${{ total: totalChars }}`,
-          })}
           style={{
-            fontSize: 12,
+            fontSize: 13,
             color: TEXT_DIM,
             fontFamily: FONT,
-            whiteSpace: "nowrap",
-            flexShrink: 0,
+            flex: 1,
+            minWidth: 0,
           }}
         >
-          <Trans id="editor.assignLoop.touch.characterCounter">
-            Character {Math.max(currentIdx + 1, 1)} of {totalChars}
+          <Trans id="editor.assignLoop.touch.keyMode.headerDescription">
+            Edit keys directly on the schematic layout below — add, remove, or
+            change what a key produces. Your desktop layout is locked — these
+            apply to phone and tablet only.
           </Trans>
         </span>
       )}
-      <span
-        style={{
-          fontSize: 13,
-          color: TEXT_DIM,
-          fontFamily: FONT,
-          flex: 1,
-          minWidth: 0,
-        }}
-      >
-        <Trans id="editor.assignLoop.touch.headerDescription">
-          For each character, choose how it appears on the touch keyboard. Your
-          desktop layout is locked — these apply to phone and tablet only.
-        </Trans>
-      </span>
     </>
   );
 
@@ -4614,6 +5394,22 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     message: plural(uncoveredChars.length, { one: "has", other: "have" }),
   });
   const uncoveredCharsList = formatUncoveredCharsList(uncoveredChars);
+
+  // FR-020h/FR-035: the live OSK preview's "for testing" verb — this is the
+  // surface you TYPE ON, in contrast with the schematic key-mode grid's
+  // "for editing" label above (keyModeContent). The character-mode wording
+  // stays exactly as it was (no id/message change) since that mode never
+  // renders anything grid-shaped beside the preview to be confused with.
+  const previewHeading =
+    touchEditorMode === "key"
+      ? t({
+          id: "editor.assignLoop.touch.keyMode.previewHeading",
+          message: "Live keyboard — for testing",
+        })
+      : t({
+          id: "editor.assignLoop.touch.previewHeading",
+          message: "Touch preview",
+        });
 
   return (
     <>
@@ -4636,10 +5432,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
             retry={retry}
             {...(handleKeyTap !== undefined ? { onKeyTap: handleKeyTap } : {})}
             defaultOskMode="touch"
-            heading={t({
-              id: "editor.assignLoop.touch.previewHeading",
-              message: "Touch preview",
-            })}
+            heading={previewHeading}
             warningLabel={t({
               id: "editor.assignLoop.touch.previewWarnings",
               message: "Preview warnings:",

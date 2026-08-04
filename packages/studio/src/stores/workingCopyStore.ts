@@ -23,6 +23,7 @@
 import { create } from "zustand";
 import type { AxisFill, BaseKeyboard, KeyboardIR, LintFinding, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
 import { detectMarkInputOrderFromImport } from "@keyboard-studio/engine";
+import type { KeyEditOperation, KeyEditOverlay } from "@keyboard-studio/engine";
 import {
   mergePhaseResults,
   type DiscoveryAxisVector,
@@ -105,12 +106,60 @@ export function bindManifest(m: readonly Step[]): void {
  *           can never collide on the same id space.
  * 'batch' — grouped cascade-delete (multiple nodes + items in one undo step).
  *            A single undoDelete() call reverses the entire cascade atomically.
+ * 'k'     — single key-level touch layout edit committed via commitKeyEdit
+ *           (spec 058 FR-032), addressed by the committed op's `seq` — its
+ *           position in `keyEditOverlay.ops`, since ops are append-only and
+ *           this entry is always pushed in the same commit that appends the
+ *           op. `undoDelete`'s branch pops the tail of `keyEditOverlay.ops`
+ *           (the LIFO nature of the shared stack keeps this in lock-step:
+ *           any 'k' entry still in `undoStack` is, in relative order, the
+ *           current tail of `keyEditOverlay.ops` — no other entry kind ever
+ *           touches that array). `undoKeyEdit` is the direct-removal
+ *           counterpart (mirrors `restoreNode`/`restoreItem`/`restoreTouchKey`):
+ *           it pops the tail op itself and filters the matching 'k' entry
+ *           out of `undoStack` by `seq`, so a caller that bypasses
+ *           `undoDelete` never leaves an orphaned entry pointing at a
+ *           removed op.
  */
 export type UndoEntry =
   | { k: 'n'; id: string }
   | { k: 'i'; id: string }
   | { k: 't'; id: string }
-  | { k: 'batch'; nodeIds: string[]; itemIds: string[] };
+  | { k: 'batch'; nodeIds: string[]; itemIds: string[] }
+  | { k: 'k'; seq: number };
+
+// ---------------------------------------------------------------------------
+// Key edit overlay (spec 058) — the ordered op log for the touch key grid,
+// plus the touch step's mode-selector state (contract key-edit-overlay.md §9).
+// ---------------------------------------------------------------------------
+
+/**
+ * `Omit<T, K>` is not distributive over a union: applied directly to
+ * `KeyEditOperation` it would collapse to only the fields common across every
+ * variant (dropping `fields`, `toId`, `key`, `outcome`, `spClass`,
+ * `sentinelId`, `sub` — each variant-specific), losing the discriminated
+ * union shape `commitKeyEdit`'s caller needs. This conditional form
+ * distributes the `Omit` over each union member individually instead.
+ */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+/**
+ * The shape a caller passes to `commitKeyEdit` — every {@link KeyEditOperation}
+ * field except `seq`, which the store assigns at commit time (it IS the
+ * commit order, so authoring it ahead of the store racing another commit
+ * would be unsound).
+ */
+export type PendingKeyEditOperation = DistributiveOmit<KeyEditOperation, "seq">;
+
+/**
+ * The touch step's mode selector (FR-036…FR-036g): `"character"` is the
+ * per-character assignment walk (the existing TouchGallery flow); `"key"` is
+ * the key-grid editor this feature adds. A view toggle, not a fork — neither
+ * mode's in-progress state is cleared by switching (FR-036b). `"character"`
+ * is the default per FR-036; the propose-on-entry logic that can route a
+ * fresh working copy straight into `"key"` mode is a later task (T073).
+ */
+export type TouchEditorMode = "character" | "key";
 
 // ---------------------------------------------------------------------------
 // Instantiation mode — spec §8 v1.3.0, two authoring tracks.
@@ -234,7 +283,9 @@ export interface WorkingCopyState {
    */
   deletedTouchKeyIds: Set<string>;
   /** Ordered list of undo entries (latest last). Each entry is either a whole-node
-   * deletion, a single-item removal, or a single touch-method deletion. */
+   * deletion, a single-item removal, a single touch-method deletion, a grouped
+   * cascade-delete batch, or (spec 058 FR-032) a single committed key-level
+   * touch layout edit. */
   undoStack: UndoEntry[];
 
   // -- Survey results (surveyResultsStore slots) --------------------------------
@@ -308,6 +359,27 @@ export interface WorkingCopyState {
    * re-show them. Cleared on reset and on a new instantiation.
    */
   galleryIntrosSeen: { mechanism: boolean; touch: boolean };
+
+  // -- Key edit overlay + touch editor mode (spec 058) -------------------------
+  /**
+   * The ordered log of committed key-level touch layout edits (contract
+   * key-edit-overlay.md §2). Order is semantic (FR-033a): replay resolves
+   * each operation's address against the layout state the prior operations
+   * produced, so a keyed snapshot cannot substitute for this. Holds no
+   * reference to the layout it was authored against. Cleared on reset and on
+   * a new instantiation.
+   */
+  keyEditOverlay: KeyEditOverlay;
+  /**
+   * The touch step's mode selector — `"character"` (the per-character
+   * assignment walk) or `"key"` (the key-grid editor). A view toggle, not a
+   * fork (FR-036b): switching modes never clears the other mode's
+   * in-progress state (`touchDraft` or `keyEditOverlay`). Defaults to
+   * `"character"` per FR-036; reset on reset and on a new instantiation
+   * (each fresh working copy re-evaluates the propose-on-entry condition,
+   * T073, from this same default).
+   */
+  touchEditorMode: TouchEditorMode;
 
   // -- Staleness slice (US3, T040) -----------------------------------------------
   /**
@@ -415,6 +487,10 @@ export interface WorkingCopyState {
    * undo stack, without touching the IR. Also clears `deletedTouchKeyIds` so
    * no 't' deletion is left applied with its only undo path (the entry this
    * just wiped from `undoStack`) gone — see the implementation comment.
+   * Also clears `keyEditOverlay` back to an empty log (spec 058 FR-032):
+   * the same reasoning applies — a 'k' undo entry is the only path back for
+   * its committed op, so wiping `undoStack` without wiping the overlay would
+   * strand that op permanently applied with no way to undo it.
    */
   keepAll: () => void;
   /** Clear all deletions (nodes + items + touch-method deletions) and the undo stack. Alias for keepAll with clearer name. */
@@ -496,6 +572,32 @@ export interface WorkingCopyState {
   ) => void;
   /** Mark a gallery's one-time intro splash as seen for this working-copy session. */
   markGalleryIntroSeen: (gallery: "mechanism" | "touch") => void;
+
+  // -- Key edit overlay + touch editor mode actions (spec 058) -----------------
+  /**
+   * Commit a key-level touch layout edit: appends `op` to `keyEditOverlay.ops`
+   * with the next `seq` (the current op count — also the commit order), and
+   * pushes a matching `'k'` {@link UndoEntry} (`{ k: 'k', seq }`) onto the
+   * shared chronological `undoStack` (spec 058 FR-032) — one entry per
+   * committed edit.
+   */
+  commitKeyEdit: (op: PendingKeyEditOperation) => void;
+  /**
+   * Remove the most recently committed key edit op (the highest `seq`).
+   * No-op when the overlay is empty.
+   *
+   * The direct-removal counterpart to `undoDelete`'s `'k'` branch — mirrors
+   * `restoreNode`/`restoreItem`/`restoreTouchKey`: pops the tail op from
+   * `keyEditOverlay.ops` AND filters the matching `'k'` entry out of
+   * `undoStack` by `seq`, so a caller using this action directly (bypassing
+   * `undoDelete`) never leaves an orphaned undo entry pointing at a removed op.
+   */
+  undoKeyEdit: () => void;
+  /**
+   * Switch the touch step's mode selector. A view toggle only — never clears
+   * `touchDraft` or `keyEditOverlay` as a side effect (FR-036b).
+   */
+  setTouchEditorMode: (mode: TouchEditorMode) => void;
   /**
    * Flag a character for later sequence assignment (idempotent add).
    * Tracked-for-Sequence-Gallery only — never emitted as a MechanismAssignment.
@@ -757,6 +859,7 @@ export type WorkingCopyData = Omit<
   | "markStale" | "clearStale"
   | "setValidatorFindings"
   | "setAxisFills"
+  | "commitKeyEdit" | "undoKeyEdit" | "setTouchEditorMode"
 >;
 
 const INITIAL_STATE: WorkingCopyData = {
@@ -781,6 +884,10 @@ const INITIAL_STATE: WorkingCopyData = {
   touchLayoutJson: null,
   touchDraft: null,
   galleryIntrosSeen: { mechanism: false, touch: false },
+  // key edit overlay + touch editor mode (spec 058) — empty log, character
+  // walk default (FR-036)
+  keyEditOverlay: { ops: [] },
+  touchEditorMode: "character",
   // staleness slice (US3) — default empty ("fresh", FR-019)
   staleSteps: new Set<string>(),
   // validator findings slice (US5, T034) — default empty (structural proxy)
@@ -845,6 +952,18 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         const next = new Set(s.deletedTouchKeyIds);
         next.delete(last.id);
         return { deletedTouchKeyIds: next, undoStack: s.undoStack.slice(0, -1) };
+      } else if (last.k === 'k') {
+        // Key-edit entry (spec 058 FR-032): pop the tail of keyEditOverlay.ops.
+        // Safe because this entry is always pushed in the same commit that
+        // appended the op (commitKeyEdit), and no other action ever inserts
+        // into or removes from the MIDDLE of that array — so the last 'k'
+        // entry still in undoStack always corresponds, in relative order, to
+        // the CURRENT tail of keyEditOverlay.ops, regardless of what other
+        // entry kinds have been pushed after it.
+        return {
+          keyEditOverlay: { ops: s.keyEditOverlay.ops.slice(0, -1) },
+          undoStack: s.undoStack.slice(0, -1),
+        };
       } else {
         // Batch entry: reverse all node AND item deletions in this cascade atomically.
         const nextNodes = new Set(s.deletedNodeIds);
@@ -923,12 +1042,19 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // three deletion Sets (deletedNodeIds, deletedItemIds, deletedTouchKeyIds)
   // are empty too — no applied deletion can outlive the undo history that
   // was its only path back.
+  //
+  // spec 058 FR-032 extends the same invariant to keyEditOverlay: a 'k' undo
+  // entry is the only path back for its committed op, so keepAll/restoreAll
+  // must also reset keyEditOverlay to an empty log alongside wiping
+  // undoStack — otherwise a committed key edit would be left applied with no
+  // remaining way to undo it.
   keepAll: () =>
     set({
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
       deletedTouchKeyIds: new Set(),
       undoStack: [],
+      keyEditOverlay: { ops: [] },
     }),
 
   restoreAll: () => get().keepAll(),
@@ -1019,6 +1145,36 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       galleryIntrosSeen: { ...s.galleryIntrosSeen, [gallery]: true },
     })),
 
+  // -- Key edit overlay + touch editor mode actions (spec 058) ----------------
+
+  commitKeyEdit: (op) =>
+    set((s) => {
+      const seq = s.keyEditOverlay.ops.length;
+      const committed = { ...op, seq } as KeyEditOperation;
+      const undoEntry: UndoEntry = { k: 'k', seq };
+      return {
+        keyEditOverlay: { ops: [...s.keyEditOverlay.ops, committed] },
+        undoStack: [...s.undoStack, undoEntry],
+      };
+    }),
+
+  undoKeyEdit: () =>
+    set((s) => {
+      if (s.keyEditOverlay.ops.length === 0) return s;
+      const removed = s.keyEditOverlay.ops[s.keyEditOverlay.ops.length - 1]!;
+      return {
+        keyEditOverlay: { ops: s.keyEditOverlay.ops.slice(0, -1) },
+        // Restore-side filter (mirrors restoreNode/restoreItem/restoreTouchKey):
+        // this is the direct-removal path, bypassing undoDelete's LIFO pop, so
+        // find-and-remove the matching 'k' entry by seq rather than assuming
+        // it is the stack's tail.
+        undoStack: s.undoStack.filter((e) => !(e.k === 'k' && e.seq === removed.seq)),
+      };
+    }),
+
+  setTouchEditorMode: (mode) =>
+    set({ touchEditorMode: mode }),
+
   // Idempotent add — tracked for the (now-retired) standalone Sequence
   // Gallery only, never emitted. MechanismGallery's inline sequence builder
   // (SequenceBuilderPanel) records real assignments directly and no longer
@@ -1075,6 +1231,11 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       deletedTouchKeyIds: new Set(),
       removalCapabilities: new Map(),
       galleryIntrosSeen: { mechanism: false, touch: false },
+      // Fresh instance (not a spread of INITIAL_STATE's) so no later mutation
+      // path can bleed the ops array across resets — same discipline as the
+      // Set/Map re-creations above.
+      keyEditOverlay: { ops: [] },
+      touchEditorMode: "character",
       staleSteps: new Set<string>(),
       // instantiationMode is null in INITIAL_STATE; explicit for clarity.
       instantiationMode: null,
@@ -1134,6 +1295,10 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       touchLayoutJson: null,
       touchDraft: null,
       galleryIntrosSeen: { mechanism: false, touch: false },
+      // Fresh instance, not carried from any preceding working copy — see
+      // reset()'s identical comment.
+      keyEditOverlay: { ops: [] },
+      touchEditorMode: "character",
       staleSteps: new Set<string>(),
       // A new working copy has no default-fill provenance yet (#890) — the
       // pattern-loading effect re-runs defaultFillAxes and republishes it.
@@ -1192,6 +1357,10 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       touchLayoutJson: null,
       touchDraft: null,
       galleryIntrosSeen: { mechanism: false, touch: false },
+      // Fresh instance, not carried from any preceding working copy — see
+      // reset()'s identical comment.
+      keyEditOverlay: { ops: [] },
+      touchEditorMode: "character",
       staleSteps: new Set<string>(),
       // A new working copy has no default-fill provenance yet (#890) — the
       // pattern-loading effect re-runs defaultFillAxes and republishes it.
