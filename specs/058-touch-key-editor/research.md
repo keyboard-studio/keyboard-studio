@@ -27,7 +27,7 @@ Architecture: a Delphi frame (`UframeTouchLayoutBuilder.pas`) hosts a **CEF brow
 
 **`sp:0`, `width:0`, `pad:0` are indistinguishable from absent** — the runtime applies defaults with `||=`, and the writer deletes zeros. Anything we emit must not rely on an explicit zero.
 
-**`dk` is dead.** Present in the loose schema and the Delphi model, absent from the current TS type and the clean schema, never used for anything. Ignore it.
+**`dk` is dead.** Present in the loose schema and the Delphi model, absent from the current TS type and the clean schema, never used for anything. Ignore it. **This verdict is about `dk` specifically, not a claim that every loose-schema field was audited with equal care** — the subkey `default` field (R4) is a loose-schema field that is very much alive on the wire and was initially missed in this pass.
 
 ---
 
@@ -93,7 +93,7 @@ Developer's key inspector has thirteen fields. Verdicts, with reasons.
 | **Hint** | **DERIVE**, override behind Advanced | Platform `defaultHint` decides the family. **Keep Developer's one genuinely good idea**: the field's *placeholder shows the inferred hint*, so the author sees what they would get without an override. |
 | **Hint Unicode** | **DROP** | Subsumed by the merged character/`U+` field. |
 | **Key Type** — six `sp` values | **KEEP, all of them, with a proposed default** | Corrected 2026-08-03 on author direction — see R3a. `sp` is a real authoring control, not a detail to hide: suppressing a key on an alt layer by setting it to **spacer** is an active idiom, and **blank (9) vs spacer (10) is a distinction authors use deliberately**. Expose the full legal set `{0, 1, 2, 8, 9, 10}` with plain-language labels and a *proposed* value per context; never remove the option. `specialActive` (2) gets a proposal (a frame key on the layer it switches *to*) rather than being derived away, which still defuses Developer's footgun without taking the control. |
-| **Modifier** (`key.layer`) | **DERIVE / read-only** | The most confusing field in Developer, and for us it is *computable*: our layer ids are auto-derived from modifier combos (`comboToTouchLayerId`, specs/008 §3c), so the modifier a key should send is the combo its layer flattens from. Show it as a read-only "**Sends:** Shift+K_Q (from the Shift layer)" line, placed visually far from Next Layer. See R4 — the field must still round-trip even though we do not let authors set it. |
+| **Modifier** (`key.layer`) | **DERIVE / read-only** | The most confusing field in Developer, and for us it is *computable*: our layer ids are auto-derived from modifier combos (`comboToTouchLayerId`, specs/008 §3c), so the modifier a key should send is the combo its layer flattens from — **unless the key itself carries a per-key `layer` override**, which supersedes the containing layer for the derived "Sends:" line (`TouchKeyIR.layer` exists for exactly these 11,593 corpus keys, R4). Show it as a read-only "**Sends:** Shift+K_Q (from the Shift layer)" line, placed visually far from Next Layer. See R4 — the field must still round-trip even though we do not let authors set it. |
 | **ID** — free text, maxlength 64, VK autocomplete, **zero validation** | **KEEP but invert** | This is the §3c anti-pattern. Replace the always-live text box with the current id in mono plus a **Rename…** action whose field is **pre-filled with the proposed id** and validated live. The VK-name table survives as *validation data* (a `K_` id must be a real VK name), not as a substitute for validation. |
 | **Padding Left** | **SIMPLIFY** | "Gap before this key" in half-key steps (none / ½ / 1), plus "Insert spacer key" — which is what `pad` is usually emulating. Numeric entry survives under Advanced. |
 | **Width** | **SIMPLIFY** | Segmented presets (½ · 1 · 1½ · 2 · Fill row), drag-resize as enhancement, and a visible row-slack bar. Advanced keeps numeric entry within Developer's 10–500 bounds so nothing is unreachable. |
@@ -312,12 +312,14 @@ Developer's editor validates **essentially nothing** — no id syntax check, no 
 | `WARN_TouchLayoutMissingLayer` | `SevWarn\|0x091` | Live; fix = repoint or remove |
 | `WARN_TouchLayoutUnidentifiedKey` | `SevWarn\|0x099` | Live |
 | `WARN_TouchLayoutMissingRequiredKeys` | `SevWarn\|0x093` | Live; per layer, `K_LOPT`/`K_BKSP`/`K_ENTER` |
-| `WARN_TouchLayoutSpecialLabelOnNormalKey` | `SevWarn\|0x0A9` | Structurally prevented; still checked on import |
+| `WARN_TouchLayoutSpecialLabelOnNormalKey` | `SevWarn\|0x0A9` | Structurally prevented; still checked on import — see version-gating note below |
 | version gates (multi-codepoint `U_` → KM15; flick/multitap → KM17) | Hint/Info | Live, informational |
 | *(Developer has none)* duplicate id within a layer | — | New |
 | *(Developer has none)* orphan `T_` rule | — | New |
 | *(Developer has none)* modifier key not marked active on its own layer (R3b) | — | New |
 | *(Developer has none)* half-done suppression — spacer-class key that kept a rule-bearing id, or a neutralized id left at `sp:0` (R3a) | — | New |
+
+**0x0A9 is target-version-gated upstream.** `validate-layout-file.ts` only warns when it cannot verify a minimum Keyman version of 14 (`!verifyAndSetMinimumRequiredKeymanVersion14()`) — a keyboard whose target version already permits bumping to 14+ gets no warning (`TransformSpecialKeys14` then handles the pre-14 client case via `CSpecialText14Map` at compile time, silently). Since the studio targets current Keyman rather than a pinned pre-14 floor, the warning path is the one that actually fires for anything we produce, so "checked on import" above means exactly this path, not the silent-transform path.
 
 Developer's own id regex, which we adopt (tightening `U_` to grouped hex so it agrees with `decodeUnicodeKeyId`):
 
@@ -327,7 +329,7 @@ Developer's own id regex, which we adopt (tightening `U_` to grouped hex so it a
 
 `K_` ids must resolve against one of three tables in `keyman/developer/src/kmc-kmn/src/kmw-compiler/keymanweb-key-codes.ts` — `VKeyNames`, `KeymanWebTouchStandardKeyNames` (`K_LOPT`, `K_ROPT`, `K_NUMERALS`, `K_SYMBOLS`, `K_CURRENCIES`, `K_UPPER`, `K_LOWER`, `K_ALPHA`, `K_SHIFTED`, `K_ALTGR`, `K_TABBACK`, `K_TABFWD`, codes 50001-50012), and `KMWAdditionalKeyNames`. `U_` codepoints must lie in `[0x20,0x7F] ∪ [0xA0,0x10FFFF]`.
 
-**Reserved ids we must never mint:** `T_new_*` (Developer's auto-mint — 34 dead instances shipped in the corpus), `T_removed_*` (our `applyDesktopModifications` placeholder), `T_carved_*` (our carve cascade), `T_touchdel_*` (our touch-method deletion), and the private-use `T_*_MT_SHIFT_TO_{SHIFT,CAPS,DEFAULT}` triple KeymanWeb injects as the default Shift multitap (these deliberately violate the id pattern so authors cannot collide with them).
+**Reserved ids we must never mint:** `T_new_*` (Developer's auto-mint — 34 dead instances shipped in the corpus), `T_removed_*` (our `applyDesktopModifications` placeholder), `T_carved_*` (our carve cascade), `T_touchdel_*` (our touch-method deletion), and the private-use `T_*_MT_SHIFT_TO_{SHIFT,CAPS,DEFAULT}` triple KeymanWeb injects as the default Shift multitap (`PRIVATE_USE_IDS` in `keyman/common/web/types/src/keyman-touch-layout/keyman-touch-layout-file.ts`). **Correction:** the literal `*` in these ids does **not** violate either id regex above (`T_\S+` upstream, `T_[^\s\]]+` ours both accept a non-whitespace `*`) — the odd form is a TS-typing convenience, not a validator-exclusion trick. Rejecting them therefore needs an **exact-match blocklist** against `PRIVATE_USE_IDS`, not a regex exclusion (see [contracts/key-id-policy.md](contracts/key-id-policy.md) §3 item 6).
 
 ### Geometry, for the record
 
@@ -338,6 +340,8 @@ Developer's own id regex, which we adopt (tightening `U_` to grouped hex so it a
 ## R4. The per-key `layer` field — the one contract change worth making
 
 The wire format allows a per-key `layer`, which overrides the *modifier state used to evaluate the rule*, independently of `nextlayer` (which switches the displayed layer). Our IR drops it: `RawKey` in [parseTouchLayout.ts](../../packages/contracts/src/parseTouchLayout.ts) maps `nextlayer` and not `layer`, and [parse-touch.ts](../../packages/engine/src/codec/parse-touch.ts) never emits it.
+
+**A second, confirmed silent drop of the same class: the subkey `default` field (longpress preselect).** `keyman-touch-layout-file-writer.ts` special-cases it on write (`if(Object.hasOwn(key, 'default') && (<any>key).default === false) delete (<any>key).default;` — only an explicit `false` is stripped, so a `true` is a real, intentional wire value), and `parseTouchLayout.ts`'s `convertKey` has zero hits for it — it is silently dropped on read, the same defect shape as `layer`. It was live in the wire format and initially missed in this audit's first pass over the loose-schema fields; the `dk` verdict below (genuinely dead) should not be read as implying every loose-schema field got equal scrutiny. Fold `default` into the same §18 sign-off recommendation as `layer` — see [contracts/touch-key-rule-join.md](contracts/touch-key-rule-join.md) §7, which now covers both.
 
 Classifying every within-layer duplicate key id across the corpus:
 
@@ -352,7 +356,7 @@ The idiom, from `adiga_danef` (`phone`/`numeric`): `{"id":"K_2","text":"2"}` in 
 
 Consequences of the gap: Case A silently collapses 11,593 corpus keys into indistinguishable duplicates; a duplicate-id check run on `TouchLayoutIR` would report ~13,900 findings of which ~1,170 are real; and the studio could add a key that `touchKeyAddress` cannot stably address — the exact ambiguity that file documents as unaddressable.
 
-**Recommendation: add `TouchKeyIR.layer?: string`.** Additive and optional (absent ⇒ no override), so it is a minor bump under the 0ver convention — the same shape as the `provenance` addition recorded in [docs/spec-signoff.md](../../docs/spec-signoff.md). It must land in **one** commit across `keyboard-ir.ts`, the zod mirror, the `_TouchKeyIRGuard` drift guard, `parseTouchLayout.ts`'s key conversion, and `parse-touch.ts`'s key emission, with §18 sign-off.
+**Recommendation: add `TouchKeyIR.layer?: string` and `default?: boolean` together.** Both additive and optional (absent ⇒ no override / not preselected), so together they are still a minor bump under the 0ver convention — the same shape as the `provenance` addition recorded in [docs/spec-signoff.md](../../docs/spec-signoff.md). Both must land in **one** commit across `keyboard-ir.ts`, the zod mirror, the `_TouchKeyIRGuard` drift guard, `parseTouchLayout.ts`'s key conversion, and `parse-touch.ts`'s key emission, with §18 sign-off.
 
 Authors do not *set* this field in Increment 1 (R3 marks Modifier read-only); we preserve it so imported keyboards round-trip and the duplicate check is implementable.
 

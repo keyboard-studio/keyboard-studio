@@ -72,7 +72,7 @@ Default is all three. This is deliberate scope expansion and it is the larger wi
 ### 2.3 Role classification — evaluated in this order
 
 1. Output length 0, or exactly one raw element whose trimmed text case-insensitively equals `nul` → **`suppresses`**.
-2. Exactly one raw element whose trimmed text case-insensitively matches `context` or `context(1)` → **`guard`**.
+2. Exactly one raw element whose trimmed text case-insensitively matches `context`, `context(1)`, **or `context(N)` for N≥2** → **`guard`**. The `context(N)` form is KMN's offset re-emit; it re-emits context exactly as `context`/`context(1)` do and produces nothing, so it is classified with them rather than falling through to `opaque` — the classifier must recognize it as text distinct from the bare `context` spelling, not a numeric variant it fails to parse.
 3. Every element is `useGroup` / `deadkey` / `beep` → **`transitions`**.
 4. Any remaining raw element → **`opaque`**.
 5. Otherwise → **`produces`**.
@@ -88,6 +88,8 @@ any(diablock) + [T_0300] > context     → guard,    produces nothing
 
 and it is what keeps `+ [T_CAM] > nul` classified as *wired, not dead*.
 
+**A rule keyed on a `U_` id is an override, not redundancy, unless proven otherwise.** `forUnicodeKeynames` ([key-id-policy.md](key-id-policy.md) §1a) makes every `U_` id self-output *before* any rule can run against it, so a rule keyed on one always fires ahead of — and instead of — that default, exactly like a rule keyed on any other id. Report a `U_`-keyed `produces` binding as "redundant" only when its `produced` text equals the id's decoded codepoint(s) exactly; otherwise it is a genuine override and must not be flagged. (This governs the reporting layer built on top of role classification, e.g. [key-id-policy.md](key-id-policy.md) §3.5 — role classification itself is unaffected, since a rule that emits different text is still correctly `produces`.)
+
 ### 2.4 Two reuse rules
 
 - **Production collection MUST reuse the exported `collectFromElements` walk**, called per binding with a **fresh** collector — that is precisely why it is exported. Store expansion (`index()` / `outs()`), NFC run-merging, and the control-character filters therefore cannot drift from `buildProducedSet`.
@@ -97,7 +99,9 @@ and it is what keeps `+ [T_CAM] > nul` classified as *wired, not dead*.
 
 ### 2.5 Case policy
 
-Index on upper-case, matching `kmcmplib`'s case-insensitive VKDictionary interning, so the join finds the rule the compiler will find. Retain every as-written spelling. A key whose layout id and rule id differ only by case therefore **joins** (correct for our arithmetic) while remaining **reportable** — because Developer's validator compares case-sensitively and will warn on a file our compile accepts. That asymmetry is the entire reason for the case hint in §5.
+Index on upper-case, matching `kmcmplib`'s case-insensitive matching, so the join finds the rule the compiler will find. This case-insensitivity has two distinct sources depending on the id kind, and only one of them is VKDictionary interning: an unknown/custom name (`T_…`, `U_…`) is interned into the VKDictionary case-insensitively (`Compiler.cpp`'s `GetVKCode`/`BuildVKDictionary` — see [research.md](../research.md) R5); a `K_` name instead resolves against the **fixed keyword table** (`VKeyNames` / `KeymanWebTouchStandardKeyNames` / `KMWAdditionalKeyNames`), a compiled-in lookup, not a runtime-interned one. The join's upper-case indexing is correct for both, but the attribution matters for anyone reading the compiler source looking for where a `K_` id resolves. Retain every as-written spelling. A key whose layout id and rule id differ only by case therefore **joins** (correct for our arithmetic) while remaining **reportable** — because Developer's validator compares case-sensitively and will warn on a file our compile accepts. That asymmetry is the entire reason for the case hint in §5.
+
+**Footnote — `&mnemoniclayout`:** the mnemonic-layout system store shifts a `K_` name's meaning from a physical position to the character it produces (a mnemonic keyboard's `K_A` means "the key that types 'a'", not "the US-layout A position"). This join and the `K_`-scope expansion in §2.2 assume position semantics; mnemonic-layout interaction is out of scope for this increment and noted here so nobody reads the `K_` scope expansion as implying mnemonic support.
 
 ---
 
@@ -130,7 +134,7 @@ Because the strip only ever *adds*, the false-positive question reduces to "coul
 
 ### 3.2 Migrate every caller in the same change
 
-The engine wrapper (threading the index through **before** its composability augmentation, so a mark credited by the join then feeds composability — that compounding is the point), the Layer C coverage check (with the lint context building the index when a keyboard IR is present), and the studio inventory-gate helper (whose inputs gain an optional index; absent, behaviour is unchanged, still failing closed on a corrupted layout). Leaving one caller on the unjoined path defeats the fix.
+Four call sites, all in the same change. The engine wrapper (threading the index through **before** its composability augmentation, so a mark credited by the join then feeds composability — that compounding is the point); the Layer C coverage check (with the lint context building the index when a keyboard IR is present); the studio inventory-gate helper (whose inputs gain an optional index; absent, behaviour is unchanged, still failing closed on a corrupted layout); and [TouchGallery.tsx](../../../packages/studio/src/editors/assignLoop/TouchGallery.tsx)'s **direct** import of `computeTouchCoverage` (~line 1964), which builds `baseTouchCoveredSet` (the un-augmented, direct-reachability half of coverage, feeding `collectCompositionMethod`) independently of the engine wrapper. It is easy to miss because it bypasses that wrapper entirely — exactly the failure this section warns against. Leaving one caller on the unjoined path defeats the fix.
 
 ---
 
@@ -169,6 +173,8 @@ Three reasons for a sibling rather than an option: the orphan list **is** the de
 
 The `K_` row and the no-layout row are both load-bearing: a desktop-only keyboard must never be penalized, and a physical key's rule must never be called unreachable because the touch layout omits it.
 
+**Scope: "reachable" means layout-reachable only, and it has two documented limitations.** (a) The BFS checks touch-layer reachability from `default` only — it does not check that the rule's own **group** is reachable via the `.kmn` `use()` chain from the entry group. A rule sitting in a group nothing ever `use()`s is layout-reachable (its struck key is on a reachable layer) yet never actually fires; this view cannot see that. (b) There is **no layer↔modifier cross-check**: a `T_X` id carried only on the `default` touch layer, whose sole binding requires `[SHIFT T_X]`, is credited as reachable, because the struck key existing on a reachable layer is all this predicate asks — it does not verify the layer's own modifier state would satisfy the rule's context. Both are candidates for a later hint-level check (comparing a binding's `modifiers` against the layer(s) that carry its struck key); both are explicitly out of scope for this increment.
+
 ### 4.4 Adopter list — normative, and repeated in both module headers
 
 | Consumer | View | Why |
@@ -186,7 +192,7 @@ The `K_` row and the no-layout row are both load-bearing: a desktop-only keyboar
 
 ## 5. Layer C checks
 
-**No rows are added to `criteria.json`.** Its 148-row count is length-tested in three places, and a prior check addition was reverted for exactly this reason; nothing enforces a code↔criterion bijection. Every new code lands as a **sibling** of an existing 18.x row, following the existing touch-coverage precedent.
+**No rows are added to `criteria.json`.** Its length is not test-asserted — `schemas.test.ts`/`types.test.ts` deliberately assert schema-validity and the four-band partition (every record falls into exactly one band, no orphans), never a literal cardinality, precisely so the catalog can grow (see this repo's CLAUDE.md contract-source-of-truth note). The real constraint is `CriteriaBands.lintRuleId: string` — **singular, 1:1** with a criterion row. A prior check addition hung several sibling codes off one row's `lintRuleId` and was reverted for exactly that reason: nothing enforces a code↔criterion bijection, and a row's own description stops describing what its codes report. So every new code here lands at **check-module level** — an additional finding emitted by an existing 18.x check file, documented in that file's header — not as an extra code hung off a criteria row whose description doesn't cover it. This is the same shape the existing touch-coverage precedent already uses, and it holds regardless of catalog size: the argument is the content-team-surface one (a criteria row is authored prose reviewed by Content; a check-file addition is Engine's own surface), not a row-count budget.
 
 | Sibling of | Code (illustrative) | Severity | Keyman analogue |
 |---|---|---|---|
@@ -194,11 +200,12 @@ The `K_` row and the no-layout row are both load-bearing: a desktop-only keyboar
 | 18.6 | `KM_HINT_TOUCH_KEY_ID_CASE` | **hint** | — (the latent case asymmetry, §2.5) |
 | 18.6 | `KM_LINT_TOUCH_RULE_ORPHAN` | warning | — (Developer has no such check) |
 | 18.4 control-key drift | `KM_WARN_TOUCH_DUPLICATE_KEY_ID` | warning | — |
-| 18.4 | `KM_ERROR_TOUCH_KEY_ID_INVALID` | **error** | `ERROR_TouchLayoutInvalidIdentifier` 0x05A |
 | 18.4 | `KM_WARN_TOUCH_MISSING_REQUIRED_KEY` | warning | `WARN_TouchLayoutMissingRequiredKeys` 0x093 |
 | 18.5 layer-switch return | `KM_WARN_TOUCH_MISSING_LAYER` | warning | `WARN_TouchLayoutMissingLayer` 0x091 |
 
-**Severity policy: keep parity with Developer.** 0x05A is the only upstream error, and an invalid id genuinely makes the file uncompilable. Do **not** promote the dangling-`nextlayer` check to an error even though it silently under-credits our own reachability BFS — upstream warns, and hundreds of corpus keyboards contain instances. Escalation belongs in **edit-time validation**, which rejects a *mutation* rather than emitting a *finding* (FR-045).
+**`ERROR_TouchLayoutInvalidIdentifier` 0x05A is deliberately absent from this table — it is not a Layer C check.** An id the compiler rejects is a Layer A validity concern, not a style/hygiene one, and every check shipped in `@keymanapp/keyboard-lint` today is warning-severity (grep confirms zero `error` severities) — introducing the first Layer C error here would be a layer-boundary breach. The two paths that actually own it: for author-typed ids, **edit-time rejection** (FR-045, [key-id-policy.md](key-id-policy.md) §3.1) blocks the mutation before it can be saved; for an imported keyboard's existing ids, this is exactly the shape of a **Layer A′ import-fidelity** check ([layer-a-prime.ts](../../../packages/engine/src/validator/layer-a-prime.ts) is the precedent for validity findings surfaced on import rather than on edit). Neither path adds an error to Layer C.
+
+**Severity policy: keep parity with Developer for everything Layer C does own.** Every code in the table above stays warning-or-hint, matching the fact that Developer's touch-layout validator has exactly one error (0x05A, routed away as above) and everything else is a warning. Do **not** promote the dangling-`nextlayer` check to an error even though it silently under-credits our own reachability BFS — upstream warns, and hundreds of corpus keyboards contain instances. Escalation belongs in **edit-time validation**, which rejects a *mutation* rather than emitting a *finding* (FR-045).
 
 ### 5.1 Dead-`T_`-key exemptions — mirroring 0x092, and then some
 
@@ -209,9 +216,11 @@ These exemptions **are** the design, so each needs its own test.
 - Skip a `*`-prefixed keycap label (frame-key labels such as `*Shift*`, `*abc*`).
 - Skip the sentinel ids (`T_BLANK`, `T_SPACER`, `T_NUL`) and any blank/spacer-class key.
 - Skip Developer's auto-mint `T_new_*` and our reserved neutralization prefixes (`T_removed_*`, `T_carved_*`, `T_touchdel_*`).
-- **Downgrade to a hint when any opaque fragment is present** — the rule may live inside it. Same conservatism the existing inventory-coverage check already applies.
+- **Downgrade to a hint when any opaque fragment is present anywhere in the IR** — i.e. `ir.raw.length > 0`, whole-IR scope, not scoped to the key's own group. This matches the touch-coverage check-18-6 precedent of skipping conservatively on *any* opaque fragment rather than trying to localize. Finer (same-group) scoping is deliberately not attempted: an opaque fragment's group attribution is exactly the information the codec failed to recover when it fell back to `RawKmnFragment` in the first place (see [codec/opaque-reasons.ts](../../../packages/engine/src/codec/opaque-reasons.ts)) — there is no group to scope the check to.
 - A key whose only bindings are `guard` / `suppresses` / `transitions` / `opaque` is **wired, not dead**. Only *zero bindings at all* fires. `+ [T_CAM] > nul` MUST NOT be reported.
 - Descend into `sk` / `multitap` / `flick`, as Developer does. Cameroon's `U_00A1` / `U_00BF` longpresses under `T_0021` / `T_003F` are correctly exempt because a `U_` id self-outputs.
+
+**0x093 required keys, upstream citation.** The required set is `CRequiredKeys = [K_LOPT, K_BKSP, K_ENTER]` (`keyman/developer/src/kmc-kmn/src/kmw-compiler/constants.ts`, `TRequiredKey`/`CRequiredKeys`), checked by `ValidateLayoutFile` in `keyman/developer/src/kmc-kmn/src/kmw-compiler/validate-layout-file.ts` against a single `FRequiredKeys` accumulator per layer. **The set does not vary by platform or layer** — the same three-key list is required of every layer of every platform the file declares; there is no phone/tablet-specific required set in this code path.
 
 ### 5.2 Orphan-rule reporting
 
@@ -233,13 +242,17 @@ The joined checks need rules *and* layout. Add one internal resolver so preceden
 
 `ensure` / `remove` / `rename` operations for a touch key's rules, in engine.
 
+- **Opaque carve-out (P0-4).** When `opaqueFragmentCount > 0`, synthesis MUST downgrade from automatic to warn-and-confirm before writing anything. The join cannot prove no equivalent rule for this key already hides inside a `RawKmnFragment` — that is the same blind spot §5.1's dead-key downgrade exists to acknowledge — and a silent synthesis on such a keyboard risks emitting a rule that permanently shadows or duplicates one already there, which violates the idempotence guarantee below and FR-027/SC-008. This gate applies before the "Group choice" step, not after: nothing below runs unconfirmed when an opaque fragment is present.
 - **Group choice: the entry group** — the first `using keys` writable group, resolved with the existing helper. Not a dedicated group: a `T_` rule must fire on a keystroke, so it must live in a `using keys` group, and a second one is reachable only via an explicit hop — needless machinery plus a real ordering hazard. Insert before the terminal `match` / `nomatch` rules using the existing helper, lifted to a shared location so the mark-guard synthesizer and this one cannot diverge.
 - **Ordering is correctness, not cosmetics.** Emit guard-then-producing as a **contiguous pair** in that order, matching the attested Cameroon source order. When a guard already exists for this key+combo, insert the producing rule **immediately after it**, never at the group tail — a producing rule ahead of its guard silently defeats the guard.
-- **Idempotency MUST be semantic, not nodeId-based.** Recognize our own output by a generated-nodeId prefix, *but* dedupe by matching (normalized id, canonical combo, role) against **any** existing rule via the join. Otherwise importing Cameroon and touching one key would duplicate all of its hand-written `T_` rules. A hand-written match counts as unchanged and is **never rewritten**.
-- **Guard synthesis** triggers when the output is a single combining mark. Propose reusing an existing guard-shaped store (non-system, all char items, contains space and digits, contains no letters — Cameroon's `store(diablock)` matches) before minting one under the `generated_*` convention. Propose-then-confirm: the author sees the store and the rules before they are written.
+- **Idempotency MUST be semantic, not nodeId-based.** Recognize our own output by a generated-nodeId prefix (`gen-touch-*` — see the naming rule below), *but* dedupe by matching (normalized id, canonical combo, role) against **any** existing rule via the join. Otherwise importing Cameroon and touching one key would duplicate all of its hand-written `T_` rules. A hand-written match counts as unchanged and is **never rewritten**.
+- **Guard naming follows the [mark-guards.ts](../../../packages/engine/src/pattern-apply/mark-guards.ts) precedent exactly — do not mint a third scheme.** That module's own convention is nodeIds under `gen-marks-*` (e.g. `gen-marks-block-1`, `gen-marks-guard-hop`) with store/group *names* under `generated_marks_*` (e.g. `generated_marks_guard`, `generated_marks_unwrap_from`) — nodeId and name deliberately use different prefixes. Rule synthesis here is the sibling: nodeIds under `gen-touch-*`, store/group names under `generated_touch_*`.
+- **Guard synthesis** triggers when the output is a single combining mark. Propose reusing an existing guard-shaped store (non-system, all char items, contains space and digits, contains no letters — Cameroon's `store(diablock)` matches) before minting one under the `generated_touch_*` convention above. Propose-then-confirm: the author sees the store and the rules before they are written. **A freshly minted guard store MUST be populated from the keyboard's own repertoire** — declared exemplars or the discovered inventory via character-discovery — never a hardcoded ASCII literal. Cameroon's `diablock` (space, digits, ASCII punctuation) is that keyboard's own convention, not a universal one; a keyboard whose punctuation or digit repertoire is non-Latin needs its own guard set derived the same way, or the guard protects nothing for it.
 - **Case variants** are driven by explicit combos, with defaults derived from the keyboard rather than invented — propose the CAPS/NCAPS triple only when the keyboard already handles CAPS, detected with the existing predicate, reusing the existing notion of the case quad.
 - **Delete MUST NOT cascade silently.** A `T_` id can legitimately appear on several layers and platforms. On key deletion, recompute presence; only when the id is carried by **no** key anywhere, **propose** removing its rules (producing and guard, plus the guard store if now unreferenced), defaulting to remove for rules we generated and to **keep-and-let-the-orphan-check-report-it** for hand-written or imported ones. Silently deleting an author's guard rule because they moved one key is exactly the failure the orphan check exists to describe.
 - **Rename** rewrites the vkey name on every binding for the old id (guard and producing alike), the layout key id, the node-id map entries (which embed the key id), and any matching address in the studio's deletion overlay — where a stale address silently fails to resolve, which is desirable idempotence for the carve cascade but silent data loss here.
+
+**Normalization.** Synthesized output text passes through the same NFC run-merge `collectFromElements` already applies (§2.4) — synthesis must not invent a second normalization path. **Canonical ordering *across* successive keystrokes (mark stacking) is explicitly out of scope this increment.** If an author types two synthesized `T_` mark keys in sequence, the resulting combining-mark order is whatever order the keystrokes occurred in; reordering to canonical combining-class order is the author's domain, not something synthesis attempts. Documented here so the gap is a stated decision, not a silent one.
 
 ### 6.2 One operation type, two thin appliers
 
@@ -257,13 +270,13 @@ Which mutations need the raw twin: **all layout operations** (R9). Rule synthesi
 
 ## 7. The one locked-contract change
 
-**`TouchKeyIR.layer?: string`** — the per-key modifier override. Additive and optional (absent ⇒ no override), so a minor bump under the 0ver convention, matching the shape of the earlier `provenance` addition.
+**`TouchKeyIR.layer?: string`** — the per-key modifier override — **and `TouchKeyIR` (subkey) `default?: boolean`** — the longpress preselect flag. Both are additive and optional (absent ⇒ no override / not preselected), so a minor bump under the 0ver convention, matching the shape of the earlier `provenance` addition. `default` joins `layer` here rather than getting its own change because it is the same defect class: a real serialized wire field the writer special-cases (`keyman-touch-layout-file-writer.ts` deletes a literal `false` — `if(Object.hasOwn(key, 'default') && (<any>key).default === false) delete (<any>key).default;` — so `true` survives) that [parseTouchLayout.ts](../../../packages/contracts/src/parseTouchLayout.ts)'s `convertKey` never maps and the engine emitter never round-trips, and the studio's own longpress editing needs to know which sub-key is preselected without re-deriving it.
 
-Must land in **one** commit across: the interface, the zod mirror, the compile-time drift guard, the parser's key conversion, and the emitter's key emission. Requires §18 sign-off recorded in [docs/spec-signoff.md](../../../docs/spec-signoff.md).
+Must land in **one** commit across: the interface, the zod mirror, the compile-time drift guard, the parser's key conversion, and the emitter's key emission — for **both** fields. Requires §18 sign-off recorded in [docs/spec-signoff.md](../../../docs/spec-signoff.md).
 
-Justification (measurements in [research.md](../research.md) R4): 11,593 corpus keys use it; without the field the duplicate-id check is unimplementable on the IR, Case A silently collapses those keys, and the studio could add a key that `touchKeyAddress` cannot stably address.
+Justification (measurements in [research.md](../research.md) R4): 11,593 corpus keys use `layer`; without the field the duplicate-id check is unimplementable on the IR, Case A silently collapses those keys, and the studio could add a key that `touchKeyAddress` cannot stably address. `default` has no equivalent corpus count in this pass, but the drop is unconditional (zero hits in `parseTouchLayout.ts`) and cheap to fix at the same time as `layer`.
 
-**If declined:** run the duplicate-id check against raw JSON inside `keyboard-lint`, which already has the VFS and its own parser, and record the Case A fidelity loss as a known limitation. The addressing hole remains, mitigated only by rejecting new in-layer collisions at edit time.
+**If declined:** run the duplicate-id check against raw JSON inside `keyboard-lint`, which already has the VFS and its own parser, and record the Case A fidelity loss as a known limitation. The addressing hole remains, mitigated only by rejecting new in-layer collisions at edit time. **This also has a UI consequence, not just a lint one:** any key whose disambiguation depends on `layer` (or whose longpress preselection depends on `default`) renders **read-only in the grid**, with an explanatory note, and is **excluded from mutation** — the studio must never silently mis-address a key it cannot uniquely identify or silently drop a preselection it cannot represent.
 
 **Explicitly declined:** adding a `context` member to the output-element union. The join classifies raw text correctly (§2.3); this would touch a locked union with a round-trip emitter for no functional gain.
 
@@ -276,9 +289,11 @@ Justification (measurements in [research.md](../research.md) R4): 11,593 corpus 
 - **Coverage regression locks**: a two-argument call is byte-identical to today's output; `T_0300` with a `◌̀` keycap credits U+0300 **only** when the index is passed; the U+25CC strip is additive; a bare `◌` keycap is not stripped to empty; multi-char and `sp:8` keys behave per the corrected enum.
 - **Plain-view lock**: `buildProducedSet` still counts the orphan `T_` rule. Plus a byte-identical regeneration of `docs/keyboard-facet-index.json`.
 - **Each lint check**: one test per exemption, individually.
-- **Rule synthesis**: re-run adds nothing; semantic dedupe against a hand-written Cameroon rule; guard-store reuse versus mint; guard-before-producing adjacency; insertion before an existing terminal rule; the CAPS triple gated on existing CAPS handling; rename and remove synchronization including the node-id map; and the emit → parse → re-emit round-trip with opaque fragments present.
-- **Applier twin equivalence**, per §6.2.
+- **Rule synthesis**: re-run adds nothing (idempotence — re-running synthesis over a keyboard already carrying an equivalent hand-written rule adds nothing); semantic dedupe against a hand-written Cameroon rule; guard-store reuse versus mint; guard-before-producing adjacency; insertion before an existing terminal rule; the CAPS triple gated on existing CAPS handling; rename and remove synchronization including the node-id map; and the emit → parse → re-emit round-trip with opaque fragments present.
+- **Applier twin equivalence**, per §6.2 — reusing **the fixture** below (no second fixture): the same inline Cameroon-derived structure feeds both the role-matrix/reachability tests above and the applier-twin comparison.
 - **Declared-writes containment** for the studio seam, verified by test rather than by reading the prose (see [research.md](../research.md) R9 on why the prefix rule is looser than it looks).
+- **`TouchKeyIR.layer` codec round-trip**: a key carrying `layer: "shift"` (and, separately, a subkey carrying `default: true`) survives parse → emit unchanged. A duplicate-id fixture disambiguated only by a per-key `layer` override resolves as two distinct keys in `TouchLayoutIR`, not one collapsed key.
+- **Corpus-wide aggregate figures are narrative only, never test-asserted.** The two named canaries below (QWERTY, AZERTY) are the only pinned fixtures; no test asserts a corpus-wide count.
 
 ### The fixture
 
