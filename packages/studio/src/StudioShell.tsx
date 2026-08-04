@@ -710,22 +710,52 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // module's own `ks.draft.active` pointer) to find — identity answers and an
   // in-progress base preview were lost outright.
   //
-  // Skipped when a real project key is ALREADY derivable at mount — a résumé
-  // (or an L3+ durable draft main.tsx already restored pre-mount) means the
-  // working copy is instantiated before this component ever renders, and
-  // `doCommit`'s own install (below) owns the real-project subscription for
-  // that case. Guarded on `autosaveTeardownRef.current === null` so
-  // StrictMode's double-invoked mount effect (no cleanup is returned; the ref
-  // itself is the idempotency guard, mirroring `instantiatedForBaseIdRef`'s
-  // pattern in this same file) never installs two overlapping subscriptions.
-  // `doCommit`'s existing teardown-then-reinstall
-  // (`autosaveTeardownRef.current?.()`) is what PROMOTES this pending
-  // subscription to the real one the moment the author actually confirms a
-  // base — see doCommit's cleanup of the abandoned pending record below.
+  // Guarded on `autosaveTeardownRef.current === null` so StrictMode's
+  // double-invoked mount effect (no cleanup is returned; the ref itself is the
+  // idempotency guard, mirroring `instantiatedForBaseIdRef`'s pattern in this
+  // same file) never installs two overlapping subscriptions. `doCommit`'s
+  // existing teardown-then-reinstall (`autosaveTeardownRef.current?.()`) is
+  // what PROMOTES this pending subscription to the real one the moment the
+  // author actually confirms a base — see doCommit's cleanup of the abandoned
+  // pending record below.
+  //
+  // RESTORING BOOT (spec 057 FR-004/SC-002). When a real project key is
+  // ALREADY derivable at mount, the working copy was instantiated before this
+  // component ever rendered — `main.tsx`'s pre-mount `loadDraft` on a plain
+  // browser refresh, or a route remount of an in-session wizard. This branch
+  // used to `return` here and leave the real-project subscription to
+  // `doCommit`, on the reading that doCommit always re-fires on such a boot.
+  // It does, and that was the defect, in both directions:
+  //
+  //   - Nothing installed the autosave until the compile pipeline re-settled,
+  //     so every store write between mount and that settle went unpersisted.
+  //   - Worse, the re-commit is NOT a no-op. `doCommit` re-derives the
+  //     instantiation mode from `useSurveySessionStore.selectedTrack`, which
+  //     has ADVANCED since the original commit: the base is confirmed at
+  //     `choose_base`, before the track step exists to answer. So an author on
+  //     the adapt track re-commits as `adapt-existing` over a working copy
+  //     recorded `new-from-base`, and `resolveInstantiationCase` reads
+  //     same-id/different-mode as a genuine base switch and clears
+  //     `phaseResults` (workingCopyStore.ts). A refresh silently discarded the
+  //     survey. The same re-commit also fires `setTouchSeedSource(null)` and
+  //     the rebase draft-key migration, neither of which a restore should do.
+  //
+  // Both follow from re-running a COMMIT to restore a copy that is already
+  // committed. So the restore path now does what the résumé path has always
+  // done (see `handleResumeDraft`): pre-seed `instantiatedForBaseIdRef` with
+  // the restored base id, which makes doCommit's own guard early-return, and
+  // install the real-project autosave here directly. A genuine base switch
+  // later is unaffected — a DIFFERENT id still passes the guard (F1).
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (autosaveTeardownRef.current !== null) return;
-    if (deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState()) !== null) return;
+    const restoredProjectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    if (restoredProjectKey !== null) {
+      instantiatedForBaseIdRef.current =
+        useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
+      autosaveTeardownRef.current = installDraftAutosave(restoredProjectKey);
+      return;
+    }
     autosaveTeardownRef.current = installDraftAutosave(DRAFT_PERSISTENCE_PENDING_KEY);
     // Runs once on mount; deriveProjectKeyFromWorkingCopy/installDraftAutosave
     // are stable module-level imports, and the refs are stable by construction.
