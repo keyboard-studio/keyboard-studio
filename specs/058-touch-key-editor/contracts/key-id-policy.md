@@ -12,6 +12,21 @@ Under [spec.md](../../../spec.md) §3c ("Defaults are the product", "no default 
 
 ---
 
+## 1a. The premise, pinned: `T_<HEX>` does **not** self-output
+
+A natural and wrong assumption is that a hex-shaped custom id such as `T_0061` natively emits its codepoint, and that only a mnemonic id such as `T_ACUTE` needs a rule. **Both are equally inert.** Verified in the KeymanWeb engine:
+
+- `web/src/engine/keyboard/src/defaultRules.ts` — `forAny()` is the complete default-output chain (`forSpecialEmulation` → `forNumpadKeys` → `forUnicodeKeynames` → `forBaseKeys`). The only id→output step, `forUnicodeKeynames`, opens with `if(!keyName || keyName.substr(0,2) != 'U_') return null;` (line 163). No branch anywhere parses trailing hex from a `T_` id.
+- `forBaseKeys` cannot rescue it: it keys on the keyCode, and a custom key's code is ≥256, assigned by `GetVKCode`'s VKDictionary interning — not a US-layout keycode.
+- The keycap behaves identically: `ActiveKey.unicodeIDToText` (`web/src/engine/keyboard/src/keyboards/activeLayout.ts:271`) also requires a `U_` prefix, so a `T_0061` with no `text` renders **blank** as well as producing nothing.
+- `web/src/engine/js-processor/src/kbdInterface.ts:502` states the distinction outright: *"will now return true for U_xxxx keys, but not for T_xxxx keys."*
+
+The hex in Cameroon's `T_0300` is therefore a **human** convention, not a machine-interpreted one: it makes the id and the rule body restate each other (`+ [T_0300] > U+0300`) so the pair is trivially cross-checkable. That is also why the keyboard writes all fourteen mark rules explicitly — under a self-outputting id they would be redundant. The AZERTY defect ([research.md](../research.md) R6) is the confirming natural experiment: swapping the layout key from `T_03B1` to `U_03B1` orphaned the rule pair, which is only a meaningful edit because `T_` ids do not self-output.
+
+**Consequence for §2:** the choice between `U_<HEX>` and `T_<HEX>` is never cosmetic. `U_<HEX>` is self-outputting and cannot go dead; `T_<HEX>` is inert until a rule exists, which is precisely what makes it guardable — and what makes an unpaired `T_` key the defect class the dead-key check hunts.
+
+---
+
 ## 2. Minting policy
 
 | Author intent | Minted id | Rules written | Why |
