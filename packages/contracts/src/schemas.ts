@@ -214,6 +214,7 @@ export const TouchKeyIRSchema: z.ZodType<LooseOptional<TouchKeyIR>> = z.lazy(() 
     hint: z.string().optional(),
     output: z.string().optional(),
     nextlayer: z.string().optional(),
+    layerAnnotation: z.string().optional(),
     sk: z.array(TouchKeyIRSchema).optional(),
     // Explicit per-direction shape (not Object.fromEntries) so the inferred
     // output keeps the literal direction keys, matching the contract's

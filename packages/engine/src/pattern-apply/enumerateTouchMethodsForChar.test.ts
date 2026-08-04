@@ -143,6 +143,43 @@ describe("enumerateTouchMethodsForChar", () => {
     ]);
   });
 
+  it("surfaces the sk sub-entry's own layerAnnotation when present (placement-priors v2)", () => {
+    const layout = makeLayout([
+      makeKey("U_0065", {
+        text: "e",
+        sk: [makeKey("U_025B", { text: "ɛ", layerAnnotation: "rightalt" })],
+      }),
+    ]);
+
+    const result = enumerateTouchMethodsForChar(layout, "ɛ");
+
+    expect(result).toEqual([
+      {
+        id: "phone:default:U_0065:sk:U_025B",
+        kind: "longpress",
+        host: "e",
+        producedChar: "ɛ",
+        platform: "phone",
+        layer: "default",
+        skLayerAnnotation: "rightalt",
+        deletable: true,
+      },
+    ]);
+  });
+
+  it("omits skLayerAnnotation when the sk sub-entry carries no layer annotation", () => {
+    const layout = makeLayout([
+      makeKey("U_0061", {
+        text: "a",
+        sk: [makeKey("U_00E1", { text: "á" })],
+      }),
+    ]);
+
+    const result = enumerateTouchMethodsForChar(layout, "á");
+
+    expect(result[0]).not.toHaveProperty("skLayerAnnotation");
+  });
+
   it("finds a multitap entry", () => {
     const layout = makeLayout([
       makeKey("U_0065", {

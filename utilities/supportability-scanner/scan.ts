@@ -55,10 +55,18 @@ import {
   checkHeaderPreservation,
   headerFieldLabel,
 } from "../../packages/engine/src/validator/layer-a-prime.js";
-import { emitPlacementMap, detectBaseLayoutFamily } from "../../packages/engine/src/placement/index.js";
+import {
+  emitPlacementMap,
+  detectBaseLayoutFamily,
+  mineLongpressHosts,
+  aggregateTouchHosts,
+  touchHostsToEntries,
+  type DeadkeySkipCounts,
+  type TouchHostObservation,
+} from "../../packages/engine/src/placement/index.js";
 import { aggregatePlacements, computeFingerprintFromCandidates } from "../../packages/engine/src/placement/aggregate.js";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
-import { ImportStatus } from "@keyboard-studio/contracts";
+import { ImportStatus, parseTouchLayoutString } from "@keyboard-studio/contracts";
 import type { KeyboardPlacementReport } from "../../packages/engine/src/placement/model.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -671,6 +679,10 @@ async function main(): Promise<void> {
 
   const reports: ScanReport[] = [];
   const placementReports: KeyboardPlacementReport[] = [];
+  // placement-priors v2 — corpus-wide counted deadkey/store-index skip
+  // reasons, and per-keyboard longpress-host observations for touch mining.
+  const deadkeySkipCounts: DeadkeySkipCounts = new Map();
+  const perKeyboardTouchObservations: TouchHostObservation[][] = [];
 
   // A single .kmn can be referenced by more than one .kpj — the aggregate
   // bundle projects under release/packages/ point at .kmn files that also have
@@ -689,7 +701,7 @@ async function main(): Promise<void> {
       // --emit-placements: extract placement candidates from the parsed IR.
       if (args.emitPlacements && ir !== null) {
         try {
-          const candidatesByCodepoint = emitPlacementMap(ir);
+          const candidatesByCodepoint = emitPlacementMap(ir, deadkeySkipCounts);
           if (candidatesByCodepoint.size > 0) {
             const flat = [...candidatesByCodepoint.values()].flat();
             placementReports.push({
@@ -702,6 +714,20 @@ async function main(): Promise<void> {
           }
         } catch {
           // Placement extraction is non-fatal; continue.
+        }
+
+        // Touch (longpress) mining — mine LONGPRESS ONLY from the sibling
+        // .keyman-touch-layout, when present, named after the .kmn (the
+        // corpus convention — see release/g/ghana, release/b/bukawa).
+        const touchLayoutPath = join(dirname(kmn), `${report.keyboardId}.keyman-touch-layout`);
+        if (existsSync(touchLayoutPath)) {
+          try {
+            const touchJson = readFileSync(touchLayoutPath, "utf8");
+            const layout = parseTouchLayoutString(touchJson);
+            perKeyboardTouchObservations.push(mineLongpressHosts(layout));
+          } catch {
+            // Touch mining is non-fatal; continue.
+          }
         }
       }
 
@@ -743,15 +769,26 @@ async function main(): Promise<void> {
 
   // --emit-placements: aggregate and write placement-priors.json.
   if (args.emitPlacements) {
+    const touchEntries = touchHostsToEntries(aggregateTouchHosts(perKeyboardTouchObservations));
     const priorsJSON = aggregatePlacements(placementReports, {
       generatedFrom: resolveKeyboardsProvenance(args.releaseDir),
+      deadkeySkipReasons: Object.fromEntries(deadkeySkipCounts),
+      touch: touchEntries,
     });
     mkdirSync(args.placementOutDir, { recursive: true });
     const priorsPath = join(args.placementOutDir, "placement-priors.json");
     await fsp.writeFile(priorsPath, JSON.stringify(priorsJSON, null, 2) + "\n", "utf8");
     console.error(
-      `[OK] placement-priors.json written (${placementReports.length} keyboards with candidates) -> ${normalizePath(relative(REPO_ROOT, priorsPath))}`,
+      `[OK] placement-priors.json written (${placementReports.length} keyboards with candidates, ` +
+        `${touchEntries.length} touch-mined codepoints) -> ${normalizePath(relative(REPO_ROOT, priorsPath))}`,
     );
+    if (deadkeySkipCounts.size > 0) {
+      const summary = [...deadkeySkipCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([reason, count]) => `${reason}×${count}`)
+        .join(", ");
+      console.error(`     deadkey/store-index skips: ${summary}`);
+    }
   }
 
   const counts = summarise(reports);

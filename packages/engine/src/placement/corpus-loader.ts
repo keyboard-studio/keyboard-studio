@@ -2,6 +2,22 @@ import type { PlacementMap, PlacementEntry } from "@keyboard-studio/contracts";
 import type { PlacementPriorsJSON } from "./model.js";
 
 /**
+ * The MAJOR version of `placement-priors.json` this loader understands
+ * (placement-priors v2). `corpusPriorsToPlacementMap` fails closed on a
+ * mismatch rather than silently misreading a shape it does not understand —
+ * see `PlacementPriorsJSON`'s versioning note in model.ts.
+ */
+const SUPPORTED_MAJOR_VERSION = 2;
+
+/** Parse the leading MAJOR component of a semver-style version string. */
+function majorVersionOf(version: string): number | null {
+  const m = /^(\d+)\./.exec(version);
+  if (!m) return null;
+  const major = m[1];
+  return major !== undefined ? parseInt(major, 10) : null;
+}
+
+/**
  * Minimum number of independent keyboards that must agree on a placement
  * before it is eligible to appear as a gallery suggestion.
  * A single-keyboard signal is noise; require at least 2.
@@ -39,10 +55,25 @@ function hasNcapsModifier(modifiers: string[]): boolean {
  * Candidates with priorCount < MIN_PRIOR_COUNT are stripped before
  * renormalization so single-keyboard outliers cannot win by tie-breaking.
  *
+ * **Fails closed on a MAJOR version mismatch** (placement-priors v2): a
+ * `placement-priors.json` whose `version` MAJOR component this loader does
+ * not recognise throws immediately, rather than silently misreading a shape
+ * it doesn't understand (e.g. a future v3 rename/removal).
+ *
  * @see spec.md §7.6 (corpus-derived placement priors)
  * @see packages/contracts/src/placementMap.ts (PlacementMap shape)
  */
 export function corpusPriorsToPlacementMap(priors: PlacementPriorsJSON): PlacementMap {
+  const major = majorVersionOf(priors.version);
+  if (major === null || major !== SUPPORTED_MAJOR_VERSION) {
+    throw new Error(
+      `placement-priors.json major version mismatch: this loader supports ` +
+        `${SUPPORTED_MAJOR_VERSION}.x.x, got "${priors.version}". Regenerate ` +
+        `placement-priors.json with the current supportability-scanner, or ` +
+        `update corpus-loader.ts if this is an intentional format bump.`,
+    );
+  }
+
   const entries: PlacementEntry[] = [];
 
   for (const [hexKey, entry] of Object.entries(priors.entries)) {
@@ -84,5 +115,6 @@ export function corpusPriorsToPlacementMap(priors: PlacementPriorsJSON): Placeme
   return {
     entries,
     pinnedPriorsVersion: priors.version,
+    ...(priors.touch !== undefined ? { touch: priors.touch } : {}),
   };
 }
