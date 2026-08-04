@@ -475,6 +475,66 @@ describe("MechanismGallery — sequence method chooser", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Abugida-safe gate on the deadkey auto-default (km-domain ruling) — a
+// consonant+virama sequence (e.g. Devanagari "क" + U+094D) still matches
+// isDecomposableAccented (virama is Mn, General_Category-universal), so the
+// predicate alone can't exclude it; the gallery additionally gates on
+// axes.scriptClass !== "abugida".
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — abugida script-class gate on the deadkey default", () => {
+  // Devanagari "क" (U+0915) + virama (U+094D) — predicate-matching (Mn mark),
+  // but a script-specific abugida mechanism, not a Latin-style accent+base.
+  const CONSONANT_VIRAMA = "क्";
+
+  it("does NOT auto-default to the deadkey method when scriptClass is abugida", async () => {
+    useWorkingCopyStore.getState().setIrAxes({ scriptClass: "abugida" });
+    seedInventory([CONSONANT_VIRAMA]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(screen.queryByLabelText(/Trigger key for deadkey/i)).toBeNull();
+    expect(screen.getByLabelText(/Physical key for Assign to a key/i)).toBeTruthy();
+  });
+
+  it("still auto-defaults to the deadkey method when scriptClass is alphabetic", async () => {
+    useWorkingCopyStore.getState().setIrAxes({ scriptClass: "alphabetic" });
+    seedInventory([CONSONANT_VIRAMA]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(screen.getByLabelText(/Trigger key for deadkey/i)).toBeTruthy();
+  });
+
+  it("still auto-defaults to the deadkey method when scriptClass is undefined (fail-open)", async () => {
+    seedInventory([CONSONANT_VIRAMA]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(screen.getByLabelText(/Trigger key for deadkey/i)).toBeTruthy();
+  });
+
+  // Regression pin (km-domain note): the gate above is abugida-ONLY — an
+  // abjad script (Hebrew/Arabic) must NOT be suppressed, and that "NOT
+  // gated" half of the ruling was previously enforced only by code
+  // omission (no scriptClass === "abjad" branch), with no test proving it.
+  // Hebrew בּ (U+FB31, BET WITH DAGESH) NFD-decomposes to ב (U+05D1, letter)
+  // + U+05BC (dagesh, General_Category Mn) — verified via NFD in this repo's
+  // Node runtime — so isDecomposableAccented(BET_DAGESH) is true, same as
+  // the Latin "á" case, and the deadkey default should fire unmodified.
+  const BET_DAGESH = "\u{FB31}";
+
+  it("still auto-defaults to the deadkey method for a decomposable abjad char (Hebrew, scriptClass 'abjad' is NOT gated)", async () => {
+    useWorkingCopyStore.getState().setIrAxes({ scriptClass: "abjad" });
+    seedInventory([BET_DAGESH]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(screen.getByLabelText(/Trigger key for deadkey/i)).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Method chooser — deadkey (only for decomposable accented chars)
 // ---------------------------------------------------------------------------
 

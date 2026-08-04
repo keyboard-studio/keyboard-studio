@@ -109,6 +109,18 @@ export interface InventoryDiff {
    * used to compute `lettersToAdd`/`alreadyProduced`.
    */
   producedSet: ReadonlySet<string>;
+  /**
+   * The SESSION-AWARE produced-glyph set BEFORE composability augmentation —
+   * i.e. the raw `buildSessionProducedSet(baseIr, sessionAssignments,
+   * getPatternByIdSync)` result this hook already computes internally to
+   * derive `producedSet`. Exposed so consumers that only need the
+   * pre-augment set (MechanismGallery's `baseProducedSet` composition-row
+   * feed, TouchGallery's `desktopDirectProducedSet`) don't re-run the same
+   * expensive round-trip a second time per render — perf dedup, no behavior
+   * change (same baseIr/sessionAssignments/getPatternByIdSync inputs as
+   * before).
+   */
+  rawProducedSet: ReadonlySet<string>;
 }
 
 /**
@@ -152,22 +164,33 @@ export function useInventoryDiff(): InventoryDiff {
     [baseIr, inventory],
   );
 
-  // SESSION-AWARE — returned as `producedSet` for informational/gate
-  // consumers only (see module doc).
-  const producedSet = useMemo<Set<string>>(
+  // SESSION-AWARE, PRE-AUGMENT — the raw round-trip, computed once and
+  // exposed as `rawProducedSet` so other consumers (MechanismGallery's
+  // `baseProducedSet`, TouchGallery's `desktopDirectProducedSet`) don't
+  // redo it (perf dedup — km-synthesis).
+  const rawProducedSet = useMemo<Set<string>>(
     () =>
       baseIr !== null
-        ? augmentWithComposable(
-            buildSessionProducedSet(baseIr, sessionAssignments, getPatternByIdSync),
-            inventory,
-          )
+        ? buildSessionProducedSet(baseIr, sessionAssignments, getPatternByIdSync)
         : new Set<string>(),
-    [baseIr, inventory, sessionAssignments],
+    [baseIr, sessionAssignments],
+  );
+
+  // SESSION-AWARE, augmented — returned as `producedSet` for
+  // informational/gate consumers only (see module doc).
+  const producedSet = useMemo<Set<string>>(
+    () => (baseIr !== null ? augmentWithComposable(rawProducedSet, inventory) : new Set<string>()),
+    [baseIr, inventory, rawProducedSet],
   );
 
   return useMemo<InventoryDiff>(() => {
     if (baseIr === null) {
-      return { lettersToAdd: lowercaseFirst(inventory), alreadyProduced: [], producedSet };
+      return {
+        lettersToAdd: lowercaseFirst(inventory),
+        alreadyProduced: [],
+        producedSet,
+        rawProducedSet,
+      };
     }
 
     const lettersToAdd: string[] = [];
@@ -188,6 +211,11 @@ export function useInventoryDiff(): InventoryDiff {
       }
     }
 
-    return { lettersToAdd: lowercaseFirst(lettersToAdd), alreadyProduced, producedSet };
-  }, [baseIr, baseProducedSetForWalk, producedSet, inventory]);
+    return {
+      lettersToAdd: lowercaseFirst(lettersToAdd),
+      alreadyProduced,
+      producedSet,
+      rawProducedSet,
+    };
+  }, [baseIr, baseProducedSetForWalk, producedSet, rawProducedSet, inventory]);
 }

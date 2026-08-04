@@ -39,11 +39,19 @@
 // (`diacriticBehavior`, packages/contracts/src/axes.ts, spec.md §7.1 A4; the
 // scriptClass "abugida" value, same file, A2, may be the more precise axis to
 // check instead/also — confirm with km-domain/km-strategy) so an Indic
-// abugida's virama/matra marks (Mn/Mc — they satisfy `\p{M}` and so this
-// broadened predicate) are never described with "accent"/"diacritic" language.
-// This module has no survey/axis dependency today; wiring one is a scope
-// decision for whichever caller owns the copy (TouchGallery's suggestion
-// card), not this pure placement generator.
+// abugida's virama/matra marks are never described with "accent"/"diacritic"
+// language. NOTE (post-narrowing correction): `isDecomposableAccented` was
+// narrowed to `\p{Mn}` only (see charUtils.ts) — a spacing matra (Mc, e.g.
+// Devanagari U+093E) no longer satisfies the predicate at all, so it never
+// reaches this module. A consonant+virama sequence still does (virama, e.g.
+// U+094D, IS Mn, General_Category-universal, not abugida-specific), so the
+// abugida case this TODO cares about is narrower than it used to be: only
+// the Mn virama form, not the Mc matra form. This module has no survey/axis
+// dependency today; the caller (TouchGallery's longpress suggestion card)
+// additionally gates the abugida virama case on `axes.scriptClass !==
+// "abugida"` before offering the sibling-accent copy — wiring an A4/A2
+// dependency directly into this pure placement generator remains a scope
+// decision for whichever caller owns the copy, not this module.
 
 import { isDecomposableAccented } from "@keyboard-studio/contracts";
 import { isUppercaseLetter } from "../../lib/caseOrder.ts";

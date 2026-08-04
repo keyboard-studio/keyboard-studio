@@ -66,12 +66,14 @@ import {
 import type { I18n } from "@lingui/core";
 import { msg, plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { useShallow } from "zustand/react/shallow";
 import { resolveMessage } from "../../lib/i18nResolve.ts";
 import { ConfirmDialog } from "./parts/ConfirmDialog.tsx";
 import type {
   TouchAssignment,
   MechanismRef,
   TouchLayoutIR,
+  DiscoveryAxisVector,
 } from "@keyboard-studio/contracts";
 import {
   toUPlusNotation,
@@ -95,7 +97,6 @@ import {
   addableTouchLayerTokens,
   optionsForTouchLayerSlot,
   caseCounterpart,
-  buildSessionProducedSet,
 } from "@keyboard-studio/engine";
 import type { TouchMethodDescriptor } from "@keyboard-studio/engine";
 import {
@@ -114,11 +115,7 @@ import {
   shouldEmitTouchLayout,
   resolveTouchSeedSource,
 } from "../../lib/touchEmission.ts";
-import {
-  formatUncoveredCharsList,
-  selectDesktopAssignments,
-} from "../../lib/unimplementedInventory.ts";
-import { getPatternByIdSync } from "../../lib/services.ts";
+import { formatUncoveredCharsList } from "../../lib/unimplementedInventory.ts";
 import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
 import { ErrorText } from "../../ui/index.ts";
 import {
@@ -1373,6 +1370,11 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const identity = useWorkingCopyStore((s) => s.identity);
   const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+  // Abugida-safe gate input (km-domain ruling) — mirrors MechanismGallery's
+  // own `axes` selector (see that file, near its `baseIr` selector).
+  const axes = useWorkingCopyStore(
+    useShallow((s) => s.session.axes as Partial<DiscoveryAxisVector>),
+  );
 
   // spec 035 R3/R11 — the carve overlay + Phase C assignments feed
   // deriveDesktopModifications (mods memo below); touchSeedSource feeds the
@@ -1455,7 +1457,8 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // gives for MechanismGallery's `lettersToAdd`: reflowing it whenever a
   // session assignment changes coverage would strand/reflow the walk mid-edit
   // (caught by this fix's own regression pass).
-  const { producedSet: desktopProducedSet } = useInventoryDiff();
+  const { producedSet: desktopProducedSet, rawProducedSet: desktopRawProducedSet } =
+    useInventoryDiff();
 
   // Draft persistence — read on mount; write on every charTouch change.
   const touchDraft = useWorkingCopyStore((s) => s.touchDraft);
@@ -2087,21 +2090,12 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // filters to `scope: "individual"` only), so this can't disagree with the
   // gate's own desktop-side produced set over a sequence/character-class-
   // scope assignment. Feeds `directTouchProducedSet` below.
-  const desktopSessionAssignmentsForComposition = useMemo(
-    () => selectDesktopAssignments(phaseResults),
-    [phaseResults],
-  );
-  const desktopDirectProducedSet = useMemo<Set<string>>(
-    () =>
-      baseIr !== null
-        ? buildSessionProducedSet(
-            baseIr,
-            desktopSessionAssignmentsForComposition,
-            getPatternByIdSync,
-          )
-        : new Set<string>(),
-    [baseIr, desktopSessionAssignmentsForComposition],
-  );
+  // Perf dedup (km-synthesis): `useInventoryDiff()`'s own internal
+  // `sessionAssignments` is `selectDesktopAssignments(phaseResults)` — the
+  // identical selector/input used here — so `rawProducedSet` from that hook
+  // (above, `desktopRawProducedSet`) IS `desktopDirectProducedSet`; no need
+  // to re-run `buildSessionProducedSet` a second time per render.
+  const desktopDirectProducedSet = desktopRawProducedSet;
 
   // Pre-augment, SESSION-AWARE direct touch-produced set — signal (c)'s
   // (COMPOSITION) input for charMechanisms.ts's getProducerBadge (replaces
@@ -2120,7 +2114,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // directTargets exclusion needed here — getProducerBadge sums its three
   // signals directly, so a char both directly touch-assigned AND composable
   // now correctly badges 2, not double-counting-or-1.
-  const directTouchProducedSet = useMemo<Set<string>>(() => {
+  const directTouchProducedSet = useMemo<ReadonlySet<string>>(() => {
     if (layoutForLintAndGate === null) return desktopDirectProducedSet;
     try {
       const { uncovered } = computeTouchCoverage(layoutForLintAndGate, inventory);
@@ -2481,18 +2475,38 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       return { kind: "none" };
     }
 
-    if (isDecomposableAccented(currentChar)) {
+    // Abugida-safe gate (km-domain ruling) — same reasoning as
+    // MechanismGallery's deadkey auto-default (see that file's reset effect):
+    // `isDecomposableAccented` is Mn-only so it no longer matches a matra
+    // syllable (Mc), but it still matches consonant+virama (virama is Mn),
+    // so the predicate alone doesn't exclude abugida mechanisms. Fail-open
+    // (keep suggesting) when `axes.scriptClass` is not yet populated.
+    if (isDecomposableAccented(currentChar) && axes.scriptClass !== "abugida") {
       const nfd = currentChar.normalize("NFD");
       const baseLetter = [...nfd][0] ?? "";
       let hk = "";
       if (baseLetter && /^[a-zA-Z]$/.test(baseLetter)) {
         hk = `K_${baseLetter.toUpperCase()}`;
       }
+      // Empty-hostkey guard (km-triage finding #3): a non-Latin base letter
+      // (e.g. the base of a Cyrillic/Hebrew/Arabic accented char whose base
+      // isn't a-z) leaves `hk` as "" — rendering a vacuous "long-press
+      // [nothing]" card. Skip the suggestion entirely rather than surface an
+      // empty target key.
+      if (hk === "") {
+        return { kind: "none" };
+      }
       return { kind: "longpress", hostKey: hk };
     }
 
     return { kind: "none" };
-  }, [currentChar, desktopAssignments, detectedChars, currentCharTouchMethods]);
+  }, [
+    currentChar,
+    desktopAssignments,
+    detectedChars,
+    currentCharTouchMethods,
+    axes.scriptClass,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Per-character method state — reset when currentChar changes

@@ -2129,6 +2129,57 @@ describe("TouchGallery — heading", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Abugida-safe gate + empty-hostkey guard on the decomposable-accented
+// longpress auto-suggestion (km-domain ruling / km-triage finding #3)
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — abugida gate and empty-hostkey guard on the longpress auto-suggestion", () => {
+  it("does NOT offer a longpress auto-suggestion for a decomposable char when scriptClass is abugida", async () => {
+    // "ä" (a + U+0308, Mn) is predicate-matching and has a Latin base — with
+    // no gate this always suggests longpress (see the "Latin base" case
+    // below); with scriptClass = abugida the suggestion must not fire.
+    seedStore({ withInventory: ["ä"] });
+    useWorkingCopyStore.getState().setIrAxes({ scriptClass: "abugida" });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expect(screen.queryByText(/Suggested: long-press/i)).toBeNull();
+    // Falls straight to the method chooser instead of a suggestion card.
+    expect(screen.queryByText(/How to reach it on touch/i)).not.toBeNull();
+  });
+
+  it("skips the longpress suggestion (no vacuous card) when the derived host key is empty (non-Latin base)", async () => {
+    // "ӝ" (ж U+0436 + U+0308 Mn) decomposes to a Cyrillic base letter, which
+    // the `/^[a-zA-Z]$/` host-key extraction cannot map to a K_ key — before
+    // this guard the component fell back to rendering "Suggested: long-press
+    // a key to reach...", a vacuous card naming no real target key.
+    seedStore({ withInventory: ["ӝ"] });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expect(screen.queryByText(/Suggested: long-press/i)).toBeNull();
+    expect(screen.queryByText(/Suggested: long-press a key to reach/i)).toBeNull();
+    // Falls straight to the method chooser — no vacuous suggestion card.
+    expect(screen.queryByText(/How to reach it on touch/i)).not.toBeNull();
+  });
+
+  it("still offers the longpress auto-suggestion for a decomposable char with a Latin base (scriptClass alphabetic / undefined)", async () => {
+    seedStore({ withInventory: ["ä"] });
+    useWorkingCopyStore.getState().setIrAxes({ scriptClass: "alphabetic" });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expect(screen.queryByText(/Suggested: long-press/i)).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Suggestion card — per-character desktop-derived suggestions
 // ---------------------------------------------------------------------------
 

@@ -75,7 +75,7 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { collateInventory } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
 import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
-import { getPatternLibraryService, getPatternByIdSync } from "../../lib/services.ts";
+import { getPatternLibraryService } from "../../lib/services.ts";
 import { displayChar } from "../../lib/irToCarveNodes.ts";
 import { capabilityHint } from "./parts/InfoView.tsx";
 import type { AxisFill, DiscoveryAxisVector } from "@keyboard-studio/contracts";
@@ -92,7 +92,6 @@ import {
   collectModifierTokensInUse,
   collectCharContributors,
   collectCompositionMethod,
-  buildSessionProducedSet,
   type ModifierToken,
   type CharContributors,
 } from "@keyboard-studio/engine";
@@ -1339,8 +1338,11 @@ export function MechanismGallery({
     (s) => s.markGalleryIntroSeen,
   );
 
-  const { lettersToAdd: inventoryLettersToAdd, producedSet: sessionProducedSet } =
-    useInventoryDiff();
+  const {
+    lettersToAdd: inventoryLettersToAdd,
+    producedSet: sessionProducedSet,
+    rawProducedSet: sharedRawProducedSet,
+  } = useInventoryDiff();
 
   // Collated display order (spec 047 FR-007's default-ICU comparator, reused
   // — not reinvented; see survey/collation.ts): puts a lowercase letter
@@ -1427,13 +1429,15 @@ export function MechanismGallery({
   // combining-diaeresis output) is visible to collectCompositionMethod
   // immediately — not just after the working copy is serialized. See
   // packages/engine/src/pattern-apply/sessionProducedSet.ts.
-  const baseProducedSet = useMemo(
-    () =>
-      baseIr !== null
-        ? buildSessionProducedSet(baseIr, sessionAssignments, getPatternByIdSync)
-        : new Set<string>(),
-    [baseIr, sessionAssignments],
-  );
+  //
+  // Perf dedup (km-synthesis): this is the SAME round-trip useInventoryDiff()
+  // already computes internally (identical baseIr/sessionAssignments/
+  // getPatternByIdSync inputs — sessionAssignments here is
+  // selectDesktopAssignments(phaseResults), same as useInventoryDiff.ts's own
+  // derivation) to produce its pre-augment set — reuse that hook's
+  // `rawProducedSet` rather than re-running `buildSessionProducedSet` a
+  // second time per render.
+  const baseProducedSet = sharedRawProducedSet;
 
   // Spec 046 worklist filter (FR-020): a composed unit whose marks are ALL
   // productive mark keys is reachable via base key + mark key — it needs no
@@ -1974,14 +1978,29 @@ export function MechanismGallery({
   useEffect(() => {
     clearCompanion();
     resetMethodState();
-    if (currentChar !== null && isDecomposableAccented(currentChar)) {
+    // Abugida-safe gate (km-domain ruling): `isDecomposableAccented` is Mn-
+    // only (see charUtils.ts) so it no longer matches a Devanagari-style
+    // matra syllable (Mc), but it STILL matches consonant+virama (virama is
+    // Mn and General_Category-universal, not abugida-specific) — so the
+    // predicate alone is insufficient. Gate the deadkey auto-default off
+    // when the survey has determined this keyboard is for an abugida
+    // script; matra/virama placement is an abugida-specific mechanism, not
+    // the Latin/Cyrillic/Hebrew/Arabic "accent + base" deadkey pattern this
+    // default is for. `axes.scriptClass === undefined` (axes not yet
+    // populated) FAILS OPEN — keep the pre-existing auto-default behavior
+    // rather than block on an unresolved axis. Do NOT gate on "abjad".
+    if (
+      currentChar !== null &&
+      isDecomposableAccented(currentChar) &&
+      axes.scriptClass !== "abugida"
+    ) {
       // §3c defaults-first: for a decomposable accented letter the natural method
       // is deadkey (S-02) — propose-then-confirm. resetMethodState sets "swap"
       // unconditionally, so override here after the reset.
       setDeadkeyBaseLetter([...currentChar.normalize("NFD")][0] ?? "");
       setMethod("deadkey");
     }
-  }, [currentChar, resetMethodState, clearCompanion]);
+  }, [currentChar, resetMethodState, clearCompanion, axes.scriptClass]);
 
   // ---------------------------------------------------------------------------
   // Suggestion row handlers
