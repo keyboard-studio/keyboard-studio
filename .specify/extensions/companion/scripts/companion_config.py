@@ -19,9 +19,45 @@ outside that subset raises, which the loader surfaces as "malformed".
 from __future__ import annotations
 
 import os
+import sys
 
 HOOK_TYPES = {"command", "prompt", "node"}
 WHENS = ("before", "after")
+
+
+# --------------------------------------------------------------------------- #
+# Shared stdio setup
+# --------------------------------------------------------------------------- #
+def configure_stdio() -> None:
+    """Force UTF-8 on stdout/stderr. Call first in every script's main().
+
+    Every script in this directory prints user data — spec names, capability
+    names, decisions, branch names, file paths — none of which is guaranteed
+    ASCII. Several also print non-ASCII literals of their own. The platform
+    default on Windows is cp1252, which cannot encode any of it, so `print`
+    raises UnicodeEncodeError.
+
+    That would merely be noisy if it failed loudly, but these scripts all
+    document a "never fail the host command" contract and catch broadly around
+    main(), so the exception is swallowed and the caller sees a TRUNCATED
+    report with exit 0. status-context.py lost its machine-readable
+    `RESOLUTION:` line that way — silently, for as long as it existed.
+
+    This lives here, in the one module with no entry point of its own, because
+    it is the only import every script can reach: the hyphenated filenames
+    (write-context.py, derive-from-files.py, resolve-spec-paths.py) need
+    importlib gymnastics, while `import companion_config` is a plain import
+    that already works from anywhere in this directory.
+
+    errors="replace" is deliberate: if a stream still cannot take a glyph it
+    degrades to a placeholder rather than losing the line. A best-effort
+    reporter that prints something imperfect beats one that prints nothing.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass  # not a reconfigurable TextIOWrapper — leave it as-is
 
 
 class ConfigError(Exception):
