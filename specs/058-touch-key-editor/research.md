@@ -183,6 +183,25 @@ The trap is for a future extension. Widening `CONTROL_KEY_IDS` to cover layer-sw
 | **Code (raw JSON) view** | **DROP** | Developer needs it as an escape hatch from its own unvalidated editor. We ship a real compile and a downloadable package. |
 | **Undo** — whole-document snapshots, 100 deep, coalesced per focus session | **ADOPT the coalescing, not the mechanism** | Commit-on-blur/Enter reproduces the useful behaviour; our overlay is small and pure, so a per-edit inverse is cheaper and exact. |
 
+### R3d — Selecting a key
+
+Developer's selection model is pointer-first: click a key, and floating wedge buttons reposition themselves around it. Its only non-spatial route is a "Press any key to select it on the keyboard" dialog that matches the pressed physical key against the standard VK table — clever for a desktop-shaped layout, useless for a `T_`-keyed one. There is no find, no filter, and no keyboard navigation of the grid itself.
+
+Our model, per FR-020a-g:
+
+- **One Tab stop** via roving tabindex (`CharScrollStrip`'s `hasSelectedVisible` pattern). Several hundred keys must not mean several hundred Tab stops — [docs/accessibility.md](../../docs/accessibility.md) rule 3 requires the ARIA APG grid pattern for exactly this reason, and names the existing character-map grid as already audited against it.
+- **Selection separate from editing.** Arrows and clicks move selection with focus staying in the grid; Enter/F2 enters the inspector; Escape returns. Avoids the trap where arrowing away from a half-typed field silently discards it.
+- **Geometry-based vertical navigation.** The load-bearing detail: rows have unequal key counts *and* unequal widths, so index-clamping puts the caret somewhere the author is not looking. Land on the key whose horizontal span contains the current centre — computable from the `padPct`/`widthPct` the view model already carries for rendering.
+- **No wrap across layers**; a layer selector switches, and the selected row/column position is **held across the switch** so comparing a key across `default`/`shift`/`caps` is one action. That doubles as the verification that a twin layer's predictability (R3c) actually holds.
+- **Find by value.** The gap spatial navigation leaves: in the Cameroon flow the author knows *"the key that types `ɛ`"* or *"`T_0300`"*, not a grid coordinate, and 394 keys across 8 layers make arrowing unreasonable. A filter by id / by produced character / by "no assigned output" is likely the *most-used* selection route, not a convenience — and the third filter is precisely the US2 worklist. `enumerateTouchMethodsForChar` already implements the character→key lookup.
+
+Two constraints worth stating so nobody designs against them:
+
+- **`[role="grid"]` must join `SKIP_SELECTOR`** in [useCharCycleKeys.ts](../../packages/studio/src/editors/assignLoop/useCharCycleKeys.ts) (verified absent: the list is `input, textarea, select, [contenteditable], [role="listbox"], [role="combobox"], [aria-expanded="true"]`). That hook lives at the pane level and eats ArrowLeft/ArrowRight from its whole subtree otherwise.
+- **No click-to-select from the OSK preview.** It is a KeymanWeb iframe; a click there types the key. Highlighting the corresponding grid cell from a preview interaction is not available, and the reverse direction (grid selection → preview) is the only one that works.
+
+**Sub-key selection is deferred to Increment 2.** Longpress, multitap, and flick entries are nested keys and need a second-level selection model (Developer used three tabbed panes below the grid). Increment 1 *displays* them as per-key annotations and reaches their deletion through the existing per-method path, which already exists in the gallery.
+
 ### Validation: the largest single gain
 
 Developer's editor validates **essentially nothing** — no id syntax check, no duplicate-id detection, no overfull-row warning, no dangling-`nextlayer` check, and no "`T_` key has no rule" check (the editor cannot see the `.kmn`). Everything is deferred to compile. Every one of those is a **pure synchronous join** available to us at edit time.
