@@ -246,7 +246,7 @@ const ZIP_TEST_BASE: BaseKeyboard = {
   version: "14.0",
 };
 
-function makeScaffoldedVFS(): Promise<VirtualFS> {
+function makeScaffoldedVFS(opts?: import("@keyboard-studio/contracts").ScaffoldOptions): Promise<VirtualFS> {
   const mockFetch = vi.fn().mockImplementation((url: string) => {
     if ((url as string).includes(".kmn")) {
       return Promise.resolve({
@@ -277,7 +277,7 @@ function makeScaffoldedVFS(): Promise<VirtualFS> {
   });
 
   const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
-  return service.scaffold(ZIP_TEST_BASE, "zip_test_kb", "Zip Test Keyboard")
+  return service.scaffold(ZIP_TEST_BASE, "zip_test_kb", "Zip Test Keyboard", opts)
     .then((r) => r.vfs);
 }
 
@@ -343,5 +343,74 @@ describe("toZip — scaffolded VFS round-trip (issue #32)", () => {
         `VFS entry "${entry.path}" missing from zip`,
       ).toBe(true);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T027 / SC-002 — the DELIVERED zip carries the confirmed attribution
+//
+// Asserted on real zip bytes read back with unzipSync, rather than in a browser:
+// the claim being verified is "the file the author downloads names the right
+// rights holder", and that is decided by scaffold -> toZip, not by the UI.
+// ---------------------------------------------------------------------------
+
+describe("attribution reaches the delivered zip (spec 059 T027)", () => {
+  const ATTRIBUTION = {
+    authorName: "Alice Example",
+    authorEmail: "alice@example.org",
+    copyrightHolder: "Bafut Language Committee",
+  };
+
+  async function zipFiles(opts?: import("@keyboard-studio/contracts").ScaffoldOptions) {
+    const vfs = await makeScaffoldedVFS(opts);
+    const entries = unzipSync(await toZip(vfs));
+    const read = (suffix: string): string => {
+      const key = Object.keys(entries).find((k) => k.endsWith(suffix));
+      if (key === undefined) throw new Error(`no zip entry ending in ${suffix}`);
+      return dec.decode(entries[key]!);
+    };
+    return { paths: Object.keys(entries), read };
+  }
+
+  it("LICENSE.md in the zip names the confirmed copyright holder", async () => {
+    const { read } = await zipFiles({ attribution: ATTRIBUTION, emitYear: 2026 });
+    expect(read("LICENSE.md")).toContain("Copyright © 2026 Bafut Language Committee");
+  });
+
+  it("LICENSE.md in the zip carries the full MIT body", async () => {
+    const { read } = await zipFiles({ attribution: ATTRIBUTION, emitYear: 2026 });
+    expect(read("LICENSE.md")).toContain("Permission is hereby granted, free of charge");
+  });
+
+  // SC-001: the bug this feature exists to remove.
+  it("never names the keyboard's own display name as the holder", async () => {
+    const { read } = await zipFiles({ attribution: ATTRIBUTION, emitYear: 2026 });
+    const license = read("LICENSE.md");
+    expect(license).not.toContain("Zip Test Keyboard");
+    expect(license).not.toMatch(/Copyright © \d{4} Zip Test/);
+  });
+
+  // SC-003: one source of truth — the three artifacts cannot disagree.
+  it("the .kmn COPYRIGHT store agrees with LICENSE.md", async () => {
+    const { read } = await zipFiles({ attribution: ATTRIBUTION, emitYear: 2026 });
+    const expected = "Copyright © 2026 Bafut Language Committee";
+    expect(read("LICENSE.md")).toContain(expected);
+    expect(read(".kmn")).toContain(`store(&COPYRIGHT) '${expected}'`);
+  });
+
+  it("the .kps carries the same holder plus the author with a mailto", async () => {
+    const { read } = await zipFiles({ attribution: ATTRIBUTION, emitYear: 2026 });
+    const kps = read(".kps");
+    expect(kps).toContain("Copyright © 2026 Bafut Language Committee");
+    expect(kps).toContain('<Author URL="mailto:alice@example.org">Alice Example</Author>');
+  });
+
+  // With no attribution the zip still builds, but states no holder at all — the
+  // UI gate (usePreviewArtifact/OutputScreen) is what stops it being downloaded.
+  it("invents no holder when attribution is absent", async () => {
+    const { read } = await zipFiles({ emitYear: 2026 });
+    const license = read("LICENSE.md");
+    expect(license).not.toMatch(/^Copyright/m);
+    expect(license).toContain("Permission is hereby granted, free of charge");
   });
 });

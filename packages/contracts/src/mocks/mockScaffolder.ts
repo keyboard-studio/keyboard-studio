@@ -26,7 +26,7 @@ export const mockScaffolder: ScaffolderService = {
     _base: BaseKeyboard,
     keyboardId: string,
     _displayName: string,
-    _opts?: ScaffoldOptions
+    opts?: ScaffoldOptions
   ): Promise<ScaffoldResult> {
     const idError = this.validateKeyboardId(keyboardId);
     if (idError !== null) {
@@ -35,7 +35,18 @@ export const mockScaffolder: ScaffolderService = {
     // Returns the pre-built scaffolded FS fixture.
     // A real implementation would clone base, run template-cleanup pipeline
     // with the routing decision in opts.group (or auto-detected from base).
-    return Promise.resolve({ vfs: scaffoldedFS, warnings: [], fonts: [], stylesheets: [] });
+    return Promise.resolve({
+      vfs: scaffoldedFS,
+      warnings: [],
+      fonts: [],
+      stylesheets: [],
+      // Mirror the real scaffolder (spec 059): attribution present means a
+      // copyright notice was emitted. Derived rather than hard-coded so a caller
+      // testing the un-attributed gate gets the same answer from the mock.
+      attributionMissing: opts?.attribution === undefined,
+      // The mock fetches nothing, so it inherits nothing.
+      inheritedHolderCount: 0,
+    });
   },
 
   listTemplates(): Promise<string[]> {

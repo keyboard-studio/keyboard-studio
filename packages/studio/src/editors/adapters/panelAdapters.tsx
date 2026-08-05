@@ -27,6 +27,8 @@
 // Boundary: editors/adapters/ → stores/ and hooks/ is allowed by depcruise.
 
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useGitHubAuth } from "../../hooks/useGitHubAuth.ts";
 import { confirmRebaseTo } from "../../lib/confirmRebase.ts";
 import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
@@ -56,6 +58,13 @@ function contextFromIdentity(identity: IdentityLiteResult): SurveyContext {
     routing_group: identity.prefill.routingGroup,
     script_family: identity.prefill.script,
     ...(identity.bcp47 !== "" ? { bcp47_tag: identity.bcp47 } : {}),
+    // spec 059 FR-016: publishing the contact here activates the Phase F
+    // pre-fill seam (see CTX_AUTHOR_CONTACT in flowStepOptions.tsx), so
+    // pf_contact_info is confirmed rather than asked a second time.
+    ...(identity.attribution?.authorEmail !== undefined &&
+    identity.attribution.authorEmail !== ""
+      ? { author_contact: identity.attribution.authorEmail }
+      : {}),
   };
 }
 
@@ -80,6 +89,11 @@ export function IdentityLiteAdapter({ onComplete }: EditorStepProps) {
   // golden-walk ordering is setIdentityResult → setSurveyContext → advance).
   const setIdentityResult = useSurveySessionStore((s) => s.setIdentityResult);
   const setSurveyContext = useSurveySessionStore((s) => s.setSurveyContext);
+  const setAttribution = useWorkingCopyStore((s) => s.setAttribution);
+  // Only the profile fields are read here; the auth STATUS is irrelevant to
+  // identity capture, and a guest simply gets no seed (D6 then requires a typed
+  // name before emission).
+  const { authorName, authorEmail } = useGitHubAuth();
   const setIdentityPhaseResult = useSurveySessionStore((s) => s.setIdentityPhaseResult);
   // Prior completed run, if any — lets a history pop back onto this step resume
   // the flow at its last question instead of replaying from question 1.
@@ -89,6 +103,10 @@ export function IdentityLiteAdapter({ onComplete }: EditorStepProps) {
     // R7: identity-specific writes fire here, before onComplete → host → advance.
     setIdentityResult(identity);
     setSurveyContext(contextFromIdentity(identity));
+    // spec 059 US1: the working copy is the single source the scaffolder reads
+    // for LICENSE.md / store(&COPYRIGHT) / .kps <Copyright>, and it rides the
+    // existing draft so attribution survives a reload for free.
+    setAttribution(identity.attribution);
     setIdentityPhaseResult(result);
     // Forward the phase result; host guards on SurveyPhaseResult shape and calls
     // recordPhase + routeAnswersThroughMutate.
@@ -97,6 +115,9 @@ export function IdentityLiteAdapter({ onComplete }: EditorStepProps) {
 
   return (
     <IdentityLite
+      // spec 059 D7: pre-fill attribution from the authenticated profile so the
+      // author confirms rather than types. Absent fields fall through to asking.
+      authorSeed={{ name: authorName, email: authorEmail }}
       context={surveyContext}
       onComplete={handleComplete}
       findingsByQuestionId={findingsByQuestionId}

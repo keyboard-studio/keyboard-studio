@@ -56,6 +56,20 @@ export interface FetchKeyboardSourceResult {
    * no .kps was found or no `.css` <File> entries were present.
    */
   stylesheets: KpsStylesheetEntry[];
+  /**
+   * The base keyboard's own `LICENSE.md`, verbatim, or undefined when it has
+   * none (spec 059 FR-011).
+   *
+   * Fetched because MIT requires the original copyright notice be retained in a
+   * derivative: a keyboard derived from this base must ACCUMULATE the base
+   * author's holder rather than replace it. Lives at the keyboard ROOT, not
+   * under `source/`, so it is a separate fetch from the sibling-asset walk.
+   *
+   * NOT written into the VFS: the derived keyboard's LICENSE.md is the merged
+   * block (base holders + the new author), so parking the base's copy at the
+   * same path would collide with it.
+   */
+  baseLicenseText?: string;
 }
 
 const DEFAULT_PROXY = "/kbd-proxy";
@@ -357,5 +371,21 @@ export async function fetchKeyboardSourceToVfs(
   // The KMW .js is produced by `CompilerService.compile()` running
   // @keymanapp/kmc-kmn's full pipeline in-browser — no need to fetch a
   // prebuilt stand-in. (Removed once kmw-compiler integration landed.)
-  return { options, filesLoaded, warnings, fonts, stylesheets };
+  // spec 059 FR-011: the base's LICENSE.md, for copyright accumulation. Absence
+  // is non-fatal and NOT a warning — ~545 of 554 legacy keyboards have none, and
+  // a missing license file is a normal condition the caller decides about.
+  let baseLicenseText: string | undefined;
+  const licenseResp = await getText(`${baseUrl}/LICENSE.md`, fetchImpl);
+  if (licenseResp.ok && licenseResp.text !== undefined) {
+    baseLicenseText = licenseResp.text;
+  }
+
+  return {
+    options,
+    filesLoaded,
+    warnings,
+    fonts,
+    stylesheets,
+    ...(baseLicenseText !== undefined ? { baseLicenseText } : {}),
+  };
 }

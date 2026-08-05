@@ -644,3 +644,26 @@ describe("useKeyboardArtifact — vfsTransform effectiveKeyboardId (reapply effe
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// KNOWN COVERAGE GAP (spec 059 US1) — attribution pass-through to scaffold()
+//
+// useKeyboardArtifact reads useWorkingCopyStore.attribution and forwards it as a
+// ScaffoldOptions field. That line is NOT covered by a test: mutation testing
+// showed removing it typechecks cleanly and breaks nothing.
+//
+// An attempt to cover it here crashed the vitest worker — asserting on it needs
+// vi.spyOn over the getScaffolderService module factory plus a renderHook of the
+// full fetch/compile pipeline, and that combination exits the worker rather than
+// failing. Not left in place as a broken test.
+//
+// What IS covered:
+//   - engine  src/output/zip.test.ts  — scaffold + toZip emit the right holder
+//                                       GIVEN attribution (T027 / SC-002/003)
+//   - studio  components/PreviewShell.test.tsx — download is BLOCKED while the
+//                                       working copy has no attribution
+//
+// So the failure mode this gap leaves open is narrow: attribution captured and
+// download enabled, but the zip emitted without it. Worth closing with an
+// integration test at the services boundary rather than the hook boundary.
+// ---------------------------------------------------------------------------

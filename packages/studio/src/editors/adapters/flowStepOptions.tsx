@@ -207,12 +207,29 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
 //
 // Context: surveySessionStore.surveyContext (matches PhaseFAdapter today).
 // usesFindings: true — derives findingsByQuestionId via buildFindingsByQuestionId.
+// Seeds: pf_contact_info from surveyContext.author_contact — see CTX_AUTHOR_CONTACT.
 // Extract: identity (raw SurveyPhaseResult — the host's applyStepCompletion / advance
 //   already handles the result shape downstream).
 // onCommit: none (PhaseFAdapter had no pre-onComplete store writes).
 // ---------------------------------------------------------------------------
 
 export type PhaseFPayload = SurveyPhaseResult;
+
+/**
+ * SurveyContext key carrying the author's public contact, used to PRE-FILL
+ * pf_contact_info rather than asking for the same fact a second time.
+ *
+ * Producer: keyboard attribution ([specs/059-keyboard-attribution](../../../../../specs/059-keyboard-attribution/spec.md))
+ * captures an author contact once, in the identity phase, itself pre-filled from
+ * the authenticated GitHub profile. Until that lands nothing writes this key, so
+ * the seed below resolves to undefined and Phase F behaves exactly as it does
+ * today — the seam is inert rather than speculative, and lights up with no
+ * further change here.
+ *
+ * SurveyContext is an open `Record<string, string | undefined>`, so this needs
+ * neither a new type nor a change to FlowStepDeps.
+ */
+const CTX_AUTHOR_CONTACT = "author_contact";
 
 export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
   flowRef: "phase_f_helpdocs",
@@ -224,6 +241,26 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
   },
 
   usesFindings: true,
+
+  seeds: {
+    getSeedValue(questionId: string, deps: FlowStepDeps): string | string[] | undefined {
+      // pf_contact_info stays OPTIONAL. Seeding pre-fills the field; it does not
+      // require an answer. The author can clear it, or replace it with a community
+      // channel that is not their own address — several shipped keyboards publish a
+      // language-community contact rather than the author's personal one.
+      if (questionId === "pf_contact_info") {
+        const contact = deps.surveyContext[CTX_AUTHOR_CONTACT];
+        return contact !== undefined && contact !== "" ? contact : undefined;
+      }
+
+      // pf_credits is deliberately NOT seeded from the copyright holder. Thanking
+      // and owning are different things: shipped credits sections routinely
+      // acknowledge advisors and contributors who hold no copyright. Pre-filling
+      // the holder here would produce exactly the duplicated boilerplate the
+      // question exists to collect something better than.
+      return undefined;
+    },
+  },
 
   extract(result: SurveyPhaseResult): PhaseFPayload | undefined {
     // Identity extraction — raw result forwarded to StepHost's generic path.
