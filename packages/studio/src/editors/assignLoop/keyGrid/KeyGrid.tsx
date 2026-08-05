@@ -9,9 +9,15 @@
 // T063 — a pure projection holding no state of its own) as a grid of
 // gridcells, proportionally sized from the 100-unit model (`padPct`/
 // `widthPct`, plus each row's `slackPct` — FR-022). Geometry is READ-ONLY
-// this increment: no drag/resize, no "Fill row"/"Even out row" actions (those
-// FR-022 affordances are a later increment — this component only surfaces
-// slack, per FR-039, as a visible trailing gap).
+// this increment (no drag/resize) — see `keyEditOps.ts`'s own module doc,
+// "What the union deliberately does NOT admit, and why": `width`/`pad` are
+// absent from `EditableKeyFields`, so nothing this component can emit today
+// actually COMMITS a width change to the overlay. `onFillRow`/`onEvenOutRow`
+// (T100, FR-022/FR-039) are therefore a CALLER-WIRED SEAM, not a
+// self-contained feature — see "Row slack, and the Fill row / Even out row
+// seam" below for the full contract and for why widening the operation
+// union to admit one is a locked-contract question this file does not
+// improvise past.
 //
 // ## Single Tab stop (FR-020a)
 //
@@ -22,6 +28,65 @@
 // grid is never stranded outside the Tab order when nothing is selected yet.
 // A layout of several hundred keys therefore still produces exactly one Tab
 // stop, not several hundred.
+//
+// ## Row slack, and the Fill row / Even out row seam (T100, FR-022, FR-039)
+//
+// `KeyGridRowViewModel.slackPct` (keyGridViewModel.ts) is already the exact
+// derived quantity FR-039 wants surfaced — this file does not recompute it,
+// only renders it and reacts to it. Two distinct things happen per row:
+//
+// - **The visual.** The trailing spacer (`key-grid-row-slack-<rowIndex>`)
+//   carries a diagonal hatch (`repeating-linear-gradient`) rather than a
+//   bare border — a hatch reads as "reserved/unused space" at a glance (the
+//   same convention design tools use for empty canvas), degrades sanely at
+//   any width (the stripe pattern keeps repeating rather than becoming
+//   illegible text at a narrow flexBasis), and — the FR-039 point — carries
+//   no digits at all. It stays `aria-hidden` and purely decorative; it is
+//   not the accessibility story (see below).
+// - **The actions.** "Fill row" (only rendered when `slackPct > 0` — there
+//   is nothing to fill otherwise, same "affordance only when applicable"
+//   convention as the pad spacer above) and "Even out row" (rendered when
+//   the row has two or more keys — a single-key row has nothing to even out
+//   across) are ORDINARY buttons, siblings of the `role="row"` div rather
+//   than children of it: the ARIA APG grid pattern's owned-element rule
+//   wants a row's children to be gridcells, so an action control that
+//   is NOT a gridcell (it does not participate in `useGridNav`'s cursor
+//   model at all) lives outside that div instead of inside it. This is
+//   also why they are not folded into `KeyGridCommandDescriptor` /
+//   `useKeyCommands.ts` (a PER-KEY command layer, T094) — these two are
+//   PER-ROW, a different addressing granularity, and that hook's file is
+//   out of this task's edit scope regardless.
+//
+// **Why clicking either button does not, by itself, change any width:**
+// `onFillRow`/`onEvenOutRow` are optional props. When a caller supplies
+// neither, clicking is a no-op (`onFillRow?.(rowIndex)`) — the same
+// optional-callback idiom this file already uses for `onPlatformChange`
+// below. That is not a stub to feel bad about: FR-022/FR-039's "widths are
+// never silently redistributed" holds trivially precisely BECAUSE nothing
+// happens without an explicit, author-invoked, CALLER-SUPPLIED handler, and
+// today no caller CAN supply one that actually commits anything — see
+// `keyEditOps.ts`'s module doc, "What the union deliberately does NOT
+// admit": `width`/`pad` are absent from `EditableKeyFields`, and the ONLY
+// thing in that union that ever writes a width is `remove`'s own
+// `"redistribute"` outcome, as a side effect of removing a key, never as a
+// directly-authored field. There is no `KeyEditOperation` kind this
+// component could construct and hand to `commitKeyEdit` that would fill or
+// even out a row today. Inventing one is exactly the "row and layer
+// operations... flagged as Increment 3 work" that module's own doc warns
+// against widening ad hoc — so this component stops at the seam: it names
+// the row (`rowIndex`, the TRUE index into `viewModel.rows`, i.e. what
+// `windowedRows`' own `rowIndex` already carries — NOT the windowed slice's
+// local position, and one less than the 1-based `aria-rowindex` already on
+// the row div), and leaves "what happens next" to whichever future task
+// extends `keyEditOps.ts`'s union and wires a real handler through.
+//
+// **The accessible equivalent to the visual hatch:** a screen reader user
+// does not see the hatch, but the mere PRESENCE of an enabled "Fill row N"
+// button already tells them the same fact the hatch tells a sighted author
+// — this row has unused space — without a percentage or unit count ever
+// being read aloud, matching the FR-039 "not printed as numbers" intent for
+// assistive tech too, not only for sighted rendering. A row with no slack
+// renders no "Fill row" button at all, the same way it renders no hatch.
 //
 // ## Seams for T065-T071 — do not re-implement any of this here
 //
@@ -114,6 +179,18 @@
 //   `scaffoldTouchLayout` or a shipped file) — this component only owns the
 //   HONEST, jargon-free COPY for each of the two values, never the strings
 //   "Case A"/"Case B" themselves (FR-034).
+// - **T094 `useKeyCommands` (landed, elsewhere — no change needed here)**:
+//   that hook's `handleKeyDown` (Insert -> "add key after") recognizes a
+//   DISJOINT key set from `useGridNav`'s own (arrows/Home/End vs. Insert),
+//   so it is not threaded through THIS component's single `onKeyDown` prop —
+//   the caller composes `useGridNav`'s and `useKeyCommands`'s handlers into
+//   one function before passing it here, the same way it will eventually
+//   need to fold in T097-T099's Delete/remove handling. `useKeyCommands`
+//   also exposes a `commands` list (today: one "Add key after" descriptor)
+//   for T111's command-menu widget to render — this component takes no new
+//   prop for that; T111 owns where that menu actually mounts (per-cell
+//   hover/right-click, per this file's own T070/T071 precedent of pushing
+//   editing surfaces to a sibling component rather than this one).
 
 import {
   Fragment,
@@ -220,6 +297,22 @@ export interface KeyGridProps {
   onPlatformChange?: (platformId: string) => void;
   /** Honest, jargon-free statement of how this layout came to exist (T077, FR-034). Omit to render no statement. */
   provenance?: KeyGridProvenance;
+  /**
+   * Fired when the author clicks "Fill row" for a row with unused slack
+   * (T100, FR-022, FR-039). `rowIndex` is the row's TRUE index into
+   * `viewModel.rows` (not the windowed slice's local position — see the
+   * module doc's "Row slack, and the Fill row / Even out row seam"). Omit to
+   * leave the action inert: see that same section for why an omitted
+   * handler is a no-op rather than a fallback default — this component
+   * never computes or commits a width change itself.
+   */
+  onFillRow?: (rowIndex: number) => void;
+  /**
+   * Fired when the author clicks "Even out row" for a row with two or more
+   * keys (T100, FR-022, FR-039). Same `rowIndex` convention and same
+   * omitted-is-inert contract as `onFillRow` above.
+   */
+  onEvenOutRow?: (rowIndex: number) => void;
 }
 
 /** Sum of `widthPct + padPct` across a row's keys, in the 100-unit model's raw units (mirrors keyGridViewModel.ts's own `rowTotalPct`, recomputed here rather than exported since it's a cheap, pure, single-formula derivation). */
@@ -239,6 +332,8 @@ export function KeyGrid({
   activePlatformId,
   onPlatformChange,
   provenance,
+  onFillRow,
+  onEvenOutRow,
 }: KeyGridProps) {
   const { t } = useLingui();
   const cellRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -463,6 +558,16 @@ export function KeyGrid({
 
   const showPlatformTabs = platforms !== undefined && platforms.length > 1;
 
+  // Hover tooltip for the decorative hatch spacer (T100, FR-039) — sighted
+  // mouse users only; the aria-hidden hatch carries no accessible-tree
+  // presence, and this `title` does not change that. See the module doc's
+  // "Row slack, and the Fill row / Even out row seam" for the actual
+  // programmatic equivalent (the "Fill row" button itself).
+  const rowSlackTitle = t({
+    id: "editor.assignLoop.keyGrid.rowSlackTitle",
+    message: "Unused space in this row",
+  });
+
   return (
     <>
       {showPlatformTabs && (
@@ -573,76 +678,154 @@ export function KeyGrid({
         {windowedRows.map(({ row, rowIndex }) => {
           const slackPercent =
             layerMaxUnits > 0 ? (row.slackPct / layerMaxUnits) * 100 : 0;
+          // See the module doc's "Row slack, and the Fill row / Even out
+          // row seam" (T100, FR-022, FR-039) for both booleans' rationale.
+          const canFillRow = row.slackPct > 0;
+          const canEvenOutRow = row.keys.length >= 2;
           return (
-            <div
-              key={rowIndex}
-              role="row"
-              aria-rowindex={rowIndex + 1}
-              // tabIndex={-1}, not 0/omitted: programmatically focusable for
-              // FR-020k's "row" tier (an entire row emptied by one action —
-              // see useGridNav.ts's `applyFocusRestorationTarget`) without
-              // ever becoming a Tab stop of its own (see the grid
-              // container's own tabIndex comment above for the same
-              // distinction).
-              tabIndex={-1}
-              style={{ display: "flex", width: "100%" }}
-            >
-              {row.keys.map((cell, colIndex) => {
-                const padPercent =
-                  layerMaxUnits > 0 ? (cell.padPct / layerMaxUnits) * 100 : 0;
-                const widthPercent =
-                  layerMaxUnits > 0 ? (cell.widthPct / layerMaxUnits) * 100 : 0;
-                const isSelected = cell.address === selectedAddress;
-                const isTabbable =
-                  isSelected ||
-                  (!hasSelectedVisible && cell.address === firstAddress);
-                return (
-                  <Fragment key={cell.address}>
-                    {/* Decorative left-padding spacer, not a gridcell — kept
+            <Fragment key={rowIndex}>
+              <div
+                role="row"
+                aria-rowindex={rowIndex + 1}
+                // tabIndex={-1}, not 0/omitted: programmatically focusable for
+                // FR-020k's "row" tier (an entire row emptied by one action —
+                // see useGridNav.ts's `applyFocusRestorationTarget`) without
+                // ever becoming a Tab stop of its own (see the grid
+                // container's own tabIndex comment above for the same
+                // distinction).
+                tabIndex={-1}
+                style={{ display: "flex", width: "100%" }}
+              >
+                {row.keys.map((cell, colIndex) => {
+                  const padPercent =
+                    layerMaxUnits > 0 ? (cell.padPct / layerMaxUnits) * 100 : 0;
+                  const widthPercent =
+                    layerMaxUnits > 0
+                      ? (cell.widthPct / layerMaxUnits) * 100
+                      : 0;
+                  const isSelected = cell.address === selectedAddress;
+                  const isTabbable =
+                    isSelected ||
+                    (!hasSelectedVisible && cell.address === firstAddress);
+                  return (
+                    <Fragment key={cell.address}>
+                      {/* Decorative left-padding spacer, not a gridcell — kept
                       aria-hidden and OUTSIDE the aria-colindex count below so
                       an assistive-technology cell iteration never confuses
                       it for a real key. */}
-                    {padPercent > 0 && (
-                      <span
-                        aria-hidden="true"
-                        data-testid={`key-grid-pad-${cell.address}`}
-                        style={{
-                          flexGrow: 0,
-                          flexShrink: 0,
-                          flexBasis: `${padPercent}%`,
-                        }}
+                      {padPercent > 0 && (
+                        <span
+                          aria-hidden="true"
+                          data-testid={`key-grid-pad-${cell.address}`}
+                          style={{
+                            flexGrow: 0,
+                            flexShrink: 0,
+                            flexBasis: `${padPercent}%`,
+                          }}
+                        />
+                      )}
+                      <KeyGridCell
+                        cell={cell}
+                        rowIndex={rowIndex + 1}
+                        colIndex={colIndex + 1}
+                        widthPercent={widthPercent}
+                        isSelected={isSelected}
+                        isTabbable={isTabbable}
+                        onSelect={onSelectCell}
+                        registerRef={registerRef}
                       />
-                    )}
-                    <KeyGridCell
-                      cell={cell}
-                      rowIndex={rowIndex + 1}
-                      colIndex={colIndex + 1}
-                      widthPercent={widthPercent}
-                      isSelected={isSelected}
-                      isTabbable={isTabbable}
-                      onSelect={onSelectCell}
-                      registerRef={registerRef}
-                    />
-                  </Fragment>
-                );
-              })}
-              {/* The row's unused slack (FR-039), rendered visibly rather than
+                    </Fragment>
+                  );
+                })}
+                {/* The row's unused slack (FR-039), rendered visibly rather than
                 silently absorbed into the last key's width — see
                 keyGridViewModel.ts's own `slackPct` doc comment. Decorative
-                only (no "Fill row"/"Even out row" actions this increment). */}
-              {slackPercent > 0 && (
-                <span
-                  aria-hidden="true"
-                  data-testid={`key-grid-row-slack-${rowIndex}`}
+                only: a diagonal hatch, never a printed number (the module
+                doc's "Row slack, and the Fill row / Even out row seam"). */}
+                {slackPercent > 0 && (
+                  <span
+                    aria-hidden="true"
+                    data-testid={`key-grid-row-slack-${rowIndex}`}
+                    title={rowSlackTitle}
+                    style={{
+                      flexGrow: 0,
+                      flexShrink: 0,
+                      flexBasis: `${slackPercent}%`,
+                      borderLeft: `1px dashed ${TEXT_DIM}`,
+                      borderRadius: 3,
+                      backgroundImage: `repeating-linear-gradient(135deg, ${TEXT_DIM} 0px, ${TEXT_DIM} 1px, transparent 1px, transparent 7px)`,
+                      opacity: 0.5,
+                    }}
+                  />
+                )}
+              </div>
+              {/* Fill row / Even out row (T100, FR-022, FR-039) — ORDINARY
+              buttons, siblings of the role="row" div above rather than
+              children of it (see the module doc's "Row slack, and the Fill
+              row / Even out row seam" for why: they are not gridcells and
+              do not participate in useGridNav's cursor model). Rendered only
+              when at least one action actually applies to this row — a row
+              with no slack and only one key gets neither button, the same
+              "affordance only when applicable" convention the pad spacer
+              above already follows. */}
+              {(canFillRow || canEvenOutRow) && (
+                <div
+                  data-testid={`key-grid-row-actions-${rowIndex}`}
                   style={{
-                    flexGrow: 0,
-                    flexShrink: 0,
-                    flexBasis: `${slackPercent}%`,
-                    borderLeft: `1px dashed ${TEXT_DIM}`,
+                    display: "flex",
+                    gap: 6,
+                    marginTop: -2,
+                    marginBottom: 2,
+                    paddingLeft: 2,
                   }}
-                />
+                >
+                  {canFillRow && (
+                    <button
+                      type="button"
+                      data-testid={`key-grid-fill-row-${rowIndex}`}
+                      onClick={() => onFillRow?.(rowIndex)}
+                      style={{
+                        padding: "2px 8px",
+                        background: "transparent",
+                        border: `1px dashed ${BORDER}`,
+                        borderRadius: 4,
+                        color: TEXT_DIM,
+                        fontSize: 11,
+                        cursor: "pointer",
+                        fontFamily: FONT,
+                      }}
+                    >
+                      {t({
+                        id: "editor.assignLoop.keyGrid.fillRow",
+                        message: `Fill row ${{ n: rowIndex + 1 }}`,
+                      })}
+                    </button>
+                  )}
+                  {canEvenOutRow && (
+                    <button
+                      type="button"
+                      data-testid={`key-grid-even-out-row-${rowIndex}`}
+                      onClick={() => onEvenOutRow?.(rowIndex)}
+                      style={{
+                        padding: "2px 8px",
+                        background: "transparent",
+                        border: `1px dashed ${BORDER}`,
+                        borderRadius: 4,
+                        color: TEXT_DIM,
+                        fontSize: 11,
+                        cursor: "pointer",
+                        fontFamily: FONT,
+                      }}
+                    >
+                      {t({
+                        id: "editor.assignLoop.keyGrid.evenOutRow",
+                        message: `Even out row ${{ n: rowIndex + 1 }}`,
+                      })}
+                    </button>
+                  )}
+                </div>
               )}
-            </div>
+            </Fragment>
           );
         })}
       </div>

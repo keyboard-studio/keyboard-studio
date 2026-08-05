@@ -120,6 +120,8 @@ export {
   resolveSubKeyEntry,
   applyFieldSemantics,
   declaredOperationOutput,
+  proposeSuppressFields,
+  applySuppressSemantics,
 } from "./keyEditOps.js";
 export type {
   KeyEditOperation,
@@ -140,6 +142,9 @@ export type {
   ResolvedKeyLocation,
   SubKeyLocation,
   KeyEditOverlay,
+  SuppressShapeChoice,
+  SuppressRejectionReason,
+  SuppressSemanticsResult,
 } from "./keyEditOps.js";
 
 export { applyKeyEditsToRawJson } from "./applyKeyEditsToRawJson.js";
@@ -154,13 +159,36 @@ export type {
 export { applyKeyEditsToVfs } from "./applyKeyEditsToVfs.js";
 export type { ApplyKeyEditsToVfsResult } from "./applyKeyEditsToVfs.js";
 
-export { decomposeLayerId, groupLayerFamilies } from "./layerFamilies.js";
+export {
+  enumerateKeyLinkedOutputs,
+  analyzeKeyEditCollateral,
+} from "./touchKeyCollateral.js";
+export type {
+  LinkedOutputMechanismKind,
+  LinkedOutput,
+  LinkedOutputReachability,
+  ClassifiedLinkedOutput,
+  KeyEditCollateralReport,
+} from "./touchKeyCollateral.js";
+
+export {
+  decomposeLayerId,
+  groupLayerFamilies,
+  findFamilyParallelismBreaks,
+  classifyPlane,
+  severityForPlane,
+} from "./layerFamilies.js";
 export type {
   ParsedLayerId,
   FreeformLayerId,
   LayerIdDecomposition,
   LayerFamily,
   LayerFamilyGrouping,
+  FamilyParallelismSeverity,
+  FamilyParallelismBreakKind,
+  FamilyParallelismFinding,
+  ReviewFamilyMemberFix,
+  PlaneClass,
 } from "./layerFamilies.js";
 
 export {
@@ -227,4 +255,19 @@ export type {
   KeyIdMintingProposal,
   KeyIdMintingRequest,
 } from "./keyIdMinting.js";
+
+export {
+  findHalfDoneSuppressions,
+  findLayerSwitchActiveMismatches,
+  findMixedSuppressRemove,
+} from "./touchKeyDiagnostics.js";
+export type {
+  TouchKeyFindingSeverity,
+  TouchKeyFindingCode,
+  TouchKeyFinding,
+  TouchKeyFix,
+  CompleteSuppressionFix,
+  SetLayerSwitchSpFix,
+  ReviewKeyFix,
+} from "./touchKeyDiagnostics.js";
 

@@ -60,7 +60,7 @@
 // `TouchKeyFinding` type and a code -> localized-copy mapping, that mapping
 // is this component's next increment, not a re-architecture of it.
 //
-// ## Editing is NOT this component's job
+// ## Editing is NOT this component's job — except the `sp` control (T096)
 //
 // This is a display surface. Assigning a character, changing an id, editing
 // `nextlayer`, or acting on a finding's fix (FR-041) are Phase 6-8 concerns
@@ -69,8 +69,19 @@
 // FOCUSABLE control inside this panel (so Tab from the panel's root reaches
 // it), the panel's own root already being a real DOM node with room for
 // children is the seam — no restructuring needed when that lands.
+//
+// T096 (FR-029a) is the first, narrow exception: the full-legal-set `sp`
+// radio control below IS an editing affordance, but this file still does not
+// COMMIT anything. `onSpChange` is an optional callback — mirroring the
+// existing `onEscape` pattern — that fires with the author's chosen value and
+// does nothing else; there is no store import, no engine mutation call, here.
+// Wiring it into the actual key-edit overlay commit (a `SetKeyOp`) alongside
+// T094's add-key and T095's suppress operation is T097's job, per tasks.md's
+// own "wait for T094-T096, then T097" dependency line — composing the three
+// independent W1 tasks into one committed edit path is explicitly what T097
+// exists to do, not something this component should pre-empt.
 
-import { useMemo, useCallback, useRef, type Ref } from "react";
+import { useMemo, useCallback, useId, useRef, type Ref } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
@@ -80,6 +91,7 @@ import { codepointLabel } from "../../../survey/codepointLabel.ts";
 import { displayChar } from "../../../lib/irToCarveNodes.ts";
 import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../../lib/galleryTheme.ts";
 import { ERROR_RED, FONT_MONO, WARNING } from "../../../ui/theme.ts";
+import { Badge, RadioGroup } from "../../../ui/index.ts";
 import type { KeyGridCellViewModel, TouchKeyFinding } from "./keyGridViewModel.ts";
 
 // Layer C's info-severity blue has no existing named token in ui/theme.ts —
@@ -136,6 +148,77 @@ export function resolveSendsLayer(
     containingLayerId,
     superseded: rawLayer !== undefined && rawLayer !== containingLayerId,
   };
+}
+
+// ---------------------------------------------------------------------------
+// `sp` (key type) control (FR-029a) — the crux of T096
+// ---------------------------------------------------------------------------
+
+/**
+ * The full legal `sp` (key class) set an author can assign: `0` character,
+ * `1` frame, `2` active frame, `8` deadkey-styled, `9` blank, `10` spacer.
+ *
+ * Mirrored from the engine's own `EditableKeySp`
+ * (`packages/engine/src/pattern-apply/keyEditOps.ts`) rather than imported
+ * from it: that type is not re-exported through `@keyboard-studio/engine`'s
+ * public entry point today (confirmed against `packages/engine/src/index.ts`
+ * before writing this) — the SAME "reach past the package boundary" gap
+ * `keyGridViewModel.ts`'s own module doc already flags for
+ * `applyKeyEditsToLayout`/`replayKeyEditOverlay` (a gap T053 later closed for
+ * that pair). **DEFECT to flag upstream:** `packages/engine/src/index.ts`
+ * should export `EditableKeySp`/`EditableKeyFields` alongside its sibling
+ * `keyEditOps.ts` exports so this literal union stops needing to be kept in
+ * sync by hand against the one file that actually enforces it (the applier).
+ */
+export type TouchKeySpValue = 0 | 1 | 2 | 8 | 9 | 10;
+
+const LEGAL_SP_VALUES: readonly TouchKeySpValue[] = [0, 1, 2, 8, 9, 10];
+
+/**
+ * `TouchKeyIR.sp`, defaulted and narrowed to the legal set. `undefined` means
+ * "the implicit letter class" per that field's own doc comment; anything
+ * outside {@link LEGAL_SP_VALUES} (never expected from a conforming layout,
+ * but not assumed) degrades the same way rather than throwing.
+ */
+function normalizeSp(sp: number | undefined): TouchKeySpValue {
+  return sp !== undefined && (LEGAL_SP_VALUES as readonly number[]).includes(sp)
+    ? (sp as TouchKeySpValue)
+    : 0;
+}
+
+/**
+ * The PROPOSED `sp` value for `cell` (FR-029a's "propose the appropriate
+ * value per context"; FR-029d). Two branches, in priority order:
+ *
+ * 1. **The key switches layers** (`nextlayer` is set) — R3b/FR-029d's
+ *    derivable rule: active (`2`) on the layer it switches TO, inactive
+ *    (`1`) everywhere else. `containingLayerId` is the grid's CURRENT layer
+ *    (the key's own address, e.g. `resolveSendsLayer`'s `containingLayerId`
+ *    — never the key's `layer` override): a frame key's "is this the layer
+ *    it switches to" question is about which layer it is PLACED on, not
+ *    which modifier state it sends under.
+ * 2. **Otherwise** — nothing in this key's own fields distinguishes a
+ *    deliberately-set character/frame/deadkey-styled/blank/spacer choice
+ *    from an author's default, so the proposal is simply the key's CURRENT
+ *    value: this never second-guesses an explicit blank/spacer/deadkey
+ *    choice on the strength of, say, `producedChars` being non-empty (R3a:
+ *    "`sp` is an authoring mechanism, not a detail to hide" — and not a fact
+ *    to infer away from output, either).
+ *
+ * This intentionally covers the FR-029d "half" of the layer-switch rule —
+ * proposing `sp:2`/`sp:1` from `nextlayer` and the containing layer. The
+ * DIAGNOSTIC half (reporting when a frame key's `sp` and `nextlayer`
+ * disagree) is T102's job (`packages/engine/src/pattern-apply/
+ * touchKeyDiagnostics.ts`), not this component's.
+ */
+export function proposeSpValue(
+  cell: KeyGridCellViewModel,
+  containingLayerId: string | undefined,
+): TouchKeySpValue {
+  if (cell.nextlayer !== undefined) {
+    return cell.nextlayer === containingLayerId ? 2 : 1;
+  }
+  return normalizeSp(cell.sp);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,6 +329,15 @@ export interface KeyInspectorProps {
   panelRef?: Ref<HTMLDivElement>;
   /** Fired on Escape anywhere within the panel (FR-020b's "returns it to the cell"). */
   onEscape?: () => void;
+  /**
+   * Fired when the author picks an `sp` value directly from the full legal
+   * set (FR-029a) — never gated on it matching the PROPOSED value; picking a
+   * non-proposed value is a legitimate authoring act, not something this
+   * callback screens out. Omitted keeps the control informational-only. See
+   * the module doc's "Editing is NOT this component's job — except the `sp`
+   * control (T096)" section for what this does and does not commit.
+   */
+  onSpChange?: (sp: TouchKeySpValue) => void;
   /** Localized panel accessible name override. */
   label?: string;
 }
@@ -272,14 +364,77 @@ export function KeyInspector({
   layout,
   panelRef,
   onEscape,
+  onSpChange,
   label,
 }: KeyInspectorProps) {
   const { t } = useLingui();
+  const spGroupLabelId = useId();
 
   const sendsInfo = useMemo(
     () => (selectedCell !== null ? resolveSendsLayer(selectedCell, layout) : undefined),
     [selectedCell, layout],
   );
+
+  const currentSp = selectedCell !== null ? normalizeSp(selectedCell.sp) : 0;
+  const proposedSp =
+    selectedCell !== null ? proposeSpValue(selectedCell, sendsInfo?.containingLayerId) : 0;
+
+  // Six explicit `t()` calls (not a data-driven loop over one shared table)
+  // so lingui's static extractor sees a literal `id`/`message` at every call
+  // site — the same discipline the "Sub-keys" section below already follows
+  // for its plural() calls.
+  const spOptionLabels: Record<TouchKeySpValue, { label: string; note: string }> = {
+    0: {
+      label: t({ id: "editor.assignLoop.keyGrid.inspector.sp.character.label", message: "Character" }),
+      note: t({
+        id: "editor.assignLoop.keyGrid.inspector.sp.character.note",
+        message: "A normal letter, digit, or punctuation key.",
+      }),
+    },
+    1: {
+      label: t({ id: "editor.assignLoop.keyGrid.inspector.sp.frame.label", message: "Frame (inactive)" }),
+      note: t({
+        id: "editor.assignLoop.keyGrid.inspector.sp.frame.note",
+        message: "A system key, such as a layer switch, shown inactive on this layer.",
+      }),
+    },
+    2: {
+      label: t({ id: "editor.assignLoop.keyGrid.inspector.sp.frameActive.label", message: "Frame (active)" }),
+      note: t({
+        id: "editor.assignLoop.keyGrid.inspector.sp.frameActive.note",
+        message: "A layer-switch key shown engaged, on the layer it switches to.",
+      }),
+    },
+    8: {
+      label: t({
+        id: "editor.assignLoop.keyGrid.inspector.sp.deadkeyStyled.label",
+        message: "Deadkey-styled",
+      }),
+      note: t({
+        id: "editor.assignLoop.keyGrid.inspector.sp.deadkeyStyled.note",
+        message: "Styled like a deadkey. Still interactive and can produce output.",
+      }),
+    },
+    9: {
+      label: t({ id: "editor.assignLoop.keyGrid.inspector.sp.blank.label", message: "Blank" }),
+      note: t({
+        id: "editor.assignLoop.keyGrid.inspector.sp.blank.note",
+        message: "Fills a keycap-shaped hole. Produces nothing by itself.",
+      }),
+    },
+    10: {
+      label: t({ id: "editor.assignLoop.keyGrid.inspector.sp.spacer.label", message: "Spacer" }),
+      note: t({
+        id: "editor.assignLoop.keyGrid.inspector.sp.spacer.note",
+        message: "Fills space with no visible keycap. Produces nothing by itself.",
+      }),
+    },
+  };
+
+  const proposedBadgeLabel = t({
+    id: "editor.assignLoop.keyGrid.inspector.sp.proposedBadge",
+    message: "Proposed",
+  });
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -369,6 +524,43 @@ export function KeyInspector({
               </span>
             </div>
           )}
+
+          {/* Key type ("sp") — full legal set, always selectable (FR-029a). */}
+          <div style={ROW_STYLE} data-testid="key-inspector-sp">
+            <span id={spGroupLabelId} style={FIELD_LABEL_STYLE}>
+              {t({ id: "editor.assignLoop.keyGrid.inspector.sp.label", message: "Key type" })}
+            </span>
+            <span
+              data-testid="key-inspector-sp-note"
+              style={{ ...FIELD_VALUE_STYLE, color: TEXT_DIM, fontSize: 12 }}
+            >
+              {t({
+                id: "editor.assignLoop.keyGrid.inspector.sp.note",
+                message:
+                  "Key type controls how this key is drawn and whether it can be tapped. It does not stop a rule from matching — the key's id controls what it sends.",
+              })}
+            </span>
+            <RadioGroup
+              name="key-inspector-sp"
+              value={String(currentSp)}
+              ariaLabelledby={spGroupLabelId}
+              onChange={(v) => onSpChange?.(Number(v) as TouchKeySpValue)}
+              options={LEGAL_SP_VALUES.map((value) => ({
+                value: String(value),
+                label: spOptionLabels[value].label,
+                note: spOptionLabels[value].note,
+                ...(value === proposedSp
+                  ? {
+                      detail: (
+                        <span data-testid="key-inspector-sp-proposed">
+                          <Badge tone="accent">{proposedBadgeLabel}</Badge>
+                        </span>
+                      ),
+                    }
+                  : {}),
+              }))}
+            />
+          </div>
 
           {/* Produced characters */}
           <div style={ROW_STYLE} data-testid="key-inspector-produces">

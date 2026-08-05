@@ -2085,6 +2085,30 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     setKeyEditInvalidationWarnings([]);
   }, [selectedKeyAddress]);
 
+  // T106 (FR-062): the characters a KEY EDIT has actually sent back to the
+  // unplaced worklist — accumulated across commits, deliberately NOT re-derived
+  // from the layout. This exists because "is this character currently
+  // unplaced" and "did an edit of mine take its last mechanism away" are
+  // different questions, and only the second one may re-open the by-character
+  // walk. `keyGridProgress.unplacedChars` answers the first, and it legitimately
+  // includes characters that were NEVER in the walk to begin with — a character
+  // the shipped layout carries on a `T_` key with no rule behind it is
+  // *detected* (it is in the file) yet *uncovered* (striking it produces
+  // nothing), and the entry-parity rule (see `touchLettersToAdd` below) keeps
+  // such a character out of the walk on purpose, reachable by its
+  // CharScrollStrip chip instead. Folding the raw uncovered set into the walk
+  // would drag every one of those in and silently move the walk's entry point,
+  // so membership here is what bounds re-entry to characters an edit really
+  // invalidated (`returnsToWorklist`, classified by `useKeyEditGuards`, itself
+  // already scoped to characters the by-character walk had assigned).
+  // `unplacedChars` remains the AUTHORITY on whether such a character is
+  // *still* unplaced — the two are intersected, never summed (FR-036d: one
+  // derived source, never two counters that can disagree), so re-placing a
+  // returned character drops it back out of the walk on its own.
+  const [returnedToWorklistChars, setReturnedToWorklistChars] = useState<
+    readonly string[]
+  >([]);
+
   // ONE commit call site for AssignPanel's `onCommit` (spec 058 T085-T089
   // composition) — reuses the EXISTING key-edit overlay / undo-stack action
   // (`commitKeyEdit`, landed in Phase 5b) and the EXISTING overlay-preserving
@@ -2094,7 +2118,8 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // directory".
   const handleAssignPanelCommit = useCallback(
     (result: AssignPanelCommitResult) => {
-      setKeyEditInvalidationWarnings(checkKeyEditOperation(result.op));
+      const warnings = checkKeyEditOperation(result.op);
+      setKeyEditInvalidationWarnings(warnings);
 
       const store = useWorkingCopyStore.getState();
       store.commitKeyEdit(result.op);
@@ -2110,6 +2135,46 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
         }
       } else {
         store.setTouchLayoutJson(emitTouchLayout(result.promotedLayout));
+      }
+
+      // T106 (FR-062): a character this edit invalidated AND that has lost
+      // its LAST mechanism anywhere in the layout (`returnsToWorklist` —
+      // never merely "invalidated at this address"; see useKeyEditGuards.ts)
+      // must return to the unplaced worklist and be OFFERED for
+      // re-placement, not merely reported. Its recorded `charTouch` entry now
+      // names a mechanism this commit just erased, so pruning the entry is
+      // what makes the character-mode gallery re-offer the method chooser
+      // for it instead of continuing to show a stale "existing methods" list
+      // for a placement that no longer exists. A character still available
+      // elsewhere (`returnsToWorklist: false`, FR-061) keeps its `charTouch`
+      // entry untouched — it is not lost, so it must not be treated as such
+      // here either.
+      const lostForGood = warnings.filter((w) => w.returnsToWorklist).map((w) => w.char);
+      if (lostForGood.length > 0) {
+        setCharTouch((prev) => {
+          let next: Map<string, TouchAssignment> | null = null;
+          for (const ch of lostForGood) {
+            if (prev.has(ch)) {
+              if (next === null) next = new Map(prev);
+              next.delete(ch);
+            }
+          }
+          return next ?? prev;
+        });
+        // Pruning the assignment above only stops the gallery showing a stale
+        // "existing methods" list for the erased placement; it does not by
+        // itself put the character back in front of the author, because the
+        // walk's own membership test reads `detectedChars` — a SEED-time
+        // snapshot that still remembers the placement this commit just took
+        // away. Recording the character here is what actually re-offers it
+        // (see `returnedToWorklistChars`' declaration for why this is recorded
+        // rather than re-derived).
+        setReturnedToWorklistChars((prev) => {
+          const merged = new Set(prev);
+          const before = merged.size;
+          for (const ch of lostForGood) merged.add(ch);
+          return merged.size === before ? prev : [...merged];
+        });
       }
 
       // touchKeyAddress.ts builds the address from the key's OWN id, so a
@@ -2314,23 +2379,52 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // upgrades the naive default mapping. `inventory` itself (the full SHOW-ALL
   // list) still feeds CharScrollStrip for display/inspection — only the walk
   // narrows.
+  //
+  // T106 (FR-062): a character that has lost its LAST mechanism to a key-mode
+  // edit (T072+) — typically a suppress/remove of its only producing key —
+  // MUST re-enter this walk, even though `detectedChars` and
+  // `desktopSuggestionTargets` (both seed/Phase-C snapshots, oblivious to any
+  // later key-mode edit) still remember the placement that edit erased. That
+  // is what turns "return to the unplaced worklist... and are offered for
+  // re-placement" from a mere count into an actual Back/Next/Skip/chip stop
+  // again. The test is the INTERSECTION of two things, and needs both halves:
+  // `returnedToWorklistChars` (an edit really took this character's last
+  // mechanism — see its declaration above for why the raw uncovered set is
+  // the wrong input here, and what entry-parity regression that caused) and
+  // `keyGridProgress.unplacedChars` (it is STILL unplaced — the same
+  // `touchCoverage`-derived truth the shared progress figures report, so this
+  // is never a second, independently-derived "is this placed" check, and a
+  // re-placement silently retires the re-entry).
+  //
   // lowercaseFirst (lib/caseOrder.ts) — same stable lowercase-before-uppercase
   // walk-order helper MechanismGallery's lettersToAdd uses (via
   // useInventoryDiff.ts), so the case-pair companion's precondition (the
   // lowercase implemented before its uppercase counterpart is even reached)
   // holds in both galleries, not just the desktop one.
-  const touchLettersToAdd = useMemo(
-    () =>
-      lowercaseFirst(
-        inventory.filter(
-          (c) => !detectedChars.has(c) || desktopSuggestionTargets.has(c),
-        ),
+  const unplacedCharsKey = keyGridProgress.unplacedChars.join("\0");
+  const returnedToWorklistKey = returnedToWorklistChars.join("\0");
+  const touchLettersToAdd = useMemo(() => {
+    const unplacedSet = new Set(keyGridProgress.unplacedChars);
+    const returnedSet = new Set(returnedToWorklistChars);
+    return lowercaseFirst(
+      inventory.filter(
+        (c) =>
+          !detectedChars.has(c) ||
+          desktopSuggestionTargets.has(c) ||
+          (returnedSet.has(c) && unplacedSet.has(c)),
       ),
-    // inventoryKey is the stable primitive proxy for `inventory` — same
-    // precedent as detectedChars above.
+    );
+    // inventoryKey/unplacedCharsKey/returnedToWorklistKey are the stable
+    // primitive proxies for `inventory`/`keyGridProgress.unplacedChars`/
+    // `returnedToWorklistChars` — same precedent as detectedChars above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [detectedChars, desktopSuggestionTargets, inventoryKey],
-  );
+  }, [
+    detectedChars,
+    desktopSuggestionTargets,
+    inventoryKey,
+    unplacedCharsKey,
+    returnedToWorklistKey,
+  ]);
   const touchLettersToAddKey = touchLettersToAdd.join("\0");
 
   // Current character index — synced with touchLettersToAdd (the walk list,

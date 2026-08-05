@@ -12,10 +12,12 @@
  * by spec 035's R9 — the import-adapt path must never round-trip through the
  * IR. Per contracts/key-edit-overlay.md §5, the two appliers duplicate
  * traversal and write mechanics deliberately, but both reuse the ONE address
- * resolver (`resolveKeyAddress` / `resolveSubKeyEntry`) and the ONE
- * field-semantics function (`applyFieldSemantics`) from `keyEditOps.ts`, so an
- * address or what a `set` means to a stale `output` cannot independently
- * drift between them. Do not re-derive that machinery here.
+ * resolver (`resolveKeyAddress` / `resolveSubKeyEntry`), the ONE
+ * field-semantics function (`applyFieldSemantics`), and the ONE `suppress`
+ * compound derivation (`applySuppressSemantics`, FR-029b) from
+ * `keyEditOps.ts`, so an address, what a `set` means to a stale `output`, or
+ * what a `suppress` does to `sp` + `id` together cannot independently drift
+ * between them. Do not re-derive that machinery here.
  *
  * ## Fields Case A drops (read by the T047 twin-equivalence test)
  *
@@ -77,6 +79,7 @@ import { DEFAULT_TOUCH_PROVENANCE, type TouchKeyIR, type TouchLayoutIR } from "@
 import { NodeIdMinter } from "../shared/node-ids.js";
 import {
   applyFieldSemantics,
+  applySuppressSemantics,
   resolveKeyAddress,
   resolveSubKeyEntry,
   type AddressableLayoutLike,
@@ -267,11 +270,18 @@ export function applyKeyEditsToLayout(
       }
 
       case "suppress": {
-        const merged = applyFieldSemantics(toEditableFields(key), {
-          id: op.sentinelId,
-          sp: op.spClass,
-        });
-        row.keys[keyIndex] = mergeFieldsIntoKey(key, merged);
+        // The compound sp+id derivation is shared, exactly once, in
+        // keyEditOps.ts (FR-029b) — see applySuppressSemantics's doc for why
+        // this applier must not hand-build `{ id: op.sentinelId, sp:
+        // op.spClass }` itself.
+        const semantics = applySuppressSemantics(toEditableFields(key), op);
+        if (!semantics.ok) {
+          warnings.push(
+            `[key-edit-apply] suppress op at "${op.address}" rejected: sentinelId "${op.sentinelId}" is not a reserved ruleless sentinel — operation skipped`,
+          );
+          break;
+        }
+        row.keys[keyIndex] = mergeFieldsIntoKey(key, semantics.fields);
         break;
       }
 

@@ -1,4 +1,4 @@
-// Unit tests for useKeyEditGuards (spec 058 T088; FR-036f).
+// Unit tests for useKeyEditGuards (spec 058 T088/T106; FR-036f/FR-061/FR-062).
 //
 // Coverage:
 //   1. The FR-036f canonical case — suppressing a key that carries a
@@ -15,6 +15,10 @@
 //      a later gate.
 //   6. Characters not tracked as a by-character assignment are not warned
 //      about even when an op removes them.
+//   7. FR-062/T106 `findCharactersLostForGood` / `returnsToWorklist`: a
+//      character that loses its LAST mechanism anywhere in the layout is
+//      classified as returning to the worklist; a character that remains
+//      reachable via a completely different key is not (FR-061).
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, renderHook } from "@testing-library/react";
@@ -25,6 +29,7 @@ import {
   type PendingKeyEditOperation,
 } from "../../../stores/workingCopyStore.ts";
 import {
+  findCharactersLostForGood,
   findInvalidatedAssignedCharacters,
   useKeyEditGuards,
 } from "./useKeyEditGuards.ts";
@@ -78,7 +83,7 @@ describe("findInvalidatedAssignedCharacters", () => {
       kind: "suppress",
       address: ADDR("K_E"),
       spClass: 9,
-      sentinelId: "T_suppressed_K_E",
+      sentinelId: "T_BLANK",
     };
 
     const lost = findInvalidatedAssignedCharacters(layout, op, undefined, new Set(["ɛ"]));
@@ -133,7 +138,7 @@ describe("findInvalidatedAssignedCharacters", () => {
       kind: "suppress",
       address: ADDR("K_E"),
       spClass: 9,
-      sentinelId: "T_suppressed_K_E",
+      sentinelId: "T_BLANK",
     };
 
     const lost = findInvalidatedAssignedCharacters(layout, op, undefined, new Set(["e"]));
@@ -229,12 +234,74 @@ describe("findInvalidatedAssignedCharacters", () => {
 });
 
 // ---------------------------------------------------------------------------
+// findCharactersLostForGood (spec 058 T106; FR-061/FR-062) — of the invalidated
+// characters, which ones lose their LAST mechanism anywhere in the layout
+// (must return to the unplaced worklist) versus which remain reachable via a
+// completely different key (must NOT be treated as lost).
+// ---------------------------------------------------------------------------
+
+describe("findCharactersLostForGood", () => {
+  it("FR-062: a character with no OTHER producer anywhere in the layout returns to the worklist", () => {
+    const layout = makeLayout([
+      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
+    ]);
+    const op: PendingKeyEditOperation = {
+      kind: "suppress",
+      address: ADDR("K_E"),
+      spClass: 9,
+      sentinelId: "T_BLANK",
+    };
+
+    const lostForGood = findCharactersLostForGood(layout, op, undefined, new Set(["ɛ"]));
+
+    expect(lostForGood).toEqual(["ɛ"]);
+  });
+
+  it("FR-061: a character still produced by a completely different key does NOT return to the worklist", () => {
+    const layout = makeLayout([
+      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
+      // A second, unrelated key that also produces ɛ — e.g. moved to a
+      // symbol layer, the FR-061 worked example.
+      makeKey("K_X", { text: "ɛ", output: "ɛ" }),
+    ]);
+    const op: PendingKeyEditOperation = {
+      kind: "suppress",
+      address: ADDR("K_E"),
+      spClass: 9,
+      sentinelId: "T_BLANK",
+    };
+
+    // findInvalidatedAssignedCharacters still reports ɛ (K_E's OWN address
+    // stopped producing it) — that FR-036f warning is unaffected. But it must
+    // not be treated as having lost its last mechanism.
+    expect(findInvalidatedAssignedCharacters(layout, op, undefined, new Set(["ɛ"]))).toEqual(["ɛ"]);
+
+    const lostForGood = findCharactersLostForGood(layout, op, undefined, new Set(["ɛ"]));
+
+    expect(lostForGood).toEqual([]);
+  });
+
+  it("short-circuits to [] when nothing is invalidated (no extra layout apply/coverage pass needed)", () => {
+    const layout = makeLayout([makeKey("K_E", { text: "e", output: "e" })]);
+    const op: PendingKeyEditOperation = {
+      kind: "set",
+      address: ADDR("K_E"),
+      fields: { text: "E" }, // keycap-only change; output/id untouched
+    };
+
+    const lostForGood = findCharactersLostForGood(layout, op, undefined, new Set(["e"]));
+
+    expect(lostForGood).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // The hook — reads the by-character assignment set from the store, and is
 // available SYNCHRONOUSLY (no timer, no debounce) at the moment of the edit.
 // ---------------------------------------------------------------------------
 
 describe("useKeyEditGuards", () => {
-  it("names the affected character in a localized, ready-to-render message (canonical FR-036f case)", () => {
+  it("names the affected character in a localized, ready-to-render message, and marks it as returning to the worklist (canonical FR-036f/FR-062 case)", () => {
     seedAssignedChars(["ɛ"]);
     const layout = makeLayout([
       makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
@@ -250,13 +317,40 @@ describe("useKeyEditGuards", () => {
       kind: "suppress",
       address: ADDR("K_E"),
       spClass: 9,
-      sentinelId: "T_suppressed_K_E",
+      sentinelId: "T_BLANK",
     });
 
     expect(warnings).toHaveLength(1);
     expect(warnings[0]!.char).toBe("ɛ");
     expect(warnings[0]!.message).toContain("ɛ");
     expect(warnings[0]!.message).toContain("U+025B");
+    // ɛ has no other producer in this layout — FR-062 says it must return to
+    // the unplaced worklist.
+    expect(warnings[0]!.returnsToWorklist).toBe(true);
+  });
+
+  it("FR-061: marks a character as NOT returning to the worklist when it remains reachable via a different key", () => {
+    seedAssignedChars(["ɛ"]);
+    const layout = makeLayout([
+      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
+      makeKey("K_X", { text: "ɛ", output: "ɛ" }),
+    ]);
+
+    const { result } = renderHook(() => useKeyEditGuards({ layout }));
+
+    const warnings = result.current.checkOperation({
+      kind: "suppress",
+      address: ADDR("K_E"),
+      spClass: 9,
+      sentinelId: "T_BLANK",
+    });
+
+    // The FR-036f warning still fires (K_E's own longpress for ɛ is gone) —
+    // but FR-061/FR-062 say a still-available-elsewhere character must not be
+    // reported as returning to the worklist.
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.char).toBe("ɛ");
+    expect(warnings[0]!.returnsToWorklist).toBe(false);
   });
 
   it("returns no warnings when the touch draft has no by-character assignments yet", () => {
@@ -270,7 +364,7 @@ describe("useKeyEditGuards", () => {
       kind: "suppress",
       address: ADDR("K_E"),
       spClass: 9,
-      sentinelId: "T_suppressed_K_E",
+      sentinelId: "T_BLANK",
     });
 
     expect(warnings).toEqual([]);
