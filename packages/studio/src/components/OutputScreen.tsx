@@ -77,6 +77,12 @@ const warningBannerStyle: React.CSSProperties = {
   fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
 };
 
+// Cap the package-failure diagnostic list. A dangling asset reference can
+// produce a long run of near-identical messages, and a banner that pushes the
+// still-working .zip button off screen would turn a recoverable failure into a
+// dead end. The full set is in the console via devLog.
+const KMP_DIAGNOSTIC_LIMIT = 5;
+
 export function OutputScreen() {
   const { t } = useLingui();
   // Each screen runs its own independent artifact pipeline — see usePreviewArtifact.ts module comment for why this is deliberate (do not "dedupe" across screens).
@@ -91,6 +97,10 @@ export function OutputScreen() {
     downloadError,
     downloadWarnings,
     handleDownload,
+    buildingKmp,
+    kmpError,
+    kmpDiagnostics,
+    handleDownloadKmp,
     coverageGate,
     showIdentityWarn,
   } = artifact;
@@ -231,6 +241,20 @@ export function OutputScreen() {
             message: "Download unavailable until compile completes",
           });
 
+  // The .kmp shares every gate with the .zip, so it reuses the same
+  // unavailability reasons and only differs in the ready case.
+  const kmpAriaLabel = canDownload && !touchStale
+    ? t({
+        id: "output.download.aria.kmp",
+        message: `Download keyboard ${downloadKeyboardId} as an installable Keyman package`,
+      })
+    : downloadAriaLabel;
+
+  // Both buttons disable while EITHER download is in flight: they share one
+  // projection + compile, so overlapping clicks would do the same work twice.
+  const kmpActionable = canDownload && !buildingKmp && !downloading && !touchStale;
+  const zipActionable = canDownload && !downloading && !buildingKmp && !touchStale;
+
   return (
     <div
       ref={containerRef}
@@ -308,22 +332,100 @@ export function OutputScreen() {
         </h2>
         {baseKeyboard !== null && (
           <>
+            {/* PRIMARY download: the installable package. A user double-clicks
+                this and the keyboard installs on Keyman for Windows, macOS,
+                Linux, iOS, or Android — no Keyman Developer, no unzipping, no
+                compile step. The source .zip below is for editing and
+                contributing, which is a different (and rarer) need. */}
+            <button
+              type="button"
+              data-testid="emit-download-kmp"
+              disabled={!canDownload || buildingKmp || downloading || touchStale}
+              onClick={() => { void handleDownloadKmp(); }}
+              aria-label={kmpAriaLabel}
+              style={{
+                alignSelf: "flex-start",
+                marginTop: 4,
+                padding: "9px 18px",
+                background: kmpActionable ? "#1f6feb" : "#161b22",
+                color: kmpActionable ? "#e6edf3" : "#484f58",
+                border: "1px solid #283040",
+                borderRadius: 6,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: kmpActionable ? "pointer" : "not-allowed",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+                transition: "background 0.15s",
+              }}
+            >
+              {buildingKmp ? (
+                <Trans id="output.download.button.kmpBuilding">Building package...</Trans>
+              ) : (
+                <Trans id="output.download.button.kmp">Download keyboard (.kmp)</Trans>
+              )}
+            </button>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12,
+                color: "#8b949e",
+                lineHeight: 1.5,
+                maxWidth: "46ch",
+              }}
+            >
+              <Trans id="output.download.kmp.help">
+                Install it by double-clicking the downloaded file. Works with Keyman
+                on Windows, macOS, Linux, Android, and iOS.
+              </Trans>
+            </p>
+
+            {/* Failed package build: say why, and leave the .zip working. */}
+            {kmpError !== null && (
+              <div
+                role="alert"
+                data-testid="emit-download-kmp-error"
+                style={{
+                  ...warningBannerStyle,
+                  color: "#f85149",
+                  borderColor: "#f85149",
+                  lineHeight: 1.5,
+                }}
+              >
+                {"[ERROR] "}
+                {kmpError}
+                {kmpDiagnostics.length > 0 && (
+                  <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                    {kmpDiagnostics.slice(0, KMP_DIAGNOSTIC_LIMIT).map((d, i) => (
+                      <li key={`${d.code}-${i}`} style={{ fontFamily: "monospace", fontSize: 11 }}>
+                        {d.code}: {d.message}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div style={{ marginTop: 6, color: "#9aa7b8" }}>
+                  <Trans id="output.download.kmp.error.zipStillAvailable">
+                    You can still download the source .zip below.
+                  </Trans>
+                </div>
+              </div>
+            )}
+
+            {/* SECONDARY download: source, for editing or contributing. */}
             <button
               type="button"
               data-testid="emit-download"
-              disabled={!canDownload || downloading || touchStale}
+              disabled={!canDownload || downloading || buildingKmp || touchStale}
               onClick={() => { void handleDownload(); }}
               aria-label={downloadAriaLabel}
               style={{
                 alignSelf: "flex-start",
-                marginTop: 4,
-                padding: "7px 16px",
-                background: canDownload && !downloading && !touchStale ? "#1f6feb" : "#161b22",
-                color: canDownload && !downloading && !touchStale ? "#e6edf3" : "#484f58",
+                padding: "6px 14px",
+                background: "transparent",
+                color: zipActionable ? "#9aa7b8" : "#484f58",
                 border: "1px solid #283040",
                 borderRadius: 6,
-                fontSize: 13,
-                cursor: canDownload && !downloading && !touchStale ? "pointer" : "not-allowed",
+                fontSize: 12,
+                cursor: zipActionable ? "pointer" : "not-allowed",
                 fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
                 transition: "background 0.15s",
               }}
@@ -331,9 +433,23 @@ export function OutputScreen() {
               {downloading ? (
                 <Trans id="output.download.button.downloading">Downloading...</Trans>
               ) : (
-                <Trans id="output.download.button.download">Download .zip</Trans>
+                <Trans id="output.download.button.download">Download source .zip</Trans>
               )}
             </button>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12,
+                color: "#8b949e",
+                lineHeight: 1.5,
+                maxWidth: "46ch",
+              }}
+            >
+              <Trans id="output.download.zip.help">
+                The keyboard&apos;s source files, for editing in Keyman Developer or
+                contributing upstream.
+              </Trans>
+            </p>
             {touchStale && (
               <div
                 role="alert"
