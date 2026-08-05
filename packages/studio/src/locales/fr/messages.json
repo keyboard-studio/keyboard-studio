@@ -1461,9 +1461,15 @@
   "ui.label.required": "obligatoire",
   "unsupported.detail": "Les claviers pour l’écriture <0>{script}</0> (CJK / réordonnancement éthiopien) ne sont pas pris en charge dans la v1.0 et arriveront dans la v1.1.",
   "unsupported.heading": "Aperçu non disponible dans la v1.0",
-  "welcome.imNew": "Je débute",
+  "welcome.guest": "",
+  "welcome.guest.hint": "",
+  "welcome.intro": "",
+  "welcome.point.confirm": "",
+  "welcome.point.describe": "",
+  "welcome.point.ship": "",
   "welcome.signIn.github": "Se connecter avec GitHub",
   "welcome.signIn.google": "Se connecter avec Google",
   "welcome.tagline": "Concevez et publiez un clavier Keyman, directement dans votre navigateur.",
-  "welcome.title": "Bienvenue dans Keyboard Studio"
+  "welcome.title": "Bienvenue dans Keyboard Studio",
+  "welcome.whySignIn": ""
 }

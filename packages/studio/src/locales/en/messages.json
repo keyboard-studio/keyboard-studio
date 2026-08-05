@@ -1461,9 +1461,15 @@
   "ui.label.required": "required",
   "unsupported.detail": "Keyboards for the <0>{script}</0> script (CJK / Ethiopic reorder) are out of scope for v1.0 and will land in v1.1.",
   "unsupported.heading": "Preview not available in v1.0",
-  "welcome.imNew": "I’m new",
+  "welcome.guest": "Continue as guest",
+  "welcome.guest.hint": "Your work is saved in this browser only. Clearing your browsing data, or moving to another computer, loses it. You can sign in at any time and we’ll bring your work with you.",
+  "welcome.intro": "Every language deserves a keyboard its speakers can actually type on. You know your language’s sounds, spelling, and characters — Studio handles the rest. Answer questions in plain language, confirm the layouts we propose, and leave with a finished, validated keyboard package.",
+  "welcome.point.confirm": "<0>Confirm what we propose.</0> Studio picks a proven approach and a close-matching existing keyboard as a starting point, then shows you real keys to try. Change anything you don’t like.",
+  "welcome.point.describe": "<0>Describe your writing system.</0> Which characters you need, and how they behave — tone marks, diacritics, clusters, alternate forms.",
+  "welcome.point.ship": "<0>Ship it.</0> Every edit is compiled and checked as you go. Download a package, or submit it to the Keyman keyboards repository as a pull request.",
   "welcome.signIn.github": "Sign in with GitHub",
   "welcome.signIn.google": "Sign in with Google",
-  "welcome.tagline": "Design and ship a Keyman keyboard, right in your browser.",
-  "welcome.title": "Welcome to Keyboard Studio"
+  "welcome.tagline": "Build a working Keyman keyboard for your language, in your browser. No .kmn code, no toolchain to install.",
+  "welcome.title": "Welcome to Keyboard Studio",
+  "welcome.whySignIn": "<0>Sign in to keep your work.</0> A keyboard takes more than one sitting. Signing in saves yours to your account, so you can close the tab, switch computers, and pick up where you left off — and it’s how you submit a finished keyboard to the Keyman repository."
 }

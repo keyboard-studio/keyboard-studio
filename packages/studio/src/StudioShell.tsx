@@ -198,7 +198,7 @@ function useRoute(): RouteId {
     if (landing === "welcome") {
       // Keep window.location.hash in sync with the forced route. Without this,
       // a deep-linked hash (e.g. "#survey") is left in place while the route
-      // renders "welcome"; WelcomeScreen's "I'm new" button then calls
+      // renders "welcome"; WelcomeScreen's "Continue as guest" button then calls
       // navigateTo("survey"), a same-value hash assignment that fires zero
       // hashchange events per spec, soft-locking the user on WelcomeScreen.
       if (raw !== "welcome") {
@@ -1237,7 +1237,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     useDecisionLogStore.getState().reset();
     // Spec 057 FR-052: view state clears with the session it belongs to. This
     // is one of exactly TWO places a reset is legitimate (the other is
-    // WelcomeScreen's "I'm new") — the same two the survey-session store's own
+    // WelcomeScreen's "Continue as guest") — the same two the survey-session store's own
     // reset lives in. Leaving a prior project's collapsed stages, pane splits
     // and Compare selection behind would make the next keyboard open in a
     // layout the author never chose for it.
