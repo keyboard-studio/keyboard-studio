@@ -125,7 +125,7 @@ const PACKAGE_STEP_ID = "package";
  * answer and appear in no walk as `done`, so they are already absent by
  * construction (spec 057 Q1's resolution) and must not be re-litigated here.
  */
-const DOTLESS_QUESTION_IDS: ReadonlySet<string> = new Set(["il_language_code"]);
+const DOTLESS_QUESTION_IDS: ReadonlySet<string> = new Set([]);
 
 // ---------------------------------------------------------------------------
 // Dot data

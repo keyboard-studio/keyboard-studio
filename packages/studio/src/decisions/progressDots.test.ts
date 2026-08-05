@@ -556,11 +556,12 @@ describe("within-step walk dots", () => {
 });
 
 // ---------------------------------------------------------------------------
-// The one question that never earns a dot (author's call, 2026-08-04)
+// il_language_code — the confirmation question now earns its own dot
+// (author's call, 2026-08-05)
 // ---------------------------------------------------------------------------
 
-describe("il_language_code — the confirmation question, excluded from the row", () => {
-  it("earns no dot from the decision record", () => {
+describe("il_language_code — the confirmation question, now earns a dot", () => {
+  it("earns a dot from the decision record", () => {
     const record = recordOf([
       answerEntry("e1", "identity", "il_language_english"),
       answerEntry("e2", "identity", "il_language_code"),
@@ -570,10 +571,10 @@ describe("il_language_code — the confirmation question, excluded from the row"
       ctx: ctxWith(),
       lookupQuestionLabel: stubLabel,
     });
-    expect(completedIds(dots)).toEqual(["il_language_english"]);
+    expect(completedIds(dots)).toEqual(["il_language_english", "il_language_code"]);
   });
 
-  it("earns no dot from a published walk either — one exclusion, both sources", () => {
+  it("earns a dot from a published walk too — both sources", () => {
     const dots = buildProgressDots({
       record: recordOf([]),
       ctx: ctxWith({
@@ -588,11 +589,11 @@ describe("il_language_code — the confirmation question, excluded from the row"
       },
       stepCursors: { identity: "il_language_english" },
     });
-    expect(dots.some((d) => d.id === "il_language_code")).toBe(false);
+    expect(dots.some((d) => d.id === "il_language_code")).toBe(true);
     expect(dots.some((d) => d.id === "il_language_english")).toBe(true);
   });
 
-  it("shows the STAGE as current while the author is on it — never no marker at all", () => {
+  it("shows il_language_code as current while the author is on it", () => {
     const dots = buildProgressDots({
       record: recordOf([]),
       ctx: ctxWith({
@@ -607,7 +608,7 @@ describe("il_language_code — the confirmation question, excluded from the row"
       },
       stepCursors: { identity: "il_language_code" },
     });
-    expect(currentDot(dots)?.id).toBe("identity");
+    expect(currentDot(dots)?.id).toBe("il_language_code");
   });
 });
 
