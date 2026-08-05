@@ -4,6 +4,7 @@ import type { VirtualFS } from "./virtualFS";
 import type { BaseKeyboard } from "./baseKeyboard";
 import type { KeyboardIR } from "./keyboard-ir";
 import type { KpsFontEntry, KpsStylesheetEntry } from "./fontEntry";
+import type { Attribution } from "./attribution";
 
 /**
  * Three-group routing identifier per spec §9. The scaffolder picks a
@@ -39,6 +40,47 @@ export interface ScaffoldOptions {
    * @see spec.md §8 step 3
    */
   ir?: KeyboardIR;
+
+  /**
+   * Who to attribute the keyboard to (spec 059 US1).
+   *
+   * When supplied this is the SINGLE source for the copyright holder across
+   * `LICENSE.md`, `IRHeader.copyright` / `store(&COPYRIGHT)`, and the `.kps`
+   * `<Copyright>`/`<Author>` fields, so the three cannot drift — 22 shipped
+   * keyboards disagree between their `LICENSE.md` and `.kmn` precisely because
+   * those were written independently.
+   *
+   * When OMITTED the scaffolder emits **no** copyright line and sets
+   * {@link ScaffoldResult.attributionMissing} rather than inventing one. Naming the keyboard's own display name as the
+   * rights holder — the behaviour before spec 059 — is a false attribution, and
+   * a missing notice that lint flags is strictly better than a wrong one.
+   */
+  attribution?: Attribution;
+
+  /**
+   * Year to stamp on the new copyright line. Defaults to the current year.
+   *
+   * Injectable because a copyright notice records when the work was PUBLISHED
+   * (spec 059 D2), and because tests must not read the clock — a time-dependent
+   * suite breaks at a year boundary.
+   */
+  emitYear?: number;
+
+  /**
+   * The original copyright holder, supplied BY THE AUTHOR when the base's own
+   * `LICENSE.md` carries a notice this tool cannot read (spec 059 D5).
+   *
+   * This is the escape hatch that makes the D5 block acceptable rather than a
+   * dead end: the author is never stuck, and the remedy PRESERVES the notice
+   * instead of dropping it. When set, it is used as the inherited holder in place
+   * of parsing, and {@link ScaffoldResult.licenseUnparseable} is not reported.
+   *
+   * Emitted with NO year, because the unreadable line's year is exactly what
+   * could not be established — matching real corpus lines such as
+   * `Copyright © SIL International`. Inventing a year here would be a fabricated
+   * fact in a legal notice.
+   */
+  baseHolderOverride?: string;
 }
 
 /**
@@ -56,6 +98,54 @@ export interface ScaffoldResult {
   fonts: KpsFontEntry[];
   /** Per-keyboard CSS forwarded from fetchKeyboardSourceToVfs — same shape, see PR #405. */
   stylesheets: KpsStylesheetEntry[];
+  /**
+   * True when no attribution was supplied, so the emitted package carries NO
+   * copyright notice (spec 059 US1).
+   *
+   * A dedicated signal rather than a `warnings` entry: `warnings` means "fell
+   * back to stub-only output", and overloading it would make every
+   * un-attributed scaffold look like a fetch failure.
+   *
+   * Callers that publish or download MUST gate on this — an unattributed package
+   * is incomplete, and the pre-059 alternative (naming the keyboard's own display
+   * name as rights holder) was a false attribution.
+   */
+  attributionMissing: boolean;
+  /**
+   * How many copyright holders were INHERITED from the base's `LICENSE.md`
+   * (spec 059 US2). Zero for a keyboard with no base license to retain.
+   *
+   * MIT requires the original notice be retained in a derivative, so a non-zero
+   * count means the emitted `LICENSE.md` carries those holders verbatim with the
+   * new author appended — never replacing them.
+   */
+  inheritedHolderCount: number;
+  /**
+   * Set when the base HAS a copyright notice that could not be read (spec 059
+   * D5) — an unfilled `Copyright (c) YYYY ____` template, or a year with no
+   * holder. Both are real shipped files.
+   *
+   * Callers MUST block publish/download on this rather than proceed: emitting a
+   * `LICENSE.md` whose only holder is the current user would strip a real notice,
+   * which is the defect FR-010 exists to prevent. The remedy is to let the author
+   * enter the original holder manually, which preserves the notice instead of
+   * dropping it — a hard block with an escape hatch, not a dead end.
+   */
+  licenseUnparseable?: { reason: string; line: string };
+  /**
+   * The base keyboard's `LICENSE.md` VERBATIM, or undefined when it has none
+   * (spec 059 FR-011).
+   *
+   * Surfaced so the caller can keep it on the working copy. The download path
+   * completes missing stub files — including `LICENSE.md`, which the loader
+   * deliberately never writes into the VFS — and without this text it would have
+   * no way to know which holders to retain, emitting a notice naming only the new
+   * author. That is the same defect on a second path.
+   *
+   * Raw text rather than the parsed block: parsing is `resolveInheritedHolders`'
+   * job, and one parser shared by both paths is the point of FR-005.
+   */
+  baseLicenseText?: string;
 }
 
 /**

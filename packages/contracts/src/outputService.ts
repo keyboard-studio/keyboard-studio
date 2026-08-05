@@ -177,6 +177,21 @@ export interface VerifyTokenResult {
   ok: boolean;
   /** GitHub login (`X-OAuth-Scopes` header user) the token belongs to. */
   login?: string;
+  /**
+   * The account's display name, from the same `/user` response (spec 059 D7).
+   *
+   * Used to PRE-FILL keyboard attribution so the author confirms rather than
+   * types it. Absent when the profile has no name set — in that case ASK for a
+   * name; never substitute `login`, because a handle is not a copyright holder.
+   */
+  name?: string;
+  /**
+   * The account's public email, from the same `/user` response (spec 059 D7).
+   *
+   * Absent when the user keeps their email private. Optional metadata only — it
+   * must never block emission.
+   */
+  email?: string;
   /** OAuth scopes the token actually has. */
   scopes: readonly string[];
   /**

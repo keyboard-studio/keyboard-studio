@@ -103,6 +103,10 @@ export function OutputScreen() {
     handleDownloadKmp,
     coverageGate,
     showIdentityWarn,
+    // spec 059: the two attribution hard-blocks and the D5 escape hatch.
+    attributionMissing,
+    licenseUnparseable,
+    resolveBaseHolder,
   } = artifact;
 
   // Identity prefill for the Option B submit form. Read from whichever auth
@@ -231,15 +235,32 @@ export function OutputScreen() {
           message:
             "Download unavailable — finish every inventory character before downloading. See the banner below for details.",
         })
-      : canDownload
+      : // spec 059 D5 before D6: an unreadable base notice is the more specific
+        // problem, and its banner is the one carrying the control that fixes it.
+        licenseUnparseable !== null
         ? t({
-            id: "output.download.aria.ready",
-            message: `Download keyboard ${downloadKeyboardId} as zip`,
+            id: "output.download.aria.licenseUnreadable",
+            // Names the field the author is being sent to ("Original copyright
+            // holder" in the banner below) rather than paraphrasing it, so the
+            // announcement and the control it points at use the same words.
+            message:
+              "Download unavailable — the base keyboard's original copyright holder could not be read. Confirm it in the banner below.",
           })
-        : t({
-            id: "output.download.aria.notReady",
-            message: "Download unavailable until compile completes",
-          });
+        : attributionMissing
+          ? t({
+              id: "output.download.aria.attributionMissing",
+              message:
+                "Download unavailable — the keyboard needs an author and a copyright holder.",
+            })
+          : canDownload
+            ? t({
+                id: "output.download.aria.ready",
+                message: `Download keyboard ${downloadKeyboardId} as zip`,
+              })
+            : t({
+                id: "output.download.aria.notReady",
+                message: "Download unavailable until compile completes",
+              });
 
   // The .kmp shares every gate with the .zip, so it reuses the same
   // unavailability reasons and only differs in the ready case.
@@ -504,6 +525,107 @@ export function OutputScreen() {
                 >
                   <Trans id="output.status.coverageBlocked.goto">Go finish them now</Trans>
                 </button>
+              </div>
+            )}
+            {/* spec 059 D5 — the base's own copyright notice could not be read.
+                This is an [ERROR] rather than a warning: emitting anyway would
+                publish a LICENSE.md naming only this author, silently dropping
+                the notice MIT requires a derivative to retain. Carries the one
+                control that clears it. */}
+            {licenseUnparseable !== null && (
+              <div
+                role="alert"
+                data-testid="license-unreadable"
+                style={{
+                  ...warningBannerStyle,
+                  color: "#f85149",
+                  borderColor: "#f85149",
+                  lineHeight: 1.5,
+                  maxWidth: 560,
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                  {"[ERROR] "}
+                  <Trans id="output.status.licenseUnreadable.title">
+                    The base keyboard&apos;s copyright notice could not be read
+                  </Trans>
+                </div>
+                <div style={{ marginBottom: 6 }}>
+                  <Trans id="output.status.licenseUnreadable.line">Its licence file says:</Trans>{" "}
+                  <code style={{ fontFamily: "ui-monospace, monospace" }}>
+                    {licenseUnparseable.line}
+                  </code>
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <Trans id="output.status.licenseUnreadable.why">
+                    This keyboard must keep the original author&apos;s copyright, so who held
+                    it needs confirming before it can be downloaded.
+                  </Trans>
+                </div>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const input = e.currentTarget.elements.namedItem(
+                      "baseHolder",
+                    ) as HTMLInputElement | null;
+                    if (input !== null) resolveBaseHolder(input.value);
+                  }}
+                  style={{ display: "flex", gap: 6, alignItems: "center" }}
+                >
+                  <input
+                    name="baseHolder"
+                    type="text"
+                    aria-label={t({
+                      id: "output.status.licenseUnreadable.holderLabel",
+                      message: "Original copyright holder",
+                    })}
+                    placeholder={t({
+                      id: "output.status.licenseUnreadable.holderPlaceholder",
+                      message: "Original copyright holder",
+                    })}
+                    style={{
+                      flex: 1,
+                      padding: "5px 8px",
+                      background: "#0d1117",
+                      color: "#e6edf3",
+                      border: "1px solid #283040",
+                      borderRadius: 4,
+                      fontSize: 12,
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    data-testid="resolve-base-holder"
+                    style={{
+                      padding: "5px 12px",
+                      background: "#1f6feb",
+                      color: "#e6edf3",
+                      border: "1px solid #283040",
+                      borderRadius: 4,
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Trans id="output.status.licenseUnreadable.confirm">Confirm</Trans>
+                  </button>
+                </form>
+              </div>
+            )}
+            {/* spec 059 D6 — no attribution captured at all. Not an error the
+                author caused, so [WARN] styling and a pointer back to where it
+                is answered. */}
+            {attributionMissing && (
+              <div
+                role="status"
+                aria-live="polite"
+                data-testid="attribution-required"
+                style={{ ...warningBannerStyle, color: "#d29922", lineHeight: 1.5 }}
+              >
+                {"[WARN] "}
+                <Trans id="output.status.attributionRequired">
+                  This keyboard needs an author and a copyright holder before it can be
+                  downloaded. Go back to the language step to add them.
+                </Trans>
               </div>
             )}
             {downloadError !== null && (

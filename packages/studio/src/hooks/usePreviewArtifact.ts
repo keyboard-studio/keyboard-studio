@@ -68,6 +68,29 @@ export interface PreviewArtifact {
   // `canDownload` gates BOTH downloads identically — the .kmp is not a laxer
   // path to an artifact than the .zip, it is the primary one.
   canDownload: boolean;
+  /**
+   * True when the working copy has no attribution, so the package would ship
+   * with NO copyright notice (spec 059 D5/D6/FR-015).
+   *
+   * Blocks BOTH downloads rather than warning: a redistributable package with no
+   * rights holder is incomplete, and the pre-059 alternative — naming the
+   * keyboard's own display name — was a false attribution. The identity flow
+   * requires an author name, so this normally cannot happen; it catches Track 2
+   * and drafts saved before attribution capture existed.
+   */
+  attributionMissing: boolean;
+  /**
+   * Set when the chosen base has a copyright notice this tool could not read
+   * (spec 059 D5). Blocks download: emitting a LICENSE.md whose only holder is
+   * the current user would strip a real notice.
+   */
+  licenseUnparseable: { reason: string; line: string } | null;
+  /**
+   * Supply the original copyright holder to clear the block above, then re-run
+   * the pipeline so it is retained in the emitted notice (D5 escape hatch).
+   */
+  resolveBaseHolder: (holder: string) => void;
+
   /** The source .zip (secondary). */
   downloading: boolean;
   downloadError: string | null;
@@ -283,11 +306,62 @@ export function usePreviewArtifact(): PreviewArtifact {
   // canDownload: require the compile to be ready AND the working copy to be
   // instantiated (baseVfs + baseIr available in the store) AND every
   // inventory character implemented in every modality actually engaged this
-  // session (the Phase F hard-gate truth — see the module comment above).
+  // session (the Phase F hard-gate truth — see the module comment above) AND
+  // the package's attribution is emittable (spec 059).
   // The serializer builds the zip from the store's baseVfs, not from
   // stage.vfs, so the download contains the full projected working copy
   // including assignments.
-  const canDownload = stage.kind === "ready" && isInstantiated && !coverageGate.blocked;
+
+  // spec 059 D5/D6: never emit a package whose only "holder" is invented, and
+  // never emit one with no notice at all. Gate rather than warn.
+  const attributionMissing = useWorkingCopyStore((s) => s.attribution === null);
+
+  // spec 059 D5: refuse to emit while the base's own notice is unreadable — a
+  // LICENSE.md naming only the current user would strip it.
+  const licenseUnparseable = useWorkingCopyStore((s) => s.licenseUnparseable);
+  const setBaseHolderOverride = useWorkingCopyStore((s) => s.setBaseHolderOverride);
+
+  const canDownload =
+    stage.kind === "ready" &&
+    isInstantiated &&
+    !coverageGate.blocked &&
+    !attributionMissing &&
+    licenseUnparseable === null;
+
+  /**
+   * Why emission is refused on attribution grounds, or null when it is not.
+   *
+   * ONE derivation shared by both download handlers below. The `.kmp` is the
+   * primary artifact and the `.zip` the secondary, but neither is a laxer path to
+   * a package with a wrong copyright notice — and two hand-written copies of this
+   * pair of checks is how one of them would eventually drift into being.
+   *
+   * D5 before D6: an unreadable base notice is the more specific problem and has
+   * a control that fixes it, so name that one when both are true.
+   */
+  const emissionBlockReason: string | null =
+    licenseUnparseable !== null
+      ? "The base keyboard's copyright notice could not be read — supply the original holder before downloading."
+      : attributionMissing
+        ? "Add the author and copyright holder before downloading."
+        : null;
+
+  /**
+   * D5 escape hatch: record the author-supplied original holder, then RE-RUN the
+   * pipeline so the scaffolder retains it in the emitted notice.
+   *
+   * The re-run is the load-bearing part — setting the override alone would clear
+   * the block while leaving the already-emitted LICENSE.md without the holder.
+   */
+  const resolveBaseHolder = useCallback(
+    (holder: string) => {
+      const trimmed = holder.trim();
+      if (trimmed === "") return;
+      setBaseHolderOverride(trimmed);
+      retry();
+    },
+    [setBaseHolderOverride, retry],
+  );
 
   const handleDownload = useCallback(async () => {
     if (stage.kind !== "ready") return;
@@ -298,6 +372,14 @@ export function usePreviewArtifact(): PreviewArtifact {
     // click (tests, a future programmatic path) must not bypass it.
     if (coverageGate.blocked) {
       setDownloadError("Finish every inventory character before downloading.");
+      return;
+    }
+    // Same defense-in-depth for the spec 059 attribution gates: emitting a
+    // package whose copyright notice is absent or would silently drop the base
+    // author's is the failure this feature exists to prevent, so the refusal
+    // lives on the emission path and not only on the button.
+    if (emissionBlockReason !== null) {
+      setDownloadError(emissionBlockReason);
       return;
     }
     setDownloading(true);
@@ -330,7 +412,7 @@ export function usePreviewArtifact(): PreviewArtifact {
     } finally {
       setDownloading(false);
     }
-  }, [stage, triggerDownload, coverageGate.blocked]);
+  }, [stage, triggerDownload, coverageGate.blocked, emissionBlockReason]);
 
   // The installable package — the primary download. Same gates as the zip:
   // .kmp is the default artifact, not a privileged shortcut past them.
@@ -338,6 +420,12 @@ export function usePreviewArtifact(): PreviewArtifact {
     if (stage.kind !== "ready") return;
     if (coverageGate.blocked) {
       setKmpError("Finish every inventory character before downloading.");
+      return;
+    }
+    // spec 059: the attribution refusals apply to the PRIMARY artifact as much as
+    // the zip — a .kmp is the one people actually install and redistribute.
+    if (emissionBlockReason !== null) {
+      setKmpError(emissionBlockReason);
       return;
     }
     setBuildingKmp(true);
@@ -368,7 +456,7 @@ export function usePreviewArtifact(): PreviewArtifact {
     } finally {
       setBuildingKmp(false);
     }
-  }, [stage, triggerDownload, coverageGate.blocked]);
+  }, [stage, triggerDownload, coverageGate.blocked, emissionBlockReason]);
 
   return {
     baseKeyboard,
@@ -382,6 +470,9 @@ export function usePreviewArtifact(): PreviewArtifact {
     recompile,
     diagnostics,
     canDownload,
+    attributionMissing,
+    licenseUnparseable,
+    resolveBaseHolder,
     downloading,
     downloadError,
     downloadWarnings,

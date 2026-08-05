@@ -172,7 +172,16 @@ export async function verifyToken(
     return { ok: false, scopes: [], missingScopes: ["public_repo"] };
   }
 
-  const data = (await res.json()) as { login?: string };
+  // spec 059 D7: `name` and `email` are already in THIS response, so retaining
+  // them costs no additional request and lets keyboard attribution be
+  // propose-then-confirm rather than a blank form. GitHub sends null (not
+  // undefined) for an unset profile name or a private email — both are
+  // normalised to absent below.
+  const data = (await res.json()) as {
+    login?: string;
+    name?: string | null;
+    email?: string | null;
+  };
   const scopeHeader = res.headers.get("X-OAuth-Scopes") ?? "";
   const scopes = scopeHeader
     .split(",")
@@ -186,6 +195,10 @@ export async function verifyToken(
   return {
     ok: missingScopes.length === 0,
     ...(data.login !== undefined ? { login: data.login } : {}),
+    // Omit rather than carry null/empty, so consumers can use `?? ask()` and
+    // never render "null" as a copyright holder.
+    ...(typeof data.name === "string" && data.name !== "" ? { name: data.name } : {}),
+    ...(typeof data.email === "string" && data.email !== "" ? { email: data.email } : {}),
     scopes,
     missingScopes,
   };
