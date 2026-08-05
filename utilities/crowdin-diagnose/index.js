@@ -33,17 +33,24 @@
 //     BRANCH the download never reads      -> align branch usage, do NOT seed
 // H4  translations exist and are approved  -> the project is fine; the download
 //                                             config or file mapping is at fault
+// H4' translations exist but unapproved,   -> also fine; same downstream fault.
+//     and the export does NOT gate on         Distinct id from H4 because the
+//     approval                                evidence differs (this is the
+//                                             shape a fresh seed produces)
 //
 // H1 is already FALSIFIED for Tier A: upload run 29940588381 (2026-07-22)
 // ran with upload_translations: true and succeeded, logging an accepted
 // fr/messages.json. So if this reports H1 anyway, the seed matched nothing --
 // which is its own finding, not a reason to re-run the seed.
 //
-// H3 has live supporting evidence independent of this script: package.json's
-// crowdin:upload / crowdin:download scripts both pass `-b main` (a CROWDIN
-// branch, not a git branch), while .github/workflows/crowdin-*.yml pass no
-// branch at all and therefore address the project root. Those are two different
-// namespaces. This script reports which one actually holds the strings.
+// H3 had live supporting evidence when this script was written: package.json's
+// crowdin:upload / crowdin:download both passed `-b main` (a CROWDIN branch, not
+// a git branch), while .github/workflows/crowdin-*.yml pass no branch at all and
+// therefore address the project root -- two different namespaces. Those flags
+// have since been removed, so the split is closed for the paths in this repo.
+// H3 stays because the reverse mistake is still reachable (a crowdin_branch_name
+// added to a workflow, or a hand-run `-b` flag), and this script reports which
+// namespace actually holds the strings either way.
 //
 // USAGE
 // -----
@@ -215,11 +222,12 @@ function verdict({ localeIsTarget, root, branches, exportApprovedOnly }) {
       id: "H3_BRANCH_MISMATCH",
       headline: `Translations exist, but only under Crowdin branch(es): ${names}. The project root has none.`,
       fix:
-        `Do NOT seed. The workflows read the project ROOT (they pass no branch), while ` +
-        `package.json's crowdin:upload / crowdin:download pass '-b main'. Align them: either ` +
-        `add crowdin_branch_name to both workflows, or drop '-b main' from the npm scripts and ` +
-        `move the strings to the root. Seeding now would write English-derived catalogs into ` +
-        `the root while the real translations sit in the branch.`,
+        `Do NOT seed. The workflows read the project ROOT -- they pass no branch -- so any ` +
+        `path that addresses a Crowdin BRANCH instead puts the strings somewhere the ` +
+        `automation never looks. Check for a '-b <name>' flag on a local CLI run and for ` +
+        `crowdin_branch_name in either workflow, and align the two on one namespace. ` +
+        `Seeding now would write English-derived catalogs into the root while the real ` +
+        `translations sit in the branch.`,
     };
   }
 
@@ -252,7 +260,11 @@ function verdict({ localeIsTarget, root, branches, exportApprovedOnly }) {
     };
   }
 
-  if (unapproved > 0) {
+  // Only when the setting could not be READ. If the project reported it as
+  // false we know approval does not gate the export, so unapproved strings are
+  // not a finding at all and this must fall through to H4_UNAPPROVED_BUT_EXPORTS
+  // below.
+  if (unapproved > 0 && exportApprovedOnly === null) {
     return {
       id: "H2_UNAPPROVED_UNCONFIRMED",
       headline:
@@ -261,7 +273,37 @@ function verdict({ localeIsTarget, root, branches, exportApprovedOnly }) {
       fix:
         `Do NOT seed. Check "Export only approved translations" in the Crowdin project ` +
         `settings by hand. If it is ON, that explains the all-English download and the fix ` +
-        `is that setting (or approving the strings). If it is OFF, treat this as H4 below.`,
+        `is that setting (or approving the strings). If it is OFF, this is really ` +
+        `H4_UNAPPROVED_BUT_EXPORTS -- the project is fine and the fault is downstream.`,
+    };
+  }
+
+  // Reaching here with unapproved > 0 means exportApprovedOnly is explicitly
+  // false: the strings are translated, they are not approved, and approval is
+  // not what the export keys on. Say so rather than printing a bare
+  // "N translated and 0 approved", which reads like a problem when it is not --
+  // a freshly seeded project sits in exactly this state, because the seeding
+  // path leaves auto_approve_imported off on purpose.
+  //
+  // Distinct id from the terminal H4 below, deliberately, for the same reason
+  // H2 is split into H2_APPROVED_ONLY_EXPORT and H2_UNAPPROVED_UNCONFIRMED: one
+  // id per distinct evidentiary state, not per conclusion. `id` is this tool's
+  // machine contract -- selftest.js asserts on it alone, and --json consumers
+  // have nothing else stable to key on -- so collapsing two distinguishable
+  // states into one id would discard the distinction for every consumer that
+  // does not parse prose.
+  if (unapproved > 0) {
+    return {
+      id: "H4_UNAPPROVED_BUT_EXPORTS",
+      headline:
+        `${root.translated} phrases translated, ${root.approved} approved (${unapproved} ` +
+        `unapproved) -- but the project does NOT export approved-only, so the unapproved ` +
+        `ones still export. The project is NOT the problem.`,
+      fix:
+        `Nothing to fix in the project. If a download still returns source text, the fault ` +
+        `is on the download side -- the file mapping in crowdin.yml, the languages_mapping, ` +
+        `or skip_untranslated_strings. Compare the file inventory above against crowdin.yml's ` +
+        `translation paths.`,
     };
   }
 

@@ -98,6 +98,29 @@ const SCENARIOS = [
     branchProgress: {},
   },
   {
+    // The freshly-seeded shape, and the regression this scenario exists for.
+    // Seeding leaves auto_approve_imported off, so a healthy just-seeded project
+    // reports translated >> approved with approved at zero. That is only a
+    // finding if approval gates the export -- here the project says it does not.
+    // The unapproved branch above used to fire on `unapproved > 0` alone, so
+    // this state reported H2_UNAPPROVED_UNCONFIRMED ("setting could not be
+    // read", "Do NOT seed") about a project that had just been seeded
+    // correctly and whose setting had in fact been read. Distinguishing null
+    // from false is the whole point; a scenario that omits the field cannot
+    // catch it, which is why the one above did not.
+    name: "H4' healthy — unapproved, but project does not export approved-only",
+    expect: "H4_UNAPPROVED_BUT_EXPORTS",
+    project: {
+      name: "kbs",
+      sourceLanguageId: "en",
+      targetLanguageIds: ["fr"],
+      exportApprovedOnly: false,
+    },
+    rootProgress: [progressRow("fr", 1168, 1104, 0)],
+    branches: [],
+    branchProgress: {},
+  },
+  {
     name: "H4 healthy — translated and approved at the root",
     expect: "H4_PROJECT_LOOKS_HEALTHY",
     project: { name: "kbs", sourceLanguageId: "en", targetLanguageIds: ["fr"] },
