@@ -297,6 +297,30 @@ export type {
   ReplayKeyEditOverlayResult,
 } from "./pattern-apply/index.js";
 
+// spec 058 T113/T114 — the edit-time touch-key diagnostics (FR-040…FR-045).
+// Studio-facing because `useValidatorFindings` computes them inside the existing
+// 300 ms cycle (FR-042 / Decision D3) and the key grid renders them per cell.
+// Only the aggregators are exported: an individual detector is an internal of
+// the aggregate, and a studio surface that reached for one directly would be
+// building a second, partial findings surface — exactly what FR-042's "single
+// aggregated findings surface" forbids. The contracts-owned finding/fix TYPES
+// come through `@keyboard-studio/contracts` directly (the studio already
+// imports from it), so they are not re-exported here.
+export {
+  computeAllTouchKeyDiagnostics,
+  groupTouchKeyFindingsByAddress,
+  findMixedSuppressRemove,
+} from "./pattern-apply/index.js";
+
+// spec 058 T118 — edit-time rejection (FR-045). Studio-facing because the guard
+// runs at the moment of the edit, in `useKeyEditGuards`, before `commitKeyEdit`.
+export { checkKeyEditRejections } from "./pattern-apply/index.js";
+export type {
+  KeyEditRejection,
+  KeyEditRejectionReason,
+  KeyEditRejectionVerdict,
+} from "./pattern-apply/index.js";
+
 // spec 058 T061 — layer-family decomposition and grouping (FR-063/FR-067).
 // Studio-facing because "family order" is what orders layers in the key grid's
 // context-carry (T074) and in the parallelism complaints (T107-T110). Without

@@ -412,27 +412,27 @@ The overlay, both appliers, both projection passes, preview identity, the store 
 
 ### Implementation
 
-- [ ] **T113** [US5] The `TouchKeyFinding` / `TouchKeyFix` shape: `code` (one of the eight), `severity`, `address`, **structured `fields`** for studio-composed localized copy — never English prose from the engine — and at least one fix descriptor (FR-044) · packages/engine/src/pattern-apply/touchKeyDiagnostics.ts
+- [x] **T113** [US5] The `TouchKeyFinding` / `TouchKeyFix` shape: `code` (one of the eight), `severity`, `address`, **structured `fields`** for studio-composed localized copy — never English prose from the engine — and at least one fix descriptor (FR-044) · packages/engine/src/pattern-apply/touchKeyDiagnostics.ts
 
 **⟶ Wait for T113, then:**
 
-- [ ] **T114** [US5] Compute all eight diagnostics as **synchronous pure joins** from the already-parsed working IR and layout (e.g. via `useMemo`) within the existing cycle's products, composed into the **single aggregated findings surface** — no second store field and no second timer, per that hook's own documented rule (FR-042, Decision D3). The eight: dead `T_` key, missing layer, unidentified key, missing required keys, special label on a normal key, duplicate id within a layer, orphan `T_` rule, modifier key not active on its own layer, and half-done suppression — reusing the Phase 4 check implementations rather than re-deriving them (FR-040) · packages/studio/src/hooks/useValidatorFindings.ts
+- [x] **T114** [US5] Compute all eight diagnostics as **synchronous pure joins** from the already-parsed working IR and layout (e.g. via `useMemo`) within the existing cycle's products, composed into the **single aggregated findings surface** — no second store field and no second timer, per that hook's own documented rule (FR-042, Decision D3). The eight: dead `T_` key, missing layer, unidentified key, missing required keys, special label on a normal key, duplicate id within a layer, orphan `T_` rule, modifier key not active on its own layer, and half-done suppression — reusing the Phase 4 check implementations rather than re-deriving them (FR-040) · packages/studio/src/hooks/useValidatorFindings.ts
 
 **⟶ Wait for T114, then:**
 
-- [ ] **T115** [P] [US5] At least one **concrete fix action** per diagnostic — e.g. a dead `T_` key offers both "add the rule" and "convert to a `U_` id"; a dangling `nextlayer` offers to repoint or remove the switch (FR-041, US5 AS1/AS2) · packages/studio/src/editors/assignLoop/keyGrid/KeyInspector.tsx
-- [ ] **T116** [P] [US5] Studio-composed, **localized** copy for every finding and fix, following the existing method-label pattern (FR-044) · packages/studio/src/editors/assignLoop/keyGrid/findingCopy.ts
-- [ ] **T117** [P] [US5] Findings conveyed by **icon and text, never colour alone**, with a codepoint-derived accessible name for any glyph, announced through a single **grid-owned** `aria-live` region — the grid adds exactly one for its own announcements; the app is not being consolidated to one (US5 AS4, FR-050) · packages/studio/src/editors/assignLoop/keyGrid/KeyGrid.tsx
+- [x] **T115** [P] [US5] At least one **concrete fix action** per diagnostic — e.g. a dead `T_` key offers both "add the rule" and "convert to a `U_` id"; a dangling `nextlayer` offers to repoint or remove the switch (FR-041, US5 AS1/AS2) · packages/studio/src/editors/assignLoop/keyGrid/KeyInspector.tsx
+- [x] **T116** [P] [US5] Studio-composed, **localized** copy for every finding and fix, following the existing method-label pattern (FR-044) · packages/studio/src/editors/assignLoop/keyGrid/findingCopy.ts
+- [x] **T117** [P] [US5] Findings conveyed by **icon and text, never colour alone**, with a codepoint-derived accessible name for any glyph, announced through a single **grid-owned** `aria-live` region — the grid adds exactly one for its own announcements; the app is not being consolidated to one (US5 AS4, FR-050) · packages/studio/src/editors/assignLoop/keyGrid/KeyGrid.tsx
 
 **⟶ Wait for T114, then — rejection, which is the counterpart to reporting:**
 
-- [ ] **T118** [US5] Edit-time **rejection**, not a finding, for mutations that would create an invalid state: a dead `T_` key must **not be creatable** and an in-layer id collision must **not be writable** — with the hard block downgrading to **warn-and-confirm** when `opaqueFragmentCount > 0`, because the join cannot prove a rule is not hiding inside opaque text. This is also where author-typed 0x05A ids are handled, with no finding emitted at all (FR-045, FR-040) · packages/engine/src/pattern-apply/keyEditOps.ts, packages/studio/src/editors/assignLoop/keyGrid/useKeyEditGuards.ts
+- [x] **T118** [US5] Edit-time **rejection**, not a finding, for mutations that would create an invalid state: a dead `T_` key must **not be creatable** and an in-layer id collision must **not be writable** — with the hard block downgrading to **warn-and-confirm** when `opaqueFragmentCount > 0`, because the join cannot prove a rule is not hiding inside opaque text. This is also where author-typed 0x05A ids are handled, with no finding emitted at all (FR-045, FR-040) · packages/engine/src/pattern-apply/keyEditOps.ts, packages/studio/src/editors/assignLoop/keyGrid/useKeyEditGuards.ts
 
 **⟶ Wait for T118, then:**
 
-- [ ] **T119** [P] [US5] An edit that removes the last mechanism for an inventory character **warns inline** — an editor must permit invalid intermediate states — offering undo or restore, while the existing FR-008 gate still **blocks** at Continue (US5 AS3) · packages/studio/src/editors/assignLoop/keyGrid/useKeyEditGuards.ts
-- [ ] **T120** [P] [US5] **Either mode completes the step**: Continue is gated on coverage, never on which view is active, and at Continue **both** in-progress surfaces — the by-character draft and the key edit overlay — are committed or explicitly resolved, neither silently discarded (FR-036e) · packages/studio/src/editors/assignLoop/TouchGallery.tsx
-- [ ] **T121** [P] [US5] SC-007: every one of the eight diagnostics is reachable in the UI with a working fix, and none requires a compile to discover · packages/studio/src/editors/assignLoop/keyGrid/KeyInspector.test.tsx
+- [x] **T119** [P] [US5] An edit that removes the last mechanism for an inventory character **warns inline** — an editor must permit invalid intermediate states — offering undo or restore, while the existing FR-008 gate still **blocks** at Continue (US5 AS3) · packages/studio/src/editors/assignLoop/keyGrid/useKeyEditGuards.ts
+- [x] **T120** [P] [US5] **Either mode completes the step**: Continue is gated on coverage, never on which view is active, and at Continue **both** in-progress surfaces — the by-character draft and the key edit overlay — are committed or explicitly resolved, neither silently discarded (FR-036e) · packages/studio/src/editors/assignLoop/TouchGallery.tsx
+- [x] **T121** [P] [US5] SC-007: every one of the eight diagnostics is reachable in the UI with a working fix, and none requires a compile to discover · packages/studio/src/editors/assignLoop/keyGrid/KeyInspector.test.tsx
 
 **Checkpoint — US5 is independently functional and testable.**
 
@@ -442,24 +442,50 @@ The overlay, both appliers, both projection passes, preview identity, the store 
 
 **Wave 1 — the conformance specs (different files):**
 
-- [ ] **T122** [P] SC-010: a fake-timer **behavioral** spec in the `useKeyboardArtifact.test.ts` mold asserting the new diagnostics resolve within the existing 300 ms cycle with **no additional timer callback** — no new debounce timer exists anywhere in the feature · packages/studio/src/hooks/useValidatorFindings.test.ts
-- [ ] **T123** [P] SC-009: an `expectNoSeriousAxeViolations` pass on the grid, with a dedicated run in **roving-tabindex state**, plus full operability with no pointer events · packages/studio/e2e/touch-key-grid-a11y.spec.ts
-- [ ] **T124** [P] SC-011's Playwright half: one toggle scenario confirming N mode switches in any order lose no state and the shared figures never disagree · packages/studio/e2e/touch-mode-toggle.spec.ts
-- [ ] **T125** [P] SC-008: assert it is **impossible** to reach the artifact with a `T_*` key that has no rule, no `nextlayer`, and a producing `sp` class · packages/studio/src/lib/projectWorkingCopyVfs.test.ts
-- [ ] **T126** [P] Declared-writes containment for the studio seam, verified **by test** rather than by reading the prose — the prefix rule is looser than it looks (research R9) · packages/studio/src/lib/projectWorkingCopyVfs.test.ts
+- [x] **T122** [P] SC-010: a fake-timer **behavioral** spec in the `useKeyboardArtifact.test.ts` mold asserting the new diagnostics resolve within the existing 300 ms cycle with **no additional timer callback** — no new debounce timer exists anywhere in the feature · packages/studio/src/hooks/useValidatorFindings.test.ts
+- [x] **T123** [P] SC-009: an `expectNoSeriousAxeViolations` pass on the grid, with a dedicated run in **roving-tabindex state**, plus full operability with no pointer events · packages/studio/e2e/touch-key-grid-a11y.spec.ts
+- [x] **T124** [P] SC-011's Playwright half: one toggle scenario confirming N mode switches in any order lose no state and the shared figures never disagree · packages/studio/e2e/touch-mode-toggle.spec.ts
+- [x] **T125** [P] SC-008: assert it is **impossible** to reach the artifact with a `T_*` key that has no rule, no `nextlayer`, and a producing `sp` class · packages/studio/src/lib/projectWorkingCopyVfs.test.ts
+- [x] **T126** [P] Declared-writes containment for the studio seam, verified **by test** rather than by reading the prose — the prefix rule is looser than it looks (research R9) · packages/studio/src/lib/projectWorkingCopyVfs.test.ts
 
 **⟶ Wait for every phase's UI strings to exist, then:**
 
-- [ ] **T127** i18n: **extract** the new strings with `messages:extract` (never hand-add them) into the English catalog, with ids following `area ( "." segment )+` lowercase dot-separated per the convention. Node ≥ 22.19 is required or every `lingui` subcommand exits 0 having written nothing (FR-051). **Already run once mechanically at the Phase 5 checkpoint** so `pnpm lint`'s `i18n-catalog-lint` gate stayed green there; this task is the final re-run plus the id review over every phase's strings · packages/studio/src/locales/en/messages.json
+- [x] **T127** i18n: **extract** the new strings with `messages:extract` (never hand-add them) into the English catalog, with ids following `area ( "." segment )+` lowercase dot-separated per the convention. Node ≥ 22.19 is required or every `lingui` subcommand exits 0 having written nothing (FR-051). **Already run once mechanically at the Phase 5 checkpoint** so `pnpm lint`'s `i18n-catalog-lint` gate stayed green there; this task is the final re-run plus the id review over every phase's strings · packages/studio/src/locales/en/messages.json
 
 **⟶ Independent of the specs above — the two doc corrections this feature owes:**
 
-- [ ] **T128** [P] Correct `docs/accessibility.md`'s **false conformance claim about our own code**: the "character-map grid" it names as audited against the APG grid pattern is a flex-wrap of plain buttons with no roles and every cell its own Tab stop. Either narrow the claim to the widgets genuinely audited (`SelectMenu`, `MultiSelect`, `RadioGroup`) or point the grid row at the new grid now that it exists (R10.4) · docs/accessibility.md
-- [ ] **T129** [P] Add phonebook rows for any keyboard this feature cites that is not already listed, reading each `<id>.kps` for name, BCP47 languages, and author — a stale phonebook is a defect, not an omission · docs/keyboard-index.md
+- [x] **T128** [P] Correct `docs/accessibility.md`'s **false conformance claim about our own code**: the "character-map grid" it names as audited against the APG grid pattern is a flex-wrap of plain buttons with no roles and every cell its own Tab stop. Either narrow the claim to the widgets genuinely audited (`SelectMenu`, `MultiSelect`, `RadioGroup`) or point the grid row at the new grid now that it exists (R10.4) · docs/accessibility.md
+- [x] **T129** [P] Add phonebook rows for any keyboard this feature cites that is not already listed, reading each `<id>.kps` for name, BCP47 languages, and author — a stale phonebook is a defect, not an omission · docs/keyboard-index.md
 
 **⟶ Wait for T122–T129, then:**
 
-- [ ] **T130** Full gate: `pnpm typecheck`, `pnpm -r test`, `pnpm lint` (which runs `depcruise`, so the contracts-cannot-import-engine boundary is machine-checked), and confirm the Success Criteria SC-001…SC-011 each have a named piece of evidence · (repo root)
+- [x] **T130** Full gate: `pnpm typecheck`, `pnpm -r test`, `pnpm lint` (which runs `depcruise`, so the contracts-cannot-import-engine boundary is machine-checked), and confirm the Success Criteria SC-001…SC-011 each have a named piece of evidence · (repo root)
+
+### T130 gate result (2026-08-05)
+
+| Gate | Result |
+|---|---|
+| `pnpm typecheck` | PASS — 7 projects, no errors |
+| `pnpm -r test` | PASS — 9,299 tests across 560 files (contracts 646, engine 2,740 + 2 skipped, keyboard-lint 115, glottolog 42, llm 9, oauth-backend 160, studio 5,587) |
+| `pnpm lint` | PASS — eslint (warnings only, none new), `depcruise`, `crew-lint`, `facet-lint`, `facet-index-lint`, `adaptation-catalog-lint`, `i18n-catalog-lint`, `content-i18n-freshness`, `content-i18n-lint`, `test-antipattern-lint` all green |
+
+### SC-001…SC-011 evidence
+
+| SC | Named evidence | State |
+|---|---|---|
+| SC-001 | `packages/engine/src/pattern-apply/touchCoverage.test.ts` (T032 canary) | Live, skip-if-corpus-absent |
+| SC-002 | `packages/studio/src/lib/touchDiagnostics.corpus.test.ts` (T042) | Live, skip-if-corpus-absent |
+| SC-003 | `docs/keyboard-facet-index.json` unchanged after regeneration (T031) | Verified — artifact byte-identical |
+| SC-004 | `packages/studio/e2e/touch-key-assign.spec.ts` (T089) | Live |
+| SC-005 | `packages/studio/src/editors/assignLoop/keyGrid/RenameDialog.test.tsx` (T093) | Live. **Disclosed limitation** (in that file's own header): "compiles clean" is asserted at the parse/emit level, because the real `compile()` oracle is not reachable from the studio vitest lane; the oracle itself is covered by engine's `compile.test.ts` |
+| SC-006 | `packages/studio/src/lib/projectWorkingCopyVfs.test.ts` (T052 Case B fidelity) **plus** `packages/studio/e2e/touch-key-add-remove.spec.ts` (T112) | **Partial.** The unit half is live and passing. The e2e half is `test.skip`-ped with a named blocker: `TouchGallery.tsx` mounts neither `useKeyCommands` (add) nor `RemoveKeyDialog` (remove), so the walk has no UI route to drive. The spec is written in full against the real test ids and runs as-is once that wiring lands — the un-skip recipe is at the top of the file. This is the one SC not fully closed by this feature |
+| SC-007 | `packages/studio/src/editors/assignLoop/keyGrid/KeyInspector.test.tsx` (T121) | Live — all **eleven** codes covered (FR-040's nine plus the two riders), exceeding the "eight" the task line names |
+| SC-008 | `packages/studio/src/lib/projectWorkingCopyVfs.test.ts` (T125) | Live — includes a non-vacuity control proving the oracle detects the state when the guard is bypassed |
+| SC-009 | `packages/studio/e2e/touch-key-grid-a11y.spec.ts` (T123) + the fast-lane structural guard in `KeyGrid.test.tsx` | Live and **passing**. It found a real critical `aria-required-children` violation (the row-action strip was a plain `<div>` child of `role="grid"`), fixed in `KeyGrid.tsx`. One documented exclusion: `["iframe", ".kmw-spacebar-caption"]`, WCAG 1.4.3, KeymanWeb's own stylesheet inside the OSK frame |
+| SC-010 | `packages/studio/src/hooks/useValidatorFindings.test.ts` (T122) | Live — fake-timer behavioral, `vi.getTimerCount() === 0` |
+| SC-011 | `packages/studio/src/stores/workingCopyStore.test.ts` (T078, store half) + `packages/studio/e2e/touch-mode-toggle.spec.ts` (T124, Playwright half) | Both live and passing |
+
+**Not silently capped.** Two things this gate does not claim: SC-006's e2e half is skipped (above), and the E2E lane as a whole is excluded from the unit CI lanes by design (see `playwright.config.ts`) — the three touch specs exercised for this phase were run manually and pass (`touch-key-grid-a11y`, `touch-mode-toggle`, and previously `touch-key-assign`).
 
 ---
 

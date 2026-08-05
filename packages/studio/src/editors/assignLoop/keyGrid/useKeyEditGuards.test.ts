@@ -19,6 +19,14 @@
 //      character that loses its LAST mechanism anywhere in the layout is
 //      classified as returning to the worklist; a character that remains
 //      reachable via a completely different key is not (FR-061).
+//   8. T119/US5 AS3 `inventoryChars` / `blocksContinue`: a CONFIRMED INVENTORY
+//      character that loses its last mechanism warns inline even though the
+//      by-character walk never assigned it (the entry-parity gap this task
+//      closes), and is marked as blocking the FR-008 Continue gate; an
+//      assignment-only character is warned about but NOT marked as blocking;
+//      an inventory character still reachable elsewhere blocks nothing; and
+//      the edit is never refused (no rejection is produced for this class),
+//      because an editor must permit invalid intermediate states.
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, renderHook } from "@testing-library/react";
@@ -368,5 +376,130 @@ describe("useKeyEditGuards", () => {
     });
 
     expect(warnings).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T119 (US5 AS3) — the confirmed inventory as a SECOND watched set, and
+// `blocksContinue` as the prediction of the FR-008 gate's verdict.
+// ---------------------------------------------------------------------------
+
+describe("useKeyEditGuards — inventory scope (T119, US5 AS3)", () => {
+  const SUPPRESS_K_E: PendingKeyEditOperation = {
+    kind: "suppress",
+    address: ADDR("K_E"),
+    spClass: 9,
+    sentinelId: "T_BLANK",
+  };
+
+  it("warns about an inventory character the by-character walk never assigned — the entry-parity gap", () => {
+    // No seedAssignedChars: this is the canonical import-fix-up case. The
+    // shipped layout already typed ɛ, so the walk never stopped on it and
+    // there is no charTouchEntries row — yet ɛ IS in the confirmed inventory,
+    // and this edit strands it.
+    const layout = makeLayout([
+      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
+    ]);
+
+    const { result } = renderHook(() =>
+      useKeyEditGuards({ layout, inventoryChars: ["e", "ɛ"] }),
+    );
+
+    const warnings = result.current.checkOperation(SUPPRESS_K_E);
+
+    // Both of K_E's characters are in the inventory and both are stranded.
+    expect(warnings.map((w) => w.char).sort()).toEqual(["e", "ɛ"].sort());
+    for (const w of warnings) {
+      expect(w.returnsToWorklist).toBe(true);
+      expect(w.blocksContinue).toBe(true);
+    }
+  });
+
+  it("names the character and states that the step cannot be finished", () => {
+    const layout = makeLayout([
+      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
+    ]);
+
+    const { result } = renderHook(() =>
+      useKeyEditGuards({ layout, inventoryChars: ["ɛ"] }),
+    );
+
+    const warnings = result.current.checkOperation(SUPPRESS_K_E);
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.message).toContain("ɛ");
+    // docs/accessibility.md rule 10: the codepoint-derived name, never the
+    // bare glyph alone.
+    expect(warnings[0]!.message).toContain("U+025B");
+    expect(warnings[0]!.message).toMatch(/cannot be finished/i);
+  });
+
+  it("does NOT mark an assignment-only character as blocking Continue — it is not in the FR-008 denominator", () => {
+    seedAssignedChars(["ɛ"]);
+    const layout = makeLayout([
+      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
+    ]);
+
+    // ɛ was assigned by the walk but is NOT in the confirmed inventory (e.g.
+    // the author placed a character the survey never confirmed).
+    const { result } = renderHook(() =>
+      useKeyEditGuards({ layout, inventoryChars: ["e"] }),
+    );
+
+    const warnings = result.current.checkOperation(SUPPRESS_K_E);
+    const epsilon = warnings.find((w) => w.char === "ɛ");
+
+    expect(epsilon).toBeDefined();
+    // Still returns to the worklist (FR-062) — it lost its last mechanism…
+    expect(epsilon!.returnsToWorklist).toBe(true);
+    // …but the Continue gate does not audit it, so claiming otherwise would
+    // send the author chasing a block that will not happen.
+    expect(epsilon!.blocksContinue).toBe(false);
+  });
+
+  it("FR-061: an inventory character still reachable via a different key blocks nothing", () => {
+    const layout = makeLayout([
+      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
+      makeKey("K_X", { text: "ɛ", output: "ɛ" }),
+    ]);
+
+    const { result } = renderHook(() =>
+      useKeyEditGuards({ layout, inventoryChars: ["ɛ"] }),
+    );
+
+    const warnings = result.current.checkOperation(SUPPRESS_K_E);
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.char).toBe("ɛ");
+    expect(warnings[0]!.returnsToWorklist).toBe(false);
+    expect(warnings[0]!.blocksContinue).toBe(false);
+  });
+
+  it("permits the invalid intermediate state: an inventory-stranding edit is warned about, never refused", () => {
+    const layout = makeLayout([
+      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
+    ]);
+
+    const { result } = renderHook(() =>
+      useKeyEditGuards({ layout, inventoryChars: ["e", "ɛ"] }),
+    );
+
+    // The warning fires…
+    expect(result.current.checkOperation(SUPPRESS_K_E).length).toBeGreaterThan(0);
+    // …and the rejection path — the ONLY path that can stop a commit (T118,
+    // FR-045) — stays silent for this class. "An editor must permit invalid
+    // intermediate states" is a behavioural claim, so it is asserted, not
+    // merely documented.
+    expect(result.current.checkRejections(SUPPRESS_K_E)).toEqual([]);
+  });
+
+  it("omitting inventoryChars narrows back to the FR-036f assignment-only scope", () => {
+    const layout = makeLayout([
+      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
+    ]);
+
+    const { result } = renderHook(() => useKeyEditGuards({ layout }));
+
+    expect(result.current.checkOperation(SUPPRESS_K_E)).toEqual([]);
   });
 });

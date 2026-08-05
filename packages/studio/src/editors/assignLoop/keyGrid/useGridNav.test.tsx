@@ -623,7 +623,7 @@ describe("useGridNav — applyFocusRestorationTarget: row/container tiers (reach
     });
 
     expect(applied).toBe(true);
-    const rows = container.querySelectorAll('[role="row"]');
+    const rows = container.querySelectorAll('[role="row"][aria-rowindex]');
     expect(document.activeElement).toBe(rows[0]);
     expect(document.activeElement).not.toBe(document.body);
   });
@@ -651,10 +651,10 @@ describe("useGridNav — applyFocusRestorationTarget: row/container tiers (reach
 
     const gridEl = container.querySelector('[role="grid"]');
     expect(gridEl?.getAttribute("tabindex")).toBe("-1");
-    for (const rowEl of container.querySelectorAll('[role="row"]')) {
+    for (const rowEl of container.querySelectorAll('[role="row"][aria-rowindex]')) {
       expect(rowEl.getAttribute("tabindex")).toBe("-1");
     }
-    const tabbableCells = Array.from(container.querySelectorAll('[role="gridcell"]')).filter(
+    const tabbableCells = Array.from(container.querySelectorAll('[role="gridcell"][aria-colindex]')).filter(
       (el) => el.getAttribute("tabindex") === "0",
     );
     expect(tabbableCells).toHaveLength(1);

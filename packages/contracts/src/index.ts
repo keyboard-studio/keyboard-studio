@@ -75,6 +75,16 @@ export * from "./touch-coverage";
 // keyboard-lint must consume it and cannot import engine — the same forced
 // placement as buildProducedSet and computeTouchCoverage.
 export * from "./touch-key-rule-join";
+// The touch-node address scheme (spec 058 T114). Defined in engine originally;
+// moved here because the diagnostics detectors below build addresses and are
+// pinned to contracts. `engine/src/pattern-apply/touchKeyAddress.ts` is now a
+// re-export shim over this module, so no call site moved.
+export * from "./touch-key-address";
+// The edit-time touch-key diagnostics (spec 058 Phase 9). Same forced placement
+// as the join above, for the same reason: FR-040 requires the edit-time surface
+// and its Layer C siblings to share ONE implementation, and contracts is the
+// only package both can import.
+export * from "./touch-key-diagnostics";
 export * from "./parseTouchLayout";
 
 // ---------------------------------------------------------------------------

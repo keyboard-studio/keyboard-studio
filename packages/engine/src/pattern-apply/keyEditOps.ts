@@ -48,6 +48,21 @@
  * traversal/mutation implementation to maintain here.
  */
 
+import {
+  hasAnyBinding,
+  isCustomTouchKeyId,
+  isFrameKeyLabel,
+  isProducingKeyClass,
+  isRulelessByConvention,
+  isSpacerKeyClass,
+  isValidTouchKeyIdentifier,
+  normalizeTouchKeyId,
+  parseTouchKeyAddress,
+  type TouchKeyIR,
+  type TouchKeyRuleIndex,
+  type TouchLayoutIR,
+} from "@keyboard-studio/contracts";
+
 import type { TouchKeyAddressParts } from "./touchKeyAddress.js";
 import { RESERVED_SENTINEL_KEY_IDS } from "./keyIdMinting.js";
 
@@ -463,3 +478,292 @@ export interface KeyEditOverlay {
 // replay is a thin wrapper over Case A's apply loop, so hosting it in this
 // module would make `keyEditOps` -> `applyKeyEditsToLayout` -> `keyEditOps` a
 // cycle, which `pnpm depcruise`'s `no-circular` rule blocks.
+
+// ---------------------------------------------------------------------------
+// Edit-time rejection (spec 058 T118; FR-045, FR-040)
+// ---------------------------------------------------------------------------
+
+/**
+ * Why {@link checkKeyEditRejections} refused a pending operation.
+ *
+ * FR-045: "Validation that would create an invalid state MUST **reject the
+ * mutation** rather than emit a finding — notably a dead `T_` key MUST NOT be
+ * creatable, and an in-layer id collision MUST NOT be writable." Rejection is
+ * the counterpart to the reporting path in `touchKeyDiagnostics.ts`: a finding
+ * describes a state that exists, and a rejection is how a state never comes to
+ * exist. The same defect never appears as both.
+ *
+ * - `invalid-identifier` — `0x05A` (`ERROR_TouchLayoutInvalidIdentifier`) for
+ *   AUTHOR-TYPED input. Deliberately emits **no finding at all** (FR-040): the
+ *   only 0x05A finding path is Layer A′ import-fidelity, for ids an imported
+ *   keyboard already contained. Grammar shared with that check via
+ *   `isValidTouchKeyIdentifier`.
+ * - `in-layer-id-collision` — the exact ambiguity `touchKeyAddress` documents as
+ *   unaddressable: two keys with one id on one layer cannot both be named by an
+ *   operation, so committing one is committing an edit that cannot be undone
+ *   precisely.
+ * - `would-create-dead-key` — a `T_*` id with no rule, no `nextlayer`, and a
+ *   producing `sp`. The one reason that can DOWNGRADE; see
+ *   {@link KeyEditRejection.confirmable}.
+ */
+export type KeyEditRejectionReason =
+  | "invalid-identifier"
+  | "in-layer-id-collision"
+  | "would-create-dead-key";
+
+export interface KeyEditRejection {
+  readonly reason: KeyEditRejectionReason;
+  /**
+   * `true` when the block downgrades to **warn-and-confirm**: the author may
+   * proceed after acknowledging it. `false` is a hard block.
+   *
+   * Only `would-create-dead-key` is ever confirmable, and only when the join
+   * cannot see the whole `.kmn` (`ruleIndex.opaqueFragmentCount > 0`, or no
+   * index supplied at all) — because a rule for this id may be sitting inside a
+   * `RawKmnFragment` the codec could not read, which would make the refusal
+   * simply wrong (data-model.md §10).
+   *
+   * The other two reasons never downgrade, and the asymmetry is the point:
+   * `in-layer-id-collision` is a fact about the LAYOUT, which is fully visible —
+   * an opaque `.kmn` fragment cannot hide a second key. `invalid-identifier` is
+   * a fact about the id's own spelling, which nothing can hide either. Applying
+   * the opaque downgrade to those would weaken a sound block for no reason.
+   */
+  readonly confirmable: boolean;
+  /** The id that triggered the rejection — the RESULTING id, not the current one. */
+  readonly keyId: string;
+  /** The operation's own address, echoed so a caller can locate the key it named. */
+  readonly address: string;
+}
+
+export type KeyEditRejectionVerdict =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly rejections: readonly KeyEditRejection[] };
+
+const OK_VERDICT: KeyEditRejectionVerdict = { ok: true };
+
+/** An operation with no `seq` yet — the studio's `PendingKeyEditOperation`, restated structurally so this module needs no studio import. */
+export type UnsequencedKeyEditOperation =
+  | Omit<SetKeyOp, "seq">
+  | Omit<RenameKeyOp, "seq">
+  | Omit<AddKeyOp, "seq">
+  | Omit<RemoveKeyOp, "seq">
+  | Omit<SuppressKeyOp, "seq">
+  | Omit<SetSubKeyOp, "seq">
+  | Omit<RemoveSubKeyOp, "seq">;
+
+/**
+ * The resulting id an operation would write, or `undefined` for the operations
+ * that author no id at all (`remove`, `removeSubKey`, and a `set`/`setSubKey`
+ * patch that happens not to touch `id`).
+ *
+ * `suppress` is deliberately excluded even though it DOES set an id:
+ * {@link applySuppressSemantics} already rejects a non-reserved sentinel, and
+ * every reserved sentinel is by construction a valid identifier, collision-exempt
+ * (several `T_BLANK` keys on one layer is the idiom), and ruleless by design.
+ * Re-checking it here would only produce false rejections.
+ */
+function authoredId(op: UnsequencedKeyEditOperation): string | undefined {
+  switch (op.kind) {
+    case "rename":
+      return op.toId;
+    case "add":
+      return op.key.id;
+    case "set":
+    case "setSubKey":
+      return op.fields.id;
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Check a PENDING operation for mutations that must be refused rather than
+ * committed-and-reported (FR-045). Pure, synchronous, and never throws — a
+ * rejection is an ordinary outcome, matching this module's existing convention
+ * (`resolveKeyAddress`, `applySuppressSemantics`).
+ *
+ * Returns `{ ok: true }` for every operation that authors no id (see
+ * {@link authoredId}) and for every authored id that passes all three checks.
+ *
+ * **`sub`-targeting operations are checked for identifier validity only.** A
+ * `setSubKey` writes an id into an `sk`/`multitap`/`flick` entry, where the
+ * in-layer collision rule does not apply (a sub-entry id is scoped to its
+ * parent, not the layer) and the dead-key rule is Developer's own 0x092 scope
+ * rather than an edit-time invariant — a longpress entry with no rule is
+ * reported by `findDeadTouchKeys`, not refused. Stating that here rather than
+ * silently running the main-key checks against a sub-entry.
+ *
+ * @param layout - The EFFECTIVE layout the operation will apply to.
+ * @param op - The pending operation, before `seq` is assigned.
+ * @param ruleIndex - The touch key/rule join. Omitting it makes the dead-key
+ *   rejection `confirmable` rather than hard, for the same reason an opaque
+ *   fragment does: without the index this function cannot prove a rule is absent.
+ */
+export function checkKeyEditRejections(
+  layout: TouchLayoutIR,
+  op: UnsequencedKeyEditOperation,
+  ruleIndex?: TouchKeyRuleIndex,
+): KeyEditRejectionVerdict {
+  const newId = authoredId(op);
+  if (newId === undefined) return OK_VERDICT;
+
+  const rejections: KeyEditRejection[] = [];
+  const push = (reason: KeyEditRejectionReason, confirmable: boolean): void => {
+    rejections.push({ reason, confirmable, keyId: newId, address: op.address });
+  };
+
+  // 1. 0x05A — the id's own spelling. Checked first, and short-circuits: an id
+  //    the compiler cannot lex is not worth collision- or rule-checking, and
+  //    reporting three reasons for one typo reads as three problems.
+  if (!isValidTouchKeyIdentifier(newId)) {
+    push("invalid-identifier", false);
+    return { ok: false, rejections };
+  }
+
+  if (op.kind === "setSubKey") return OK_VERDICT;
+
+  const parts = parseTouchKeyAddress(op.address);
+  if (parts === undefined) return OK_VERDICT;
+  const layer = findLayer(layout, parts.platform, parts.layerId);
+  // An unresolvable platform/layer is not a rejection: it is an ordinary
+  // reportable miss (an orphan at replay, FR-033b), and refusing the edit here
+  // would turn that into a dead end the author cannot act on.
+  if (layer === undefined) return OK_VERDICT;
+  // Same reasoning one level down, and it is NOT redundant with the layer check:
+  // an operation naming a key the layer does not carry will orphan rather than
+  // mutate, so there is no resulting key for the two state-based checks below to
+  // be about. Without this, such an op read as "a `T_` key with no rule and no
+  // `sp`" — i.e. a dead key — and got refused, which is precisely the dead end
+  // the paragraph above rules out. `add` is included deliberately: its address
+  // names the ANCHOR it inserts beside, so an unresolvable anchor orphans too.
+  if (findMainKey(layer, parts.keyId) === undefined) return OK_VERDICT;
+
+  // 2. In-layer id collision. The current key at this address is excluded — a
+  //    `set` that re-writes a key's own id to what it already is is a no-op, not
+  //    a collision. Exemptions mirror `findDuplicateTouchKeyIds`' first two
+  //    (sentinel/auto-minted ids, and non-interactive classes), because the
+  //    reporting and rejection paths must agree on what counts as a collision:
+  //    a duplicate the detector deliberately does not report must not be a
+  //    duplicate this function refuses.
+  const resultingSp = resultingSpFor(op, layer, parts.keyId);
+  const collisionExempt =
+    isRulelessByConvention(newId) || isSpacerKeyClass(resultingSp);
+  if (!collisionExempt && layerHasOtherKeyWithId(layer, newId, parts.keyId)) {
+    push("in-layer-id-collision", false);
+  }
+
+  // 3. Would create a dead `T_` key. Same predicate set as
+  //    `findDeadTouchKeys` — a state the detector would report as a defect must
+  //    not be reachable by an edit in the first place, which is exactly the
+  //    FR-045/FR-040 division of labour.
+  if (wouldBeDeadKey(newId, op, layer, parts.keyId, ruleIndex)) {
+    const cannotProveAbsence =
+      ruleIndex === undefined || ruleIndex.opaqueFragmentCount > 0;
+    push("would-create-dead-key", cannotProveAbsence);
+  }
+
+  return rejections.length === 0 ? OK_VERDICT : { ok: false, rejections };
+}
+
+type ResolvedLayer = TouchLayoutIR["platforms"][number]["layers"][number];
+
+function findLayer(
+  layout: TouchLayoutIR,
+  platformId: string,
+  layerId: string,
+): ResolvedLayer | undefined {
+  return layout.platforms
+    .find((p) => p.id === platformId)
+    ?.layers.find((l) => l.id === layerId);
+}
+
+/** The main key currently at `keyId` within `layer`, if any. */
+function findMainKey(layer: ResolvedLayer, keyId: string): TouchKeyIR | undefined {
+  for (const row of layer.rows) {
+    const found = row.keys.find((k) => k.id === keyId);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+/** True when some OTHER main key in `layer` already carries `newId` (case-insensitively, matching `kmcmplib` interning). */
+function layerHasOtherKeyWithId(
+  layer: ResolvedLayer,
+  newId: string,
+  currentKeyId: string,
+): boolean {
+  const target = normalizeTouchKeyId(newId);
+  for (const row of layer.rows) {
+    for (const key of row.keys) {
+      if (key.id === currentKeyId) continue;
+      if (normalizeTouchKeyId(key.id) === target) return true;
+    }
+  }
+  return false;
+}
+
+/** The `sp` the key would end up with: the op's own value where it authors one, else the current key's. */
+function resultingSpFor(
+  op: UnsequencedKeyEditOperation,
+  layer: ResolvedLayer,
+  currentKeyId: string,
+): number | undefined {
+  if (op.kind === "add") return op.key.sp;
+  if (op.kind === "set" && op.fields.sp !== undefined) return op.fields.sp;
+  return findMainKey(layer, currentKeyId)?.sp;
+}
+
+/**
+ * The same exemption chain `findDeadTouchKeys` applies, run against the state the
+ * operation WOULD produce rather than against a state that exists.
+ *
+ * `text` and `nextlayer` come from the op where it authors them and from the
+ * current key otherwise, so a `rename` on a key that already has a `nextlayer`
+ * correctly stays exempt.
+ */
+function wouldBeDeadKey(
+  newId: string,
+  op: UnsequencedKeyEditOperation,
+  layer: ResolvedLayer,
+  currentKeyId: string,
+  ruleIndex: TouchKeyRuleIndex | undefined,
+): boolean {
+  if (!isCustomTouchKeyId(newId)) return false;
+  if (normalizeTouchKeyId(newId).startsWith("U_")) return false;
+  if (isRulelessByConvention(newId)) return false;
+
+  const current = findMainKey(layer, currentKeyId);
+  const nextlayer =
+    op.kind === "add"
+      ? op.key.nextlayer
+      : op.kind === "set"
+        ? (op.fields.nextlayer ?? current?.nextlayer)
+        : current?.nextlayer;
+  if (nextlayer !== undefined && nextlayer.length > 0) return false;
+
+  const text =
+    op.kind === "add"
+      ? op.key.text
+      : op.kind === "set"
+        ? (op.fields.text ?? current?.text)
+        : current?.text;
+  if (isFrameKeyLabel(text)) return false;
+
+  const sp = resultingSpFor(op, layer, currentKeyId);
+  if (!isProducingKeyClass(sp)) return false;
+  if (isSpacerKeyClass(sp)) return false;
+
+  // An `add` or `set` that supplies its own `output` is not dead: the key types
+  // that character directly, with no rule needed. `findDeadTouchKeys` has no
+  // equivalent branch because a layout key's `output` is already folded into the
+  // grid's `producedChars` before that detector ever sees it — here the output
+  // is still only a promise in the operation's fields.
+  const output = op.kind === "add" ? op.key.output : op.kind === "set" ? op.fields.output : undefined;
+  if (output !== undefined && output.length > 0) return false;
+
+  // Without an index this cannot be proven either way — reported as a
+  // CONFIRMABLE rejection by the caller above, never as a hard block.
+  if (ruleIndex === undefined) return true;
+  return !hasAnyBinding(ruleIndex, newId);
+}

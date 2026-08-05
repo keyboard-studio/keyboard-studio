@@ -25,6 +25,30 @@ afterEach(() => {
   cleanup();
 });
 
+/**
+ * The grid's LAYOUT rows and KEY cells, as distinct from the per-row
+ * "Fill row / Even out row" control strip, which also carries `role="row"` +
+ * `role="gridcell"` (T123/SC-009: `role="grid"` admits only `row`/`rowgroup`
+ * children, so a plain `<div>` there failed axe's `aria-required-children` at
+ * critical impact — see KeyGrid.tsx's own comment on that strip).
+ *
+ * Layout rows are exactly the rows carrying `aria-rowindex`, and key cells
+ * exactly the cells carrying `aria-colindex`; the control strip deliberately
+ * carries neither, because those indices describe LAYOUT positions and a
+ * control strip has none. Every assertion below that counts rows or cells means
+ * the layout's, so it goes through these two helpers rather than the raw role
+ * query.
+ */
+function layoutRows(): HTMLElement[] {
+  return screen.getAllByRole("row").filter((r) => r.hasAttribute("aria-rowindex"));
+}
+
+function keyCells(): HTMLElement[] {
+  return screen
+    .getAllByRole("gridcell")
+    .filter((c) => c.hasAttribute("aria-colindex"));
+}
+
 const EMPTY_ANNOTATIONS: KeyGridAnnotationCounts = {
   longpress: 0,
   multitap: 0,
@@ -91,6 +115,58 @@ function manyKeyViewModel(count: number): KeyGridViewModel {
 }
 
 describe("KeyGrid — ARIA grid structure", () => {
+  // Regression guard for the T123/SC-009 finding: the per-row "Fill row / Even
+  // out row" strip was a plain <div> child of role="grid", which axe rates a
+  // CRITICAL `aria-required-children` violation (role="grid" admits only
+  // row/rowgroup children; role="row" only gridcell/columnheader/rowheader).
+  //
+  // The axe scan that found it lives in `e2e/touch-key-grid-a11y.spec.ts`, and
+  // e2e is deliberately OUT of the unit CI lane — so without this test the
+  // invariant is only checked by a suite nobody runs on a PR. Asserted
+  // structurally here (children carry an allowed role, or are decorative and
+  // aria-hidden) rather than by re-running axe, which would drag a browser into
+  // the fast lane.
+  it("every child of the grid is a row, and every child of a row is a cell or decorative — the invariant axe enforces", () => {
+    const vm = makeViewModel([
+      // Two keys and slack, so BOTH row-action buttons render and the
+      // decorative pad/slack spacers are present too — i.e. the fixture
+      // actually contains the elements this invariant is about.
+      makeRow([makeCell({ id: "K1" }), makeCell({ id: "K2" })], 40),
+      makeRow([makeCell({ id: "K3" })]),
+    ]);
+
+    const { container } = render(
+      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+    );
+
+    const grid = container.querySelector('[role="grid"]');
+    expect(grid).toBeTruthy();
+
+    const decorative = (el: Element) => el.getAttribute("aria-hidden") === "true";
+
+    for (const child of Array.from(grid!.children)) {
+      expect(
+        child.getAttribute("role") === "row" || decorative(child),
+        `grid child <${child.tagName.toLowerCase()} role=${child.getAttribute("role")}> is neither a row nor decorative`,
+      ).toBe(true);
+    }
+
+    const allRows = grid!.querySelectorAll('[role="row"]');
+    expect(allRows.length).toBeGreaterThan(0);
+    for (const row of Array.from(allRows)) {
+      for (const child of Array.from(row.children)) {
+        expect(
+          child.getAttribute("role") === "gridcell" || decorative(child),
+          `row child <${child.tagName.toLowerCase()} role=${child.getAttribute("role")}> is neither a gridcell nor decorative`,
+        ).toBe(true);
+      }
+    }
+
+    // And the control strip really was in this fixture — otherwise the loops
+    // above pass by not encountering the case they exist for.
+    expect(container.querySelector('[data-testid="key-grid-row-actions-0"]')).toBeTruthy();
+  });
+
   it("renders role=grid on the container, role=row per row, role=gridcell per key", () => {
     const vm = makeViewModel([
       makeRow([makeCell({ id: "K1" }), makeCell({ id: "K2" })]),
@@ -102,8 +178,8 @@ describe("KeyGrid — ARIA grid structure", () => {
     );
 
     expect(screen.getByRole("grid")).toBeTruthy();
-    expect(screen.getAllByRole("row")).toHaveLength(2);
-    expect(screen.getAllByRole("gridcell")).toHaveLength(3);
+    expect(layoutRows()).toHaveLength(2);
+    expect(keyCells()).toHaveLength(3);
   });
 
   it("sets aria-rowindex per row (1-based) and aria-colindex per key within its row (1-based, counting only actual keys)", () => {
@@ -116,7 +192,7 @@ describe("KeyGrid — ARIA grid structure", () => {
       <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
-    const rows = screen.getAllByRole("row");
+    const rows = layoutRows();
     expect(rows[0]?.getAttribute("aria-rowindex")).toBe("1");
     expect(rows[1]?.getAttribute("aria-rowindex")).toBe("2");
 
@@ -169,7 +245,7 @@ describe("KeyGrid — single Tab stop (FR-020a)", () => {
       />,
     );
 
-    const gridcells = screen.getAllByRole("gridcell");
+    const gridcells = keyCells();
     expect(gridcells).toHaveLength(300);
     const tabbable = gridcells.filter(
       (el) => el.getAttribute("tabindex") === "0",
@@ -219,7 +295,7 @@ describe("KeyGrid — single Tab stop (FR-020a)", () => {
       <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
-    const gridcells = screen.getAllByRole("gridcell");
+    const gridcells = keyCells();
     const tabbable = gridcells.filter(
       (el) => el.getAttribute("tabindex") === "0",
     );
@@ -267,11 +343,11 @@ describe("KeyGrid — single Tab stop (FR-020a)", () => {
     );
 
     expect(screen.getByRole("grid").getAttribute("tabindex")).toBe("-1");
-    for (const rowEl of screen.getAllByRole("row")) {
+    for (const rowEl of layoutRows()) {
       expect(rowEl.getAttribute("tabindex")).toBe("-1");
     }
 
-    const gridcells = screen.getAllByRole("gridcell");
+    const gridcells = keyCells();
     const tabbable = gridcells.filter(
       (el) => el.getAttribute("tabindex") === "0",
     );
@@ -363,7 +439,7 @@ describe("KeyGrid — proportional geometry from padPct/widthPct (FR-022)", () =
     // "button" role for the accessibility tree, per APG) — no separate
     // resize-handle control exists this increment. The pad spacer must
     // never itself be a button/input.
-    expect(screen.getAllByRole("gridcell")).toHaveLength(1);
+    expect(keyCells()).toHaveLength(1);
     expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(screen.getByTestId("key-grid-pad-phone:default:K1").tagName).toBe(
       "SPAN",
@@ -536,7 +612,7 @@ describe("KeyGrid — Fill row / Even out row (T100, FR-022, FR-039)", () => {
       <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
-    const rowEl = screen.getAllByRole("row")[0];
+    const rowEl = layoutRows()[0];
     expect(
       rowEl?.querySelector('[data-testid="key-grid-fill-row-0"]'),
     ).toBeNull();
@@ -800,7 +876,7 @@ describe("KeyGrid — windowing (T067, FR-020j)", () => {
       />,
     );
 
-    const gridcells = screen.getAllByRole("gridcell");
+    const gridcells = keyCells();
     // Real, meaningful bound: comfortably under the full 1000 keys, and no
     // more than the budget plus one row's worth of rounding slack (rows are
     // mounted whole, never split).
@@ -821,7 +897,7 @@ describe("KeyGrid — windowing (T067, FR-020j)", () => {
       />,
     );
 
-    const gridcells = screen.getAllByRole("gridcell");
+    const gridcells = keyCells();
     const tabbable = gridcells.filter(
       (el) => el.getAttribute("tabindex") === "0",
     );
@@ -837,7 +913,7 @@ describe("KeyGrid — windowing (T067, FR-020j)", () => {
       <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
-    const gridcells = screen.getAllByRole("gridcell");
+    const gridcells = keyCells();
     const tabbable = gridcells.filter(
       (el) => el.getAttribute("tabindex") === "0",
     );
@@ -861,7 +937,7 @@ describe("KeyGrid — windowing (T067, FR-020j)", () => {
 
     const grid = screen.getByRole("grid");
     expect(Number(grid.getAttribute("aria-rowcount"))).toBe(vm.rows.length);
-    expect(screen.getAllByRole("row").length).toBeLessThan(vm.rows.length);
+    expect(layoutRows().length).toBeLessThan(vm.rows.length);
   });
 
   it("does not window a layout at or under the visible-key budget — every row still mounts (regression guard against over-eager windowing)", () => {
@@ -870,7 +946,7 @@ describe("KeyGrid — windowing (T067, FR-020j)", () => {
       <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
-    expect(screen.getAllByRole("gridcell")).toHaveLength(MAX_VISIBLE_KEY_COUNT);
+    expect(keyCells()).toHaveLength(MAX_VISIBLE_KEY_COUNT);
     expect(screen.getByRole("grid").getAttribute("aria-rowcount")).toBe(
       String(vm.rows.length),
     );
@@ -1120,10 +1196,10 @@ describe("KeyGridCell — the pointer paths (T111, FR-021)", () => {
     }
     // Still exactly one gridcell and zero exposed buttons: the explicit
     // role="gridcell" on the cell <button> is the only interactive node.
-    expect(screen.getAllByRole("gridcell")).toHaveLength(1);
+    expect(keyCells()).toHaveLength(1);
     expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(
-      screen.getAllByRole("gridcell").filter((c) => c.getAttribute("tabindex") === "0"),
+      keyCells().filter((c) => c.getAttribute("tabindex") === "0"),
     ).toHaveLength(1);
   });
 
