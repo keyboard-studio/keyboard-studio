@@ -2445,8 +2445,13 @@ describe("SurveyView — traversal survives a route round trip (spec 057 FR-002)
 describe("SurveyView — a reset happens only on an explicit start-over (spec 057 FR-003)", () => {
   it("the corner reset control clears traversal back to identity", async () => {
     useSurveySessionStore.getState().reset();
+    // The reset control lives in the NavBar (StudioShell chrome), not in
+    // SurveyView — so mount the full shell on #survey (as a returning visitor,
+    // to clear the first-visit welcome gate) rather than SurveyView alone.
+    window.location.hash = "#survey";
+    localStorage.setItem("ks.visited", "1");
     await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
+      render(<StudioShell />);
     });
     advanceToTrack();
     expect(useSurveySessionStore.getState().activeStepId).toBe("track");
