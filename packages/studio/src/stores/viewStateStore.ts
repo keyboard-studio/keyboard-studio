@@ -17,7 +17,7 @@
 // could change an emitted artifact does not belong in this file.
 //
 // `reset()` is called from exactly the two existing start-over paths —
-// `StudioShell.handleStartOver()` and WelcomeScreen's "I'm new" — so view
+// `StudioShell.handleStartOver()` and WelcomeScreen's "Continue as guest" — so view
 // state is cleared with the session it belongs to and never outlives it
 // (FR-052).
 

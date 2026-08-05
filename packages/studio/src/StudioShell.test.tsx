@@ -1160,7 +1160,7 @@ describe("StudioShell — first-visit landing gate", () => {
 
     // A newcomer is forced onto welcome even on a deep-linked #survey hash, and
     // that hash is normalized to #welcome. Without this normalization the
-    // WelcomeScreen "I'm new" button's navigateTo("survey") would be a
+    // WelcomeScreen "Continue as guest" button's navigateTo("survey") would be a
     // same-value hash assignment that fires zero hashchange events, soft-locking
     // the user on welcome.
     expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
@@ -2476,7 +2476,7 @@ describe("SurveyView — a reset happens only on an explicit start-over (spec 05
 //
 // Defect D-9: `hashToRoute` forces a genuine newcomer onto `#welcome` and
 // rewrites the address bar to match, DISCARDING whatever location was
-// requested. That rewrite is load-bearing (without it, "I'm new"'s
+// requested. That rewrite is load-bearing (without it, "Continue as guest"'s
 // `navigateTo("survey")` would be a same-value hash assignment firing zero
 // hashchange events, soft-locking the visitor on welcome), so the fix is not
 // to remove it but to hold the requested location across it — see
