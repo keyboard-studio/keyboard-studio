@@ -174,9 +174,47 @@ the store fully. Consequence: a keyboard **derived from a base** likely already 
 base's `COPYRIGHT` through parse → emit, because stubs are write-if-absent and the base's
 `.kmn` is used instead; a keyboard from the bare stub path gets none.
 
-**This needs verifying before implementation** — it changes how much of US2 is already
-working, and it means the `.kmn` may currently be *more* correct than `LICENSE.md` for derived
-keyboards. Recorded as a task, not assumed.
+### D8 VERIFIED 2026-08-04 — the inference above was WRONG, and the truth is worse
+
+Task T010 measured it instead of assuming. The `.kmn` is **not** more correct than `LICENSE.md`;
+it is actively destructive. `resetIdentity`
+([scaffold-ir.ts:174](../../packages/engine/src/scaffolder/scaffold-ir.ts)) **overwrites** the
+parsed copyright:
+
+```ts
+const copyright = identity.copyright ?? `Copyright © ${currentYear()} ${displayName}`;
+...
+ir.header.copyright = copyright;
+setSystemStore(ir, "COPYRIGHT", kmnStringEscape(copyright));
+```
+
+Observed end to end (parse → scaffoldIR → emit) against a base carrying
+`store(&COPYRIGHT) '© 2016-2021 Original Author'`:
+
+| Stage | `header.copyright` |
+|---|---|
+| after `parse()` | `© 2016-2021 Original Author` |
+| after `scaffoldIR()` | `Copyright © 2026 My Keyboard` |
+| emitted `.kmn` store | `store(&COPYRIGHT) 'Copyright © 2026 My Keyboard'` |
+| original author retained? | **NO — stripped** |
+
+**Three consequences that change the work:**
+
+1. **There are TWO fabrication sites, not one.** `scaffolder/index.ts:352` (`LICENSE.md`) and
+   `scaffold-ir.ts:174` (the `.kmn` store) independently build the same wrong
+   `Copyright © <year> <displayName>` string. FR-003's single source of truth must replace both,
+   or they will keep drifting exactly as the 22 corpus keyboards already do.
+2. **A real notice is destroyed, not merely absent.** `parse()` reads the base's copyright
+   correctly and `resetIdentity` then discards it. The MIT retention problem is therefore live
+   in the `.kmn` today, not only in `LICENSE.md` — which raises US2's severity from "missing
+   provenance" to "strips an existing notice".
+3. **The fix has a seam that already exists.** `identity.copyright` is an optional field on
+   `ScaffoldIRIdentity`, and passing it overrides the fabricated default — verified in the same
+   run. No new plumbing through `scaffoldIR` is needed; the work is computing the right value.
+
+**Correction to D2**: `currentYear()` is called inside `resetIdentity`, which runs at *scaffold*
+time. So the wrong-year bug is real in the `.kmn` as well as in `LICENSE.md`, and D2's move to
+emit-time must cover both sites.
 
 ---
 
@@ -210,5 +248,5 @@ input. No license detection (FR-005).
 | D5 | OQ-5 | Unparseable base license blocks emission, with manual-entry escape hatch; both paths |
 | D6 | OQ-6 | Guests must type an author name; no placeholder emitted |
 | D7 | — | Retain `name`/`email` from the `/user` call already made |
-| D8 | — | Populate `header.copyright`; codec already emits the store (verify current behaviour) |
+| D8 | — | **VERIFIED**: `resetIdentity` OVERWRITES the base's copyright, stripping a real notice. Two fabrication sites, not one. Fix via the existing `identity.copyright` seam |
 | D9 | — | Copyright as data; pure parse/render; one canonical MIT body |

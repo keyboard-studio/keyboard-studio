@@ -4,10 +4,12 @@
 // own factory (makeX) and any related Init type. Alphabetized within group.
 // ---------------------------------------------------------------------------
 export * from "./assignmentMap";
+export * from "./attribution";
 export * from "./axes";
 export * from "./axisFill";
 export * from "./baseKeyboard";
 export * from "./compileResult";
+export * from "./copyright";
 export * from "./criteria";
 export * from "./keyboard-ir";
 export * from "./keyboardId";

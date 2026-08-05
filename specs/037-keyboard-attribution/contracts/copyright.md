@@ -92,6 +92,35 @@ Each line renders as `Copyright <marker> <years> <name>`, where `years` is:
 
 The body is one frozen constant, BOM-free, byte-identical across every keyboard (FR-005).
 
+## P6b — Inherited lines re-emit VERBATIM from `raw` *(amended 2026-08-04 by implementation)*
+
+The original contract assumed `{name, years, marker}` could reconstruct any line. **Implementing
+against the harvested corpus disproved that.** Three real shapes break it:
+
+```
+release/fv/fv_dakelh   Copyright (c) 2008-2024 FirstVoices, SIL International. Portions (c) 2006 Chris Harvey
+release/e/ekwtamil99uni Copyright (c) 2008, 2015, 2018-2023 thamiza.com and SIL International
+release/e/enga          Copyright © Copyright 2019 Stanley Stanis Kaka, Marc Durdin
+```
+
+The first has **two markers and two year groups** (32+ keyboards share the shape); the second
+**mixes a comma list with a range**; the third repeats the word *Copyright*. No triple
+reproduces any of them byte-for-byte, so reconstruction would silently rewrite a legal notice —
+exactly what FR-007 forbids.
+
+**Amendment**: `CopyrightHolder` gains an optional `raw` field holding the verbatim source line.
+
+- Set when parsed from an existing file; **absent** for holders this tool authors.
+- `renderHolderLine` returns `raw` unchanged when present.
+- `name` and `years` are still populated best-effort, because D3 ordering and P8 dedupe need
+  them — they simply are not the rendering source for inherited lines.
+- **`raw` is dropped when that holder's years change** (the same holder deriving again), because
+  the retained line no longer states the new range and would re-emit a stale notice.
+
+Two consequences for testing: `parse(render(x))` compares on `{name, years, marker}` rather than
+including `raw` (parsed output is always `inherited: true`), and a separate assertion checks
+verbatim re-emission for every harvested line.
+
 ## P7 — Round-trip stability
 
 ```ts
