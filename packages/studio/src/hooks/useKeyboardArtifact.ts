@@ -12,6 +12,7 @@ export { LOCAL_PROXY_BASE };
 import { findKmnPath } from "../lib/findKmnPath.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
 import { readVfsText } from "../lib/vfsText.ts";
+import { importOrReload, recoverFromStaleChunk } from "../lib/staleChunkReload.ts";
 
 interface EngineModule {
   compile: (fs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
@@ -44,8 +45,8 @@ interface EngineModule {
 
 async function loadEngine(): Promise<EngineModule | null> {
   try {
-    const mod = await import(
-      /* @vite-ignore */ "@keyboard-studio/engine"
+    const mod = await importOrReload(() =>
+      import(/* @vite-ignore */ "@keyboard-studio/engine"),
     );
     if (
       typeof mod.compile === "function" &&
@@ -543,6 +544,11 @@ export function useKeyboardArtifact(
     try {
       await engineReadyPromise.current;
     } catch (err: unknown) {
+      // A deployment that landed while this tab was open deletes the hashed
+      // chunk the engine (and, through it, kmc-kmn) is imported from, so the
+      // load fails with a module-script/MIME error no retry in this document
+      // can fix. Reload instead of stranding the preview on "VFS load failed".
+      if (recoverFromStaleChunk(err)) return;
       if (runId.current !== thisRunId) return;
       const message =
         err instanceof Error ? err.message : "WASM engine failed to load";

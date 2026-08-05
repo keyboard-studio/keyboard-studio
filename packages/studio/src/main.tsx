@@ -11,9 +11,10 @@ import {
 } from "./lib/handleOAuthCallback.ts";
 import { rehydrateWorkingCopyFromSession } from "./lib/persistWorkingCopy.ts";
 import { installE2eHook } from "./lib/e2eHook.ts";
-import { loadDraft, resolveActiveProjectKey } from "./lib/draftPersistence.ts";
+import { flushActiveDraft, loadDraft, resolveActiveProjectKey } from "./lib/draftPersistence.ts";
 import { localeReady } from "./lib/i18n.ts";
 import { warmExemplarSource } from "./lib/services.ts";
+import { installStaleChunkRecovery } from "./lib/staleChunkReload.ts";
 
 function requireRoot(): HTMLElement {
   const rootEl = document.getElementById("root");
@@ -105,6 +106,13 @@ async function mountCallbackScreen(provider: OAuthProvider): Promise<void> {
     </StrictMode>,
   );
 }
+
+// A deployment replaces every hashed chunk, so a tab open across one asks for
+// asset names the server no longer has and every lazy import it has not already
+// resolved fails for the rest of the tab's life. Installed before either mount
+// so the boot-time lazy loads (locale catalog, exemplar warm-up) are covered
+// too. See lib/staleChunkReload.ts.
+installStaleChunkRecovery({ beforeReload: flushActiveDraft });
 
 // OAuth (spec §12): the studio is hash-routed, so the /oauth/callback and
 // /oauth/google/callback redirects are handled here at boot rather than by a

@@ -35,8 +35,22 @@ import {
   getPatternLibraryService as getBrowserPatternLibraryService,
   getPatternByIdSync as getBrowserPatternByIdSync,
 } from "./browserPatternLibrary.ts";
+import { importOrReload } from "./staleChunkReload.ts";
 
 export const USE_REAL = import.meta.env.VITE_USE_REAL_ENGINE !== "false";
+
+// Single lazy-import seam for the engine barrel. Every accessor below routes
+// through it so (a) there is one `import()` expression for Vite to key the
+// engine chunk on, and (b) a chunk a deployment deleted under an open tab is
+// recovered by a reload instead of surfacing as an unfixable MIME/module-script
+// error on whichever accessor the author happened to reach first. See
+// lib/staleChunkReload.ts.
+type EngineModule = typeof import("@keyboard-studio/engine");
+function importEngine(): Promise<EngineModule> {
+  return importOrReload(
+    () => import(/* @vite-ignore */ "@keyboard-studio/engine"),
+  );
+}
 
 // Re-export the proxy base for callers that need it (e.g. scaffolder).
 export { LOCAL_PROXY_BASE };
@@ -60,9 +74,7 @@ let scaffolderCache: ScaffolderService | null = null;
 export async function getScaffolderService(): Promise<ScaffolderService> {
   if (!USE_REAL) return mockScaffolder;
   if (scaffolderCache !== null) return scaffolderCache;
-  const { createScaffolderService } = await import(
-    /* @vite-ignore */ "@keyboard-studio/engine"
-  );
+  const { createScaffolderService } = await importEngine();
   scaffolderCache = createScaffolderService({ proxyBase: LOCAL_PROXY_BASE });
   return scaffolderCache;
 }
@@ -99,9 +111,7 @@ export async function getCharacterDiscoveryService(): Promise<CharacterDiscovery
     return stub;
   }
   if (charDiscoveryCache !== null) return charDiscoveryCache;
-  const { createCharacterDiscoveryService, createFetchCldrLoader } = await import(
-    /* @vite-ignore */ "@keyboard-studio/engine"
-  );
+  const { createCharacterDiscoveryService, createFetchCldrLoader } = await importEngine();
   const loader = createFetchCldrLoader();
   const noopCompleter = async (): Promise<string> => { throw new Error("LLM completer not configured"); };
   charDiscoveryCache = createCharacterDiscoveryService(loader, noopCompleter);
@@ -120,7 +130,7 @@ let toZipCache: ToZipFn | null = null;
 export async function getToZip(): Promise<ToZipFn> {
   if (!USE_REAL) return mockOutputService.toZip.bind(mockOutputService);
   if (toZipCache !== null) return toZipCache;
-  const { toZip } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
+  const { toZip } = await importEngine();
   toZipCache = toZip as ToZipFn;
   return toZipCache;
 }
@@ -148,7 +158,7 @@ export async function getBuildKmp(): Promise<BuildKmpFn> {
     );
   }
   if (buildKmpCache !== null) return buildKmpCache;
-  const { buildKmp } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
+  const { buildKmp } = await importEngine();
   buildKmpCache = buildKmp as BuildKmpFn;
   return buildKmpCache;
 }
@@ -170,7 +180,7 @@ export async function getCompile(): Promise<CompileFn> {
     );
   }
   if (compileCache !== null) return compileCache;
-  const { compile } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
+  const { compile } = await importEngine();
   compileCache = compile as CompileFn;
   return compileCache;
 }
@@ -186,9 +196,7 @@ type EnsurePackageFilesFn = (input: {
 let ensurePackageFilesCache: EnsurePackageFilesFn | null = null;
 export async function getEnsurePackageFiles(): Promise<EnsurePackageFilesFn> {
   if (ensurePackageFilesCache !== null) return ensurePackageFilesCache;
-  const { ensurePackageFiles } = await import(
-    /* @vite-ignore */ "@keyboard-studio/engine"
-  );
+  const { ensurePackageFiles } = await importEngine();
   ensurePackageFilesCache = ensurePackageFiles as EnsurePackageFilesFn;
   return ensurePackageFilesCache;
 }
@@ -206,9 +214,7 @@ let gitHubOutputServiceCache: GitHubOutputService | null = null;
 export async function getGitHubOutputService(): Promise<GitHubOutputService> {
   if (!USE_REAL) return mockOutputService;
   if (gitHubOutputServiceCache !== null) return gitHubOutputServiceCache;
-  const { createGitHubOutputService } = await import(
-    /* @vite-ignore */ "@keyboard-studio/engine"
-  );
+  const { createGitHubOutputService } = await importEngine();
   gitHubOutputServiceCache = createGitHubOutputService();
   return gitHubOutputServiceCache;
 }
@@ -228,9 +234,7 @@ let managedPROutputServiceCache: ManagedPROutputService | null = null;
 export async function getManagedPROutputService(): Promise<ManagedPROutputService> {
   if (!USE_REAL) return mockOutputService;
   if (managedPROutputServiceCache !== null) return managedPROutputServiceCache;
-  const { createManagedPROutputService } = await import(
-    /* @vite-ignore */ "@keyboard-studio/engine"
-  );
+  const { createManagedPROutputService } = await importEngine();
   managedPROutputServiceCache = createManagedPROutputService();
   return managedPROutputServiceCache;
 }
@@ -270,9 +274,7 @@ export async function suggestMissingChars(
 ): Promise<MissingCharSuggestions | null> {
   if (!USE_REAL) return null;
   if (suggestEngineCache === null) {
-    const { suggestMissingCharacters } = await import(
-      /* @vite-ignore */ "@keyboard-studio/engine"
-    );
+    const { suggestMissingCharacters } = await importEngine();
     suggestEngineCache = suggestMissingCharacters;
   }
   const fn = suggestEngineCache;
@@ -290,7 +292,7 @@ export async function suggestMissingChars(
 // problem, only a latency one.
 export async function warmExemplarSource(): Promise<void> {
   if (!USE_REAL) return;
-  const { loadExemplarSource } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
+  const { loadExemplarSource } = await importEngine();
   await loadExemplarSource();
 }
 
@@ -300,9 +302,7 @@ export async function warmExemplarSource(): Promise<void> {
 // the exemplar option entirely rather than offering an empty one.
 export async function sourcedExemplars(bcp47: string): Promise<SourcedInventory | null> {
   if (!USE_REAL) return null;
-  const { loadExemplarSource, sourceExemplars } = await import(
-    /* @vite-ignore */ "@keyboard-studio/engine"
-  );
+  const { loadExemplarSource, sourceExemplars } = await importEngine();
   await loadExemplarSource();
   return sourceExemplars(bcp47);
 }
@@ -343,7 +343,7 @@ export async function characterMapGroups(
 ): Promise<CharacterMapGroup[]> {
   if (!USE_REAL) return [];
   if (characterMapEngineCache === null) {
-    const { buildCharacterMap } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
+    const { buildCharacterMap } = await importEngine();
     characterMapEngineCache = buildCharacterMap;
   }
   return characterMapEngineCache(baseIr, bcp47, languageName, {
@@ -366,9 +366,7 @@ let neededCharsEngineCache: NeededCharsEngineFn | null = null;
 export async function neededCharsForLanguage(bcp47: string): Promise<Set<string> | null> {
   if (!USE_REAL) return null;
   if (neededCharsEngineCache === null) {
-    const { neededCharsForLanguage: engineNeededCharsForLanguage } = await import(
-      /* @vite-ignore */ "@keyboard-studio/engine"
-    );
+    const { neededCharsForLanguage: engineNeededCharsForLanguage } = await importEngine();
     neededCharsEngineCache = engineNeededCharsForLanguage;
   }
   const fn = neededCharsEngineCache;
