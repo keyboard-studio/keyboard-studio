@@ -51,6 +51,17 @@ function TestPane({
       <div data-testid="expanded-chooser" aria-expanded="true">
         <span data-testid="expanded-child">expanded</span>
       </div>
+      {/* Stands in for the touch key-editor's key grid (T064) and the
+          key-edit overlay's grid/simulator mode selector (T072) — both are
+          arrow-key-consuming widgets registered in SKIP_SELECTOR per
+          FR-020f / R10.7. Without BOTH entries the pane handler silently
+          eats one or the other's arrows (T069). */}
+      <div data-testid="key-grid" role="grid">
+        <span data-testid="key-grid-child">grid cell</span>
+      </div>
+      <div data-testid="mode-tablist" role="tablist">
+        <span data-testid="mode-tablist-child">tab</span>
+      </div>
     </div>
   );
 }
@@ -240,6 +251,10 @@ describe("useCharCycleKeys — ArrowLeft/ArrowRight cycle selection at the pane 
       ["a descendant of an open combobox", "combobox-child"],
       ["an element with aria-expanded=true", "expanded-chooser"],
       ["a descendant of an aria-expanded=true element", "expanded-child"],
+      ["a role=grid element (the touch key grid)", "key-grid"],
+      ["a descendant of a role=grid element", "key-grid-child"],
+      ["a role=tablist element (the mode selector)", "mode-tablist"],
+      ["a descendant of a role=tablist element", "mode-tablist-child"],
     ])("does not cycle or preventDefault when the keydown originates from %s", (_label, testId) => {
       const onSelectChar = vi.fn();
       render(<TestPane chars={["a", "b", "c"]} currentChar="b" onSelectChar={onSelectChar} />);
@@ -248,6 +263,38 @@ describe("useCharCycleKeys — ArrowLeft/ArrowRight cycle selection at the pane 
 
       expect(onSelectChar).not.toHaveBeenCalled();
       expect(event.defaultPrevented).toBe(false);
+    });
+  });
+
+  describe("T069 regression: BOTH role=grid and role=tablist must be registered — one without the other is the exact defect", () => {
+    it("a role=grid descendant's ArrowLeft is left alone (grid's own horizontal nav is not eaten)", () => {
+      const onSelectChar = vi.fn();
+      render(<TestPane chars={["a", "b", "c"]} currentChar="b" onSelectChar={onSelectChar} />);
+
+      const event = dispatchKeyDown(screen.getByTestId("key-grid-child"), "ArrowLeft");
+
+      expect(onSelectChar).not.toHaveBeenCalled();
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it("a role=tablist descendant's ArrowRight is left alone (the mode selector's own tab nav is not eaten)", () => {
+      const onSelectChar = vi.fn();
+      render(<TestPane chars={["a", "b", "c"]} currentChar="b" onSelectChar={onSelectChar} />);
+
+      const event = dispatchKeyDown(screen.getByTestId("mode-tablist-child"), "ArrowRight");
+
+      expect(onSelectChar).not.toHaveBeenCalled();
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it("an ordinary (non-grid, non-tablist) descendant's ArrowRight is STILL cycled by the pane handler", () => {
+      const onSelectChar = vi.fn();
+      render(<TestPane chars={["a", "b", "c"]} currentChar="b" onSelectChar={onSelectChar} />);
+
+      dispatchKeyDown(screen.getByTestId("other-control"), "ArrowRight");
+
+      expect(onSelectChar).toHaveBeenCalledTimes(1);
+      expect(onSelectChar).toHaveBeenCalledWith("c");
     });
   });
 });

@@ -117,6 +117,14 @@ Three items noted in the spec's Revision policy (Sec 18) — Risk/dependencies s
 
   **Not the `Pattern` schema.** Verified: `MentalModelAnswer` was declared in `packages/engine/src/marks/mental-model-prefill.ts`, is absent from `packages/contracts/src/pattern.ts`, and had no zod mirror or drift guard in `packages/contracts/src/schemas.ts`. Constitution Article I's stop-and-escalate therefore does not fire; the §18 process still applies and is discharged by this record. Does not reopen any resolved decision (D1–D14). **Reviewed by:** Matthew Lee (contract authority, §18), engine + content jointly. **Date:** 2026-07-29.
 
+- **2026-08-03 (§18 contract change — `TouchKeyIR.layer` + subkey `default`, spec 058):** Ratified by **Matthew Lee** (contract authority) during the [specs/058-touch-key-editor](../specs/058-touch-key-editor/spec.md) specify clarification pass.
+
+  **Decision.** Two **additive optional fields** join `TouchKeyIR` in `@keyboard-studio/contracts` ([keyboard-ir.ts](../packages/contracts/src/keyboard-ir.ts)), taken **together in one locked-type change**, with the matching zod-mirror updates in `schemas.ts` (Art. I drift guards): `layer?: string` — the per-key **modifier override** for the emitted key event, distinct from `nextlayer` (which switches the displayed layer); 11,593 corpus keys carry it, overwhelmingly to disambiguate two keys sharing an id within one layer (058 FR-030) — and the subkey **`default`** field (longpress preselect). Both are real serialized wire fields that [parseTouchLayout.ts](../packages/contracts/src/parseTouchLayout.ts) currently **drops silently** — the identical defect class — which is why they land as one change rather than two.
+
+  **Rationale.** Without `layer`, Case A collapses legitimately-duplicated key ids into indistinguishable duplicates, a duplicate-id check is unimplementable on `TouchLayoutIR`, and the studio could add a key that `touchKeyAddress` cannot stably address. Rejected: the raw-preservation fallback in [specs/058-touch-key-editor/contracts/touch-key-rule-join.md](../specs/058-touch-key-editor/contracts/touch-key-rule-join.md) (leaves FR-030 and the duplicate-id diagnostic weakened), and taking `layer` alone (leaves a second known silent-drop field for an inevitable later §18 round-trip).
+
+  **Bump.** Purely additive — no existing field renamed, removed, or retyped — so the change rides the contracts package's established 0ver-minor convention for locked-surface changes (0.11.0 IRPath, 0.12.0 `TouchKeyIR.provenance`, 0.13.0 touch schemas); the exact version is fixed when the change lands on the 058 feature branch. Does not reopen any resolved decision (D1–D14); Decision 6 is not engaged (see the 058 spec's "Relationship to spec 035"). **Reviewed by:** Matthew Lee (contract authority, §18). **Date:** 2026-08-03.
+
 ---
 
 ## Sign-Off

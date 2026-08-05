@@ -15,8 +15,30 @@
 //     the app bootstrap (main.tsx).
 
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { projectWorkingCopyForOutput } from "./serializeWorkingCopy.ts";
 import { readEnvFlag } from "./envFlag.ts";
-import type { KeyboardIR } from "@keyboard-studio/contracts";
+import type { KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
+
+/**
+ * A whole VFS reduced to `path -> exact content`, for the byte-identity half of
+ * spec 058 SC-006 (T112). Text entries map to their string content verbatim;
+ * BINARY entries map to a `"bin:"`-prefixed byte list, which is byte-exact
+ * rather than a digest so an equality comparison needs no hashing (and no
+ * async `crypto.subtle`) inside a Playwright `evaluate`. The keyboard corpus's
+ * binaries are icons and bitmaps of a few KB, so the encoding stays cheap.
+ */
+export type KsE2EFileSnapshot = Readonly<Record<string, string>>;
+
+function snapshotVfs(vfs: VirtualFS): KsE2EFileSnapshot {
+  const out: Record<string, string> = {};
+  for (const entry of vfs.entries()) {
+    out[entry.path] =
+      typeof entry.content === "string"
+        ? entry.content
+        : `bin:${Array.from(entry.content).join(",")}`;
+  }
+  return out;
+}
 
 export interface KsE2EHook {
   /** The live working-copy IR (pre-carve-filter), or null before instantiation. */
@@ -38,6 +60,21 @@ export interface KsE2EHook {
    * clears them.
    */
   getPhaseResultsCount: () => number;
+  /**
+   * The SHIPPED SOURCE as instantiated — a snapshot of the store's `baseVfs`,
+   * before any projection layer. Null before instantiation. Added for spec 058
+   * SC-006 (T112), which has to compare "what the base shipped" against "what
+   * we emit" for every file the author never touched.
+   */
+  snapshotBaseFiles: () => KsE2EFileSnapshot | null;
+  /**
+   * The EMITTED ARTIFACT — a snapshot of the fully projected output VFS, i.e.
+   * exactly what `serializeWorkingCopy` would zip. Runs the same
+   * `projectWorkingCopyForOutput` the download path uses, so a test can never
+   * pass against a projection the real output does not perform. Null before
+   * instantiation. Async because the projection resolves patterns.
+   */
+  snapshotOutputFiles: () => Promise<KsE2EFileSnapshot | null>;
 }
 
 declare global {
@@ -62,5 +99,13 @@ export function installE2eHook(): void {
     getDeletedNodeIds: () => [...useWorkingCopyStore.getState().deletedNodeIds],
     getBaseKeyboardId: () => useWorkingCopyStore.getState().baseKeyboard?.id ?? null,
     getPhaseResultsCount: () => useWorkingCopyStore.getState().phaseResults.length,
+    snapshotBaseFiles: () => {
+      const { baseVfs } = useWorkingCopyStore.getState();
+      return baseVfs === null ? null : snapshotVfs(baseVfs);
+    },
+    snapshotOutputFiles: async () => {
+      const projected = await projectWorkingCopyForOutput();
+      return projected === null ? null : snapshotVfs(projected.vfs);
+    },
   };
 }
