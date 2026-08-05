@@ -3,6 +3,11 @@
 Three ways a user can submit a finished keyboard to `keymanapp/keyboards`.
 The studio should offer all three; users pick at output time.
 
+Distinct from all three: the **installable `.kmp` download**, which puts the
+keyboard on the author's own machine rather than upstream. It is the primary
+button on the Output screen, and its status lives in the Status section below —
+but it publishes nothing, so it is not a fourth submission option.
+
 ---
 
 ## Option A — User-fork, app-managed
@@ -133,7 +138,7 @@ exactly.
 
 > Keep this section up to date as work lands. Update it whenever a delivery
 > option moves from "not started" to "in progress" or "done".
-> Last updated: 2026-07-31
+> Last updated: 2026-08-04
 
 ### Pipeline prerequisites (must exist before any delivery option works)
 
@@ -152,11 +157,35 @@ exactly.
 | Step | Status | Notes |
 |---|---|---|
 | `OutputService.toZip` contract | **Done** | `packages/contracts/src/outputService.ts` |
-| `toZip` implementation | **Done** | Issue #46 — `packages/engine/src/output/zip.ts`; fflate, injects `NEXT_STEPS.md`, compiled artifacts included per spec §12, 11 vitest specs |
+| `toZip` implementation | **Done** | Issue #46 — `packages/engine/src/output/zip.ts`; fflate, injects `NEXT_STEPS.md`, 11 vitest specs. Compiled artifacts really are in the archive **as of the `.kmp` work** — `toZip` always passed through whatever the VFS held, but nothing ever wrote `build/`, so spec §12's claim was aspirational until `lib/buildOutputBundle.ts` began staging `build/<id>.{kmx,kvk,js}` on the download path |
 | `serializeToZip` alias | **Done** | Exported from `packages/engine/src/output/zip.ts` |
 | `createOutputService()` factory | **Done** | `packages/engine/src/output/index.ts` — zip wired; GitHub path throws "not implemented" until issue #47 |
-| Studio UI — "Download ZIP" button | **Done** | Issue #32 — `PreviewShell` calls `getToZip()(stage.vfs)`, wraps result in `Blob`, triggers anchor click; button label "Download .zip"; `USE_REAL` flag respected (mock fallback in CI) |
+| Studio UI — "Download ZIP" button | **Done** | Issue #32 — anchor-click download off the projected VFS; `USE_REAL` flag respected (mock fallback in CI). Now the **secondary** action, relabelled "Download source .zip" (id `output.download.button.download` kept — the wording changed, the meaning did not), for authors who want to edit or contribute rather than install |
 | Decision-record sidecar (spec 053) | **Done** | `.studio/decision-record.json` written by `addDecisionRecordSidecar` (`packages/engine/src/decision-audit/sidecar.ts`) into the same VirtualFS `toZip` walks; `NEXT_STEPS.md` names it as not-to-be-copied. `isSidecarPath` keeps it out of the Option A/B commit tree, so the keyboard's own directory stays byte-identical to a hand-authored submission (SC-008). This is evidence added to the download, not new delivery-option coverage — it does not move Option C's completion. The sidecar sits at the archive root beside the keyboard's own files rather than nested under `<id>/`, because the archive root already *is* the keyboard's directory (no existing "beside, not inside" position exists to reuse); true positional nesting is deferred as a Keyman-team-facing call — see [specs/053-decision-audit/spec.md](../specs/053-decision-audit/spec.md) FR-020 and `specs/053-decision-audit/research.md` D-07 |
+
+### Installable package (`.kmp`) — the primary *download*
+
+**Not a fourth submission option.** Options A–C are ways to get a keyboard
+*upstream into `keymanapp/keyboards`*; a `.kmp` is how the author gets the
+keyboard *onto their own machine*. It is listed here because it shares the whole
+output pipeline with Option C and because it is now the primary button on the
+Output screen — but it publishes nothing.
+
+It matters because every other route assumed the recipient would install Keyman
+Developer, unzip into a specific directory, open the project, and compile. A
+`.kmp` installs by double-clicking, on Keyman for Windows, macOS, Linux, Android,
+and iOS.
+
+| Step | Status | Notes |
+|---|---|---|
+| Package compiler dependency | **Done** | `@keymanapp/kmc-package@19.0.240-alpha` (exact-pinned to match `kmc-kmn`) in `packages/engine/package.json`. Pure JS — jszip + marked + `@keymanapp/{common-types,developer-utils}`, **no wasm**, and the `kmp.json` schema validator common-types ships is a precompiled ajv standalone, so packaging is fully offline |
+| `buildKmp` implementation | **Done** | `packages/engine/src/output/kmp.ts` — drives `KmpCompiler` over a `CompilerCallbacks` adapter bound to the VirtualFS. Stages the compiled artifacts into `build/` on a **clone**, so the caller's VFS (shared with the Option A/B PR path) never gains compiled output. Never throws for an expected failure: a missing descriptor, a listed-but-absent member, or an unavailable packager all return `success:false` with diagnostics |
+| Path resolution | **Done** | `packages/engine/src/output/kmpPaths.ts` — the hinge of the feature: a descriptor's `..\build\<id>.kmx` (backslashes, escaping up out of `source/`) must land on the VFS key `build/<id>.kmx`. Deliberately **not** the kmn bridge's `resolveFilename`, which short-circuits on any separator and returns such a path verbatim; `kmpPaths.test.ts` pins the divergence so the two are not "unified" later |
+| Diagnostic mapping | **Done** | `CompilerEvent` has no `severity` field — severity is bit-packed into `code` (mask `0x00F00000`), and the code masks to the `KM04003` form `kmc`'s own CLI prints. Decoded properly into `KM_${SEVERITY}_KMP_${code}` |
+| Package files for the adapt track | **Done** | `packages/engine/src/output/ensurePackageFiles.ts` + `packages/engine/src/shared/packageDocs.ts` — the descriptor lists `welcome.htm`/`readme.htm`, which Track 2 never had, so the package build would have failed on a listed-but-absent member. Written only when absent, and the synthesis is reported through `warnings` rather than done silently |
+| Studio UI — "Download keyboard (.kmp)" | **Done** | Primary (filled) button `emit-download-kmp` on the Output screen, above the secondary source `.zip`, with install guidance beneath it. Shares **every** existing gate with the zip (compile-ready, instantiated, inventory coverage, touch staleness) — the primary artifact is not a laxer path past them |
+| Failure behaviour | **Done** | On failure the package-compiler diagnostics render in `emit-download-kmp-error` and the source `.zip` stays enabled: never a dead end, and never a silent fallback to an artifact the author did not ask for |
+| Cross-checked against Keyman Developer | **Done** | Our in-browser `.kmp` for `bambara` vs. `kmc build source/bambara.kps`: **identical member list**, and `kmp.json` differs in exactly one line — the `keymanDeveloperVersion` stamp (`19.0.240` ours vs. `19.0.261` installed). `kmp.inf` and the `.kvk` are byte-identical in size. Remaining deltas are explained: the `.kmx` differs by compiler version, and `kmc`'s CLI minifies the KeymanWeb `.js` where ours does not (same code, 1 line vs. 1440) |
 
 ### Option A — User-fork, app-managed
 
@@ -193,7 +222,8 @@ exactly.
 ### Summary
 
 ```
-Option C  [====================]  100%  engine + studio UI done; full end-to-end zip download wired (#32); now also carries the .studio/decision-record.json sidecar (spec 053) — evidence added, bar unchanged
+.kmp      [====================]  100%  installable-package download, now the PRIMARY button; engine buildKmp (kmc-package, pure JS/offline) + studio wiring done; cross-checked against `kmc build` — identical member list, kmp.json differs only in the compiler-version stamp. NOT a submission path (see its section above) — it does not move A/B/C
+Option C  [====================]  100%  engine + studio UI done; full end-to-end zip download wired (#32); now also carries the .studio/decision-record.json sidecar (spec 053) — evidence added, bar unchanged; the archive now genuinely contains build/ artifacts (spec §12's long-standing claim)
 Option A  [===================-]   95%  engine + studio sign-up (identity) UI done; backend co-located on Vercel (#550); submit action deferred to Option B (§1a); OAuth App registration + deploy remaining (DEPLOY.md); the spec-053 PR-body decision block is contract-compatible here but not wired, since no studio call site uses this path
 Option B  [===================-]   95%  DEFAULT submit path (§1a); contract + engine client + backend pipeline/route (Fastify + Vercel) + GitHub-App installation-token minter + studio attribution-form UI done & tested; App provisioned + installed; pipeline validated end-to-end against the staging repo keyboard-studio/keyboards (same-repo PR — see 2026-07-06 note); remaining: fix the malformed prod GITHUB_APP_PRIVATE_KEY env value + redeploy (§5 Q3, #550); PR body now also carries a bounded decision-summary block (spec 053) — evidence added, bar unchanged
 ```

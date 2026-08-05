@@ -373,7 +373,10 @@ describe("projectWorkingCopyVfs — identity (step 3)", () => {
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
-      identity: { displayName: "Test" },
+      // Must DIFFER from makeTestIR's base name ("Test") to be treated as an
+      // edit — step 3 only invokes applyIdentityStubMutation on a changed name,
+      // which is what makes the throw path reachable here.
+      identity: { displayName: "My Keyboard" },
     });
     expect(warnings.some((w) => w.includes("identity projection skipped"))).toBe(true);
     expect(warnings.some((w) => w.includes("file not found"))).toBe(true);

@@ -180,6 +180,21 @@ export interface ProjectWorkingCopyVfsInput {
   touchLayoutJson?: string | null;
   /** Identity overlay. Pass `null` to skip identity projection. */
   identity: IdentityOverlay | null;
+  /**
+   * The base keyboard's own display name — the value the `.kmn`'s existing
+   * `store(&NAME)` already holds. Step 3 treats the overlay's display name as an
+   * EDIT and rewrites the name store ONLY when it DIFFERS from this. It is the
+   * anchor that keeps the no-identity output byte-identical to the base: the
+   * output path passes this same value as its display-name fallback, so the two
+   * compare equal and the name store is left untouched.
+   *
+   * Optional. When omitted, the comparison falls back to `baseIr.header.name`.
+   * The gallery's `BaseKeyboard.displayName` and the parsed `baseIr.header.name`
+   * are the same in practice; passing it explicitly lets a caller whose overlay
+   * fallback is the gallery name (rather than the parsed `.kmn` name) match on
+   * the exact value it fell back to.
+   */
+  baseDisplayName?: string;
 }
 
 /**
@@ -257,6 +272,7 @@ export function projectWorkingCopyVfs(
     getPattern,
     identity,
     touchLayoutJson,
+    baseDisplayName,
   } = input;
 
   const warnings: string[] = [];
@@ -562,9 +578,28 @@ export function projectWorkingCopyVfs(
   }
 
   // Step 3: Identity projection — write &NAME (display name) into the .kmn.
+  //
+  // The display name is treated as an EDIT, reflected only when it CHANGES.
+  // `store(&NAME)` is rewritten in place ONLY when the effective display name
+  // DIFFERS from the base keyboard's own name (`baseDisplayName`, falling back
+  // to `baseIr.header.name`). When they match — which includes the no-identity-
+  // set case, where `serializeWorkingCopy` passes the base's own display name
+  // straight back as a fallback so the `.kmp` descriptor writer (step 3.6) has a
+  // non-null overlay to key on — the name is NOT an edit and the base's name
+  // store is left untouched, so the output `.kmn` stays byte-identical to the
+  // base. The store is never deleted and never duplicated:
+  // `applyIdentityStubMutation` rewrites the existing line in place (or, only on
+  // a genuine change to a base that never had a &NAME store, inserts one).
+  //
+  // This is the single seam BOTH output paths (zip + pull request via
+  // `serializeWorkingCopy`) and the OSK preview (`useWorkingCopyTransform`) pass
+  // through, so they cannot disagree about whether the name changed.
   if (identity !== null) {
+    const baseName = baseDisplayName ?? baseIr.header.name;
     const identityArg: { name?: string; copyright?: string; version?: string } = {};
-    if (identity.displayName !== undefined) identityArg.name = identity.displayName;
+    if (identity.displayName !== undefined && identity.displayName !== baseName) {
+      identityArg.name = identity.displayName;
+    }
     if (identity.copyright !== undefined) identityArg.copyright = identity.copyright;
     if (identity.version !== undefined) identityArg.version = identity.version;
 

@@ -64,6 +64,17 @@ export type { ImportAttributionInput } from "./output/index.js";
 
 // Track 2 adapt-staging helpers (output-only; not used in the OSK preview path).
 export { bumpKeyboardVersion, stageAdaptHistory } from "./output/index.js";
+// Installable package (.kmp) — the primary download (spec §12). `buildKmp`
+// lazily imports @keymanapp/kmc-package on first call, so naming it here does
+// not pull jszip/marked into a consumer's entry chunk.
+export { buildKmp, initKmpCompiler, isKmpCompilerReady, ensurePackageFiles } from "./output/index.js";
+export type {
+  BuildKmpResult,
+  BuildKmpOptions,
+  KmpBuildArtifacts,
+  EnsurePackageFilesInput,
+  EnsurePackageFilesResult,
+} from "./output/index.js";
 
 // Per-keyboard decision audit (specs/053-decision-audit) — the pure differ,
 // serializer, tolerant reader, save-budget shed pass, and the two evidence

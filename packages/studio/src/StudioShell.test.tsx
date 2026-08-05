@@ -27,6 +27,7 @@ import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore, snapshotTraversal } from "./stores/surveySessionStore.ts";
+import { useStartOverStore } from "./stores/startOverStore.ts";
 import { consumePendingWelcomeLocation, jumpToLocation } from "./lib/jumpToLocation.ts";
 import { snapshotWorkingCopyData } from "./lib/persistWorkingCopy.ts";
 import type { OnInstantiateCallback, Stage } from "./hooks/useKeyboardArtifact.ts";
@@ -1640,10 +1641,14 @@ describe("F6 wiring: promotePendingAutosave", () => {
     });
     expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).not.toBeNull();
 
-    // Start over: arm + confirm the corner reset control (real component,
-    // not mocked — visible on every survey step).
-    fireEvent.click(screen.getByTestId("survey-reset-arm"));
-    fireEvent.click(screen.getByTestId("survey-reset-yes"));
+    // Start over. The Reset control itself now lives in the NavBar (out of this
+    // SurveyView-only render), so fire the handler SurveyView publishes for it
+    // — which also proves the startOverStore bridge is live on mount.
+    const startOver = useStartOverStore.getState().handler;
+    expect(startOver).not.toBeNull();
+    act(() => {
+      startOver!();
+    });
 
     // handleStartOver's discardActiveDraft() removes the just-abandoned
     // pending record synchronously.
