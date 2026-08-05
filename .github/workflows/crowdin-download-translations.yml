@@ -134,6 +134,15 @@ jobs:
           # keys (measured 2026-08-05: fr/messages.json 1201 -> 918, fr/patterns
           # .json 97 -> `{}`), which breaks the key-set parity the loaders need.
           skip_untranslated_strings: false
+          # This action's container runs as root by default, so the files it
+          # writes come out root-owned on the runner's filesystem. That was
+          # invisible before this PR -- the SAME container did the git
+          # add/commit/push too, as root throughout. Now the normalize step
+          # after it runs as the ordinary (non-root) runner user, which
+          # cannot write a root-owned file: EACCES (measured 2026-08-05,
+          # workflow run 31025433620). "auto" re-execs the download as
+          # whichever uid:gid already owns the checked-out workspace instead.
+          user: "auto"
         env:
           CROWDIN_PROJECT_ID: ${{ secrets.CROWDIN_PROJECT_ID }}
           CROWDIN_PERSONAL_TOKEN: ${{ secrets.CROWDIN_PERSONAL_TOKEN }}
