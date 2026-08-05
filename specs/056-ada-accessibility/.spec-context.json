@@ -1,0 +1,143 @@
+{
+  "workflow": "companion",
+  "specName": "056-ada-accessibility",
+  "branch": "056-ada-accessibility",
+  "selectedAt": "2026-08-04T22:40:13.058Z",
+  "currentStep": "implement",
+  "status": "implementing",
+  "history": [
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-04T22:50:20.303Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-04T22:50:20.363Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "agent",
+      "at": "2026-08-04T23:00:54.925Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-04T23:29:37.076Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T02:24:39.749Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T02:42:12.832Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T02:43:57.734Z"
+    }
+  ],
+  "telemetryInstanceId": "59ee9445-1561-4f20-93d3-e3edc5969751",
+  "currentTask": "T002",
+  "task_summaries": {
+    "T003": {
+      "status": "DONE",
+      "did": "Resolved 8 statically-decidable WCAG rows with named grep evidence: 2.1.4/2.2.1/2.2.2/2.3.1/2.5.4/1.4.5/1.3.4 pass, 2.4.5 recommended fail; re-verified the six media n/a rows",
+      "files": [
+        "specs/056-ada-accessibility/evidence/cycle1-static-checks.md"
+      ]
+    },
+    "T001": {
+      "status": "DONE",
+      "did": "Ran the axe lane per-spec (whole-suite run degrades the dev server), captured 10 walk-spec + 5 unexcluded probe scans incl. minor/moderate/passes/incomplete; found the gate green only because serious color-contrast nodes are excluded, plus a 4th undebted offender; enumerated all 14 live exclusions",
+      "files": [
+        "specs/056-ada-accessibility/evidence/cycle1-axe-baseline.md",
+        "specs/056-ada-accessibility/evidence/axe-baseline.jsonl",
+        "specs/056-ada-accessibility/evidence/axe-supplemental.jsonl",
+        "packages/studio/e2e/helpers/axe.ts"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Keyboard-only walk of 5 Track 1 screens (54 tab stops, key events only): 2.4.7 FAIL (base-source combobox + OSK iframe have no focus indicator), 2.4.1 FAIL (no skip link, 7 chrome stops before content), 2.1.2/3.2.1/3.2.2 pass with named evidence; walk is partial - composite widgets unreachable, so SC-004 not demonstrated",
+      "files": [
+        "specs/056-ada-accessibility/evidence/cycle1-keyboard-walk.md",
+        "specs/056-ada-accessibility/evidence/kbwalk.json",
+        "specs/056-ada-accessibility/evidence/kbwalk2.json"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "axe walk-spec lane, per-spec invocation",
+      "command": "A11Y_BASELINE=1 npx playwright test <spec> --reporter=line",
+      "result": "10 walk-spec scans captured; zero serious/critical; landmark-one-main + region fail 10/10 screens (moderate, below the gate)",
+      "warnings": [
+        "whole-suite run degrades the dev server (even boot-smoke times out); proven pre-existing via a control run with the recorder stashed",
+        "7 of 17 scan sites unreachable - composite-widget screens under-sampled"
+      ]
+    },
+    {
+      "what": "unexcluded supplemental axe scan of 5 screens",
+      "command": "standalone playwright+AxeBuilder probe, no exclusions",
+      "result": "color-contrast SERIOUS on welcome/#preview/#output - the gate is green only because these nodes are excluded; 1.4.3 = fail confirmed",
+      "warnings": [
+        "found a 4th offender not in contrastDebt.ts: div[aria-label=\"Keyboard source mode\"] > button:nth-child(1)"
+      ]
+    },
+    {
+      "what": "keyboard-only walk, 5 screens / 54 tab stops, key events only",
+      "command": "standalone playwright probe",
+      "result": "2.4.7 FAIL (base-source combobox + OSK iframe: no outline, no box-shadow); 2.4.1 FAIL (no skip link); 2.1.2/3.2.1/3.2.2 pass; combobox focus-opens its listbox without moving focus - content change, not context change (3/3 trials)",
+      "warnings": [
+        "not a human pass",
+        "walk is partial - SC-004 not demonstrated"
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Added an env-gated (A11Y_BASELINE=1) recording sink to e2e/helpers/axe.ts",
+      "why": "T001 must record minor/moderate findings and rule passes, which the serious/critical gate discards; inert when the env var is unset so the shipped gate is unchanged",
+      "rejected": "Lowering the gate threshold, which would change FR-003 assertion behaviour rather than record"
+    },
+    {
+      "decision": "Ran the axe lane one spec per invocation instead of the full suite",
+      "why": "the 69-test single-worker run degrades the shared dev server until even boot-smoke page.goto times out; per-spec runs captured 10 scans vs 1-4 for the whole-suite runs",
+      "rejected": "Reporting the whole-suite failure as the baseline result, which would have recorded ~0 coverage"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "pnpm --filter @keyboard-studio/studio typecheck fails with 4 pre-existing errors from a STALE engine dist (buildSessionProducedSet is in engine/src but not in dist). Unrelated to this branch (only e2e/ touched, which is outside tsconfig scope). Needs pnpm build before Phase 2 source edits.",
+      "step": "implement"
+    },
+    {
+      "note": "8 e2e specs fail pre-existing in this environment (proven by a control run with the change stashed), so 7 of 17 axe scan sites - the composite-widget screens - were never scanned. The Cycle 1 baseline under-samples the highest-risk surfaces.",
+      "step": "implement"
+    }
+  ],
+  "last_action": "Phase 1 wave 1 done (T001-T003); next is T004 (flip all 49 tracker rows) - see specs/056-ada-accessibility/evidence/"
+}

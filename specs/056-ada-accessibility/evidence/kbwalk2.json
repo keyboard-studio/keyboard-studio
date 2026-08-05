@@ -1,0 +1,83 @@
+{
+  "trials": [
+    {
+      "trial": 0,
+      "beforeFocus": {
+        "listboxCount": 0,
+        "listboxTabIndex": null,
+        "comboPresent": true,
+        "active": "body[role=null]",
+        "comboExpanded": "false"
+      },
+      "afterFocus": {
+        "listboxCount": 1,
+        "listboxTabIndex": null,
+        "comboPresent": true,
+        "active": "input[role=combobox]",
+        "comboExpanded": "true"
+      },
+      "afterEscape": {
+        "listboxCount": 0,
+        "listboxTabIndex": null,
+        "comboPresent": true,
+        "active": "input[role=combobox]",
+        "comboExpanded": "false"
+      }
+    },
+    {
+      "trial": 1,
+      "beforeFocus": {
+        "listboxCount": 0,
+        "listboxTabIndex": null,
+        "comboPresent": true,
+        "active": "body[role=null]",
+        "comboExpanded": "false"
+      },
+      "afterFocus": {
+        "listboxCount": 1,
+        "listboxTabIndex": null,
+        "comboPresent": true,
+        "active": "input[role=combobox]",
+        "comboExpanded": "true"
+      },
+      "afterEscape": {
+        "listboxCount": 0,
+        "listboxTabIndex": null,
+        "comboPresent": true,
+        "active": "input[role=combobox]",
+        "comboExpanded": "false"
+      }
+    },
+    {
+      "trial": 2,
+      "beforeFocus": {
+        "listboxCount": 0,
+        "listboxTabIndex": null,
+        "comboPresent": true,
+        "active": "body[role=null]",
+        "comboExpanded": "false"
+      },
+      "afterFocus": {
+        "listboxCount": 1,
+        "listboxTabIndex": null,
+        "comboPresent": true,
+        "active": "input[role=combobox]",
+        "comboExpanded": "true"
+      },
+      "afterEscape": {
+        "listboxCount": 0,
+        "listboxTabIndex": null,
+        "comboPresent": true,
+        "active": "input[role=combobox]",
+        "comboExpanded": "false"
+      }
+    }
+  ],
+  "ready": {
+    "listboxCount": 0,
+    "listboxTabIndex": null,
+    "comboPresent": true,
+    "active": "button[role=null]",
+    "comboExpanded": "false"
+  }
+}
