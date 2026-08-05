@@ -566,7 +566,16 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       let inheritedHolders: readonly import("@keyboard-studio/contracts").CopyrightHolder[] = [];
       let licenseUnparseable: { reason: string; line: string } | null = null;
 
-      if (baseLicenseText !== undefined) {
+      const holderOverride = scaffoldOpts?.baseHolderOverride?.trim() ?? "";
+      if (holderOverride !== "") {
+        // D5 escape hatch: the author told us who held the copyright, so the
+        // notice is retained rather than dropped. No year — that is precisely
+        // what the unreadable line failed to establish, and inventing one would
+        // put a fabricated fact into a legal notice.
+        inheritedHolders = [
+          { name: holderOverride, years: [], marker: DEFAULT_MARKER, inherited: true },
+        ];
+      } else if (baseLicenseText !== undefined) {
         const parsed = parseCopyright(baseLicenseText);
         if (parsed.ok) {
           inheritedHolders = parsed.block;

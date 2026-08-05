@@ -65,6 +65,22 @@ export interface ScaffoldOptions {
    * suite breaks at a year boundary.
    */
   emitYear?: number;
+
+  /**
+   * The original copyright holder, supplied BY THE AUTHOR when the base's own
+   * `LICENSE.md` carries a notice this tool cannot read (spec 037 D5).
+   *
+   * This is the escape hatch that makes the D5 block acceptable rather than a
+   * dead end: the author is never stuck, and the remedy PRESERVES the notice
+   * instead of dropping it. When set, it is used as the inherited holder in place
+   * of parsing, and {@link ScaffoldResult.licenseUnparseable} is not reported.
+   *
+   * Emitted with NO year, because the unreadable line's year is exactly what
+   * could not be established — matching real corpus lines such as
+   * `Copyright © SIL International`. Inventing a year here would be a fabricated
+   * fact in a legal notice.
+   */
+  baseHolderOverride?: string;
 }
 
 /**

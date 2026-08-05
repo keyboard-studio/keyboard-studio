@@ -561,10 +561,19 @@ export function useKeyboardArtifact(
         // re-scaffold picks up an attribution confirmed after the first run.
         // Absent => the scaffolder emits no notice and flags attributionMissing;
         // it never invents a holder.
-        const attribution = useWorkingCopyStore.getState().attribution;
+        const wc = useWorkingCopyStore.getState();
+        const attribution = wc.attribution;
+        // spec 037 D5: an author-supplied original holder replaces parsing, so
+        // the remedy preserves the base's notice instead of dropping it.
+        const baseHolderOverride = wc.baseHolderOverride;
         const result = await svc.scaffold(kb, scaffoldSpec.keyboardId, scaffoldSpec.displayName, {
           ...(attribution !== null ? { attribution } : {}),
+          ...(baseHolderOverride !== null && baseHolderOverride !== ""
+            ? { baseHolderOverride }
+            : {}),
         });
+        // Record (or clear) the unreadable-notice block for the download gate.
+        wc.setLicenseUnparseable(result.licenseUnparseable ?? null);
         vfsRef.current = result.vfs;
         scaffoldWarnings.push(...result.warnings);
         // Build font + CSS blob URLs from scaffold result — mirrors the open-base path below.

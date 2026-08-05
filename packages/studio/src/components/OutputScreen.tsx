@@ -44,6 +44,8 @@ export function OutputScreen() {
     handleDownload,
     showIdentityWarn,
     attributionMissing,
+    licenseUnparseable,
+    resolveBaseHolder,
   } = artifact;
 
   // Identity prefill for the Option B submit form. Read from whichever auth
@@ -135,9 +137,11 @@ export function OutputScreen() {
               aria-label={
                 canDownload
                   ? `Download keyboard ${pickerMode === "scaffold" && scaffoldSpec !== null ? scaffoldSpec.keyboardId : baseKeyboard.id} as zip`
-                  : attributionMissing
-                    ? "Download unavailable until the keyboard has an author and copyright holder"
-                    : "Download unavailable until compile completes"
+                  : licenseUnparseable !== null
+                    ? "Download unavailable until the original copyright holder is confirmed"
+                    : attributionMissing
+                      ? "Download unavailable until the keyboard has an author and copyright holder"
+                      : "Download unavailable until compile completes"
               }
               style={{
                 alignSelf: "flex-start",
@@ -155,6 +159,78 @@ export function OutputScreen() {
             >
               {downloading ? "Downloading..." : "Download .zip"}
             </button>
+            {licenseUnparseable !== null && (
+              <div
+                role="alert"
+                data-testid="license-unreadable"
+                style={{
+                  marginTop: 4,
+                  padding: "8px 12px",
+                  background: "#2a1a00",
+                  border: "1px solid #d29922",
+                  borderRadius: 6,
+                  fontSize: 12,
+                  color: "#d29922",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+                  maxWidth: 560,
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                  The base keyboard&apos;s copyright notice could not be read
+                </div>
+                <div style={{ marginBottom: 6 }}>
+                  Its licence file says:{" "}
+                  <code style={{ fontFamily: "ui-monospace, monospace" }}>
+                    {licenseUnparseable.line}
+                  </code>
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  This keyboard must keep the original author&apos;s copyright, so who held it
+                  needs confirming before it can be downloaded.
+                </div>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const input = e.currentTarget.elements.namedItem(
+                      "baseHolder",
+                    ) as HTMLInputElement | null;
+                    if (input !== null) resolveBaseHolder(input.value);
+                  }}
+                  style={{ display: "flex", gap: 6, alignItems: "center" }}
+                >
+                  <input
+                    name="baseHolder"
+                    type="text"
+                    aria-label="Original copyright holder"
+                    placeholder="Original copyright holder"
+                    style={{
+                      flex: 1,
+                      padding: "5px 8px",
+                      background: "#0d1117",
+                      color: "#e6edf3",
+                      border: "1px solid #283040",
+                      borderRadius: 4,
+                      fontSize: 12,
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    data-testid="resolve-base-holder"
+                    style={{
+                      padding: "5px 12px",
+                      background: "#1f6feb",
+                      color: "#e6edf3",
+                      border: "1px solid #283040",
+                      borderRadius: 4,
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Confirm
+                  </button>
+                </form>
+              </div>
+            )}
             {attributionMissing && (
               <div
                 role="status"

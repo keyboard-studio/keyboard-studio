@@ -181,6 +181,24 @@ export interface WorkingCopyState {
    */
   attribution: Attribution | null;
 
+  /**
+   * Set when the chosen base has a copyright notice this tool cannot read
+   * (spec 037 D5) — an unfilled template, or a year with no holder.
+   *
+   * Blocks download: emitting a LICENSE.md whose only holder is the current user
+   * would strip a real notice. Cleared by supplying `baseHolderOverride`.
+   */
+  licenseUnparseable: { reason: string; line: string } | null;
+
+  /**
+   * The original copyright holder as typed by the author, when the base's notice
+   * could not be read (spec 037 D5 escape hatch).
+   *
+   * Passed to the scaffolder on the next run, where it becomes the inherited
+   * holder — so the remedy PRESERVES the notice rather than dropping it.
+   */
+  baseHolderOverride: string | null;
+
   // -- Carve working IR (irStore slots) ----------------------------------------
   /**
    * Carve working IR — the in-progress keyboard IR being edited in the carve
@@ -460,6 +478,12 @@ export interface WorkingCopyState {
    */
   setAttribution: (attribution: Attribution | null) => void;
 
+  /** Record (or clear) an unreadable base notice — spec 037 D5. */
+  setLicenseUnparseable: (v: { reason: string; line: string } | null) => void;
+
+  /** Record the author-supplied original holder — spec 037 D5 escape hatch. */
+  setBaseHolderOverride: (holder: string | null) => void;
+
   /**
    * Returns true once instantiateFromBase or instantiateFromExisting has been
    * called (i.e. baseKeyboard is non-null). Callers that need the full triple
@@ -653,7 +677,7 @@ export type WorkingCopyData = Omit<
   | "setIrAxes" | "lockDesktop" | "unlockDesktop"
   | "setTouchLayoutJson" | "setTouchDraft" | "markGalleryIntroSeen" | "reset"
   | "instantiateFromBase" | "instantiateFromExisting" | "setIdentity" | "isInstantiated"
-  | "setAttribution"
+  | "setAttribution" | "setLicenseUnparseable" | "setBaseHolderOverride"
   | "markStale" | "clearStale"
   | "setValidatorFindings"
   | "setAxisFills"
@@ -668,6 +692,8 @@ const INITIAL_STATE: WorkingCopyData = {
   baseIr: null,
   identity: null,
   attribution: null,
+  licenseUnparseable: null,
+  baseHolderOverride: null,
   // carve IR slots
   ir: null,
   removalCapabilities: new Map(),
@@ -979,6 +1005,10 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     set({ identity: patch }),
 
   setAttribution: (attribution) => set({ attribution }),
+
+  setLicenseUnparseable: (v) => set({ licenseUnparseable: v }),
+
+  setBaseHolderOverride: (holder) => set({ baseHolderOverride: holder }),
 
   isInstantiated: () => get().baseKeyboard !== null,
 

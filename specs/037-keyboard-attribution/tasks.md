@@ -250,7 +250,17 @@ is the authoritative notice (D4); the other two are metadata mirrors. Consequenc
 rather than several. That is acceptable because D4 makes `LICENSE.md` the source a fork reads —
 but it means the `.kmn` is not a lossless fallback for a multi-generation chain.
 
+**T037 DONE 2026-08-04.** contracts 454, engine 1555, studio 3749 — all green.
+
+Verified by mutation: dropping the D5 term from the download gate (3 failures), accepting a blank
+holder (1), and — after a gap was found — omitting the `retry()` re-scaffold (1).
+
+That last one initially SURVIVED, and it was the load-bearing half: without the re-run the block
+clears while the already-emitted `LICENSE.md` still lacks the holder, so the author would believe
+the notice was retained when it was not. The harness mocked `retry` with a fresh `vi.fn()` per
+call, which is unassertable; it is now hoisted.
+
 ### Still open in US2
 
-- [ ] T037 [US2] Surface `licenseUnparseable` in the UI as a hard block with the manual-entry escape hatch D5 requires — the engine reports it, but no caller gates on it yet, so today an unreadable base notice is *flagged and ignored*
+- [x] T037 [US2] Surface `licenseUnparseable` in the UI as a hard block with the manual-entry escape hatch D5 requires — **DONE**. `ScaffoldOptions.baseHolderOverride` lets the author name the original holder; the scaffolder then uses it as the inherited holder and stops reporting the block. Emitted with NO year, because the year is exactly what the unreadable line failed to establish — inventing one would put a fabricated fact in a legal notice. Held on the working copy (and persisted, so a reload does not re-block), gated in `usePreviewArtifact`, surfaced in `OutputScreen` with the offending line quoted and an input to resolve it. Confirming re-runs the pipeline so the notice is genuinely retained
 - [ ] T038 [US2] Decide whether `.kps <Copyright>` should carry the joined chain or only the primary holder (see the limitation above)

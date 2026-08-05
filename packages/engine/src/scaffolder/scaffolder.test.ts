@@ -890,3 +890,74 @@ describe("derived keyboard accumulates the base's copyright (spec 037 US2)", () 
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// D5 escape hatch (spec 037 T037) — the author supplies the original holder
+//
+// A hard block is only acceptable because the author is never stuck, and because
+// the remedy PRESERVES the notice rather than dropping it.
+// ---------------------------------------------------------------------------
+
+describe("D5 escape hatch — baseHolderOverride (spec 037)", () => {
+  const NEW_AUTHOR = { authorName: "Second Author", copyrightHolder: "Second Author" };
+  const UNREADABLE = "The MIT License (MIT)\n\nCopyright (c) YYYY _____________________\n";
+
+  function svc(licenseText: string) {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+      if (url.endsWith("/LICENSE.md")) return Promise.resolve(makeTextResponse(licenseText));
+      return Promise.resolve(makeNotFoundResponse());
+    });
+    return createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+  }
+
+  async function run(override?: string) {
+    return svc(UNREADABLE).scaffold(baseKeyboard, "my_keyboard", "My Keyboard", {
+      attribution: NEW_AUTHOR,
+      emitYear: 2026,
+      ...(override !== undefined ? { baseHolderOverride: override } : {}),
+    });
+  }
+
+  it("without an override, the unreadable notice is reported", async () => {
+    const r = await run();
+    expect(r.licenseUnparseable?.reason).toBe("template_placeholder");
+    expect(r.inheritedHolderCount).toBe(0);
+  });
+
+  it("with an override, the block clears", async () => {
+    const r = await run("Original Author");
+    expect(r.licenseUnparseable).toBeUndefined();
+    expect(r.inheritedHolderCount).toBe(1);
+  });
+
+  it("the supplied holder is RETAINED in the emitted LICENSE.md", async () => {
+    const { vfs } = await run("Original Author");
+    const out = vfs.get("LICENSE.md")!.content as string;
+    expect(out).toContain("Copyright © Original Author");
+    expect(out).toContain("Copyright © 2026 Second Author");
+  });
+
+  it("emits NO year for the supplied holder — the unreadable line never stated one", async () => {
+    const { vfs } = await run("Original Author");
+    const line = (vfs.get("LICENSE.md")!.content as string)
+      .split("\n")
+      .find((l) => l.includes("Original Author"))!;
+    expect(line).not.toMatch(/\d{4}/);
+  });
+
+  it("orders the supplied holder BEFORE the new author (it predates by definition)", async () => {
+    const { vfs } = await run("Original Author");
+    const out = vfs.get("LICENSE.md")!.content as string;
+    expect(out.indexOf("Original Author")).toBeLessThan(out.indexOf("Second Author"));
+  });
+
+  it("ignores a blank or whitespace-only override", async () => {
+    for (const v of ["", "   "]) {
+      const r = await run(v);
+      expect(r.licenseUnparseable?.reason, `override ${JSON.stringify(v)}`).toBe(
+        "template_placeholder",
+      );
+    }
+  });
+});

@@ -145,6 +145,11 @@ export function snapshotWorkingCopyToSession(): void {
     // here because WorkingCopySnapshot is Omit-derived from WorkingCopyData —
     // the compiler required this line, which is the point of that derivation.
     attribution: s.attribution,
+    // spec 037 D5: both are plain JSON. The override in particular MUST persist —
+    // an author who supplied the original holder should not have to re-enter it
+    // after a reload, or the block would reappear on resume.
+    licenseUnparseable: s.licenseUnparseable,
+    baseHolderOverride: s.baseHolderOverride,
     ir: s.ir,
     deletedNodeIds: [...s.deletedNodeIds],
     deletedItemIds: [...s.deletedItemIds],
@@ -231,6 +236,8 @@ export function rehydrateWorkingCopyFromSession(): boolean {
     baseIr: snapshot.baseIr,
     identity: snapshot.identity,
     attribution: snapshot.attribution,
+    licenseUnparseable: snapshot.licenseUnparseable,
+    baseHolderOverride: snapshot.baseHolderOverride,
     ir: snapshot.ir,
     removalCapabilities,
     deletedNodeIds: new Set(snapshot.deletedNodeIds),

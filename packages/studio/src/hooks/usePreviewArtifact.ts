@@ -53,6 +53,17 @@ export interface PreviewArtifact {
    * and drafts saved before attribution capture existed.
    */
   attributionMissing: boolean;
+  /**
+   * Set when the chosen base has a copyright notice this tool could not read
+   * (spec 037 D5). Blocks download: emitting a LICENSE.md whose only holder is
+   * the current user would strip a real notice.
+   */
+  licenseUnparseable: { reason: string; line: string } | null;
+  /**
+   * Supply the original copyright holder to clear the block above, then re-run
+   * the pipeline so it is retained in the emitted notice (D5 escape hatch).
+   */
+  resolveBaseHolder: (holder: string) => void;
   downloading: boolean;
   downloadError: string | null;
   downloadWarnings: string[];
@@ -183,7 +194,33 @@ export function usePreviewArtifact(): PreviewArtifact {
   // never emit one with no notice at all. Gate rather than warn.
   const attributionMissing = useWorkingCopyStore((s) => s.attribution === null);
 
-  const canDownload = stage.kind === "ready" && isInstantiated && !attributionMissing;
+  // spec 037 D5: refuse to emit while the base's own notice is unreadable — a
+  // LICENSE.md naming only the current user would strip it.
+  const licenseUnparseable = useWorkingCopyStore((s) => s.licenseUnparseable);
+  const setBaseHolderOverride = useWorkingCopyStore((s) => s.setBaseHolderOverride);
+
+  const canDownload =
+    stage.kind === "ready" &&
+    isInstantiated &&
+    !attributionMissing &&
+    licenseUnparseable === null;
+
+  /**
+   * D5 escape hatch: record the author-supplied original holder, then RE-RUN the
+   * pipeline so the scaffolder retains it in the emitted notice.
+   *
+   * The re-run is the load-bearing part — setting the override alone would clear
+   * the block while leaving the already-emitted LICENSE.md without the holder.
+   */
+  const resolveBaseHolder = useCallback(
+    (holder: string) => {
+      const trimmed = holder.trim();
+      if (trimmed === "") return;
+      setBaseHolderOverride(trimmed);
+      retry();
+    },
+    [setBaseHolderOverride, retry],
+  );
 
   const handleDownload = useCallback(async () => {
     if (stage.kind !== "ready") return;
@@ -254,6 +291,8 @@ export function usePreviewArtifact(): PreviewArtifact {
     diagnostics,
     canDownload,
     attributionMissing,
+    licenseUnparseable,
+    resolveBaseHolder,
     downloading,
     downloadError,
     downloadWarnings,
