@@ -28,12 +28,21 @@
 //     utilities/i18n-collapse-guard.
 //
 // Fix when it fails:  pnpm --filter @keyboard-studio/studio messages:extract
+//
+// It also gates KEY ORDER, on every locale: the committed catalogs must be in
+// message-id order (see utilities/i18n-catalog-sort for why — it is a merge-
+// conflict measure, and that module owns the comparator). Order is deliberately
+// NOT part of the drift comparison above, which stays order-independent: drift
+// is about which strings exist, order is about how the file merges. They are
+// separate failures with separate fixes, so they are reported separately.
+// Fix when order fails:  pnpm run i18n-catalog-sort
 
 const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { checkEnglishCollapse } = require("../i18n-collapse-guard/index.js");
+const { checkCatalogDir } = require("../i18n-catalog-sort/index.js");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const STUDIO_DIR = path.join(REPO_ROOT, "packages", "studio");
@@ -49,6 +58,10 @@ const problems = [];
 // instruction at someone whose only signal needs no action.
 const warnings = [];
 const notes = [];
+// Key order is its own failure channel for the same reason: an unsorted catalog
+// is not stale, and `messages:extract` is the wrong instruction to print at it
+// (it would work, but it rewrites the whole catalog to fix a pure reordering).
+const orderProblems = [];
 
 function readCatalog(file) {
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : null;
@@ -82,6 +95,11 @@ function resolveLinguiBin() {
   }
   return found;
 }
+
+// Key order is read straight off the committed tree, deliberately before (and
+// independently of) the fresh extraction: it needs no comparison baseline, so it
+// still reports if `lingui extract` is broken or unavailable.
+orderProblems.push(...checkCatalogDir(COMMITTED_DIR));
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "i18n-catalog-check-"));
 let freshLocales = [];
@@ -232,7 +250,19 @@ if (problems.length > 0) {
   console.error(
     "\nFix: pnpm --filter @keyboard-studio/studio messages:extract, then commit the updated catalogs.",
   );
-  process.exit(1);
 }
 
-console.log("[OK] i18n-catalog-lint: message catalogs are in sync.");
+// Its own block with its own remediation, and reported even when the drift
+// checks above already failed — the two are independent, and hiding the order
+// failure behind a drift failure would make it reappear on the next run.
+if (orderProblems.length > 0) {
+  console.error("[ERROR] i18n-catalog-lint: message catalogs are not in message-id order.");
+  for (const p of orderProblems) console.error("  - " + p);
+  console.error(
+    "\nFix: pnpm run i18n-catalog-sort (message-id order keeps concurrent branches out of the same hunk).",
+  );
+}
+
+if (problems.length > 0 || orderProblems.length > 0) process.exit(1);
+
+console.log("[OK] i18n-catalog-lint: message catalogs are in sync and in message-id order.");
