@@ -56,6 +56,23 @@ export interface PackageDescriptorIdentity {
   languageTag?: string;
   /** Display text for `<Language>` — the language's English name (FR-002). */
   languageName?: string;
+  /**
+   * The single-line copyright notice for `<Info><Copyright>` (spec 059 FR-003).
+   *
+   * Supplied by the caller from the SAME accumulated copyright block that wrote
+   * `LICENSE.md` and `store(&COPYRIGHT)` — never composed here, for the reason
+   * FR-005 exists: 22 shipped keyboards disagree between their `LICENSE.md` and
+   * `.kmn` precisely because those strings were each built independently.
+   *
+   * Absent means "state no holder". The element is then omitted rather than
+   * emitted with the display name in it, which is what named the keyboard as its
+   * own rights holder before this feature.
+   */
+  copyrightLine?: string;
+  /** Author name for `<Info><Author>` (spec 059 FR-003). Omitted when blank. */
+  authorName?: string;
+  /** Author email, emitted as the `<Author URL="mailto:…">` attribute. Optional. */
+  authorEmail?: string;
 }
 
 /**
@@ -103,13 +120,43 @@ export function buildKpsContent(
     `<Package>\n` +
     `  <System>\n    <KeymanDeveloperVersion>17.0.0.0</KeymanDeveloperVersion>\n    <FileVersion>7.0</FileVersion>\n  </System>\n` +
     `  <Options>\n    <ReadMeFile>readme.htm</ReadMeFile>\n    <WelcomeFile>welcome.htm</WelcomeFile>\n    <FollowKeyboardVersion/>\n  </Options>\n` +
-    `  <Info>\n    <Name URL="">${name}</Name>\n    <Description URL="">${description}</Description>\n  </Info>\n` +
+    `  <Info>\n    <Name URL="">${name}</Name>\n    <Description URL="">${description}</Description>\n${buildAttributionBlock(identity)}  </Info>\n` +
     `  <Files>\n${fileEntries}\n  </Files>\n` +
     `  <Keyboards>\n    <Keyboard>\n      <Name>${name}</Name>\n      <ID>${escapeHtml(keyboardId)}</ID>\n      <Version>${escapeHtml(version)}</Version>\n` +
     buildLanguagesBlock(identity) +
     `    </Keyboard>\n  </Keyboards>\n` +
     `</Package>\n`
   );
+}
+
+/**
+ * The `<Copyright>` / `<Author>` lines for `<Info>`, indented and newline-terminated
+ * (spec 059 FR-003), or `""` when there is nothing to state.
+ *
+ * Both elements are OMITTED rather than emitted empty when their source is absent.
+ * An empty `<Copyright/>` asserts "this work has no copyright holder", which is a
+ * different and false claim from saying nothing; and `kmc` does not require either
+ * element, so silence is safe. For reference, 917/918 shipped keyboards populate
+ * `<Copyright>` and 442 populate `<Author>`.
+ *
+ * `.trim()` on the guards, matching `effectiveDisplayName`: a field holding only a
+ * space has not been filled in.
+ */
+function buildAttributionBlock(identity: PackageDescriptorIdentity): string {
+  const copyrightLine = identity.copyrightLine?.trim() ?? "";
+  const authorName = identity.authorName?.trim() ?? "";
+  const authorEmail = identity.authorEmail?.trim() ?? "";
+
+  const copyright =
+    copyrightLine !== ""
+      ? `    <Copyright URL="">${escapeHtml(copyrightLine)}</Copyright>\n`
+      : "";
+  const author =
+    authorName !== ""
+      ? `    <Author URL="${authorEmail !== "" ? `mailto:${escapeHtml(authorEmail)}` : ""}">${escapeHtml(authorName)}</Author>\n`
+      : "";
+
+  return copyright + author;
 }
 
 /**

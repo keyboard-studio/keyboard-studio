@@ -67,4 +67,30 @@ describe("ensurePackageFiles", () => {
       "Copyright © 2024 Sekou Goro\n\nMIT License\n",
     );
   });
+
+  // spec 059 FR-004. The holder used to fall back to `displayName`, which emitted
+  // "Copyright © <year> Piaroa" — naming the KEYBOARD as its own rights holder.
+  // That is a false statement of fact in a legal notice, and worse than silence
+  // because a wrong notice reads as authoritative. The package still ships a
+  // license (so it stays redistributable); what it must not do is invent a holder.
+  it("omits the copyright line rather than naming the keyboard as its own holder", () => {
+    const vfs = createVirtualFS([]);
+
+    ensurePackageFiles({ vfs, displayName: "Piaroa", year: 2024 });
+
+    const license = vfs.get("LICENSE.md")?.content as string;
+    expect(license).toBe("MIT License\n");
+    expect(license).not.toContain("Piaroa");
+    expect(license).not.toContain("Copyright");
+  });
+
+  it("treats a whitespace-only copyright as absent, not as a holder", () => {
+    const vfs = createVirtualFS([]);
+
+    ensurePackageFiles({ vfs, displayName: "Piaroa", copyright: "   ", year: 2024 });
+
+    // An author who cleared the field has not named a holder, and a notice
+    // reading "Copyright © 2024    " states nothing while looking like it does.
+    expect(vfs.get("LICENSE.md")?.content).toBe("MIT License\n");
+  });
 });

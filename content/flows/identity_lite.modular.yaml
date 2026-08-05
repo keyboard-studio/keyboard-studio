@@ -17,3 +17,10 @@ questions:
   - il_language_code
   - il_target_script
   - il_script_not_supported
+  # spec 059 US1 — attribution capture. Reached from il_target_script's default
+  # branch, so gated scripts terminate before it. Separate ids from the demoted
+  # author_display_name / author_contact_email / pa_copyright_holder: routing
+  # lives in definition.next, and those three belong to the phase_a chain.
+  - il_author_name
+  - il_author_email
+  - il_copyright_holder

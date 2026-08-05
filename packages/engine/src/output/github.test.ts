@@ -100,6 +100,78 @@ function makeSourceFS(): VirtualFS {
 // verifyToken tests
 // ---------------------------------------------------------------------------
 
+// spec 059 D7 / FR-002: `name` and `email` come from the SAME /user response the
+// scope check already makes. The null cases are the ones that matter — GitHub
+// sends null for an unset profile name and for a private email, and a bare login
+// handle must never stand in as a copyright holder.
+describe("verifyToken — attribution fields (spec 059 D7)", () => {
+  const API_USER = `GET ${API}/user`;
+  const SCOPES = { "X-OAuth-Scopes": "public_repo" };
+
+  it("retains name and email when the profile provides them", async () => {
+    const fetch = buildMockFetch(new Map([
+      [API_USER, { ok: true, body: { login: "alice", name: "Alice Example", email: "alice@example.org" }, headers: SCOPES }],
+    ]));
+    const r = await verifyToken("token", fetch);
+    expect(r.name).toBe("Alice Example");
+    expect(r.email).toBe("alice@example.org");
+  });
+
+  it("omits name when the profile has none set — must NOT fall back to the login handle", async () => {
+    const fetch = buildMockFetch(new Map([
+      [API_USER, { ok: true, body: { login: "alice", name: null, email: "alice@example.org" }, headers: SCOPES }],
+    ]));
+    const r = await verifyToken("token", fetch);
+    expect(r.name).toBeUndefined();
+    expect(r.name).not.toBe("alice");
+    // Still usable for publishing — a missing name must not fail verification.
+    expect(r.ok).toBe(true);
+    expect(r.login).toBe("alice");
+  });
+
+  it("omits email when it is private, without failing verification", async () => {
+    const fetch = buildMockFetch(new Map([
+      [API_USER, { ok: true, body: { login: "alice", name: "Alice Example", email: null }, headers: SCOPES }],
+    ]));
+    const r = await verifyToken("token", fetch);
+    expect(r.email).toBeUndefined();
+    expect(r.ok).toBe(true);
+    expect(r.name).toBe("Alice Example");
+  });
+
+  it("omits both when absent from the response entirely", async () => {
+    const fetch = buildMockFetch(new Map([
+      [API_USER, { ok: true, body: { login: "alice" }, headers: SCOPES }],
+    ]));
+    const r = await verifyToken("token", fetch);
+    expect(r.name).toBeUndefined();
+    expect(r.email).toBeUndefined();
+    expect(r.ok).toBe(true);
+  });
+
+  it("treats an empty-string name or email as absent, never as a holder", async () => {
+    const fetch = buildMockFetch(new Map([
+      [API_USER, { ok: true, body: { login: "alice", name: "", email: "" }, headers: SCOPES }],
+    ]));
+    const r = await verifyToken("token", fetch);
+    expect(r.name).toBeUndefined();
+    expect(r.email).toBeUndefined();
+  });
+
+  it("makes no additional request beyond the existing /user call", async () => {
+    let calls = 0;
+    const inner = buildMockFetch(new Map([
+      [API_USER, { ok: true, body: { login: "alice", name: "Alice Example" }, headers: SCOPES }],
+    ]));
+    const counting: GitHubFetchFn = (url, init) => {
+      calls += 1;
+      return inner(url, init);
+    };
+    await verifyToken("token", counting);
+    expect(calls, "retaining name/email must not cost an extra request").toBe(1);
+  });
+});
+
 describe("verifyToken", () => {
   it("returns ok:true with login when token has public_repo scope", async () => {
     const fetch = buildMockFetch(new Map([

@@ -74,6 +74,15 @@ function seedInstantiatedWorkingCopy() {
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
   ]);
   useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+  // spec 059: download is gated on attribution, and the download control's
+  // aria-label states the blocking reason when it is missing. A working copy that
+  // has reached the ship-it screen has an author, so seed one — otherwise the
+  // id-announcement test below would assert against the blocked label and fail
+  // for a reason that has nothing to do with the id it is checking.
+  useWorkingCopyStore.getState().setAttribution({
+    authorName: "Alice Example",
+    copyrightHolder: "Alice Example",
+  });
 }
 
 /** The mode toggle, located the way an author does — by its group label. */

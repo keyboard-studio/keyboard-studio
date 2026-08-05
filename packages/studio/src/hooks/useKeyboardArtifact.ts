@@ -1,5 +1,6 @@
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { BaseKeyboard, VirtualFS, KeyboardIR, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
@@ -569,7 +570,29 @@ export function useKeyboardArtifact(
         // Scaffold path — new keyboard authoring. Routes through
         // getScaffolderService() so USE_REAL=false uses the mock in CI.
         const svc = await getScaffolderService();
-        const result = await svc.scaffold(kb, scaffoldSpec.keyboardId, scaffoldSpec.displayName);
+        // spec 059 US1: pass the captured attribution so LICENSE.md,
+        // store(&COPYRIGHT) and .kps <Copyright>/<Author> name the real holder.
+        // Read from the store at call time rather than through a hook dep, so a
+        // re-scaffold picks up an attribution confirmed after the first run.
+        // Absent => the scaffolder emits no notice and flags attributionMissing;
+        // it never invents a holder.
+        const wc = useWorkingCopyStore.getState();
+        const attribution = wc.attribution;
+        // spec 059 D5: an author-supplied original holder replaces parsing, so
+        // the remedy preserves the base's notice instead of dropping it.
+        const baseHolderOverride = wc.baseHolderOverride;
+        const result = await svc.scaffold(kb, scaffoldSpec.keyboardId, scaffoldSpec.displayName, {
+          ...(attribution !== null ? { attribution } : {}),
+          ...(baseHolderOverride !== null && baseHolderOverride !== ""
+            ? { baseHolderOverride }
+            : {}),
+        });
+        // Record (or clear) the unreadable-notice block for the download gate.
+        wc.setLicenseUnparseable(result.licenseUnparseable ?? null);
+        // Retain the base's verbatim license so the DOWNLOAD path can inherit the
+        // same holders. It completes a missing LICENSE.md, and the loader never
+        // writes the base's into the VFS, so this is its only source.
+        wc.setBaseLicenseText(result.baseLicenseText ?? null);
         vfsRef.current = result.vfs;
         scaffoldWarnings.push(...result.warnings);
         // Build font + CSS blob URLs from scaffold result — mirrors the open-base path below.

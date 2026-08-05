@@ -29,7 +29,7 @@ import type { Stage } from "../hooks/useKeyboardArtifact";
 // vi.hoisted — variables referenced inside vi.mock factories.
 // ---------------------------------------------------------------------------
 
-const { mockSerializeResult, mockStage } = vi.hoisted(() => {
+const { mockSerializeResult, mockStage, mockRetry } = vi.hoisted(() => {
   return {
     mockSerializeResult: {
       current: null as
@@ -39,6 +39,10 @@ const { mockSerializeResult, mockStage } = vi.hoisted(() => {
     mockStage: {
       current: { kind: "idle" } as Stage,
     },
+    // Hoisted so a test can assert the D5 escape hatch actually RE-SCAFFOLDS.
+    // A fresh vi.fn() per call would be unassertable, and without the re-run the
+    // block would clear while the emitted LICENSE.md still lacked the holder.
+    mockRetry: vi.fn(),
   };
 });
 
@@ -85,7 +89,7 @@ vi.mock("../lib/buildOutputBundle.ts", () => ({
 vi.mock("../hooks/useKeyboardArtifact.ts", () => ({
   useKeyboardArtifact: () => ({
     stage: mockStage.current,
-    retry: vi.fn(),
+    retry: mockRetry,
     recompile: vi.fn(),
   }),
 }));
@@ -180,6 +184,14 @@ function seedInstantiatedWorkingCopy() {
   useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
     vfs,
     ir: makeTestIR([]),
+  });
+  // spec 059 D5/D6: download is gated on attribution, because a redistributable
+  // package with no rights holder is incomplete. A fully instantiated working
+  // copy therefore has one — the dedicated no-attribution case is asserted
+  // separately below.
+  useWorkingCopyStore.getState().setAttribution({
+    authorName: "Alice Example",
+    copyrightHolder: "Alice Example",
   });
 }
 
@@ -553,5 +565,153 @@ describe("OutputScreen — download filename", () => {
     } finally {
       createElementSpy.mockRestore();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Attribution gate on download (spec 059 D5/D6/FR-015)
+//
+// A redistributable package with no rights holder is incomplete, and the
+// pre-037 alternative — naming the keyboard's own display name — was a false
+// attribution. So download is GATED, not warned, and the disabled reason names
+// the real cause rather than blaming the compile.
+// ---------------------------------------------------------------------------
+
+describe("OutputScreen — attribution gate", () => {
+  function seedWithoutAttribution() {
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+      vfs,
+      ir: makeTestIR([]),
+    });
+    // Deliberately NO setAttribution — this is the case under test.
+  }
+
+  it("disables download when the working copy has no attribution", () => {
+    seedWithoutAttribution();
+    render(<OutputScreen />);
+    expect((screen.getByTestId("emit-download") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("explains WHY rather than blaming the compile", () => {
+    seedWithoutAttribution();
+    render(<OutputScreen />);
+    const label = screen.getByTestId("emit-download").getAttribute("aria-label") ?? "";
+    // Tolerant of the articles ("an author and a copyright holder") — the
+    // assertion is about naming both missing facts, not the exact phrasing,
+    // which is Content's to word (Article VI).
+    expect(label).toMatch(/author and a? ?copyright holder/i);
+    expect(label).not.toMatch(/compile/i);
+  });
+
+  it("shows an actionable message naming where to fix it", () => {
+    seedWithoutAttribution();
+    render(<OutputScreen />);
+    const msg = screen.getByTestId("attribution-required").textContent ?? "";
+    expect(msg).toMatch(/author/i);
+    expect(msg).toMatch(/copyright holder/i);
+    expect(msg).toMatch(/language step/i);
+  });
+
+  it("enables download once attribution is present", () => {
+    seedInstantiatedWorkingCopy(); // seeds attribution
+    render(<OutputScreen />);
+    expect((screen.getByTestId("emit-download") as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByTestId("attribution-required")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D5 — unreadable base notice blocks, with an escape hatch (spec 059 T037)
+//
+// The block is only acceptable because the author is never stuck AND the remedy
+// preserves the original notice rather than dropping it.
+// ---------------------------------------------------------------------------
+
+describe("OutputScreen — unreadable base copyright notice (D5)", () => {
+  const UNREADABLE = { reason: "template_placeholder", line: "Copyright (c) YYYY ______" };
+
+  function seedWithUnreadableLicense() {
+    seedInstantiatedWorkingCopy(); // attribution present, so D5 is the ONLY blocker
+    useWorkingCopyStore.getState().setLicenseUnparseable(UNREADABLE);
+  }
+
+  it("blocks download while the base notice is unreadable", () => {
+    seedWithUnreadableLicense();
+    render(<OutputScreen />);
+    expect((screen.getByTestId("emit-download") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("names THIS reason rather than the attribution one", () => {
+    seedWithUnreadableLicense();
+    render(<OutputScreen />);
+    const label = screen.getByTestId("emit-download").getAttribute("aria-label") ?? "";
+    expect(label).toMatch(/original copyright holder/i);
+    expect(label).not.toMatch(/compile/i);
+  });
+
+  it("shows the offending line so the author can see what could not be read", () => {
+    seedWithUnreadableLicense();
+    render(<OutputScreen />);
+    expect(screen.getByTestId("license-unreadable").textContent).toContain(UNREADABLE.line);
+  });
+
+  it("offers an input to supply the original holder — a block, not a dead end", () => {
+    seedWithUnreadableLicense();
+    render(<OutputScreen />);
+    expect(screen.getByLabelText("Original copyright holder")).toBeTruthy();
+    expect(screen.getByTestId("resolve-base-holder")).toBeTruthy();
+  });
+
+  it("confirming a holder records it for the re-scaffold", () => {
+    seedWithUnreadableLicense();
+    render(<OutputScreen />);
+    fireEvent.change(screen.getByLabelText("Original copyright holder"), {
+      target: { value: "  Original Author  " },
+    });
+    fireEvent.click(screen.getByTestId("resolve-base-holder"));
+    // Trimmed, so the emitted notice carries a clean holder name.
+    expect(useWorkingCopyStore.getState().baseHolderOverride).toBe("Original Author");
+  });
+
+  it("ignores a blank submission rather than clearing the block", () => {
+    seedWithUnreadableLicense();
+    render(<OutputScreen />);
+    fireEvent.click(screen.getByTestId("resolve-base-holder"));
+    expect(useWorkingCopyStore.getState().baseHolderOverride).toBeNull();
+    expect((screen.getByTestId("emit-download") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("does not show the block when the base notice was readable", () => {
+    seedInstantiatedWorkingCopy();
+    render(<OutputScreen />);
+    expect(screen.queryByTestId("license-unreadable")).toBeNull();
+    expect((screen.getByTestId("emit-download") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  // The load-bearing half of the escape hatch. Recording the holder alone would
+  // clear the block while leaving the already-emitted LICENSE.md without it — the
+  // pipeline has to re-run so the scaffolder retains the notice.
+  it("RE-SCAFFOLDS after the holder is confirmed, so the notice is actually retained", () => {
+    seedWithUnreadableLicense();
+    render(<OutputScreen />);
+    mockRetry.mockClear();
+
+    fireEvent.change(screen.getByLabelText("Original copyright holder"), {
+      target: { value: "Original Author" },
+    });
+    fireEvent.click(screen.getByTestId("resolve-base-holder"));
+
+    expect(mockRetry, "the pipeline must re-run or the emitted notice stays wrong").toHaveBeenCalled();
+  });
+
+  it("does NOT re-scaffold on a blank submission", () => {
+    seedWithUnreadableLicense();
+    render(<OutputScreen />);
+    mockRetry.mockClear();
+    fireEvent.click(screen.getByTestId("resolve-base-holder"));
+    expect(mockRetry).not.toHaveBeenCalled();
   });
 });

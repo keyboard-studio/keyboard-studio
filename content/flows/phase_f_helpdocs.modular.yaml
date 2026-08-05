@@ -2,16 +2,66 @@
 # Each question's definition lives in packages/studio/src/survey/questions/f/<id>.ts.
 # This file contains only the flow metadata and ordered question ID list.
 # The original phase_f_helpdocs.yaml is preserved — do NOT delete it.
+#
+# Membership is a DECLARATION OF MEMBERSHIP, not a routing table — routing lives
+# in each module's definition.next (see loadModularFlow.ts). Being listed here
+# does NOT mean every author is asked: most of these sit behind an opt-in gate.
+#
+# DESIGN RULE: ask only what cannot be derived from the keyboard AND that the
+# author can answer from memory in one breath. Anything needing research (which
+# font covers the repertoire, what the canonical mark order is) or experience the
+# author does not have yet (a brand-new keyboard has no support history) is
+# OPT-IN, never on the default path.
+#
+# DEFAULT PATH — 5 screens, exactly ONE of them required:
+#   pf_welcome_paragraph   (REQUIRED — the only thing a help page truly needs)
+#   pf_usage_tip_1         (optional, one tip)
+#   pf_more_detail_gate    (one click; No is a good answer)
+#   pf_credits             (optional)
+#   pf_contact_info        (optional)
+#
+# OPT-IN BATTERY — reached only when pf_more_detail_gate is Yes:
+#   pf_doc_language -> pf_font_guidance -> pf_usage_tip_2 -> pf_scope_variety
+#   -> pf_provenance_basis -> pf_design_rationale
+#   -> [pf_canonical_order -> pf_script_glossary, non-roman only]
+#   -> pf_example_words -> pf_troubleshooting -> pf_related_keyboards
+#   -> pf_known_limitations -> pf_further_reading -> pf_project_url
+#   -> pf_credits -> pf_contact_info
+#
+# pf_design_rationale branches on ctx.routing_group ("non-roman" vs
+# "qwerty-qwertz", set from the identity step) so canonical mark order and script
+# terminology are asked only where they mean something.
+#
+# DEMOTED (deliberately absent, revivable by re-adding the id here):
+#   pf_usage_tip_3, pf_usage_tip_4, pf_usage_tip_5
+# Five fixed tip slots fit neither end of the shipped corpus — 54% of published
+# help pages are one paragraph plus an auto-rendered layout chart, while
+# complex-script keyboards document 14-30 rule sections. The three modules
+# remain registered, on disk, and test-covered (demotion is not deletion).
 
 flow_id: phase_f_helpdocs
 phase: "F"
 
 questions:
+  # --- default path ---
   - pf_welcome_paragraph
   - pf_usage_tip_1
+  - pf_more_detail_gate
+  # --- opt-in battery (gate = Yes) ---
+  - pf_doc_language
+  - pf_font_guidance
   - pf_usage_tip_2
-  - pf_usage_tip_3
-  - pf_usage_tip_4
-  - pf_usage_tip_5
+  - pf_scope_variety
+  - pf_provenance_basis
+  - pf_design_rationale
+  - pf_canonical_order
+  - pf_script_glossary
+  - pf_example_words
+  - pf_troubleshooting
+  - pf_related_keyboards
+  - pf_known_limitations
+  - pf_further_reading
+  - pf_project_url
+  # --- close (both paths) ---
   - pf_credits
   - pf_contact_info

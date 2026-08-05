@@ -71,14 +71,16 @@ describe("il_target_script — definition", () => {
     expect(fallthrough?.condition).toBeUndefined();
   });
 
-  it("default branch goto is null (terminal)", () => {
+  // spec 059 US1: the supported path is no longer terminal — it continues into
+  // attribution capture. The GATED path still terminates (see the branch above).
+  it("default branch continues to attribution capture", () => {
     const rules = definition.next as Array<{
       condition?: string;
       goto: string | null;
       default?: unknown;
     }>;
     const fallthrough = rules.find((r) => "default" in r);
-    expect(fallthrough?.goto).toBeNull();
+    expect(fallthrough?.goto).toBe("il_author_name");
   });
 });
 

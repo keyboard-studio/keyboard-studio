@@ -222,6 +222,12 @@ const IDENTITY_PHASE_RESULT = {
     { questionId: "il_language_english", answerType: "text" as const, value: "Hausa" },
     { questionId: "il_language_code", answerType: "text" as const, value: "ha" },
     { questionId: "il_target_script", answerType: "select" as const, value: "Latn" },
+    // spec 059 US1: identity-lite continues into attribution, so a genuinely
+    // COMPLETED result includes these. Without them, resume correctly lands on
+    // the first unanswered attribution question rather than the flow's end.
+    { questionId: "il_author_name", answerType: "text" as const, value: "Alice Example" },
+    { questionId: "il_author_email", answerType: "text" as const, value: "alice@example.org" },
+    { questionId: "il_copyright_holder", answerType: "text" as const, value: "Hausa Language Committee" },
   ],
 };
 
@@ -240,7 +246,8 @@ describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
 
     render(<IdentityLiteAdapter onComplete={() => {}} />);
 
-    expect(screen.getByText("Which script will THIS keyboard type?")).toBeDefined();
+    // spec 059 US1: the flow's last question is now the copyright holder.
+    expect(screen.getByText("Who holds the copyright for this keyboard?")).toBeDefined();
     expect(
       screen.queryByText("What is your language called in your own language?"),
     ).toBeNull();
@@ -248,12 +255,16 @@ describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
 
   it("completion writes identityResult, surveyContext, AND identityPhaseResult before onComplete", () => {
     useSurveySessionStore.getState().setIdentityPhaseResult(IDENTITY_PHASE_RESULT);
+    // R7 ordering: SNAPSHOT the store from inside the callback, but ASSERT
+    // outside it.
+    //
+    // An expect() that throws in here surfaces as an uncaught React error and
+    // does NOT fail the test — verified by mutation: removing the author_contact
+    // write made this assertion throw while the suite still reported all green.
+    // Capturing and asserting afterwards is what actually gates.
+    let atCompletion: ReturnType<typeof useSurveySessionStore.getState> | null = null;
     const onComplete = vi.fn((_result: unknown) => {
-      // Store writes must have landed BEFORE onComplete fires (R7 ordering).
-      const s = useSurveySessionStore.getState();
-      expect(s.identityResult?.bcp47).toBe("ha-Latn");
-      expect(s.surveyContext.language_name).toBe("Hausa");
-      expect(s.identityPhaseResult?.answers.length).toBe(4);
+      atCompletion = { ...useSurveySessionStore.getState() };
     });
 
     render(<IdentityLiteAdapter onComplete={onComplete} />);
@@ -261,5 +272,15 @@ describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
     fireEvent.click(screen.getByTestId("survey-advance"));
 
     expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(atCompletion, "store was not snapshotted — onComplete never ran").not.toBeNull();
+    const s = atCompletion!;
+    // Every write below must have landed BEFORE onComplete fired.
+    expect(s.identityResult?.bcp47).toBe("ha-Latn");
+    expect(s.surveyContext.language_name).toBe("Hausa");
+    // 4 -> 7: spec 059 US1 appends the three attribution answers.
+    expect(s.identityPhaseResult?.answers.length).toBe(7);
+    // spec 059 FR-016: publishing the contact here is what activates the Phase F
+    // pf_contact_info pre-fill.
+    expect(s.surveyContext.author_contact).toBe("alice@example.org");
   });
 });
