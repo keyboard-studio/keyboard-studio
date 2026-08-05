@@ -22,7 +22,7 @@
 
 import { create } from "zustand";
 import type { AxisFill, BaseKeyboard, KeyboardIR, LintFinding, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
-import { detectMarkInputOrderFromImport } from "@keyboard-studio/engine";
+import { detectMarkInputOrderFromImport, renameTouchKey } from "@keyboard-studio/engine";
 import type { KeyEditOperation, KeyEditOverlay } from "@keyboard-studio/engine";
 import {
   mergePhaseResults,
@@ -37,6 +37,7 @@ import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
 import { resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
 import type { Step } from "../steps/types.ts";
 import { isSequenceAssignmentForChar } from "../editors/assignLoop/patternIds.ts";
+import { promoteKeyAtAddressToHandSet } from "../editors/assignLoop/touchBehavior.ts";
 
 /**
  * One sibling-accent bulk group: the batch of accented siblings the longpress
@@ -150,6 +151,19 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
  * would be unsound).
  */
 export type PendingKeyEditOperation = DistributiveOmit<KeyEditOperation, "seq">;
+
+/**
+ * Result of {@link WorkingCopyState.commitTouchKeyRename} (spec 058 T091).
+ * `renamedAddresses` echoes the engine's own old -> new address pairs
+ * (`RenameTouchKeyResult.renamedAddresses`) so a caller that wants to react
+ * further (e.g. re-selecting the renamed key in the grid) does not need to
+ * re-derive them.
+ */
+export interface CommitTouchKeyRenameOutcome {
+  readonly changed: boolean;
+  readonly renamedRuleNodeIds: readonly string[];
+  readonly renamedAddresses: readonly { readonly oldAddress: string; readonly newAddress: string }[];
+}
 
 /**
  * The touch step's mode selector (FR-036…FR-036g): `"character"` is the
@@ -585,6 +599,36 @@ export interface WorkingCopyState {
    */
   undoKeyEdit: () => void;
   /**
+   * The complete key-rename reference fix-up (spec 058 T091;
+   * key-id-policy.md §4; touch-key-rule-join.md §6.1's final bullet). ONE
+   * call:
+   *
+   * 1. Runs the engine's {@link renameTouchKey} against the working `ir` —
+   *    every `.kmn` binding for `fromKeyId` (guard and producing alike), the
+   *    layout key id on every layer and platform (`sk`/`multitap`/`flick`
+   *    alike), and the `touchLayout.nodeIds` entries that embed it.
+   * 2. Promotes every renamed occurrence to `hand-set` provenance via the
+   *    ADDRESS-matched T059 path (`promoteKeyAtAddressToHandSet`) — never an
+   *    id-matched one (key-id-policy.md §4's second named failure mode: an
+   *    id-matched promotion has no single correct id to match on across a
+   *    rename boundary).
+   * 3. Writes the result via the overlay-preserving {@link setWorkingIR} seam.
+   * 4. Remaps any `deletedTouchKeyIds` address matching a renamed occurrence
+   *    to its new address, THROUGH the existing `restoreTouchKey`/
+   *    `deleteTouchKey` actions — so undo entries stay consistent and step
+   *    ordering can never observe a stale address (FR-028, FR-033). A stale
+   *    address left unmapped would silently fail to resolve elsewhere
+   *    (`touchKeyAddress.ts`'s documented carve-cascade idempotence) — here
+   *    that would be silent data loss, so it is remapped explicitly.
+   *
+   * No-op (`changed: false`) when there is no working IR yet, or when
+   * `fromKeyId` matches nothing anywhere. This action does NOT append a
+   * `RenameKeyOp` to `keyEditOverlay.ops` — that stays the caller's own
+   * `commitKeyEdit(op)` call, a sibling of this one, not something this
+   * action performs on the caller's behalf.
+   */
+  commitTouchKeyRename: (fromKeyId: string, toKeyId: string) => CommitTouchKeyRenameOutcome;
+  /**
    * Switch the touch step's mode selector. A view toggle only — never clears
    * `touchDraft` or `keyEditOverlay` as a side effect (FR-036b).
    */
@@ -850,7 +894,7 @@ export type WorkingCopyData = Omit<
   | "markStale" | "clearStale"
   | "setValidatorFindings"
   | "setAxisFills"
-  | "commitKeyEdit" | "undoKeyEdit" | "setTouchEditorMode"
+  | "commitKeyEdit" | "undoKeyEdit" | "commitTouchKeyRename" | "setTouchEditorMode"
 >;
 
 const INITIAL_STATE: WorkingCopyData = {
@@ -1162,6 +1206,55 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         undoStack: s.undoStack.filter((e) => !(e.k === 'k' && e.seq === removed.seq)),
       };
     }),
+
+  // The T091 complete rename fix-up — see the interface doc comment for the
+  // full contract. Reads/writes via `get()` rather than a single `set()`
+  // reducer because it composes THREE existing seams (setWorkingIR,
+  // restoreTouchKey, deleteTouchKey) rather than reimplementing their
+  // semantics; all of it runs synchronously in one call, so no external
+  // subscriber can observe an in-between state (step ordering never sees a
+  // stale address, FR-033).
+  commitTouchKeyRename: (fromKeyId, toKeyId) => {
+    const ir = get().ir;
+    if (ir === null) {
+      return { changed: false, renamedRuleNodeIds: [], renamedAddresses: [] };
+    }
+
+    const result = renameTouchKey(ir, fromKeyId, toKeyId);
+    if (!result.changed) {
+      return { changed: false, renamedRuleNodeIds: result.renamedRuleNodeIds, renamedAddresses: [] };
+    }
+
+    // Address-matched provenance promotion (spec 058 T059) for every renamed
+    // occurrence, at its NEW address — never id-matched (key-id-policy.md
+    // §4's second named failure mode).
+    let nextIr = result.ir;
+    if (nextIr.touchLayout !== undefined) {
+      let layout = nextIr.touchLayout;
+      for (const { newAddress } of result.renamedAddresses) {
+        layout = promoteKeyAtAddressToHandSet(layout, newAddress);
+      }
+      nextIr = { ...nextIr, touchLayout: layout };
+    }
+    get().setWorkingIR(nextIr);
+
+    // Deletion-overlay remap THROUGH the existing delete/restore actions
+    // (FR-028, FR-033) — never left to resolution failure. restoreTouchKey
+    // drops the stale 't' undo entry; deleteTouchKey pushes a fresh one at
+    // the new address, so undo entries stay consistent.
+    for (const { oldAddress, newAddress } of result.renamedAddresses) {
+      if (get().deletedTouchKeyIds.has(oldAddress)) {
+        get().restoreTouchKey(oldAddress);
+        get().deleteTouchKey(newAddress);
+      }
+    }
+
+    return {
+      changed: true,
+      renamedRuleNodeIds: result.renamedRuleNodeIds,
+      renamedAddresses: result.renamedAddresses,
+    };
+  },
 
   setTouchEditorMode: (mode) =>
     set({ touchEditorMode: mode }),

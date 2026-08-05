@@ -39,7 +39,11 @@ async function chooseLocale(
   const trigger = navBar(page).locator("#nav-language-select");
   await trigger.waitFor({ timeout: 10_000 });
   await trigger.click();
-  await trigger.locator("xpath=..").locator(`li[data-value="${locale}"]`).click();
+  // The option list is portalled to document.body (ui/SelectMenu.tsx), not a
+  // DOM sibling of the trigger — `xpath=..` no longer reaches it. Exactly one
+  // `role="listbox"` is ever open at a time (the portal only mounts while
+  // `open` is true), so this is unambiguous.
+  await page.locator('ul[role="listbox"]').locator(`li[data-value="${locale}"]`).click();
 }
 
 test.describe("Locale switcher — persistence + no first-paint English flash", () => {

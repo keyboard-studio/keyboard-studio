@@ -163,3 +163,68 @@ export type {
   LayerFamilyGrouping,
 } from "./layerFamilies.js";
 
+export {
+  TOUCH_SYNTH_NODE_ID_PREFIX,
+  TOUCH_SYNTH_STORE_NAME_PREFIX,
+  TOUCH_SYNTH_GUARD_STORE_NAME,
+  isSingleCombiningMark,
+  checkOpaqueGate,
+  ensureTouchKeyRule,
+  isGuardShapedStore,
+  findReusableGuardStore,
+  planGuardSynthesis,
+  applyGuardSynthesis,
+  planCaseTripleSynthesis,
+  applyCaseTripleSynthesis,
+  removeTouchKeyRule,
+  planKeyDeletionRuleRemoval,
+  applyKeyDeletionRuleRemoval,
+  renameTouchKeyRule,
+  renameTouchKey,
+} from "./touchRuleSynthesis.js";
+export type {
+  OpaqueGateResult,
+  TouchRuleSynthesisBlocked,
+  EnsureTouchKeyRuleRequest,
+  EnsureTouchKeyRuleResult,
+  EnsureTouchKeyRuleOutcome,
+  GuardRuleDescription,
+  GuardSynthesisPlan,
+  GuardSynthesisPlanResult,
+  ApplyGuardSynthesisResult,
+  CaseTripleRuleDescription,
+  CaseTriplePlan,
+  CaseTriplePlanResult,
+  ApplyCaseTripleSynthesisResult,
+  RemoveTouchKeyRuleResult,
+  KeyDeletionRuleRemovalPlan,
+  RenameTouchKeyRuleResult,
+  RenameTouchKeyResult,
+} from "./touchRuleSynthesis.js";
+
+export {
+  RESERVED_KEY_ID_PREFIXES,
+  RESERVED_SENTINEL_KEY_IDS,
+  RESERVED_PRIVATE_USE_KEY_IDS,
+  checkKeyIdSyntax,
+  checkReservedKeyId,
+  validateCandidateKeyId,
+  proposeKeyId,
+} from "./keyIdMinting.js";
+export type {
+  KeyIdSyntaxRejectionReason,
+  KeyIdSyntaxCheckResult,
+  ReservedKeyIdRejectionReason,
+  ExistingKeyIdInScope,
+  KeyIdCandidateContext,
+  KeyIdRejectionReason,
+  ValidateKeyIdResult,
+  KeyIdMintingPath,
+  NoCaseTripleReason,
+  CaseTripleRuleLines,
+  KeyIdMintingAlternativeReason,
+  KeyIdMintingAlternative,
+  KeyIdMintingProposal,
+  KeyIdMintingRequest,
+} from "./keyIdMinting.js";
+

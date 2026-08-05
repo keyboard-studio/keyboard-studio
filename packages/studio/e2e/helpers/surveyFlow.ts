@@ -168,7 +168,11 @@ export async function driveIdentityLite(
   const targetScriptSelect = page.locator("#il_target_script");
   await targetScriptSelect.waitFor({ timeout: 10_000 });
   await targetScriptSelect.click();
-  await targetScriptSelect.locator('xpath=..').locator(`li[data-value="${script}"]`).click();
+  // The option list is portalled to document.body (ui/SelectMenu.tsx), not a
+  // DOM sibling of the trigger — `xpath=..` no longer reaches it. Exactly one
+  // `role="listbox"` is ever open at a time (the portal only mounts while
+  // `open` is true), so this is unambiguous.
+  await page.locator('ul[role="listbox"]').locator(`li[data-value="${script}"]`).click();
   await surveyAdvance(page).click();
 
   // Robustness check for the phase boundary: identity-lite hands off
@@ -449,7 +453,11 @@ export async function driveTouchGallery(page: Page): Promise<void> {
     // this character still needs the default long-press method + Apply.
     if (await continueButton.isDisabled()) {
       await hostKeySelect.click();
-      await hostKeySelect.locator('xpath=..').locator('li[data-value="K_A"]').click();
+      // The option list is portalled to document.body (ui/SelectMenu.tsx),
+      // not a DOM sibling of the trigger — `xpath=..` no longer reaches it.
+      // Exactly one `role="listbox"` is ever open at a time (the portal only
+      // mounts while `open` is true), so this is unambiguous.
+      await page.locator('ul[role="listbox"]').locator('li[data-value="K_A"]').click();
       await applyButton.click();
     }
     await continueButton.click();
