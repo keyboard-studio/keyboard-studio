@@ -38,8 +38,10 @@
     "content-i18n-lint": "node utilities/content-i18n-lint/index.js",
     "test-antipattern-lint": "node utilities/test-antipattern-lint/index.js",
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,json,md}\"",
-    "crowdin:upload": "crowdin upload sources -b main",
-    "crowdin:download": "crowdin download -b main"
+    "crowdin:upload": "crowdin upload sources",
+    "crowdin:download": "crowdin download",
+    "crowdin:diagnose": "node utilities/crowdin-diagnose/index.js",
+    "crowdin:diagnose:selftest": "node utilities/crowdin-diagnose/selftest.js"
   },
   "devDependencies": {
     "@crowdin/cli": "^4.14.4",

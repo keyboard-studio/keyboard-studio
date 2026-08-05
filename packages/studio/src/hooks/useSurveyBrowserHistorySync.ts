@@ -52,14 +52,44 @@
 // browser event. This holds across: in-app Back (direct call, no browser
 // motion), browser Back (matches -> applied; degrades to no-op otherwise),
 // browser Forward (never matches a BACK prediction -> always a no-op, an
-// explicitly acceptable degrade), hash-route jumps away from #survey (this
-// hook is unmounted with SurveyView; the returning hashchange remounts
-// SurveyView fresh — an existing, unrelated invariant — and this hook's mount
-// effect re-tags the current entry to match), and page reload (the browser
-// preserves `history.state` for the current entry across reload in the same
-// tab, but the store does not persist across reload — the mount effect
-// retags the current entry to the FRESH (or freshly-restored) store position,
-// so the two are back in lockstep from the first render onward).
+// explicitly acceptable degrade), hash-route jumps away from #survey (see the
+// re-derivation immediately below), and page reload (the browser preserves
+// `history.state` for the current entry across reload in the same tab, but the
+// store does not persist across reload — the mount effect retags the current
+// entry to the freshly-restored store position, so the two are back in
+// lockstep from the first render onward).
+//
+// PREMISE RE-DERIVED FOR SPEC 057 (FR-017, defect D-9a).
+//
+// This docstring used to say that a hash-route jump away from #survey
+// "remounts SurveyView fresh — an existing, unrelated invariant". It was not
+// unrelated: it WAS defect D-1, the mount-time traversal reset, and it is now
+// gone. The wizard's position survives a tab round trip, so the ground truth
+// under this hook has changed. Traced against a preserved store the design
+// gets strictly MORE correct, in three specific ways — which is why this is a
+// re-derivation and not a rewrite:
+//
+//   1. THE MOUNT TAG. It reads `activeStepId` at mount and tags the current
+//      entry with it. Against a reset store that meant "identity" every time;
+//      against a preserved store it means the step the author is actually on.
+//      The tag agreed with the store before and agrees with it now — but now
+//      it agrees with something true.
+//   2. THE BACK PREDICTION. `expectedBackTarget` is computed from the store's
+//      `history`, which the round trip used to empty. After returning to the
+//      tab the prediction could then match no entry still on the browser
+//      stack, so every native Back degraded to a no-op. With history
+//      preserved, the entries pushed BEFORE the author left are exactly the
+//      ones the prediction now names — the bridge keeps working across a round
+//      trip instead of quietly going inert after one.
+//   3. THE TAB-SWITCH ENTRY ITSELF. A hash-route change pushes a browser entry
+//      carrying no `ksStep` of ours (`state === null`), and the listener
+//      already returns early on that — so popping back across a tab switch is
+//      a no-op by construction. No new rule was needed.
+//
+// FR-016's two accepted degrades are deliberately NOT reopened: a browser
+// Forward still never matches a back prediction and is still a silent no-op,
+// and the first native Back after an in-app Back is still absorbed. Changing
+// either is a separate, explicit decision.
 //
 // Not fully covered (acknowledged, out of the five required cases): resuming
 // a draft in a BRAND NEW tab/window that never itself pushed the resumed
@@ -87,19 +117,28 @@ function readKsStep(state: unknown): string | undefined {
 }
 
 /**
- * Optional ordering guard (dev-only). The caller's reset/restore effect
- * (StudioShell.tsx's SurveyView) MUST run before this hook's own mount-tag
- * effect (see the module docstring) so the entry gets tagged with the
- * SETTLED activeStepId, not a stale value left over from a prior session on
- * the module-level store singleton. Passing the ref that effect flips at its
- * end turns the "declaration order" contract into a live check: if the two
- * are ever reordered (or the sync hook's own effect somehow runs first),
- * `.current` is still `false` when this hook's mount effect runs, and DEV
- * fails loud instead of silently tagging the wrong step. Not a proxy check —
- * it inspects the actual antecedent-effect settlement, not activeStepId's
- * value (which cannot distinguish a fresh reset from a legitimate restore).
+ * Optional ordering guard (dev-only). The caller's draft-restore settlement
+ * effect (StudioShell.tsx's SurveyView) MUST run before this hook's own
+ * mount-tag effect, so the entry gets tagged with the SETTLED activeStepId
+ * rather than one still in flux.
+ *
+ * Spec 057 (FR-017): this guard used to key on the mount-time reset/restore
+ * effect. That effect was defect D-1 and has been deleted. Re-pointing the
+ * guard at draft-restore settlement — the antecedent that genuinely remains —
+ * is not bookkeeping: had the caller simply dropped the argument, the guard's
+ * optional parameter would have become `undefined` and the check would have
+ * gone SILENTLY INERT rather than failing, which is the exact unprotected-
+ * reordering risk it exists to catch. Silent inertness is worse than a
+ * failure, because nothing surfaces it.
+ *
+ * Passing the ref that effect flips at its end turns the "declaration order"
+ * contract into a live check: if the two are ever reordered (or this hook's
+ * own effect somehow runs first), `.current` is still `false` when the mount
+ * effect runs and DEV fails loud. Not a proxy check — it inspects the actual
+ * antecedent-effect settlement, not activeStepId's value (which cannot
+ * distinguish a preserved position from a freshly-restored one).
  */
-export function useSurveyBrowserHistorySync(resetOrRestoreSettledRef?: RefObject<boolean>): void {
+export function useSurveyBrowserHistorySync(draftRestoreSettledRef?: RefObject<boolean>): void {
   const activeStepId = useSurveySessionStore((s) => s.activeStepId);
   const lastNavigation = useSurveySessionStore((s) => s.lastNavigation);
 
@@ -110,22 +149,24 @@ export function useSurveyBrowserHistorySync(resetOrRestoreSettledRef?: RefObject
 
   // Effect 1 — mount tag. `replaceState`, not `pushState`: this labels the
   // entry that already exists rather than adding a new one, so a Back click
-  // at the very first (untouched) step still leaves the app naturally.
-  // Reads the store's CURRENT activeStepId at the time this runs, so it
-  // reflects whatever SurveyView's own reset-on-mount / draft-restore effect
-  // already decided (this hook must be called AFTER that effect — see the
-  // call site in StudioShell.tsx's SurveyView).
+  // at the very first (untouched) step still leaves the app naturally — and,
+  // since spec 057, so that a tab round trip does not add a stack entry the
+  // author has to cross twice to leave.
+  //
+  // Reads the store's CURRENT activeStepId at the time this runs. Against a
+  // preserved store that is the step the author is actually on, whether they
+  // walked to it, resumed into it, or came back to it from another tab.
   useEffect(() => {
     if (
       import.meta.env.DEV &&
-      resetOrRestoreSettledRef !== undefined &&
-      resetOrRestoreSettledRef.current !== true
+      draftRestoreSettledRef !== undefined &&
+      draftRestoreSettledRef.current !== true
     ) {
       devLog.error(
-        "[useSurveyBrowserHistorySync] mounted before the survey reset/restore effect " +
-          "settled — this hook must be called AFTER that effect (see the call site in " +
+        "[useSurveyBrowserHistorySync] mounted before the draft-restore settlement " +
+          "effect ran — this hook must be called AFTER that effect (see the call site in " +
           "StudioShell.tsx's SurveyView), or the browser history entry will get tagged " +
-          "with a stale activeStepId left over from a prior session.",
+          "before the restored position is observable.",
       );
     }
     const current = useSurveySessionStore.getState().activeStepId;

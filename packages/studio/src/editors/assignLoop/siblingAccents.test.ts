@@ -54,10 +54,23 @@ describe("siblingAccentPlacements", () => {
     expect(chars).toEqual(["á"]);
   });
 
-  it("returns [] for a non-Latin base (Latin-only scope gate)", () => {
-    // Cyrillic и-with-grave shares no a-z base; the accelerator declines.
-    const placements = siblingAccentPlacements("ѝ", "K_?", ["ѝ", "и"]);
-    expect(placements).toEqual([]);
+  it("offers Cyrillic siblings sharing a non-Latin base (script-neutral gate, shaped-bug fix)", () => {
+    // и (U+0438) is the shared base; й (breve, U+0439) is accepted and
+    // excluded, leaving its two OTHER inventory siblings: ѝ (grave, U+045D)
+    // and ӥ (diaeresis, U+04E5). Under the old `/^[a-z]$/` Latin-only gate
+    // this would have returned [] outright (baseLetterOf("й") === "и" fails
+    // `/^[a-z]$/`) — this pins the broadened `\p{L}` gate actually returning
+    // BOTH non-Latin siblings, not merely declining to crash on them.
+    const placements = siblingAccentPlacements("й", "K_I", ["и", "й", "ѝ", "ӥ"]);
+    const lower = placements
+      .filter((p) => p.layer === "default")
+      .map((p) => p.char);
+
+    // и is the base letter (not itself accented — excluded); й is the
+    // accepted char (excluded). Ordered grave-before-diaeresis per
+    // DIACRITIC_PRIORITY.
+    expect(lower).toEqual(["ѝ", "ӥ"]);
+    expect(placements.every((p) => p.hostKey === "K_I")).toBe(true);
   });
 
   it("returns [] when no inventory character shares the base", () => {

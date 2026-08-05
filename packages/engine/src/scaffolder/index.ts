@@ -276,7 +276,23 @@ function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
 // tracks. Behaviour here is unchanged: still generated last, still only when the
 // path is absent.
 
-function generateStubs(
+/**
+ * Fill in every scaffold stub file that is MISSING from `vfs` — `.kmn`,
+ * `.kvks`, touch layout, icon, welcome/readme, help, LICENSE, HISTORY,
+ * README, tests, and (last, because it reads the final `.kmn`) the `.kps`
+ * package. Existing entries are never overwritten, so calling this on an
+ * already-populated VFS only completes the keyboard directory.
+ *
+ * Exported for the output path: the working copy of a Track 1 (new-from-base)
+ * project is instantiated from `fetchKeyboardSourceToVfs`, which deliberately
+ * never writes the base's `.kps` into the VFS (it references compiled
+ * `../build/*` artifacts). Whether the scaffolded VFS (which does carry a
+ * generated `.kps`) ever replaces it in the working-copy store is a race the
+ * commit seam intentionally does not re-run (StudioShell's
+ * `instantiatedForBaseIdRef`), so serialization completes the directory here
+ * instead — a downloaded keyboard must be submittable as-is (spec §12).
+ */
+export function generateStubs(
   vfs: VirtualFS,
   keyboardId: string,
   displayName: string,

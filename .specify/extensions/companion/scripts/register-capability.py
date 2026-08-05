@@ -210,6 +210,7 @@ def register(root: str, name: str, match: list[str], exclude: list[str],
 
 
 def main(argv=None) -> int:
+    cc.configure_stdio()
     ap = argparse.ArgumentParser(description="Append a Living-Specs capability to companion.yml.")
     ap.add_argument("--name", required=True, help="capability name (idempotency key)")
     ap.add_argument("--match", action="append", default=[], help="membership glob (repeatable)")

@@ -1,0 +1,305 @@
+// Unit tests for CarveGalleryV2.tsx — the character-first carve gallery
+// (#1399). Component-level coverage was previously zero for this file; this
+// suite exercises the behavior CarveGallery.test.tsx already covers for the
+// sibling rule/node "Rail" view, adapted to V2's flatter, dialog-free
+// interaction model (toggleCell/toggleGroup call cascadeDelete/cascadeRestore
+// directly — there is no ConfirmDialog in this view).
+//
+// collectCharContributors is MOCKED (vi.mock, importActual for everything
+// else) exactly as in CarveGallery.test.tsx, so cascade behavior is driven
+// deterministically. neededCharsForLanguage (../../lib/services.ts) is also
+// mocked to keep the suite offline/deterministic, per that file's pattern.
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { render } from '../../test/renderWithI18n.tsx';
+import type { IRRule, IRGroup, IRStore, KeyboardIR, RemovalCapability } from '@keyboard-studio/contracts';
+import { createVirtualFS } from '@keyboard-studio/contracts';
+import { basicKbdus } from '@keyboard-studio/contracts/fixtures';
+import { CarveGalleryV2 } from './CarveGalleryV2.tsx';
+import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
+import type { CharContributors } from '@keyboard-studio/engine';
+
+const { collectCharContributorsMock, neededCharsResult } = vi.hoisted(() => {
+  let _needed: Set<string> | null = null;
+  return {
+    collectCharContributorsMock: vi.fn(),
+    neededCharsResult: {
+      get: () => _needed,
+      set: (v: Set<string> | null) => { _needed = v; },
+    },
+  };
+});
+
+vi.mock('@keyboard-studio/engine', async () => {
+  const actual = await vi.importActual<typeof import('@keyboard-studio/engine')>('@keyboard-studio/engine');
+  return {
+    ...actual,
+    collectCharContributors: collectCharContributorsMock,
+  };
+});
+
+// Offline stub — see the identical rationale in CarveGallery.test.tsx.
+vi.mock('../../lib/services.ts', () => ({
+  neededCharsForLanguage: async () => neededCharsResult.get(),
+}));
+
+afterEach(() => {
+  cleanup();
+  collectCharContributorsMock.mockReset();
+  neededCharsResult.set(null);
+});
+
+beforeEach(() => {
+  useWorkingCopyStore.getState().reset();
+});
+
+// ---------------------------------------------------------------------------
+// Fixture — one keyboard exercising all four grouping/search/banner paths:
+//   'a' — K_A,             basic-letter / direct-key
+//   '1' — K_1,             digit        / direct-key
+//   'C' — Shift+K_C,       basic-letter / direct-key (key label "Shift + C")
+//   'q' — store item,      basic-letter / store       (no key sequence)
+// ---------------------------------------------------------------------------
+
+function makeSimpleRule(nodeId: string, vkey: string, char: string, modifiers: string[] = []): IRRule {
+  return {
+    nodeId,
+    context: [{ kind: 'vkey', name: vkey, modifiers }],
+    output: [{ kind: 'char', value: char }],
+  };
+}
+
+function makeGroup(nodeId: string, name: string, rules: IRRule[]): IRGroup {
+  return { nodeId, name, usingKeys: true, rules, readonly: false };
+}
+
+function makeStore(nodeId: string, name: string, chars: string[]): IRStore {
+  return { nodeId, name, items: chars.map((c) => ({ kind: 'char' as const, value: c })), isSystem: false };
+}
+
+function makeIR(groups: IRGroup[], stores: IRStore[] = []): KeyboardIR {
+  return {
+    origin: 'imported',
+    header: {
+      keyboardId: 'test', name: 'Test', bcp47: [], copyright: '', version: '1.0',
+      targets: [], storeDirectives: [],
+    },
+    stores,
+    groups,
+    comments: [],
+    raw: [],
+    recognizedPatterns: [],
+  };
+}
+
+function emptyContributors(targetChar: string): CharContributors {
+  return { targetChar, ruleNodeIds: [], storeSlotIds: [], storeSlots: [], locations: [], blocked: [] };
+}
+
+function makeFixtureIR(): KeyboardIR {
+  return makeIR(
+    [makeGroup('g-main', 'main', [
+      makeSimpleRule('r-a', 'K_A', 'a'),
+      makeSimpleRule('r-1', 'K_1', '1'),
+      makeSimpleRule('r-shiftc', 'K_C', 'C', ['SHIFT']),
+    ])],
+    [makeStore('store#sX', 'sX', ['q'])],
+  );
+}
+
+/** Maps each fixture character to its contributor ids — mirrors CarveGallery.test.tsx's per-char mock shape. */
+function mockFixtureContributors() {
+  collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => {
+    if (ch === 'a') return { ...emptyContributors(ch), ruleNodeIds: ['r-a'] };
+    if (ch === '1') return { ...emptyContributors(ch), ruleNodeIds: ['r-1'] };
+    if (ch === 'C') return { ...emptyContributors(ch), ruleNodeIds: ['r-shiftc'] };
+    if (ch === 'q') return { ...emptyContributors(ch), storeSlotIds: ['store#sX#0'] };
+    return emptyContributors(ch);
+  });
+}
+
+/** Instantiate the working copy (Track 2, mirrors CarveGallery.test.tsx's renderGallery) and render CarveGalleryV2. */
+function renderGalleryV2(ir: KeyboardIR, caps: Map<string, RemovalCapability> = new Map()) {
+  const vfs = createVirtualFS();
+  useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir, removalCapabilities: caps });
+  return render(<CarveGalleryV2 onComplete={vi.fn()} />);
+}
+
+// ---------------------------------------------------------------------------
+// 1. Renders the character cells for the fixture keyboard.
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — renders character cells', () => {
+  it('renders one cell per distinct produced character, each with a codepoint-bearing accessible name', () => {
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+
+    expect(screen.getByRole('button', { name: 'a — U+0061' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '1 — U+0031' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'C — U+0043' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'q — U+0071' })).not.toBeNull();
+
+    // Status strip counts all 4 as kept before any interaction.
+    expect(screen.getByText('4').textContent).toBe('4');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2. toggleCell — discard cascades to the contributor id; toggling again restores.
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — toggleCell', () => {
+  it('discards a character (cascade marks its rule contributor deleted) and restores it on a second click', () => {
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+
+    const cell = screen.getByRole('button', { name: 'a — U+0061' });
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(false);
+    expect(cell.getAttribute('aria-pressed')).toBe('false');
+
+    fireEvent.click(cell);
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(true);
+    expect(cell.getAttribute('aria-pressed')).toBe('true');
+
+    fireEvent.click(cell);
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(false);
+    expect(cell.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('discards a store-backed character (cascade marks its store-slot contributor deleted)', () => {
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+
+    const cell = screen.getByRole('button', { name: 'q — U+0071' });
+    fireEvent.click(cell);
+
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#sX#0')).toBe(true);
+    expect(cell.getAttribute('aria-pressed')).toBe('true');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3. toggleGroup — discard/restore every toggleable cell in a group at once.
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — toggleGroup', () => {
+  it('"Discard all" on a group cascades every cell in it; "Restore all" reverses it', () => {
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+
+    // The default (category) grouping puts '1' alone in "Digits & numerals".
+    const digitsRegion = screen.getByRole('region', { name: 'Digits & numerals' });
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-1')).toBe(false);
+
+    fireEvent.click(within(digitsRegion).getByRole('button', { name: 'Discard all' }));
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-1')).toBe(true);
+
+    fireEvent.click(within(digitsRegion).getByRole('button', { name: 'Restore all' }));
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-1')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. Search filtering — by character, by codepoint name, and by key label.
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — search filtering', () => {
+  it('narrows to the matching cell by literal character', () => {
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search a character or code point' }), { target: { value: 'q' } });
+
+    expect(screen.getByRole('button', { name: 'q — U+0071' })).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'a — U+0061' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '1 — U+0031' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'C — U+0043' })).toBeNull();
+  });
+
+  it('narrows to the matching cell by codepoint name', () => {
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search a character or code point' }), { target: { value: 'U+0031' } });
+
+    expect(screen.getByRole('button', { name: '1 — U+0031' })).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'a — U+0061' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'q — U+0071' })).toBeNull();
+  });
+
+  it('narrows to the matching cell by resolved key label', () => {
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+
+    // Only 'C' (Shift+K_C) resolves a key sequence containing "shift".
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search a character or code point' }), { target: { value: 'shift' } });
+
+    expect(screen.getByRole('button', { name: 'C — U+0043' })).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'a — U+0061' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '1 — U+0031' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'q — U+0071' })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. "Group by" toggle — Category vs Source re-groups the grid.
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — group-by toggle', () => {
+  it('switches group headers from category labels to source labels, and back', () => {
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+
+    const categoryRadio = screen.getByRole('radio', { name: 'Category' }) as HTMLInputElement;
+    const sourceRadio = screen.getByRole('radio', { name: 'Source' }) as HTMLInputElement;
+    expect(categoryRadio.checked).toBe(true);
+    expect(sourceRadio.checked).toBe(false);
+
+    // Default grouping — category headers present, source headers absent.
+    expect(screen.getByRole('heading', { level: 2, name: 'Basic letters' })).not.toBeNull();
+    expect(screen.getByRole('heading', { level: 2, name: 'Digits & numerals' })).not.toBeNull();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Direct keys' })).toBeNull();
+    expect(screen.queryByRole('heading', { level: 2, name: 'From stores' })).toBeNull();
+
+    fireEvent.click(sourceRadio);
+
+    expect(sourceRadio.checked).toBe(true);
+    expect(categoryRadio.checked).toBe(false);
+    expect(screen.getByRole('heading', { level: 2, name: 'Direct keys' })).not.toBeNull();
+    expect(screen.getByRole('heading', { level: 2, name: 'From stores' })).not.toBeNull();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Basic letters' })).toBeNull();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Digits & numerals' })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. RemovalBanner — renders once recommendedRemovalChars resolves >= 1 char.
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — removal recommendation banner', () => {
+  it('renders the banner once the CLDR-driven needed-set leaves a surplus character', async () => {
+    mockFixtureContributors();
+    // 'a' is needed — 'C' (a plain letter, never in an always-keep category)
+    // is surplus and becomes recommended-removal. 'q' is deliberately NOT a
+    // candidate here: recommendedRemovalChars walks buildProducedSet(ir),
+    // which is rule-reachability-driven — an orphan store item never wired
+    // into any rule's output never "produces" a character, so it can never
+    // be a removal candidate regardless of the needed-set (verified against
+    // the real recommendedRemovalChars, not asserted blind).
+    neededCharsResult.set(new Set(['a']));
+
+    renderGalleryV2(makeFixtureIR());
+
+    await screen.findByText(/We recommend removing 1 character/);
+    expect(screen.getByRole('region', { name: 'Removal recommendation' })).not.toBeNull();
+  });
+
+  it('does not render the banner when there is no recommendation signal at all', () => {
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+
+    expect(screen.queryByText(/We recommend removing/)).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Removal recommendation' })).toBeNull();
+  });
+});

@@ -34,6 +34,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import companion_config as cc  # noqa: E402
 
 
 def _load_resolver():
@@ -206,38 +207,42 @@ def render_human(result: dict) -> str:
     if not result["enabled"]:
         return ""  # opt-in: disabled feature reports nothing in human mode
 
+    # ASCII tags, not emoji: this is a Windows-first repo whose console default
+    # is cp1252 (see the convention in CLAUDE.md, and configure_stdio's docstring
+    # for what the glyphs used to cost). Same tag vocabulary as check-coverage.py.
     lines: list[str] = []
     for sk in result["skipped"]:
-        lines.append(f"ℹ {sk['name']}: {sk['reason']}; skipping drift check")
+        lines.append(f"[INFO] {sk['name']}: {sk['reason']}; skipping drift check")
 
     has_drift = any(c["drifted"] for c in result["capabilities"])
     if not has_drift:
         if lines:
-            lines.append("✓ All capabilities in sync.")
+            lines.append("[OK] All capabilities in sync.")
             return "\n".join(lines)
-        return "✓ All capabilities in sync."
+        return "[OK] All capabilities in sync."
 
-    lines.append("🔍 Spec drift report")
+    lines.append("[DRIFT] Spec drift report")
     for cap in result["capabilities"]:
         if not cap["drifted"]:
-            lines.append(f"✓ {cap['name']} — in sync")
+            lines.append(f"[OK] {cap['name']} - in sync")
             continue
         n = len(cap["drifted"])
         lines.append("")
-        lines.append(f"📁 {cap['spec']}  (last committed {cap['commit']})")
+        lines.append(f"[CAP] {cap['spec']}  (last committed {cap['commit']})")
         lines.append(f"   {n} file{'s' if n != 1 else ''} changed since spec was last committed:")
         for d in cap["drifted"]:
             note = ("changed via pipeline, never folded back"
                     if d["severity"] == "tracked"
                     else "changed outside the pipeline")
-            lines.append(f"   {d['severity']:<8} {d['file']}  — {note}")
+            lines.append(f"   {d['severity']:<8} {d['file']}  - {note}")
     lines.append("")
-    lines.append("👉 Fold these into the living spec (e.g. /speckit.companion.adopt) "
+    lines.append("[ACTION] Fold these into the living spec (e.g. /speckit.companion.adopt) "
                  "or add the path to livingSpecs.exempt.")
     return "\n".join(lines)
 
 
 def main(argv=None) -> int:
+    cc.configure_stdio()
     ap = argparse.ArgumentParser(description="Report Companion living-spec drift.")
     ap.add_argument("--root", default=".", help="repo root (default: cwd)")
     ap.add_argument("--json", action="store_true",

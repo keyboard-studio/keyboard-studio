@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { PlacementCandidate } from "@keyboard-studio/contracts";
-import { aggregatePlacements } from "./aggregate.js";
+import { aggregatePlacements, PLACEMENT_PRIORS_VERSION } from "./aggregate.js";
 import type { KeyboardPlacementReport } from "./model.js";
 
 function cand(vkey: string): PlacementCandidate {
@@ -11,6 +11,20 @@ function cand(vkey: string): PlacementCandidate {
     priorSource: "corpus",
     priorCount: 1,
     confidence: 0,
+  };
+}
+
+/** A deadkey/store-index candidate — its `vkey` is a BASE LETTER position,
+ *  not a "free key" assignment (see the anti-pattern-scoping test below). */
+function deadkeyCand(vkey: string, baseLetter: string): PlacementCandidate {
+  return {
+    vkey,
+    modifiers: [],
+    mechanism: "store-index",
+    priorSource: "corpus",
+    priorCount: 1,
+    confidence: 0,
+    baseLetter,
   };
 }
 
@@ -83,5 +97,57 @@ describe("aggregatePlacements — §7.6 anti-pattern discard", () => {
     const out = aggregatePlacements([kb]);
     expect(out.priorCount).toBe(1);
     expect(out.entries["0100"]).toBeDefined();
+  });
+
+  it("does NOT flag a keyboard as anti-pattern from deadkey/store-index base-letter vkeys alone (placement-priors v2)", () => {
+    // A deadkey table naturally spans most of the alphabet as base letters
+    // (Q..T here) — this is NOT "free keys filled left-to-right"; it is the
+    // keyboard's pre-existing letter keys used as compose bases. Only ONE
+    // direct candidate (K_A) is present, well under the 5-key threshold, so
+    // the whole keyboard must survive.
+    const byCp = new Map<string, PlacementCandidate[]>([
+      ["0253", [cand("K_A")]],
+      ["0300", [deadkeyCand("K_Q", "q")]],
+      ["0301", [deadkeyCand("K_W", "w")]],
+      ["0302", [deadkeyCand("K_E", "e")]],
+      ["0303", [deadkeyCand("K_R", "r")]],
+      ["0304", [deadkeyCand("K_T", "t")]],
+    ]);
+    const report: KeyboardPlacementReport = {
+      keyboardId: "kbDeadkeyTable",
+      bcp47: ["xx"],
+      baseLayoutFamily: "QWERTY",
+      candidatesByCodepoint: byCp,
+      placementFingerprint: "fpDeadkeyTable",
+    };
+    const out = aggregatePlacements([report]);
+    expect(out.priorCount).toBe(1);
+    expect(out.entries["0253"]).toBeDefined();
+    expect(out.entries["0300"]).toBeDefined();
+  });
+});
+
+describe("aggregatePlacements — versioning (placement-priors v2)", () => {
+  it("stamps the current PLACEMENT_PRIORS_VERSION onto every snapshot", () => {
+    const out = aggregatePlacements([]);
+    expect(out.version).toBe(PLACEMENT_PRIORS_VERSION);
+    expect(out.version.startsWith("2.")).toBe(true);
+  });
+
+  it("omits deadkeySkipReasons/touch entirely when not supplied", () => {
+    const out = aggregatePlacements([]);
+    expect("deadkeySkipReasons" in out).toBe(false);
+    expect("touch" in out).toBe(false);
+  });
+
+  it("carries deadkeySkipReasons and touch through when supplied and non-empty", () => {
+    const out = aggregatePlacements([], {
+      deadkeySkipReasons: { "multi-deadkey-context": 3 },
+      touch: [{ codepoint: "U+025B", hosts: [{ vkey: "K_E", layerClass: "default", priorCount: 1 }] }],
+    });
+    expect(out.deadkeySkipReasons).toEqual({ "multi-deadkey-context": 3 });
+    expect(out.touch).toEqual([
+      { codepoint: "U+025B", hosts: [{ vkey: "K_E", layerClass: "default", priorCount: 1 }] },
+    ]);
   });
 });

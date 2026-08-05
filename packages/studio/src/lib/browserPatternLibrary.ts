@@ -115,3 +115,16 @@ export function getPatternLibraryService(): PatternLibraryService {
   }
   return _instance;
 }
+
+/**
+ * Synchronous pattern-by-id lookup over the same eagerly-loaded
+ * `_patternById` index `getById()` wraps in a resolved Promise. Needed by
+ * pure/non-async call sites (e.g. `buildSessionProducedSet` callers in
+ * `useInventoryDiff`/galleries) that must resolve a `MechanismRef.patternId`
+ * to its `Pattern.kmnFragment` inside a `useMemo`, not an effect — see
+ * `services.ts`'s `getPatternByIdSync`, which switches between this and the
+ * mock fixture index the same way `getPatternLibraryService` does.
+ */
+export function getPatternByIdSync(id: string): Pattern | undefined {
+  return _patternById.get(id);
+}

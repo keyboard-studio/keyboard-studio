@@ -10,7 +10,7 @@
 //   cd packages/studio && npx playwright test locale-switch.spec.ts
 
 import { test, expect } from "playwright/test";
-import { seedReturningVisitor } from "./helpers/surveyFlow";
+import { seedReturningVisitor, selectMenuOption } from "./helpers/surveyFlow";
 
 // Scope everything to the NavBar landmark (aria-label="Studio navigation",
 // StudioShell.tsx) — the survey's own language-identify question also has
@@ -36,10 +36,10 @@ async function chooseLocale(
   page: import("playwright/test").Page,
   locale: "en" | "fr",
 ): Promise<void> {
-  const trigger = navBar(page).locator("#nav-language-select");
-  await trigger.waitFor({ timeout: 10_000 });
-  await trigger.click();
-  await trigger.locator("xpath=..").locator(`li[data-value="${locale}"]`).click();
+  // Through the shared driver: SelectMenu portals its listbox to
+  // document.body, so the option is not reachable through the trigger's
+  // parent (see selectMenuOption's docstring).
+  await selectMenuOption(page, navBar(page).locator("#nav-language-select"), locale);
 }
 
 test.describe("Locale switcher — persistence + no first-paint English flash", () => {
@@ -65,6 +65,51 @@ test.describe("Locale switcher — persistence + no first-paint English flash", 
 
     // Switch back to English so this test leaves no locale side effect for
     // any spec that happens to reuse the browser context/storage state.
+    await chooseLocale(page, "en");
+    await expect(navBar(page).getByText("Language")).toBeVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 057 FR-020 / SC-006 (T037) — the tab is "Compare", in every locale.
+//
+// The rename is a change of MEANING, not of wording, so it took a NEW message
+// id (`nav.compare`) and the old `nav.preview` was retired rather than
+// re-worded. The consequences of that decision are exactly what this test
+// pins: in English the tab reads "Compare", and in French — where the new id
+// is deliberately still untranslated — it must fall back to the English
+// SOURCE rather than silently inheriting the retired id's "Aperçu", which
+// would be a mistranslation that reads as reviewed.
+//
+// The link is located by its href, not its text: the route TOKEN stays
+// `preview` (contract §1), and that is the stable handle across this rename.
+// ---------------------------------------------------------------------------
+
+test.describe("Compare tab label (spec 057 FR-020)", () => {
+  const compareLink = (page: import("playwright/test").Page) =>
+    navBar(page).locator('a[href="#preview"]');
+
+  test("reads 'Compare' in English and never 'Preview'", async ({ page }) => {
+    await seedReturningVisitor(page);
+    await page.goto("/?e2e=1");
+
+    await expect(compareLink(page)).toHaveText(/^Compare$/);
+    await expect(navBar(page).getByText("Preview", { exact: true })).toHaveCount(0);
+  });
+
+  test("in fr, falls back to the new id's source string — never the retired id's translation", async ({
+    page,
+  }) => {
+    await seedReturningVisitor(page);
+    await page.goto("/?e2e=1");
+    await chooseLocale(page, "fr");
+    await expect(navBar(page).getByText("Langue")).toBeVisible();
+
+    // "Aperçu" was `nav.preview`'s French. Inheriting it here would mean the
+    // retired id's translation had been reused for a different meaning.
+    await expect(navBar(page).getByText("Aperçu", { exact: true })).toHaveCount(0);
+    await expect(compareLink(page)).toHaveText(/^Compare$/);
+
     await chooseLocale(page, "en");
     await expect(navBar(page).getByText("Language")).toBeVisible();
   });

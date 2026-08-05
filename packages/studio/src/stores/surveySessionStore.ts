@@ -317,6 +317,27 @@ export interface SurveySessionState {
   popHistory: () => void;
 
   /**
+   * Land directly on a step the author has ALREADY walked (spec 057 FR-045).
+   *
+   * The many-step counterpart of `popHistory`: instead of consuming one entry
+   * it consumes every entry after the target, so `history` still describes the
+   * true walked path from the landing point. `lastNavigation` is `"pop"`,
+   * which is what keeps the browser-history bridge from pushing an entry for a
+   * move the browser did not make.
+   *
+   * DELIBERATELY BACKWARD-ONLY. A target that is neither the current step nor
+   * present in `history` is a no-op, so this action can never skip a lock or a
+   * gate the walk enforces — forward jumps are refused upstream by
+   * `resolveLocation`'s `beyond-gate`, and this is the second line of that
+   * same rule rather than a place it could be bypassed.
+   *
+   * FR-063: this truncates `history`, not progress. The footer's completed
+   * dots come from the decision record, so jumping back leaves every dot
+   * ahead of the landing point exactly where it was.
+   */
+  jumpToStep: (target: ActiveStepId) => void;
+
+  /**
    * Special-case back-navigation for the touch step's "Back from the very
    * first character" affordance (spec 035 R12 re-entry path). The generic
    * `popHistory` follows the walked-history stack, which lands on
@@ -440,7 +461,7 @@ export interface SurveySessionState {
 
 type SurveySessionData = Omit<
   SurveySessionState,
-  | "advance" | "popHistory" | "backToTouchSeedSource" | "backToUnfinishedGallery" | "reset" | "hydrate"
+  | "advance" | "popHistory" | "jumpToStep" | "backToTouchSeedSource" | "backToUnfinishedGallery" | "reset" | "hydrate"
   | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
   | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
   | "setTouchSeedSource" | "setBaseConfirmed" | "setDiscoveryMethod"
@@ -510,6 +531,24 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
       return {
         activeStepId: popped.prev,
         history: popped.rest,
+        lastNavigation: "pop" as const,
+      };
+    }),
+
+  jumpToStep: (target) =>
+    set((s) => {
+      if (s.activeStepId === target) return s;
+      // Sanitize first, for the same reason every other back primitive does:
+      // `history` may have been patched straight from a draft written by an
+      // older build (see applyTraversalSnapshot).
+      const sanitized = sanitizeHistory(s.activeStepId, s.history);
+      // The LAST occurrence, so a revisited step lands on the most recent
+      // visit rather than an older one further down the stack.
+      const index = sanitized.lastIndexOf(target);
+      if (index === -1) return s; // not walked — never a forward jump
+      return {
+        activeStepId: target,
+        history: sanitized.slice(0, index),
         lastNavigation: "pop" as const,
       };
     }),

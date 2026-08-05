@@ -1,4 +1,8 @@
-// PickerPane — shared left pane used by both PreviewScreen and OutputScreen.
+// PickerPane — the left pane used by OutputScreen.
+//
+// Spec 057: it used to be shared with PreviewScreen. That screen is gone —
+// the Compare tab that replaced it renders its own, deliberately smaller pane
+// with no mode toggle, no scaffold form and no identity panel (US2, FR-023).
 //
 // Renders: heading + description, mode toggle (open/scaffold), the picker
 // component slot, the scaffold-form slot, the identity-panel slot, the

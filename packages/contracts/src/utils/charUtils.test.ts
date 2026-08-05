@@ -7,7 +7,13 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { isNoncharacterCodePoint, parseUPlusNotation, toHex4, toUPlusNotation } from "./charUtils.js";
+import {
+  isDecomposableAccented,
+  isNoncharacterCodePoint,
+  parseUPlusNotation,
+  toHex4,
+  toUPlusNotation,
+} from "./charUtils.js";
 
 describe("toHex4", () => {
   it("pads a BMP codepoint to 4 uppercase hex digits", () => {
@@ -36,6 +42,33 @@ describe("isNoncharacterCodePoint", () => {
 
   it.each([0x0041, 0xfdcf, 0xfdf0])("returns false for non-noncharacter U+%s", (cp) => {
     expect(isNoncharacterCodePoint(cp)).toBe(false);
+  });
+});
+
+describe("isDecomposableAccented (abugida-safe narrowing to Mn-only, km-domain ruling)", () => {
+  it.each([
+    ["ǯ", "ǯ"], // LATIN SMALL LETTER EZH WITH CARON -> ʒ + U+030C (Mn)
+    ["ӝ", "ӝ"], // CYRILLIC SMALL LETTER ZHE WITH DIAERESIS -> ж + U+0308 (Mn)
+    ["Hebrew letter+niqqud (dagesh)", "בּ"], // ב + dagesh (Mn)
+    ["Arabic letter+harakat (fatha)", "بَ"], // ب + fatha (Mn)
+    ["à", "à"], // LATIN SMALL LETTER A WITH GRAVE -> a + U+0300 (Mn)
+  ])("still returns true for %s (Mn mark, unaffected by the narrowing)", (_label, char) => {
+    expect(isDecomposableAccented(char)).toBe(true);
+  });
+
+  it.each([
+    ["का", "का"], // Devanagari क + vowel sign AA (Mc matra)
+    ["कि", "कि"], // Devanagari क + vowel sign I (Mc matra)
+    ["की", "की"], // Devanagari क + vowel sign II (Mc matra)
+  ])(
+    "returns false for the Devanagari matra syllable %s (Mc, not Mn — no longer matches after the abugida-safe narrowing)",
+    (_label, char) => {
+      expect(isDecomposableAccented(char)).toBe(false);
+    },
+  );
+
+  it("still returns true for consonant+virama (क + U+094D) — virama is Mn and General_Category-universal, not abugida-specific, so the predicate alone does not exclude it; callers gate separately on scriptClass", () => {
+    expect(isDecomposableAccented("क्")).toBe(true);
   });
 });
 
