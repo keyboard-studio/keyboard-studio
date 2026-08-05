@@ -761,7 +761,7 @@ export function loadDecisionRecordForProject(projectKey: string): boolean {
  * Remove `projectKey`'s durable draft AND its "My keyboards" index row. Does
  * NOT touch the active-project pointer — callers that also want the pointer
  * cleared (start-over) call `clearActiveProjectKey()` alongside this (see
- * StudioShell.handleStartOver and WelcomeScreen's "I'm new" entry point), so
+ * StudioShell.handleStartOver and WelcomeScreen's "Continue as guest" entry point), so
  * the two concerns stay independently callable per the persistence contract.
  *
  * Removing the index row here (not just the record) keeps every discard path
@@ -800,7 +800,7 @@ export function clearDraft(projectKey: string): void {
  * and unconditionally clears the active-project pointer itself.
  *
  * Extracted (P2 synthesis) from two identical inline call sites —
- * WelcomeScreen's "I'm new" entry point and StudioShell's
+ * WelcomeScreen's "Continue as guest" entry point and StudioShell's
  * `handleStartOver` — so the "resolve active projectKey -> clearDraft ->
  * clearActiveProjectKey" sequence is written once. Resolves the target via
  * `resolveActiveProjectKey()` rather than requiring the caller to derive it,
