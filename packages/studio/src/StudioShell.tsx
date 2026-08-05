@@ -41,6 +41,7 @@ import { type RouteId } from "./lib/navigate.ts";
 import { parseLocation } from "./lib/location.ts";
 import { liveResolveContext, setPendingWelcomeLocation } from "./lib/jumpToLocation.ts";
 import { readPaneSplitPct, useViewStateStore } from "./stores/viewStateStore.ts";
+import { useStepWalkStore } from "./stores/stepWalkStore.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
@@ -1203,6 +1204,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // and Compare selection behind would make the next keyboard open in a
     // layout the author never chose for it.
     useViewStateStore.getState().reset();
+    // Within-step positions belong to the walk being abandoned. Left behind,
+    // the next keyboard's mechanism/touch galleries would open on a character
+    // from the previous project's inventory — a cursor is only meaningful
+    // against the walk that published it (stores/stepWalkStore.ts).
+    useStepWalkStore.getState().reset();
     snapshotterRef.current.reset();
     pendingArtifactRef.current = null;
     // F6 fix: re-arm the pre-instantiation pending autosave for the NEXT

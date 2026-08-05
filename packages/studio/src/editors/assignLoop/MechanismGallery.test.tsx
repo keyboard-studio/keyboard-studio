@@ -36,6 +36,8 @@ import {
 } from "./MechanismGallery.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { useWorkingCopyStore, bindManifest } from "../../stores/workingCopyStore.ts";
+import { useStepWalkStore } from "../../stores/stepWalkStore.ts";
+import { charToPositionToken } from "../../lib/stepWalk.ts";
 import {
   MECHANISMS_STEP_ID,
   TOUCH_STEP_ID,
@@ -6349,5 +6351,108 @@ describe("MechanismGallery — 'counterpart already placed' suppression (spec 05
     const assignments = getPhaseCPhysicalAssignments();
     expect(assignments.filter((a) => a.target === "Á")).toHaveLength(1);
     expect(assignments.find((a) => a.target === "á")).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Within-step walk binding (lib/stepWalk.ts, hooks/useCharWalkPosition.ts)
+//
+// Two defects these cover, both reported as "if I jump away from later
+// questions in Mechanisms without completing all of them, I can't get back to
+// the question I was on":
+//
+//   1. `currentChar` was plain component state, and a tab switch unmounts this
+//      gallery — so the walk restarted at the first uncovered character.
+//   2. The whole stage was ONE footer dot, so the row could not say which of a
+//      dozen characters the author was on, and offered no way back into one.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — within-step walk position", () => {
+  it("publishes one stop per walk character, with its code points in the label", async () => {
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    const walk = useStepWalkStore.getState().walks[MECHANISMS_STEP_ID];
+    expect(walk?.map((p) => p.id)).toEqual([charToPositionToken("á"), charToPositionToken("é")]);
+    // A character has no question-registry entry, so the walk must carry its own
+    // label — and it names the code points, since a bare glyph is ambiguous
+    // between composed forms and useless to a screen reader.
+    expect(walk?.[0]?.label).toBe("á (U+00E1)");
+  });
+
+  it("publishes the cursor as the author walks, so the footer marker tracks it", async () => {
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(useStepWalkStore.getState().cursors[MECHANISMS_STEP_ID]).toBe(
+      charToPositionToken("á"),
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /skip this character/i }));
+    });
+    expectCurrentChar("é");
+    expect(useStepWalkStore.getState().cursors[MECHANISMS_STEP_ID]).toBe(
+      charToPositionToken("é"),
+    );
+  });
+
+  it("resumes on the character the author was on after the unmount a tab switch causes", async () => {
+    seedInventory(["á", "é", "í"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /skip this character/i }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /skip this character/i }));
+    });
+    expectCurrentChar("í");
+
+    // The tab switch. NOT a store reset — the working copy survives; only this
+    // component is destroyed and rebuilt.
+    cleanup();
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    // Pre-fix: "á" — the first uncovered character, because nothing outlived the
+    // component to say otherwise.
+    expectCurrentChar("í");
+  });
+
+  it("honours a cursor written while mounted — activating a dot for this same stage", async () => {
+    seedInventory(["á", "é", "í"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expectCurrentChar("á");
+    // A footer dot inside the step the author is already on: no route change, no
+    // step change, nothing remounts, so only the live cursor can carry it.
+    await act(async () => {
+      useStepWalkStore.getState().setStepCursor(MECHANISMS_STEP_ID, charToPositionToken("í"));
+    });
+    expectCurrentChar("í");
+  });
+
+  it("ignores a cursor naming a character this walk does not hold", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      useStepWalkStore.getState().setStepCursor(MECHANISMS_STEP_ID, charToPositionToken("ω"));
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expectCurrentChar("á");
+  });
+
+  it("still prefers the first UNCOVERED character on a first-ever entry", async () => {
+    // The arrival heuristic is unchanged where there is no cursor to honour —
+    // only OUTRANKED by one, never replaced.
+    useStepWalkStore.getState().reset();
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expectCurrentChar("á");
   });
 });

@@ -70,7 +70,10 @@ import { toUPlusNotation, buildProducedSet } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { collateInventory } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
-import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
+import { MECHANISMS_STEP_ID, TOUCH_STEP_ID } from "../../steps/reducer.ts";
+import { useCharWalkPosition } from "../../hooks/useCharWalkPosition.ts";
+import { cursorCharIn } from "../../lib/stepWalk.ts";
+import { peekStepCursor } from "../../stores/stepWalkStore.ts";
 import { getPatternLibraryService } from "../../lib/services.ts";
 import { displayChar } from "../../lib/irToCarveNodes.ts";
 import { capabilityHint } from "./parts/InfoView.tsx";
@@ -1621,6 +1624,14 @@ export function MechanismGallery({
       // spuriously look like a removal.
       if (prev !== null && indexOfChar(lettersToAdd, prev) !== -1) return prev;
       if (prev === null) {
+        // ARRIVAL POSITION. A cursor stored for this step outranks every
+        // heuristic below: it is either where the author was before a tab switch
+        // unmounted this gallery, or the character a footer dot asked for (see
+        // lib/stepWalk.ts). Both are an explicit statement about where the walk
+        // should resume; "first uncovered" is only a guess for a first-ever
+        // entry, so it stays the fallback rather than overriding an answer.
+        const requested = cursorCharIn(peekStepCursor(MECHANISMS_STEP_ID), lettersToAdd);
+        if (requested !== null) return requested;
         // First-ever pick — prefer the first UNCOVERED char over strict
         // position 0.
         return (
@@ -1641,6 +1652,19 @@ export function MechanismGallery({
     // inventory list itself changes, not when methods are applied.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lettersKey]);
+
+  // Bind this walk to the shared within-step position model, so the footer shows
+  // one dot per character instead of one dot for the whole stage, and so a jump
+  // into the middle of the walk lands. Declared AFTER the sync effect above,
+  // which owns the arrival position (see the hook's own header).
+  const isCharCovered = useCallback((char: string) => coveredChars.has(char), [coveredChars]);
+  useCharWalkPosition({
+    stepId: MECHANISMS_STEP_ID,
+    list: lettersToAdd,
+    currentChar,
+    setCurrentChar,
+    isDone: isCharCovered,
+  });
 
   // ---------------------------------------------------------------------------
   // Pattern loading — needed for patternMap (GalleryPreviewWithPatterns)
