@@ -26,6 +26,12 @@
 //     export of an untranslated project returns source text under every
 //     original key — same keys, no translations left. See
 //     utilities/i18n-collapse-guard.
+//   • target locales, additionally: the values must not have REGRESSED against
+//     their own previously-committed state (baseline). Neither of the checks
+//     above can see a catalog that kept its keys and went from translated to
+//     EMPTY — the shape a Crowdin download produces from a locale with no
+//     translations once untranslated strings export as empty rather than
+//     source text (#1489). See utilities/i18n-collapse-guard/git-baseline.js.
 //
 // Fix when it fails:  pnpm --filter @keyboard-studio/studio messages:extract
 //
@@ -41,7 +47,8 @@ const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { checkEnglishCollapse } = require("../i18n-collapse-guard/index.js");
+const { checkEnglishCollapse, checkBaselineRegression } = require("../i18n-collapse-guard/index.js");
+const { resolveBaselineRef, readCatalogAtRef } = require("../i18n-collapse-guard/git-baseline.js");
 const { checkCatalogDir } = require("../i18n-catalog-sort/index.js");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
@@ -100,6 +107,19 @@ function resolveLinguiBin() {
 // independently of) the fresh extraction: it needs no comparison baseline, so it
 // still reports if `lingui extract` is broken or unavailable.
 orderProblems.push(...checkCatalogDir(COMMITTED_DIR));
+
+// Resolved once per run (may do a single network fetch) — see
+// git-baseline.js. null means no baseline could be found (offline, no origin
+// remote, shallow single-commit clone); every per-locale check below degrades
+// to a no-op in that case rather than failing the whole lint run over it.
+const baselineRef = resolveBaselineRef(REPO_ROOT);
+if (!baselineRef) {
+  notes.push(
+    "[baseline] could not resolve a git ref to compare catalogs against their previous " +
+      "committed state (offline / no 'origin' remote / shallow clone) — the regression guard " +
+      "did not run this time. No action needed unless this persists in CI.",
+  );
+}
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "i18n-catalog-check-"));
 let freshLocales = [];
@@ -191,6 +211,31 @@ try {
         // `notes`, not `warnings`: nothing is stale, so the extract remediation
         // does not apply.
         if (collapse.note) notes.push(collapse.note);
+      }
+
+      // Neither key-set parity nor the English-collapse check above can see a
+      // catalog that kept its keys and went from translated to EMPTY (#1489) —
+      // that needs a comparison against this same locale's own prior state,
+      // which committedSource (English) can never provide.
+      if (baselineRef) {
+        const baseline = readCatalogAtRef(
+          baselineRef,
+          path.join(COMMITTED_DIR, locale, CATALOG_FILE),
+          REPO_ROOT,
+        );
+        // baseline === null means the file didn't exist at that ref (a
+        // brand-new locale) — nothing to regress from, and not worth a note.
+        if (baseline !== null) {
+          const regression = checkBaselineRegression({
+            baseline,
+            target: committed,
+            locale,
+            catalog: CATALOG_FILE,
+            baselineLabel: baselineRef,
+          });
+          if (regression.problem) problems.push(regression.problem);
+          if (regression.note) notes.push(regression.note);
+        }
       }
     }
   }

@@ -5,8 +5,29 @@
  * are rejected with 400 before any GitHub API call is made.
  */
 
-import { GITHUB_OAUTH_CLIENTS, type GitHubOAuthClient } from "@keyboard-studio/contracts";
+import type { GitHubOAuthClient } from "@keyboard-studio/contracts";
 import { z } from "zod";
+
+/**
+ * The client-discriminator literals, declared locally rather than imported as a
+ * *value* from `@keyboard-studio/contracts`.
+ *
+ * WHY THE COPY — do not "fix" this back into a value import. The co-located
+ * Vercel functions under `api/` reach this module through a relative path and
+ * live OUTSIDE the pnpm workspace, so anything this module imports as a value
+ * must survive being traced into a serverless bundle. A value import of
+ * contracts pulls in its whole barrel, which re-exports data modules that load
+ * checked-in JSON from `packages/contracts/data/` — paths outside the emitted
+ * `dist/`. That resolution fails inside the function bundle, and because it
+ * fails at ESM module load the handler never runs: every route 500s with a
+ * platform-level FUNCTION_INVOCATION_FAILED instead of a JSON error body, which
+ * is indistinguishable from an outage and takes sign-in down completely.
+ *
+ * The `import type` above is erased at compile time, so it costs the bundle
+ * nothing while `_ClientUnionGuard` below still fails the build if this copy
+ * ever drifts from the shared wire contract.
+ */
+const GITHUB_OAUTH_CLIENTS = ["github_app", "oauth_app"] as const;
 
 // ---------------------------------------------------------------------------
 // POST /oauth/exchange
@@ -110,3 +131,27 @@ export interface GitHubTokenResponseShape {
   expires_in?: number;
   refresh_token_expires_in?: number;
 }
+
+// ---------------------------------------------------------------------------
+// Compile-time drift guard.
+//
+// `GITHUB_OAUTH_CLIENTS` above is a local copy of the shared wire contract's
+// client union (see its doc comment for why it cannot be a value import). This
+// guard is what keeps the copy honest: the two unions must be mutually
+// assignable, so adding, removing, or renaming a client on either side fails
+// the build here rather than diverging silently between the SPA and this
+// backend. Follows the same alias-declaration-as-assertion idiom the contracts
+// package uses for its schema/interface guards.
+// ---------------------------------------------------------------------------
+
+type Expect<T extends true> = T;
+type MutuallyAssignable<A, B> = [A] extends [B]
+  ? [B] extends [A]
+    ? true
+    : false
+  : false;
+
+// Intentionally unused at the value level — the declaration IS the assertion.
+type _ClientUnionGuard = Expect<
+  MutuallyAssignable<(typeof GITHUB_OAUTH_CLIENTS)[number], GitHubOAuthClient>
+>;

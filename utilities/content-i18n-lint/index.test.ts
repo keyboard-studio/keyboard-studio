@@ -6,7 +6,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { lint } from "./index.js";
 // The shared guard, tested directly at the bottom of this file: i18n-catalog-lint
 // consumes the same contract but is a bare script with nothing to import.
-import { checkEnglishCollapse, measureCollapse } from "../i18n-collapse-guard/index.js";
+import {
+  checkEnglishCollapse,
+  measureCollapse,
+  checkBaselineRegression,
+  measureRegression,
+} from "../i18n-collapse-guard/index.js";
 
 const dirs: string[] = [];
 function tempContentI18nDir(): string {
@@ -444,5 +449,172 @@ describe("i18n-collapse-guard contract (shared by both lints)", () => {
     expect(measureCollapse(small, small).rule).toBe("exact");
     const fr = catalog(30, (i) => `Francais ${i}`);
     expect(measureCollapse(big, fr).rule).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Baseline regression guard (#1489)
+//
+// checkEnglishCollapse above compares a locale against English in the SAME
+// commit, so it is blind to a catalog that kept its keys and went from
+// translated to EMPTY -- exactly what a Crowdin download of an unseeded
+// project now produces once skip_untranslated_strings is true (#1483). That
+// needs a different comparison: this locale's own catalog, now vs. before.
+// ---------------------------------------------------------------------------
+
+describe("i18n-collapse-guard baseline regression guard (#1489)", () => {
+  const catalog = (n: number, f: (i: number) => string) =>
+    Object.fromEntries(Array.from({ length: n }, (_, i) => [`k${i}`, f(i)]));
+
+  it("flags a large catalog that went from translated to empty (ratio rule)", () => {
+    const baseline = catalog(30, (i) => `Francais ${i}`);
+    const target = catalog(30, () => "");
+    const r = checkBaselineRegression({
+      baseline,
+      target,
+      locale: "fr",
+      catalog: "messages.json",
+      baselineLabel: "origin/main",
+    });
+    expect(r.problem).toContain("lost translations compared to origin/main");
+    expect(r.problem).toContain("now empty");
+    expect(r.note).toBeNull();
+  });
+
+  it("flags a small catalog fully emptied (exact rule, below the ratio floor)", () => {
+    const baseline = catalog(5, (i) => `Francais ${i}`);
+    const target = catalog(5, () => "");
+    const r = checkBaselineRegression({
+      baseline,
+      target,
+      locale: "fr",
+      catalog: "adaptationQuestions.json",
+      baselineLabel: "origin/main",
+    });
+    expect(r.problem).toContain("every one of its 5 previously-translated values is now empty");
+  });
+
+  it("does not flag ordinary editing — untouched keys keep their baseline value", () => {
+    const baseline = catalog(30, (i) => `Francais ${i}`);
+    // One key legitimately re-translated; the rest untouched.
+    const target = { ...baseline, k0: "Francais amelioree" };
+    const r = checkBaselineRegression({
+      baseline,
+      target,
+      locale: "fr",
+      catalog: "messages.json",
+      baselineLabel: "origin/main",
+    });
+    expect(r.problem).toBeNull();
+    expect(r.note).toBeNull();
+  });
+
+  it("does not flag a key the target dropped entirely — that is key-set parity's job, not this guard's", () => {
+    const baseline = catalog(30, (i) => `Francais ${i}`);
+    const target = catalog(30, (i) => `Francais ${i}`);
+    delete target.k0; // removed, not emptied
+    const r = checkBaselineRegression({
+      baseline,
+      target,
+      locale: "fr",
+      catalog: "messages.json",
+      baselineLabel: "origin/main",
+    });
+    expect(r.problem).toBeNull();
+  });
+
+  it("does not flag a brand-new key with no baseline entry", () => {
+    const baseline = catalog(30, (i) => `Francais ${i}`);
+    const target = { ...baseline, kNew: "" }; // just added, not yet translated
+    const r = checkBaselineRegression({
+      baseline,
+      target,
+      locale: "fr",
+      catalog: "messages.json",
+      baselineLabel: "origin/main",
+    });
+    expect(r.problem).toBeNull();
+  });
+
+  it("tolerates a single deliberate revert to empty in a large catalog", () => {
+    const baseline = catalog(30, (i) => `Francais ${i}`);
+    const target = { ...baseline, k0: "" }; // one bad translation reverted on purpose
+    const r = checkBaselineRegression({
+      baseline,
+      target,
+      locale: "fr",
+      catalog: "messages.json",
+      baselineLabel: "origin/main",
+    });
+    expect(r.problem).toBeNull();
+  });
+
+  it("reports rather than passing silently when below the regression floor", () => {
+    const baseline = catalog(2, (i) => `Francais ${i}`);
+    const target = catalog(2, () => "");
+    const r = checkBaselineRegression({
+      baseline,
+      target,
+      locale: "fr",
+      catalog: "messages.json",
+      baselineLabel: "origin/main",
+    });
+    expect(r.problem).toBeNull();
+    expect(r.note).toContain("NOT checked for lost translations");
+  });
+
+  it("names which rule fired", () => {
+    const big = catalog(30, (i) => `Francais ${i}`);
+    expect(measureRegression(big, catalog(30, () => "")).rule).toBe("ratio");
+    const small = catalog(5, (i) => `Francais ${i}`);
+    expect(measureRegression(small, catalog(5, () => "")).rule).toBe("exact");
+    expect(measureRegression(big, big).rule).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wiring: content-i18n-lint threads a getBaselineCatalog callback down to the
+// regression guard. A caller that doesn't supply one (every test above this
+// point) gets the default no-op — this section proves the wiring itself,
+// with a fake callback standing in for git-baseline.js's real one.
+// ---------------------------------------------------------------------------
+
+describe("content-i18n-lint baseline regression wiring (#1489)", () => {
+  it("surfaces a regression problem when a target catalog emptied against the supplied baseline", () => {
+    const dir = tempContentI18nDir();
+    const en = englishCatalog(30);
+    writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
+    // Current catalog is all-empty -- passes the collapse guard (empty isn't
+    // English) and key-set parity (same keys) on its own.
+    writeFileSync(
+      join(dir, "fr", "flowQuestions.json"),
+      JSON.stringify(mapValues(en, () => "")),
+    );
+
+    const baselineFr = mapValues(en, (v) => `Invite ${v}`); // it used to be fully translated
+    const { problems, warnings } = lint({
+      contentI18nDir: dir,
+      freshCatalogs: EMPTY_FRESH,
+      parityOnlyFiles: ["flowQuestions.json"],
+      getBaselineCatalog: (locale, name) => (locale === "fr" && name === "flowQuestions.json" ? baselineFr : null),
+    });
+
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("lost translations");
+    expect(warnings).toEqual([]);
+  });
+
+  it("stays silent when no baseline is available for the catalog (the default no-op callback)", () => {
+    const dir = tempContentI18nDir();
+    const en = englishCatalog(30);
+    writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
+    writeFileSync(
+      join(dir, "fr", "flowQuestions.json"),
+      JSON.stringify(mapValues(en, () => "")),
+    );
+
+    // No getBaselineCatalog supplied at all -- must not throw, must not flag.
+    const { problems } = runFlowQuestions(dir);
+    expect(problems).toEqual([]);
   });
 });
