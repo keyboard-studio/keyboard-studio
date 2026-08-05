@@ -9,7 +9,11 @@
 // extractor. Also checks that every non-English locale directory under
 // content/i18n/ has, for each file it has started translating, the same KEY
 // SET as the English source (values legitimately differ — those are
-// translations).
+// translations); that its values haven't collapsed into the English source
+// (a Crowdin export of an untranslated project); and that its values haven't
+// REGRESSED against their own previously-committed state — a catalog that
+// kept every key but went from translated to empty, which the two checks
+// above cannot see (#1489).
 //
 // Read-only: never writes to content/i18n/**.
 //
@@ -36,7 +40,8 @@
 const { readFileSync, readdirSync, existsSync } = require("node:fs");
 const path = require("node:path");
 const { parse: parseYaml } = require("yaml");
-const { checkEnglishCollapse } = require("../i18n-collapse-guard/index.js");
+const { checkEnglishCollapse, checkBaselineRegression } = require("../i18n-collapse-guard/index.js");
+const { resolveBaselineRef, readCatalogAtRef } = require("../i18n-collapse-guard/git-baseline.js");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const CONTENT_I18N_DIR = path.join(REPO_ROOT, "content", "i18n");
@@ -209,7 +214,17 @@ function checkFreshness(problems, warnings, englishDir, name, fresh) {
   }
 }
 
-function checkTargetLocaleParity(problems, notes, contentI18nDir, name, freshEnglish) {
+// `getBaselineCatalog` defaults to a no-op so every existing test (which
+// never supplies one) is unaffected — it is only ever a real, git-backed
+// lookup when threaded down from main()'s real repo paths. See #1489.
+function checkTargetLocaleParity(
+  problems,
+  notes,
+  contentI18nDir,
+  name,
+  freshEnglish,
+  getBaselineCatalog = () => null,
+) {
   if (!existsSync(contentI18nDir)) return;
   const locales = readdirSync(contentI18nDir, { withFileTypes: true })
     .filter((d) => d.isDirectory() && d.name !== SOURCE_LOCALE)
@@ -247,6 +262,25 @@ function checkTargetLocaleParity(problems, notes, contentI18nDir, name, freshEng
     });
     if (collapse.problem) problems.push(collapse.problem);
     if (collapse.note) notes.push(collapse.note);
+
+    // Neither key-set parity nor the English-collapse check above can see a
+    // catalog that kept its keys and went from translated to EMPTY (#1489) —
+    // that needs a comparison against this same locale's own prior state,
+    // which English can never provide. null means "no baseline available for
+    // this file" (offline, brand-new catalog, ref unresolvable) — silently
+    // skipped, same as the collapse guard treats an all-empty target.
+    const baseline = getBaselineCatalog(locale, name);
+    if (baseline !== null) {
+      const regression = checkBaselineRegression({
+        baseline,
+        target,
+        locale,
+        catalog: name,
+        baselineLabel: "its previous committed state",
+      });
+      if (regression.problem) problems.push(regression.problem);
+      if (regression.note) notes.push(regression.note);
+    }
   }
 }
 
@@ -258,7 +292,7 @@ function checkTargetLocaleParity(problems, notes, contentI18nDir, name, freshEng
  * freshness-checked `CATALOG_FILES`; `parityOnlyFiles` are key-set-checked
  * against their committed en/*.json (see PARITY_ONLY_FILES).
  */
-function lint({ contentI18nDir, freshCatalogs, parityOnlyFiles }) {
+function lint({ contentI18nDir, freshCatalogs, parityOnlyFiles, getBaselineCatalog }) {
   const problems = [];
   // Two non-blocking channels, deliberately NOT one array. `warnings` means
   // "the English moved, re-run the extractor" and main() prints exactly that
@@ -272,7 +306,14 @@ function lint({ contentI18nDir, freshCatalogs, parityOnlyFiles }) {
 
   for (const name of CATALOG_FILES) {
     checkFreshness(problems, warnings, englishDir, name, freshCatalogs[name]);
-    checkTargetLocaleParity(problems, notes, contentI18nDir, name, freshCatalogs[name]);
+    checkTargetLocaleParity(
+      problems,
+      notes,
+      contentI18nDir,
+      name,
+      freshCatalogs[name],
+      getBaselineCatalog,
+    );
   }
 
   for (const name of parityOnlyFiles) {
@@ -281,7 +322,7 @@ function lint({ contentI18nDir, freshCatalogs, parityOnlyFiles }) {
       problems.push(`[en/${name}] committed catalog is missing entirely — run the extractor.`);
       continue;
     }
-    checkTargetLocaleParity(problems, notes, contentI18nDir, name, committedEnglish);
+    checkTargetLocaleParity(problems, notes, contentI18nDir, name, committedEnglish, getBaselineCatalog);
   }
 
   return { problems, warnings, notes };
@@ -294,11 +335,30 @@ function main() {
     "criteria.json": extractCriteriaStrings(),
   };
 
+  // Resolved once per run (may do a single network fetch) — see
+  // ../i18n-collapse-guard/git-baseline.js. null means no baseline could be
+  // found (offline / no origin remote / shallow clone); getBaselineCatalog
+  // then returns null for everything and the regression guard is a no-op
+  // rather than failing the whole lint run over it.
+  const baselineRef = resolveBaselineRef(REPO_ROOT);
+  const getBaselineCatalog = baselineRef
+    ? (locale, name) => readCatalogAtRef(baselineRef, path.join(CONTENT_I18N_DIR, locale, name), REPO_ROOT)
+    : () => null;
+
   const { problems, warnings, notes } = lint({
     contentI18nDir: CONTENT_I18N_DIR,
     freshCatalogs,
     parityOnlyFiles: PARITY_ONLY_FILES,
+    getBaselineCatalog,
   });
+
+  if (!baselineRef) {
+    notes.push(
+      "[baseline] could not resolve a git ref to compare catalogs against their previous " +
+        "committed state (offline / no 'origin' remote / shallow clone) — the regression guard " +
+        "did not run this time. No action needed unless this persists in CI.",
+    );
+  }
 
   if (warnings.length > 0) {
     console.warn("[WARN] content-i18n-lint: English source prose changed under existing ids.");

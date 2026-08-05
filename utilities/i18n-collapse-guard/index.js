@@ -186,10 +186,139 @@ function checkEnglishCollapse({ en, target, locale, catalog }) {
   return { problem: null, note: null };
 }
 
+// ---------------------------------------------------------------------------
+// BASELINE REGRESSION GUARD (#1489)
+// ---------------------------------------------------------------------------
+// checkEnglishCollapse above compares a target locale against English, in the
+// SAME commit. That is blind to a different corruption shape: a target catalog
+// that goes from translated to EMPTY. Emptying isn't collapse-into-English (the
+// exclude-empties rule above says so on purpose, to let a new locale bootstrap
+// as all-empty) -- it needs a comparison en can never provide, against what
+// this same locale/catalog looked like BEFORE.
+//
+// This stopped being hypothetical the moment #1483 flipped
+// `skip_untranslated_strings` to `true`: a download from a project holding no
+// translations for a locale now returns EMPTY values instead of English source
+// text, which is exactly the shape checkEnglishCollapse is designed to let
+// through. See #1489.
+//
+// Same two-rule shape as the English-collapse guard, for the same reason: a
+// ratio threshold needs enough keys to mean anything (MIN_KEYS_REGRESSION), and
+// below that only a total wipe (the exact rule) is a safe signal.
+
+/** Fraction of previously-non-empty baseline values that may go empty in the
+ *  current target before we call it a regression. Ratio rule. */
+const REGRESSION_THRESHOLD = 0.5;
+
+/** Ratio-rule floor: below this many comparable keys a ratio is too noisy. */
+const MIN_KEYS_REGRESSION = 20;
+
+/** Exact-rule floor: below this many comparable keys even "all of them went
+ *  empty" is plausible noise (a deliberate revert of one bad translation). */
+const MIN_KEYS_REGRESSION_EXACT = 3;
+
+/**
+ * Measure how far a target catalog has regressed from a prior baseline of the
+ * SAME locale/catalog (not English).
+ *
+ * A key only counts as `comparable` when the baseline held a real (non-empty)
+ * value for it AND the key still exists in the current target. A key the
+ * target dropped entirely is not this check's concern -- that is either a
+ * legitimate removal (the id no longer exists upstream, and dropping it is the
+ * correct move) or is already caught by the callers' key-set-parity checks.
+ * Only "kept the key, lost the value" is the shape this catches.
+ *
+ * @param {object} baseline  the same locale/catalog as it existed previously, { id: text }
+ * @param {object} target    the same locale/catalog now, { id: text }
+ * @returns {{regressed: boolean, rule: "ratio"|"exact"|null, comparable: number,
+ *            emptied: number, ratio: number, skipped: boolean}}
+ */
+function measureRegression(baseline, target) {
+  let comparable = 0;
+  let emptied = 0;
+
+  for (const key of Object.keys(baseline)) {
+    const baseValue = baseline[key];
+    if (typeof baseValue !== "string" || baseValue === "") continue;
+    if (!(key in target)) continue;
+
+    comparable++;
+    const value = target[key];
+    if (typeof value !== "string" || value === "") emptied++;
+  }
+
+  const ratio = comparable === 0 ? 0 : emptied / comparable;
+  const ratioRule = comparable >= MIN_KEYS_REGRESSION && ratio > REGRESSION_THRESHOLD;
+  const exactRule = comparable >= MIN_KEYS_REGRESSION_EXACT && emptied === comparable;
+
+  return {
+    regressed: ratioRule || exactRule,
+    rule: ratioRule ? "ratio" : exactRule ? "exact" : null,
+    comparable,
+    emptied,
+    ratio,
+    skipped: comparable < MIN_KEYS_REGRESSION_EXACT,
+  };
+}
+
+/**
+ * Check one target catalog for regression against a prior baseline of itself.
+ *
+ * @param {object}  args
+ * @param {object}  args.baseline      the same locale/catalog previously (e.g. at origin/main)
+ * @param {object}  args.target        the same locale/catalog now
+ * @param {string}  args.locale        e.g. "fr"
+ * @param {string}  args.catalog       display name, e.g. "messages.json"
+ * @param {string}  args.baselineLabel what to call the baseline in the message, e.g. "origin/main"
+ * @returns {{problem: string|null, note: string|null}}
+ */
+function checkBaselineRegression({ baseline, target, locale, catalog, baselineLabel }) {
+  const m = measureRegression(baseline, target);
+
+  if (m.regressed) {
+    const pct = (m.ratio * 100).toFixed(1);
+    const basis =
+      m.rule === "exact"
+        ? `every one of its ${m.comparable} previously-translated values is now empty`
+        : `${m.emptied}/${m.comparable} previously-translated values (${pct}%) are now empty`;
+    return {
+      problem:
+        `[${locale}] ${catalog} lost translations compared to ${baselineLabel} — ${basis}. ` +
+        `Key-set parity and the English-collapse guard both miss this shape: the keys are ` +
+        `still there and the values don't equal English, they are just gone. This is what a ` +
+        `Crowdin download produces when the project holds no '${locale}' translations for ` +
+        `these ids and untranslated strings export as empty rather than source text. Do not ` +
+        `commit this — it would revert real translations. Verify the Crowdin project actually ` +
+        `holds '${locale}' translations for these ids before regenerating. To retire a locale ` +
+        `on purpose, stop generating/committing a catalog for it (delete the Tier B directory; ` +
+        `for Tier A also drop it from lingui.config's locales list) rather than emptying values ` +
+        `in place — a catalog this guard no longer sees is not checked.`,
+      note: null,
+    };
+  }
+
+  if (m.skipped && m.comparable > 0) {
+    return {
+      problem: null,
+      note:
+        `[${locale}] ${catalog} has only ${m.comparable} previously-translated value(s) to ` +
+        `compare against ${baselineLabel} — below the regression floor of ` +
+        `${MIN_KEYS_REGRESSION_EXACT}, so it was NOT checked for lost translations. No action needed.`,
+    };
+  }
+
+  return { problem: null, note: null };
+}
+
 module.exports = {
   COLLAPSE_THRESHOLD,
   MIN_KEYS,
   MIN_KEYS_EXACT,
   measureCollapse,
   checkEnglishCollapse,
+  REGRESSION_THRESHOLD,
+  MIN_KEYS_REGRESSION,
+  MIN_KEYS_REGRESSION_EXACT,
+  measureRegression,
+  checkBaselineRegression,
 };

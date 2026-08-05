@@ -28,7 +28,6 @@ import { render } from "./test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore, snapshotTraversal } from "./stores/surveySessionStore.ts";
 import { useStartOverStore } from "./stores/startOverStore.ts";
-import { SurveyResetButton } from "./components/SurveyResetButton.tsx";
 import { consumePendingWelcomeLocation, jumpToLocation } from "./lib/jumpToLocation.ts";
 import { snapshotWorkingCopyData } from "./lib/persistWorkingCopy.ts";
 import type { OnInstantiateCallback, Stage } from "./hooks/useKeyboardArtifact.ts";
@@ -2447,26 +2446,16 @@ describe("SurveyView — a reset happens only on an explicit start-over (spec 05
   it("the corner reset control clears traversal back to identity", async () => {
     useSurveySessionStore.getState().reset();
 
-    // Spec 057's own move of the Reset control INTO the NavBar (out of
-    // SurveyView's own render — see the sibling "(c) start-over re-arms..."
-    // test above, and the NavBar wiring in StudioShell.tsx) means a bare
-    // `<SurveyView>` render publishes the handler to startOverStore but
-    // renders no button for it. Mount the same wiring NavBar uses — the real
-    // `SurveyResetButton` bound to the store's published handler — so this
-    // test can still exercise the actual arm/confirm UI without pulling in
-    // the whole StudioShell.
-    function ResetHarness() {
-      const startOver = useStartOverStore((s) => s.handler);
-      return (
-        <>
-          <SurveyView baseKeyboard={null} />
-          {startOver !== null && <SurveyResetButton onReset={startOver} />}
-        </>
-      );
-    }
+    // The whole shell, not SurveyView alone: the Reset control lives in the
+    // NavBar's right group and reaches SurveyView's handleStartOver through the
+    // startOverStore bridge, so a SurveyView-only render has no button to click.
+    // Mounting both ends is what makes this an end-to-end assertion of the
+    // control rather than of the handler it happens to publish.
+    window.location.hash = "#survey";
+    localStorage.setItem("ks.visited", "1"); // returning visitor: no welcome gate
 
     await act(async () => {
-      render(<ResetHarness />);
+      render(<StudioShell />);
     });
     advanceToTrack();
     expect(useSurveySessionStore.getState().activeStepId).toBe("track");
