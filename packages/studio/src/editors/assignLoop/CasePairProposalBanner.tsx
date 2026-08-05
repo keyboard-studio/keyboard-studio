@@ -147,12 +147,16 @@ export function CasePairProposalBanner({
 }
 
 /**
- * What the confirm button's accessible name names as the pairing target. The
- * physical and touch mechanisms name their physical key under the keycap
- * convention (lowercase glyph, "the … key" phrasing) — see `keyNameFor`.
- * The combo mechanism names its own parallel slot (the dead-key trigger or
- * sequence indicator key) unchanged; that is a separate, not-yet-audited
- * key-naming site (see the ambiguity-fix report).
+ * What the confirm button's accessible name names as the pairing target,
+ * under the same keycap convention as everywhere else (lowercase glyph,
+ * "the … key" phrasing). The physical, touch, and ralt-layer mechanisms name
+ * their physical key directly through `keyNameFor`; the combo mechanism names
+ * its own parallel slot — the dead-key trigger key or the sequence indicator
+ * key. The dead-key trigger is a `K_` vkey, so it routes through `keyNameFor`
+ * to avoid leaking a raw `K_QUOTE` into the accessible name; the sequence
+ * indicator is already a resolved display glyph (its case is meaningful and
+ * must survive), so it passes through untouched — the same `K_`-prefix guard
+ * `GlyphCell` uses, since `keyNameFor`/`vkeyLabel` upper-normalizes its input.
  */
 function confirmTargetLabel(proposal: CasePairProposal): string {
   switch (proposal.mechanism) {
@@ -160,10 +164,14 @@ function confirmTargetLabel(proposal: CasePairProposal): string {
       return `the ${keyNameFor(proposal.vkey)} key`;
     case "touch":
       return `the ${keyNameFor(proposal.hostKey)} key`;
-    case "combo":
-      return proposal.combo.kind === "deadkey"
-        ? proposal.combo.triggerKey
-        : proposal.combo.indicator;
+    case "combo": {
+      const comboKey =
+        proposal.combo.kind === "deadkey"
+          ? proposal.combo.triggerKey
+          : proposal.combo.indicator;
+      const named = comboKey.startsWith("K_") ? keyNameFor(comboKey) : comboKey;
+      return `the ${named} key`;
+    }
     case "ralt-layer":
       return `the ${keyNameFor(proposal.vkey)} key`;
   }
