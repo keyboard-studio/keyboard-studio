@@ -1387,5 +1387,20 @@
   "editor.assignLoop.keyGrid.removeKeyDialog.proposal.overLimit": "",
   "editor.assignLoop.keyGrid.removeKeyDialog.collateral.lostHeading": "",
   "editor.assignLoop.keyGrid.rowSlackTitle": "",
-  "editor.assignLoop.keyGrid.removeKeyDialog.outcomeLabel": ""
+  "editor.assignLoop.keyGrid.removeKeyDialog.outcomeLabel": "",
+  "editor.assignLoop.keyGrid.cell.addWedgeTitle": "",
+  "editor.assignLoop.keyGrid.familyApplyDialog.anchorNote": "",
+  "editor.assignLoop.keyGrid.familyApplyDialog.ariaLabel": "",
+  "editor.assignLoop.keyGrid.familyApplyDialog.confirm": "",
+  "editor.assignLoop.keyGrid.familyApplyDialog.perLayerNote": "",
+  "editor.assignLoop.keyGrid.cell.followNextLayerTitle": "",
+  "editor.assignLoop.keyGrid.commands.followNextLayer": "",
+  "editor.assignLoop.keyGrid.commandMenu.ariaLabel": "",
+  "editor.assignLoop.keyGrid.familyApplyDialog.membersLabel": "",
+  "editor.assignLoop.keyGrid.familyApplyDialog.cancel": "",
+  "editor.assignLoop.keyGrid.commands.openCommandMenu": "",
+  "editor.assignLoop.keyGrid.cell.menuWedgeTitle": "",
+  "editor.assignLoop.keyGrid.familyApplyDialog.unavailable": "",
+  "editor.assignLoop.keyGrid.familyApplyDialog.noContent": "",
+  "editor.assignLoop.keyGrid.familyApplyDialog.heading": ""
 }
