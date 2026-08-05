@@ -3,9 +3,24 @@ import { useLingui } from "@lingui/react/macro";
 import type { RemovalCapability } from '@keyboard-studio/contracts';
 import type { GlyphOwner, CharLocation } from '../../../lib/irToCarveNodes.ts';
 import { displayChar } from '../../../lib/irToCarveNodes.ts';
+import { physicalKeyLabel, stripVkeyPrefix } from '../../../lib/keyLabel.ts';
 import { KeySeq } from './KeySeq.tsx';
 import { KIND_COLOR } from './KindBadge.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
+
+/**
+ * Human-readable form of one `keys` entry for the chip's aria-label — never
+ * a raw `K_*` vkey id (the keycap-naming-ambiguity fix's accessible-name
+ * requirement). `keys` (CarveGlyph.keys, via `contextToKeys`) mixes raw vkey
+ * names (vkey context elements) with already-resolved tokens (a literal
+ * char run through `displayChar`, or the '‹dk›' deadkey placeholder) — only
+ * the `K_`-prefixed raw form needs translating; every other entry is passed
+ * through untouched so a produced glyph is never mistaken for a vkey name
+ * and re-cased by `vkeyLabel`'s fallback (see keyLabel.ts).
+ */
+function keyNameFor(k: string): string {
+  return k.startsWith('K_') ? physicalKeyLabel(k) ?? stripVkeyPrefix(k) : k;
+}
 
 // Order the cross-reference summary tags render in: group, then pattern, then store.
 const WEB_KINDS = ['group', 'pattern', 'store'] as const;
@@ -78,7 +93,7 @@ export const GlyphCell = memo(function GlyphCell({
         onMouseLeave={clearInfo}
         onFocus={() => setInfo(hoverInfo)}
         onBlur={clearInfo}
-        aria-label={`${display} — ${keys.join(' ')}`}
+        aria-label={`${display} — ${keys.map(keyNameFor).join(' ')}`}
         aria-pressed={off}
         style={{
           position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center',

@@ -28,8 +28,21 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { canonicalizeCombo } from "@keyboard-studio/engine";
 import { formatModifierCombo } from "../../lib/modifierTokenLabel.ts";
+import { physicalKeyLabel, stripVkeyPrefix } from "../../lib/keyLabel.ts";
+import { KeyCap } from "../../ui/KeyCap.tsx";
 import { ProposalBanner } from "./parts/ProposalBanner.tsx";
 import type { CasePairProposal } from "./casePairCompanion.ts";
+
+/**
+ * Keycap-convention display label for a proposal's physical key (vkey or
+ * touch host key) — lowercase unshifted glyph, boxed by the caller as a
+ * `<KeyCap>` where the surface is JSX, or embedded plain in an aria-label.
+ * See lib/keyLabel.ts for the convention this disambiguates (a bare
+ * uppercase "Q" reads as the capital character, not the physical q key).
+ */
+function keyNameFor(vkeyOrHostKey: string): string {
+  return physicalKeyLabel(vkeyOrHostKey) ?? stripVkeyPrefix(vkeyOrHostKey);
+}
 
 export interface CasePairProposalBannerProps {
   proposal: CasePairProposal;
@@ -67,7 +80,8 @@ export function CasePairProposalBanner({
           <Trans id="editor.assignLoop.companion.prompt.raltLayer">
             {proposal.originalChar} has an uppercase form,{" "}
             {proposal.counterpart}. Map {proposal.counterpart} to the{" "}
-            {raltLayerModifierLabel(proposal)} layer of {proposal.vkey}?
+            {raltLayerModifierLabel(proposal)} layer of the{" "}
+            <KeyCap>{keyNameFor(proposal.vkey)}</KeyCap> key?
           </Trans>
         ) : (
           <Trans id="editor.assignLoop.companion.prompt">
@@ -86,15 +100,18 @@ export function CasePairProposalBanner({
         // physical and combo paths (their parallel slot IS the shift plane),
         // and a new id orphans no translation, where editing the shared
         // message would restate it for two mechanisms that didn't change.
+        // Human-readable, never the raw K_*/T_* key id — same keycap-naming
+        // convention as the prompt text above (lowercase key name, "the …
+        // key" phrasing).
         proposal.mechanism === "touch"
           ? t({
               id: "editor.assignLoop.companion.confirmAriaLabel.touch",
-              message: `Map ${proposal.counterpart} to the ${proposal.targetLayerLabel} layer of ${proposal.hostKey}`,
+              message: `Map ${proposal.counterpart} to the ${proposal.targetLayerLabel} layer of the ${keyNameFor(proposal.hostKey)} key`,
             })
           : proposal.mechanism === "ralt-layer"
             ? t({
                 id: "editor.assignLoop.companion.confirmAriaLabel.raltLayer",
-                message: `Map ${proposal.counterpart} to the ${raltLayerModifierLabel(proposal)} layer of ${proposal.vkey}`,
+                message: `Map ${proposal.counterpart} to the ${raltLayerModifierLabel(proposal)} layer of the ${keyNameFor(proposal.vkey)} key`,
               })
             : t({
                 id: "editor.assignLoop.companion.confirmAriaLabel",
@@ -130,22 +147,24 @@ export function CasePairProposalBanner({
 
 /**
  * What the confirm button's accessible name names as the pairing target. The
- * physical mechanism names its vkey — the exact string the shipping banner
- * used, so its existing tests and translations are unaffected. The other two
- * mechanisms name their own parallel slot.
+ * physical and touch mechanisms name their physical key under the keycap
+ * convention (lowercase glyph, "the … key" phrasing) — see `keyNameFor`.
+ * The combo mechanism names its own parallel slot (the dead-key trigger or
+ * sequence indicator key) unchanged; that is a separate, not-yet-audited
+ * key-naming site (see the ambiguity-fix report).
  */
 function confirmTargetLabel(proposal: CasePairProposal): string {
   switch (proposal.mechanism) {
     case "physical":
-      return proposal.vkey;
+      return `the ${keyNameFor(proposal.vkey)} key`;
     case "touch":
-      return proposal.hostKey;
+      return `the ${keyNameFor(proposal.hostKey)} key`;
     case "combo":
       return proposal.combo.kind === "deadkey"
         ? proposal.combo.triggerKey
         : proposal.combo.indicator;
     case "ralt-layer":
-      return proposal.vkey;
+      return `the ${keyNameFor(proposal.vkey)} key`;
   }
 }
 

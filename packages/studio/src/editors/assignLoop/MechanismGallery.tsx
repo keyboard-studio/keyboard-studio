@@ -109,6 +109,8 @@ import {
   CUSTOM_KEY_OPTION_VALUE,
 } from "../../lib/keyOptions.ts";
 import { formatModifierCombo } from "../../lib/modifierTokenLabel.ts";
+import { physicalKeyLabel, stripVkeyPrefix } from "../../lib/keyLabel.ts";
+import { KeyCap } from "../../ui/KeyCap.tsx";
 import {
   resolveCharInput,
   resolveKeyPickerSelection,
@@ -3730,123 +3732,153 @@ export function MechanismGallery({
                   never visibly disagree. */}
             {suggestion !== null &&
               !suggestionDismissed &&
-              (currentCharBadge?.count ?? 0) === 0 && (
-              <div
-                role="note"
-                aria-label={t({
-                  id: "editor.assignLoop.suggestion.ariaLabel",
-                  message: "Placement suggestion from kbgen seeder",
-                })}
-                style={{
-                  // RED, not green — the suggestion row only ever renders
-                  // when currentCharBadge's count is 0 (see the gate above),
-                  // so it always reads as "not yet implemented", matching
-                  // the badge's own 0-count colors (charMechanisms.ts /
-                  // CharScrollStrip.tsx's `ERROR_RED` + its paired dark-red
-                  // background).
-                  background: ERROR_BG,
-                  border: `1px solid ${ERROR_RED}`,
-                  borderRadius: 8,
-                  padding: "10px 14px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 12,
-                    color: ERROR_RED,
-                    fontFamily: FONT,
-                    fontWeight: 600,
-                  }}
-                >
-                  {(() => {
-                    const keyName = suggestion.topCandidate.vkey.replace(
-                      /^K_/,
-                      "",
-                    );
-                    const charOrEmpty =
-                      currentChar !== null ? displayChar(currentChar) : "";
-                    if (suggestion.strategyId === "S-01") {
-                      return t({
-                        id: "editor.assignLoop.suggestion.replaceText",
-                        message: `Suggested: Replace ${keyName} with ${charOrEmpty}`,
-                      });
-                    }
-                    // S-08: derive the label from the candidate's OWN
-                    // modifiers (never hardcode "Right Alt") — reuses the
-                    // shared per-token label table + "+"-joined formatting
-                    // (modifierTokenLabel.ts) rather than a second copy, so a
-                    // case-pair fallback candidate's ["SHIFT","RALT"] renders
-                    // "Shift+RAlt" instead of the plain-RAlt lowercase text.
-                    const modifierLabel = formatModifierCombo(
-                      suggestionComboTokens,
-                    );
-                    return t({
-                      id: "editor.assignLoop.suggestion.raltText",
-                      message: `Suggested: ${modifierLabel} + ${keyName} for ${charOrEmpty}`,
-                    });
-                  })()}
-                </p>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    type="button"
-                    disabled={locked}
-                    onClick={handleSuggestionAccept}
-                    aria-label={
-                      suggestion.strategyId === "S-01"
-                        ? t({
-                            id: "editor.assignLoop.suggestion.acceptSwapAriaLabel",
-                            message: `Accept suggestion: assign ${currentChar} to ${suggestion.topCandidate.vkey}`,
-                          })
-                        : t({
-                            id: "editor.assignLoop.suggestion.acceptRaltAriaLabel",
-                            message: `Accept suggestion: ${formatModifierCombo(suggestionComboTokens)} + ${suggestion.topCandidate.vkey} for ${currentChar}`,
-                          })
-                    }
-                    style={{
-                      padding: "5px 14px",
-                      background: "#238636",
-                      border: "none",
-                      borderRadius: 5,
-                      color: "#e6edf3",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      fontFamily: FONT,
-                    }}
-                  >
-                    <Trans id="editor.assignLoop.suggestion.acceptButton">
-                      Accept
-                    </Trans>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSuggestionChange}
+              (currentCharBadge?.count ?? 0) === 0 &&
+              (() => {
+                // Keycap convention (physical-key-naming ambiguity fix): the
+                // physical key is named by its unshifted, lowercase glyph and
+                // boxed as a keycap, with the word "key" in the surrounding
+                // phrase — a bare uppercase "Q" reads as the capital
+                // CHARACTER Q, not the physical q key. Produced characters
+                // are quoted in their real case (never lowercased) via
+                // displayChar. See lib/keyLabel.ts. Hoisted ONCE here (rather
+                // than recomputed separately for the visible message and the
+                // accept button's aria-label below) so the two can never
+                // desync — mirrors CasePairProposalBanner's `keyNameFor`.
+                const keyName =
+                  physicalKeyLabel(suggestion.topCandidate.vkey) ??
+                  stripVkeyPrefix(suggestion.topCandidate.vkey);
+                // Quoted IN THE VALUE, not the message template — an
+                // apostrophe inside an ICU/Lingui message is escape syntax
+                // (it opens a quoted-literal region, swallowing any
+                // `{placeholder}` inside it instead of interpolating), so the
+                // quote marks must travel with the interpolated value itself.
+                const quotedChar =
+                  currentChar !== null ? `'${displayChar(currentChar)}'` : "";
+                return (
+                  <div
+                    role="note"
                     aria-label={t({
-                      id: "editor.assignLoop.suggestion.denyAriaLabel",
-                      message: "Deny suggestion and choose method manually",
+                      id: "editor.assignLoop.suggestion.ariaLabel",
+                      message: "Placement suggestion from kbgen seeder",
                     })}
                     style={{
-                      padding: "5px 14px",
-                      background: "transparent",
-                      border: `1px solid ${BORDER}`,
-                      borderRadius: 5,
-                      color: TEXT_DIM,
-                      fontSize: 12,
-                      cursor: "pointer",
-                      fontFamily: FONT,
+                      // RED, not green — the suggestion row only ever renders
+                      // when currentCharBadge's count is 0 (see the gate above),
+                      // so it always reads as "not yet implemented", matching
+                      // the badge's own 0-count colors (charMechanisms.ts /
+                      // CharScrollStrip.tsx's `ERROR_RED` + its paired dark-red
+                      // background).
+                      background: ERROR_BG,
+                      border: `1px solid ${ERROR_RED}`,
+                      borderRadius: 8,
+                      padding: "10px 14px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
                     }}
                   >
-                    <Trans id="editor.assignLoop.suggestion.denyButton">
-                      Deny
-                    </Trans>
-                  </button>
-                </div>
-              </div>
-            )}
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 12,
+                        color: ERROR_RED,
+                        fontFamily: FONT,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {(() => {
+                        if (suggestion.strategyId === "S-01") {
+                          return (
+                            <Trans id="editor.assignLoop.suggestion.replaceText">
+                              Suggested: Replace the <KeyCap>{keyName}</KeyCap>{" "}
+                              key with {quotedChar}
+                            </Trans>
+                          );
+                        }
+                        // S-08: derive the label from the candidate's OWN
+                        // modifiers (never hardcode "Right Alt") — reuses the
+                        // shared per-token label table + "+"-joined formatting
+                        // (modifierTokenLabel.ts) rather than a second copy, so a
+                        // case-pair fallback candidate's ["SHIFT","RALT"] renders
+                        // "Shift+RAlt" instead of the plain-RAlt lowercase text.
+                        // The shift is conveyed by the modifier word, not by
+                        // casing the key letter itself.
+                        const modifierLabel = formatModifierCombo(
+                          suggestionComboTokens,
+                        );
+                        return (
+                          <Trans id="editor.assignLoop.suggestion.raltText">
+                            Suggested: {modifierLabel} +{" "}
+                            <KeyCap>{keyName}</KeyCap> for {quotedChar}
+                          </Trans>
+                        );
+                      })()}
+                    </p>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        type="button"
+                        disabled={locked}
+                        onClick={handleSuggestionAccept}
+                        aria-label={(() => {
+                          // Human-readable, never the raw K_* vkey id — same
+                          // keycap-naming convention as the visible suggestion
+                          // text above (lowercase key name, real-case quoted
+                          // character), just rendered as a plain string since an
+                          // aria-label can't carry a boxed <KeyCap>. Reuses the
+                          // SAME keyName/quotedChar hoisted above the visible
+                          // message so the two can never desync.
+                          return suggestion.strategyId === "S-01"
+                            ? t({
+                                id: "editor.assignLoop.suggestion.acceptSwapAriaLabel",
+                                message: `Accept suggestion: replace the ${keyName} key with ${quotedChar}`,
+                              })
+                            : t({
+                                id: "editor.assignLoop.suggestion.acceptRaltAriaLabel",
+                                message: `Accept suggestion: ${formatModifierCombo(suggestionComboTokens)} + ${keyName} key for ${quotedChar}`,
+                              });
+                        })()}
+                        style={{
+                          padding: "5px 14px",
+                          background: "#238636",
+                          border: "none",
+                          borderRadius: 5,
+                          color: "#e6edf3",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          fontFamily: FONT,
+                        }}
+                      >
+                        <Trans id="editor.assignLoop.suggestion.acceptButton">
+                          Accept
+                        </Trans>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSuggestionChange}
+                        aria-label={t({
+                          id: "editor.assignLoop.suggestion.denyAriaLabel",
+                          message: "Deny suggestion and choose method manually",
+                        })}
+                        style={{
+                          padding: "5px 14px",
+                          background: "transparent",
+                          border: `1px solid ${BORDER}`,
+                          borderRadius: 5,
+                          color: TEXT_DIM,
+                          fontSize: 12,
+                          cursor: "pointer",
+                          fontFamily: FONT,
+                        }}
+                      >
+                        <Trans id="editor.assignLoop.suggestion.denyButton">
+                          Deny
+                        </Trans>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
             {/* Method chooser */}
             <MethodChooser

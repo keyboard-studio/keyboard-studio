@@ -173,7 +173,7 @@ describe('CarveGallery — sole removable producer', () => {
     renderGallery(ir, caps);
     expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(false);
 
-    fireEvent.click(screen.getByRole('button', { name: 'a — K_A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'a — a' }));
 
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(true);
@@ -201,7 +201,7 @@ describe('CarveGallery — multi-contributor remove', () => {
     }));
 
     renderGallery(ir, caps);
-    fireEvent.click(screen.getByRole('button', { name: 'b — K_B' }));
+    fireEvent.click(screen.getByRole('button', { name: 'b — b' }));
 
     const dialog = screen.getByRole('alertdialog');
     expect(dialog.textContent).toContain('Remove "b" everywhere?');
@@ -225,7 +225,7 @@ describe('CarveGallery — multi-contributor remove', () => {
     }));
 
     renderGallery(ir, caps);
-    fireEvent.click(screen.getByRole('button', { name: 'b — K_B' }));
+    fireEvent.click(screen.getByRole('button', { name: 'b — b' }));
     fireEvent.click(screen.getByRole('button', { name: 'Yes, remove everywhere' }));
 
     expect(useWorkingCopyStore.getState().isItemDeleted('r-b')).toBe(true);
@@ -250,7 +250,7 @@ describe('CarveGallery — restore mode', () => {
     useWorkingCopyStore.getState().deleteItem('r-c');
     expect(useWorkingCopyStore.getState().isItemDeleted('r-c')).toBe(true);
 
-    fireEvent.click(screen.getByRole('button', { name: 'c — K_C' }));
+    fireEvent.click(screen.getByRole('button', { name: 'c — c' }));
 
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(useWorkingCopyStore.getState().isItemDeleted('r-c')).toBe(false);
@@ -268,7 +268,7 @@ describe('CarveGallery — restore mode', () => {
     useWorkingCopyStore.getState().deleteItem('r-d');
     useWorkingCopyStore.getState().deleteItem('r-d2');
 
-    fireEvent.click(screen.getByRole('button', { name: 'd — K_D' }));
+    fireEvent.click(screen.getByRole('button', { name: 'd — d' }));
 
     const dialog = screen.getByRole('alertdialog');
     expect(dialog.textContent).toContain('Restore "d" everywhere?');
@@ -294,7 +294,7 @@ describe('CarveGallery — not-removable chip / actionCount === 0', () => {
     collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => emptyContributors(ch));
 
     renderGallery(ir, caps);
-    fireEvent.click(screen.getByRole('button', { name: 'e — K_E' }));
+    fireEvent.click(screen.getByRole('button', { name: 'e — e' }));
 
     const dialog = screen.getByRole('alertdialog');
     expect(dialog.textContent).toContain('"e" can\'t be fully removed');
@@ -312,7 +312,7 @@ describe('CarveGallery — not-removable chip / actionCount === 0', () => {
     collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => emptyContributors(ch));
 
     renderGallery(ir, caps);
-    fireEvent.click(screen.getByRole('button', { name: 'f — K_F' }));
+    fireEvent.click(screen.getByRole('button', { name: 'f — f' }));
     fireEvent.click(screen.getByRole('button', { name: 'OK' }));
 
     expect(screen.queryByRole('alertdialog')).toBeNull();
@@ -956,16 +956,16 @@ describe('CarveGallery — every applied trim is visible (spec 051 US3)', () => 
     }));
 
     renderGallery(makeTwoProducerIR(), caps);
-    expect(tileIsRemoved('g — K_G')).toBe(false);
-    expect(tileIsRemoved('g — K_H')).toBe(false);
+    expect(tileIsRemoved('g — g')).toBe(false);
+    expect(tileIsRemoved('g — h')).toBe(false);
 
-    fireEvent.click(screen.getByRole('button', { name: 'g — K_G' }));
+    fireEvent.click(screen.getByRole('button', { name: 'g — g' }));
     fireEvent.click(screen.getByRole('button', { name: 'Yes, remove everywhere' }));
 
     // The clicked tile AND the other producer's tile both flip — the trimmed
     // contributor set is a subset of the tiles rendered removed.
-    expect(tileIsRemoved('g — K_G')).toBe(true);
-    expect(tileIsRemoved('g — K_H')).toBe(true);
+    expect(tileIsRemoved('g — g')).toBe(true);
+    expect(tileIsRemoved('g — h')).toBe(true);
   });
 
   it('FR-007: the kept/total counter updates in the same render', () => {
@@ -981,7 +981,7 @@ describe('CarveGallery — every applied trim is visible (spec 051 US3)', () => 
     renderGallery(makeTwoProducerIR(), caps);
     expect(screen.getByText('2').textContent).toBe('2'); // 2 of 2 kept
 
-    fireEvent.click(screen.getByRole('button', { name: 'g — K_G' }));
+    fireEvent.click(screen.getByRole('button', { name: 'g — g' }));
     fireEvent.click(screen.getByRole('button', { name: 'Yes, remove everywhere' }));
 
     expect(screen.getByText('0').textContent).toBe('0'); // 0 of 2 kept
@@ -996,10 +996,10 @@ describe('CarveGallery — every applied trim is visible (spec 051 US3)', () => 
     }));
 
     renderGallery(ir, caps);
-    fireEvent.click(screen.getByRole('button', { name: 'a — K_A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'a — a' }));
 
     expect(screen.queryByRole('alertdialog')).toBeNull();
-    expect(tileIsRemoved('a — K_A')).toBe(true);
+    expect(tileIsRemoved('a — a')).toBe(true);
   });
 
   it('FR-008 outcome 2 — APPLIED WITH RETAINED PRODUCERS: the retained one is named with a reason, and stays lit', () => {
@@ -1013,7 +1013,7 @@ describe('CarveGallery — every applied trim is visible (spec 051 US3)', () => 
     }));
 
     renderGallery(makeTwoProducerIR(), caps);
-    fireEvent.click(screen.getByRole('button', { name: 'g — K_G' }));
+    fireEvent.click(screen.getByRole('button', { name: 'g — g' }));
 
     // The dialog says WHICH producer is being kept and WHY — never silent.
     const dialog = screen.getByRole('alertdialog');
@@ -1022,8 +1022,8 @@ describe('CarveGallery — every applied trim is visible (spec 051 US3)', () => 
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, remove everywhere' }));
 
-    expect(tileIsRemoved('g — K_G')).toBe(true);
-    expect(tileIsRemoved('g — K_H')).toBe(false); // retained, and the author was told
+    expect(tileIsRemoved('g — g')).toBe(true);
+    expect(tileIsRemoved('g — h')).toBe(false); // retained, and the author was told
   });
 
   it('FR-008 outcome 3 — REFUSED WITH REASON: nothing is removable, nothing flips, and the reason is shown', () => {
@@ -1032,14 +1032,14 @@ describe('CarveGallery — every applied trim is visible (spec 051 US3)', () => 
     collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => emptyContributors(ch));
 
     renderGallery(ir, caps);
-    fireEvent.click(screen.getByRole('button', { name: 'e — K_E' }));
+    fireEvent.click(screen.getByRole('button', { name: 'e — e' }));
 
     const dialog = screen.getByRole('alertdialog');
     expect(dialog.textContent).toContain('can\'t be fully removed');
     expect(dialog.textContent).toContain('Only produces this character after certain keys are pressed');
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
-    expect(tileIsRemoved('e — K_E')).toBe(false);
+    expect(tileIsRemoved('e — e')).toBe(false);
   });
 
   it('FR-008: a trim never closes with no visible effect — the plain-toggle fast path only fires for a complete trim', () => {
@@ -1057,7 +1057,7 @@ describe('CarveGallery — every applied trim is visible (spec 051 US3)', () => 
     }));
 
     renderGallery(makeTwoProducerIR(), caps);
-    fireEvent.click(screen.getByRole('button', { name: 'g — K_G' }));
+    fireEvent.click(screen.getByRole('button', { name: 'g — g' }));
 
     expect(screen.queryByRole('alertdialog')).not.toBeNull();
   });
@@ -1204,8 +1204,8 @@ describe('CarveGallery — cased-letter proposal rows (spec 051 T028)', () => {
     renderGallery(ir, caps);
     // Deliberately does NOT expand/accept the banner row — the author is using
     // the per-chip cascade directly, i.e. declining the paired proposal.
-    const upperTileName = `${CASE_UPPER} — K_A`;
-    const lowerTileName = `${CASE_LOWER} — K_B`;
+    const upperTileName = `${CASE_UPPER} — a`;
+    const lowerTileName = `${CASE_LOWER} — b`;
     expect(tileIsRemoved(upperTileName)).toBe(false);
     expect(tileIsRemoved(lowerTileName)).toBe(false);
 

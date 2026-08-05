@@ -206,6 +206,26 @@ function setMockStage(s: Stage) {
   _mockStage = s;
 }
 
+/**
+ * The kbgen suggestion row's full visible text, read off its `role="note"`
+ * container rather than a single text node. The row's key name now renders
+ * boxed inside a `<KeyCap>` element (the physical-key keycap convention),
+ * which splits the sentence across sibling DOM nodes — RTL's `getByText`
+ * only matches a node's OWN direct text-node children (see
+ * `@testing-library/dom`'s `getNodeText`), so a query for the WHOLE sentence
+ * never matches any single node once it contains a nested element. Reading
+ * the note's `textContent` sidesteps that by concatenating every descendant
+ * text node, matching what a sighted user actually sees. Throws (via
+ * `getByRole`) if the row isn't rendered at all — callers asserting absence
+ * should query `queryByRole("note", { name: /kbgen seeder/i })` instead.
+ */
+function suggestionRowText(): string {
+  return (
+    screen.getByRole("note", { name: /Placement suggestion from kbgen seeder/i })
+      .textContent ?? ""
+  );
+}
+
 /** Seed confirmedInventory via Phase B result. baseIr stays null so
  *  useInventoryDiff returns lettersToAdd === inventory (no diff).
  *
@@ -2552,7 +2572,7 @@ describe("MechanismGallery — kbgen suggestion gated on the current char's prod
     // not the suggestion row's presence. waitFor retries until both have
     // caught up, without weakening what's asserted.
     await waitFor(() => {
-      expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
+      expect(suggestionRowText()).toMatch(/Suggested: RAlt \+ a for 'à'/i);
     });
   });
 
@@ -2620,6 +2640,63 @@ describe("MechanismGallery — kbgen suggestion gated on the current char's prod
 
     // Badge already reads count >= 1 (base-direct) — no suggestion may show.
     expect(screen.queryByText(/Suggested: Replace Q with ɛ/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// kbgen suggestion row text — S-01 keycap convention (physical-key-naming
+// ambiguity fix). The S-08 (RALT) shape already has a positive assertion
+// above ("Suggested: RAlt + a for 'à'"); this closes the matching gap for
+// S-01 (a `direct` candidate with no RALT modifier — strategyForCandidate
+// resolves it to S-01) — the KEY name lowercase, the produced CHARACTER
+// quoted in its real case.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — kbgen suggestion row text (S-01 keycap convention)", () => {
+  it("renders the lowercase key name and real-case quoted character for an S-01 (no-modifier direct) candidate", async () => {
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+
+    seedInventory(["x"]);
+
+    const placementMap = makePlacementMap({
+      bcp47Context: "test",
+      baseLayoutFamily: "QWERTY",
+      entries: [
+        {
+          codepoint: "U+0078", // x
+          candidates: [
+            {
+              vkey: "K_Q",
+              modifiers: [],
+              mechanism: "direct",
+              priorSource: "corpus",
+              priorCount: 4,
+              confidence: 0.88,
+            },
+          ],
+        },
+      ],
+    });
+
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} placementMap={placementMap} />,
+      );
+    });
+
+    fireEvent.click(screen.getByTestId("char-scroll-chip-0078"));
+    await waitFor(() => {
+      expectCurrentChar("x");
+    });
+
+    await waitFor(() => {
+      expect(suggestionRowText()).toMatch(/Suggested: Replace the q key with 'x'/i);
+    });
   });
 });
 
@@ -2759,16 +2836,18 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // synchronous-getByText-after-render pattern hardened elsewhere in this
     // describe block (see the kbgen-suggestion-gated describe above).
     await waitFor(() => {
-      expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
+      expect(suggestionRowText()).toMatch(/Suggested: RAlt \+ a for 'à'/i);
     });
 
     // Accept it — records the S-08 assignment and dismisses the row (the
     // dismissal is also implied by coveredChars once accepted).
     fireEvent.click(
-      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_A for à/i }),
+      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ a key for 'à'/i }),
     );
     await waitFor(() => {
-      expect(screen.queryByText(/Suggested: RAlt \+ A for à/i)).toBeNull();
+      expect(
+        screen.queryByRole("note", { name: /Placement suggestion from kbgen seeder/i }),
+      ).toBeNull();
     });
 
     // Advance to "é" — its own (not-yet-resolved) suggestion row shows.
@@ -2778,7 +2857,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
       fireEvent.click(nextBtn);
     });
     await waitFor(() => {
-      expect(screen.getByText(/Suggested: RAlt \+ E for é/i)).toBeTruthy();
+      expect(suggestionRowText()).toMatch(/Suggested: RAlt \+ e for 'é'/i);
     });
 
     // Navigate back to "à" without resolving é's suggestion. Scoped via
@@ -2793,7 +2872,9 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     });
 
     // The already-accepted suggestion for "à" must NOT re-render its card.
-    expect(screen.queryByText(/Suggested: RAlt \+ A for à/i)).toBeNull();
+    expect(
+      screen.queryByRole("note", { name: /Placement suggestion from kbgen seeder/i }),
+    ).toBeNull();
   });
 
   it("a suggestion row REAPPEARS after Skip (unlike Accept/Deny) — Skip resolves nothing", async () => {
@@ -2816,7 +2897,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // synchronous-getByText-after-render pattern hardened elsewhere in this
     // describe block.
     await waitFor(() => {
-      expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
+      expect(suggestionRowText()).toMatch(/Suggested: RAlt \+ a for 'à'/i);
     });
 
     // Skip it — no accept/deny, no assignment recorded.
@@ -2835,7 +2916,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // reappear — Skip resolved nothing. (If `skippedChars` were reintroduced
     // to suppress the row, this assertion would fail.)
     await waitFor(() => {
-      expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
+      expect(suggestionRowText()).toMatch(/Suggested: RAlt \+ a for 'à'/i);
     });
   });
 });
@@ -2881,12 +2962,10 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
     });
 
     expectCurrentChar("Ƒ");
-    expect(
-      screen.getByText(/Suggested: Shift\+RAlt \+ F for Ƒ/i),
-    ).toBeTruthy();
+    expect(suggestionRowText()).toMatch(/Suggested: Shift\+RAlt \+ f for 'Ƒ'/i);
     expect(
       screen.getByRole("button", {
-        name: /Accept suggestion: Shift\+RAlt \+ K_F for Ƒ/i,
+        name: /Accept suggestion: Shift\+RAlt \+ f key for 'Ƒ'/i,
       }),
     ).toBeTruthy();
   });
@@ -2904,7 +2983,7 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Accept suggestion: Shift\+RAlt \+ K_F for Ƒ/i,
+        name: /Accept suggestion: Shift\+RAlt \+ f key for 'Ƒ'/i,
       }),
     );
 
@@ -2938,10 +3017,10 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
     });
 
     expectCurrentChar("ƒ");
-    expect(screen.getByText(/Suggested: RAlt \+ F for ƒ/i)).toBeTruthy();
+    expect(suggestionRowText()).toMatch(/Suggested: RAlt \+ f for 'ƒ'/i);
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_F for ƒ/i }),
+      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ f key for 'ƒ'/i }),
     );
     const assignments = useWorkingCopyStore
       .getState()
@@ -3012,7 +3091,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
     expectCurrentChar("ƒ");
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Accept suggestion: RAlt \+ K_F for ƒ/i,
+        name: /Accept suggestion: RAlt \+ f key for 'ƒ'/i,
       }),
     );
 
@@ -3032,12 +3111,12 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Accept suggestion: RAlt \+ K_F for ƒ/i,
+        name: /Accept suggestion: RAlt \+ f key for 'ƒ'/i,
       }),
     );
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Map Ƒ to the Shift\+RAlt layer of K_F/i,
+        name: /Map Ƒ to the Shift\+RAlt layer of the f key/i,
       }),
     );
 
@@ -3075,7 +3154,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
     expectCurrentChar("Ƒ");
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Accept suggestion: Shift\+RAlt \+ K_F for Ƒ/i,
+        name: /Accept suggestion: Shift\+RAlt \+ f key for 'Ƒ'/i,
       }),
     );
 
@@ -3095,7 +3174,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Accept suggestion: RAlt \+ K_F for ƒ/i,
+        name: /Accept suggestion: RAlt \+ f key for 'ƒ'/i,
       }),
     );
     expect(screen.getByText(/has an uppercase form, Ƒ/i)).toBeTruthy();
@@ -3117,7 +3196,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Map Ƒ to the Shift\+RAlt layer of K_F/i,
+        name: /Map Ƒ to the Shift\+RAlt layer of the f key/i,
       }),
     );
 
@@ -4318,7 +4397,7 @@ describe("MechanismGallery — case-pair companion proposal", () => {
     expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Map Θ to the shift layer of K_Q/i }),
+      screen.getByRole("button", { name: /Map Θ to the shift layer of the q key/i }),
     );
 
     const assignments = useWorkingCopyStore
@@ -4430,7 +4509,7 @@ describe("MechanismGallery — CAPS-aware base-layer swap (P0)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Map Θ to the shift layer of K_Q/i }),
+      screen.getByRole("button", { name: /Map Θ to the shift layer of the q key/i }),
     );
 
     const assignments = useWorkingCopyStore
@@ -4568,7 +4647,7 @@ describe("MechanismGallery — companion proposal identity tracking (P1/P2 regre
 
     // 3. Confirm the companion.
     fireEvent.click(
-      screen.getByRole("button", { name: /Map Θ to the shift layer of K_Q/i }),
+      screen.getByRole("button", { name: /Map Θ to the shift layer of the q key/i }),
     );
 
     const assignments = getPhaseCPhysicalAssignments();
@@ -4661,7 +4740,7 @@ describe("MechanismGallery — companion proposal identity tracking (P1/P2 regre
     expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Map Θ to the shift layer of K_Q/i }),
+      screen.getByRole("button", { name: /Map Θ to the shift layer of the q key/i }),
     );
 
     // Nothing was recorded — the stale proposal was dismissed, not applied.
@@ -4691,7 +4770,7 @@ describe("MechanismGallery — companion proposal bcp47 plumbing", () => {
     expect(screen.getByText(/has an uppercase form, İ/i)).toBeTruthy();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Map İ to the shift layer of K_Q/i }),
+      screen.getByRole("button", { name: /Map İ to the shift layer of the q key/i }),
     );
 
     const companion = useWorkingCopyStore
@@ -5518,7 +5597,7 @@ describe("MechanismGallery — shared case-pair affordance (spec 051)", () => {
     await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), "K_Q");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
     expect(
-      screen.getByRole("button", { name: /Map Θ to the shift layer of K_Q/i }),
+      screen.getByRole("button", { name: /Map Θ to the shift layer of the q key/i }),
     ).toBeTruthy();
 
     // 2. Second swap for the SAME character on K_W — at most one proposal is
@@ -5530,7 +5609,7 @@ describe("MechanismGallery — shared case-pair affordance (spec 051)", () => {
     // 3. Confirm — must pair with K_W (the raising placement), not K_Q. An
     //    index/target scan would grab the first θ assignment and emit K_Q.
     fireEvent.click(
-      screen.getByRole("button", { name: /Map Θ to the shift layer of K_W/i }),
+      screen.getByRole("button", { name: /Map Θ to the shift layer of the w key/i }),
     );
 
     const assignments = getPhaseCPhysicalAssignments();

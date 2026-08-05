@@ -1184,16 +1184,44 @@ export function isTouchOnlyVkeyName(name: string): boolean {
 }
 
 /**
+ * Applies the physical-key-naming-ambiguity fix's lowercase-letter display
+ * convention (see lib/keyLabel.ts's `physicalKeyLabel`) to an already-
+ * resolved `vkeyLabel()` output: a bare single-letter label ("A", "Q", …) is
+ * the key's UNSHIFTED glyph, not the shifted/produced CHARACTER, so it reads
+ * lowercase ("a", "q"). Digit/symbol/named-key labels ("5", "[", "Backspace")
+ * are never single ASCII letters, so they pass through unchanged; any casing
+ * implied by a modifier is conveyed by the modifier word in the surrounding
+ * chord text ("Shift + a"), never by casing the key letter itself.
+ *
+ * Deliberately duplicated (not imported) from `physicalKeyLabel` — this
+ * module (`irToCarveNodes.ts`) is where `vkeyLabel` itself lives, and
+ * `keyLabel.ts` already imports `vkeyLabel` FROM here, so importing the
+ * other direction would create a circular module dependency. The two must
+ * stay in sync; `keyLabel.ts`'s doc comment cross-references this one.
+ */
+function lowerBareKeyLetter(label: string): string {
+  return label.length === 1 && /[A-Z]/.test(label) ? label.toLowerCase() : label;
+}
+
+/**
  * Desktop-safe vkey label: same resolution as `vkeyLabel`, but returns
  * `undefined` (rather than falling back to the raw name) for a touch-only
  * vkey — the one case where "just show the raw name" would leak a
  * non-physical key id into a desktop keystroke step. Every call site that
  * previously did `vkeyLabel(name) ?? name` for a context/store-item vkey
  * feeding a rendered "how it's typed" step or floor uses this instead.
+ *
+ * Applies the lowercase-letter keycap convention (`lowerBareKeyLetter`) on
+ * top of `vkeyLabel`'s resolution — this is the ONE choke point every
+ * "how it's typed" desktop label (`triggerKeyLabel`, `primaryChordLabel`,
+ * `slotItemLabel`/`storeTriggerFloorLabel`, `sequenceShapeCells`'s
+ * `baseSlotLabel`, `crossPairTrigger`) resolves a vkey through, so fixing it
+ * here is sufficient — `vkeyLabel` itself is untouched and stays the shared,
+ * unlowered resolver other (non-desktop-label) call sites still rely on.
  */
 export function desktopVkeyLabel(name: string): string | undefined {
   if (isTouchOnlyVkeyName(name)) return undefined;
-  return vkeyLabel(name) ?? name;
+  return lowerBareKeyLetter(vkeyLabel(name) ?? name);
 }
 
 // ---------------------------------------------------------------------------

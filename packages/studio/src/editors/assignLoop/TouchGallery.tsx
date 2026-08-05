@@ -176,6 +176,7 @@ import {
 } from "./parts/RemovableChipRow.tsx";
 import { SelectMenu, type SelectMenuOption } from "../../ui/SelectMenu.tsx";
 import { KEY_OPTIONS, VALID_HOST_KEYS } from "../../lib/keyOptions.ts";
+import { stripVkeyPrefix } from "../../lib/keyLabel.ts";
 import {
   resolveKeyPickerSelection,
   resolvedVkeyOf,
@@ -234,7 +235,7 @@ export function isCasingBearingTouchLayer(layer: TouchLayerId): boolean {
  * today.
  */
 export function hostKeyShortLabel(keyId: string, layer: TouchLayerId): string {
-  const short = keyId.startsWith("K_") ? keyId.slice(2) : keyId;
+  const short = stripVkeyPrefix(keyId);
   if (layer === "default") return short.toLowerCase();
   if (isCasingBearingTouchLayer(layer)) return short.toUpperCase();
   return short;
