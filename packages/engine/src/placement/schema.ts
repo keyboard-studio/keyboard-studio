@@ -44,6 +44,8 @@ const PlacementCandidateSchema = z.object({
   priorSource: PriorSourceSchema,
   priorCount: z.number(),
   confidence: z.number(),
+  // Present iff mechanism is "deadkey" / "store-index" (placement-priors v2).
+  baseLetter: z.string().optional(),
 });
 
 const AggregatedEntrySchema = z.object({
@@ -53,11 +55,27 @@ const AggregatedEntrySchema = z.object({
   baseLayoutFamily: z.string(),
 });
 
+// Touch (longpress) placement priors — placement-priors v2. Mirrors
+// contracts' TouchPlacementEntry/TouchPlacementHost; a SEPARATE vocabulary
+// from PlacementMechanism, never merged into it (see placementMap.ts).
+const TouchPlacementHostSchema = z.object({
+  vkey: z.string(),
+  layerClass: z.enum(["default", "shift", "other"]),
+  priorCount: z.number(),
+});
+
+const TouchPlacementEntrySchema = z.object({
+  codepoint: z.string(),
+  hosts: z.array(TouchPlacementHostSchema),
+});
+
 export const PlacementPriorsJSONSchema = z.object({
   version: z.string(),
   generatedFrom: z.string(),
   priorCount: z.number(),
   entries: z.record(z.string(), AggregatedEntrySchema),
+  deadkeySkipReasons: z.record(z.string(), z.number()).optional(),
+  touch: z.array(TouchPlacementEntrySchema).optional(),
 });
 
 /**

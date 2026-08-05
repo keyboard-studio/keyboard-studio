@@ -29,12 +29,23 @@
 // done nothing (research D-05); `"none"` and `"unavailable"` are different states
 // and the trail says different things about them.
 
-import type { DecisionEntry, DecisionImpact, KeyboardIR } from "@keyboard-studio/contracts";
+import type {
+  DecisionEntry,
+  DecisionImpact,
+  DecisionRecord,
+  KeyboardIR,
+} from "@keyboard-studio/contracts";
 import { diffLines, diffMagnitude, emitKmn } from "@keyboard-studio/engine";
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import { applyMutatePatch } from "../steps/mutateApply.ts";
 import { manifest } from "../steps/manifest.ts";
+import {
+  coDecisionEntryIds,
+  outputFieldForEntry,
+  resolveIdentityCounterfactual,
+  type CounterfactualDeps,
+} from "./counterfactualProjection.ts";
 
 export interface ResolveImpactDeps {
   /**
@@ -167,4 +178,90 @@ export function resolveImpact(
   return isBehindPassedLock(entry, deps)
     ? { state: "unavailable", reason: "lock-gate-dependency" }
     : { state: "unavailable", reason: "no-rederivable-write-path" };
+}
+
+// ---------------------------------------------------------------------------
+// The async resolver (spec 059 FR-009…FR-012)
+// ---------------------------------------------------------------------------
+//
+// `resolveImpact` above is unchanged and still the whole answer for a stored
+// capture. What it could not do is attribute a decision recorded BEFORE a working
+// copy existed: the identity questions have no `mutate()`, so they fell to
+// `"no-rederivable-write-path"` — which was true until spec 059 gave their answers
+// a write path into the package descriptor, and false afterwards.
+//
+// So this resolver adds exactly one capability: for an entry whose question
+// DECLARES that it reaches an output artifact, re-derive the effect by projecting
+// the working copy twice and diffing (counterfactualProjection.ts). Everything
+// else defers to the sync path.
+
+export interface ResolveImpactAsyncDeps extends ResolveImpactDeps, CounterfactualDeps {
+  /** Whether a working copy exists to project. */
+  hasWorkingCopy: () => boolean;
+  /** The current record, for the joint-attribution co-decision set (FR-014). */
+  getRecord: () => DecisionRecord;
+}
+
+/**
+ * Resolve ONE entry's impact, including the counterfactual for a decision made
+ * before instantiation.
+ *
+ * Precedence (contracts/impact-resolution.md §3), in this order:
+ *
+ *   1. shed (`impact === null`)                      -> `null`, never re-derived
+ *   2. stored capture, no `requestedValue`            -> returned VERBATIM (SC-005)
+ *   3. declares `outputs` + a working copy exists     -> the counterfactual
+ *   4. declares `outputs` + no working copy           -> `"no-working-copy-yet"`
+ *   5. otherwise                                      -> the sync resolver's answer
+ *
+ * (2) is verbatim on purpose: re-deriving a long-recorded fact could produce a
+ * different answer than the one taken at the time, which is the audit-versus-
+ * artifact disagreement SC-005 forbids. (4) is its own reason because "the effect
+ * cannot be shown YET" is a different statement from "there is no write path" —
+ * the author can act on the first by choosing a base (FR-012).
+ *
+ * There is NO BATCH FORM, exactly as with `resolveImpact`: FR-011's "only the entry
+ * the author expanded" is a property of this signature, not a promise about timing.
+ */
+export async function resolveImpactAsync(
+  entry: DecisionEntry,
+  deps: ResolveImpactAsyncDeps,
+  requestedValue?: string | string[] | undefined,
+): Promise<DecisionImpact | null> {
+  if (entry.impact === null) return null;
+  if (entry.impact !== undefined && requestedValue === undefined) return entry.impact;
+
+  const field = outputFieldForEntry(entry);
+  if (field !== undefined) {
+    if (!deps.hasWorkingCopy()) {
+      return { state: "unavailable", reason: "no-working-copy-yet" };
+    }
+    const recorded =
+      requestedValue !== undefined
+        ? requestedValue
+        : entry.payload.kind === "survey-answer"
+          ? entry.payload.value
+          : undefined;
+    // The overlay is a string space; a non-string answer has no value to vary, so
+    // it falls through to the sync resolver rather than being coerced into one.
+    if (typeof recorded === "string") {
+      const sharedWith = coDecisionEntryIds(entry, deps.getRecord(), field);
+      // The alternative is "left blank" — the one alternative that exists for every
+      // identity answer without inventing a second value the author never
+      // considered. FR-026's explicit-alternative form goes through the flow map,
+      // which passes its own `requestedValue`.
+      const impact = await resolveIdentityCounterfactual(
+        field,
+        recorded,
+        undefined,
+        deps,
+        sharedWith,
+      );
+      if (impact !== null) return impact;
+      // The projection vanished between the guard and the call (a reset mid-expand).
+      return { state: "unavailable", reason: "no-working-copy-yet" };
+    }
+  }
+
+  return resolveImpact(entry, deps, requestedValue);
 }

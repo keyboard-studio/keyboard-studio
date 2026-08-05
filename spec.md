@@ -697,13 +697,39 @@ release/<letter-or-org>/<id>/
     <id>_tests.kmn            -- round-trip test vectors (from pattern test cases)
 ```
 
-Compiled artifacts (`.kmx`, `.kvk`, `.js`) are produced by the in-browser compiler service and included in the `.zip` output; they are not committed to source in the PR (criteria SS1).
+Compiled artifacts (`.kmx`, `.kvk`, `.js`) are produced by the in-browser compiler service and included in the `.zip` output under `build/`; they are not committed to source in the PR (criteria SS1).
+
+*Implementation note (2026-08-04).* This paragraph described the intent from
+Day 1 but was not true until the `.kmp` work: the compile bridge's
+`fs.writeFileSync` is a deliberate no-op (artifacts come back off `run()`'s
+return value as blob URLs), so nothing ever wrote `build/` and the archive
+shipped source only — while the `.kps` it shipped referenced `..\build\<id>.kmx`.
+Staging now happens on the download path only
+([`studio/src/lib/buildOutputBundle.ts`](packages/studio/src/lib/buildOutputBundle.ts)),
+deliberately *not* inside the shared projection the PR paths also consume, which
+is what keeps SS1 true by construction rather than by a filter.
 
 **Import attribution in committed artifacts (D14).** When `KeyboardIR.origin === "imported"`, the scaffolder injects an "Adapted from `<sourcePath>`" bullet under the 1.0 entry in `HISTORY.md` (`<sourcePath>` is the source-keyboard path the importer recorded). This is the only carrier that survives in the committed PR tree; the full attribution block also lives in the PR body (via `buildImportAttributionBlock()`). `LICENSE.md` carries import attribution only when the source keyboard's licence requires it (e.g. CC-BY); `README.md` never carries it.
 
-### Two delivery modes
+### Delivery modes
 
-**Download `.zip`.** The virtual FS is serialized to a zip archive. A `NEXT_STEPS.md` is appended explaining how to submit to `keymanapp/keyboards`; any supplied provenance metadata (Sec 8 Phase A) is rendered into `NEXT_STEPS.md` for the submitter's reference. Works without a GitHub account.
+**Download `.kmp` (the primary download).** The virtual FS's package descriptor
+(`source/<id>.kps`) is compiled to an installable Keyman package via
+`@keymanapp/kmc-package` — pure JS, no wasm, fully offline — after the compiled
+artifacts are staged into `build/`. The author installs it by double-clicking, on
+Keyman for Windows, macOS, Linux, Android, or iOS. This is the artifact an
+ordinary author wants; the two modes below both assume the recipient will install
+Keyman Developer and compile. Works without a GitHub account.
+
+The descriptor is not optional here: without it there is nothing to package. It
+is written by the single writer in
+[`engine/src/package-descriptor/`](packages/engine/src/package-descriptor/) during
+projection, for both tracks and regardless of whether the author has set an
+identity yet (an unset identity yields the `und` language placeholder — never the
+base keyboard's language). Doc members the descriptor lists but the adapt track
+lacks (`welcome.htm`, `readme.htm`) are synthesized at output time and reported.
+
+**Download `.zip` (source).** The virtual FS is serialized to a zip archive. A `NEXT_STEPS.md` is appended explaining how to submit to `keymanapp/keyboards`; any supplied provenance metadata (Sec 8 Phase A) is rendered into `NEXT_STEPS.md` for the submitter's reference. Works without a GitHub account. This is the artifact for editing in Keyman Developer or contributing upstream.
 
 **GitHub OAuth fork+PR.** User authenticates via GitHub OAuth (`public_repo` scope). Studio forks `keymanapp/keyboards` under the user's account, creates branch `add/<id>`, commits the virtual FS source tree (no compiled artifacts), and opens a draft PR. The PR body is auto-generated:
 

@@ -22,6 +22,7 @@ import { useEffect, useRef, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { validateKeyboardId } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { TextField, Label, ErrorText } from "../../ui/index.ts";
 import { CARD_BORDER, TEXT_DIM, WARNING } from "../../ui/theme.ts";
 
@@ -35,6 +36,11 @@ export function TrackOneIdentityPanel() {
   const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
   const identity = useWorkingCopyStore((s) => s.identity);
   const setIdentity = useWorkingCopyStore((s) => s.setIdentity);
+  // The identity-lite answers, still in the survey session. `bcp47` is the tag the
+  // series composed; `english` is the language's English name (spec 059 FR-001/FR-002).
+  const identityResult = useSurveySessionStore((s) => s.identityResult);
+  const identityBcp47 = (identity?.bcp47 ?? identityResult?.bcp47 ?? "").trim();
+  const identityLanguageName = (identity?.languageName ?? identityResult?.english ?? "").trim();
 
   // Local controlled state — mirrors the store with a round-trip:
   // store → local (seeded), local → store (on change).
@@ -73,12 +79,31 @@ export function TrackOneIdentityPanel() {
   const isIdValid = idValidation.valid;
   const isIdUntouched = keyboardId.trim() === baseKeyboard.id;
 
+  // The identity-lite answers, carried into every patch this panel writes.
+  //
+  // spec 059 FR-001/FR-002: the package descriptor declares the author's language,
+  // and this panel is the copy track's OTHER identity writer (the first being
+  // project_name's onCommit). Without these two fields a later edit here would
+  // spread `...identity` over a patch that had them and then be re-merged — which
+  // works — but on a walk that reaches this panel before project_name has
+  // committed, the store would carry a display name and no language at all. Both
+  // writers therefore source the same two values from the same place.
+  //
+  // Taken WHOLE from the composed tag (research D-03); a blank answer is omitted
+  // so the descriptor writer applies its `und` placeholder rather than declaring
+  // an empty tag.
+  const languageFields = {
+    ...(identityBcp47 !== "" ? { bcp47: identityBcp47 } : {}),
+    ...(identityLanguageName !== "" ? { languageName: identityLanguageName } : {}),
+  };
+
   // Propagate to the store on display-name change.
   function handleDisplayNameChange(e: React.ChangeEvent<HTMLInputElement>) {
     const next = e.currentTarget.value;
     setDisplayName(next);
     setIdentity({
       ...identity,
+      ...languageFields,
       displayName: next,
     });
   }
@@ -93,6 +118,7 @@ export function TrackOneIdentityPanel() {
     if (validationError.valid) {
       setIdentity({
         ...identity,
+        ...languageFields,
         keyboardId: trimmed,
       });
     }

@@ -315,6 +315,26 @@ describe("parseTouchLayoutString — hint narrowing", () => {
   });
 });
 
+describe("parseTouchLayoutString — layerAnnotation (placement-priors v2)", () => {
+  it("preserves the raw sk[] wire-format layer annotation onto layerAnnotation", () => {
+    const key = firstKey(
+      makeLayout({ sk: [{ id: "K_A", text: "ɛ", layer: "rightalt" }] }),
+    );
+    expect(key.sk?.[0]?.layerAnnotation).toBe("rightalt");
+  });
+
+  it("leaves layerAnnotation undefined when the wire field is absent", () => {
+    const key = firstKey(makeLayout({}));
+    expect(key.layerAnnotation).toBeUndefined();
+    expect("layerAnnotation" in key).toBe(false);
+  });
+
+  it("treats an empty-string layer annotation as absent (not carried onto the IR)", () => {
+    const key = firstKey(makeLayout({ layer: "" }));
+    expect(key.layerAnnotation).toBeUndefined();
+  });
+});
+
 describe("parseTouchLayoutFromVfs — VFS adapter (lenient entry point)", () => {
   const kbId = "khmer_angkor";
   const layoutJson = JSON.stringify({

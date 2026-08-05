@@ -251,6 +251,55 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     const kmnText = strFromU8(kmnBytes as Uint8Array);
 
     expect(kmnText).not.toContain(KEPT_ONLY_TOKEN);
+
+    // -------------------------------------------------------------------
+    // The source zip now also ships the compiled artifacts, so the
+    // descriptor's `..\build\<id>.*` members resolve and the project opens
+    // cleanly in Keyman Developer (spec §12 always claimed this; until the
+    // .kmp work it was not true).
+    // -------------------------------------------------------------------
+    const zipNames = Object.keys(entries);
+    expect(
+      zipNames.some((n) => n.startsWith("build/") && n.endsWith(".kmx")),
+      `expected a compiled build/*.kmx in the zip, got: ${zipNames.join(", ")}`,
+    ).toBe(true);
+
+    // -------------------------------------------------------------------
+    // The PRIMARY download: an installable .kmp. This is the artifact an
+    // ordinary author double-clicks — no Keyman Developer, no unzipping.
+    // -------------------------------------------------------------------
+    const kmpButton = page.getByTestId("emit-download-kmp");
+    await expect(kmpButton).toBeEnabled({ timeout: 30_000 });
+
+    const [kmpDownload] = await Promise.all([
+      page.waitForEvent("download"),
+      kmpButton.click(),
+    ]);
+
+    expect(kmpDownload.suggestedFilename()).toMatch(/\.kmp$/);
+
+    const kmpPath = await kmpDownload.path();
+    expect(kmpPath).not.toBeNull();
+    const kmpBytes = new Uint8Array(await readFile(kmpPath as string));
+
+    // A .kmp is a zip; Keyman reads kmp.json out of it at install time.
+    const kmpEntries = unzipSync(kmpBytes);
+    const kmpNames = Object.keys(kmpEntries).sort();
+    expect(kmpNames, `.kmp members: ${kmpNames.join(", ")}`).toContain("kmp.json");
+    expect(kmpNames).toContain("kmp.inf");
+    expect(kmpNames.some((n) => n.endsWith(".kmx"))).toBe(true);
+    // Members are flattened to basename inside a package — no directories.
+    expect(kmpNames.every((n) => !n.includes("/"))).toBe(true);
+
+    // The descriptor Keyman actually reads must name the keyboard and a language.
+    const kmpJson = JSON.parse(strFromU8(kmpEntries["kmp.json"] as Uint8Array)) as {
+      keyboards?: { id?: string; version?: string; languages?: unknown[] }[];
+    };
+    expect(kmpJson.keyboards?.[0]?.id).toBeTruthy();
+    expect(kmpJson.keyboards?.[0]?.languages?.length ?? 0).toBeGreaterThan(0);
+
+    // No package-build error banner was shown.
+    await expect(page.getByTestId("emit-download-kmp-error")).toHaveCount(0);
   });
 
   // Positive control — same walk, but the opaque rule is left in place, so

@@ -73,8 +73,12 @@ export function stepChar(
 // role="slider", role="tab" strip, or a custom listbox not already covered
 // here) MUST add its selector to this list, or the pane-level cycle handler
 // will swallow its arrow keys before the widget ever sees them.
+// `[role="grid"]` covers the touch key-editor's key grid (FR-020f);
+// `[role="tablist"]` covers the key-edit overlay's grid/simulator mode
+// selector, an APG tabs pattern that also consumes ArrowLeft/ArrowRight
+// (R10.7) — both are required, not either/or.
 const SKIP_SELECTOR =
-  'input, textarea, select, [contenteditable], [contenteditable="true"], [role="listbox"], [role="combobox"], [aria-expanded="true"]';
+  'input, textarea, select, [contenteditable], [contenteditable="true"], [role="listbox"], [role="combobox"], [aria-expanded="true"], [role="grid"], [role="tablist"]';
 
 function originatesFromEditableOrOpenChooser(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;

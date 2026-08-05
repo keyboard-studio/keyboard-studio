@@ -8,7 +8,7 @@
  * @see spec.md §7.6 (corpus-derived placement priors)
  */
 
-import type { PlacementCandidate } from "@keyboard-studio/contracts";
+import type { PlacementCandidate, TouchPlacementEntry } from "@keyboard-studio/contracts";
 
 /**
  * Per-keyboard summary produced by emitPlacementMap and then fed to
@@ -44,6 +44,14 @@ export interface AggregatedEntry {
 /**
  * Top-level structure of the emitted placement-priors.json file.
  *
+ * **Versioning (placement-priors v2):** `version` is semver-style
+ * (`"2.0.0"` as of v2). The MAJOR component is a breaking-shape marker —
+ * `corpus-loader.ts`'s `corpusPriorsToPlacementMap` fails closed (throws) on
+ * a major-version mismatch rather than silently misreading a shape it does
+ * not understand. v2 added `deadkeySkipReasons` and `touch`; both are
+ * optional/additive, so a v1 (`"1.0.0"`) snapshot is a DIFFERENT major and is
+ * rejected, not merely "missing the new optional fields".
+ *
  * @see spec.md §7.6
  */
 export interface PlacementPriorsJSON {
@@ -53,4 +61,18 @@ export interface PlacementPriorsJSON {
   priorCount: number;
   /** Map from 4-char hex codepoint (e.g. "0253") to AggregatedEntry. */
   entries: Record<string, AggregatedEntry>;
+  /**
+   * Corpus-wide counted reasons the v2 deadkey/store-index extraction pass
+   * discarded a rule (see `deadkey.ts`'s `DEADKEY_SKIP_REASONS`) — e.g.
+   * `{ "multi-deadkey-context": 3, "any-over-non-char-store": 15 }`. Mirrors
+   * the codec's `opaqueFeatures` counting. Optional — absent from a v1
+   * snapshot or when no deadkey rule was discarded.
+   */
+  deadkeySkipReasons?: Record<string, number>;
+  /**
+   * Corpus-mined touch (longpress) placement priors (placement-priors v2) —
+   * see `TouchPlacementEntry`. Optional — absent from a v1 snapshot or when
+   * no corpus keyboard's `.keyman-touch-layout` yielded a longpress host.
+   */
+  touch?: TouchPlacementEntry[];
 }

@@ -24,12 +24,36 @@
 //                         carve keycap cascade so an address already
 //                         neutralized by that step resolves to nothing here,
 //                         never a double-blank)
+//   1.7 Key edit overlay (layout half) — applyKeyEditsToVfs splices the
+//                         committed KeyEditOperation[] overlay (spec 058)
+//                         directly onto .keyman-touch-layout (Case B, never
+//                         round-tripped through the IR — spec 035 R9). Runs
+//                         AFTER step 1.6 so an id it already neutralized
+//                         resolves to nothing here.
+//   1.7b Key edit overlay (rule half) — a `rename` op's vkey-binding fix-up,
+//                         re-emitted into the .kmn. Runs immediately after
+//                         1.7 so a rename's layout half and rule half land
+//                         in the SAME projection (contracts/
+//                         key-edit-overlay.md §6.2, R10.2 — the working IR
+//                         is never emitted into the artifact, so this pass
+//                         cannot be inherited from applyMarkGuards). Rule
+//                         SYNTHESIS policy (minting a new producing/guard
+//                         rule pair for a freshly assigned character) is
+//                         Phase 6/touchRuleSynthesis.ts, not this pass —
+//                         see the step's own comment below for the seam.
 //   2. Assignments      — applyAssignmentsToVfs (injects mechanism patterns)
 //   2.5 Layer propagation — propagateDesktopLayersToTouch (surfaces S-08
 //                         generalized modifier-combo layers onto the
 //                         .keyman-touch-layout written by step 0; no-op when
 //                         the VFS has no touch layout file)
 //   3. Identity         — applyIdentityStubMutation (writes &NAME)
+//   3.5 Keycap labels   — applyKeycapLabelsToVfs (see step 3.5 below)
+//   3.6 Package descriptor — applyIdentityToKps writes the AUTHOR's language +
+//                         display name into source/<keyboardId>.kps, generating
+//                         the descriptor when the track has none (spec 059).
+//                         Runs after the .kmn is final (the <Files> list derives
+//                         from it) and before the step-4 rename (which owns <ID>
+//                         and the <Files> paths).
 //
 // Touch layout is injected FIRST (step 0) so:
 //   - Step 2.5 layer propagation patches the injected layout (or the base
@@ -46,6 +70,7 @@
 
 import type { KeyboardIR, Pattern, VirtualFS } from "@keyboard-studio/contracts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
+import type { KeyEditOperation, RenameKeyOp } from "@keyboard-studio/engine";
 import {
   applyCarveToVfs,
   applyCarveKeycapRemovalsToVfs,
@@ -54,6 +79,8 @@ import {
   applyIdentityStubMutation,
   applyKeycapLabelsToVfs,
   applyTouchKeycapRemovalsToVfs,
+  applyKeyEditsToVfs,
+  parseTouchKeyAddress,
   parseKmn,
   emitKmn,
   resetIdentity,
@@ -61,7 +88,9 @@ import {
   parseSlotId,
   propagateDesktopLayersToTouch,
   collectLayerCombosInUse,
+  applyIdentityToKps,
 } from "@keyboard-studio/engine";
+import type { PackageDescriptorIdentity } from "@keyboard-studio/engine";
 import { applyCarveMutate, applyAddGalleryMutate } from "../steps/editorMutate.ts";
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
@@ -126,6 +155,17 @@ export interface ProjectWorkingCopyVfsInput {
    * when there are no touch-method deletions.
    */
   deletedTouchKeyIds?: ReadonlySet<string>;
+  /**
+   * The committed key-level touch layout edit overlay (spec 058
+   * FR-031…FR-034), in commit order (`seq` ascending; this projection sorts
+   * defensively, so an out-of-commit-order array is not required). Applied
+   * at step 1.7 (layout half, via `applyKeyEditsToVfs` — Case B, never
+   * round-tripped through the IR per spec 035 R9) and, for `rename` ops
+   * only, at the rule-half pass immediately after (contracts/
+   * key-edit-overlay.md §6.2, R10.2). Omit or pass an empty array when
+   * there is no key-edit overlay yet.
+   */
+  keyEditOps?: readonly KeyEditOperation[];
   assignments: ReadonlyArray<MechanismAssignment>;
   /** Synchronous resolver. Pass `() => undefined` when no pattern library is available. */
   getPattern: (id: string) => Pattern | undefined;
@@ -140,6 +180,21 @@ export interface ProjectWorkingCopyVfsInput {
   touchLayoutJson?: string | null;
   /** Identity overlay. Pass `null` to skip identity projection. */
   identity: IdentityOverlay | null;
+  /**
+   * The base keyboard's own display name — the value the `.kmn`'s existing
+   * `store(&NAME)` already holds. Step 3 treats the overlay's display name as an
+   * EDIT and rewrites the name store ONLY when it DIFFERS from this. It is the
+   * anchor that keeps the no-identity output byte-identical to the base: the
+   * output path passes this same value as its display-name fallback, so the two
+   * compare equal and the name store is left untouched.
+   *
+   * Optional. When omitted, the comparison falls back to `baseIr.header.name`.
+   * The gallery's `BaseKeyboard.displayName` and the parsed `baseIr.header.name`
+   * are the same in practice; passing it explicitly lets a caller whose overlay
+   * fallback is the gallery name (rather than the parsed `.kmn` name) match on
+   * the exact value it fell back to.
+   */
+  baseDisplayName?: string;
 }
 
 /**
@@ -152,7 +207,22 @@ export type IdentityOverlay = {
   displayName?: string;
   copyright?: string;
   version?: string;
+  /**
+   * The author's composed BCP47 tag.
+   *
+   * Consumed by `resetIdentity` during the step-4 id rename AND, since spec 059,
+   * by step 3.6 as the package descriptor's declared language tag. Taken whole
+   * from the identity-lite result — never re-composed here (FR-001).
+   */
   bcp47?: string;
+  /**
+   * The language's name in English, display text for the descriptor's
+   * `<Language>` element (spec 059 FR-002).
+   *
+   * Descriptor-only: the codec does not serialize a language name, and teaching
+   * it to is out of scope, so this never reaches the `.kmn`.
+   */
+  languageName?: string;
 };
 
 export interface ProjectWorkingCopyVfsResult {
@@ -197,10 +267,12 @@ export function projectWorkingCopyVfs(
     deletedNodeIds,
     deletedItemIds = new Set<string>(),
     deletedTouchKeyIds = new Set<string>(),
+    keyEditOps = [],
     assignments,
     getPattern,
     identity,
     touchLayoutJson,
+    baseDisplayName,
   } = input;
 
   const warnings: string[] = [];
@@ -338,6 +410,76 @@ export function projectWorkingCopyVfs(
     }
   }
 
+  // Step 1.7: Key edit overlay projection — layout half (spec 058
+  // FR-031…FR-034, contracts/key-edit-overlay.md §6.1 "new step 1.7").
+  // Splices the committed KeyEditOperation[] overlay directly onto
+  // `.keyman-touch-layout` (Case B, never round-tripped through the IR —
+  // spec 035 R9). Runs AFTER step 1.6 so an id it already neutralized
+  // (blanked/dropped) resolves to nothing here rather than double-processing,
+  // and gates on a non-empty overlay so an unedited working copy leaves the
+  // file byte-identical (FR-033).
+  if (keyEditOps.length > 0) {
+    try {
+      const keyEditResult = applyKeyEditsToVfs(vfs, keyboardId, keyEditOps);
+      warnings.push(...keyEditResult.warnings);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      warnings.push(
+        `[project-working-copy] key edit layout projection skipped: ${msg}`,
+      );
+    }
+  }
+
+  // Step 1.7b: Key edit overlay projection — rule half (contracts/
+  // key-edit-overlay.md §6.2 "the rule pass — required, not inherited";
+  // R10.2). The working IR (`store.ir`, written by `setWorkingIR`) is NEVER
+  // emitted into the artifact — this VFS-mutating chain is the only path a
+  // rule reaches the preview or the zip through — so a rule consequence
+  // synthesized only into the working IR (e.g. by `applyMarkGuards`) would
+  // be a silent no-op here. Runs immediately after step 1.7 so a rename's
+  // LAYOUT half (above) and RULE half (here) land in the SAME projection,
+  // never split across two debounce cycles.
+  //
+  // Scope, deliberately narrow: rule SYNTHESIS policy — minting a brand-new
+  // producing/guard rule pair for a freshly assigned character, guard-store
+  // reuse-vs-mint, CAPS triplication, idempotent dedup against a
+  // hand-written rule, and propose-then-confirm removal of a now-orphaned
+  // rule — is Phase 6 (`touchRuleSynthesis.ts`, not yet written) and is
+  // deliberately NOT implemented here. What this pass DOES handle is the one
+  // rule consequence that is purely mechanical, not policy: a `rename` op's
+  // contractual obligation to "rewrite the vkey name on every binding for
+  // the old id, guard and producing alike" (touch-key-rule-join.md §6.1) — a
+  // reference fix-up, not a synthesis decision. `set` / `add` / `remove` /
+  // `suppress` / `setSubKey` / `removeSubKey` carry no rule consequence this
+  // pass can respond to without that policy, so they are a no-op here today;
+  // Phase 6's touchRuleSynthesis.ts is the seam that extends this switch
+  // with `ensure` (mint) and `remove` (orphan cleanup) passes of its own.
+  const renameOps = keyEditOps.filter(
+    (op): op is RenameKeyOp => op.kind === "rename",
+  );
+  if (renameOps.length > 0) {
+    const kmnPathForRename = `source/${keyboardId}.kmn`;
+    const kmnTextForRename = readVfsText(vfs, kmnPathForRename);
+    if (kmnTextForRename !== undefined) {
+      try {
+        const parsedForRename = parseKmn(kmnTextForRename, keyboardId);
+        const renameResult = applyKeyRenamesToRuleBindings(
+          parsedForRename.ir,
+          renameOps,
+        );
+        if (renameResult.changed) {
+          vfs.set(kmnPathForRename, emitKmn(renameResult.ir), false);
+        }
+        warnings.push(...renameResult.warnings);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        warnings.push(
+          `[project-working-copy] key edit rule projection skipped: ${msg}`,
+        );
+      }
+    }
+  }
+
   // Step 2: Assignments projection — inject mechanism pattern fragments.
   // Physical-only: touch assignments are handled by a separate gallery.
   // Skipped when there are no physical assignments.
@@ -436,9 +578,28 @@ export function projectWorkingCopyVfs(
   }
 
   // Step 3: Identity projection — write &NAME (display name) into the .kmn.
+  //
+  // The display name is treated as an EDIT, reflected only when it CHANGES.
+  // `store(&NAME)` is rewritten in place ONLY when the effective display name
+  // DIFFERS from the base keyboard's own name (`baseDisplayName`, falling back
+  // to `baseIr.header.name`). When they match — which includes the no-identity-
+  // set case, where `serializeWorkingCopy` passes the base's own display name
+  // straight back as a fallback so the `.kmp` descriptor writer (step 3.6) has a
+  // non-null overlay to key on — the name is NOT an edit and the base's name
+  // store is left untouched, so the output `.kmn` stays byte-identical to the
+  // base. The store is never deleted and never duplicated:
+  // `applyIdentityStubMutation` rewrites the existing line in place (or, only on
+  // a genuine change to a base that never had a &NAME store, inserts one).
+  //
+  // This is the single seam BOTH output paths (zip + pull request via
+  // `serializeWorkingCopy`) and the OSK preview (`useWorkingCopyTransform`) pass
+  // through, so they cannot disagree about whether the name changed.
   if (identity !== null) {
+    const baseName = baseDisplayName ?? baseIr.header.name;
     const identityArg: { name?: string; copyright?: string; version?: string } = {};
-    if (identity.displayName !== undefined) identityArg.name = identity.displayName;
+    if (identity.displayName !== undefined && identity.displayName !== baseName) {
+      identityArg.name = identity.displayName;
+    }
     if (identity.copyright !== undefined) identityArg.copyright = identity.copyright;
     if (identity.version !== undefined) identityArg.version = identity.version;
 
@@ -468,6 +629,56 @@ export function projectWorkingCopyVfs(
       const msg = err instanceof Error ? err.message : String(err);
       warnings.push(`[project-working-copy] keycap label projection skipped: ${msg}`);
     }
+  }
+
+  // Step 3.6: Package-descriptor identity — write the AUTHOR's language and
+  // display name into `source/<keyboardId>.kps`, generating the descriptor when
+  // the track never had one (spec 059 FR-001…FR-006).
+  //
+  // ORDER IS LOAD-BEARING, in both directions:
+  //
+  //   After step 3/3.5, because the descriptor's `<Files>` list is derived from the
+  //   final `.kmn` — a list that named artifacts this build does not emit fails
+  //   `kmc`.
+  //
+  //   Before step 4, because `rewriteKpsFilePaths` owns `<ID>` and the `<Files>`
+  //   paths. This step deliberately writes neither, under the PRE-rename keyboard
+  //   id, so the rename pass composes with no new code. That pass's skip of
+  //   non-path-shaped `<Name>` values is exactly what preserves the display names
+  //   set here (research D-02). Inverting the two would either strand the
+  //   descriptor under the old filename or have the rename mangle the author's
+  //   name into a path.
+  //
+  // Runs for BOTH tracks and on BOTH the preview and output paths, which is what
+  // makes FR-004/SC-005 true: the OSK preview, the zip, and the pull request all
+  // see one descriptor because they all come through here.
+  if (identity !== null) {
+    const kmnTextForKps = readVfsText(vfs, `source/${keyboardId}.kmn`) ?? "";
+    const kpsIdentity: PackageDescriptorIdentity = {
+      // Passed through as-is, INCLUDING a blank: the writer owns the fallback
+      // (`effectiveDisplayName`) so both its paths apply the same one. Note `??`
+      // would not be enough here — an author who clears the display-name field
+      // commits `""`, not `undefined`, and `""` is exactly the case that must not
+      // leave the base keyboard's name standing in the descriptor.
+      displayName: identity.displayName ?? "",
+      ...(identity.bcp47 !== undefined && identity.bcp47 !== ""
+        ? { languageTag: identity.bcp47 }
+        : {}),
+      ...(identity.languageName !== undefined && identity.languageName !== ""
+        ? { languageName: identity.languageName }
+        : {}),
+    };
+    // `applyIdentityToKps` never throws — an absent or unreadable descriptor
+    // reports through its warnings, which merge into the projection's own. A
+    // silent no-op here is the defect this step exists to remove (FR-006).
+    const kpsResult = applyIdentityToKps(
+      vfs,
+      keyboardId,
+      kpsIdentity,
+      kmnTextForKps,
+      identity.version,
+    );
+    warnings.push(...kpsResult.warnings);
   }
 
   // Step 4: Id rename — only when the author chose a different keyboard id.
@@ -525,4 +736,81 @@ export function projectWorkingCopyVfs(
     warnings,
     ...(effectiveKeyboardId !== undefined ? { effectiveKeyboardId } : {}),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Step 1.7b helper — the mechanical half of key-edit rule projection
+// ---------------------------------------------------------------------------
+
+/**
+ * Rewrite every `vkey` context element in `ir` whose name case-insensitively
+ * matches a `rename` op's PRE-rename id (the `keyId` its `address` parses
+ * to) to that op's `toId`, across every group/rule — "guard and producing
+ * alike" (touch-key-rule-join.md §6.1). Purely a reference fix-up: it does
+ * not decide whether a rule is NEEDED (that's rule-synthesis policy, Phase
+ * 6) — only that an EXISTING binding must not silently point at an id no key
+ * carries any more once the layout half has renamed it.
+ *
+ * `renameOps` is sorted by `seq` before replay so a rename authored after an
+ * upstream rename in the same overlay sees the upstream rewrite already
+ * applied — the same ordering guarantee `replayKeyEditOverlay` gives the
+ * layout side (contracts/key-edit-overlay.md §2, "ordered, not keyed").
+ *
+ * A malformed `address` is reported as a warning and skipped, never thrown —
+ * matching every other resolver in this feature's never-throw convention. A
+ * rename whose old id matches no `vkey` binding is NOT warned about: not
+ * every key has a rule (e.g. a `U_` id that self-outputs), so this is the
+ * ordinary case, not a sign of drift.
+ */
+function applyKeyRenamesToRuleBindings(
+  ir: KeyboardIR,
+  renameOps: readonly RenameKeyOp[],
+): { ir: KeyboardIR; changed: boolean; warnings: string[] } {
+  const warnings: string[] = [];
+  let currentIr = ir;
+  let anyChanged = false;
+
+  const orderedRenames = [...renameOps].sort((a, b) => a.seq - b.seq);
+
+  for (const op of orderedRenames) {
+    const parts = parseTouchKeyAddress(op.address);
+    if (parts === undefined) {
+      warnings.push(
+        `[key-edit-rule-rename] op #${op.seq}: malformed address "${op.address}" — rule rewrite skipped`,
+      );
+      continue;
+    }
+
+    const oldUpper = parts.keyId.toUpperCase();
+    const newId = op.toId;
+    if (oldUpper === newId.toUpperCase()) continue; // nothing to rewrite
+
+    let renameTouchedAnything = false;
+    const nextGroups = currentIr.groups.map((group) => {
+      let groupTouched = false;
+      const nextRules = group.rules.map((rule) => {
+        let ruleTouched = false;
+        const nextContext = rule.context.map((el) => {
+          if (el.kind === "vkey" && el.name.toUpperCase() === oldUpper) {
+            ruleTouched = true;
+            return { ...el, name: newId };
+          }
+          return el;
+        });
+        if (!ruleTouched) return rule;
+        groupTouched = true;
+        return { ...rule, context: nextContext };
+      });
+      if (!groupTouched) return group;
+      renameTouchedAnything = true;
+      return { ...group, rules: nextRules };
+    });
+
+    if (renameTouchedAnything) {
+      currentIr = { ...currentIr, groups: nextGroups };
+      anyChanged = true;
+    }
+  }
+
+  return { ir: currentIr, changed: anyChanged, warnings };
 }

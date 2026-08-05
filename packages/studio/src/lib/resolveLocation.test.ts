@@ -107,6 +107,27 @@ describe("one case per UnreachableReason", () => {
     }
   });
 
+  it("a within-step stop that is not a flow question resolves via the step's published walk", () => {
+    // A gallery stage's stops are CHARACTERS. They have no questionRegistry entry
+    // — nothing to add one to — but they are perfectly addressable, so membership
+    // is "registry OR this step's walk" (see ResolveContext.stepPositions).
+    // Without this the footer's own dot would refuse the jump it offers.
+    const ctx = ctxWith({ stepPositions: { identity: ["u00e1"] } });
+    const loc: Location = { route: "survey", step: "identity", question: "u00e1" };
+    expect(resolveLocation(loc, ctx)).toEqual({ kind: "reachable", location: loc });
+  });
+
+  it("still refuses a stop that is in neither the registry nor the step's walk", () => {
+    // Scoped per step: a stop published for one stage does not become addressable
+    // inside another.
+    const ctx = ctxWith({ stepPositions: { choose_base: ["u00e1"] } });
+    const loc: Location = { route: "survey", step: "identity", question: "u00e1" };
+    expect(resolveLocation(loc, ctx)).toMatchObject({
+      kind: "degraded",
+      reason: "question-not-in-build",
+    });
+  });
+
   it("skipped-by-track — project_name is not walked on the adapt track", () => {
     const ctx = ctxWith();
     const loc: Location = { route: "survey", step: "project_name" };

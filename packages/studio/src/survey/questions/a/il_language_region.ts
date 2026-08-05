@@ -42,5 +42,9 @@ export const fixtures: QuestionModule["fixtures"] = {
   invalid: [],
 };
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [] };
+// Output reach (spec 059 FR-016): `writes` stays `[]` — this question writes no
+// KeyboardIR — while `outputs` states that the answer nevertheless reaches an
+// emitted artifact. Here, the answer contributes the region subtag to the
+// composed tag the descriptor declares.
+const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], outputs: [{ target: "package-descriptor", field: "bcp47" }] };
 export default mod;

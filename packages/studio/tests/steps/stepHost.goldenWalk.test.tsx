@@ -674,9 +674,19 @@ function createRecorder() {
  * entry captures both setLocalBase (preview) and setBaseConfirmed (confirm)
  * in real call order, exactly as the real two-click user flow produces them.
  */
+/**
+ * `settleFor` — a testId that only appears once the transparent steps this click
+ * crosses have finished skipping. Awaited INSIDE the recorder window, so their
+ * store calls stay attributed to the step that triggered them rather than leaking
+ * into the next window and reshaping the fixture.
+ *
+ * Needed since spec 057: the convenience step holds its skip until the CLDR/SLDR
+ * exemplar lookup settles, and Track 1 now carries the author's BCP47 tag into the
+ * working copy, so there is genuinely a lookup to wait for.
+ */
 type StepAction =
-  | { stepId: string; testId: string; async?: boolean }
-  | { stepId: string; testIds: string[]; async?: boolean };
+  | { stepId: string; testId: string; async?: boolean; settleFor?: string }
+  | { stepId: string; testIds: string[]; async?: boolean; settleFor?: string };
 
 /**
  * Drive a sequence of step actions through the recorder.
@@ -693,6 +703,9 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
       } else {
         fireEvent.click(screen.getByTestId(testId));
       }
+    }
+    if (step.settleFor !== undefined) {
+      await screen.findByTestId(step.settleFor);
     }
     recorder.endStep();
   }
@@ -722,7 +735,10 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "track", testId: "track-copy" },
     { stepId: "project_name", testId: "project-name-next" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
-    { stepId: "characters/B", testId: "phaseB-complete" },
+    // marks and convenience both skip transparently inside this window; the
+    // convenience skip is async (see StepAction.settleFor), so wait for carve's
+    // own control to exist before closing the window.
+    { stepId: "characters/B", testId: "phaseB-complete", settleFor: "carve-complete" },
     { stepId: "carve", testId: "carve-complete" },
     { stepId: "mechanisms", testId: "mechanisms-complete" },
     { stepId: "touch_seed_source", testId: "seed-source-complete", async: true },
@@ -746,7 +762,10 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-adapt" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
-    { stepId: "characters/B", testId: "phaseB-complete" },
+    // marks and convenience both skip transparently inside this window; the
+    // convenience skip is async (see StepAction.settleFor), so wait for carve's
+    // own control to exist before closing the window.
+    { stepId: "characters/B", testId: "phaseB-complete", settleFor: "carve-complete" },
     { stepId: "carve", testId: "carve-complete" },
     { stepId: "mechanisms", testId: "mechanisms-complete" },
     { stepId: "touch_seed_source", testId: "seed-source-complete", async: true },

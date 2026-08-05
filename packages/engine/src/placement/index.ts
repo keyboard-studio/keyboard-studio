@@ -6,8 +6,10 @@
  * flat array of PlacementCandidate records ready for aggregation.
  *
  * v1 scope (D-INT-3): S-01 (direct substitution) and S-08 (RALT-layer) only.
- * Deadkey, mnemonic, cycle, and cluster rules are skipped or produce an
- * 'opaque' candidate that is discarded by the SMP/PUA filter.
+ * v2 (placement-priors v2) adds two ALLOWLISTED deadkey/store-index shapes —
+ * see `deadkey.ts`'s module docstring. Mnemonic keyboards, cycle, and
+ * cluster rules are still skipped, or produce an 'opaque' candidate that is
+ * discarded by the SMP/PUA filter.
  *
  * @see spec.md §7.6 (corpus-derived placement priors)
  * @see D-INT-3 / D-INT-4 in utilities/kbgen/INTEGRATION.md
@@ -20,6 +22,7 @@ import {
   hasNonUSBase,
   dedupCapsNcaps,
 } from "./filters.js";
+import { extractDeadkeyCandidates, type DeadkeySkipCounts } from "./deadkey.js";
 
 // ---------------------------------------------------------------------------
 // Internal tagged tuple (codepoint attached for filtering stages)
@@ -135,17 +138,30 @@ function extractOutput(
  *
  * Map key is 4-char uppercase hex codepoint (e.g. "0253").
  *
+ * `skipCounts`, if supplied, accumulates COUNTED reasons for every v2
+ * deadkey/store-index rule this pass discards (mirrors the codec's
+ * `opaqueFeatures` counting) — see `deadkey.ts`. Callers that don't need the
+ * counts (e.g. existing tests) can omit it; a throwaway Map is used
+ * internally so nothing is silently dropped even when uncounted.
+ *
  * @see spec.md §7.6
  */
-export function emitPlacementMap(ir: KeyboardIR): Map<string, PlacementCandidate[]> {
+export function emitPlacementMap(
+  ir: KeyboardIR,
+  skipCounts: DeadkeySkipCounts = new Map(),
+): Map<string, PlacementCandidate[]> {
   if (isMnemonicKeyboard(ir)) return new Map();
   if (hasNonUSBase(ir)) return new Map();
 
   const raw: TaggedCandidate[] = [];
 
   for (const group of ir.groups) {
-    // Skip non-key groups — rules inside `group(x)` without `using keys` are
-    // deadkey-body groups and produce no direct key→char mappings.
+    // Skip non-key groups for DIRECT-mechanism extraction only: a direct
+    // rule always needs a struck vkey, which only a `using keys` group can
+    // define, so this filter is safe here. It is NOT safe for deadkey
+    // extraction (see the separate all-groups pass below) — corpus deadkey-
+    // consumer rules commonly live in a dedicated non-`using keys` group
+    // (e.g. release/a/amazigh_latin's `group(deadkeys)`).
     if (!group.usingKeys) continue;
 
     for (const rule of group.rules) {
@@ -193,6 +209,16 @@ export function emitPlacementMap(ir: KeyboardIR): Map<string, PlacementCandidate
     }
   }
 
+  // v2 — deadkey/store-index extraction, over ALL groups (see deadkey.ts).
+  // Same codepoint-level filters as the direct-mechanism pass above (null/
+  // control, SMP, PUA) apply uniformly regardless of mechanism.
+  for (const { codepoint: cp, candidate } of extractDeadkeyCandidates(ir, skipCounts)) {
+    if (cp === 0) continue;
+    if (cp > 0xffff) continue;
+    if (cp >= 0xe000 && cp <= 0xf8ff) continue;
+    raw.push({ codepoint: cp, candidate });
+  }
+
   // Apply CAPS/NCAPS dedup.
   const deduped = dedupCapsNcaps(raw);
 
@@ -209,6 +235,15 @@ export function emitPlacementMap(ir: KeyboardIR): Map<string, PlacementCandidate
   }
   return result;
 }
+
+// Re-export the deadkey/store-index skip-count type + reasons so the scanner
+// can accumulate corpus-wide counts across `emitPlacementMap` calls.
+export { DEADKEY_SKIP_REASONS } from "./deadkey.js";
+export type { DeadkeySkipCounts } from "./deadkey.js";
+
+// Re-export touch (longpress) mining so the scanner can use it directly.
+export { mineLongpressHosts, aggregateTouchHosts, touchHostsToEntries } from "./touch-mining.js";
+export type { TouchHostObservation, TouchLayerClass } from "./touch-mining.js";
 
 // Re-export filter helpers so the supportability scanner can use them directly.
 export {

@@ -46,6 +46,20 @@ describe("normalizeGithubRemote", () => {
     expect(normalizeGithubRemote("https://gitlab.com/foo/bar.git")).toBeNull();
     expect(normalizeGithubRemote("not-a-url")).toBeNull();
   });
+
+  it("normalizes a local git-mirror-proxy remote (sandboxed CI harness)", () => {
+    expect(
+      normalizeGithubRemote(
+        "http://local_proxy@127.0.0.1:41729/git/keyboard-studio/keyboards",
+      ),
+    ).toBe("keyboard-studio/keyboards");
+  });
+
+  it("normalizes a local git-mirror-proxy remote with a .git suffix", () => {
+    expect(
+      normalizeGithubRemote("http://127.0.0.1:41729/git/keymanapp/keyboards.git"),
+    ).toBe("keymanapp/keyboards");
+  });
 });
 
 describe("resolveKeyboardsProvenance", () => {

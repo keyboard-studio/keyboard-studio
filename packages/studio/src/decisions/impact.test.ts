@@ -23,7 +23,13 @@ import type {
   KeyboardIR,
   SurveyAnswer,
 } from "@keyboard-studio/contracts";
-import { resolveImpact, type ResolveImpactDeps } from "./impact.ts";
+import { createVirtualFS } from "@keyboard-studio/contracts";
+import {
+  resolveImpact,
+  resolveImpactAsync,
+  type ResolveImpactAsyncDeps,
+  type ResolveImpactDeps,
+} from "./impact.ts";
 import { createDecisionRecorder } from "./createDecisionRecorder.ts";
 import { resetDecisionEntryIds, useDecisionLogStore } from "./decisionLogStore.ts";
 import { DecisionTrailView } from "./DecisionTrailView.tsx";
@@ -685,5 +691,174 @@ describe("FR-021 — the injected resolver is the trail's only route to impact",
       expect(source).toContain("resolveImpact");
       expect(source).not.toMatch(/^\s*import[^;]*from\s+"\.\/impact\.ts"/m);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveImpactAsync — the precedence table (spec 059 T029)
+// ---------------------------------------------------------------------------
+//
+// One row per line of contracts/impact-resolution.md §3. The rows are not
+// interchangeable: each says something different to the author, and the reason this
+// resolver exists at all is that the identity questions used to fall to the LAST row
+// and be told their answers had no write path.
+
+describe("resolveImpactAsync — precedence (spec 059 FR-009…FR-012)", () => {
+  /** An entry for a question that DECLARES output reach (`outputs: [...]`). */
+  function identityEntry(overrides: Partial<DecisionEntry> = {}): DecisionEntry {
+    return entry({
+      entryId: "d-identity",
+      stepId: "identity",
+      payload: {
+        kind: "survey-answer",
+        questionId: "il_language_code",
+        answerType: "text",
+        value: "bm",
+      },
+      ...overrides,
+    });
+  }
+
+  function projectedVfsDeclaring(tag: string | undefined) {
+    const effective = tag === undefined || tag === "" ? "und" : tag;
+    return createVirtualFS([
+      {
+        path: "source/kb.kps",
+        content: `<Package><Languages><Language ID="${effective}">${effective}</Language></Languages></Package>\n`,
+        isBinary: false,
+      },
+    ]);
+  }
+
+  function asyncDeps(overrides: Partial<ResolveImpactAsyncDeps> = {}): ResolveImpactAsyncDeps {
+    return {
+      ...deps(),
+      hasWorkingCopy: () => true,
+      getRecord: () => ({ keyboardId: "kb", entries: [] }) as DecisionRecord,
+      project: vi.fn(async (opts) => ({
+        vfs: projectedVfsDeclaring(opts?.identityOverride?.bcp47 as string | undefined),
+        keyboardId: "kb",
+        displayName: "KB",
+        version: "1.0",
+        warnings: [],
+      })),
+      ...overrides,
+    };
+  }
+
+  it("row 1 — a shed entry returns null and is never re-derived", async () => {
+    const project = vi.fn();
+    const impact = await resolveImpactAsync(
+      identityEntry({ impact: null }),
+      asyncDeps({ project }),
+    );
+    expect(impact).toBeNull();
+    expect(project).not.toHaveBeenCalled();
+  });
+
+  // SC-005: byte-for-byte, not merely equal-looking. Re-deriving a fact recorded at
+  // a boundary could produce a different answer than the one taken at the time.
+  it("row 2 — a stored capture is returned verbatim, without projecting", async () => {
+    const project = vi.fn();
+    const stored = CAPTURED;
+    const impact = await resolveImpactAsync(
+      identityEntry({ impact: stored }),
+      asyncDeps({ project }),
+    );
+    expect(impact).toBe(stored);
+    expect(project).not.toHaveBeenCalled();
+  });
+
+  it("row 3 — declares outputs + a working copy exists -> the counterfactual", async () => {
+    const d = asyncDeps();
+    const impact = await resolveImpactAsync(identityEntry(), d);
+    expect(impact).not.toBeNull();
+    expect(impact!.state).toBe("captured");
+    if (impact!.state !== "captured") return;
+    expect(impact!.files.map((f) => f.path)).toEqual(["source/kb.kps"]);
+    expect(d.project).toHaveBeenCalledTimes(2);
+  });
+
+  // FR-012. The distinction the whole feature turns on: this is not "no write path"
+  // and not "changed nothing" — it is "not yet".
+  it("row 4 — declares outputs + NO working copy -> no-working-copy-yet", async () => {
+    const project = vi.fn();
+    const impact = await resolveImpactAsync(
+      identityEntry(),
+      asyncDeps({ hasWorkingCopy: () => false, project }),
+    );
+    expect(impact).toEqual({ state: "unavailable", reason: "no-working-copy-yet" });
+    // Not projected at all — the guard is checked before the work.
+    expect(project).not.toHaveBeenCalled();
+  });
+
+  it("row 5 — a question with no declared output reach keeps the old answer", async () => {
+    const impact = await resolveImpactAsync(entry(), asyncDeps());
+    expect(impact).toEqual({ state: "unavailable", reason: "no-rederivable-write-path" });
+  });
+
+  it("row 5 — a passed lock still takes precedence for a non-declaring question", async () => {
+    const impact = await resolveImpactAsync(
+      entry({ stepId: "mechanisms" }),
+      asyncDeps({ isDesktopLocked: () => true }),
+    );
+    expect(impact).toEqual({ state: "unavailable", reason: "lock-gate-dependency" });
+  });
+
+  it("reports no-working-copy-yet when the projection disappears mid-resolution", async () => {
+    const impact = await resolveImpactAsync(
+      identityEntry(),
+      asyncDeps({ project: vi.fn(async () => null) }),
+    );
+    expect(impact).toEqual({ state: "unavailable", reason: "no-working-copy-yet" });
+  });
+
+  it("returns {state:'none'} rather than a fabricated change when nothing differs", async () => {
+    // A projection that ignores the override: the artifact does not depend on this
+    // answer, so the honest report is "changed nothing".
+    const impact = await resolveImpactAsync(
+      identityEntry(),
+      asyncDeps({
+        project: vi.fn(async () => ({
+          vfs: projectedVfsDeclaring("fixed"),
+          keyboardId: "kb",
+          displayName: "KB",
+          version: "1.0",
+          warnings: [],
+        })),
+      }),
+    );
+    expect(impact).toEqual({ state: "none" });
+  });
+
+  // FR-014 / 055 FR-019: the three questions composing one tag share their change.
+  it("names co-decisions in sharedWith for an answer that feeds a shared field", async () => {
+    const code = identityEntry();
+    const script: DecisionEntry = entry({
+      entryId: "d-script",
+      stepId: "identity",
+      payload: {
+        kind: "survey-answer",
+        questionId: "il_target_script",
+        answerType: "select",
+        value: "Latn",
+      },
+    });
+    const impact = await resolveImpactAsync(
+      code,
+      asyncDeps({
+        getRecord: () => ({ keyboardId: "kb", entries: [code, script] }) as DecisionRecord,
+      }),
+    );
+    expect(impact!.state).toBe("captured");
+    if (impact!.state !== "captured") return;
+    expect(impact!.sharedWith).toEqual(["d-script"]);
+  });
+
+  it("has no batch form — the signature takes one entry", () => {
+    expect(resolveImpactAsync.length).toBeGreaterThanOrEqual(2);
+    // Deliberately not a list-accepting overload: FR-011 is a property of the
+    // signature, not a promise about timing.
+    expect(typeof resolveImpactAsync).toBe("function");
   });
 });

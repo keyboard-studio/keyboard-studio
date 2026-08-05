@@ -8,7 +8,29 @@
  * @see https://help.keyman.com/developer/current-version/reference/file-types/keyman-touch-layout
  */
 
-import { decodeUnicodeKeyId } from "@keyboard-studio/contracts";
+import { decodeUnicodeKeyId, toHex4 } from "@keyboard-studio/contracts";
+
+/**
+ * Uppercase, zero-padded-to-4-digits hex of the FIRST Unicode code point in
+ * `char` after NFC normalization (5 digits for astral planes, e.g. 1F600) -
+ * the shared "hex of a character" primitive behind charToUnicodeKeyId's `U_`
+ * prefix below AND pattern-apply/keyIdMinting.ts's `T_<UPPERHEX>` minting
+ * (spec 058 key-id-policy.md section 2), so the two id forms cannot drift
+ * apart from each other.
+ *
+ * The input is normalized to NFC before extracting the code point so that
+ * NFD inputs (base + combining mark as separate code points) yield the same
+ * hex as their precomposed NFC equivalent (e.g. "a" + combining acute yields
+ * the same hex as precomposed "á").
+ *
+ * Returns `"FFFD"` (REPLACEMENT CHARACTER) when the input string has no valid
+ * code point (empty string edge case).
+ */
+export function unicodeCharHex(char: string): string {
+  const cp = char.normalize("NFC").codePointAt(0);
+  if (cp === undefined) return "FFFD";
+  return toHex4(cp);
+}
 
 /**
  * Convert a Unicode character to its Keyman touch-layout key id.
@@ -32,10 +54,7 @@ import { decodeUnicodeKeyId } from "@keyboard-studio/contracts";
  *   charToUnicodeKeyId("$")  // "U_0024"
  */
 export function charToUnicodeKeyId(char: string): string {
-  const cp = char.normalize("NFC").codePointAt(0);
-  if (cp === undefined) return "U_FFFD";
-  const hex = cp.toString(16).toUpperCase().padStart(4, "0");
-  return `U_${hex}`;
+  return `U_${unicodeCharHex(char)}`;
 }
 
 /**
