@@ -749,7 +749,7 @@ exports[`flow-parity: phase_f_helpdocs — questions[] > projected fields are st
     "type": "text",
   },
   {
-    "help_text": "An email address, website, or social media handle where people can reach the language community. This appears at the end of the help page so users can ask questions or report problems. Leave blank to omit it.",
+    "help_text": "An email address, website, or social media handle where people can reach the language community. This appears at the end of the help page so users can ask questions or report problems. If your own contact details are already filled in, you can replace them with a shared community address, or leave them as they are. Leave blank to omit the section.",
     "id": "pf_contact_info",
     "next": null,
     "options": undefined,

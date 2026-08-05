@@ -17,6 +17,8 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { trackOptions, phaseFOptions } from "./flowStepOptions.tsx";
 import type { TrackPayload } from "./flowStepOptions.tsx";
 import type { FlowStepDeps } from "./makeFlowStepComponent.tsx";
+import pfContactInfoMod from "../../survey/questions/f/pf_contact_info.ts";
+import pfCreditsMod from "../../survey/questions/f/pf_credits.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
@@ -234,5 +236,68 @@ describe("phaseFOptions — record shape", () => {
 
   it("declares no onCommit (PhaseFAdapter had no pre-onComplete store writes)", () => {
     expect(phaseFOptions.onCommit).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// phaseFOptions.seeds — pf_contact_info pre-fill (spec 037 FR-016)
+//
+// The contact is captured once during attribution and published into
+// SurveyContext as `author_contact`; Phase F pre-fills from it instead of asking
+// again. The seam is INERT until that producer exists, which is what the
+// "absent" cases below pin — so landing this early cannot change today's
+// behaviour.
+// ---------------------------------------------------------------------------
+
+describe("phaseFOptions.seeds — pf_contact_info pre-fill", () => {
+  function seed(questionId: string, ctx: Record<string, string | undefined>) {
+    const { deps } = buildDeps({ surveyContext: ctx });
+    return phaseFOptions.seeds?.getSeedValue(questionId, deps);
+  }
+
+  it("declares a seeds block", () => {
+    expect(phaseFOptions.seeds).toBeDefined();
+  });
+
+  it("pre-fills pf_contact_info from surveyContext.author_contact", () => {
+    expect(seed("pf_contact_info", { author_contact: "info@bafutliteracy.org" })).toBe(
+      "info@bafutliteracy.org",
+    );
+  });
+
+  // Inert-today guarantee: nothing writes author_contact until spec 037 lands.
+  it("returns undefined when author_contact is absent (today's behaviour, unchanged)", () => {
+    expect(seed("pf_contact_info", {})).toBeUndefined();
+  });
+
+  it("returns undefined when author_contact is empty rather than seeding a blank", () => {
+    expect(seed("pf_contact_info", { author_contact: "" })).toBeUndefined();
+  });
+
+  // Thanking and owning are different: shipped credits sections acknowledge
+  // advisors and contributors who hold no copyright, so seeding the holder here
+  // would produce duplicated boilerplate.
+  it("does NOT seed pf_credits, even when a holder-ish context value is present", () => {
+    expect(seed("pf_credits", { author_contact: "info@example.org" })).toBeUndefined();
+    expect(seed("pf_credits", { copyright_holder: "SIL Global" })).toBeUndefined();
+  });
+
+  it("seeds no other Phase F question", () => {
+    for (const id of [
+      "pf_welcome_paragraph",
+      "pf_usage_tip_1",
+      "pf_more_detail_gate",
+      "pf_font_guidance",
+      "pf_project_url",
+    ]) {
+      expect(seed(id, { author_contact: "info@example.org" }), `${id} must not be seeded`).toBeUndefined();
+    }
+  });
+
+  // Pre-filled is not the same as required — the whole point of the answer to
+  // "should credits and contact be optional?".
+  it("pre-filling does not make either question required", () => {
+    expect(pfContactInfoMod.definition.required).toBe(false);
+    expect(pfCreditsMod.definition.required).toBe(false);
   });
 });

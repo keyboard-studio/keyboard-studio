@@ -237,6 +237,13 @@ stored in the working copy rather than read live from the auth session at emit t
   placeholder, underscore-run holders, and lines with no holder token.
 - **FR-014**: Parser and renderer MUST be covered by a fixture table **harvested from
   keymanapp/keyboards**, not hand-invented, including every shape listed in Edge Cases.
+- **FR-016**: Attribution capture MUST publish the author contact into `SurveyContext` under
+  the key `author_contact`, so downstream questions can pre-fill from it instead of asking a
+  second time. The Phase F consumer seam already exists and is inert until this key is written
+  — `phaseFOptions.seeds` pre-fills `pf_contact_info` from it
+  ([flowStepOptions.tsx](../../packages/studio/src/editors/adapters/flowStepOptions.tsx),
+  `CTX_AUTHOR_CONTACT`). `pf_contact_info` stays optional; the value is a starting point the
+  author may clear or replace with a community address.
 - **FR-015** *(resolved by D6)*: A guest with no GitHub session MUST supply an author name
   before emission. No placeholder holder may be emitted — that is how the corpus's own
   `Copyright (c) YYYY _____________________` file came to exist.
