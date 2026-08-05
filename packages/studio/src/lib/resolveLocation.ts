@@ -96,9 +96,25 @@ function walkedByTrack(stepId: string, traversal: TraversalSnapshot): boolean {
  * are now, or somewhere they have already walked. Anything else is ahead of
  * them — and the walk's own gates are what make it ahead, so honouring a jump
  * there would skip a lock the wizard enforces.
+ *
+ * `visited` is the load-bearing term, not `history` (defect, 2026-08-05).
+ * `history` is a BACK-STACK: every backward primitive truncates it, so after a
+ * jump back to an early step it no longer mentions the stages the author had
+ * already finished — and this predicate then called their own completed work
+ * "ahead of them", refusing every dot in the row's right-hand half. `visited`
+ * is the monotonic high-water mark (see surveySessionStore.ts), which is what
+ * "has the author actually been here" always meant. `history` is kept as a
+ * disjunct so a snapshot that predates the slot still resolves.
+ *
+ * This does not widen what a jump may skip: a step absent from BOTH is one the
+ * author never reached, and it is still refused as `beyond-gate`.
  */
 function isReached(stepId: ActiveStepId, traversal: TraversalSnapshot): boolean {
-  return traversal.activeStepId === stepId || traversal.history.includes(stepId);
+  return (
+    traversal.activeStepId === stepId ||
+    traversal.visited?.includes(stepId) === true ||
+    traversal.history.includes(stepId)
+  );
 }
 
 /**
