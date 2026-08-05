@@ -5,6 +5,7 @@
 // builder should not need to also break these.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
+import type { ComponentProps } from "react";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { render } from "../../../test/renderWithI18n.tsx";
 import {
@@ -1042,5 +1043,209 @@ describe("KeyGrid — provenance statement (T077, FR-034)", () => {
     const importedText = screen.getByTestId("key-grid-provenance").textContent;
 
     expect(derivedText).not.toBe(importedText);
+  });
+});
+
+describe("KeyGridCell — the pointer paths (T111, FR-021)", () => {
+  const ADD_WEDGE = "key-grid-cell-phone:default:K1-add-wedge";
+  const MENU_WEDGE = "key-grid-cell-phone:default:K1-menu-wedge";
+
+  function renderOneKey(
+    props: Partial<ComponentProps<typeof KeyGrid>> = {},
+    cellOverrides: Partial<KeyGridCellViewModel> = {},
+  ) {
+    const cell = makeCell({ id: "K1", ...cellOverrides });
+    const vm = makeViewModel([makeRow([cell])]);
+    render(
+      <KeyGrid
+        viewModel={vm}
+        selectedAddress={null}
+        onSelectCell={vi.fn()}
+        {...props}
+      />,
+    );
+    return { cell, el: screen.getByTestId("key-grid-cell-phone:default:K1") };
+  }
+
+  it("reveals the (+) and ⋯ wedges on hover and hides them again on leave — 'hover reveals' means mounted, not merely made visible", () => {
+    const { el } = renderOneKey({
+      onAddKeyAfter: vi.fn(),
+      onOpenCommandMenu: vi.fn(),
+    });
+
+    // At rest: no wedge in the DOM at all.
+    expect(screen.queryByTestId(ADD_WEDGE)).toBeNull();
+    expect(screen.queryByTestId(MENU_WEDGE)).toBeNull();
+
+    fireEvent.mouseEnter(el);
+    expect(screen.getByTestId(ADD_WEDGE)).not.toBeNull();
+    expect(screen.getByTestId(MENU_WEDGE)).not.toBeNull();
+
+    fireEvent.mouseLeave(el);
+    expect(screen.queryByTestId(ADD_WEDGE)).toBeNull();
+    expect(screen.queryByTestId(MENU_WEDGE)).toBeNull();
+  });
+
+  it("renders no wedge for a command whose callback is absent — an affordance that cannot act is never shown", () => {
+    const { el } = renderOneKey({ onAddKeyAfter: vi.fn() });
+    fireEvent.mouseEnter(el);
+
+    expect(screen.getByTestId(ADD_WEDGE)).not.toBeNull();
+    expect(screen.queryByTestId(MENU_WEDGE)).toBeNull();
+  });
+
+  it("renders no wedges on a blank/spacer key — it is not an authorable key", () => {
+    // sp 10 is the spacer class (isSpacerKeyClass).
+    const { el } = renderOneKey(
+      { onAddKeyAfter: vi.fn(), onOpenCommandMenu: vi.fn() },
+      { sp: 10 },
+    );
+    fireEvent.mouseEnter(el);
+
+    expect(screen.queryByTestId(ADD_WEDGE)).toBeNull();
+    expect(screen.queryByTestId(MENU_WEDGE)).toBeNull();
+  });
+
+  it("keeps the wedges OUT of the accessibility tree and adds no second Tab stop (FR-020a) — they are aria-hidden spans, never nested buttons", () => {
+    const { el } = renderOneKey({
+      onAddKeyAfter: vi.fn(),
+      onOpenCommandMenu: vi.fn(),
+    });
+    fireEvent.mouseEnter(el);
+
+    for (const testId of [ADD_WEDGE, MENU_WEDGE]) {
+      const wedge = screen.getByTestId(testId);
+      expect(wedge.tagName).toBe("SPAN");
+      expect(wedge.getAttribute("aria-hidden")).toBe("true");
+    }
+    // Still exactly one gridcell and zero exposed buttons: the explicit
+    // role="gridcell" on the cell <button> is the only interactive node.
+    expect(screen.getAllByRole("gridcell")).toHaveLength(1);
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
+    expect(
+      screen.getAllByRole("gridcell").filter((c) => c.getAttribute("tabindex") === "0"),
+    ).toHaveLength(1);
+  });
+
+  it("routes a click on the (+) wedge to onAddKeyAfter and NOT to selection", () => {
+    const onAddKeyAfter = vi.fn();
+    const onSelectCell = vi.fn();
+    const { cell, el } = renderOneKey({ onAddKeyAfter, onSelectCell });
+    fireEvent.mouseEnter(el);
+
+    fireEvent.click(screen.getByTestId(ADD_WEDGE));
+
+    expect(onAddKeyAfter).toHaveBeenCalledTimes(1);
+    expect(onAddKeyAfter).toHaveBeenCalledWith(cell);
+    expect(onSelectCell).not.toHaveBeenCalled();
+  });
+
+  it("routes a click on the ⋯ wedge to onOpenCommandMenu and NOT to selection", () => {
+    const onOpenCommandMenu = vi.fn();
+    const onSelectCell = vi.fn();
+    const { cell, el } = renderOneKey({ onOpenCommandMenu, onSelectCell });
+    fireEvent.mouseEnter(el);
+
+    fireEvent.click(screen.getByTestId(MENU_WEDGE));
+
+    expect(onOpenCommandMenu).toHaveBeenCalledTimes(1);
+    expect(onOpenCommandMenu.mock.calls[0]?.[0]).toBe(cell);
+    expect(onOpenCommandMenu.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+    );
+    expect(onSelectCell).not.toHaveBeenCalled();
+  });
+
+  it("still selects when the click lands on the key itself rather than a wedge — the primary action is unchanged by T111", () => {
+    const onSelectCell = vi.fn();
+    const onAddKeyAfter = vi.fn();
+    const { cell, el } = renderOneKey({ onSelectCell, onAddKeyAfter });
+    fireEvent.mouseEnter(el);
+
+    fireEvent.click(el);
+
+    expect(onSelectCell).toHaveBeenCalledTimes(1);
+    expect(onSelectCell).toHaveBeenCalledWith(cell);
+    expect(onAddKeyAfter).not.toHaveBeenCalled();
+  });
+
+  it("opens the command menu on right-click, anchored at the POINTER, and suppresses the browser's own menu", () => {
+    const onOpenCommandMenu = vi.fn();
+    const { cell, el } = renderOneKey({ onOpenCommandMenu });
+
+    const event = new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 123,
+      clientY: 456,
+    });
+    const notCancelled = el.dispatchEvent(event);
+
+    expect(onOpenCommandMenu).toHaveBeenCalledWith(cell, { x: 123, y: 456 });
+    // preventDefault() was called — otherwise the native context menu would
+    // appear on top of ours.
+    expect(notCancelled).toBe(false);
+  });
+
+  it("leaves right-click to the browser when no command-menu handler is supplied", () => {
+    const { el } = renderOneKey();
+
+    const event = new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+    });
+    expect(el.dispatchEvent(event)).toBe(true);
+  });
+
+  it("follows the key's 'Goes to' layer on double-click, reporting the resolved nextlayer", () => {
+    const onFollowNextLayer = vi.fn();
+    const { cell, el } = renderOneKey(
+      { onFollowNextLayer },
+      { nextlayer: "shift" },
+    );
+
+    fireEvent.doubleClick(el);
+
+    expect(onFollowNextLayer).toHaveBeenCalledTimes(1);
+    expect(onFollowNextLayer).toHaveBeenCalledWith(cell, "shift");
+  });
+
+  it("does not fire the follow on double-click for a key that switches nowhere", () => {
+    const onFollowNextLayer = vi.fn();
+    const { el } = renderOneKey({ onFollowNextLayer });
+
+    fireEvent.doubleClick(el);
+
+    expect(onFollowNextLayer).not.toHaveBeenCalled();
+  });
+
+  it("advertises the double-click route by title ONLY on a key that has a layer to follow", () => {
+    const { el: withLayer } = renderOneKey(
+      { onFollowNextLayer: vi.fn() },
+      { nextlayer: "shift" },
+    );
+    expect(withLayer.getAttribute("title")).toContain("Ctrl+Enter");
+    cleanup();
+
+    const { el: withoutLayer } = renderOneKey({ onFollowNextLayer: vi.fn() });
+    expect(withoutLayer.getAttribute("title")).toBeNull();
+  });
+
+  it("adds NO drag-and-drop or resize affordance (FR-021: drag stays an enhancement over commands that do not exist yet)", () => {
+    const { el } = renderOneKey({
+      onAddKeyAfter: vi.fn(),
+      onOpenCommandMenu: vi.fn(),
+      onFollowNextLayer: vi.fn(),
+    });
+    fireEvent.mouseEnter(el);
+
+    // Neither the cell nor either revealed wedge is draggable, and no
+    // separate resize handle exists — geometry is read-only this increment.
+    expect(el.getAttribute("draggable")).toBeNull();
+    for (const testId of [ADD_WEDGE, MENU_WEDGE]) {
+      expect(screen.getByTestId(testId).getAttribute("draggable")).toBeNull();
+    }
+    expect(screen.getByTestId("key-grid").querySelectorAll("[draggable='true']")).toHaveLength(0);
+    expect(screen.queryAllByRole("separator")).toHaveLength(0);
   });
 });

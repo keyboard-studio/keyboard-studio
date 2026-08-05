@@ -202,6 +202,7 @@ import {
 } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { KeyGridCell } from "./KeyGridCell.tsx";
+import type { KeyGridCommandMenuAnchor } from "./useKeyCommands.ts";
 import type {
   KeyGridCellViewModel,
   KeyGridRowViewModel,
@@ -313,6 +314,21 @@ export interface KeyGridProps {
    * omitted-is-inert contract as `onFillRow` above.
    */
   onEvenOutRow?: (rowIndex: number) => void;
+  /**
+   * T111 (FR-021) — the per-key pointer commands, forwarded verbatim to every
+   * `KeyGridCell`. Each is optional and independently omittable: an omitted
+   * callback means that cell renders no affordance for it at all (see
+   * `KeyGridCell.tsx`'s own prop docs). This component adds no behaviour of
+   * its own around them — it only passes them down, the same way it forwards
+   * `onSelectCell`. Their KEYBOARD equivalents are `useKeyCommands.ts`'s and
+   * arrive through `onKeyDown`, not through these props.
+   */
+  onAddKeyAfter?: (cell: KeyGridCellViewModel) => void;
+  onOpenCommandMenu?: (
+    cell: KeyGridCellViewModel,
+    anchor: KeyGridCommandMenuAnchor,
+  ) => void;
+  onFollowNextLayer?: (cell: KeyGridCellViewModel, nextlayer: string) => void;
 }
 
 /** Sum of `widthPct + padPct` across a row's keys, in the 100-unit model's raw units (mirrors keyGridViewModel.ts's own `rowTotalPct`, recomputed here rather than exported since it's a cheap, pure, single-formula derivation). */
@@ -334,6 +350,9 @@ export function KeyGrid({
   provenance,
   onFillRow,
   onEvenOutRow,
+  onAddKeyAfter,
+  onOpenCommandMenu,
+  onFollowNextLayer,
 }: KeyGridProps) {
   const { t } = useLingui();
   const cellRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -733,6 +752,9 @@ export function KeyGrid({
                         isTabbable={isTabbable}
                         onSelect={onSelectCell}
                         registerRef={registerRef}
+                        onAddKeyAfter={onAddKeyAfter}
+                        onOpenCommandMenu={onOpenCommandMenu}
+                        onFollowNextLayer={onFollowNextLayer}
                       />
                     </Fragment>
                   );

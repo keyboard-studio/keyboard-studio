@@ -280,3 +280,177 @@ describe("useKeyCommands", () => {
     expect(addCommand?.label).toBe("Add key after");
   });
 });
+
+// ---------------------------------------------------------------------------
+// T111's two keyboard routes (FR-021, FR-020b) — the keyboard half of the
+// pointer commands KeyGridCell.tsx owns. See useKeyCommands.ts's module doc,
+// "T111's two keyboard routes", for why these bindings and not Alt+Arrow.
+// ---------------------------------------------------------------------------
+
+describe("useKeyCommands — T111's keyboard routes", () => {
+  function renderHost(
+    selectedCell: KeyGridCellViewModel | null,
+    layout: TouchLayoutIR,
+  ) {
+    const onAddKeyAfter = vi.fn<(outcome: AddKeyAfterOutcome) => void>();
+    const onOpenCommandMenu = vi.fn();
+    const onFollowNextLayer = vi.fn();
+    const { result } = renderHook(() =>
+      useKeyCommands({
+        selectedCell,
+        layout,
+        onAddKeyAfter,
+        onOpenCommandMenu,
+        onFollowNextLayer,
+      }),
+    );
+    return { result, onAddKeyAfter, onOpenCommandMenu, onFollowNextLayer };
+  }
+
+  /** Fire one synthetic keydown through the hook's handler. */
+  function press(
+    result: { current: ReturnType<typeof useKeyCommands> },
+    key: string,
+    modifiers: Partial<Record<"shiftKey" | "ctrlKey" | "altKey" | "metaKey", boolean>> = {},
+  ) {
+    const preventDefault = vi.fn();
+    result.current.handleKeyDown({
+      key,
+      shiftKey: modifiers.shiftKey ?? false,
+      ctrlKey: modifiers.ctrlKey ?? false,
+      altKey: modifiers.altKey ?? false,
+      metaKey: modifiers.metaKey ?? false,
+      preventDefault,
+    } as unknown as Parameters<typeof result.current.handleKeyDown>[0]);
+    return { preventDefault };
+  }
+
+  it("ContextMenu opens the command menu with NO anchor — a keyboard invocation has no pointer position", () => {
+    const anchor = makeCell("K_A");
+    const layout = makeLayout([makeTouchKey("K_A")]);
+    const { result, onOpenCommandMenu } = renderHost(anchor, layout);
+
+    const { preventDefault } = press(result, "ContextMenu");
+
+    expect(onOpenCommandMenu).toHaveBeenCalledTimes(1);
+    expect(onOpenCommandMenu).toHaveBeenCalledWith(anchor);
+    expect(preventDefault).toHaveBeenCalled();
+  });
+
+  it("Shift+F10 is the second, equivalent route to the same menu", () => {
+    const anchor = makeCell("K_A");
+    const layout = makeLayout([makeTouchKey("K_A")]);
+    const { result, onOpenCommandMenu } = renderHost(anchor, layout);
+
+    press(result, "F10", { shiftKey: true });
+
+    expect(onOpenCommandMenu).toHaveBeenCalledWith(anchor);
+  });
+
+  it("bare F10 is NOT claimed — only Shift+F10 is the menu binding", () => {
+    const anchor = makeCell("K_A");
+    const layout = makeLayout([makeTouchKey("K_A")]);
+    const { result, onOpenCommandMenu } = renderHost(anchor, layout);
+
+    const { preventDefault } = press(result, "F10");
+
+    expect(onOpenCommandMenu).not.toHaveBeenCalled();
+    expect(preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("Ctrl+Enter follows the selected key's nextlayer, and claims the event so the native <button> activation cannot also re-select", () => {
+    const anchor = makeCell("K_A", { nextlayer: "shift" });
+    const layout = makeLayout([makeTouchKey("K_A")]);
+    const { result, onFollowNextLayer } = renderHost(anchor, layout);
+
+    const { preventDefault } = press(result, "Enter", { ctrlKey: true });
+
+    expect(onFollowNextLayer).toHaveBeenCalledTimes(1);
+    expect(onFollowNextLayer).toHaveBeenCalledWith(anchor, "shift");
+    expect(preventDefault).toHaveBeenCalled();
+  });
+
+  it("Ctrl+Enter does nothing for a key that switches nowhere", () => {
+    const anchor = makeCell("K_A");
+    const layout = makeLayout([makeTouchKey("K_A")]);
+    const { result, onFollowNextLayer } = renderHost(anchor, layout);
+
+    press(result, "Enter", { ctrlKey: true });
+
+    expect(onFollowNextLayer).not.toHaveBeenCalled();
+  });
+
+  it("plain Enter is NOT claimed — FR-020b gives it to the inspector, a different surface", () => {
+    const anchor = makeCell("K_A", { nextlayer: "shift" });
+    const layout = makeLayout([makeTouchKey("K_A")]);
+    const { result, onFollowNextLayer } = renderHost(anchor, layout);
+
+    const { preventDefault } = press(result, "Enter");
+
+    expect(onFollowNextLayer).not.toHaveBeenCalled();
+    expect(preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("does NOT claim Alt+ArrowRight — useGridNav.ts claims arrows regardless of modifiers, so an Alt+Arrow binding here would double-fire (see module doc)", () => {
+    const anchor = makeCell("K_A", { nextlayer: "shift" });
+    const layout = makeLayout([makeTouchKey("K_A")]);
+    const { result, onFollowNextLayer, onOpenCommandMenu, onAddKeyAfter } =
+      renderHost(anchor, layout);
+
+    const { preventDefault } = press(result, "ArrowRight", { altKey: true });
+
+    expect(onFollowNextLayer).not.toHaveBeenCalled();
+    expect(onOpenCommandMenu).not.toHaveBeenCalled();
+    expect(onAddKeyAfter).not.toHaveBeenCalled();
+    expect(preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("neither route fires when nothing is selected", () => {
+    const layout = makeLayout([makeTouchKey("K_A")]);
+    const { result, onOpenCommandMenu, onFollowNextLayer } = renderHost(null, layout);
+
+    press(result, "ContextMenu");
+    press(result, "Enter", { ctrlKey: true });
+
+    expect(onOpenCommandMenu).not.toHaveBeenCalled();
+    expect(onFollowNextLayer).not.toHaveBeenCalled();
+  });
+
+  it("exposes both commands as descriptors carrying their keybinding hints", () => {
+    const anchor = makeCell("K_A", { nextlayer: "shift" });
+    const layout = makeLayout([makeTouchKey("K_A")]);
+    const { result } = renderHost(anchor, layout);
+
+    const menu = result.current.commands.find((c) => c.id === "open-command-menu");
+    expect(menu?.enabled).toBe(true);
+    expect(menu?.shortcutKey).toBe("ContextMenu");
+    expect(menu?.label).toBe("More commands");
+
+    const follow = result.current.commands.find((c) => c.id === "follow-next-layer");
+    expect(follow?.enabled).toBe(true);
+    expect(follow?.shortcutKey).toBe("Ctrl+Enter");
+    expect(follow?.label).toBe("Go to this key's layer");
+  });
+
+  it("keeps 'follow next layer' in the list but DISABLED for a key with no nextlayer — discoverable, not omitted", () => {
+    const anchor = makeCell("K_A");
+    const layout = makeLayout([makeTouchKey("K_A")]);
+    const { result } = renderHost(anchor, layout);
+
+    const follow = result.current.commands.find((c) => c.id === "follow-next-layer");
+    expect(follow).toBeDefined();
+    expect(follow?.enabled).toBe(false);
+  });
+
+  it("a descriptor's run() is the SAME implementation the keyboard route uses", () => {
+    const anchor = makeCell("K_A", { nextlayer: "shift" });
+    const layout = makeLayout([makeTouchKey("K_A")]);
+    const { result, onOpenCommandMenu, onFollowNextLayer } = renderHost(anchor, layout);
+
+    result.current.commands.find((c) => c.id === "open-command-menu")?.run();
+    result.current.commands.find((c) => c.id === "follow-next-layer")?.run();
+
+    expect(onOpenCommandMenu).toHaveBeenCalledWith(anchor);
+    expect(onFollowNextLayer).toHaveBeenCalledWith(anchor, "shift");
+  });
+});

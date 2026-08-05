@@ -826,6 +826,158 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-08-05T02:22:48.218Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T094",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:18:37.714Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T095",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:18:38.004Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T096",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:18:38.263Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T097",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:18:38.503Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T098",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:18:38.750Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T099",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:18:38.980Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T100",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:18:39.211Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T101",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:18:58.640Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T102",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:18:58.906Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T103",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:18:59.155Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T104",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:18:59.420Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T105",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:18:59.668Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T106",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:18:59.918Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T107",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:19:00.160Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T108",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:19:00.400Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T109",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:19:00.634Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T110",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:19:00.864Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T111",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:33:24.405Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T112",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-05T06:42:17.646Z"
     }
   ],
   "decisions": [
@@ -860,6 +1012,26 @@
     },
     {
       "decision": "{decision:SC-002 corpus canaries are hosted in packages/studio, not packages/keyboard-lint,why:@keymanapp/keyboard-lint has zero node:fs usage anywhere in src - every one of its tests uses inline fixtures - and studio is the only package that depends on it, so the established KEYBOARDS_ROOT + fs.existsSync skip-if-absent pattern has a home there. The SC-001 coverage canary stays in engine, which already reads the corpus.,rejected:A disk-reading canary test inside keyboard-lint, which would be the first fs-touching test in that package}"
+    },
+    {
+      "decision": "T111 hover wedges are aria-hidden decorative hit regions INSIDE the cell button, routed by event.target, not nested <button>s",
+      "why": "the gridcell IS a native <button>; nested interactive descendants are invalid HTML and break the APG row-owns-gridcell structure, and 2 real buttons per cell would add 600 Tab stops to a 300-key window, violating FR-020a. Every wedge command has a keyboard route (Insert / ContextMenu / Ctrl+Enter) so nothing is pointer-only.",
+      "rejected": "real nested buttons, or a role=presentation wrapper - the wrapper makes the row own non-gridcell children, failing aria-required-children the other way"
+    },
+    {
+      "decision": "Ctrl+Enter (not Alt+Arrow) is the keyboard route for follow-the-Goes-to-layer",
+      "why": "useGridNav claims ArrowLeft/Right REGARDLESS of modifiers (it tests RECOGNIZED_KEYS before any modifier), so Alt+ArrowRight would double-fire: follow the layer AND step the selection. research.md also reserves Alt+Arrow for MOVING a key. A regression test locks that Alt+ArrowRight stays unclaimed.",
+      "rejected": "Alt+ArrowRight per research.md shortcut family; plain Enter (FR-020b gives it to the inspector)"
+    },
+    {
+      "decision": "T112 e2e written in full but .skip-ped with the blocker named, rather than trimmed to what passes today",
+      "why": "TouchGallery.tsx mounts neither useKeyCommands (add) nor RemoveKeyDialog (remove), so steps 1 and 3 of the SC-006 walk have no UI route. import-improve.spec.ts sets the repo precedent for an honestly-skipped spec carrying its own un-skip recipe.",
+      "rejected": "building the whole TouchGallery add/remove wiring layer inside T112 (a substantial task tasks.md never allocated, and one the code itself defers); or weakening the spec until it passed"
+    },
+    {
+      "decision": "Extended the flag-gated __ksE2E__ hook with snapshotBaseFiles/snapshotOutputFiles",
+      "why": "SC-006 must compare shipped source against the EMITTED artifact; snapshotOutputFiles runs the same projectWorkingCopyForOutput the download path uses, so the test cannot pass against a projection the real output does not perform. Binary entries encode byte-exactly so equality needs no async hashing inside page.evaluate.",
+      "rejected": "downloading and unzipping the artifact in Playwright (needs a zip reader in the test and asserts the zip layer, not the projection)"
     }
   ],
   "approach": "Land a touch key<->rule join in packages/contracts first (Layer C cannot import engine), which fixes the coverage arithmetic with zero UI change and is the prerequisite primitive for everything else. Then build key-level editing as a second MODE of the existing touch step (no manifest churn): an ordered key-edit operation log applied through the existing single-writer projection chain as a raw-JSON layout pass plus a new .kmn rule pass, with a net-new ARIA grid, and eight edit-time diagnostics computed as synchronous pure joins on the existing findings surface.",
@@ -989,6 +1161,9 @@
       "tasks": [
         "T065",
         "T070"
+      ],
+      "tests": [
+        "packages/studio/src/editors/assignLoop/keyGrid/useKeyCommands.test.ts::useKeyCommands — T111's keyboard routes"
       ]
     },
     "FR-020c": {
@@ -1050,6 +1225,12 @@
       "tasks": [
         "T065",
         "T111"
+      ],
+      "tests": [
+        "packages/studio/src/editors/assignLoop/keyGrid/KeyGrid.test.tsx::KeyGridCell — the pointer paths (T111",
+        "FR-021)",
+        "packages/studio/src/editors/assignLoop/keyGrid/useKeyCommands.test.ts::useKeyCommands — T111's keyboard routes",
+        "packages/studio/src/editors/assignLoop/keyGrid/KeyGridCommandMenu.test.tsx"
       ]
     },
     "FR-022": {
@@ -1533,7 +1714,183 @@
       "what": "Repo lint gate (eslint + depcruise + 8 custom checkers) at the Phase 4 checkpoint",
       "command": "pnpm lint",
       "result": "all GREEN including depcruise (contracts-cannot-import-engine boundary holds) and facet-index-lint"
+    },
+    {
+      "what": "Full repo typecheck after Phase 8 completion",
+      "command": "pnpm typecheck",
+      "result": "clean across all 7 workspace projects"
+    },
+    {
+      "what": "Full unit suite",
+      "command": "pnpm -r test",
+      "result": "all green; studio 362 files / 5553 tests (up from 361 / 5513), engine 2708 pass + 2 skipped",
+      "warnings": [
+        "pre-existing jsdom console noise: useLingui-without-I18nProvider probe in AppRoot.test.tsx and HTMLCanvasElement.getContext not implemented in fontSupport tests - both assert-passing, unrelated to this change"
+      ]
+    },
+    {
+      "what": "Full lint gate incl. depcruise, crew-lint, facet/i18n/test-antipattern linters",
+      "command": "pnpm lint",
+      "result": "0 errors (125 pre-existing lingui/react-hooks warnings unchanged)"
+    },
+    {
+      "what": "New SC-006 e2e compiles and skips cleanly rather than failing",
+      "command": "npx playwright test touch-key-add-remove.spec.ts",
+      "result": "1 skipped, blocker named in the spec STATUS block"
+    },
+    {
+      "what": "i18n extraction for the 6 new message ids",
+      "command": "pnpm --filter @keyboard-studio/studio messages:extract",
+      "result": "en+fr catalogs updated (+15 lines each); i18n-catalog-lint green under Node 24.11"
     }
   ],
-  "currentTask": "T094"
+  "currentTask": "T112",
+  "task_summaries": {
+    "T094": {
+      "status": "DONE",
+      "did": "Add-key after selection via Insert and command menu, sharing one add-after impl with a real minted id (never T_new_<n>) - landed in cd4c6feb",
+      "files": [
+        "packages/studio/src/editors/assignLoop/keyGrid/useKeyCommands.ts"
+      ]
+    },
+    "T095": {
+      "status": "DONE",
+      "did": "Suppress as one compound op: non-interactive sp plus ruleless sentinel id, so the halves cannot desynchronize - landed in cd4c6feb",
+      "files": [
+        "packages/engine/src/pattern-apply/keyEditOps.ts"
+      ]
+    },
+    "T096": {
+      "status": "DONE",
+      "did": "Full sp control across {0,1,2,8,9,10} in the inspector - studio proposes but never removes the control - landed in cd4c6feb",
+      "files": [
+        "packages/studio/src/editors/assignLoop/keyGrid/KeyInspector.tsx"
+      ]
+    },
+    "T097": {
+      "status": "DONE",
+      "did": "Remove-key resolves to three co-equal outcomes with trade-offs stated, none hard-coded as globally correct - landed in cd4c6feb",
+      "files": [
+        "packages/studio/src/editors/assignLoop/keyGrid/RemoveKeyDialog.tsx"
+      ]
+    },
+    "T098": {
+      "status": "DONE",
+      "did": "Outcome proposed from layer kind, always overridable, with the platform crowding limit overriding regardless of kind - landed in cd4c6feb",
+      "files": [
+        "packages/studio/src/editors/assignLoop/keyGrid/RemoveKeyDialog.tsx"
+      ]
+    },
+    "T099": {
+      "status": "DONE",
+      "did": "Last-key-in-row prompt defaulting to KEEPING the row with a full-width spacer - landed in cd4c6feb",
+      "files": [
+        "packages/studio/src/editors/assignLoop/keyGrid/RemoveKeyDialog.tsx"
+      ]
+    },
+    "T100": {
+      "status": "DONE",
+      "did": "Row slack rendered visibly with explicit Fill row / Even out row actions; widths never silently redistributed - landed in cd4c6feb",
+      "files": [
+        "packages/studio/src/editors/assignLoop/keyGrid/KeyGrid.tsx"
+      ]
+    },
+    "T101": {
+      "status": "DONE",
+      "did": "Half-done suppression reported both ways, with the ruleless sentinel idiom exempted from dead-key reporting - landed in cd4c6feb",
+      "files": [
+        "packages/engine/src/pattern-apply/touchKeyDiagnostics.ts"
+      ]
+    },
+    "T102": {
+      "status": "DONE",
+      "did": "Layer-switch key marked active (sp:2) on the layer it switches to, proposed from nextlayer, editable, with a disagreement diagnostic - landed in cd4c6feb",
+      "files": [
+        "packages/engine/src/pattern-apply/touchKeyDiagnostics.ts"
+      ]
+    },
+    "T103": {
+      "status": "DONE",
+      "did": "Mixed suppressed/removed row surfaced as an inconsistency achieving neither goal - landed in cd4c6feb",
+      "files": [
+        "packages/engine/src/pattern-apply/touchKeyDiagnostics.ts"
+      ]
+    },
+    "T104": {
+      "status": "DONE",
+      "did": "Linked outputs (own output plus every sk, flick, multitap sub-key) enumerated and named by character, warned before commit - landed in cd4c6feb",
+      "files": [
+        "packages/engine/src/pattern-apply/touchKeyCollateral.ts"
+      ]
+    },
+    "T105": {
+      "status": "DONE",
+      "did": "Unreachable characters distinguished from still-available-elsewhere, naming the surviving location - landed in cd4c6feb",
+      "files": [
+        "packages/engine/src/pattern-apply/touchKeyCollateral.ts"
+      ]
+    },
+    "T106": {
+      "status": "DONE",
+      "did": "Last-mechanism losses return to the unplaced worklist and shared progress figures, intersected with still-unplaced so re-placement retires the re-entry - landed in cd4c6feb",
+      "files": [
+        "packages/studio/src/editors/assignLoop/keyGrid/useKeyEditGuards.ts"
+      ]
+    },
+    "T107": {
+      "status": "DONE",
+      "did": "Loud complaint when an edit breaks positional parallelism within a layer family - landed in cd4c6feb",
+      "files": [
+        "packages/engine/src/pattern-apply/layerFamilies.ts"
+      ]
+    },
+    "T108": {
+      "status": "DONE",
+      "did": "FamilyApplyDialog offers applying across the family, showing every affected layer and its per-layer content first - landed in cd4c6feb",
+      "files": [
+        "packages/studio/src/editors/assignLoop/keyGrid/FamilyApplyDialog.tsx"
+      ]
+    },
+    "T109": {
+      "status": "DONE",
+      "did": "Distinct planes treated as freeform (never nagged); within-plane modifier family checked at softer severity - landed in cd4c6feb",
+      "files": [
+        "packages/engine/src/pattern-apply/layerFamilies.ts"
+      ]
+    },
+    "T110": {
+      "status": "DONE",
+      "did": "FR-068 property split keyed on frame/layer-switch key: sp, nextlayer, id, keycap text may differ; position and width still checked - landed in cd4c6feb",
+      "files": [
+        "packages/engine/src/pattern-apply/layerFamilies.ts"
+      ]
+    },
+    "T111": {
+      "status": "DONE",
+      "did": "Pointer paths as first-class: hover-revealed (+)/menu wedges as aria-hidden hit regions inside the cell button (no nested buttons, so the single Tab stop and APG grid structure hold), right-click and Ctrl-less menu routes, double-click follows nextlayer; keyboard equivalents (ContextMenu/Shift+F10, Ctrl+Enter) added to useKeyCommands - deliberately NOT Alt+Arrow, which useGridNav claims regardless of modifiers; no drag/resize affordance per FR-021",
+      "files": [
+        "packages/studio/src/editors/assignLoop/keyGrid/KeyGridCell.tsx",
+        "packages/studio/src/editors/assignLoop/keyGrid/KeyGrid.tsx",
+        "packages/studio/src/editors/assignLoop/keyGrid/useKeyCommands.ts",
+        "packages/studio/src/editors/assignLoop/keyGrid/KeyGridCommandMenu.tsx",
+        "packages/studio/src/editors/assignLoop/keyGrid/KeyGridCommandMenu.test.tsx",
+        "packages/studio/src/editors/assignLoop/keyGrid/KeyGrid.test.tsx",
+        "packages/studio/src/editors/assignLoop/keyGrid/useKeyCommands.test.ts"
+      ]
+    },
+    "T112": {
+      "status": "DONE",
+      "did": "SC-006 import-adapt e2e written in full against real test ids (add + assign + remove; emitted layout reflects both; untouched keys/platform fields incl. font structurally identical; untouched files byte-identical). Extended the flag-gated __ksE2E__ hook with snapshotBaseFiles/snapshotOutputFiles so the spec compares shipped source vs the same projection serializeWorkingCopy zips. SKIPPED with the blocker named: TouchGallery.tsx mounts neither useKeyCommands (add) nor RemoveKeyDialog (remove), a wiring task Phase 8 never allocated",
+      "files": [
+        "packages/studio/e2e/touch-key-add-remove.spec.ts",
+        "packages/studio/src/lib/e2eHook.ts"
+      ]
+    }
+  },
+  "concerns": [
+    {
+      "note": "BLOCKER for SC-006 evidence: Phase 8 built the add/remove surfaces (useKeyCommands, RemoveKeyDialog, FamilyApplyDialog, KeyGridCommandMenu) but TouchGallery.tsx mounts NONE of them - only the US2 assign path is wired. tasks.md allocates no wiring task in Phase 8, and useKeyCommands.ts calls it out as a later TouchGallery wiring task. Until it lands, add/remove are unreachable in the running app and T112 stays skipped. Phase 9 T120 already touches TouchGallery and may be the natural home.",
+      "step": "implement"
+    }
+  ]
 }
