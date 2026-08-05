@@ -2098,24 +2098,6 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     return { unplacedChars: uncovered, keysWithNoOutput };
   }, [effectiveKeyModeLayout, keyModeRuleIndex, inventory, keyModeCoverageOptions]);
 
-  // T073 (FR-036): propose the by-key mode ONLY when BOTH hold — the
-  // effective layout has keys with no reachable output AND the inventory
-  // still has unplaced characters. Neither alone is the "import fix-up"
-  // scenario this exists for: keys-with-no-output but nothing unplaced means
-  // the layout is already covering everything some other way; unplaced
-  // characters with no broken keys is the ordinary character-walk case.
-  const shouldProposeKeyMode =
-    keyGridProgress.keysWithNoOutput.length > 0 &&
-    keyGridProgress.unplacedChars.length > 0;
-
-  // Propose-then-confirm (spec v1.3.1 §3c) — never a silent jump. Dismissal
-  // is component-local (not persisted): this is a one-time nudge on entry,
-  // not durable working-copy state, so a remount (e.g. back-navigation to
-  // Phase C and forward again) is free to re-offer it if the condition still
-  // holds.
-  const [keyModeProposalDismissed, setKeyModeProposalDismissed] =
-    useState(false);
-
   // Platform catalog for the key-mode grid's platform tabs (T077 already
   // renders the tablist; this just supplies the catalog from the effective
   // layout for the currently-mounted mode's grid).
@@ -4678,65 +4660,6 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           baseDirectSet={touchBaseDirectSet}
           preAugmentSessionAwareSet={directTouchProducedSet}
         />
-      )}
-
-      {/* T073 (FR-036): propose — never silently route into — the by-key mode
-          when the effective layout has keys with no reachable output AND the
-          inventory still has unplaced characters (the "imported keyboard
-          needs fixing up before the character walk" case). Distinct button
-          copy from the shared Accept/Deny suggestion-card pair below (never
-          "Accept"/"Deny") so this banner cannot be picked up by a query aimed
-          at the per-character suggestion card. Dismissing (either button)
-          hides the banner for the rest of this mount; switching modes is
-          free and lossless either way (FR-036a), so declining costs nothing. */}
-      {shouldProposeKeyMode && !keyModeProposalDismissed && (
-        <ProposalCard
-          ariaLabel={t({
-            id: "editor.assignLoop.touch.keyModeProposal.ariaLabel",
-            message: "Suggestion: switch to the by-key view",
-          })}
-          message={
-            <Trans id="editor.assignLoop.touch.keyModeProposal.message">
-              Some keys on this touch layout don&rsquo;t produce anything yet,
-              and there are still characters to place. Fixing the keys
-              directly may be faster than going character by character.
-            </Trans>
-          }
-        >
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              type="button"
-              onClick={() => {
-                handleSwitchTouchEditorMode("key");
-                setKeyModeProposalDismissed(true);
-              }}
-              aria-label={t({
-                id: "editor.assignLoop.touch.keyModeProposal.acceptAriaLabel",
-                message: "Switch to the by-key view",
-              })}
-              data-testid="touch-key-mode-proposal-accept"
-              style={suggestionAcceptBtnStyle}
-            >
-              <Trans id="editor.assignLoop.touch.keyModeProposal.accept">
-                Switch to key view
-              </Trans>
-            </button>
-            <button
-              type="button"
-              onClick={() => setKeyModeProposalDismissed(true)}
-              aria-label={t({
-                id: "editor.assignLoop.touch.keyModeProposal.declineAriaLabel",
-                message: "Stay on the by-character view",
-              })}
-              data-testid="touch-key-mode-proposal-decline"
-              style={suggestionDenyBtnStyle}
-            >
-              <Trans id="editor.assignLoop.touch.keyModeProposal.decline">
-                Stay on characters
-              </Trans>
-            </button>
-          </div>
-        </ProposalCard>
       )}
 
       {/* All-caught-up state — every inventory character is already reachable
