@@ -58,6 +58,22 @@ export interface ResolveContext {
   readonly traversal: TraversalSnapshot;
   /** Whether a working copy exists at all. */
   readonly hasProject: boolean;
+  /**
+   * Addressable WITHIN-STEP stops per step id, from the walks components
+   * publish into `stores/stepWalkStore.ts` (see lib/stepWalk.ts's header).
+   *
+   * Why this is a second membership source alongside `questionRegistry` rather
+   * than an extension of it: the registry holds FLOW QUESTIONS — pure
+   * descriptor modules with prompts and answer types. A gallery stage's stops
+   * are characters, which are not questions and have no registry entry to add.
+   * A location naming one is still perfectly addressable, so membership is
+   * "in the registry OR in this step's published walk"; a position in neither
+   * is `question-not-in-build`, exactly as before.
+   *
+   * Optional: absent (or a step with no published walk) behaves precisely as it
+   * did before this field existed — registry membership alone.
+   */
+  readonly stepPositions?: Readonly<Record<string, readonly string[]>>;
 }
 
 /** The route that owns the wizard. Only this route can carry a step. */
@@ -83,6 +99,23 @@ function walkedByTrack(stepId: string, traversal: TraversalSnapshot): boolean {
  */
 function isReached(stepId: ActiveStepId, traversal: TraversalSnapshot): boolean {
   return traversal.activeStepId === stepId || traversal.history.includes(stepId);
+}
+
+/**
+ * Is `positionId` an addressable stop inside `stepId` in this build?
+ *
+ * Two sources, checked in order (see `ResolveContext.stepPositions` for why
+ * there are two): the flow-question registry, then the step's published
+ * within-step walk. Nothing else — a position in neither is refused, which is
+ * what keeps a retired question id in an old bookmark from silently resolving.
+ */
+function isAddressablePosition(
+  positionId: string,
+  stepId: string,
+  ctx: ResolveContext,
+): boolean {
+  if (positionId in ctx.questionRegistry) return true;
+  return ctx.stepPositions?.[stepId]?.includes(positionId) === true;
 }
 
 /**
@@ -152,7 +185,7 @@ export function resolveLocation(loc: Location, ctx: ResolveContext): LocationRes
     return refuse(loc, "beyond-gate", ctx);
   }
 
-  if (loc.question !== undefined && !(loc.question in ctx.questionRegistry)) {
+  if (loc.question !== undefined && !isAddressablePosition(loc.question, loc.step, ctx)) {
     return refuse(loc, "question-not-in-build", ctx);
   }
 

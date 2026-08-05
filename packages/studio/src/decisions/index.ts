@@ -48,8 +48,19 @@ export type { ProjectedSource, SourceSnapshotter, SourceSnapshotterDeps } from "
 export { createDecisionRecorder } from "./createDecisionRecorder.ts";
 export type { DecisionRecorderDeps } from "./createDecisionRecorder.ts";
 
-export { resolveImpact } from "./impact.ts";
-export type { ResolveImpactDeps } from "./impact.ts";
+export { resolveImpact, resolveImpactAsync } from "./impact.ts";
+export type { ResolveImpactDeps, ResolveImpactAsyncDeps } from "./impact.ts";
+
+// spec 057 — attribution for decisions recorded before a working copy existed.
+export { textBaseline, normalizeHistoryDateStamp } from "./projectedText.ts";
+export {
+  resolveIdentityCounterfactual,
+  outputFieldForEntry,
+  coDecisionEntryIds,
+} from "./counterfactualProjection.ts";
+export type { CounterfactualDeps } from "./counterfactualProjection.ts";
+export { useEntryImpact } from "./useEntryImpact.ts";
+export type { EntryImpactState } from "./useEntryImpact.ts";
 
 export { headlineFor, headlineOf, formatAnswerValue } from "./headline.ts";
 export type { HeadlineSpec } from "./headline.ts";

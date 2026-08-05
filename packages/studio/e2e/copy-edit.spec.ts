@@ -331,11 +331,19 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     await expect(downloadBtn).toHaveText("Download .zip");
   });
 
-  test("emitted .kps, .kvks, and welcome.htm have non-empty bodies", async ({
+  test("emitted .kps declares the author's language and name; .kvks and welcome.htm are non-empty", async ({
     page,
   }) => {
-    // Walk the wizard and download.
-    await fillIdentityLite(page);
+    // Walk the wizard and download. Unlike the other walks here this one supplies
+    // the language code, so the identity-lite series composes a real BCP47 tag for
+    // the package descriptor to declare (spec 057 FR-001) instead of leaving the
+    // field blank and falling back to the `und` placeholder.
+    await driveIdentityLite(page, {
+      english: FIXTURE.english,
+      autonym: FIXTURE.autonym,
+      script: FIXTURE.targetScript,
+      languageCode: FIXTURE.languageCode,
+    });
     await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
     await chooseTrackCopy(page);
     await acceptProjectName(page);
@@ -352,10 +360,31 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     // the decompressed body length so "non-empty" reflects real content.
     const entries = Object.entries(unzipSync(new Uint8Array(zipBuf)));
 
-    // Check for .kps
+    // The .kps must not merely EXIST — it must declare the author's language and
+    // name (US1-1, SC-002). Presence alone is what the pre-057 assertion checked,
+    // and a descriptor declaring the French base's `fr` passed it.
     const kps = entries.find(([name]) => name.endsWith(".kps"));
     expect(kps, "zip must contain a .kps package file").toBeDefined();
     expect(kps![1].length, ".kps must be non-empty").toBeGreaterThan(0);
+
+    const kpsText = new TextDecoder().decode(kps![1]);
+    // The author's composed tag: language code + target script, taken whole from
+    // the identity-lite result. EXACTLY ONE <Language>, so a base tag cannot be
+    // sitting alongside it.
+    const languageElements = kpsText.match(/<Language\b[^>]*>[^<]*<\/Language>/g) ?? [];
+    expect(
+      languageElements,
+      ".kps must declare exactly one language: the author's composed tag, with their language's English name as its display text",
+    ).toEqual([
+      `<Language ID="${FIXTURE.languageCode}-${FIXTURE.targetScript}">${FIXTURE.english}</Language>`,
+    ]);
+    // SC-002 stated directly: the base keyboard's own language declaration is gone.
+    expect(kpsText, ".kps must not declare the base keyboard's language").not.toContain(
+      '<Language ID="fr">fr</Language>',
+    );
+    // FR-003: the author's display name reaches <Info><Name> and the keyboard's own
+    // <Name>. acceptProjectName commits the seeded name, which is the autonym.
+    expect(kpsText).toContain(`<Name URL="">${FIXTURE.autonym}</Name>`);
 
     // Check for .kvks (visual keyboard source)
     const kvks = entries.find(([name]) => name.endsWith(".kvks"));

@@ -41,6 +41,7 @@ import { type RouteId } from "./lib/navigate.ts";
 import { parseLocation } from "./lib/location.ts";
 import { liveResolveContext, setPendingWelcomeLocation } from "./lib/jumpToLocation.ts";
 import { readPaneSplitPct, useViewStateStore } from "./stores/viewStateStore.ts";
+import { useStepWalkStore } from "./stores/stepWalkStore.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
@@ -73,7 +74,7 @@ import { createStudioDecisionRecorder } from "./decisions/createStudioDecisionRe
 import { createSourceSnapshotter } from "./decisions/snapshotSource.ts";
 import { useDecisionLogStore } from "./decisions/decisionLogStore.ts";
 import { DecisionTrailView } from "./decisions/DecisionTrailView.tsx";
-import { resolveImpact } from "./decisions/impact.ts";
+import { resolveImpact, resolveImpactAsync } from "./decisions/impact.ts";
 import { buildPathOverlay } from "./dashboard/pathOverlay.ts";
 import { projectWorkingCopyForOutput } from "./lib/serializeWorkingCopy.ts";
 import { StepHost } from "./components/StepHost.tsx";
@@ -1203,6 +1204,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // and Compare selection behind would make the next keyboard open in a
     // layout the author never chose for it.
     useViewStateStore.getState().reset();
+    // Within-step positions belong to the walk being abandoned. Left behind,
+    // the next keyboard's mechanism/touch galleries would open on a character
+    // from the previous project's inventory — a cursor is only meaningful
+    // against the walk that published it (stores/stepWalkStore.ts).
+    useStepWalkStore.getState().reset();
     snapshotterRef.current.reset();
     pendingArtifactRef.current = null;
     // F6 fix: re-arm the pre-instantiation pending autosave for the NEXT
@@ -1632,6 +1638,30 @@ export function StudioShell() {
     [impactDeps],
   );
 
+  // spec 057 FR-009/FR-010: the async resolver, for a decision recorded before a
+  // working copy existed. It re-derives the effect by projecting the working copy
+  // twice through `projectWorkingCopyForOutput` — the SAME function the download zip
+  // and the pull-request path use, and the same one `readProjectedFiles` above
+  // delegates to. That is FR-010, not a convenience: both sides of the comparison
+  // must come from the function that produces the shipped keyboard, or the trail can
+  // disagree with the artifact (SC-005).
+  //
+  // Passed as a FUNCTION for the same reason `resolveEntryImpact` is: mounting the
+  // trail resolves nothing, and expanding one row resolves exactly that row.
+  const asyncImpactDeps = useMemo(
+    () => ({
+      ...impactDeps,
+      project: projectWorkingCopyForOutput,
+      hasWorkingCopy: () => useWorkingCopyStore.getState().baseVfs !== null,
+      getRecord: () => useDecisionLogStore.getState().record,
+    }),
+    [impactDeps],
+  );
+  const resolveEntryImpactAsync = useCallback(
+    (entry: DecisionEntry) => resolveImpactAsync(entry, asyncImpactDeps),
+    [asyncImpactDeps],
+  );
+
   // ---------------------------------------------------------------------------
   // Flow-map walked path (spec 053 US3, FR-023/FR-026). Projected HERE, where the
   // record is reachable, and passed into FlowMapView as a prop — `dashboard/` has
@@ -1712,6 +1742,7 @@ export function StudioShell() {
           record={decisionRecord}
           droppedCount={decisionDroppedCount}
           resolveImpact={resolveEntryImpact}
+          resolveImpactAsync={resolveEntryImpactAsync}
           // Spec 057 US5 (FR-050): per-stage collapse and the replaced-
           // decisions toggle are view state, read here for the same
           // layer-boundary reason as the flow map's section above.

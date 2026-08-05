@@ -143,6 +143,15 @@ export type IdentityPatch = Partial<{
   /** Human-readable display name for the new keyboard. */
   displayName: string;
   /**
+   * The language's name in English, as the author confirmed it (spec 057 FR-002).
+   *
+   * Display text for the package descriptor's `<Language>` element and nothing
+   * else — the codec does not serialize a language name, so this never reaches
+   * the `.kmn`. Blank or absent lets the BCP47 tag stand in as its own display
+   * text, which is what the descriptor writer did for every tag before 057.
+   */
+  languageName: string;
+  /**
    * New keyboard identifier chosen by the author (Track 1 only).
    *
    * Must satisfy validateKeyboardId (§10 Layer A check #1: 1-255 chars,

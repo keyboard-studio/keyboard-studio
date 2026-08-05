@@ -69,6 +69,16 @@ export interface TouchMethodDescriptor {
   layer: string;
   /** Compass direction — present only when `kind === "flick"`. */
   direction?: string;
+  /**
+   * The sub-entry's own raw `.keyman-touch-layout` `layer` wire annotation
+   * (`TouchKeyIR.layerAnnotation`) — present only when `kind === "longpress"`
+   * and the `sk[]` sub-entry actually carries one (e.g. `"rightalt"` in
+   * release/g/ghana/source/ghana.keyman-touch-layout). This is a free-text
+   * hint the corpus applies inconsistently — sometimes naming a layer that
+   * does not exist top-level — so it is surfaced as-is, distinct from
+   * `layer` above (which is always the reachable OUTER layer id).
+   */
+  skLayerAnnotation?: string;
   /** False when deleting this method could not actually stop the char from being typed. */
   deletable: boolean;
   /** Present only when `deletable` is false. */
@@ -154,6 +164,8 @@ function collectDescriptorsForKey(
 
   for (const sub of key.sk ?? []) {
     if (!isBackspaceKeyId(sub.id) && keyMatchesRemovalSet(sub, removalSet)) {
+      const skLayerField =
+        sub.layerAnnotation !== undefined ? { skLayerAnnotation: sub.layerAnnotation } : {};
       out.push({
         id: touchSubKeyAddress(platform, layerId, key.id, "sk", sub.id),
         kind: "longpress",
@@ -161,6 +173,7 @@ function collectDescriptorsForKey(
         producedChar: char,
         platform,
         layer: layerId,
+        ...skLayerField,
         deletable: true,
       });
     }

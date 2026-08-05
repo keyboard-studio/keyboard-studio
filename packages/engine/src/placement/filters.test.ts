@@ -5,6 +5,7 @@ import {
   dedupCapsNcaps,
   detectBaseLayoutFamily,
   hasInvertedNumberRow,
+  isStandardKey,
 } from "./filters.js";
 import { parse } from "../codec/parse.js";
 import { existsSync, readFileSync } from "fs";
@@ -478,5 +479,21 @@ describe("hasInvertedNumberRow against the real basic_kbdbe AZERTY base", () => 
   it.skipIf(!available)("detects the inverted number row in basic_kbdbe", () => {
     const { ir } = parse(readFileSync(KMN_PATH, "utf-8"), "basic_kbdbe");
     expect(hasInvertedNumberRow(ir)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isStandardKey — shared by corpus-loader.ts and touch-mining.ts
+// ---------------------------------------------------------------------------
+
+describe("isStandardKey", () => {
+  it("accepts K_* physical vkeys", () => {
+    expect(isStandardKey("K_F")).toBe(true);
+    expect(isStandardKey("K_QUOTE")).toBe(true);
+  });
+
+  it("rejects touch-layout virtual keys and other non-K_* names", () => {
+    expect(isStandardKey("T_myCustomTouchKey")).toBe(false);
+    expect(isStandardKey("SomeOtherName")).toBe(false);
   });
 });

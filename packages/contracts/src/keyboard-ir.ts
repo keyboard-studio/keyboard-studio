@@ -114,6 +114,18 @@ export interface TouchKeyIR {
   hint?: string;
   output?: string;
   nextlayer?: string;
+  /**
+   * Raw `.keyman-touch-layout` wire-format `layer` annotation carried on this
+   * key/sub-entry (e.g. an `sk[]` longpress sub-key tagged `"layer": "rightalt"`
+   * — see `release/g/ghana/source/ghana.keyman-touch-layout`). This is a
+   * free-text hint, NOT a validated reference to an actual top-level layer id:
+   * corpus keyboards apply it inconsistently and sometimes name a layer that
+   * does not exist top-level. Consumers must not treat it as authoritative
+   * layer-routing data; see `enumerateTouchMethodsForChar`'s `layerClass`
+   * bucketing, which reads the OUTER layer id instead and keeps this
+   * annotation only as a cheap, best-effort surface.
+   */
+  layerAnnotation?: string;
   /** Sub-keys (longpress menu). */
   sk?: TouchKeyIR[];
   /** Directional gesture map (compass directions). */

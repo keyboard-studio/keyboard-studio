@@ -20,6 +20,8 @@ import { render } from "../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
+import { useStepWalkStore } from "../stores/stepWalkStore.ts";
+import { charToPositionToken } from "../lib/stepWalk.ts";
 import { StudioFooter } from "./StudioFooter.tsx";
 
 const BASE = makeBaseKeyboard({
@@ -173,5 +175,68 @@ describe("StudioFooter — keyboard operability (SC-010)", () => {
     expect(useSurveySessionStore.getState().activeStepId).toBe("characters");
     // And the reason is stated, not silently swallowed (FR-045, US4 scenario 9).
     expect(screen.getByRole("status").textContent).toMatch(/not yet reached/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Within-step walk dots — the wiring, end to end through the real component
+//
+// progressDots.test.ts covers the derivation against fixtures; this covers what
+// only the mounted footer can: that it reads the live walk store, that a
+// character stop's dot resolves (rather than refusing itself as
+// "question-not-in-build"), and that activating one moves the within-step cursor
+// the gallery reads on arrival.
+// ---------------------------------------------------------------------------
+
+describe("StudioFooter — within-step walk dots", () => {
+  it("renders a dot per character stop instead of a single stage dot", () => {
+    useSurveySessionStore.setState({
+      activeStepId: "mechanisms",
+      history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve"],
+      selectedTrack: "adapt",
+    });
+    useStepWalkStore.getState().publishStepWalk("mechanisms", [
+      { id: charToPositionToken("á"), label: "á (U+00E1)", done: true },
+      { id: charToPositionToken("é"), label: "é (U+00E9)", done: false },
+      { id: charToPositionToken("í"), label: "í (U+00ED)", done: false },
+    ]);
+    useStepWalkStore.getState().setStepCursor("mechanisms", charToPositionToken("é"));
+
+    render(<StudioFooter />);
+    const names = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? "");
+    expect(names.some((n) => n.startsWith("á (U+00E1)"))).toBe(true);
+    expect(names.some((n) => n.startsWith("é (U+00E9)"))).toBe(true);
+    expect(names.some((n) => n.startsWith("í (U+00ED)"))).toBe(true);
+    // The stage's own dot is gone — the stops replaced it, they did not join it.
+    expect(names.some((n) => n.startsWith("Mechanisms"))).toBe(false);
+  });
+
+  it("activating a character stop moves the within-step cursor, not just the step", async () => {
+    const user = userEvent.setup();
+    useSurveySessionStore.setState({
+      activeStepId: "mechanisms",
+      history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve"],
+      selectedTrack: "adapt",
+    });
+    useStepWalkStore.getState().publishStepWalk("mechanisms", [
+      { id: charToPositionToken("á"), label: "á (U+00E1)", done: true },
+      { id: charToPositionToken("é"), label: "é (U+00E9)", done: false },
+    ]);
+    useStepWalkStore.getState().setStepCursor("mechanisms", charToPositionToken("é"));
+
+    render(<StudioFooter />);
+    const target = screen
+      .getAllByRole("button")
+      .find((b) => (b.getAttribute("aria-label") ?? "").startsWith("á (U+00E1)"));
+    expect(target).toBeDefined();
+
+    target!.focus();
+    await user.keyboard("{Enter}");
+
+    // No refusal: a character has no questionRegistry entry, so this only
+    // resolves because the published walk makes it addressable.
+    expect(screen.getByRole("status").textContent ?? "").toBe("");
+    expect(useStepWalkStore.getState().cursors["mechanisms"]).toBe(charToPositionToken("á"));
+    expect(useSurveySessionStore.getState().activeStepId).toBe("mechanisms");
   });
 });
