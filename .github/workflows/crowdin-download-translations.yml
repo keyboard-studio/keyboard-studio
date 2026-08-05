@@ -171,6 +171,15 @@ jobs:
             exit 0
           fi
 
+          # Read the PR body BEFORE switching branches. .github/workflows/
+          # crowdin-sync-pr-body.md is an unmodified tracked file -- the
+          # checkout below replaces every unmodified path with the target
+          # branch's version, and l10n_crowdin_action's existing tip predates
+          # this file. --body-file would then read a path that no longer
+          # exists on disk. A variable has no such dependency on what's
+          # currently checked out.
+          PR_BODY="$(cat .github/workflows/crowdin-sync-pr-body.md)"
+
           git config user.name "l10n-crowdin-sync"
           git config user.email "l10n-crowdin-sync@users.noreply.github.com"
 
@@ -191,4 +200,4 @@ jobs:
             --title "chore(process): sync Crowdin translations" \
             --base main \
             --head "$BRANCH" \
-            --body-file .github/workflows/crowdin-sync-pr-body.md
+            --body "$PR_BODY"
