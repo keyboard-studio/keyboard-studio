@@ -92,14 +92,39 @@ describe("mineLongpressHosts", () => {
     expect(mineLongpressHosts(layout)).toEqual([]);
   });
 
-  it("skips a spacer-class host key (sp:8/10)", () => {
+  it("skips a non-interactive host key (sp:9 blank / sp:10 spacer)", () => {
+    const layoutBlank = makeLayout([
+      {
+        id: "default",
+        rows: [{ keys: [makeKey("K_E", { sp: 9, sk: [makeKey("K_E", { text: "ɛ" })] })] }],
+      },
+    ]);
+    const layoutSpacer = makeLayout([
+      {
+        id: "default",
+        rows: [{ keys: [makeKey("K_E", { sp: 10, sk: [makeKey("K_E", { text: "ɛ" })] })] }],
+      },
+    ]);
+    expect(mineLongpressHosts(layoutBlank)).toEqual([]);
+    expect(mineLongpressHosts(layoutSpacer)).toEqual([]);
+  });
+
+  // sp:8 is `deadkey` in the upstream enum — a STYLING signal, not a
+  // behavioural one (only `blank`=9 and `spacer`=10 are documented as
+  // blocking interaction). A deadkey-styled key stays interactive and may
+  // produce output, so mining must not skip it. Real precedent: the
+  // arabic_w_o_dots host key T_new_8655 carries sp:8 with a longpress `sk[]`
+  // menu producing Arabic tashkeel.
+  it("does NOT skip a deadkey-STYLED host key (sp:8) — it is interactive, not a spacer", () => {
     const layout = makeLayout([
       {
         id: "default",
         rows: [{ keys: [makeKey("K_E", { sp: 8, sk: [makeKey("K_E", { text: "ɛ" })] })] }],
       },
     ]);
-    expect(mineLongpressHosts(layout)).toEqual([]);
+    expect(mineLongpressHosts(layout)).toEqual([
+      { codepoint: "U+025B", vkey: "K_E", layerClass: "default" },
+    ]);
   });
 
   it("skips an sk sub-entry with no char-producing field", () => {

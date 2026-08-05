@@ -26,6 +26,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Amazigh Latin (SIL) | `amazigh_latin` | `auj-Latn`, `swn-Latn`, `siz-Latn`, `cnu-Latn`, `jbe-Latn`, `shi-Latn`, `tzm`, `zgh-Latn`, `kab`, `gha-Latn`, `jbn-Latn`, `sds-Latn`, `gho-Latn`, `oua-Latn`, `tjo-Latn` … (+12 more) | SIL Global | `../keyboards/release/a/amazigh_latin` |
 | Anii | `anii` | `blo-Latn` | Martin Zaske | `../keyboards/release/a/anii` |
 | Arabic Izza | `arabic_izza` | `ar-DZ` | Prof. Abdelmalek Bouhadjera | `../keyboards/release/a/arabic_izza` |
+| Arabic W/O Dots | `arabic_w_o_dots` | `ar` | 3ubaidUrRe7man | `../keyboards/release/a/arabic_w_o_dots` |
 | Arbore | `arbore` | `arv-Latn`, `amf` | Sophia Ku | `../keyboards/release/a/arbore` |
 | Armenian Mnemonic R | `armenian_mnemonic_r` | `hy` | Tigran Sarukhanyan | `../keyboards/release/a/armenian_mnemonic_r` |
 | Vai (Athinkra) | `athinkra_vai` | `vai` | Jason Glavy | `../keyboards/release/athinkra/athinkra_vai` |
