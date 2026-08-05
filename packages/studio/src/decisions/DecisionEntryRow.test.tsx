@@ -276,6 +276,181 @@ describe("clause lists are locale-formatted, not comma-joined (km-triage/km-doma
 });
 
 // ---------------------------------------------------------------------------
+// Async resolution and the third unavailability reason (spec 057 T036)
+// ---------------------------------------------------------------------------
+//
+// Same through-line as above: a STATEMENT, never an absence — and never the WRONG
+// statement. The row previously told an author who answered the identity questions
+// that their answers had no re-derivable write path, which was true only because
+// nothing wrote them anywhere.
+
+describe("spec 057 — identity entries resolved on expand", () => {
+  /** Render a row with an async resolver, not yet expanded. */
+  function renderAsyncRow(
+    resolveImpactAsync: (e: DecisionEntry) => Promise<DecisionImpact | null>,
+    entryOverrides: Partial<DecisionEntry> = {},
+  ) {
+    return render(
+      <ul>
+        <DecisionEntryRow
+          entry={entry(entryOverrides)}
+          superseded={false}
+          resolveImpact={() => null}
+          resolveImpactAsync={resolveImpactAsync}
+        />
+      </ul>,
+    );
+  }
+
+  const DESCRIPTOR_CAPTURE: DecisionImpact = {
+    state: "captured",
+    files: [
+      {
+        path: "source/hausa_std.kps",
+        hunks: [
+          {
+            oldStart: 6,
+            oldLines: 1,
+            newStart: 6,
+            newLines: 1,
+            lines: ['-  <Language ID="fr">fr</Language>', '+  <Language ID="ha-Latn">Hausa</Language>'],
+          },
+        ],
+        magnitude: { added: 1, removed: 1 },
+      },
+    ],
+    magnitude: { added: 1, removed: 1 },
+  };
+
+  // US2-1: the thing the author actually wanted to see.
+  it("names the package descriptor as the changed file once resolved", async () => {
+    renderAsyncRow(async () => DESCRIPTOR_CAPTURE);
+    fireEvent.click(screen.getByTestId("decision-entry-expand"));
+
+    const file = await screen.findByTestId("decision-entry-impact-file");
+    expect(file.getAttribute("data-file-path")).toBe("source/hausa_std.kps");
+    expect(screen.getByTestId("decision-entry-impact").textContent).toContain("ha-Latn");
+  });
+
+  it("shows the pending notice while resolving, then replaces it with the change", async () => {
+    let release!: (impact: DecisionImpact) => void;
+    renderAsyncRow(
+      () => new Promise<DecisionImpact>((resolve) => { release = resolve; }),
+    );
+    fireEvent.click(screen.getByTestId("decision-entry-expand"));
+
+    // A statement, not a blank region.
+    expect(screen.getByTestId("decision-entry-impact-pending")).toBeTruthy();
+    expect(screen.queryByTestId("decision-entry-impact-file")).toBeNull();
+
+    release(DESCRIPTOR_CAPTURE);
+    await screen.findByTestId("decision-entry-impact-file");
+    expect(screen.queryByTestId("decision-entry-impact-pending")).toBeNull();
+  });
+
+  // US2-2 / FR-012: its own words. This is the assertion that would have caught the
+  // reason being absorbed into a trailing else.
+  it("renders no-working-copy-yet distinctly from both other reasons and from 'none'", async () => {
+    const texts: Record<string, string> = {};
+    for (const [label, impact] of [
+      ["noWorkingCopyYet", { state: "unavailable", reason: "no-working-copy-yet" }],
+      ["lockGate", { state: "unavailable", reason: "lock-gate-dependency" }],
+      ["noWritePath", { state: "unavailable", reason: "no-rederivable-write-path" }],
+      ["none", { state: "none" }],
+    ] as Array<[string, DecisionImpact]>) {
+      renderAsyncRow(async () => impact);
+      fireEvent.click(screen.getByTestId("decision-entry-expand"));
+      await screen.findByTestId("decision-entry-impact");
+      texts[label] = screen.getByTestId("decision-entry-impact").textContent!.trim();
+      cleanup();
+    }
+
+    // Non-empty, and all four mutually distinct.
+    for (const [label, text] of Object.entries(texts)) {
+      expect(text.length, `${label} must render prose`).toBeGreaterThan(0);
+    }
+    expect(new Set(Object.values(texts)).size).toBe(4);
+    // And it reads as "not yet", pointing at the action that resolves it.
+    expect(texts["noWorkingCopyYet"]).toMatch(/base keyboard/i);
+    expect(texts["noWorkingCopyYet"]).not.toBe(texts["noWritePath"]);
+  });
+
+  // US2-3 / SC-006: FR-011 by construction. Mounting resolves nothing; expanding one
+  // row resolves exactly that row.
+  it("resolves nothing on mount, and only the expanded entry on expand", async () => {
+    const resolved: string[] = [];
+    const resolveImpactAsync = async (e: DecisionEntry) => {
+      resolved.push(e.entryId);
+      return { state: "none" } as DecisionImpact;
+    };
+
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={entry({ entryId: "d1" })}
+          superseded={false}
+          resolveImpact={() => null}
+          resolveImpactAsync={resolveImpactAsync}
+        />
+        <DecisionEntryRow
+          entry={entry({ entryId: "d2" })}
+          superseded={false}
+          resolveImpact={() => null}
+          resolveImpactAsync={resolveImpactAsync}
+        />
+      </ul>,
+    );
+
+    expect(resolved).toEqual([]);
+
+    const expandButtons = screen.getAllByTestId("decision-entry-expand");
+    fireEvent.click(expandButtons[1]!);
+    await screen.findByTestId("decision-entry-impact");
+    expect(resolved).toEqual(["d2"]);
+  });
+
+  // SC-005: a stored capture must not flicker through the pending state. It was
+  // recorded at a boundary and is a fact, not a derivation.
+  it("renders a stored capture synchronously, with no pending state", () => {
+    renderAsyncRow(
+      async () => {
+        throw new Error("must not be called for a stored capture");
+      },
+      { impact: DESCRIPTOR_CAPTURE },
+    );
+    fireEvent.click(screen.getByTestId("decision-entry-expand"));
+    expect(screen.queryByTestId("decision-entry-impact-pending")).toBeNull();
+    expect(screen.getByTestId("decision-entry-impact-file")).toBeTruthy();
+  });
+
+  // US2-4 / FR-014: an answer that contributes to a shared value says so.
+  it("names co-decisions when the change is jointly attributed", async () => {
+    renderAsyncRow(async () => ({
+      ...DESCRIPTOR_CAPTURE,
+      sharedWith: ["d-region", "d-script"],
+    }));
+    fireEvent.click(screen.getByTestId("decision-entry-expand"));
+    const shared = await screen.findByTestId("decision-entry-impact-shared");
+    expect(shared.textContent).toMatch(/2/);
+  });
+
+  it("keeps the sync-only path working when no async resolver is supplied", () => {
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={entry()}
+          superseded={false}
+          resolveImpact={() => ({ state: "none" })}
+        />
+      </ul>,
+    );
+    fireEvent.click(screen.getByTestId("decision-entry-expand"));
+    expect(screen.queryByTestId("decision-entry-impact-pending")).toBeNull();
+    expect(screen.getByTestId("decision-entry-impact").textContent).toContain("changed nothing");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // spec 057 T039 — the deep-link jump affordance (FR-030, FR-031, FR-035,
 // FR-036). `resolveCtx` is a plain, fully-controlled prop here (see
 // DecisionEntryRow.tsx's own doc comment for why it must be a prop rather

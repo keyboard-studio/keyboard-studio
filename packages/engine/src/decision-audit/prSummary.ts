@@ -203,9 +203,23 @@ function formatEffect(impact: DecisionImpact | null | undefined): string {
     case "none":
       return "no source change";
     case "unavailable":
-      return impact.reason === "lock-gate-dependency"
-        ? "not tracked separately (part of a combined change confirmed together)"
-        : "not tracked separately (no way to isolate its exact change)";
+      // An EXPLICIT arm per reason, never a trailing else. `no-working-copy-yet`
+      // absorbed into the "no way to isolate" wording would state something false:
+      // the write path exists (spec 057 gave the identity answers one into the
+      // package descriptor), and the effect is only unresolved because the summary
+      // was cut before a base was chosen.
+      switch (impact.reason) {
+        case "lock-gate-dependency":
+          return "not tracked separately (part of a combined change confirmed together)";
+        case "no-rederivable-write-path":
+          return "not tracked separately (no way to isolate its exact change)";
+        case "no-working-copy-yet":
+          return "not tracked separately (recorded before a keyboard existed to change)";
+        default: {
+          const _exhaustiveReason: never = impact.reason;
+          return String(_exhaustiveReason);
+        }
+      }
     default: {
       const _exhaustive: never = impact;
       return String(_exhaustive);

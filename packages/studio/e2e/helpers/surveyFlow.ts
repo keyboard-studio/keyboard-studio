@@ -170,11 +170,23 @@ export async function driveIdentityLite(
     english?: string;
     autonym?: string;
     script?: string;
+    /**
+     * ISO 639 language subtag to type at `il_language_code`. OMIT to leave the
+     * field blank, which is the default every existing walk relies on.
+     *
+     * Supply it when the walk needs a real composed BCP47 tag downstream — the
+     * package descriptor's declared language is the case this exists for (spec
+     * 057 FR-001): with the code blank the composed tag is empty and the
+     * descriptor falls back to its `und` placeholder, which cannot distinguish
+     * "the author's tag" from "no tag".
+     */
+    languageCode?: string;
   },
 ): Promise<void> {
   const english = options?.english ?? "Test";
   const autonym = options?.autonym ?? "Test Autonym";
   const script = options?.script ?? "other";
+  const languageCode = options?.languageCode;
 
   // Q1: English name (autocomplete) — spec 036 starts here
   await fillComboboxFreeText(page, "#il_language_english", english);
@@ -198,6 +210,9 @@ export async function driveIdentityLite(
   // by one question instead of failing loudly. Wait with the same timeout
   // used elsewhere and leave the field blank (the value is optional).
   await page.waitForSelector("#il_language_code", { timeout: 15_000 });
+  if (languageCode !== undefined) {
+    await page.locator("#il_language_code").fill(languageCode);
+  }
   await surveyAdvance(page).click();
 
   // Q5: Target script (select) — required. A ui/SelectMenu, not a native
