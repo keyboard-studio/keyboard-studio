@@ -22,7 +22,7 @@ import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 const flow = loadModularFlow(identityLiteRaw as string);
 
 describe("spec 030 US1 — identity flow order (English name first)", () => {
-  it("orders the questions: english -> region -> autonym -> code -> script -> not-supported", () => {
+  it("orders the questions: english -> region -> autonym -> code -> script -> not-supported -> attribution", () => {
     // Assert the expected relative order via indexOf rather than a brittle
     // full-order array literal. il_language_region (US3) sits after the English-name
     // step; it is a conditional step reached only when the picked language is
@@ -34,6 +34,13 @@ describe("spec 030 US1 — identity flow order (English name first)", () => {
     expect(ids.indexOf("il_language_code")).toBeGreaterThan(ids.indexOf("il_language_autonym"));
     expect(ids.indexOf("il_target_script")).toBeGreaterThan(ids.indexOf("il_language_code"));
     expect(ids.indexOf("il_script_not_supported")).toBeGreaterThan(ids.indexOf("il_target_script"));
+    // spec 059 US1 — attribution capture, ordered name -> email -> holder. Anchored
+    // to il_target_script rather than to il_script_not_supported: these are reached
+    // from il_target_script's DEFAULT branch, while a gated script terminates at the
+    // not-supported notice and never arrives here.
+    expect(ids.indexOf("il_author_name")).toBeGreaterThan(ids.indexOf("il_target_script"));
+    expect(ids.indexOf("il_author_email")).toBeGreaterThan(ids.indexOf("il_author_name"));
+    expect(ids.indexOf("il_copyright_holder")).toBeGreaterThan(ids.indexOf("il_author_email"));
   });
 
   it("the first question is the English-name langtags picker", () => {

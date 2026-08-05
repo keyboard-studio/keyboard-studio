@@ -4,11 +4,13 @@
 // own factory (makeX) and any related Init type. Alphabetized within group.
 // ---------------------------------------------------------------------------
 export * from "./assignmentMap";
+export * from "./attribution";
 export * from "./axes";
 export * from "./axisFill";
 export * from "./baseKeyboard";
 export * from "./compileResult";
 export * from "./confirmedAlphabet";
+export * from "./copyright";
 export * from "./criteria";
 // The append-only per-keyboard decision audit (specs/053-decision-audit). Sits
 // alongside the survey/IR types it derives from rather than under a subpath —

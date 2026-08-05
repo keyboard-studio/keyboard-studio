@@ -18,6 +18,9 @@ import il_language_english from "./a/il_language_english.ts";
 import il_language_code from "./a/il_language_code.ts";
 import il_language_region from "./a/il_language_region.ts";
 import il_target_script from "./a/il_target_script.ts";
+import il_author_name from "./a/il_author_name.ts";
+import il_author_email from "./a/il_author_email.ts";
+import il_copyright_holder from "./a/il_copyright_holder.ts";
 import il_script_not_supported from "./a/il_script_not_supported.ts";
 
 /**
@@ -31,5 +34,11 @@ export const phaseARegistry: Readonly<Record<string, QuestionModule>> = {
   il_language_code,
   il_language_region,
   il_target_script,
+  // spec 059 US1 — attribution capture. Separate ids from the demoted
+  // author_display_name / author_contact_email / pa_copyright_holder, because
+  // routing lives in definition.next and those three belong to the phase_a chain.
+  il_author_name,
+  il_author_email,
+  il_copyright_holder,
   il_script_not_supported,
 } as const;

@@ -206,6 +206,16 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     baseVfsEntries: serializeBaseVfsEntries(s.baseVfs),
     baseIr: s.baseIr,
     identity: s.identity,
+    // spec 059: plain JSON, so it round-trips with no custom handling. Present
+    // here because WorkingCopySnapshot is Omit-derived from WorkingCopyData —
+    // the compiler required this line, which is the point of that derivation.
+    attribution: s.attribution,
+    // spec 059 D5: both are plain JSON. The override in particular MUST persist —
+    // an author who supplied the original holder should not have to re-enter it
+    // after a reload, or the download block would reappear on resume.
+    licenseUnparseable: s.licenseUnparseable,
+    baseHolderOverride: s.baseHolderOverride,
+    baseLicenseText: s.baseLicenseText,
     ir: s.ir,
     deletedNodeIds: [...s.deletedNodeIds],
     deletedItemIds: [...s.deletedItemIds],
@@ -257,6 +267,14 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     baseVfs,
     baseIr: snapshot.baseIr,
     identity: snapshot.identity,
+    // Tolerate snapshots saved before these fields existed (spec 059 landed
+    // after the durable draft): an absent value must not clobber the store's
+    // null default with undefined. `baseHolderOverride` in particular decides
+    // whether the download block reappears, so it has to restore as a real null.
+    attribution: snapshot.attribution ?? null,
+    licenseUnparseable: snapshot.licenseUnparseable ?? null,
+    baseHolderOverride: snapshot.baseHolderOverride ?? null,
+    baseLicenseText: snapshot.baseLicenseText ?? null,
     ir: snapshot.ir,
     removalCapabilities,
     deletedNodeIds: new Set(snapshot.deletedNodeIds),

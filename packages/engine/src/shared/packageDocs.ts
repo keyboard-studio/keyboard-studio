@@ -28,12 +28,20 @@ export function readmeHtm(displayName: string): string {
 /**
  * `LICENSE.md` — the MIT stub every package must ship so it is redistributable.
  *
- * One home for both callers: the scaffolder's `generateStubs` (Track 1, holder
- * = displayName) and `output/ensurePackageFiles` (Track 2, holder = the
- * author's copyright falling back to displayName). Two copies of this literal
- * is exactly the kind of drift `welcomeHtm`/`readmeHtm` were consolidated to
- * prevent. Not HTML-escaped: LICENSE.md is Markdown/plain text, not markup.
+ * Called by `output/ensurePackageFiles` (the adapt/`.kmp` track). Track 1 goes
+ * through the scaffolder's accumulated copyright block instead
+ * (`attributionText` -> `renderLicense`), because a keyboard derived from a base
+ * must RETAIN the base's holders and not merely state one (spec 059 US2).
+ *
+ * `holder` is nullable, and null omits the copyright line entirely. It used to
+ * fall back to the keyboard's display name, which produced notices like
+ * "Copyright © 2026 Dagbanli Keyboard" — naming the work as its own rights
+ * holder. That is a false attribution, and worse than saying nothing, because a
+ * wrong notice reads as authoritative (spec 059 FR-004).
+ *
+ * Not HTML-escaped: LICENSE.md is Markdown/plain text, not markup.
  */
-export function licenseMd(holder: string, year: number): string {
-  return `Copyright © ${year} ${holder}\n\nMIT License\n`;
+export function licenseMd(holder: string | null, year: number): string {
+  const notice = holder !== null ? `Copyright © ${year} ${holder}\n\n` : "";
+  return `${notice}MIT License\n`;
 }

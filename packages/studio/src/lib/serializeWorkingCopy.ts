@@ -26,7 +26,12 @@ import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
 import { resolveOutputKeyboardId } from "./outputKeyboardId.ts";
-import { bumpKeyboardVersion, generateStubs, stageAdaptHistory } from "@keyboard-studio/engine";
+import {
+  bumpKeyboardVersion,
+  generateStubs,
+  resolveInheritedHolders,
+  stageAdaptHistory,
+} from "@keyboard-studio/engine";
 import { readVfsText } from "./vfsText.ts";
 import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
 
@@ -143,7 +148,7 @@ export async function projectWorkingCopyForOutput(
 ): Promise<ProjectWorkingCopyForOutputResult | null> {
   // 1. Read current working-copy store state.
   const state = useWorkingCopyStore.getState();
-  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode } = state;
+  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, baseLicenseText, baseHolderOverride } = state;
 
   // Not-instantiated guard.
   if (baseVfs === null || baseIr === null || baseKeyboard === null) {
@@ -396,12 +401,26 @@ export async function projectWorkingCopyForOutput(
   //     fidelity is its own concern — a freshly generated stub .kps would
   //     silently mask the original package's metadata there.
   if (instantiationMode === "new-from-base") {
+    // spec 059 FR-007: the stub LICENSE.md this may write must RETAIN the base's
+    // holders, not name only the new author. The base's own LICENSE.md is never in
+    // the VFS (loader FR-011), so the holders come from the text kept on the working
+    // copy, resolved by the SAME engine helper scaffold() uses — one D4/D5 policy,
+    // not two.
+    const { inherited } = resolveInheritedHolders(
+      baseLicenseText ?? undefined,
+      baseHolderOverride ?? undefined,
+    );
     generateStubs(
       clonedVfs,
       resolvedKeyboardId,
       identity?.displayName ?? baseKeyboard.displayName,
       identity?.bcp47 !== undefined ? [identity.bcp47] : (baseKeyboard.languages ?? []),
       version,
+      attribution ?? undefined,
+      // emitYear: defaulted to the current year. D2 records when the work is
+      // PUBLISHED, and this path runs at the moment the author downloads it.
+      undefined,
+      inherited,
     );
   }
 

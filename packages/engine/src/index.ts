@@ -129,7 +129,12 @@ export type {
 } from "./package-descriptor/index.js";
 
 // Issue #19 — scaffolder (template-cleanup pipeline).
-export { createScaffolderService, renameFilesInVfs, generateStubs } from "./scaffolder/index.js";
+export {
+  createScaffolderService,
+  renameFilesInVfs,
+  generateStubs,
+  resolveInheritedHolders,
+} from "./scaffolder/index.js";
 export { scaffoldIR, resetIdentity } from "./scaffolder/scaffold-ir.js";
 export {
   scaffoldTouchLayout,

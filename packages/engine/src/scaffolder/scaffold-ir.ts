@@ -33,9 +33,6 @@ export interface ScaffoldIROptions {
 
 // Year used for the &COPYRIGHT directive when not supplied. Pulled out so
 // callers in deterministic tests can monkey-patch via Date if needed.
-function currentYear(): number {
-  return new Date().getFullYear();
-}
 
 // Replace C0/C1 control chars (incl. newlines, nulls) with spaces, collapse and trim.
 // Exported: index.ts's text-based scaffold path shares this exact sanitizer.
@@ -173,8 +170,15 @@ export function resetIdentity(ir: KeyboardIR, identity: ScaffoldIRIdentity): voi
   const fileFormatVersion = "14.0";
   // &KEYBOARDVERSION is the human-visible keyboard release version.
   const keyboardVersion = identity.version ?? "1.0";
-  const copyright =
-    identity.copyright ?? `Copyright © ${currentYear()} ${displayName}`;
+  // spec 059 SC-001: when no copyright is supplied, PRESERVE whatever the base
+  // declared rather than fabricating `Copyright © <year> <displayName>`.
+  //
+  // The old fallback named the KEYBOARD as its own rights holder AND destroyed a
+  // real notice that parse() had already read from the base — MIT requires that
+  // notice be retained in a derivative. Preserving is both more correct and
+  // strictly less destructive; the caller passes identity.copyright once the
+  // author's attribution is confirmed.
+  const copyright = identity.copyright ?? ir.header.copyright;
   const bcp47 = identity.bcp47 ?? [];
 
   // Capture the base id before mutating header — needed to mirror

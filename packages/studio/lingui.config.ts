@@ -17,6 +17,17 @@ const catalogDir =
 export default defineConfig({
   sourceLocale: "en",
   locales: ["en", "fr"],
+  // Sort by message ID, not by message text (Lingui's default is `"message"`).
+  // Value order interleaves unrelated areas — a new `editor.*` string lands
+  // wherever its English text sorts, i.e. next to whatever `survey.*` /
+  // `output.*` line happens to read similarly — so two branches that each add a
+  // string collide on the same hunk and every merge is a hand-resolved
+  // both-sides keep. ID order groups by area prefix instead, so independent
+  // features insert in different regions of the file and merge cleanly.
+  // Order is enforced on the committed catalogs by utilities/i18n-catalog-sort,
+  // which mirrors Lingui's own `orderByMessageId` comparator (`localeCompare`).
+  // Changing this setting means updating that comparator in the same commit.
+  orderBy: "messageId",
   catalogs: [
     {
       path: `${catalogDir}/{locale}/messages`,

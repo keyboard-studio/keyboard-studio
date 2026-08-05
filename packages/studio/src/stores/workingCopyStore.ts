@@ -21,7 +21,8 @@
 //   - Worker boundary upheld: WASM is not imported here.
 
 import { create } from "zustand";
-import type { AxisFill, BaseKeyboard, KeyboardIR, LintFinding, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
+import type {
+  Attribution, AxisFill, BaseKeyboard, KeyboardIR, LintFinding, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
 import { detectMarkInputOrderFromImport, renameTouchKey } from "@keyboard-studio/engine";
 import type { KeyEditOperation, KeyEditOverlay } from "@keyboard-studio/engine";
 import {
@@ -259,6 +260,57 @@ export interface WorkingCopyState {
    * instantiateFromExisting sets it from the loaded keyboard's identity (Track 2).
    */
   identity: IdentityPatch | null;
+
+  // -- Attribution (spec 059) --------------------------------------------------
+  /**
+   * Who made this keyboard and who holds its copyright.
+   *
+   * The SINGLE source the scaffolder reads for LICENSE.md, store(&COPYRIGHT) and
+   * the .kps <Copyright>/<Author> fields (FR-003) — 22 shipped keyboards disagree
+   * between their LICENSE.md and .kmn because those were written independently.
+   *
+   * Lives here rather than in its own store so it rides the existing localStorage
+   * draft (spec 034 US3) with no new persistence: WorkingCopySnapshot is derived
+   * from this type with Omit, so the compiler requires the persist path to carry
+   * any field added here.
+   *
+   * Null until the identity step captures it. While null the scaffolder emits NO
+   * copyright notice and reports attributionMissing, rather than inventing one.
+   */
+  attribution: Attribution | null;
+
+  /**
+   * Set when the chosen base has a copyright notice this tool cannot read
+   * (spec 059 D5) — an unfilled template, or a year with no holder.
+   *
+   * Blocks download: emitting a LICENSE.md whose only holder is the current user
+   * would strip a real notice. Cleared by supplying `baseHolderOverride`.
+   */
+  licenseUnparseable: { reason: string; line: string } | null;
+
+  /**
+   * The original copyright holder as typed by the author, when the base's notice
+   * could not be read (spec 059 D5 escape hatch).
+   *
+   * Passed to the scaffolder on the next run, where it becomes the inherited
+   * holder — so the remedy PRESERVES the notice rather than dropping it.
+   */
+  baseHolderOverride: string | null;
+
+  /**
+   * The base keyboard's `LICENSE.md` VERBATIM, or null when it has none
+   * (spec 059 FR-011).
+   *
+   * Kept on the working copy because the base's license is deliberately never
+   * written into the VFS (fetchKeyboardSourceToVfs FR-011), so it cannot be read
+   * back out of it — and the download path needs it to know which holders the
+   * emitted LICENSE.md must retain. Without it a downloaded zip would name only
+   * the new author, dropping the notice MIT requires a derivative to keep.
+   *
+   * Raw text, not the parsed holders: `resolveInheritedHolders` in the engine is
+   * the one parser, shared by both emission paths.
+   */
+  baseLicenseText: string | null;
 
   // -- Carve working IR (irStore slots) ----------------------------------------
   /**
@@ -706,6 +758,20 @@ export interface WorkingCopyState {
   setIdentity: (patch: IdentityPatch) => void;
 
   /**
+   * Record who to attribute the keyboard to (spec 059 US1). Pass null to clear.
+   */
+  setAttribution: (attribution: Attribution | null) => void;
+
+  /** Record (or clear) an unreadable base notice — spec 059 D5. */
+  setLicenseUnparseable: (v: { reason: string; line: string } | null) => void;
+
+  /** Record the author-supplied original holder — spec 059 D5 escape hatch. */
+  setBaseHolderOverride: (holder: string | null) => void;
+
+  /** Retain the base's verbatim LICENSE.md so both emission paths can read it. */
+  setBaseLicenseText: (text: string | null) => void;
+
+  /**
    * Returns true once instantiateFromBase or instantiateFromExisting has been
    * called (i.e. baseKeyboard is non-null). Callers that need the full triple
    * (base + VFS + IR) should check all three slots directly.
@@ -900,6 +966,8 @@ export type WorkingCopyData = Omit<
   | "setTouchLayoutJson" | "setTouchDraft" | "markGalleryIntroSeen" | "reset"
   | "flagCharForSequence" | "unflagCharForSequence"
   | "instantiateFromBase" | "instantiateFromExisting" | "setIdentity" | "isInstantiated"
+  | "setAttribution" | "setLicenseUnparseable" | "setBaseHolderOverride"
+  | "setBaseLicenseText"
   | "markStale" | "clearStale"
   | "setValidatorFindings"
   | "setAxisFills"
@@ -914,6 +982,10 @@ const INITIAL_STATE: WorkingCopyData = {
   baseVfs: null,
   baseIr: null,
   identity: null,
+  attribution: null,
+  licenseUnparseable: null,
+  baseHolderOverride: null,
+  baseLicenseText: null,
   // carve IR slots
   ir: null,
   removalCapabilities: new Map(),
@@ -1463,6 +1535,14 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   setIdentity: (patch) =>
     set({ identity: patch }),
+
+  setAttribution: (attribution) => set({ attribution }),
+
+  setLicenseUnparseable: (v) => set({ licenseUnparseable: v }),
+
+  setBaseHolderOverride: (holder) => set({ baseHolderOverride: holder }),
+
+  setBaseLicenseText: (text) => set({ baseLicenseText: text }),
 
   isInstantiated: () => get().baseKeyboard !== null,
 

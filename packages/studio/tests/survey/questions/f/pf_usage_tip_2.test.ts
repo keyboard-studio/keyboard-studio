@@ -14,8 +14,11 @@ describe("pf_usage_tip_2 — definition", () => {
   it("is a text question", () => {
     expect(definition.type).toBe("text");
   });
-  it("routes to pf_usage_tip_3", () => {
-    expect(definition.next).toBe("pf_usage_tip_3");
+  // Tips 3-5 are demoted out of the live flow. This second tip now sits inside
+  // the opt-in battery, so it continues into that battery rather than chaining
+  // to a third fixed tip slot. The default path asks for at most one tip.
+  it("routes to pf_scope_variety", () => {
+    expect(definition.next).toBe("pf_scope_variety");
   });
 });
 

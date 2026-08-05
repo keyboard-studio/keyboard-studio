@@ -7,7 +7,7 @@
 import { useMemo, useRef, useCallback } from "react";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { SurveyPhaseResult, LintFinding, LangtagsProvenance, LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
+import type { Attribution, SurveyPhaseResult, LintFinding, LangtagsProvenance, LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { loadModularFlow } from "./loadModularFlow.ts";
 import type { SurveyContext, FlowOption } from "./types.ts";
@@ -120,11 +120,44 @@ export function extractIdentityLite(result: SurveyPhaseResult): IdentityLiteResu
     bcp47: buildTargetBcp47(languageSubtag, targetScriptRaw, region),
     supported: !UNSUPPORTED_SCRIPTS.has(targetScriptRaw),
     prefill: deriveScriptPrefill(targetScriptRaw),
+    attribution: extractAttribution(result),
+  };
+}
+
+/**
+ * Derive attribution from the completed flow (spec 059 US1).
+ *
+ * Returns null when no author name was captured — a gated script terminates at
+ * il_script_not_supported before the attribution questions. Callers must treat
+ * null as "no notice to emit" rather than substituting anything.
+ *
+ * The copyright holder deliberately falls back to the author name (D1), so an
+ * author who is also the rights holder confirms one field instead of two.
+ */
+function extractAttribution(result: SurveyPhaseResult): Attribution | null {
+  const authorName = answerString(result, "il_author_name").trim();
+  if (authorName === "") return null;
+  const email = answerString(result, "il_author_email").trim();
+  const holder = answerString(result, "il_copyright_holder").trim();
+  return {
+    authorName,
+    ...(email !== "" ? { authorEmail: email } : {}),
+    copyrightHolder: holder !== "" ? holder : authorName,
   };
 }
 
 export interface IdentityLiteProps {
   context?: SurveyContext;
+  /**
+   * Authenticated profile used to PRE-FILL the attribution questions (spec 059
+   * D7/FR-001), so the author confirms rather than types.
+   *
+   * Passed in rather than read from the auth hook here, to keep this component a
+   * pure survey surface with no dependency on the GitHub session. The adapter
+   * supplies it. A null/absent `name` means ASK — never substitute the login
+   * handle, because a handle is not a copyright holder.
+   */
+  authorSeed?: { name?: string | null; email?: string | null };
   onComplete: (result: SurveyPhaseResult, identity: IdentityLiteResult) => void;
   onBack?: () => void;
   findingsByQuestionId?: Record<string, LintFinding[]>;
@@ -178,6 +211,7 @@ export function IdentityLite({
   onBack,
   findingsByQuestionId,
   resume,
+  authorSeed,
 }: IdentityLiteProps) {
   const { t, i18n } = useLingui();
   // Mirrors the latest `i18n` for seedFromEntry/handleAnswerCommit below (deps
@@ -191,6 +225,10 @@ export function IdentityLite({
   i18nRef.current = i18n;
 
   const flow = useMemo(() => loadModularFlow(identityLiteRaw as string), []);
+  // Held in a ref to match this file's seeding idiom: getSeedValue has an empty
+  // dep array by design (see its comment), so it must read through refs.
+  const authorSeedRef = useRef(authorSeed);
+  authorSeedRef.current = authorSeed;
 
   const resumeAnswers = useMemo(
     () => (resume !== undefined ? toResumeAnswers(resume) : undefined),
@@ -420,6 +458,20 @@ export function IdentityLite({
       if (questionId === "il_target_script") {
         return scriptSeedRef.current;
       }
+      // spec 059 FR-001: propose-then-confirm, never a blank form. Undefined
+      // when the profile has no name — ASK rather than substitute the login
+      // handle, which is not a copyright holder.
+      if (questionId === "il_author_name") {
+        const n = authorSeedRef.current?.name;
+        return n !== undefined && n !== null && n !== "" ? n : undefined;
+      }
+      if (questionId === "il_author_email") {
+        const e = authorSeedRef.current?.email;
+        return e !== undefined && e !== null && e !== "" ? e : undefined;
+      }
+      // il_copyright_holder is deliberately NOT seeded: a blank means "same as
+      // the author" (D1), so pre-filling it would turn a sensible default into a
+      // value the author has to notice and delete.
       return undefined;
     },
     [],
