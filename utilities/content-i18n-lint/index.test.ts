@@ -453,16 +453,16 @@ describe("i18n-collapse-guard contract (shared by both lints)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Baseline regression guard (#1489)
+// Baseline regression guard
 //
 // checkEnglishCollapse above compares a locale against English in the SAME
 // commit, so it is blind to a catalog that kept its keys and went from
 // translated to EMPTY -- exactly what a Crowdin download of an unseeded
-// project now produces once skip_untranslated_strings is true (#1483). That
-// needs a different comparison: this locale's own catalog, now vs. before.
+// project produces once skip_untranslated_strings is true. That needs a
+// different comparison: this locale's own catalog, now vs. before.
 // ---------------------------------------------------------------------------
 
-describe("i18n-collapse-guard baseline regression guard (#1489)", () => {
+describe("i18n-collapse-guard baseline regression guard", () => {
   const catalog = (n: number, f: (i: number) => string) =>
     Object.fromEntries(Array.from({ length: n }, (_, i) => [`k${i}`, f(i)]));
 
@@ -579,7 +579,7 @@ describe("i18n-collapse-guard baseline regression guard (#1489)", () => {
 // with a fake callback standing in for git-baseline.js's real one.
 // ---------------------------------------------------------------------------
 
-describe("content-i18n-lint baseline regression wiring (#1489)", () => {
+describe("content-i18n-lint baseline regression wiring", () => {
   it("surfaces a regression problem when a target catalog emptied against the supplied baseline", () => {
     const dir = tempContentI18nDir();
     const en = englishCatalog(30);

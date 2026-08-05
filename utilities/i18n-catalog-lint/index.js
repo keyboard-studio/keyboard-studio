@@ -31,7 +31,7 @@
 //     above can see a catalog that kept its keys and went from translated to
 //     EMPTY — the shape a Crowdin download produces from a locale with no
 //     translations once untranslated strings export as empty rather than
-//     source text (#1489). See utilities/i18n-collapse-guard/git-baseline.js.
+//     source text. See utilities/i18n-collapse-guard/git-baseline.js.
 //
 // Fix when it fails:  pnpm --filter @keyboard-studio/studio messages:extract
 //
@@ -214,9 +214,9 @@ try {
       }
 
       // Neither key-set parity nor the English-collapse check above can see a
-      // catalog that kept its keys and went from translated to EMPTY (#1489) —
-      // that needs a comparison against this same locale's own prior state,
-      // which committedSource (English) can never provide.
+      // catalog that kept its keys and went from translated to EMPTY — that
+      // needs a comparison against this same locale's own prior state, which
+      // committedSource (English) can never provide.
       if (baselineRef) {
         const baseline = readCatalogAtRef(
           baselineRef,
