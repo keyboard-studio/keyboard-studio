@@ -276,7 +276,7 @@ describe("clause lists are locale-formatted, not comma-joined (km-triage/km-doma
 });
 
 // ---------------------------------------------------------------------------
-// Async resolution and the third unavailability reason (spec 057 T036)
+// Async resolution and the third unavailability reason (spec 059 T036)
 // ---------------------------------------------------------------------------
 //
 // Same through-line as above: a STATEMENT, never an absence — and never the WRONG
@@ -284,7 +284,7 @@ describe("clause lists are locale-formatted, not comma-joined (km-triage/km-doma
 // that their answers had no re-derivable write path, which was true only because
 // nothing wrote them anywhere.
 
-describe("spec 057 — identity entries resolved on expand", () => {
+describe("spec 059 — identity entries resolved on expand", () => {
   /** Render a row with an async resolver, not yet expanded. */
   function renderAsyncRow(
     resolveImpactAsync: (e: DecisionEntry) => Promise<DecisionImpact | null>,

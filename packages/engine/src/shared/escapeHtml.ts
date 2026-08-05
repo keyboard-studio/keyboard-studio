@@ -1,6 +1,6 @@
 // escapeHtml — the single XML/HTML text-escaper for emitted artifacts.
 //
-// Extracted from `scaffolder/index.ts` (spec 057 T002) when `buildKpsContent`
+// Extracted from `scaffolder/index.ts` (spec 059 T002) when `buildKpsContent`
 // moved out into `package-descriptor/`: both the scaffolder's `.htm` / `LICENSE`
 // stubs and the package descriptor interpolate author-supplied text, and a
 // second copy is how one of them comes to escape a character the other does not.

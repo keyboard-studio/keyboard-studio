@@ -726,3 +726,146 @@ describe("touch-key provenance round-trip (spec-014 T028)", () => {
     expect(parent?.multitap?.[0]?.provenance).toBe("physical-suggested");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Per-key `layer` override + subkey `default` preselect (spec 058 FR-030,
+// T012). Both fields were dropped unconditionally before the §18 contract
+// change, so these are the codec's half of that change.
+// ---------------------------------------------------------------------------
+describe("per-key layer override and subkey default preselect (spec 058 FR-030)", () => {
+  it("survives parse → emit unchanged for a key carrying layer:\"shift\"", () => {
+    const json = JSON.stringify({
+      phone: {
+        layer: [
+          {
+            id: "default",
+            row: [{ id: 1, key: [{ id: "T_0300", text: "◌̀", layer: "shift" }] }],
+          },
+        ],
+      },
+    });
+    const ir = parseTouchLayout(json);
+    expect(ir.platforms[0]?.layers[0]?.rows[0]?.keys[0]?.layer).toBe("shift");
+
+    // The wire property must come back as `layer`, not be folded into anything.
+    const wire = JSON.parse(emitTouchLayout(ir)) as Record<
+      string,
+      { layer: Array<{ row: Array<{ key: Array<{ id: string; layer?: string }> }> }> }
+    >;
+    expect(wire["phone"]?.layer[0]?.row[0]?.key[0]?.layer).toBe("shift");
+
+    const ir2 = parseTouchLayout(emitTouchLayout(ir));
+    expect(ir2.platforms[0]?.layers[0]?.rows[0]?.keys[0]?.layer).toBe("shift");
+  });
+
+  it("survives parse → emit unchanged for a subkey carrying default:true", () => {
+    const json = JSON.stringify({
+      phone: {
+        layer: [
+          {
+            id: "default",
+            row: [
+              {
+                id: 1,
+                key: [
+                  {
+                    id: "T_0021",
+                    text: "!",
+                    sk: [
+                      { id: "U_00A1", text: "¡", default: true },
+                      { id: "U_203D", text: "‽" },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const ir = parseTouchLayout(json);
+    expect(ir.platforms[0]?.layers[0]?.rows[0]?.keys[0]?.sk?.[0]?.default).toBe(true);
+    expect(ir.platforms[0]?.layers[0]?.rows[0]?.keys[0]?.sk?.[1]?.default).toBeUndefined();
+
+    // Emitted as a real JSON boolean, unlike sp/width/pad which are strings.
+    const wire = JSON.parse(emitTouchLayout(ir)) as Record<
+      string,
+      {
+        layer: Array<{
+          row: Array<{ key: Array<{ sk?: Array<{ id: string; default?: unknown }> }> }>;
+        }>;
+      }
+    >;
+    expect(wire["phone"]?.layer[0]?.row[0]?.key[0]?.sk?.[0]?.default).toBe(true);
+    expect(wire["phone"]?.layer[0]?.row[0]?.key[0]?.sk?.[1]?.default).toBeUndefined();
+
+    const ir2 = parseTouchLayout(emitTouchLayout(ir));
+    const sk = ir2.platforms[0]?.layers[0]?.rows[0]?.keys[0]?.sk;
+    expect(sk?.[0]?.default).toBe(true);
+    expect(sk?.[1]?.default).toBeUndefined();
+  });
+
+  it("leaves both fields absent when the wire data omits them (additive)", () => {
+    const ir = parseTouchLayout(MINIMAL_TOUCH);
+    const key = ir.platforms[0]?.layers[0]?.rows[0]?.keys[0];
+    expect(key?.layer).toBeUndefined();
+    expect(key?.default).toBeUndefined();
+    // …and the emitter does not invent them.
+    const wire = JSON.parse(emitTouchLayout(ir)) as Record<
+      string,
+      {
+        layer: Array<{
+          row: Array<{ key: Array<Record<string, unknown>> }>;
+        }>;
+      }
+    >;
+    const emittedKey = wire["tablet"]?.layer[0]?.row[0]?.key[0] ?? {};
+    expect("layer" in emittedKey).toBe(false);
+    expect("default" in emittedKey).toBe(false);
+  });
+
+  it("resolves a duplicate key id disambiguated ONLY by `layer` as two distinct keys", () => {
+    // This is why the field is load-bearing rather than cosmetic: a real corpus
+    // layout carries the same id twice within one layer, differing only in the
+    // modifier state each emits under. If `layer` were dropped (the pre-058
+    // behaviour) the two keys would be indistinguishable, and the duplicate-id
+    // check's third exemption — the one that takes it from ~13,900 corpus
+    // findings to ~1,170 — would be unimplementable.
+    const json = JSON.stringify({
+      phone: {
+        layer: [
+          {
+            id: "default",
+            row: [
+              {
+                id: 1,
+                key: [
+                  { id: "T_DUP", text: "a" },
+                  { id: "T_DUP", text: "A", layer: "shift" },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const ir = parseTouchLayout(json);
+    const keys = ir.platforms[0]?.layers[0]?.rows[0]?.keys;
+
+    // Two entries, not one collapsed key.
+    expect(keys).toHaveLength(2);
+    expect(keys?.[0]?.id).toBe("T_DUP");
+    expect(keys?.[1]?.id).toBe("T_DUP");
+    expect(keys?.[0]?.layer).toBeUndefined();
+    expect(keys?.[1]?.layer).toBe("shift");
+    // Distinct node ids, so each is independently addressable.
+    expect(keys?.[0]?.nodeId).not.toBe(keys?.[1]?.nodeId);
+
+    // And both survive the emit cycle as a distinguishable pair.
+    const ir2 = parseTouchLayout(emitTouchLayout(ir));
+    const keys2 = ir2.platforms[0]?.layers[0]?.rows[0]?.keys;
+    expect(keys2).toHaveLength(2);
+    expect(keys2?.map((k) => k.layer)).toEqual([undefined, "shift"]);
+    expect(keys2?.map((k) => k.text)).toEqual(["a", "A"]);
+  });
+});

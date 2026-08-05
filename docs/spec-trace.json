@@ -778,6 +778,14 @@
       "implements": [],
       "decisions": [],
       "notes": ""
+    },
+    "specs/058-touch-key-editor": {
+      "title": "Feature Specification: Key-level touch layout editing",
+      "hash": "sha256:cbf82bb4536eb5e3",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
     }
   }
 }

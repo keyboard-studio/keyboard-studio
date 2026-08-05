@@ -19,14 +19,14 @@
 //                  says so, rather than implying the decision did nothing. The
 //                  three reasons (`lock-gate-dependency`, `no-rederivable-write-path`,
 //                  `no-working-copy-yet`) each render distinct prose, from each other
-//                  AND from "none" (FR-020; spec 057 FR-012). Each gets an EXPLICIT
+//                  AND from "none" (FR-020; spec 059 FR-012). Each gets an EXPLICIT
 //                  arm — a new reason absorbed into a trailing else would render as
 //                  the old, now-false message.
 //   shed        -> `impact` is null: the detail existed and was dropped to fit the
 //                  save budget. Distinct from "never captured" because the author
 //                  can act on it (a shorter session keeps its detail).
 //
-// Resolution may be ASYNC (spec 057): attributing a decision recorded before a
+// Resolution may be ASYNC (spec 059): attributing a decision recorded before a
 // working copy existed means projecting the working copy twice and diffing, which is
 // async because pattern resolution is. `useEntryImpact` owns that, and a stored
 // capture still resolves synchronously so a long-recorded fact never flickers
@@ -113,7 +113,7 @@ export interface DecisionEntryRowProps {
   resolveImpact: (entry: DecisionEntry) => DecisionImpact | null;
   /**
    * Async resolver for an entry whose effect must be re-derived by projecting the
-   * working copy (spec 057 FR-009). Optional: when absent the row falls back to
+   * working copy (spec 059 FR-009). Optional: when absent the row falls back to
    * `resolveImpact` alone, which is what every existing test and the fixture-driven
    * renders rely on.
    *
@@ -719,7 +719,7 @@ export function DecisionEntryRow({
             baseContributionDetail
           ) : impactPending ? (
             // The one transient state. Only ever reached for an entry whose effect
-            // has to be re-derived by projecting (spec 057); a stored capture
+            // has to be re-derived by projecting (spec 059); a stored capture
             // resolves on the first render and never passes through here.
             <p style={noticeStyle} data-testid="decision-entry-impact-pending">
               {t({

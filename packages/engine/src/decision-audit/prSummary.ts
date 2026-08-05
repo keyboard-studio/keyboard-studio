@@ -205,7 +205,7 @@ function formatEffect(impact: DecisionImpact | null | undefined): string {
     case "unavailable":
       // An EXPLICIT arm per reason, never a trailing else. `no-working-copy-yet`
       // absorbed into the "no way to isolate" wording would state something false:
-      // the write path exists (spec 057 gave the identity answers one into the
+      // the write path exists (spec 059 gave the identity answers one into the
       // package descriptor), and the effect is only unresolved because the summary
       // was cut before a base was chosen.
       switch (impact.reason) {

@@ -913,10 +913,15 @@ function makeGenericModifierLayerJson(): string {
               id: 1,
               key: [
                 { id: "T_BLANK", text: "", sp: 10 },
-                // sp:8 (spacer) — a canonical spacer-class value per
+                // sp:9 (blank) — a canonical non-interactive class per
                 // isSpacerKeyClass, deliberately NOT "T_BLANK", to prove the
                 // predicate generalizes beyond the well-known sentinel id.
-                { id: "T_OTHER_SENTINEL", text: " ", sp: 8 },
+                // (Was sp:8 before spec 058 FR-012 corrected the class set from
+                // `{8,10}` to `{9,10}`; sp:8 is deadkey-STYLED and interactive,
+                // so it is no longer a promotable free slot — see the
+                // isBlankPlaceholder canary below. The fixture's intent is
+                // unchanged: an author-invented sentinel id, not T_BLANK.)
+                { id: "T_OTHER_SENTINEL", text: " ", sp: 9 },
                 { id: "K_ZZZ", text: "z" },
               ],
             },
@@ -1173,8 +1178,35 @@ describe("isBlankPlaceholder", () => {
     expect(isBlankPlaceholder({ id: "T_ANYTHING", text: "", sp: 10 })).toBe(true);
   });
 
-  it("returns true for sp:8 (canonical spacer class) with whitespace-only text", () => {
-    expect(isBlankPlaceholder({ id: "T_ANYTHING", text: "  ", sp: 8 })).toBe(true);
+  it("returns true for sp:9 (blank class) with whitespace-only text", () => {
+    expect(isBlankPlaceholder({ id: "T_ANYTHING", text: "  ", sp: 9 })).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // THE PLACEMENT-PROMOTION CANARY (spec 058 FR-012 / T019).
+  //
+  // `isBlankPlaceholder` is `isEmptyText(text) && isSpacerKeyClass(sp)`, so
+  // correcting `isSpacerKeyClass` from `{8, 10}` to `{9, 10}` moved WHICH SLOTS
+  // READ AS FREE for the positional-fallback promotion path — in both
+  // directions. That is a behaviour change in an assignment writer, not a
+  // cosmetic fix, so it is pinned here explicitly rather than absorbed silently.
+  //
+  //   - STRICTER about sp:8: a deadkey-styled key with empty text is no longer a
+  //     free slot, so the fallback will not overwrite it. This is the important
+  //     half — sp:8 keys are interactive, and promoting one silently replaced a
+  //     real key the author had placed.
+  //   - LOOSER about sp:9: a blank key with empty text is now a free slot, which
+  //     is exactly what the blank class means and what an author expects the
+  //     fallback to fill.
+  // -------------------------------------------------------------------------
+
+  it("CANARY: returns FALSE for sp:8 (deadkey-styled) with empty text — no longer a free slot", () => {
+    expect(isBlankPlaceholder({ id: "T_ANYTHING", text: "", sp: 8 })).toBe(false);
+    expect(isBlankPlaceholder({ id: "T_ANYTHING", text: "  ", sp: 8 })).toBe(false);
+  });
+
+  it("CANARY: returns TRUE for sp:9 (blank) with empty text — now a free slot", () => {
+    expect(isBlankPlaceholder({ id: "T_ANYTHING", text: "", sp: 9 })).toBe(true);
   });
 
   it("returns false for sp:0 (normal key class) even with empty text — the spacebar shape", () => {

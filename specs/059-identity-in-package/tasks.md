@@ -1,6 +1,6 @@
 # Tasks: Identity in the package
 
-**Feature**: 057-identity-in-package · **Branch**: `057-identity-in-package` · **Size**: normal
+**Feature**: 059-identity-in-package · **Branch**: `059-identity-in-package` · **Size**: normal
 
 **Spec**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md) · **Research**: [research.md](research.md) · **Data model**: [data-model.md](data-model.md) · **Contracts**: [contracts/](contracts/)
 
@@ -191,7 +191,7 @@ Not polish. FR-016's check is what stops the E-1/E-4 class from reappearing, and
 **⟶ Wait for Wave 1 to finish, then:**
 
 - [x] **T043** Full gate: `pnpm typecheck`, `pnpm -r test`, `pnpm lint`. `pnpm lint` includes `crew-lint`, `depcruise`, and the i18n catalog checks — the new `messages.json` ids must pass catalog lint · repo root
-- [x] **T044** Validate against the spec's Success Criteria and record the evidence for each: SC-001 (both tracks), SC-002/SC-003 (zero base-language and zero missing descriptors), SC-004/SC-007 (trail and artifact agree), SC-005 (preview / archive / PR agree), SC-006 (one expand computes one impact), SC-008 (the repository check catches the promise class) · `specs/057-identity-in-package/`
+- [x] **T044** Validate against the spec's Success Criteria and record the evidence for each: SC-001 (both tracks), SC-002/SC-003 (zero base-language and zero missing descriptors), SC-004/SC-007 (trail and artifact agree), SC-005 (preview / archive / PR agree), SC-006 (one expand computes one impact), SC-008 (the repository check catches the promise class) · `specs/059-identity-in-package/`
 
 ---
 

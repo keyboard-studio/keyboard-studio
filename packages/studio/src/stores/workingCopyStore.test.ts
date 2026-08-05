@@ -22,6 +22,7 @@ import { useWorkingCopyStore, bindManifest } from "./workingCopyStore.ts";
 import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
 import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
+import { makeTouchKeyRuleJoinFixture, TOUCH_JOIN_IDS } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 import { defaultFillAxes, selectStrategy } from "@keyboard-studio/engine";
 import type {
@@ -956,6 +957,485 @@ describe("workingCopyStore — keepAll/restoreAll clear deletedTouchKeyIds", () 
 });
 
 // ---------------------------------------------------------------------------
+// spec 058 T056/T057 — keyEditOverlay: commitKeyEdit/undoKeyEdit, plus (T057)
+// their integration with the shared chronological undoStack: commitKeyEdit
+// pushes a 'k' UndoEntry, undoDelete has a 'k' branch, undoKeyEdit filters the
+// matching entry out of undoStack (the restore-side filter), and keepAll
+// clears keyEditOverlay alongside the other deletion state (FR-032).
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — keyEditOverlay", () => {
+  it("starts as an empty ordered log", () => {
+    expect(useWorkingCopyStore.getState().keyEditOverlay).toEqual({ ops: [] });
+  });
+
+  it("commitKeyEdit appends an op, assigning seq = the current op count", () => {
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_A",
+      kind: "suppress",
+      spClass: 9,
+      sentinelId: "T_none",
+    });
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_B",
+      kind: "rename",
+      toId: "K_C",
+    });
+
+    const ops = useWorkingCopyStore.getState().keyEditOverlay.ops;
+    expect(ops).toHaveLength(2);
+    expect(ops[0]).toMatchObject({ seq: 0, address: "phone:default:K_A", kind: "suppress" });
+    expect(ops[1]).toMatchObject({ seq: 1, address: "phone:default:K_B", kind: "rename" });
+  });
+
+  it("undoKeyEdit removes only the most recently committed op", () => {
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_A",
+      kind: "suppress",
+      spClass: 9,
+      sentinelId: "T_none",
+    });
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_B",
+      kind: "rename",
+      toId: "K_C",
+    });
+
+    useWorkingCopyStore.getState().undoKeyEdit();
+
+    const ops = useWorkingCopyStore.getState().keyEditOverlay.ops;
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toMatchObject({ address: "phone:default:K_A", kind: "suppress" });
+  });
+
+  it("undoKeyEdit on an empty overlay is a no-op", () => {
+    useWorkingCopyStore.getState().undoKeyEdit();
+    expect(useWorkingCopyStore.getState().keyEditOverlay).toEqual({ ops: [] });
+  });
+
+  it("reset clears keyEditOverlay back to an empty log", () => {
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_A",
+      kind: "suppress",
+      spClass: 9,
+      sentinelId: "T_none",
+    });
+    expect(useWorkingCopyStore.getState().keyEditOverlay.ops).toHaveLength(1);
+
+    useWorkingCopyStore.getState().reset();
+    expect(useWorkingCopyStore.getState().keyEditOverlay).toEqual({ ops: [] });
+  });
+
+  it("instantiateFromBase clears keyEditOverlay on a genuine base switch", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_A",
+      kind: "suppress",
+      spClass: 9,
+      sentinelId: "T_none",
+    });
+    expect(useWorkingCopyStore.getState().keyEditOverlay.ops).toHaveLength(1);
+
+    // A different base id forces the genuine-switch path (resolveInstantiationCase).
+    const otherBase = { ...basicKbdus, id: "some_other_base" };
+    useWorkingCopyStore.getState().instantiateFromBase(otherBase, { vfs, ir });
+    expect(useWorkingCopyStore.getState().keyEditOverlay).toEqual({ ops: [] });
+  });
+
+  it("instantiateFromExisting clears keyEditOverlay on a genuine base switch", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_A",
+      kind: "suppress",
+      spClass: 9,
+      sentinelId: "T_none",
+    });
+    expect(useWorkingCopyStore.getState().keyEditOverlay.ops).toHaveLength(1);
+
+    const otherKeyboard = { ...basicKbdus, id: "some_other_keyboard" };
+    useWorkingCopyStore.getState().instantiateFromExisting(otherKeyboard, { vfs, ir });
+    expect(useWorkingCopyStore.getState().keyEditOverlay).toEqual({ ops: [] });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 058 T057 — key edits on the shared chronological undoStack.
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — key edit undo integration (T057, FR-032)", () => {
+  it("commitKeyEdit pushes a 'k' UndoEntry with the committed op's seq", () => {
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_A",
+      kind: "suppress",
+      spClass: 9,
+      sentinelId: "T_none",
+    });
+
+    const s = useWorkingCopyStore.getState();
+    expect(s.undoStack).toEqual([{ k: "k", seq: 0 }]);
+  });
+
+  it("undoDelete pops a 'k' entry and removes the matching op from keyEditOverlay", () => {
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_A",
+      kind: "suppress",
+      spClass: 9,
+      sentinelId: "T_none",
+    });
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_B",
+      kind: "rename",
+      toId: "K_C",
+    });
+    expect(useWorkingCopyStore.getState().keyEditOverlay.ops).toHaveLength(2);
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(2);
+
+    useWorkingCopyStore.getState().undoDelete();
+
+    const s = useWorkingCopyStore.getState();
+    expect(s.keyEditOverlay.ops).toHaveLength(1);
+    expect(s.keyEditOverlay.ops[0]).toMatchObject({ address: "phone:default:K_A", kind: "suppress" });
+    expect(s.undoStack).toHaveLength(1);
+    expect(s.undoStack[0]).toEqual({ k: "k", seq: 0 });
+  });
+
+  it("undoDelete interleaves correctly: a node delete and a key edit are each other's independent undo entries", () => {
+    useWorkingCopyStore.getState().deleteNode("node-1");
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_A",
+      kind: "suppress",
+      spClass: 9,
+      sentinelId: "T_none",
+    });
+
+    // Last entry is the key edit — undoDelete should reverse it, not the node.
+    useWorkingCopyStore.getState().undoDelete();
+    let s = useWorkingCopyStore.getState();
+    expect(s.keyEditOverlay.ops).toHaveLength(0);
+    expect(s.isDeleted("node-1")).toBe(true);
+
+    // Now the node delete is last — undoDelete reverses that.
+    useWorkingCopyStore.getState().undoDelete();
+    s = useWorkingCopyStore.getState();
+    expect(s.isDeleted("node-1")).toBe(false);
+  });
+
+  it("undoKeyEdit (the restore-side filter) removes the matching 'k' entry from undoStack even when it is not the stack's tail", () => {
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_A",
+      kind: "suppress",
+      spClass: 9,
+      sentinelId: "T_none",
+    });
+    // A node delete lands on the stack AFTER the key edit, so the 'k' entry is
+    // no longer the tail.
+    useWorkingCopyStore.getState().deleteNode("node-1");
+    expect(useWorkingCopyStore.getState().undoStack).toEqual([
+      { k: "k", seq: 0 },
+      { k: "n", id: "node-1" },
+    ]);
+
+    useWorkingCopyStore.getState().undoKeyEdit();
+
+    const s = useWorkingCopyStore.getState();
+    expect(s.keyEditOverlay.ops).toHaveLength(0);
+    // The matching 'k' entry is gone; the unrelated 'n' entry is untouched.
+    expect(s.undoStack).toEqual([{ k: "n", id: "node-1" }]);
+    expect(s.isDeleted("node-1")).toBe(true);
+  });
+
+  it("undoKeyEdit on an empty overlay does not touch undoStack", () => {
+    useWorkingCopyStore.getState().deleteNode("node-1");
+    useWorkingCopyStore.getState().undoKeyEdit();
+
+    const s = useWorkingCopyStore.getState();
+    expect(s.undoStack).toEqual([{ k: "n", id: "node-1" }]);
+  });
+
+  it("keepAll clears keyEditOverlay along with the deletion sets and undoStack", () => {
+    useWorkingCopyStore.getState().deleteNode("node-1");
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_A",
+      kind: "suppress",
+      spClass: 9,
+      sentinelId: "T_none",
+    });
+    expect(useWorkingCopyStore.getState().keyEditOverlay.ops).toHaveLength(1);
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(2);
+
+    useWorkingCopyStore.getState().keepAll();
+
+    const s = useWorkingCopyStore.getState();
+    expect(s.keyEditOverlay).toEqual({ ops: [] });
+    expect(s.undoStack).toEqual([]);
+    expect(s.deletedNodeIds.size).toBe(0);
+    expect(s.isDeleted("node-1")).toBe(false);
+  });
+
+  it("restoreAll (alias for keepAll) also clears keyEditOverlay", () => {
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_A",
+      kind: "suppress",
+      spClass: 9,
+      sentinelId: "T_none",
+    });
+
+    useWorkingCopyStore.getState().restoreAll();
+
+    const s = useWorkingCopyStore.getState();
+    expect(s.keyEditOverlay).toEqual({ ops: [] });
+    expect(s.undoStack).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 058 T056 — touchEditorMode: setTouchEditorMode.
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — touchEditorMode", () => {
+  it("defaults to 'character' (the character walk is the default per FR-036)", () => {
+    expect(useWorkingCopyStore.getState().touchEditorMode).toBe("character");
+  });
+
+  it("setTouchEditorMode switches to 'key' and back", () => {
+    useWorkingCopyStore.getState().setTouchEditorMode("key");
+    expect(useWorkingCopyStore.getState().touchEditorMode).toBe("key");
+
+    useWorkingCopyStore.getState().setTouchEditorMode("character");
+    expect(useWorkingCopyStore.getState().touchEditorMode).toBe("character");
+  });
+
+  it("toggling mode does NOT clear touchDraft or keyEditOverlay (FR-036b)", () => {
+    useWorkingCopyStore.getState().setTouchDraft({ charTouchEntries: [], suggestionResolvedChars: ["a"] });
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_A",
+      kind: "suppress",
+      spClass: 9,
+      sentinelId: "T_none",
+    });
+
+    useWorkingCopyStore.getState().setTouchEditorMode("key");
+
+    const s = useWorkingCopyStore.getState();
+    expect(s.touchDraft).toEqual({ charTouchEntries: [], suggestionResolvedChars: ["a"] });
+    expect(s.keyEditOverlay.ops).toHaveLength(1);
+  });
+
+  it("reset restores touchEditorMode to 'character'", () => {
+    useWorkingCopyStore.getState().setTouchEditorMode("key");
+    useWorkingCopyStore.getState().reset();
+    expect(useWorkingCopyStore.getState().touchEditorMode).toBe("character");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 058 T078 (SC-011) — mode-toggle regression suite.
+//
+// The point of this block is narrower than "toggling works": a mode switch
+// clearing touchDraft or keyEditOverlay "to tidy up" is EXACTLY the kind of
+// change that looks reasonable in isolation and is precisely what someone
+// adds later (see the task's own framing). setTouchEditorMode's current
+// implementation is a bare `set({ touchEditorMode: mode })` — no other field
+// — and this suite is written to fail loudly the moment that stops being
+// true, whichever direction the clearing is added in (character->key or
+// key->character), and regardless of how many toggles preceded it.
+//
+// Verified by temporarily reproducing the regression before writing these
+// assertions: patching setTouchEditorMode to additionally
+// `touchDraft: null, keyEditOverlay: { ops: [] }` on every call turns EVERY
+// test in this block red (both the snapshot-equality checks and the
+// not-null/non-empty sanity checks below) — see the T078 report for the
+// before/after run. The patch was reverted; it is not part of this change.
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — T078 mode-toggle regression suite (SC-011, FR-036a/b)", () => {
+  /**
+   * Seeds a NON-TRIVIAL touchDraft, keyEditOverlay, and undoStack (mixed
+   * entry kinds: 'k' key edits plus an 'n' node delete) so a test asserting
+   * "nothing changed" is actually exercising real state, not a vacuous check
+   * against empty defaults. Returns the three snapshots to compare against
+   * after every subsequent toggle.
+   */
+  function seedNonTrivialState() {
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [
+        [
+          "ñ",
+          {
+            scope: "individual",
+            target: "ñ",
+            modality: "touch",
+            mechanisms: [
+              { patternId: "longpress_alternates", slotValues: { hostKey: "K_N", char: "ñ" } },
+            ],
+            source: "user",
+          },
+        ],
+      ],
+      suggestionResolvedChars: ["ñ", "á"],
+      bulkAccentGroups: [
+        { id: "a:K_A", hostKey: "K_A", baseChar: "a", members: ["a", "á"] },
+      ],
+    });
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_A",
+      kind: "suppress",
+      spClass: 9,
+      sentinelId: "T_none",
+    });
+    useWorkingCopyStore.getState().deleteNode("node-x");
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_B",
+      kind: "rename",
+      toId: "K_C",
+    });
+
+    const s = useWorkingCopyStore.getState();
+    const expectedDraft = s.touchDraft;
+    const expectedOps = s.keyEditOverlay.ops;
+    const expectedUndo = s.undoStack;
+
+    // Sanity: the seeded state is actually non-trivial. A test that "changes
+    // nothing" against already-empty state proves nothing.
+    expect(expectedDraft).not.toBeNull();
+    expect(expectedOps).toHaveLength(2);
+    expect(expectedUndo).toHaveLength(3);
+
+    return { expectedDraft, expectedOps, expectedUndo };
+  }
+
+  it("N toggles in an arbitrary order (including repeats and both directions) leave touchDraft, keyEditOverlay.ops, and undoStack unchanged after EVERY single toggle", () => {
+    const { expectedDraft, expectedOps, expectedUndo } = seedNonTrivialState();
+
+    // Deliberately not a clean alternation: repeats ("key" twice running),
+    // both directions, and an odd total length so the LAST toggle in the
+    // sequence lands on each mode across the two runs below.
+    const sequence: Array<"character" | "key"> = [
+      "key",
+      "character",
+      "key",
+      "key",
+      "character",
+      "character",
+      "key",
+      "character",
+      "key",
+    ];
+
+    for (const mode of sequence) {
+      useWorkingCopyStore.getState().setTouchEditorMode(mode);
+      const s = useWorkingCopyStore.getState();
+
+      // The mode itself actually changed (the toggle had an effect)...
+      expect(s.touchEditorMode).toBe(mode);
+      // ...but nothing else did. Checked after EVERY toggle, not just the
+      // first and last — a bug that only clears on the SECOND switch (e.g.
+      // a "settle" effect keyed off a prior-mode ref) would survive a
+      // before/after-only assertion but not this one.
+      expect(s.touchDraft).toEqual(expectedDraft);
+      expect(s.keyEditOverlay.ops).toEqual(expectedOps);
+      expect(s.undoStack).toEqual(expectedUndo);
+    }
+  });
+
+  it("nothing is cleared as a side effect of a mode change — touchDraft specifically", () => {
+    const { expectedDraft } = seedNonTrivialState();
+
+    useWorkingCopyStore.getState().setTouchEditorMode("key");
+    expect(useWorkingCopyStore.getState().touchDraft).not.toBeNull();
+    expect(useWorkingCopyStore.getState().touchDraft).toEqual(expectedDraft);
+
+    useWorkingCopyStore.getState().setTouchEditorMode("character");
+    expect(useWorkingCopyStore.getState().touchDraft).not.toBeNull();
+    expect(useWorkingCopyStore.getState().touchDraft).toEqual(expectedDraft);
+  });
+
+  it("nothing is cleared as a side effect of a mode change — keyEditOverlay specifically", () => {
+    const { expectedOps } = seedNonTrivialState();
+
+    useWorkingCopyStore.getState().setTouchEditorMode("key");
+    expect(useWorkingCopyStore.getState().keyEditOverlay.ops.length).toBeGreaterThan(0);
+    expect(useWorkingCopyStore.getState().keyEditOverlay.ops).toEqual(expectedOps);
+
+    useWorkingCopyStore.getState().setTouchEditorMode("character");
+    expect(useWorkingCopyStore.getState().keyEditOverlay.ops.length).toBeGreaterThan(0);
+    expect(useWorkingCopyStore.getState().keyEditOverlay.ops).toEqual(expectedOps);
+  });
+
+  it("a sequence that STARTS already in 'key' mode (not the store default) also loses no state in either direction", () => {
+    // Move to 'key' BEFORE any of the in-progress state exists, so this run
+    // exercises "the working copy was already in key mode when the author
+    // started doing key-mode work" rather than always starting from the
+    // character-mode default.
+    useWorkingCopyStore.getState().setTouchEditorMode("key");
+    expect(useWorkingCopyStore.getState().touchEditorMode).toBe("key");
+
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_A",
+      kind: "suppress",
+      spClass: 9,
+      sentinelId: "T_none",
+    });
+    useWorkingCopyStore.getState().commitKeyEdit({
+      address: "phone:default:K_B",
+      kind: "rename",
+      toId: "K_C",
+    });
+    const opsAfterKeyModeWork = useWorkingCopyStore.getState().keyEditOverlay.ops;
+    expect(opsAfterKeyModeWork).toHaveLength(2);
+
+    // Switch away to do character-mode work, then back, more than once.
+    useWorkingCopyStore.getState().setTouchEditorMode("character");
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [
+        [
+          "日",
+          {
+            scope: "individual",
+            target: "日",
+            modality: "touch",
+            mechanisms: [
+              { patternId: "multitap", slotValues: { hostKey: "K_D", char: "日" } },
+            ],
+            source: "user",
+          },
+        ],
+      ],
+      suggestionResolvedChars: ["日"],
+    });
+    const draftAfterCharacterModeWork = useWorkingCopyStore.getState().touchDraft;
+
+    useWorkingCopyStore.getState().setTouchEditorMode("key");
+    useWorkingCopyStore.getState().setTouchEditorMode("character");
+    useWorkingCopyStore.getState().setTouchEditorMode("key");
+
+    const s = useWorkingCopyStore.getState();
+    // Key-mode work committed BEFORE the first switch away survived every
+    // subsequent round trip...
+    expect(s.keyEditOverlay.ops).toEqual(opsAfterKeyModeWork);
+    // ...and so did character-mode work done WHILE away from key mode, once
+    // the author switches back to it.
+    expect(s.touchDraft).toEqual(draftAfterCharacterModeWork);
+  });
+
+  it("the undo stack (shared across both modes' entry kinds) is untouched by any mode toggle", () => {
+    const { expectedUndo } = seedNonTrivialState();
+    expect(expectedUndo.some((e) => e.k === "k")).toBe(true);
+    expect(expectedUndo.some((e) => e.k === "n")).toBe(true);
+
+    useWorkingCopyStore.getState().setTouchEditorMode("key");
+    useWorkingCopyStore.getState().setTouchEditorMode("character");
+    useWorkingCopyStore.getState().setTouchEditorMode("key");
+
+    expect(useWorkingCopyStore.getState().undoStack).toEqual(expectedUndo);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // spec-014 mutate-seam — setWorkingIR PRESERVES the carve-deletion overlay
 //
 // Regression for the Phase-5 MAJOR bug: the mutate-seam write path routed
@@ -1570,5 +2050,123 @@ describe("workingCopyStore — Phase B proposal decisions are per-working-copy",
 
     expect(usePhaseBDraftStore.getState().rejected).toContain("ɔ");
     expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// commitTouchKeyRename — the T091 complete reference fix-up (spec 058;
+// key-id-policy.md §4; touch-key-rule-join.md §6.1's final bullet). Reuses
+// the shared touch-key<->rule-join fixture (contract §8, "no second
+// fixture") rather than a bespoke one, mirroring AssignPanel.test.tsx's own
+// precedent for the same fixture in this package.
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — commitTouchKeyRename (spec 058 T091)", () => {
+  it("returns changed:false and touches nothing when there is no working IR yet", () => {
+    const result = useWorkingCopyStore
+      .getState()
+      .commitTouchKeyRename(TOUCH_JOIN_IDS.mark, "T_0300RENAMED");
+
+    expect(result).toEqual({ changed: false, renamedRuleNodeIds: [], renamedAddresses: [] });
+  });
+
+  it("writes the renamed ir via the overlay-preserving setWorkingIR seam, preserving the carve-deletion overlay", () => {
+    useWorkingCopyStore.getState().setIR(makeTouchKeyRuleJoinFixture({ withoutOpaqueFragments: true }));
+    useWorkingCopyStore.getState().deleteNode("unrelated-carve-node");
+    expect(useWorkingCopyStore.getState().deletedNodeIds.has("unrelated-carve-node")).toBe(true);
+
+    const result = useWorkingCopyStore
+      .getState()
+      .commitTouchKeyRename(TOUCH_JOIN_IDS.mark, "T_0300RENAMED");
+
+    expect(result.changed).toBe(true);
+    expect([...result.renamedRuleNodeIds].sort()).toEqual(["rule#mark", "rule#mark-guard"].sort());
+
+    const after = useWorkingCopyStore.getState();
+    // A carve-side deletion made through a DIFFERENT overlay survives —
+    // setWorkingIR, not setIR, is the seam this action must use.
+    expect(after.deletedNodeIds.has("unrelated-carve-node")).toBe(true);
+
+    const phoneKey = after.ir!.touchLayout!.platforms.find((p) => p.id === "phone")!.layers[0]!.rows[0]!.keys[0]!;
+    const tabletKey = after.ir!.touchLayout!.platforms.find((p) => p.id === "tablet")!.layers[0]!.rows[0]!.keys[0]!;
+    expect(phoneKey.id).toBe("T_0300RENAMED");
+    expect(tabletKey.id).toBe("T_0300RENAMED");
+  });
+
+  it("remaps a deleted-touch-key address through the EXISTING restore/delete actions, keeping undo entries consistent (FR-028, FR-033)", () => {
+    useWorkingCopyStore.getState().setIR(makeTouchKeyRuleJoinFixture({ withoutOpaqueFragments: true }));
+    const oldAddress = "phone:default:T_0300";
+    const newAddress = "phone:default:T_0300RENAMED";
+    useWorkingCopyStore.getState().deleteTouchKey(oldAddress);
+    expect(useWorkingCopyStore.getState().deletedTouchKeyIds.has(oldAddress)).toBe(true);
+    expect(
+      useWorkingCopyStore.getState().undoStack.some((e) => e.k === "t" && e.id === oldAddress),
+    ).toBe(true);
+
+    const result = useWorkingCopyStore
+      .getState()
+      .commitTouchKeyRename(TOUCH_JOIN_IDS.mark, "T_0300RENAMED");
+
+    expect(result.renamedAddresses).toEqual(
+      expect.arrayContaining([{ oldAddress, newAddress }]),
+    );
+
+    const after = useWorkingCopyStore.getState();
+    // The stale (pre-rename) address no longer resolves to a deletion...
+    expect(after.deletedTouchKeyIds.has(oldAddress)).toBe(false);
+    // ...it moved to the renamed key's new address instead of silently
+    // vanishing (touchKeyAddress.ts: a stale address here would be data
+    // loss, not the carve cascade's desirable idempotence).
+    expect(after.deletedTouchKeyIds.has(newAddress)).toBe(true);
+    // The tablet platform's occurrence of T_0300 was never deleted, so it is
+    // not spuriously added to the overlay by the remap.
+    expect(after.deletedTouchKeyIds.size).toBe(1);
+    // Undo stack: no stale 't' entry for the old address, exactly one for the new.
+    expect(after.undoStack.some((e) => e.k === "t" && e.id === oldAddress)).toBe(false);
+    expect(after.undoStack.filter((e) => e.k === "t" && e.id === newAddress)).toHaveLength(1);
+  });
+
+  it("leaves a deletion overlay untouched when nothing in it matches the renamed key", () => {
+    useWorkingCopyStore.getState().setIR(makeTouchKeyRuleJoinFixture({ withoutOpaqueFragments: true }));
+    useWorkingCopyStore.getState().deleteTouchKey("phone:default:T_FCFA");
+
+    useWorkingCopyStore.getState().commitTouchKeyRename(TOUCH_JOIN_IDS.mark, "T_0300RENAMED");
+
+    const after = useWorkingCopyStore.getState();
+    expect(after.deletedTouchKeyIds.has("phone:default:T_FCFA")).toBe(true);
+    expect(after.deletedTouchKeyIds.size).toBe(1);
+  });
+
+  it("promotes every renamed occurrence to hand-set provenance at its NEW address (T059, address-matched — never id-matched)", () => {
+    useWorkingCopyStore.getState().setIR(makeTouchKeyRuleJoinFixture({ withoutOpaqueFragments: true }));
+
+    const result = useWorkingCopyStore
+      .getState()
+      .commitTouchKeyRename(TOUCH_JOIN_IDS.mark, "T_0300RENAMED");
+    expect(result.changed).toBe(true);
+
+    const after = useWorkingCopyStore.getState();
+    const phoneKey = after.ir!.touchLayout!.platforms.find((p) => p.id === "phone")!.layers[0]!.rows[0]!.keys[0]!;
+    const tabletKey = after.ir!.touchLayout!.platforms.find((p) => p.id === "tablet")!.layers[0]!.rows[0]!.keys[0]!;
+    expect(phoneKey.id).toBe("T_0300RENAMED");
+    expect(phoneKey.provenance).toBe("hand-set");
+    expect(tabletKey.id).toBe("T_0300RENAMED");
+    expect(tabletKey.provenance).toBe("hand-set");
+  });
+
+  it("is a no-op end to end (no ir write, no overlay remap) when fromKeyId matches nothing", () => {
+    useWorkingCopyStore.getState().setIR(makeTouchKeyRuleJoinFixture({ withoutOpaqueFragments: true }));
+    useWorkingCopyStore.getState().deleteTouchKey("phone:default:T_0300");
+    const before = useWorkingCopyStore.getState();
+
+    const result = useWorkingCopyStore
+      .getState()
+      .commitTouchKeyRename("T_DOES_NOT_EXIST", "T_WHATEVER");
+
+    expect(result).toEqual({ changed: false, renamedRuleNodeIds: [], renamedAddresses: [] });
+    const after = useWorkingCopyStore.getState();
+    expect(after.ir).toBe(before.ir);
+    expect(after.deletedTouchKeyIds).toEqual(before.deletedTouchKeyIds);
+    expect(after.undoStack).toEqual(before.undoStack);
   });
 });

@@ -82,8 +82,25 @@
 // lettersToAdd === inventory (full alphabet) and alreadyProduced === [] — the
 // gallery behaves exactly as it did before the diff was wired.
 
+// Spec 058 FR-011 — the third array, and why this hook is EXTENDED rather than
+// switched to the reachability-aware view.
+//
+// `buildReachableProducedSet` would move a character produced only by an
+// unreachable rule out of `alreadyProduced` and into `lettersToAdd`. That is
+// arguably "more correct", and it is still the wrong change to make here: it
+// would silently increase author workload on the ~205 corpus bases that carry an
+// orphan rule, and it would move the §18.6 coverage denominator underneath a
+// figure authors and tests both read. So `lettersToAdd` / `alreadyProduced`
+// arithmetic is UNTOUCHED, and the honest delta is surfaced as a third array the
+// UI can explain in its own words: "the base declares a rule for X but no key
+// reaches it."
+
 import { useMemo } from "react";
-import { augmentWithComposable, buildProducedSet } from "@keyboard-studio/contracts";
+import {
+  augmentWithComposable,
+  buildProducedSet,
+  buildReachableProducedSet,
+} from "@keyboard-studio/contracts";
 import { buildSessionProducedSet } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { lowercaseFirst } from "../lib/caseOrder.ts";
@@ -102,6 +119,21 @@ export interface InventoryDiff {
   lettersToAdd: string[];
   /** Characters already produced by the base (informational display only). */
   alreadyProduced: string[];
+  /**
+   * Inventory characters the base's RULES produce but that no reachable key can
+   * actually type (spec 058 FR-011) — the honest delta between the two
+   * producibility views.
+   *
+   * A strict SUBSET of `alreadyProduced`: these characters still count as
+   * produced for every existing arithmetic, deliberately, so adding this array
+   * moved no author's workload and no coverage denominator. It exists so the UI
+   * can say what is true — the base declares a rule for this character but no
+   * key reaches it — instead of the author discovering it at compile time.
+   *
+   * Empty when the base has no touch layout, because then nothing is
+   * layout-unreachable.
+   */
+  producedButUnreachable: string[];
   /**
    * The augmented, SESSION-AWARE produced-glyph set (NFC) — base .kmn PLUS
    * this session's physical assignments (see `buildSessionProducedSet`).
@@ -164,6 +196,17 @@ export function useInventoryDiff(): InventoryDiff {
     [baseIr, inventory],
   );
 
+  // The orphaned delta, memoized SEPARATELY so the frozen arithmetic above is
+  // visibly independent of it. Same options as the plain call, so the two views
+  // are asked the same question and differ only in reachability.
+  const orphanedSet = useMemo<Set<string>>(
+    () =>
+      baseIr !== null
+        ? buildReachableProducedSet(baseIr, { excludeBackspaceCorrections: true }).orphaned
+        : new Set<string>(),
+    [baseIr],
+  );
+
   // SESSION-AWARE, PRE-AUGMENT — the raw round-trip, computed once and
   // exposed as `rawProducedSet` so other consumers (MechanismGallery's
   // `baseProducedSet`, TouchGallery's `desktopDirectProducedSet`) don't
@@ -185,9 +228,13 @@ export function useInventoryDiff(): InventoryDiff {
 
   return useMemo<InventoryDiff>(() => {
     if (baseIr === null) {
+      // The baseIr-null fallback must return ALL THREE arrays (FR-011): a caller
+      // destructuring `producedButUnreachable` here would otherwise read
+      // `undefined` before instantiation and throw on `.length`.
       return {
         lettersToAdd: lowercaseFirst(inventory),
         alreadyProduced: [],
+        producedButUnreachable: [],
         producedSet,
         rawProducedSet,
       };
@@ -195,6 +242,7 @@ export function useInventoryDiff(): InventoryDiff {
 
     const lettersToAdd: string[] = [];
     const alreadyProduced: string[] = [];
+    const producedButUnreachable: string[] = [];
 
     for (const raw of inventory) {
       // NFC-normalize the inventory entry before lookup. producedSet is already
@@ -206,6 +254,11 @@ export function useInventoryDiff(): InventoryDiff {
         // inventory character as the author entered it, while the lookup used
         // the normalized form.
         alreadyProduced.push(raw);
+        // ADDITIVE: also reported as unreachable when the ONLY thing producing it
+        // is an unreachable-key rule. Note this does NOT remove it from
+        // `alreadyProduced` — that is precisely the point of extending rather
+        // than switching (see the note at the top of this file).
+        if (orphanedSet.has(nfc)) producedButUnreachable.push(raw);
       } else {
         lettersToAdd.push(raw);
       }
@@ -214,8 +267,9 @@ export function useInventoryDiff(): InventoryDiff {
     return {
       lettersToAdd: lowercaseFirst(lettersToAdd),
       alreadyProduced,
+      producedButUnreachable,
       producedSet,
       rawProducedSet,
     };
-  }, [baseIr, baseProducedSetForWalk, producedSet, rawProducedSet, inventory]);
+  }, [baseIr, baseProducedSetForWalk, orphanedSet, producedSet, rawProducedSet, inventory]);
 }

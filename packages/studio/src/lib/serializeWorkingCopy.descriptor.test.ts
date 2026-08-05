@@ -1,4 +1,4 @@
-// Package-descriptor coverage for the OUTPUT path (spec 057 T017/T019/T020/T039).
+// Package-descriptor coverage for the OUTPUT path (spec 059 T017/T019/T020/T039).
 //
 // WHY THIS IS A SEPARATE FILE FROM serializeWorkingCopy.test.ts
 //

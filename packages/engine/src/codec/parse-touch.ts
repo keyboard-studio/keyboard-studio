@@ -42,7 +42,16 @@ function emitKey(key: TouchKeyIR): EmittedKey {
   if (key.width !== undefined) out["width"] = String(key.width);
   if (key.pad !== undefined) out["pad"] = String(key.pad);
   if (key.nextlayer !== undefined) out["nextlayer"] = key.nextlayer;
-  if (key.layerAnnotation !== undefined) out["layer"] = key.layerAnnotation;
+  // Per-key modifier override and longpress preselect (spec 058 FR-030). Both
+  // are standard wire properties; `default` is emitted as a real JSON boolean,
+  // not a string, matching the file format (unlike `sp`/`width`/`pad`).
+  // `layer` and `layerAnnotation` carry the same wire `layer` value: the
+  // editable spec-058 `layer` wins when present (so a key edit round-trips),
+  // falling back to the engine's best-effort `layerAnnotation` for keys the
+  // key editor never touched.
+  if (key.layer !== undefined) out["layer"] = key.layer;
+  else if (key.layerAnnotation !== undefined) out["layer"] = key.layerAnnotation;
+  if (key.default !== undefined) out["default"] = key.default;
   if (key.sk !== undefined && key.sk.length > 0) {
     out["sk"] = key.sk.map(emitKey);
   }

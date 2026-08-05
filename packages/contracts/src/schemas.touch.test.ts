@@ -167,3 +167,85 @@ describe("KeyboardIRSchema round-trip (P3/SC-007/FR-010)", () => {
     expect(parsed.origin).toBe("imported");
   });
 });
+
+// ---------------------------------------------------------------------------
+// THE DRIFT GUARD FOR ADDITIVE OPTIONAL TouchKeyIR FIELDS (spec 058 FR-030).
+//
+// This suite is not redundant with the compile-time aliases in schemas.ts — it
+// is the ONLY thing that catches a `TouchKeyIR` field the zod mirror omits.
+// `TouchKeyIRSchema` carries an explicit `z.ZodType<LooseOptional<TouchKeyIR>>`
+// annotation (required by the self-recursive `z.lazy()`), so `z.infer` resolves
+// to the annotation rather than to the object literal and every compile-time
+// key-set or assignability comparison passes even with the field deleted from
+// the schema. zod's default strip behaviour then drops the field at runtime.
+//
+// Verified empirically at T008: deleting `layer:` from the schema typechecks
+// clean and fails only here. Any future additive `TouchKeyIR` field belongs in
+// this suite in the same commit that adds it.
+// ---------------------------------------------------------------------------
+describe("TouchKeyIRSchema — additive optional fields survive a parse", () => {
+  it("keeps a per-key `layer` modifier override (FR-030)", () => {
+    const parsed = TouchKeyIRSchema.parse({
+      nodeId: "n1",
+      id: "T_0300",
+      text: "◌̀",
+      layer: "shift",
+    });
+    expect(parsed.layer).toBe("shift");
+  });
+
+  it("keeps a subkey `default` longpress preselect (FR-030)", () => {
+    const parsed = TouchKeyIRSchema.parse({
+      nodeId: "n1",
+      id: "T_0021",
+      text: "!",
+      sk: [
+        { nodeId: "n1s1", id: "U_00A1", text: "¡", default: true },
+        { nodeId: "n1s2", id: "U_203D", text: "‽" },
+      ],
+    });
+    expect(parsed.sk?.[0]?.default).toBe(true);
+    expect(parsed.sk?.[1]?.default).toBeUndefined();
+  });
+
+  it("keeps both fields through a full KeyboardIR round-trip", () => {
+    const layout: TouchLayoutIR = {
+      platforms: [
+        {
+          id: "phone",
+          layers: [
+            {
+              id: "default",
+              rows: [
+                {
+                  keys: [
+                    {
+                      nodeId: "n1",
+                      id: "T_0300",
+                      text: "◌̀",
+                      layer: "shift",
+                      sk: [{ nodeId: "n1s1", id: "U_0301", text: "◌́", default: true }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      nodeIds: [],
+    };
+    const parsed = KeyboardIRSchema.parse(
+      JSON.parse(JSON.stringify(makeIR(layout))),
+    ) as KeyboardIR;
+    const key = parsed.touchLayout?.platforms[0]?.layers[0]?.rows[0]?.keys[0];
+    expect(key?.layer).toBe("shift");
+    expect(key?.sk?.[0]?.default).toBe(true);
+  });
+
+  it("leaves both absent when the wire data omits them (additive, not defaulted)", () => {
+    const parsed = TouchKeyIRSchema.parse({ nodeId: "n1", id: "K_A", text: "a" });
+    expect(parsed.layer).toBeUndefined();
+    expect(parsed.default).toBeUndefined();
+  });
+});

@@ -1,4 +1,4 @@
-// Tests for applyIdentityToKps (spec 057 T010).
+// Tests for applyIdentityToKps (spec 059 T010).
 //
 // The two paths that matter are the two authoring tracks: PATCH (the copy track,
 // whose scaffolded descriptor declares the base's language) and GENERATE (the
