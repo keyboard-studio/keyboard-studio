@@ -159,6 +159,17 @@ jobs:
       - name: "Normalize Tier B catalogs collapsed into English (#1458, #1489)"
         run: node utilities/content-i18n-normalize/index.js
 
+      # Tier A's counterpart, and for a different reason: `pnpm lint` now gates
+      # packages/studio/src/locales/*/messages.json on message-id key order (a
+      # merge-conflict measure -- see utilities/i18n-catalog-sort). Crowdin
+      # exports a translation file in its SOURCE file's key order, so a download
+      # normally arrives already sorted and this is a no-op; it runs anyway so
+      # that an export which reorders for any reason produces a mergeable
+      # translation PR instead of one that fails the order gate with no human
+      # around to run the fixer. Idempotent: no diff when order is already right.
+      - name: "Keep Tier A catalogs in message-id order"
+        run: node utilities/i18n-catalog-sort/index.js
+
       # Replaces the crowdin/github-action's own push_translations +
       # create_pull_request steps (see the NORMALIZE STEP note in the file
       # header for why those can't run after a step of ours). Mirrors that
