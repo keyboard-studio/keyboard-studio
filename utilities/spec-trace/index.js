@@ -13,6 +13,7 @@
  *   report                    print coverage + unacknowledged drift summary
  *   acknowledge <section-id>  accept a reviewed section, update its hash, and
  *                             auto-close its open spec-drift Issue (when a token is set)
+ *   search <query>            BM25 retrieval over the spec corpus (see search.js)
  *
  * The check subcommand never exits non-zero — drift is a warning, not a build failure.
  */
@@ -524,21 +525,162 @@ async function createMissingIssues(drifted, token, owner, repo, existing) {
 }
 
 // ---------------------------------------------------------------------------
+// search
+//
+// Corpus roots. CLAUDE.md is deliberately excluded: it is already loaded into
+// every session, so a hit inside it spends budget to return text the agent can
+// already see. Everything else that a reader might reasonably cite is in.
+// ---------------------------------------------------------------------------
+
+const DOCS_DIR = path.join(REPO_ROOT, 'docs');
+const ROOT_DOCS = ['spec.md', 'README.md'];
+
+function walkMarkdown(dir, out) {
+  if (!fs.existsSync(dir)) return out;
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) walkMarkdown(p, out);
+    else if (e.name.endsWith('.md')) out.push(p);
+  }
+  return out;
+}
+
+// Forward slashes everywhere so ids, --scope prefixes and printed anchors are
+// identical on Windows and POSIX.
+function relId(abs) {
+  return path.relative(REPO_ROOT, abs).split(path.sep).join('/');
+}
+
+function collectCorpusFiles() {
+  const abs = [
+    ...ROOT_DOCS.map(f => path.join(REPO_ROOT, f)).filter(f => fs.existsSync(f)),
+    ...walkMarkdown(SPECS_DIR, []),
+    ...walkMarkdown(DOCS_DIR, [])
+  ];
+  return abs
+    .map(f => ({ path: relId(f), content: fs.readFileSync(f, 'utf8') }))
+    .sort((a, b) => a.path.localeCompare(b.path));
+}
+
+// Map a hit back onto a spec-trace tracked unit, so a search result can carry
+// the review status of the text it just quoted. Not every hit maps to a unit
+// (plan.md, tasks.md, evidence/ are searchable but untracked) -- those get no
+// annotation rather than a misleading one.
+function unitIdFor(hit) {
+  if (hit.path === 'spec.md') {
+    const top = (hit.crumb || '').split(' > ')[0] || '';
+    const m = top.match(/^(\d+[a-z]?)\./);
+    return m ? '§' + m[1] : null;
+  }
+  const feature = hit.path.match(/^specs\/([^/]+)\/spec\.md$/);
+  if (feature) return 'specs/' + feature[1];
+  if (EXTRA_DOCS.some(d => d.id === hit.path)) return hit.path;
+  return null;
+}
+
+function buildAnnotator() {
+  const trace = loadTrace();
+  if (!trace || !trace.sections) return null;
+  const drifted = new Set(computeDrift(trace, collectUnits()).map(d => d.id));
+
+  return (hit) => {
+    const id = unitIdFor(hit);
+    if (!id) return null;
+    const stored = trace.sections[id];
+    if (!stored) return 'untracked';
+    return drifted.has(id) ? stored.status + ', drifted' : stored.status;
+  };
+}
+
+function parseSearchArgs(args) {
+  const opts = { terms: [], limit: null, budget: null, scope: null, json: false };
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--json') opts.json = true;
+    else if (a === '--limit') opts.limit = parseInt(args[++i], 10);
+    else if (a === '--budget') opts.budget = parseInt(args[++i], 10);
+    else if (a === '--scope') opts.scope = args[++i];
+    else opts.terms.push(a);
+  }
+  return opts;
+}
+
+function search(args) {
+  const engine = require('./search.js');
+  const opts = parseSearchArgs(args);
+  const query = opts.terms.join(' ').trim();
+
+  if (!query) {
+    console.log('[ERROR] Usage: node utilities/spec-trace search <query> [--limit N] [--budget BYTES] [--scope PREFIX] [--json]');
+    process.exit(1);
+  }
+
+  const budget = opts.budget === null ? engine.DEFAULT_BUDGET : opts.budget;
+  if (!Number.isFinite(budget) || budget < engine.MIN_BUDGET) {
+    // Refuse rather than overrun: an unenforceable cap is worse than no cap,
+    // because callers size their context around the number we advertise.
+    console.log('[ERROR] --budget must be at least ' + engine.MIN_BUDGET + ' bytes');
+    process.exit(1);
+  }
+  const limit = opts.limit === null ? engine.DEFAULT_LIMIT : opts.limit;
+  if (!Number.isFinite(limit) || limit < 1) {
+    console.log('[ERROR] --limit must be a positive integer');
+    process.exit(1);
+  }
+
+  const corpus = engine.buildCorpus(collectCorpusFiles());
+  const result = engine.search(corpus, query, { limit, scope: opts.scope });
+
+  if (result.hits.length === 0) {
+    console.log('[INFO] 0 hits for "' + query + '" (' + result.scanned + ' chunks scanned)');
+    console.log('[INFO] Terms searched: ' + (result.qterms.join(', ') || '(none -- all stopwords)'));
+    return;
+  }
+
+  const render = opts.json ? engine.renderJson : engine.renderText;
+  console.log(render(result, { budget, annotate: buildAnnotator() }).text);
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
-const [,, cmd, ...args] = process.argv;
-switch (cmd) {
-  case 'seed':        seed(); break;
-  case 'check':       check().catch(e => console.error('[ERROR]', e.message)); break;
-  case 'acknowledge': acknowledge(args[0]).catch(e => console.error('[ERROR]', e.message)); break;
-  case 'report':      report(); break;
-  default:
-    console.log('spec-trace -- spec.md drift detector');
-    console.log('');
-    console.log('Usage:');
-    console.log('  node utilities/spec-trace seed                        # initialise / refresh hashes');
-    console.log('  node utilities/spec-trace check [--dry-run]           # detect drift, create issues');
-    console.log('  node utilities/spec-trace report                      # coverage + drift summary');
-    console.log('  node utilities/spec-trace acknowledge <section-id>    # accept reviewed section');
+function main() {
+  const [,, cmd, ...args] = process.argv;
+  switch (cmd) {
+    case 'seed':        seed(); break;
+    case 'check':       check().catch(e => console.error('[ERROR]', e.message)); break;
+    case 'acknowledge': acknowledge(args[0]).catch(e => console.error('[ERROR]', e.message)); break;
+    case 'report':      report(); break;
+    case 'search':      search(args); break;
+    default:
+      console.log('spec-trace -- spec corpus drift detector + search');
+      console.log('');
+      console.log('Usage:');
+      console.log('  node utilities/spec-trace seed                        # initialise / refresh hashes');
+      console.log('  node utilities/spec-trace check [--dry-run]           # detect drift, create issues');
+      console.log('  node utilities/spec-trace report                      # coverage + drift summary');
+      console.log('  node utilities/spec-trace acknowledge <section-id>    # accept reviewed section');
+      console.log('  node utilities/spec-trace search <query> [opts]       # BM25 search over specs/ + docs/');
+      console.log('');
+      console.log('search options:');
+      console.log('  --limit N        max hits (default 5)');
+      console.log('  --budget BYTES   hard cap on printed output (default 2048, min 256)');
+      console.log('  --scope PREFIX   restrict to paths under PREFIX, e.g. specs/058-touch-key-editor');
+      console.log('  --json           machine-readable output, same byte cap');
+  }
 }
+
+module.exports = {
+  parseSpecSections,
+  hashSection,
+  collectUnits,
+  computeDrift,
+  loadTrace,
+  collectCorpusFiles,
+  unitIdFor,
+  parseSearchArgs
+};
+
+if (require.main === module) main();

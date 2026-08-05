@@ -2,153 +2,250 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+This file is loaded into **every** session, so it holds only what you need *before* you know
+what to look up: the gates, the cross-cutting invariants, and where everything else lives.
+Reference detail lives in [docs/tooling.md](docs/tooling.md) (build/test/lint/E2E),
+[docs/packages.md](docs/packages.md) (what each package owns), and
+[docs/architecture.md](docs/architecture.md) (how they compose). Search those rather than
+reading them.
+
+## Finding things
+
+The spec corpus is ~5.4 MB across ~430 markdown files under `specs/**` and `docs/**`. **Search
+it; don't read it.**
+
+```
+pnpm run spec-search "remove key confirmation dialog"
+pnpm run spec-search "touch layout" --scope specs/058-touch-key-editor --limit 8
+```
+
+Every hit returns `path:line` plus its heading breadcrumb, annotated with the spec-trace review
+status of the unit it came from. If a snippet isn't enough, `Read` that file **at that offset** —
+opening the whole file spends the tokens the search just saved. Output is byte-capped (default
+2048; `--budget` to change). Details in [docs/tooling.md](docs/tooling.md#searching-the-corpus).
+
+For keyboards specifically, [docs/keyboard-index.md](docs/keyboard-index.md) is the phonebook —
+see below.
+
 ## Commands
 
-Package manager is **pnpm 9** (Node **≥ 22.19.0** — `@lingui/cli` uses `node:fs.globSync`, and its CLI entry is gated on `import.meta.main`, which does not exist before 22.19. On an older Node every `lingui` subcommand exits 0 having printed nothing and written nothing — `messages:extract` appears to succeed while producing no diff, and `i18n-catalog-lint` then misreports every committed catalog as an orphan. The floor is in the root [package.json](package.json) `engines` and [.nvmrc](.nvmrc)). Run from the repo root unless noted.
+Package manager is **pnpm 9**, Node **≥ 22.19.0** (hard floor — an older Node makes `lingui`
+subcommands exit 0 having done nothing). Run from the repo root unless noted.
 
 | Task | Command |
 |------|---------|
 | Install | `pnpm install` |
-| Build everything | `pnpm build` (runs `prebuild` first — see below) |
+| Build everything | `pnpm build` |
 | Typecheck | `pnpm typecheck` |
-| Test everything | `pnpm test` (`pnpm -r test` → each package's vitest) |
-| Lint / format | `pnpm lint` (ESLint over `packages/*/src`, then `pnpm depcruise`, then `pnpm crew-lint` (see the Crew-file consistency row below), then `pnpm run facet-lint` ([utilities/facet-lint/index.js](utilities/facet-lint/index.js) — plain-node checker over `content/facets/**` records), then `pnpm run facet-index-lint` ([utilities/facet-index-lint/index.js](utilities/facet-index-lint/index.js) — plain-node checker validating `docs/keyboard-facet-index.json` against `content/keyboard-facets/*.yaml` per contract X1–X7 / C1–C5), then `pnpm run adaptation-catalog-lint`, `pnpm run i18n-catalog-lint` (drift **and** message-id key order of `packages/studio/src/locales/*/messages.json` — see the Sort Tier A catalogs row below), `pnpm run content-i18n-freshness` (tsx-run `utilities/i18n-content-extract/cli.ts --check` — freshness of `content/i18n/en/*.json` against a fresh extraction; single-sources the `flowQuestions.json` freshness the plain-JS `content-i18n-lint` can't re-derive from TS-module question definitions; spec 050 T015), and `pnpm run content-i18n-lint` ([utilities/content-i18n-lint/index.js](utilities/content-i18n-lint/index.js) — Tier B's counterpart to `i18n-catalog-lint`: checks `content/i18n/en/*.json` against a fresh extraction from the content records, plus target-locale key-set parity for any locale that has started translating a given catalog — including `flowQuestions.json` as a parity-only catalog; spec 046 T031, spec 050 T014), and finally `pnpm run test-antipattern-lint` ([utilities/test-antipattern-lint/index.js](utilities/test-antipattern-lint/index.js) — plain-node checker banning `expect(true).toBe(true)`-style tautologies across all `packages/*/**/*.test.ts` and hardcoded survey question-order `.map((q) => q.id)).toEqual([…])` snapshots)) · `pnpm format` (Prettier) |
-| Architecture boundaries | `pnpm depcruise` (dependency-cruiser fitness functions — cross-package layering/team-split/dependency-root rules in [.dependency-cruiser.cjs](.dependency-cruiser.cjs); also run by `pnpm lint`) |
-| Crew-file consistency | `pnpm crew-lint` ([utilities/crew-lint/index.js](utilities/crew-lint/index.js) — 7 machine-enforced checks over `.claude/**/km-*` crew files: no python fences, no emoji, no phantom package paths, no line-number self-refs in km-triage.md, km-qc rubric agreement, roster consistency, sentinel spelling; the full check list is documented in [.claude/agents/km-README.md](.claude/agents/km-README.md); also run by `pnpm lint`) |
-| Run the studio SPA | `pnpm dev` (builds `engine`, then runs `engine` watch + `studio` Vite dev server) |
-| Diagnose the Crowdin round-trip | `pnpm run crowdin:diagnose` ([utilities/crowdin-diagnose/index.js](utilities/crowdin-diagnose/index.js) — read-only; needs `CROWDIN_PROJECT_ID` + `CROWDIN_PERSONAL_TOKEN`, network, and is **not** part of `pnpm lint`. Answers "why does the download return English/empty?" by reporting per-locale progress, root-vs-branch string placement, the file inventory, and the export settings, then names one verdict with a fix. `pnpm run crowdin:diagnose:selftest` needs no credentials and drives the script against a mock API) |
-| Sort Tier A catalogs | `pnpm run i18n-catalog-sort` ([utilities/i18n-catalog-sort/index.js](utilities/i18n-catalog-sort/index.js) — rewrites `packages/studio/src/locales/<locale>/messages.json` in message-id order; `--check` reports instead. **Why order is enforced:** Lingui's default `orderBy` is `"message"`, so a new string lands wherever its English text sorts — beside an unrelated area — and two branches that each add one string collide on the same hunk, making every merge a hand-resolved "keep both sides". [lingui.config.ts](packages/studio/lingui.config.ts) now sets `orderBy: "messageId"` so `messages:extract` emits that order, and this utility enforces it on the committed files because extract is not the only writer (Crowdin downloads and hand edits are too). Its comparator deliberately mirrors Lingui's own `orderByMessageId` (plain `localeCompare`) — a codepoint sort disagrees on camelCase segments and the two would overwrite each other forever. Not part of `pnpm lint` — it's the fix; the check half runs inside `i18n-catalog-lint`, which imports `checkCatalogDir` from here so there is one definition of "sorted". Also called by [crowdin-download-translations.yml](.github/workflows/crowdin-download-translations.yml) after the download) |
-| Normalize Tier B Crowdin catalogs | `pnpm run content-i18n-normalize` ([utilities/content-i18n-normalize/index.js](utilities/content-i18n-normalize/index.js) — mutates `content/i18n/<locale>/*.json`: any target value byte-identical to its `en/` source becomes `""`, since Tier B (unlike Tier A's Lingui-compiled `messages.json`) falls back to English at render time only on an empty value. Not part of `pnpm lint` — it's a fix, not a check. Called by [crowdin-download-translations.yml](.github/workflows/crowdin-download-translations.yml) between the Crowdin download and the commit/push step; see that workflow's header for why they can't be one `crowdin/github-action` step. #1458, #1489) |
+| Test everything | `pnpm test` |
+| Lint / format | `pnpm lint` · `pnpm format` |
+| Run the studio SPA | `pnpm dev` |
+| Search the spec corpus | `pnpm run spec-search "<query>"` |
+| One package's tests | `pnpm --filter @keyboard-studio/engine test` |
 
-**`prebuild` is not optional for a clean checkout.** `pnpm build` runs it automatically, but a bare `tsc -b` inside a package will fail without it. It does codegen/fetch steps, all producing build artifacts you should regenerate rather than hand-edit:
-- `fetch-langtags` downloads the pinned SIL `langtags.json` (MIT; SHA-256 pinned in [scripts/langtags-version.json](scripts/langtags-version.json); raw file gitignored under `packages/engine/data/langtags/`).
-- `codegen-langtags` derives the slim lookup index into `packages/engine/src/langtags/generated/` from the downloaded data.
-- `compile-recognizer-rules` codegens `content/recognizer-rules/*.yaml` → `packages/engine/src/recognizer/rules/generated/*.ts`.
-- `codegen-charnames` derives a codepoint -> Unicode NAME lookup (0x0020..0x2FFFF, algorithmic/range-marker names excluded) from the checked-in `lib/ucd/UnicodeData.txt` into `packages/engine/src/character-discovery/generated/charnames.generated.json`; ~1.4 MB, gitignored (see the directory-local `.gitignore` there) and regenerated by this prebuild step, the same treatment as the langtags raw data below.
-- `fetch-sldr` downloads the pinned SIL SLDR source tarball (MIT; commit + tarball SHA-256 pinned in [scripts/sldr-version.json](scripts/sldr-version.json)) and extracts the locale tree to the gitignored `packages/engine/data/sldr/sldr/`; `LICENSE` + `SOURCES.json` beside it are committed. Fails loudly on a placeholder pin, a checksum mismatch, a truncated body, or an HTML error page served as a tarball.
-- `codegen-exemplars` bakes CLDR (`cldr-misc-full`, version pinned in [scripts/cldr-version.json](scripts/cldr-version.json), integrity pinned by the pnpm lockfile) plus the SLDR extract into `packages/engine/src/character-discovery/generated/exemplars.generated.json` — the offline exemplar index behind [specs/044-cldr-sldr-exemplars/](specs/044-cldr-sldr-exemplars/). ~1.2 MB and **committed** (unlike the two artifacts above — it is under the contract's 2 MB budget and its diff is the review surface when a pin is bumped). Regeneration from the same pins is byte-identical, and it validates every stored set through the engine's own `parseUnicodeSet`, imported from source under Node type stripping (importing the compiled module would be circular). Not in the prebuild chain: `pnpm run check-exemplar-staleness` **reports** — never applies — when either pin has fallen behind upstream, so a stale pin can't silently change the index under a review. `node scripts/gen-exemplar-baseline.mjs` regenerates the pre-feature regression-floor fixture; do that only alongside a CLDR pin bump, and review the diff.
+Two things that will bite you:
 
-The compiler wasm is **not** a prebuild artifact: it ships inside the `@keymanapp/kmc-kmn` npm dependency (pinned in `packages/engine/package.json`; the pnpm lockfile is the version/integrity source of truth), loaded at runtime as a sibling of that package's `wasm-host.js`. See `packages/engine/src/compiler/index.ts` and `packages/studio/vite.config.ts` (`optimizeDeps.exclude`).
+- **Never run bare `vitest` at the repo root.** The root `vitest.config.ts` intentionally has an
+  empty `include`; tests only resolve through each package's own config. Suites outside the
+  workspace (`/api`, the i18n utilities, spec-trace) each need their own invocation — see
+  [docs/tooling.md](docs/tooling.md#running-a-subset-of-tests).
+- **`prebuild` is not optional for a clean checkout.** `pnpm build` runs it automatically, but a
+  bare `tsc -b` inside a package will fail without it. It fetches pinned upstream data
+  (langtags, SLDR, CLDR, Glottolog) and codegens several artifacts — regenerate them, never
+  hand-edit. See [docs/tooling.md](docs/tooling.md#prebuild).
 
-The **package** compiler is a second, separate Keyman dependency: `@keymanapp/kmc-package`, exact-pinned to the same `19.0.240-alpha` as `kmc-kmn`. It turns a `.kps` descriptor into an installable `.kmp` and is **pure JS — no wasm** (jszip + marked + `@keymanapp/{common-types,developer-utils}`, and the `kmp.json` schema validator is a precompiled ajv standalone), so it needs no `optimizeDeps.exclude` entry and no network. See `packages/engine/src/output/kmp.ts`. Keep the two versions in step when bumping either: they share `common-types` / `developer-utils` at an exact pin.
-
-**Running a subset of tests** (the test script in each package is `vitest run`):
-- One package: `pnpm --filter @keyboard-studio/engine test`
-- Watch a package: `pnpm --filter @keyboard-studio/engine test:watch`
-- One file: `pnpm --filter @keyboard-studio/engine test src/codec/parse.test.ts`
-- One test by name: append `-t "round-trips"`
-- **Never run bare `vitest` at the repo root** — the root `vitest.config.ts` intentionally has an empty `include`; tests only resolve through each package's own config.
-
-**E2E:** Playwright specs live under `packages/studio/e2e/`, run against the `playwright` devDependency of `@keyboard-studio/studio` — `pnpm --filter @keyboard-studio/studio test:e2e` (or `cd packages/studio && npx playwright test <spec>` for a single spec); run `npx playwright install chromium` once per version bump for browser binaries. E2E stays out of the unit CI lanes (vitest and tsc both exclude `e2e/**`). All specs import from `"playwright/test"` — the `playwright` package's test entry; do not add `@playwright/test` as a second runner package. **Status (2026-07-16, resolved):** Survey prelude helpers consolidated into `packages/studio/e2e/helpers/surveyFlow.ts` and updated for the spec 036 language-identify flow (question order changed: `il_language_english` is now the first question instead of `il_language_autonym`). All four walk specs are live/passing: [`carve.spec.ts`](packages/studio/e2e/carve.spec.ts), [`copy-edit.spec.ts`](packages/studio/e2e/copy-edit.spec.ts), [`touch-derivation-us1.spec.ts`](packages/studio/e2e/touch-derivation-us1.spec.ts) (spec 035 US1: bambara import-and-adapt walk), and [`touch-derivation-us2.spec.ts`](packages/studio/e2e/touch-derivation-us2.spec.ts) (spec 035 US2: pid_piaroa reseed walk + the explicit-reseed AS4 variant), which is now rewired onto the shared helpers and un-skipped. A first-visit welcome-screen gate now forces a fresh browser to the WelcomeScreen regardless of URL; the shared helpers handle it via `seedReturningVisitor(page)`, which seeds `localStorage["ks.visited"]="1"` via `page.addInitScript` before `page.goto` — new walk specs must call it before navigating. `import-improve.spec.ts` (Track 2) remains `.skip`-ped for its own reasons (recipe at the top of the file), as does [`touch-key-add-remove.spec.ts`](packages/studio/e2e/touch-key-add-remove.spec.ts) (spec 058 T112 / SC-006: written in full against the real test ids, but blocked until `TouchGallery.tsx` actually mounts the Phase 8 add/remove surfaces — it calls neither `useKeyCommands` nor `RemoveKeyDialog` today; un-skip recipe in that file's STATUS block). Studio code exposes a flag-gated `window.__ksE2E__` test hook ([`packages/studio/src/lib/e2eHook.ts`](packages/studio/src/lib/e2eHook.ts)), active only under `VITE_E2E=1` or `?e2e=1`. **Update (spec 057):** three specs join the live set — [`tab-roundtrip.spec.ts`](packages/studio/e2e/tab-roundtrip.spec.ts) and [`compare-isolation.spec.ts`](packages/studio/e2e/compare-isolation.spec.ts) (the two gating specs, written and recorded RED against the pre-fix tree before the fix landed — see [specs/057-bulletproof-navigation/evidence/gating-red.md](specs/057-bulletproof-navigation/evidence/gating-red.md)) and [`decision-deeplink.spec.ts`](packages/studio/e2e/decision-deeplink.spec.ts) / [`footer-progress.spec.ts`](packages/studio/e2e/footer-progress.spec.ts). Tab switching goes through one shared step driver, `switchTab(page, route)` in the helpers module — no spec assigns `window.location.hash` inline — and it selects by `nav a[href="#<route>"]`, never by visible label text, because the tab behind the `preview` ROUTE TOKEN is now labelled **Compare**. That token deliberately did not change: renaming it would break every existing bookmark and hash assertion. `selectMenuOption(page, trigger, value)` is the other shared driver — `ui/SelectMenu` portals its listbox to `document.body`, so an option is never a descendant of its trigger and a `xpath=..`-scoped query hangs until the test's own timeout.
+`pnpm lint` chains ESLint, `depcruise`, and nine plain-node checkers (crew files, facet records,
+the facet index, adaptation catalogs, both i18n tiers, test antipatterns). Run `pnpm crew-lint`
+after touching any `.claude/**/km-*` file — every drift class it catches has shipped before.
+Full list: [docs/tooling.md](docs/tooling.md#what-pnpm-lint-actually-runs).
 
 ## Repository status
 
-**Day-1 contract is locked and the engine + studio are now built out** (this supersedes the earlier "contracts only" status). Packages under `packages/*`:
+Day-1 contract is locked; the engine and studio are built out. Packages: `contracts` (the
+dependency root — types, service interfaces, criteria catalog, zod schemas), `engine` (codec,
+scaffolder, output, validator, compiler, simulator, recognizer, and more), `keyboard-lint`
+(Layer C), `llm`, `glottolog`, `studio` (React + Vite SPA). Per-package detail:
+[docs/packages.md](docs/packages.md).
 
-- **`@keyboard-studio/contracts`** — the locked Day-1 shared contract: TS types, the seven service interfaces + mocks, fixtures, the criteria catalog at `packages/contracts/data/criteria.json` (currently 148 rows — 133 repo-hygiene + 12 §18 DISCUS design-heuristic at Day-1 lock, plus post-lock adjustments; descriptive count, not a locked constant; see spec §11 and [docs/discus-principles-integration.md](docs/discus-principles-integration.md)), and the runtime **zod schemas** (`src/schemas.ts`) that mirror the locked `Pattern`/`Criterion` types. The dependency root — everything else builds to it.
-- **`@keyboard-studio/engine`** — the real engine. Subsystems under `packages/engine/src/`: `codec` (.kmn ↔ KeyboardIR), `scaffolder`, `output` (VirtualFS → zip **and** → installable `.kmp`), `validator`, `compiler` (kmcmplib wrapper), `simulator`, `recognizer` (+ generated rules), `pattern-apply`, `pattern-library`, `strategy-selector`, `character-discovery`, `inventory`, `loader`, `base-browser`, `stub-mutator`, `langtags` (SIL langtags slim-index lookup; exposed as `@keyboard-studio/engine/langtags`).
-- **`@keymanapp/keyboard-lint`** — Layer C hygiene lint engine (`lintEngine.ts`, `checks/`, `parsers/`).
-- **`@keyboard-studio/llm`** — pluggable LLM client (`backends/`) for prompt-driven assistance.
-- **`@keyboard-studio/glottolog`** — offline, pinned copy of Glottolog's language-classification tree (checked-in generated index derived from `glottolog-cldf` via `fetch-glottolog`/`codegen-glottolog`) plus the relatedness catalog and the keyboard-base bridge (`./bridge`) that turns "language X has no keyboard" into ranked bases from close relatives. Contracts-only edge (the bridge takes injected deps; no engine/studio import). See [specs/036-glottolog-catalog/](specs/036-glottolog-catalog/).
-- **`@keyboard-studio/studio`** — the React + Vite SPA (three-pane gallery / editor / preview; working-copy spine).
-
-Spec targets **not yet realised as written:** the `@keymanapp/kmn-validator` package has not been extracted — Layer A/B (and Layer A' import-fidelity) validation lives in `engine/src/validator` (see Architecture). Check a package's actual exports before referencing it.
-
-**kbgen (placement seeder) — prototype, lives in `utilities/kbgen/`.** A standalone Node CLI that derives data-driven character placement (which key, which mechanism) from pinned Unicode/CLDR signals and emits a `placement-map.json`. Intended to become an engine deliverable (a seeder ahead of the survey, §8 Phase B), but it is CommonJS/plain-JS, does not conform to the `packages/contracts` types, and implements only S-01/S-08 of the §7.3 catalog. It is kept out of `packages/*` so it does not trip `pnpm -r`. Conformance path + open joint-session questions: [utilities/kbgen/INTEGRATION.md](utilities/kbgen/INTEGRATION.md). Do not treat it as a built package.
-
-Keep this file's commands, package inventory, and architecture map in sync with reality as new packages land.
-
-**Delivery-option progress lives in [`docs/github_flow.md`](docs/github_flow.md) — Status section.** Whenever work lands that advances Option A (user-fork/app-managed PR), Option B (org-mediated PR), or Option C (ZIP download), update that table and the progress bar before closing the issue or merging the PR. The scaffolder and VirtualFS serialisation rows in the prerequisites table also need updating as those land.
+**Check a package's actual exports before referencing it** — some spec targets are not realised
+as written. Notably the `@keymanapp/kmn-validator` package has not been extracted; Layer A/B
+validation lives in `engine/src/validator`.
 
 ## Source of truth
 
-- **`spec.md`** — the v1.3.1 spec (v1.0 signed off; v1.1.0 KeyboardIR import amendment applied 2026-06-08; v1.1.1 placement-priors amendment applied 2026-06-11; v1.2.0 hybrid-workflow + scoped-gallery amendment applied 2026-06-13, see [docs/workflow-model.md](docs/workflow-model.md) — typed assignment-map contract held for the #5b joint session; v1.3.0 working-copy spine + two authoring tracks amendment applied 2026-06-14 — single persistent working copy instantiated at keyboard selection via Track 1 `instantiateFromBase` or Track 2 `instantiateFromExisting`, all steps mutate it, serialized only at output; extends Decision 9; v1.3.1 defaults-first principle (§3c "Defaults are the product") + §8 defaults-audit follow-ups applied 2026-06-15 — propose-then-confirm everywhere, "no default is a defect"). Treat as authoritative for scope, schema, validator layering, team boundaries, and resolved decisions.
-- **`docs/spec-signoff.md`** — review-cycle log and decision summary (D1–D9). Use this to see *why* a spec section reads the way it does before proposing changes.
-- **`README.md`** — external-facing project description (what it is, status, layout, scope); keep it accurate and lean — don't expand without reason. The per-package inventory and build commands live here in CLAUDE.md; README points at this file rather than restating them.
-- **`strategy tree/strategies.md`** — **superseded.** Merged into `spec.md §7`; now a stub pointer only. Do not edit it or treat it as a source.
+- **[spec.md](spec.md)** — the v1.3.1 spec. Authoritative for scope, schema, validator layering,
+  team boundaries, and resolved decisions. Amendment history: v1.1.0 KeyboardIR import
+  (2026-06-08); v1.1.1 placement priors (2026-06-11); v1.2.0 hybrid workflow + scoped gallery
+  (2026-06-13, see [docs/workflow-model.md](docs/workflow-model.md)); v1.3.0 working-copy spine +
+  two authoring tracks (2026-06-14); v1.3.1 defaults-first — §3c "Defaults are the product",
+  propose-then-confirm everywhere, "no default is a defect" (2026-06-15).
+- **[docs/spec-signoff.md](docs/spec-signoff.md)** — review-cycle log and decision summary
+  (D1–D9). Read this to see *why* a spec section reads the way it does before proposing changes.
+- **[README.md](README.md)** — external-facing description. Keep it accurate and lean; the
+  package inventory and build commands live in `docs/`, not there.
+- **`strategy tree/strategies.md`** — **superseded**, now a stub pointer. Do not edit it or treat
+  it as a source. Its content merged into **spec.md §7** (extracted to
+  [specs/007-strategy-selection/](specs/007-strategy-selection/)). §7.1/§7.2/§7.3 and the §7.5
+  validation table are mutually consistent by design — keep them that way across any edit; the
+  table is a self-consistency regression suite with two documented v1.1 gaps (EuroLatin, IPA).
 
-**Contract source-of-truth chain (avoid divergent copies).** The `Pattern` / `Criterion` contract exists in several representations; this is their authority order, so edits land in the right place:
-- **Canonical types:** `packages/contracts/src/pattern.ts`, `criteria.ts`. The TypeScript is the contract.
-- **Runtime mirror:** `packages/contracts/src/schemas.ts` (zod). Bound to the canonical types by **compile-time drift guards** — the one *machine-enforced* link: change a type and its schema must change in the same commit or the build fails. The engine/studio loaders consume `RawPatternSchema` via `@keyboard-studio/engine/pattern-schema` (re-export, not a copy).
-- **Prose spec:** [`specs/005-pattern-schema/spec.md`](specs/005-pattern-schema/spec.md) (§5, extracted). The **Day-1 reference** — illustrative, may lag the code's non-breaking optional fields; not a second source. Field renames/type changes/removals are a locked-contract change (§18).
-- **Criteria data + count:** `packages/contracts/data/criteria.json` is the data; the per-band recompute lives in `criteria-summary.md`; the current count (148; 40/66/32/10) is **descriptive and expected to grow**. Tests enforce schema-validity of every row (via `CriterionSchema`) and the four-band partition invariant (sum of band counts === total, no orphans) — **not the literal cardinality**. Prose mentions (spec §11, this file, README) cross-link rather than re-derive.
+The spec embeds external docs by reference (§19): `docs/KM-Questionnaire.md`, `docs/lint.md`,
+`docs/criteria.md`, `docs/making-a-template.md`.
 
-**Relationship between `spec.md` and `strategies.md` (resolved — merged).** The two documents have been unified: the `.kmn` strategy framework (seven discovery axes A1–A7, the decision tree, the S-01…S-12 strategy catalog, building blocks, and the validation table) now lives in **`spec.md` Section 7 (Strategy selection)**. It is wired into the rest of the spec: the survey computes the axes (§7.1), the strategy selector runs the decision tree (§7.2) to pick a strategy, and each `Pattern` (§5) links to its strategy card via the (ratified) optional `strategyId` / `combinesWith` fields. The §7.5 validation table is a self-consistency regression suite — two intentional v1.1 gaps (EuroLatin, IPA) are documented; keep §7.1/§7.2/§7.3 and that table mutually consistent across any edit.
+### Contract source-of-truth chain
 
-The spec embeds external docs by reference (Sec 19): `docs/KM-Questionnaire.md`, `docs/lint.md`, `docs/criteria.md`, `docs/making-a-template.md`. These live in the planned repo layout but are not yet in this working copy — fetch from `https://github.com/keyboard-studio/keyboard-studio` if needed.
+The `Pattern` / `Criterion` contract exists in several representations. This is their authority
+order, so edits land in the right place:
 
-**Keyboard phonebook.** When you need to locate or look up a keyboard this project references — by name, language, author, or where its source lives on disk — consult [docs/keyboard-index.md](docs/keyboard-index.md) **first**. It maps each acknowledged keyboard to its BCP47 languages, author, and relative path. The keyboards themselves live in the sibling `../keyboards` checkout, not in this repo. That checkout tracks the [`keyboard-studio/keyboards`](https://github.com/keyboard-studio/keyboards) fork (a stable mirror of `keymanapp/keyboards`) — the project's canonical corpus for deterministic tests and facet-index builds; point `../keyboards` at that fork's `master`, not upstream, or corpus-calibrated tests (e.g. the recognizer `basic_kbdfr` fixtures) will drift. **Keeping the phonebook current is mandatory, not optional:** it indexes only keyboards already referenced, so whenever you introduce, cite, or otherwise reference a keyboard that is not yet in the table, you MUST add its row in the same change (read the keyboard's `<id>.kps` for name, BCP47 languages, and author — see the "Keep this current" recipe in that file). Treat a stale phonebook as a defect.
+- **Canonical types:** `packages/contracts/src/pattern.ts`, `criteria.ts`. The TypeScript *is*
+  the contract.
+- **Runtime mirror:** `packages/contracts/src/schemas.ts` (zod). Bound to the canonical types by
+  **compile-time drift guards** — the one *machine-enforced* link: change a type and its schema
+  must change in the same commit or the build fails. Engine/studio loaders consume
+  `RawPatternSchema` via `@keyboard-studio/engine/pattern-schema` (re-export, not a copy).
+- **Prose spec:** [specs/005-pattern-schema/spec.md](specs/005-pattern-schema/spec.md) (§5,
+  extracted). The Day-1 reference — illustrative, may lag the code's non-breaking optional
+  fields; not a second source.
+- **Criteria data + count:** `packages/contracts/data/criteria.json` is the data; the per-band
+  recompute lives in `criteria-summary.md`. The current count (148; 40/66/32/10) is
+  **descriptive and expected to grow**. Tests enforce schema-validity of every row and the
+  four-band partition invariant (sum of band counts === total, no orphans) — **not** the literal
+  cardinality. Prose mentions cross-link rather than re-derive.
 
-## Architecture
+### Keyboard phonebook
 
-`spec.md` is authoritative for *intended* design; this is how it maps to the code that exists. These are the cross-cutting invariants that require reading several files to see — honour them, and surface deviations rather than inventing new ones.
+When you need to locate or look up a keyboard this project references — by name, language,
+author, or where its source lives on disk — consult
+[docs/keyboard-index.md](docs/keyboard-index.md) **first**. It maps each acknowledged keyboard to
+its BCP47 languages, author, and relative path.
 
-- **Codec / `KeyboardIR` is the spine of the engine.** `engine/src/codec` parses `.kmn` into a typed `KeyboardIR` (`parse.ts` / `tokenize.ts`), emits it back (`emit.ts`), and round-trips (`roundtrip.test.ts`). Scaffolding, import, validation, and mutation all operate on the IR, not on raw `.kmn` text — e.g. `scaffold()` is `parse → scaffoldIR → emit`. Constructs the codec can't model are preserved as opaque `RawKmnFragment` nodes (the type is defined in `@keyboard-studio/contracts`; reasons are catalogued in `engine/src/codec/opaque-reasons.ts`), never silently dropped. A base the codec can't parse fails the whole scaffold (no try/catch around `parse()`), so "codec-clean" matters when choosing a base.
-- **Working-copy spine (spec v1.3.0).** A single persistent working copy is instantiated when the user picks a keyboard — Track 1 `instantiateFromBase` (copy/adapt) or Track 2 `instantiateFromExisting` (import). Every step mutates that one copy; it is serialized only at output. See [docs/workflow-model.md](docs/workflow-model.md).
-- **Validator layering (spec §10).** Three layers — Layer A validity + Layer B style + Layer C hygiene; Layer A is 9 TS-portable checks + 5 WASM-only (spec §10 has the per-check `kmcmplib` source references). **In code:** Layer A/B — plus the Layer A' import-fidelity checks I1–I6 (`engine/src/validator/layer-a-prime.ts`, `index-import-fidelity.ts`) — live in `engine/src/validator`; Layer C is `@keymanapp/keyboard-lint`. (The spec's `@keymanapp/kmn-validator` package has not been extracted yet.)
-- **Single 300 ms debounce cycle (decision D3).** In the studio, the TS-check and the WASM `kmcmplib` oracle run as concurrent microtasks within one debounce cycle. Do not introduce a second debounce timer. **Scope:** D3 governs the *validation* cycle — anything that produces diagnostics from the working copy. It does not reach persistence or network-sync timers (e.g. `AUTOSAVE_DEBOUNCE_MS` and `CLOUD_SYNC_DEBOUNCE_MS` in [packages/studio/src/lib/draftPersistence.ts](packages/studio/src/lib/draftPersistence.ts)), which race nothing and emit no diagnostics. A new timer needs D3 sign-off when it validates; not when it merely saves.
-- **Virtual FS (spec §11).** All authoring happens in an in-memory FS mirroring the `keymanapp/keyboards` layout; serialized at output to an installable `.kmp` (the primary download) or a source `.zip` (`engine/src/output`), or committed via GitHub OAuth fork+PR. The studio never writes to host disk during authoring. **Compiled artifacts are staged on the download path only** ([studio/src/lib/buildOutputBundle.ts](packages/studio/src/lib/buildOutputBundle.ts)), never inside the shared projection — the PR paths read that same projection, and a community PR must not carry `build/` output or a `.kmp` (criteria SS1). `buildKmp` likewise stages into a clone, so the caller's VFS is never mutated.
-- **Co-located Vercel functions under `/api` must stay bundle-safe.** The serverless functions (`rewrites` in [vercel.json](vercel.json)) live outside the pnpm workspace but reach `utilities/oauth-backend/src` by relative path, so their whole reachable module graph gets traced into a **function bundle** rather than resolved as a workspace build. **A module in that graph must not import a `@keyboard-studio/*` package as a value** — the contracts barrel re-exports data modules that load JSON from `packages/contracts/data/`, a path outside the emitted `dist/` that does not survive bundling. This fails at ESM *module load*, so the handler never runs and every route returns a platform-level `FUNCTION_INVOCATION_FAILED` (text/plain) instead of a JSON error — an outage, not a degraded response. `import type` is erased and always fine; when a *value* is genuinely shared, copy the literal locally behind a compile-time drift guard (see `GITHUB_OAUTH_CLIENTS` in [utilities/oauth-backend/src/schemas.ts](utilities/oauth-backend/src/schemas.ts)). Enforced by [api/bundle-safety.test.ts](api/bundle-safety.test.ts); `/api` is outside `pnpm -r`, so it runs via its own CI step (`npx vitest run --config api/vitest.config.ts`).
-- **Two teams (spec §12).** Engine owns the SPA, scaffolder, compiler service, validator, output paths. Content owns the pattern library, survey text, gallery ordering, LLM prompts, and criteria triage. Respect the split when picking up work.
-- **Standalone utilities.** `utilities/*` (kbgen, supportability-scanner, smoke-artifact, spec-trace, km-triage-app, hermes, Template Cleanup, `crowdin-diagnose`, `content-i18n-normalize`, `facet-index` + `facet-index-lint`) are deliberately kept out of `packages/*` so they don't trip `pnpm -r`; run them with `tsx` (see each tool's tsconfig) — except the plain-node ones (`crowdin-diagnose`, `content-i18n-normalize`, and the `*-lint` checkers), which run under bare `node`. Do not treat them as built workspace packages. `facet-index` ([spec 036](specs/036-keyboard-facet-index/)) scans the sibling `../keyboards` corpus (the `keyboard-studio/keyboards` fork — see the phonebook note above) and emits the offline, deterministic `docs/keyboard-facet-index.json` (+ `.md` companion) — a per-keyboard facet index (036 landed the `script` facet; [spec 037](specs/037-facet-classifiers/) added the `strategy-fingerprint` and `target-mix` classifiers; [spec 041](specs/041-construction-facet-classifiers/) added the thirteen **construction** classifiers — nine desktop `.kmn`/script facets + four `.keyman-touch-layout` facets — riding on a shared shell (`cause-predicates.ts`, `measurement.ts`, the `.keyman-touch-layout` reader `touch-layout.ts`) plus the per-script input-facet derivation `display-difficulty.ts` (block-age from a pinned `DerivedAge.txt` join; feeds `content/facets/orth/display-difficulty.yaml`, validated by `facet-lint`)); [spec 043](specs/043-base-selection-facets/) added the thirteen **base-selection & strategy** classifiers — four strategy-selector (`primary-strategy`, `added-char-count`, `platform-coverage`, `font-dependency`), four writing-system-matching (`diacritic-mechanism`, `combining-mark-repertoire`, `spare-key-budget`, `orthography-coverage-ratio`), and five eligibility/enricher (`license-fork-eligibility`, `directionality`, `script-family`, `declared-bcp47-tags`, `package-completeness`) — riding a shared `.kps`/LICENSE reader (`kps-reader.ts`) and three pinned datasets under `data/` (`cldr-exemplars.json`, `known-licenses.json`, `iso15924-script-family.json`); `script-family` is the durable guard `combining-mark-repertoire` keys on. Classifiers live flat under `utilities/facet-index/*-classifier.ts`, registered as `{ classify, fallback }` pairs in `DEFAULT_CLASSIFIERS` keyed by facet id. [Spec 040](specs/040-desktop-base-layout-fallthrough/) taught the `script` classifier to fold **desktop base-layout fall-through** — an un-named base-layer physical key falls through to the OS default (`kbdus`, pinned in `utilities/facet-index/data/base-layouts.json`), so its Latin char surfaces as a distribution-only sliver (recorded in `notes`, never a dominant flip); the fold is tool-local (no `buildProducedSet`/IR/codec change). A facet YAML can land ahead of its classifier (e.g. spec 039's construction facets); the default build fails loud on such a def, and `--classified-only` builds the artifact scoped to facets that have a classifier (how the shipped index is built today). `facet-index-lint` is its plain-node artifact validator, wired into `pnpm lint`.
+The keyboards themselves live in the sibling `../keyboards` checkout, not in this repo. That
+checkout tracks the [keyboard-studio/keyboards](https://github.com/keyboard-studio/keyboards)
+fork (a stable mirror of `keymanapp/keyboards`) — the project's canonical corpus for
+deterministic tests and facet-index builds. Point `../keyboards` at that fork's `master`, not
+upstream, or corpus-calibrated tests (e.g. the recognizer `basic_kbdfr` fixtures) will drift.
+
+**Keeping the phonebook current is mandatory.** It indexes only keyboards already referenced, so
+whenever you introduce, cite, or otherwise reference a keyboard not yet in the table, you MUST
+add its row in the same change (read the keyboard's `<id>.kps` for name, BCP47 languages, and
+author — see the "Keep this current" recipe in that file). Treat a stale phonebook as a defect.
+
+## Architecture invariants
+
+[spec.md](spec.md) is authoritative for *intended* design and
+[docs/architecture.md](docs/architecture.md) composes it against the code. These are the
+cross-cutting invariants you cannot see by reading any single file — honour them, and surface
+deviations rather than inventing new ones.
+
+- **Codec / `KeyboardIR` is the spine of the engine.** `engine/src/codec` parses `.kmn` into a
+  typed `KeyboardIR` (`parse.ts` / `tokenize.ts`), emits it back (`emit.ts`), and round-trips
+  (`roundtrip.test.ts`). Scaffolding, import, validation, and mutation all operate on the IR, not
+  on raw `.kmn` text — e.g. `scaffold()` is `parse → scaffoldIR → emit`. Constructs the codec
+  can't model are preserved as opaque `RawKmnFragment` nodes (type defined in
+  `@keyboard-studio/contracts`; reasons catalogued in `engine/src/codec/opaque-reasons.ts`),
+  never silently dropped. A base the codec can't parse fails the whole scaffold (no try/catch
+  around `parse()`), so "codec-clean" matters when choosing a base.
+- **Working-copy spine (spec v1.3.0).** A single persistent working copy is instantiated when the
+  user picks a keyboard — Track 1 `instantiateFromBase` (copy/adapt) or Track 2
+  `instantiateFromExisting` (import). Every step mutates that one copy; it is serialized only at
+  output. See [docs/workflow-model.md](docs/workflow-model.md).
+- **Validator layering (spec §10).** Three layers — Layer A validity + Layer B style + Layer C
+  hygiene; Layer A is 9 TS-portable checks + 5 WASM-only (spec §10 has the per-check `kmcmplib`
+  source references). **In code:** Layer A/B — plus the Layer A' import-fidelity checks I1–I6
+  (`engine/src/validator/layer-a-prime.ts`, `index-import-fidelity.ts`) — live in
+  `engine/src/validator`; Layer C is `@keymanapp/keyboard-lint`.
+- **Single 300 ms debounce cycle (decision D3).** In the studio, the TS-check and the WASM
+  `kmcmplib` oracle run as concurrent microtasks within one debounce cycle. Do not introduce a
+  second debounce timer. **Scope:** D3 governs the *validation* cycle — anything that produces
+  diagnostics from the working copy. It does not reach persistence or network-sync timers (e.g.
+  `AUTOSAVE_DEBOUNCE_MS` and `CLOUD_SYNC_DEBOUNCE_MS` in
+  [packages/studio/src/lib/draftPersistence.ts](packages/studio/src/lib/draftPersistence.ts)),
+  which race nothing and emit no diagnostics. A new timer needs D3 sign-off when it validates;
+  not when it merely saves.
+- **Virtual FS (spec §11).** All authoring happens in an in-memory FS mirroring the
+  `keymanapp/keyboards` layout; serialized at output to an installable `.kmp` (the primary
+  download) or a source `.zip` (`engine/src/output`), or committed via GitHub OAuth fork+PR. The
+  studio never writes to host disk during authoring. **Compiled artifacts are staged on the
+  download path only** ([packages/studio/src/lib/buildOutputBundle.ts](packages/studio/src/lib/buildOutputBundle.ts)),
+  never inside the shared projection — the PR paths read that same projection, and a community PR
+  must not carry `build/` output or a `.kmp` (criteria SS1). `buildKmp` likewise stages into a
+  clone, so the caller's VFS is never mutated.
+- **Co-located Vercel functions under `/api` must stay bundle-safe.** The serverless functions
+  (`rewrites` in [vercel.json](vercel.json)) live outside the pnpm workspace but reach
+  `utilities/oauth-backend/src` by relative path, so their whole reachable module graph gets
+  traced into a **function bundle** rather than resolved as a workspace build. **A module in that
+  graph must not import a `@keyboard-studio/*` package as a value** — the contracts barrel
+  re-exports data modules that load JSON from `packages/contracts/data/`, a path outside the
+  emitted `dist/` that does not survive bundling. This fails at ESM *module load*, so the handler
+  never runs and every route returns a platform-level `FUNCTION_INVOCATION_FAILED` (text/plain)
+  instead of a JSON error — an outage, not a degraded response. `import type` is erased and
+  always fine; when a *value* is genuinely shared, copy the literal locally behind a compile-time
+  drift guard (see `GITHUB_OAUTH_CLIENTS` in
+  [utilities/oauth-backend/src/schemas.ts](utilities/oauth-backend/src/schemas.ts)). Enforced by
+  [api/bundle-safety.test.ts](api/bundle-safety.test.ts); `/api` is outside `pnpm -r`, so it runs
+  via its own CI step.
+- **Two teams (spec §12).** Engine owns the SPA, scaffolder, compiler service, validator, output
+  paths. Content owns the pattern library, survey text, gallery ordering, LLM prompts, and
+  criteria triage. Respect the split when picking up work.
+- **Standalone utilities.** `utilities/*` is deliberately kept out of `packages/*` so it doesn't
+  trip `pnpm -r`. Do not treat them as built workspace packages. Inventory and run instructions:
+  [docs/tooling.md](docs/tooling.md#standalone-utilities).
 
 ## Pattern schema is a contract
 
-The `Pattern` TS interface in spec Sec 5 is the Day-1 contract (issue #5). Treat its field names, types, and `{{slotId}}` placeholder syntax as locked. Per the revision policy (Sec 17):
+The `Pattern` TS interface in spec §5 is the Day-1 contract. Treat its field names, types, and
+`{{slotId}}` placeholder syntax as locked. Per the revision policy (§17):
 
 - Prose section edits — single-reviewer approval.
-- `Pattern` schema field renames/type changes/removals — major version bump of `packages/contracts` + joint engine+content session.
-- Reopening a resolved decision (D1–D9, Sec 14) — explicit revision request citing original decision and new evidence; **not** informal.
+- `Pattern` schema field renames/type changes/removals — major version bump of
+  `packages/contracts` + joint engine+content session.
+- Reopening a resolved decision (D1–D9, §14) — explicit revision request citing original decision
+  and new evidence; **not** informal.
 
-If a task seems to require schema-breaking changes, surface this to the user before editing — don't change the schema silently.
+**If a task seems to require schema-breaking changes, surface this to the user before editing —
+don't change the schema silently.**
 
-**Runtime enforcement.** The locked types are mirrored by zod schemas in `packages/contracts/src/schemas.ts` (`PatternSchema`, `CriterionSchema`, plus the YAML-tolerant `RawPatternSchema` the engine/studio loaders consume via `@keyboard-studio/engine/pattern-schema`). The data-file boundaries parse through them — `criteria.json` in `criteriaData.ts`, pattern YAML in the engine loader — so malformed records fail loudly. **The hand-written interfaces stay canonical; the schemas mirror them.** Compile-time drift guards in `schemas.ts` fail the build if a schema and its interface diverge, so editing a locked type means editing its schema in the same change.
+Runtime enforcement: the locked types are mirrored by zod schemas in
+`packages/contracts/src/schemas.ts`. Data-file boundaries parse through them — `criteria.json` in
+`criteriaData.ts`, pattern YAML in the engine loader — so malformed records fail loudly. The
+hand-written interfaces stay canonical; the schemas mirror them, and compile-time drift guards
+fail the build if the two diverge.
 
 ## Out of scope for v1 (do not implement)
 
-Spec Sec 16. CJK and Ethiopic reorder patterns, LDML output, mobile-app integration, hosting, multi-language `welcome.htm` variants, `.kpj.user` management, touch-first authoring (Decision 6). The v1.1.0 amendment removed "editing existing keyboards" — single-source adaptation is now in scope. Still out of scope: multi-source merge, survey-editing opaque IR fragments (`RawKmnFragment`), and byte-identical round-trip. The Three-group routing (Sec 9) explicitly renders a "not yet supported" stub for CJK/Ethiopic — do not silently empty the gallery.
+Spec §16. CJK and Ethiopic reorder patterns, LDML output, mobile-app integration, hosting,
+multi-language `welcome.htm` variants, `.kpj.user` management, touch-first authoring (Decision
+6). The v1.1.0 amendment removed "editing existing keyboards" — single-source adaptation is now
+in scope. Still out of scope: multi-source merge, survey-editing opaque IR fragments
+(`RawKmnFragment`), and byte-identical round-trip.
+
+The Three-group routing (§9) explicitly renders a "not yet supported" stub for CJK/Ethiopic — do
+not silently empty the gallery.
 
 ## KM crew
 
-The KM crew is a specialist pipeline coordinated by **`/km-lead`**. Agent definitions live in `.claude/agents/km-*.md`; slash-command entry points live in `.claude/commands/km-*.md`. **Crew-file edits are gated by `pnpm crew-lint`** (see the commands table) — run it after touching any `.claude/**/km-*` file; the drift classes it catches (rubric forks, phantom paths, emoji, rotted line refs, sentinel misspellings) have all shipped before.
+A specialist pipeline coordinated by **`/km-lead`**. Agent definitions live in
+`.claude/agents/km-*.md`; slash-command entry points in `.claude/commands/km-*.md`. **The full
+roster — who does what, when to invoke each — is
+[.claude/agents/km-README.md](.claude/agents/km-README.md).**
+
+**Crew-file edits are gated by `pnpm crew-lint`.** Run it after touching any `.claude/**/km-*`
+file.
 
 ### The one skill: `/km-lead`
 
-`/km-lead` is the **only** KM crew member invoked as a Skill. It loads a team-lead playbook into the **main session's** context. The main session adopts the lead role, plans the work, and spawns all other specialists as Agent subagents. It is not itself a subagent.
+`/km-lead` is the **only** KM crew member invoked as a Skill. It loads a team-lead playbook into
+the **main session's** context; the main session then adopts the lead role, plans the work, and
+spawns all other specialists as Agent subagents. It is not itself a subagent.
 
-Use `/km-lead` when starting any coordinated team task. For brief, one-off tasks where the main session needs to temporarily act as a single specialist (e.g. a quick archivist action), you may invoke the individual skill — but when running a team task through km-lead, **always use the other roles as Agent subagent_types, never as skills**.
+Use `/km-lead` when starting any coordinated team task. For brief one-off tasks where the main
+session needs to temporarily act as a single specialist, you may invoke that individual skill —
+but when running a team task through km-lead, **always use the other roles as Agent
+`subagent_type`s, never as skills**.
 
-### All other km-* roles: Agent subagent_types
-
-Every specialist except km-lead is defined in `.claude/agents/` and should be invoked via `Agent({ subagent_type: "<name>", prompt: "..." })`. The individual `/km-*` slash commands exist for one-off use only.
-
-**Implementation**
-- `km-programmer` — implements code changes across the TS monorepo (contracts, scaffolder, engine, validator)
-- `km-frontend` — SPA front-end (TypeScript + React + Vite); three-pane layout, 300 ms debounce, VirtualFS authoring
-- `km-simplify` — refactor specialist; removes dead code, consolidates duplication
-
-**Domain expertise**
-- `km-domain` — master linguist; script/layout/normalization/IME-design decisions
-- `km-keyman` — Keyman / `.kmn` / `kmcmplib` expert; Pattern schema semantics, 14 Layer-A checks
-- `km-strategy` — owns spec §7 strategy framework (A1–A7, decision tree, S-01..S-12, §7.5)
-- `km-validator` — validator-layer specialist; spec §10 three-layer architecture, Layer A/B/C checks
-- `km-output` — output / scaffolder / VirtualFS specialist; spec §11/§12, zip, GitHub OAuth fork+PR
-- `km-author` — original-intent reviewer; keymanapp/keyman upstream parity, `.kmn` idioms
-
-**Quality gates**
-- `km-qc` — code-quality review; style, complexity, error handling, test coverage
-- `km-verification` — verifies a change does what it claims; runs tests, produces pre/post evidence
-- `km-testing` — vitest + Playwright suite engineer; fixtures, round-trip test vectors
-- `km-synthesis` — integration-fit reviewer; checks new code against existing patterns, flags duplication
-
-**Coordination & documentation**
-- `km-archivist` — git commits, PR creation, AC reconciliation, CHANGELOG, release cuts
-- `km-doc` — maintains `docs/`, spec-signoff log, module docstrings
-- `km-README` — read-only crew roster reference
-
-### How /km-lead operates
-
-`/km-lead` loads the team-lead playbook into the main session. km-lead plans work, writes a `dispatch_plan` YAML block before every cycle so the user can see what's about to fire, then immediately calls the Agent tool to execute it in the same response. Independent specialists in the same cycle run in parallel.
+km-lead writes a `dispatch_plan` YAML block before every cycle so the user can see what's about
+to fire, then calls the Agent tool to execute it in the same response. Independent specialists in
+the same cycle run in parallel.
 
 ### Branch policy
 
@@ -156,53 +253,104 @@ One feature branch per km-lead cycle. Convention: `km/<short-task-slug>`.
 
 - Open the branch at cycle 1. State it in the dispatch_plan `branch:` field.
 - All specialist commits during the cycle target that branch.
-- `km-archivist` opens a PR against `main` at cycle close with `closes #N` or `refs #N` per the issue closure policy below.
+- `km-archivist` opens a PR against `main` at cycle close with `closes #N` or `refs #N` per the
+  policy below.
 - **Direct-to-main only when the user explicitly authorizes it** for that specific commit.
 
 When in doubt, branch.
 
 ### Issue closure policy
 
-When a cycle lands work that touches a tracked issue (`#N`), the closing specialist — usually `/km-archivist` at PR open, but also `/km-lead` for direct-to-main commits — must reconcile what shipped against the issue's acceptance-criteria checkboxes:
+When a cycle lands work that touches a tracked issue (`#N`), the closing specialist — usually
+`km-archivist` at PR open, but also `/km-lead` for direct-to-main commits — must reconcile what
+shipped against the issue's acceptance-criteria checkboxes:
 
-1. **Enumerate the AC checkboxes.** `gh issue view N --json body` and walk the `- [ ]` list. If the issue has no checkboxes, this policy does not apply.
-2. **Verify each one against the diff.** A checkbox is *done* only if the shipped change actually satisfies it — not if "we meant to" or "it's covered by another PR." Run the relevant command, read the relevant file, or call the relevant specialist (typically `/km-verification`) to confirm.
-3. **Check the boxes that are done.** `gh issue edit N --body "<updated>"` with the verified boxes flipped to `- [x]`. Leave a one-line note in the issue or PR body explaining which boxes flipped and which didn't.
-4. **Pick the right closing keyword.**
-   - **All boxes checked** → `closes #N` in the PR or commit message.
-   - **Some boxes still open** → `refs #N` (not `closes`), and the issue stays open. Do not check boxes you haven't verified.
+1. **Enumerate the AC checkboxes.** `gh issue view N --json body` and walk the `- [ ]` list. If
+   the issue has no checkboxes, this policy does not apply.
+2. **Verify each one against the diff.** A checkbox is *done* only if the shipped change actually
+   satisfies it — not if "we meant to" or "it's covered by another PR". Run the relevant command,
+   read the relevant file, or call the relevant specialist (typically `km-verification`).
+3. **Check the boxes that are done.** `gh issue edit N --body "<updated>"` with the verified boxes
+   flipped. Leave a one-line note explaining which flipped and which didn't.
+4. **Pick the right closing keyword.** All boxes checked → `closes #N`. Some still open →
+   `refs #N`, and the issue stays open. Do not check boxes you haven't verified.
 
-The point: an issue with half its checkboxes flipped is more honest than one closed prematurely or one left fully unchecked despite real progress. Partial closures are normal; silent partial closures are the bug.
-
-### Use the crew for…
-
-Review cycles on spec or code changes; coordinated multi-specialist refactors; anything that benefits from parallel specialist perspectives. `docs/spec-signoff.md` is the model for what a completed cycle looks like.
+An issue with half its checkboxes flipped is more honest than one closed prematurely or one left
+fully unchecked despite real progress. Partial closures are normal; **silent** partial closures
+are the bug.
 
 ## Spec-kit (spec-driven feature loop)
 
-[spec-kit](https://github.com/github/spec-kit) provides the **per-feature** generative loop that sits *below* the monolithic [spec.md](spec.md). It is installed in `.specify/` (templates, scripts, `memory/constitution.md`) with the skills under `.claude/skills/speckit-*`. The CLI version is pinned in [scripts/spec-kit-version.json](scripts/spec-kit-version.json) — re-run `specify init --here` only after deliberately bumping that pin.
+[spec-kit](https://github.com/github/spec-kit) provides the **per-feature** generative loop that
+sits *below* the monolithic [spec.md](spec.md). Installed in `.specify/` (templates, scripts,
+`memory/constitution.md`) with skills under `.claude/skills/speckit-*`. The CLI version is pinned
+in [scripts/spec-kit-version.json](scripts/spec-kit-version.json) — re-run `specify init --here`
+only after deliberately bumping that pin.
 
-**Section-by-section spec extraction (in progress, 2026-06-15→).** The monolithic `spec.md` is being migrated into `specs/NNN-<slug>/` folders one numbered section at a time, where `NNN` mirrors the spec.md section number (e.g. `specs/007-strategy-selection/` for §7). **The extracted folder is authoritative for its section once landed; `spec.md` keeps a stub pointer.** Sections not yet extracted remain authoritative in `spec.md`. The reference-only sections (§14 resolved decisions, §17 glossary, §18 revision policy, §19 reference) are not planned for extraction. Extracted so far: §7 (pilot, 2026-06-15), §8 (2026-06-15), §5 (Pattern schema, 2026-06-16).
+**Workflow:** `/speckit-specify` (+ `/speckit-clarify`) → `/speckit-plan` (Constitution Check) →
+`/speckit-tasks` → `/speckit-taskstoissues`, then `/km-lead` dispatches the crew against the
+tasks. `/speckit-analyze` runs as a `km-doc`/`km-synthesis` review check before
+`/speckit-implement`.
 
-**Not everything is a feature — don't shred the architecture.** Only *feature / contract* sections extract into `specs/NNN/`. The **architecture-core** sections — §4 (system overview), §5a (KeyboardIR spine), §9 (routing), §10 (validator layering), §11 (criteria model), §12/§13 (output + team boundaries) — describe how the whole tool composes; they are **not** features and stay authoritative in `spec.md`, composed (with links to code + the extracted feature specs) in [docs/architecture.md](docs/architecture.md), the system/meta-flow layer. (§8 Data flow was extracted before this rule; it is the meta-flow and is treated as architecture-core wherever its text lives.) `docs/architecture.md` is the home for "how the tool works"; `spec.md` architecture-core sections are its detail; `constitution.md` holds the invariant rules. When deciding whether to extract a section, ask: *feature/contract → `specs/NNN`; architecture/meta-flow → stays, composed in `docs/architecture.md`; reference → stays.*
+`.specify/memory/constitution.md` restates the locked gates so `/speckit-plan`'s Constitution
+Check enforces them mechanically. It does **not** amend the spec — on conflict `spec.md` +
+[docs/spec-signoff.md](docs/spec-signoff.md) win.
 
-**New features still get their own `specs/NNN-<slug>/`** with a creation-order `NNN`, and **cite the governing `spec.md §X` (or its extracted folder)** rather than re-deriving scope. The mirror-numbering convention only applies to spec sections being extracted — new features pick the next free `NNN` above the extracted-section range.
+### Section extraction — don't shred the architecture
 
-- **`.specify/memory/constitution.md`** restates the locked gates (Pattern schema, KeyboardIR spine, working-copy spine, validator layering, VirtualFS, team boundaries, out-of-scope, conventions) so `/speckit-plan`'s Constitution Check enforces them mechanically. It does **not** amend the spec — on conflict `spec.md` + [docs/spec-signoff.md](docs/spec-signoff.md) win.
-- **Workflow:** `/speckit-specify` (+ `/speckit-clarify`) → `/speckit-plan` (Constitution Check) → `/speckit-tasks` → `/speckit-taskstoissues`, then `/km-lead` dispatches the crew against the tasks. `/speckit-analyze` runs as a `km-doc`/`km-synthesis` review check before `/speckit-implement`.
-- **Drift split:** `utilities/spec-trace` owns textual drift of the spec corpus — the monolith `spec.md` sections, the extracted feature specs (`specs/NNN/spec.md`), and the architecture/meta-flow doc (`docs/architecture.md`); it hashes each unit and flags un-acknowledged changes (`node utilities/spec-trace check|report|acknowledge`). `/speckit-analyze` owns per-feature `spec ↔ plan ↔ tasks` consistency. Do **not** install spec-kit's "Spec Trace" community extension — it duplicates the existing utility.
+The monolithic `spec.md` is migrating into `specs/NNN-<slug>/` folders one numbered section at a
+time, where `NNN` mirrors the spec.md section number (e.g. `specs/007-strategy-selection/` for
+§7). **The extracted folder is authoritative for its section once landed; `spec.md` keeps a stub
+pointer.** Sections not yet extracted remain authoritative in `spec.md`. Extracted so far: §7
+(pilot), §8, §5 (Pattern schema).
+
+Only *feature / contract* sections extract. The **architecture-core** sections — §4 (system
+overview), §5a (KeyboardIR spine), §9 (routing), §10 (validator layering), §11 (criteria model),
+§12/§13 (output + team boundaries) — describe how the whole tool composes; they are **not**
+features and stay authoritative in `spec.md`, composed in
+[docs/architecture.md](docs/architecture.md). (§8 Data flow was extracted before this rule; it is
+the meta-flow and is treated as architecture-core wherever its text lives.) The reference-only
+sections (§14, §17, §18, §19) are not planned for extraction.
+
+When deciding whether to extract: *feature/contract → `specs/NNN`; architecture/meta-flow → stays,
+composed in `docs/architecture.md`; reference → stays.*
+
+**New features still get their own `specs/NNN-<slug>/`** with a creation-order `NNN`, and **cite
+the governing `spec.md §X`** (or its extracted folder) rather than re-deriving scope. The
+mirror-numbering convention applies only to sections being extracted; new features pick the next
+free `NNN` above the extracted-section range.
+
+**Drift split:** `utilities/spec-trace` owns textual drift of the spec corpus — the monolith's
+sections, the extracted feature specs, and `docs/architecture.md`; it hashes each unit and flags
+un-acknowledged changes (`node utilities/spec-trace check|report|acknowledge`).
+`/speckit-analyze` owns per-feature `spec ↔ plan ↔ tasks` consistency. Do **not** install
+spec-kit's "Spec Trace" community extension — it duplicates the existing utility.
 
 ## Conventions
 
-- Windows environment: no emoji in console output (global CLAUDE.md rule). Use `[OK]`, `[ERROR]`, `[WARN]` etc.
-- File references in user-facing text use markdown links (`[spec.md](spec.md)`), not backticks, per the VSCode-extension guidance in the system prompt.
-- Don't cite specific GitHub issue numbers inside shipped code or comments — cross-link via commit messages and PR bodies (spec Sec 18).
-- **Accessibility** (spec 056): studio UI code follows the house rules in [docs/accessibility.md](docs/accessibility.md) — semantic HTML first, keyboard-operable everything, programmatic labels, ARIA APG patterns for composite widgets, codepoint-derived accessible names for glyphs, aria-live riding existing cycles (D3). Conformance state lives in [specs/056-ada-accessibility/wcag-2.2-aa-tracker.md](specs/056-ada-accessibility/wcag-2.2-aa-tracker.md); a tracker row flips to `pass` only with named evidence.
-- **i18n message ids** (spec 046): `area ( "." segment )+`, lowercase, dot-separated — e.g. `welcome.title`, `output.submit.button.submit`. An id is a permanent handle; renaming one orphans its translations, so only do it when the string's *meaning* changed, not its wording. Full authoring rules (JSX `<Trans>` vs. the `t` macro, variable interpolation, ICU plurals, what not to wrap) live in [specs/046-i18n-localization/contracts/catalog-format.md](specs/046-i18n-localization/contracts/catalog-format.md); rationale in [docs/i18n-spike.md](docs/i18n-spike.md).
+- Windows environment: no emoji in console output (global CLAUDE.md rule). Use `[OK]`, `[ERROR]`,
+  `[WARN]`.
+- File references in user-facing text use markdown links (`[spec.md](spec.md)`), not backticks.
+- Don't cite specific GitHub issue numbers inside shipped code or comments — cross-link via
+  commit messages and PR bodies (spec §18).
+- **Accessibility** (spec 056): studio UI code follows the house rules in
+  [docs/accessibility.md](docs/accessibility.md) — semantic HTML first, keyboard-operable
+  everything, programmatic labels, ARIA APG patterns for composite widgets, codepoint-derived
+  accessible names for glyphs, aria-live riding existing cycles (D3). Conformance state lives in
+  [specs/056-ada-accessibility/wcag-2.2-aa-tracker.md](specs/056-ada-accessibility/wcag-2.2-aa-tracker.md);
+  a tracker row flips to `pass` only with named evidence.
+- **i18n message ids** (spec 046): `area ( "." segment )+`, lowercase, dot-separated — e.g.
+  `welcome.title`, `output.submit.button.submit`. An id is a permanent handle; renaming one
+  orphans its translations, so only do it when the string's *meaning* changed, not its wording.
+  Full authoring rules (JSX `<Trans>` vs. the `t` macro, variable interpolation, ICU plurals,
+  what not to wrap) live in
+  [specs/046-i18n-localization/contracts/catalog-format.md](specs/046-i18n-localization/contracts/catalog-format.md);
+  rationale in [docs/i18n-spike.md](docs/i18n-spike.md).
 
 ## Commit and issue title style
 
-Adopted from [keymanapp/keyman](https://github.com/keymanapp/keyman/issues). Format: `<prefix>(<area>): <description>`.
+Adopted from [keymanapp/keyman](https://github.com/keymanapp/keyman/issues). Format:
+`<prefix>(<area>): <description>`.
 
 **Prefixes**
 
@@ -211,21 +359,24 @@ Adopted from [keymanapp/keyman](https://github.com/keymanapp/keyman/issues). For
 - `feat` — new functionality (issues, PRs, commits)
 - `docs` — documentation only
 - `chore` — housekeeping with no behaviour change (deps bumps, formatting, build wiring)
-- `maint` — internal cleanup that touches functional code but is not a feature or fix (renames, dead-code removal, shape-preserving cleanup)
+- `maint` — internal cleanup that touches functional code but is not a feature or fix (renames,
+  dead-code removal, shape-preserving cleanup)
 - `refactor` — structural restructuring with no behaviour change
 - `epic` — umbrella tracking issue (no area)
 - `auto` — machine-generated (dep bumps, version bumps)
 
 **Areas** (parenthesised after the prefix; pick the smallest that locates the change):
-`contracts`, `tools`, `scaffolder`, `engine`, `studio`, `output`, `criteria`, `spec`, `process`, `base-browser`, `deps`, `deps-dev`. Drop the area if the change spans more than one (e.g. `chore: bump TS across packages`).
+`contracts`, `tools`, `scaffolder`, `engine`, `studio`, `output`, `criteria`, `spec`, `process`,
+`base-browser`, `deps`, `deps-dev`. Drop the area if the change spans more than one.
 
 **Examples**
 
 - `bug(scaffolder): scaffold() doesn't validate keyboardId per §10 Layer A check #1`
-- `fix(scaffolder): validate keyboardId in scaffold() before VirtualFS write` (PR closing the bug)
+- `fix(scaffolder): validate keyboardId in scaffold() before VirtualFS write`
 - `feat(tools): K_SYMBOLS placement algorithm + dry-run preview`
 - `docs(spec): clarify §7.2 decision-tree firing order`
 - `chore(deps): bump vitest 1.6 → 2.0`
 - `maint(contracts): rename PatternQuestion.required → optional`
 
-Keep `bug` and `fix` separate — `bug(...)` issues link to `fix(...)` PRs via `closes #N`. Mixing the two blurs the issue/PR relationship.
+Keep `bug` and `fix` separate — `bug(...)` issues link to `fix(...)` PRs via `closes #N`. Mixing
+the two blurs the issue/PR relationship.

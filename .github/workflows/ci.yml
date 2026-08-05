@@ -126,6 +126,13 @@ jobs:
       - name: Test (i18n utilities — outside the pnpm workspace)
         run: pnpm run test:i18n-utilities
 
+      # spec-trace is likewise outside the workspace. Its search half is what
+      # the crew uses instead of reading whole spec files, and the budget cap
+      # it advertises is load-bearing — callers size their context around it,
+      # so an unenforced cap is a silent context blowout, not a cosmetic bug.
+      - name: Test (spec-trace — outside the pnpm workspace)
+        run: pnpm run test:spec-trace
+
       # Non-blocking: warns in CI log and opens GitHub Issues for any spec
       # sections whose content changed since the last acknowledgement.
       # Never fails the build — drift is a backlog item, not a blocker.
