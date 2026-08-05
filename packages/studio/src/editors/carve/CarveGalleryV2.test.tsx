@@ -58,7 +58,10 @@ beforeEach(() => {
 // Fixture — one keyboard exercising all four grouping/search/banner paths:
 //   'a' — K_A,             basic-letter / direct-key
 //   '1' — K_1,             digit        / direct-key
-//   'C' — Shift+K_C,       basic-letter / direct-key (key label "Shift + C")
+//   'C' — Shift+K_C,       basic-letter / direct-key (key label "Shift + c" —
+//                          lowercase key name under the keycap convention,
+//                          the produced 'C' is a separate, still-uppercase
+//                          character)
 //   'q' — store item,      basic-letter / store       (no key sequence)
 // ---------------------------------------------------------------------------
 

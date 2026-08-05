@@ -969,6 +969,11 @@ function surveySnapshot(): SurveySessionSnapshot {
   return {
     activeStepId: s.activeStepId,
     history: [...s.history],
+    // The walk's high-water mark (surveySessionStore.ts). Persisted for the
+    // same reason `history` is: without it, a resumed draft cannot tell a stage
+    // the author FINISHED and jumped behind from one they never reached, and
+    // every dot ahead of them goes back to being refused.
+    visited: [...s.visited],
     identityResult: s.identityResult,
     identityPhaseResult: s.identityPhaseResult,
     surveyContext: s.surveyContext,
@@ -981,5 +986,7 @@ function surveySnapshot(): SurveySessionSnapshot {
     baseConfirmed: s.baseConfirmed,
     touchSeedSource: s.touchSeedSource,
     discoveryMethod: s.discoveryMethod,
+    markedForLaterDesktop: s.markedForLaterDesktop,
+    markedForLaterTouch: s.markedForLaterTouch,
   };
 }

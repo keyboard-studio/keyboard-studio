@@ -28,6 +28,7 @@ import { render } from "./test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore, snapshotTraversal } from "./stores/surveySessionStore.ts";
 import { useStartOverStore } from "./stores/startOverStore.ts";
+import { useStepWalkStore } from "./stores/stepWalkStore.ts";
 import { consumePendingWelcomeLocation, jumpToLocation } from "./lib/jumpToLocation.ts";
 import { snapshotWorkingCopyData } from "./lib/persistWorkingCopy.ts";
 import type { OnInstantiateCallback, Stage } from "./hooks/useKeyboardArtifact.ts";
@@ -718,6 +719,10 @@ afterEach(() => {
   cleanup();
   useWorkingCopyStore.getState().reset();
   useSurveySessionStore.getState().reset();
+  // The footer's visibility gate reads this store (FR-040's revised rule — a
+  // published walk means the journey has started), so a walk left behind by a
+  // previous test would decide a later test's footer for it.
+  useStepWalkStore.getState().reset();
   vi.clearAllMocks();
   // The first-visit gate reads ks.visited / the ks.studio.draft key from
   // localStorage; clear it so gate state can't leak between tests.
@@ -1160,7 +1165,7 @@ describe("StudioShell — first-visit landing gate", () => {
 
     // A newcomer is forced onto welcome even on a deep-linked #survey hash, and
     // that hash is normalized to #welcome. Without this normalization the
-    // WelcomeScreen "I'm new" button's navigateTo("survey") would be a
+    // WelcomeScreen "Continue as guest" button's navigateTo("survey") would be a
     // same-value hash assignment that fires zero hashchange events, soft-locking
     // the user on welcome.
     expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
@@ -2476,7 +2481,7 @@ describe("SurveyView — a reset happens only on an explicit start-over (spec 05
 //
 // Defect D-9: `hashToRoute` forces a genuine newcomer onto `#welcome` and
 // rewrites the address bar to match, DISCARDING whatever location was
-// requested. That rewrite is load-bearing (without it, "I'm new"'s
+// requested. That rewrite is load-bearing (without it, "Continue as guest"'s
 // `navigateTo("survey")` would be a same-value hash assignment firing zero
 // hashchange events, soft-locking the visitor on welcome), so the fix is not
 // to remove it but to hold the requested location across it — see
@@ -2568,5 +2573,55 @@ describe("StudioShell — a first-time visitor's deep link survives the welcome 
       at: { route: "survey" },
       reason: "no-project",
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The journey footer is actually MOUNTED by the shell (spec 057 T052, FR-040).
+//
+// This gap was real: StudioFooter.a11y.test.tsx renders the component in
+// isolation and e2e/footer-progress.spec.ts is outside the unit CI lane, so
+// dropping `<StudioFooter />` from the shell shipped green. These two cases pin
+// the mount and both sides of the revised visibility gate through the real
+// shell, in the lane every PR runs.
+// ---------------------------------------------------------------------------
+
+describe("StudioShell — journey footer mount (T052, FR-040)", () => {
+  it("mounts the footer on #survey once the journey has started, with no base keyboard yet", async () => {
+    window.location.hash = "#survey";
+    localStorage.setItem("ks.visited", "1");
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    // This file mocks `survey/FlowStepHost.tsx` and `survey/index.ts`, so the
+    // real SurveyRunner — the thing that publishes a walk on mount — never
+    // runs here. Publish what it would publish, which is the state the shell
+    // has to render correctly. (The unmocked end of this, the real runner
+    // publishing `identity` at question 1, is covered by
+    // StudioFooter.a11y.test.tsx's gate cases.)
+    act(() => {
+      useStepWalkStore
+        .getState()
+        .publishStepWalk("identity", [{ id: "il_language_english", done: false }]);
+    });
+
+    expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
+
+    const footer = document.querySelector("footer");
+    expect(footer).not.toBeNull();
+    expect(footer!.querySelectorAll("[data-progress-dot-kind]").length).toBeGreaterThan(0);
+  });
+
+  it("does not mount the footer on the welcome screen", async () => {
+    window.location.hash = "";
+    localStorage.clear(); // pristine browser: the first-visit gate forces welcome
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(document.querySelector("footer")).toBeNull();
   });
 });

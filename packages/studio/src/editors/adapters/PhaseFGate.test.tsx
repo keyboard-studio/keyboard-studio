@@ -154,6 +154,60 @@ describe("PhaseFGate — coverage-blocked dialog", () => {
 });
 
 // ---------------------------------------------------------------------------
+// CRITICAL INVARIANT (mechanism-gallery-progression): "mark for later review"
+// (surveySessionStore.markedForLaterDesktop/markedForLaterTouch) relaxes ONLY
+// the gallery Done button and the NavBar "still to account for" indicator
+// (lib/accountedForGate.ts's useAccountedForGate()). It must NEVER relax the
+// Phase F hard gate — PhaseFGate reads `useInventoryCoverageGate()` directly
+// (../../hooks/useInventoryCoverageGate.ts), which has no mark-aware
+// parameter at all, so a marked-but-unimplemented character is still
+// UNIMPLEMENTED here and the gate stays blocked.
+// ---------------------------------------------------------------------------
+
+describe("PhaseFGate — marks do not relax the Phase F hard gate", () => {
+  it("stays blocked (dialog open, gate.blocked true) when every uncovered character has been marked for later review", async () => {
+    const inventory = ["á", "é"];
+    seedInstantiatedWorkingCopy(inventory);
+    // No mechanism assignments recorded — both characters are genuinely
+    // unimplemented in the physical/desktop modality.
+
+    // Mark BOTH uncovered characters for later review — the exact authoring
+    // action MechanismGallery's "Mark for later review" toggle performs.
+    useSurveySessionStore.getState().toggleMarkedForLaterDesktop("á");
+    useSurveySessionStore.getState().toggleMarkedForLaterDesktop("é");
+    expect(useSurveySessionStore.getState().markedForLaterDesktop).toEqual(["á", "é"]);
+
+    const { PhaseFGate } = await import("./PhaseFGate.tsx");
+    const { container } = render(<PhaseFGate onComplete={vi.fn()} />);
+
+    // The Phase F dialog is STILL open — marks did not relax it.
+    expect(container.querySelector("dialog")?.hasAttribute("open")).toBe(true);
+    const bodyText = document.body.textContent ?? "";
+    expect(bodyText).toContain("á");
+    expect(bodyText).toContain("é");
+    expect(bodyText).toMatch(/2 characters still need an implementation/);
+  });
+
+  it("advance.ts's allCharactersImplemented (fed by the SAME hook) is still false when marked-but-unimplemented", async () => {
+    const inventory = ["á"];
+    seedInstantiatedWorkingCopy(inventory);
+    useSurveySessionStore.getState().toggleMarkedForLaterDesktop("á");
+
+    const { useInventoryCoverageGate } = await import(
+      "../../hooks/useInventoryCoverageGate.ts"
+    );
+    const { renderHook } = await import("@testing-library/react");
+    const { result } = renderHook(() => useInventoryCoverageGate());
+
+    // This is exactly `!useInventoryCoverageGate().blocked` — StepHost's own
+    // `allCharactersImplemented` computation (components/StepHost.tsx) — and
+    // it must be false: marks are invisible to this hook by construction.
+    expect(result.current.blocked).toBe(true);
+    expect(result.current.unimplementedDesktop).toEqual(["á"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // "Go back and finish" — the P0 Back->Phase F regression.
 //
 // Root cause: PhaseFGate's handleGoBack used to call the forward-push

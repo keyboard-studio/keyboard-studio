@@ -24,6 +24,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
@@ -49,6 +50,7 @@ vi.mock("./useKeyboardArtifact.ts", async (importOriginal) => ({
 
 function resetStore() {
   useWorkingCopyStore.getState().reset();
+  useSurveySessionStore.getState().reset();
 }
 
 function swapAssignment(target: string): MechanismAssignment {
@@ -125,5 +127,34 @@ describe("usePreviewArtifact — canDownload folds in inventory coverage (P0)", 
     rerender();
 
     expect(result.current.downloadError).not.toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // CRITICAL INVARIANT (mechanism-gallery-progression): "mark for later
+  // review" (surveySessionStore.markedForLaterDesktop) relaxes ONLY the
+  // gallery Done button and the NavBar indicator (lib/accountedForGate.ts).
+  // `usePreviewArtifact`'s `coverageGate`/`canDownload` read
+  // `useInventoryCoverageGate()` directly — the same implemented-only hook
+  // this whole file already tests — which has no mark-aware parameter at
+  // all, so marking every uncovered character must NOT unblock the download/
+  // submit gate.
+  // -------------------------------------------------------------------------
+  it("canDownload stays false when every uncovered character has been marked for later review", async () => {
+    seedInstantiatedWorkingCopy(["á", "é"]);
+    // Only "á" gets a physical mechanism — "é" is left unimplemented, but
+    // marked for later review (the exact authoring action MechanismGallery's
+    // "Mark for later review" toggle performs).
+    useWorkingCopyStore.getState().recordAssignments([swapAssignment("á")]);
+    useSurveySessionStore.getState().toggleMarkedForLaterDesktop("é");
+    expect(useSurveySessionStore.getState().markedForLaterDesktop).toEqual(["é"]);
+
+    const { usePreviewArtifact } = await import("./usePreviewArtifact.ts");
+    const { result } = renderHook(() => usePreviewArtifact());
+
+    // The mark is invisible to this hook — "é" is still unimplementedDesktop,
+    // the gate is still blocked, and download/submit is still refused.
+    expect(result.current.coverageGate.blocked).toBe(true);
+    expect(result.current.coverageGate.unimplementedDesktop).toEqual(["é"]);
+    expect(result.current.canDownload).toBe(false);
   });
 });

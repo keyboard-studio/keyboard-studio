@@ -39,8 +39,17 @@ export function getCurrentCharChip(): HTMLElement {
  * has exactly one selected chip, and its accessible name is exactly
  * `Go to <U+XXXX> <char>` — the replacement for the removed heading card's
  * `<U+XXXX> <char>` label (see this module's file header).
+ *
+ * Pass `{ marked: true }` for a character in the caller surface's "mark for
+ * later review" set (mechanism-gallery-progression): CharScrollStrip appends
+ * a `marked for later review` clause to that chip's own accessible name (see
+ * that file's `chipMarkedClause` — a BLUE flag glyph is the visual half of
+ * the same signal, never the only one), so its exact accessible name differs
+ * from an unmarked chip's.
  */
-export function expectCurrentChar(char: string): void {
+export function expectCurrentChar(char: string, opts: { marked?: boolean } = {}): void {
   const chip = getCurrentCharChip();
-  expect(chip.getAttribute("aria-label")).toBe(`Go to ${toUPlusNotation(char)} ${char}`);
+  const base = `Go to ${toUPlusNotation(char)} ${char}`;
+  const expected = opts.marked === true ? `${base} marked for later review` : base;
+  expect(chip.getAttribute("aria-label")).toBe(expected);
 }

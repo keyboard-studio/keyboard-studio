@@ -1,5 +1,5 @@
 // git-baseline — resolves "what did this catalog look like before" for the
-// baseline regression guard (#1489).
+// baseline regression guard.
 //
 // Deliberately separate from index.js's pure measureRegression/
 // checkBaselineRegression: those take plain objects and are exercised by
@@ -18,8 +18,21 @@
 const { execFileSync } = require("node:child_process");
 const path = require("node:path");
 
+// This module's whole design goal is "tolerate failure by skipping, don't
+// crash the lint run" -- offline, no origin remote, shallow clone. A stalled
+// network connection defeats that goal a different way: execFileSync blocks
+// until the OS-level TCP timeout (can be minutes) rather than failing fast
+// into the catch block below. Every git call here gets a generous but finite
+// ceiling so a bad connection degrades like any other failure instead of
+// hanging `pnpm lint` for everyone.
+const GIT_TIMEOUT_MS = 10_000;
+
 function git(args, cwd) {
-  return execFileSync("git", args, { cwd, stdio: ["ignore", "pipe", "ignore"] }).toString("utf8");
+  return execFileSync("git", args, {
+    cwd,
+    stdio: ["ignore", "pipe", "ignore"],
+    timeout: GIT_TIMEOUT_MS,
+  }).toString("utf8");
 }
 
 /**
@@ -44,6 +57,7 @@ function resolveBaselineRef(cwd) {
     execFileSync("git", ["fetch", "--quiet", "--depth=1", "origin", baseBranch], {
       cwd,
       stdio: "ignore",
+      timeout: GIT_TIMEOUT_MS,
     });
     git(["rev-parse", "--verify", `origin/${baseBranch}`], cwd);
     return `origin/${baseBranch}`;
@@ -82,4 +96,4 @@ function readCatalogAtRef(ref, absPath, cwd) {
   }
 }
 
-module.exports = { resolveBaselineRef, readCatalogAtRef };
+module.exports = { resolveBaselineRef, readCatalogAtRef, GIT_TIMEOUT_MS };

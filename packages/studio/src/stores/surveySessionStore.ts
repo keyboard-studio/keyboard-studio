@@ -193,6 +193,34 @@ function popValidHistoryEntry(
   return { prev, rest: sanitized.slice(0, -1) };
 }
 
+/**
+ * Record a visit, preserving first-visit order and returning the SAME array
+ * when nothing changed — so a re-visit does not notify every subscriber of the
+ * traversal store with an identical value.
+ *
+ * See `SurveySessionState.visited` for what this slot is and why it never
+ * shrinks.
+ */
+function withVisited(
+  visited: readonly ActiveStepId[],
+  ...steps: readonly ActiveStepId[]
+): readonly ActiveStepId[] {
+  const fresh = steps.filter((s, i) => !visited.includes(s) && steps.indexOf(s) === i);
+  return fresh.length === 0 ? visited : [...visited, ...fresh];
+}
+
+/**
+ * The `visited` array for a restored snapshot, tolerating one written before
+ * the slot existed (see `hydrate`). Typed against the snapshot rather than the
+ * slot because the whole point is that the field may be absent at runtime while
+ * the type says otherwise.
+ */
+function normalizeVisited(snapshot: SurveySessionData): readonly ActiveStepId[] {
+  const stored: unknown = snapshot.visited;
+  if (Array.isArray(stored) && stored.length > 0) return [...(stored as ActiveStepId[])];
+  return withVisited([], ...snapshot.history, snapshot.activeStepId);
+}
+
 // ---------------------------------------------------------------------------
 // State interface
 // ---------------------------------------------------------------------------
@@ -202,6 +230,35 @@ export interface SurveySessionState {
 
   /** Current manifest step id, incl. terminals "done" / "unsupported". */
   activeStepId: ActiveStepId;
+
+  /**
+   * Every step the author has ever stood on, in first-visit order — the walk's
+   * HIGH-WATER MARK, as distinct from `history`'s "how do I get back from
+   * here" stack.
+   *
+   * WHY THIS EXISTS (defect, 2026-08-05: "I jumped back and now I can't jump
+   * forward again"). `history` is a back-stack: every backward primitive
+   * TRUNCATES it, `jumpToStep` most aggressively of all — landing on "identity"
+   * from "touch" leaves it empty. Reachability was asking `history` "has the
+   * author been here", so the moment they jumped back, every stage they had
+   * already finished became indistinguishable from one they had never seen, and
+   * `resolveLocation` refused it as `beyond-gate`. The row still SHOWED those
+   * stages (their completed dots come from the decision record, which a jump
+   * does not touch — FR-063), so the author was looking at their own finished
+   * work and being told it was ahead of them. The only way forward was to
+   * re-walk every step by hand.
+   *
+   * MONOTONIC. Nothing removes an entry; only `reset()` clears the slot. That
+   * is precisely what makes it safe to gate on: a step is in here only because
+   * the author genuinely reached it, so honouring a jump to one can never skip
+   * a lock — the lock already fired on the way in. A step they have never
+   * reached is still absent, still `beyond-gate`, still refused.
+   *
+   * Deduplicated: a revisited step keeps its FIRST position, so the array reads
+   * as the author's route through the manifest and `indexOf` is a stable
+   * "how far had I got when I first saw this".
+   */
+  visited: readonly ActiveStepId[];
 
   /**
    * Walked-step stack — the back-nav source of truth (D5).
@@ -225,6 +282,12 @@ export interface SurveySessionState {
    * ready-made forms — the base's existing content needs a follow-on
    * conversion. This flag only RECORDS that the need exists; building the
    * conversion is out of scope for spec 046.
+   *
+   * Unrelated to the `markedForLaterDesktop` / `markedForLaterTouch` fields
+   * below despite the shared "mark" vocabulary — those are the
+   * mechanism-gallery-progression "mark a character for later review" state,
+   * a per-character author choice, not a Unicode normalization-form
+   * migration flag.
    */
   marksMigrationNeeded: boolean;
 
@@ -478,6 +541,48 @@ export interface SurveySessionState {
 
   /** Plain setter — the Phase B IntroChooser discovery-method choice. */
   setDiscoveryMethod: (m: DiscoveryMethod | null) => void;
+
+  /**
+   * Characters the author has explicitly "marked for later review" in the
+   * desktop/physical Mechanism Gallery (spec: mechanism-gallery-progression).
+   * AUTHORING METADATA ONLY — this is never read by the codec/scaffolder/
+   * output paths and never reaches the working copy's KeyboardIR or the
+   * emitted `.kmn`; it exists purely so the gallery's Done affordance and the
+   * NavBar "still to account for" indicator can distinguish "consciously
+   * deferred" from "never looked at". Lives HERE (not workingCopyStore, not a
+   * new module-scoped Set) because:
+   *   (a) it is per-authoring-session traversal state, not keyboard content —
+   *       the same category as activeStepId/history/touchSeedSource above,
+   *       never the working copy's own data;
+   *   (b) this store already has a serialize/restore seam
+   *       (snapshotTraversal/applyTraversalSnapshot, driven by
+   *       ../lib/draftPersistence.ts on its EXISTING autosave timer) — adding
+   *       a field here rides that timer rather than inventing a new one (D3
+   *       does not apply: this produces no diagnostics, see draftPersistence's
+   *       AUTOSAVE_DEBOUNCE_MS docstring);
+   *   (c) a plain JSON-safe `readonly string[]` (not a Set — this store's
+   *       fields must all be plain-JSON per TraversalSnapshot's own docstring)
+   *       so it round-trips through `JSON.stringify`/`JSON.parse` exactly like
+   *       every other slot here.
+   * Kept SEPARATE from `markedForLaterTouch` below (not one combined set):
+   * a character can be implemented on one surface and only deferred on the
+   * other (e.g. a desktop deadkey exists but the touch longpress placement is
+   * still undecided) — collapsing the two would falsely "unmark" one surface
+   * whenever the other surface's mark changed.
+   */
+  markedForLaterDesktop: readonly string[];
+
+  /** Touch-gallery counterpart of {@link markedForLaterDesktop}. Same rules. */
+  markedForLaterTouch: readonly string[];
+
+  /**
+   * Toggle `char` in `markedForLaterDesktop` (add if absent, remove if
+   * present). Pure UI state — never touches the working copy.
+   */
+  toggleMarkedForLaterDesktop: (char: string) => void;
+
+  /** Touch-gallery counterpart of {@link toggleMarkedForLaterDesktop}. */
+  toggleMarkedForLaterTouch: (char: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -504,7 +609,7 @@ type SurveySessionData = Omit<
   | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
   | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
   | "setTouchSeedSource" | "setBaseConfirmed" | "setDiscoveryMethod"
-  | "setMarksMigrationNeeded"
+  | "setMarksMigrationNeeded" | "toggleMarkedForLaterDesktop" | "toggleMarkedForLaterTouch"
 >;
 
 /**
@@ -531,6 +636,10 @@ export type SurveySessionSnapshot = SurveySessionData;
 const INITIAL_STATE = {
   activeStepId: "identity" as ActiveStepId,
   history: [] as readonly ActiveStepId[],
+  // The author is standing on "identity" from the first render, so it is
+  // already visited — seeding it empty would make the entry step the one place
+  // a jump could be refused for lack of a visit that has plainly happened.
+  visited: ["identity"] as readonly ActiveStepId[],
   lastNavigation: "advance" as const,
   marksMigrationNeeded: false,
   identityResult: null,
@@ -543,6 +652,8 @@ const INITIAL_STATE = {
   charactersSubStage: "prefill" as CharactersSubStage,
   touchSeedSource: null as TouchSeedSource | null,
   discoveryMethod: null as DiscoveryMethod | null,
+  markedForLaterDesktop: [] as readonly string[],
+  markedForLaterTouch: [] as readonly string[],
 } as const satisfies SurveySessionData;
 
 // ---------------------------------------------------------------------------
@@ -556,6 +667,10 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
     set((s) => ({
       history: [...s.history, s.activeStepId],
       activeStepId: stepId,
+      // Both ends: the step being left is provably visited, and on the very
+      // first advance out of a hydrated-but-unseeded draft it may be the only
+      // evidence of that.
+      visited: withVisited(s.visited, s.activeStepId, stepId),
       lastNavigation: "advance",
     })),
 
@@ -584,10 +699,37 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
       // The LAST occurrence, so a revisited step lands on the most recent
       // visit rather than an older one further down the stack.
       const index = sanitized.lastIndexOf(target);
-      if (index === -1) return s; // not walked — never a forward jump
+      if (index !== -1) {
+        return {
+          activeStepId: target,
+          history: sanitized.slice(0, index),
+          visited: withVisited(s.visited, s.activeStepId, target),
+          lastNavigation: "pop" as const,
+        };
+      }
+
+      // Not on the back-stack — but the author may still have BEEN there and
+      // jumped behind it, which is exactly the case `history` alone cannot
+      // distinguish from "never reached" (see `visited`'s docstring: this is
+      // the defect where a back-jump stranded the author with no way forward).
+      //
+      // The bound is `visited`, never the manifest: a step the author has not
+      // reached stays a no-op here, so this is still the second line of
+      // `resolveLocation`'s gate rather than a hole in it.
+      const visitedIndex = s.visited.indexOf(target);
+      if (visitedIndex === -1) return s;
+
+      // Rebuild the back-stack from the route the author actually took, up to
+      // the target. `visited` is first-visit order and deduplicated, so this
+      // is the walked path — and it keeps Back working after a forward jump
+      // instead of stranding them a second time with an empty stack.
+      const rebuilt = s.visited.slice(0, visitedIndex);
       return {
         activeStepId: target,
-        history: sanitized.slice(0, index),
+        history: sanitizeHistory(target, rebuilt),
+        visited: withVisited(s.visited, s.activeStepId),
+        // A forward jump is still not a browser-history push: the hash change
+        // it rides on is the router's, exactly as the backward case is.
         lastNavigation: "pop" as const,
       };
     }),
@@ -654,16 +796,30 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
   reset: () =>
     set({
       ...INITIAL_STATE,
-      // Re-initialize array so mutations do not bleed across resets.
+      // Re-initialize arrays so mutations do not bleed across resets.
       history: [] as readonly ActiveStepId[],
+      visited: ["identity"] as readonly ActiveStepId[],
     }),
 
   hydrate: (snapshot) =>
     set({
       ...snapshot,
-      // Copy the array so a mutation of the restored draft can't bleed back
-      // into the caller's snapshot object.
+      // Copy the arrays so a mutation of the restored draft can't bleed back
+      // into the caller's snapshot object. `?? []` tolerates a pre-this-change
+      // persisted draft that predates these two fields (same additive
+      // tolerance as phaseBDraft/selectedFont elsewhere in the durable-draft
+      // layer) — a genuinely missing field resumes with "nothing marked",
+      // never a runtime crash on a stale localStorage record.
       history: [...snapshot.history],
+      // A draft written before `visited` existed has none — back-fill it from
+      // the walked path that draft DOES carry, so a returning author is not
+      // stranded by exactly the defect this slot fixes. `history` is the
+      // back-stack from wherever they stopped, which under-reports any stage
+      // they had jumped behind; that is the best this draft can know, and it
+      // grows correctly from the next `advance` on.
+      visited: normalizeVisited(snapshot),
+      markedForLaterDesktop: [...(snapshot.markedForLaterDesktop ?? [])],
+      markedForLaterTouch: [...(snapshot.markedForLaterTouch ?? [])],
     }),
 
   setMarksMigrationNeeded: (needed) => set({ marksMigrationNeeded: needed }),
@@ -690,6 +846,20 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
     }),
 
   setDiscoveryMethod: (m) => set({ discoveryMethod: m }),
+
+  toggleMarkedForLaterDesktop: (char) =>
+    set((s) => ({
+      markedForLaterDesktop: s.markedForLaterDesktop.includes(char)
+        ? s.markedForLaterDesktop.filter((c) => c !== char)
+        : [...s.markedForLaterDesktop, char],
+    })),
+
+  toggleMarkedForLaterTouch: (char) =>
+    set((s) => ({
+      markedForLaterTouch: s.markedForLaterTouch.includes(char)
+        ? s.markedForLaterTouch.filter((c) => c !== char)
+        : [...s.markedForLaterTouch, char],
+    })),
 }));
 
 // Ensure the store's getState() escape hatch is available for imperative reads
@@ -712,6 +882,10 @@ export function snapshotTraversal(): TraversalSnapshot {
   return {
     activeStepId: s.activeStepId,
     history: s.history,
+    // Part of the durable draft, not just live state: a reload that lost the
+    // high-water mark would strand a returning author exactly where the
+    // pre-`visited` build stranded everyone — see the slot's docstring.
+    visited: s.visited,
     lastNavigation: s.lastNavigation,
     marksMigrationNeeded: s.marksMigrationNeeded,
     identityResult: s.identityResult,
@@ -724,6 +898,8 @@ export function snapshotTraversal(): TraversalSnapshot {
     charactersSubStage: s.charactersSubStage,
     touchSeedSource: s.touchSeedSource,
     discoveryMethod: s.discoveryMethod,
+    markedForLaterDesktop: s.markedForLaterDesktop,
+    markedForLaterTouch: s.markedForLaterTouch,
   };
 }
 
@@ -790,5 +966,8 @@ export function applyTraversalSnapshot(snapshot: TraversalSnapshot): void {
   useSurveySessionStore.setState({
     ...snapshot,
     history: sanitizeHistory(snapshot.activeStepId, snapshot.history),
+    // Same back-fill as `hydrate` — this is the OTHER restore seam, and a
+    // draft written before the slot existed reaches the store through either.
+    visited: normalizeVisited(snapshot),
   });
 }

@@ -37,6 +37,11 @@ function seedProject(): void {
   useWorkingCopyStore.getState().reset();
   useSurveySessionStore.getState().reset();
   useDecisionLogStore.getState().reset();
+  // The walk store is now load-bearing for VISIBILITY (FR-040's revised gate),
+  // not only for dot granularity — a walk leaked from a previous test would
+  // make the "absent before the journey starts" case pass for the wrong
+  // reason, or fail depending on file order.
+  useStepWalkStore.getState().reset();
 
   useWorkingCopyStore.setState({ baseKeyboard: BASE });
   useSurveySessionStore.setState({
@@ -79,7 +84,73 @@ afterEach(() => {
   useWorkingCopyStore.getState().reset();
   useSurveySessionStore.getState().reset();
   useDecisionLogStore.getState().reset();
+  useStepWalkStore.getState().reset();
   window.location.hash = "";
+});
+
+// ---------------------------------------------------------------------------
+// Visibility gate (FR-040, revised 2026-08-05).
+//
+// The row must be up from the FIRST question, not from base selection: the
+// identity-lite battery runs before a base is chosen and its answers reach the
+// emitted `.kps`. These cases pin both directions of the new gate, and the
+// separation between "the strip is up" and "the project has a name" — the
+// second is what the OLD gate conflated with the first.
+// ---------------------------------------------------------------------------
+
+/** No project, no walks, no answers — the state a first-time author boots into. */
+function seedNothing(): void {
+  useWorkingCopyStore.getState().reset();
+  useSurveySessionStore.getState().reset();
+  useDecisionLogStore.getState().reset();
+  useStepWalkStore.getState().reset();
+}
+
+describe("StudioFooter — visibility gate (FR-040)", () => {
+  it("is absent before the journey starts — no project, no walk", () => {
+    seedNothing();
+    const { container } = render(<StudioFooter />);
+    expect(container.querySelector("footer")).toBeNull();
+  });
+
+  it("is present at the FIRST question, with no base keyboard chosen yet", () => {
+    seedNothing();
+    // Exactly the pre-base state: the author is on `identity`, the identity
+    // flow's runner has published its walk, and nothing has been instantiated.
+    useSurveySessionStore.setState({ activeStepId: "identity", history: [] });
+    useStepWalkStore
+      .getState()
+      .publishStepWalk("identity", [{ id: "il_language_english", done: false }]);
+
+    const { container } = render(<StudioFooter />);
+
+    expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
+    expect(container.querySelector("footer")).not.toBeNull();
+    expect(screen.getAllByRole("button").length).toBeGreaterThan(0);
+  });
+
+  it("omits the project label — rather than inventing one — while the project has no name", () => {
+    seedNothing();
+    useSurveySessionStore.setState({ activeStepId: "identity", history: [] });
+    useStepWalkStore
+      .getState()
+      .publishStepWalk("identity", [{ id: "il_language_english", done: false }]);
+
+    render(<StudioFooter />);
+
+    expect(screen.queryByText(/^Project:/)).toBeNull();
+    expect(screen.queryByText(/untitled/i)).toBeNull();
+  });
+
+  it("still shows for a project whose step published no walk (pre-change behaviour)", () => {
+    seedProject();
+    useStepWalkStore.getState().reset();
+
+    const { container } = render(<StudioFooter />);
+
+    expect(container.querySelector("footer")).not.toBeNull();
+    expect(screen.getByText(/^Project: French$/)).toBeTruthy();
+  });
 });
 
 describe("StudioFooter — keyboard operability (SC-010)", () => {
@@ -189,10 +260,11 @@ describe("StudioFooter — keyboard operability (SC-010)", () => {
 // ---------------------------------------------------------------------------
 
 describe("StudioFooter — within-step walk dots", () => {
-  it("renders a dot per character stop instead of a single stage dot", () => {
+  it("collapses a gallery's character walk to a single stage dot", () => {
     useSurveySessionStore.setState({
       activeStepId: "mechanisms",
       history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve"],
+      visited: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve", "mechanisms"],
       selectedTrack: "adapt",
     });
     useStepWalkStore.getState().publishStepWalk("mechanisms", [
@@ -204,39 +276,158 @@ describe("StudioFooter — within-step walk dots", () => {
 
     render(<StudioFooter />);
     const names = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? "");
-    expect(names.some((n) => n.startsWith("á (U+00E1)"))).toBe(true);
-    expect(names.some((n) => n.startsWith("é (U+00E9)"))).toBe(true);
-    expect(names.some((n) => n.startsWith("í (U+00ED)"))).toBe(true);
-    // The stage's own dot is gone — the stops replaced it, they did not join it.
-    expect(names.some((n) => n.startsWith("Mechanisms"))).toBe(false);
+    // One dot for the gallery, none per letter — the author navigates to the
+    // character they want inside the gallery itself.
+    expect(names.some((n) => n.startsWith("á (U+00E1)"))).toBe(false);
+    expect(names.some((n) => n.startsWith("é (U+00E9)"))).toBe(false);
+    expect(names.some((n) => n.startsWith("í (U+00ED)"))).toBe(false);
+    expect(names.filter((n) => n.startsWith("Mechanisms"))).toHaveLength(1);
   });
 
-  it("activating a character stop moves the within-step cursor, not just the step", async () => {
-    const user = userEvent.setup();
+  it("keeps ONE dot per question for a flow's walk — the marks battery is not a gallery", () => {
     useSurveySessionStore.setState({
-      activeStepId: "mechanisms",
-      history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve"],
+      activeStepId: "marks",
+      history: ["identity", "choose_base", "track", "characters"],
+      visited: ["identity", "choose_base", "track", "characters", "marks"],
       selectedTrack: "adapt",
     });
-    useStepWalkStore.getState().publishStepWalk("mechanisms", [
-      { id: charToPositionToken("á"), label: "á (U+00E1)", done: true },
-      { id: charToPositionToken("é"), label: "é (U+00E9)", done: false },
+    useStepWalkStore.getState().publishStepWalk("marks", [
+      { id: "ms_series_s1", done: true },
+      { id: "ms_series_s2", done: false },
     ]);
-    useStepWalkStore.getState().setStepCursor("mechanisms", charToPositionToken("é"));
 
     render(<StudioFooter />);
-    const target = screen
+    // These ids have no catalog entry, so the resolver falls through to the raw
+    // id — which is all this case needs: two stops, two dots.
+    const marksDots = screen
       .getAllByRole("button")
-      .find((b) => (b.getAttribute("aria-label") ?? "").startsWith("á (U+00E1)"));
-    expect(target).toBeDefined();
+      .filter((b) => (b.getAttribute("aria-label") ?? "").startsWith("ms_series_"));
+    expect(marksDots).toHaveLength(2);
+  });
+});
 
-    target!.focus();
+// ---------------------------------------------------------------------------
+// Jump round trip (defect, 2026-08-05: "I jumped back and can't jump forward
+// again").
+//
+// `jumpToStep` truncates `history`, so reachability keyed on `history` alone
+// told the author their own finished stages were ahead of them and refused
+// every one. These cases pin the round trip end to end through the mounted
+// footer: back, then forward again, with nothing lost on either leg.
+// ---------------------------------------------------------------------------
+
+describe("StudioFooter — jumping back and forward again (FR-045/FR-063)", () => {
+  /** Mid-journey: the author has walked as far as the touch gallery. */
+  function seedDeepWalk(): void {
+    useSurveySessionStore.setState({
+      activeStepId: "touch",
+      history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve", "mechanisms"],
+      visited: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve", "mechanisms", "touch"],
+      selectedTrack: "adapt",
+    });
+  }
+
+  it("a stage ahead of the landing point stays in the row AND stays jumpable", async () => {
+    const user = userEvent.setup();
+    seedDeepWalk();
+    useSurveySessionStore.getState().jumpToStep("carve");
+    expect(useSurveySessionStore.getState().activeStepId).toBe("carve");
+
+    render(<StudioFooter />);
+
+    // FR-063: jumping back truncates history, not progress — mechanisms is
+    // still in the row even though it is now ahead of where the author stands.
+    const mechanisms = screen
+      .getAllByRole("button")
+      .find((b) => (b.getAttribute("aria-label") ?? "").startsWith("Mechanisms"));
+    expect(mechanisms).toBeDefined();
+    // ...and it is reported as finished work, not as an unvisited stage.
+    expect(mechanisms!.getAttribute("data-progress-dot-kind")).toBe("completed");
+
+    mechanisms!.focus();
     await user.keyboard("{Enter}");
 
-    // No refusal: a character has no questionRegistry entry, so this only
-    // resolves because the published walk makes it addressable.
+    // The jump ARRIVED — no refusal message, and the author actually moved.
     expect(screen.getByRole("status").textContent ?? "").toBe("");
-    expect(useStepWalkStore.getState().cursors["mechanisms"]).toBe(charToPositionToken("á"));
     expect(useSurveySessionStore.getState().activeStepId).toBe("mechanisms");
+  });
+
+  it("back, forward, and back again — the walked path is never lost", () => {
+    seedDeepWalk();
+    const session = useSurveySessionStore.getState();
+
+    session.jumpToStep("characters");
+    expect(useSurveySessionStore.getState().activeStepId).toBe("characters");
+
+    // Forward again to a stage the truncated back-stack no longer mentions.
+    session.jumpToStep("touch");
+    expect(useSurveySessionStore.getState().activeStepId).toBe("touch");
+
+    // Nothing was dropped from the high-water mark on either leg.
+    expect(useSurveySessionStore.getState().visited).toEqual([
+      "identity", "choose_base", "track", "characters",
+      "marks", "convenience", "carve", "mechanisms", "touch",
+    ]);
+
+    // Back still works after a forward jump — the stack was rebuilt from the
+    // walked route, not left empty.
+    session.popHistory();
+    expect(useSurveySessionStore.getState().activeStepId).toBe("mechanisms");
+  });
+
+  it("loses no in-progress work on the round trip — walk, cursor and answer draft all survive", () => {
+    seedDeepWalk();
+    const walkStore = useStepWalkStore.getState();
+    // A half-answered flow left behind on an earlier step, plus a gallery walk
+    // parked mid-inventory. Both are the state a jump must not disturb.
+    walkStore.publishStepWalk("identity", [
+      { id: "il_language_english", done: true },
+      { id: "il_language_autonym", done: false },
+    ]);
+    walkStore.setStepCursor("identity", "il_language_autonym");
+    walkStore.setAnswerDraft("identity", { il_language_english: "Bambara" });
+    walkStore.publishStepWalk("mechanisms", [
+      { id: charToPositionToken("á"), done: true },
+      { id: charToPositionToken("é"), done: false },
+    ]);
+    walkStore.setStepCursor("mechanisms", charToPositionToken("é"));
+
+    const session = useSurveySessionStore.getState();
+    session.jumpToStep("identity");
+    session.jumpToStep("mechanisms");
+    session.jumpToStep("identity");
+
+    const after = useStepWalkStore.getState();
+    expect(after.answerDrafts["identity"]).toEqual({ il_language_english: "Bambara" });
+    expect(after.cursors["identity"]).toBe("il_language_autonym");
+    expect(after.walks["identity"]).toHaveLength(2);
+    // The gallery it passed through twice is exactly as it was left.
+    expect(after.cursors["mechanisms"]).toBe(charToPositionToken("é"));
+    expect(after.walks["mechanisms"]?.[0]?.done).toBe(true);
+  });
+
+  it("still refuses a stage the author has genuinely never reached", async () => {
+    const user = userEvent.setup();
+    // Only as far as `track`; the galleries are ahead and unvisited.
+    useSurveySessionStore.setState({
+      activeStepId: "track",
+      history: ["identity", "choose_base"],
+      visited: ["identity", "choose_base", "track"],
+      selectedTrack: "adapt",
+    });
+
+    render(<StudioFooter />);
+    const mechanisms = screen
+      .getAllByRole("button")
+      .find((b) => (b.getAttribute("aria-label") ?? "").startsWith("Mechanisms"));
+    expect(mechanisms).toBeDefined();
+    expect(mechanisms!.getAttribute("data-progress-dot-kind")).toBe("upcoming");
+
+    mechanisms!.focus();
+    await user.keyboard("{Enter}");
+
+    // The gate held, with a stated reason, and the author did not move.
+    expect(screen.getByRole("status").textContent ?? "").not.toBe("");
+    expect(useSurveySessionStore.getState().activeStepId).toBe("track");
   });
 });

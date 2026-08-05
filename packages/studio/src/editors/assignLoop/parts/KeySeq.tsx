@@ -1,5 +1,5 @@
 import { Fragment } from 'react';
-import { KeyCap } from './KeyCap.tsx';
+import { KeyCap } from '../../../ui/KeyCap.tsx';
 
 interface KeySeqProps {
   keys: string[];

@@ -92,6 +92,7 @@ import {
   type UnreachableReason,
 } from "../lib/resolveLocation.ts";
 import type { Location } from "../lib/location.ts";
+import { positionTokenToChar } from "../lib/stepWalk.ts";
 import type { StepWalkMap, StepWalkPositions } from "../lib/stepWalk.ts";
 import { resolveMessage } from "../lib/i18nResolve.ts";
 import { createLookupQuestionLabel } from "./lookupQuestionLabel.ts";
@@ -363,7 +364,7 @@ function buildCurrentDot(
  * author's path". `stepIndex`/`currentIndex` are manifest positions; a terminal
  * `activeStepId` arrives as `currentIndex === -1`, for which nothing is ahead.
  */
-function upcomingStageDot(
+function aheadStageDot(
   step: { readonly id: string },
   stepIndex: number,
   currentIndex: number,
@@ -383,14 +384,25 @@ function upcomingStageDot(
   const location: Location = { route: "survey", step: step.id as StepId };
   const resolution = resolveLocation(location, ctx);
 
-  // Already visited (present in `history`, or somehow the live position) —
-  // not "ahead" at all. This is what makes a jump BACK reappear the
-  // stages between the landing point and where the author used to be:
-  // `jumpToStep` truncates `history` (see its own docstring in
-  // surveySessionStore.ts, FR-063), so a step that was "reachable" before
-  // the jump goes back to "beyond-gate" afterward and re-enters this branch
-  // — exactly T065's "dots ahead of the landing point are still present".
-  if (resolution.kind === "reachable") return null;
+  // A stage AHEAD of the current position that the author has nonetheless
+  // already been to — they jumped back behind it. It resolves `reachable`
+  // (surveySessionStore's `visited` high-water mark, not the truncated
+  // back-stack), so it is jumpable, and it is rendered `completed` because
+  // that is what it is: finished work sitting ahead of where they are
+  // standing. FR-063's "dots ahead of the landing point are still present"
+  // is satisfied by KEEPING this dot rather than, as before, by the stage
+  // falling back to `beyond-gate` and reappearing as `upcoming` — which
+  // presented the author's own finished stages as unvisited and, worse,
+  // refused every click on them.
+  if (resolution.kind === "reachable") {
+    return {
+      kind: "completed",
+      id: step.id,
+      location,
+      label: stageLabel(step.id, i18n),
+      resolution,
+    };
+  }
 
   // Every OTHER outcome for a step-bearing location is `kind:"degraded"`
   // (see the module header's load-bearing-reading note — `resolveLocation`
@@ -437,6 +449,61 @@ function upcomingStageDot(
 //               there is nothing there yet.
 // ---------------------------------------------------------------------------
 
+/**
+ * Whether this walk is a CHARACTER walk (a gallery's inventory) rather than a
+ * flow's questions.
+ *
+ * `positionTokenToChar` is the existing "cheap recognition" of a character
+ * stop — lib/stepWalk.ts documents that a flow question id and a character
+ * token deliberately share the same slot and that this codec is how they are
+ * told apart. Classifying here rather than keeping a list of gallery step ids
+ * means a new gallery gets the right treatment on the day it publishes a walk,
+ * with nothing to remember to add.
+ *
+ * Requires EVERY stop to decode: a mixed walk is not a shape any publisher
+ * emits today, and collapsing one would silently swallow real questions.
+ */
+function isCharacterWalk(positions: StepWalkPositions): boolean {
+  return positions.length > 0 && positions.every((p) => positionTokenToChar(p.id) !== null);
+}
+
+/**
+ * The single dot a character walk contributes (author's call, 2026-08-05).
+ *
+ * A gallery is ONE stop in the journey, not one per letter. The row's job is
+ * "where am I in the whole build", and a thirty-character inventory rendering
+ * as thirty dots drowns the eight or nine stages around it. The per-letter
+ * addressing this replaces is not lost to the author — each gallery has its own
+ * in-page navigation to the character it needs, which is the affordance the
+ * dots were duplicating.
+ *
+ * `location` names the STEP with no `question`, so activating it lands on the
+ * gallery and lets that in-page navigation take over. Kind mirrors the walk:
+ * the author is either standing in it, finished with every character, or
+ * has not settled it yet.
+ */
+function collapsedWalkDot(
+  stepId: string,
+  positions: StepWalkPositions,
+  isActiveStep: boolean,
+  ctx: ResolveContext,
+  i18n: I18n | undefined,
+): ProgressDot {
+  const location: Location = { route: "survey", step: stepId as StepId };
+  const kind: ProgressDotKind = isActiveStep
+    ? "current"
+    : positions.every((p) => p.done)
+      ? "completed"
+      : "upcoming";
+  return {
+    kind,
+    id: stepId,
+    location,
+    label: stageLabel(stepId, i18n),
+    resolution: resolveLocation(location, ctx),
+  };
+}
+
 function buildWalkDots(
   stepId: string,
   positions: StepWalkPositions,
@@ -444,7 +511,11 @@ function buildWalkDots(
   isActiveStep: boolean,
   ctx: ResolveContext,
   lookupQuestionLabel: (questionId: string) => string | undefined,
+  i18n: I18n | undefined,
 ): ProgressDot[] {
+  if (isCharacterWalk(positions)) {
+    return [collapsedWalkDot(stepId, positions, isActiveStep, ctx, i18n)];
+  }
   const shown = positions.filter((position) => !DOTLESS_QUESTION_IDS.has(position.id));
   return shown.map((position) => {
     const location: Location = {
@@ -534,11 +605,13 @@ export function buildProgressDots(input: ProgressDotsInput): readonly ProgressDo
     // sequence (PhaseA then PhaseB inside `characters`), the record holds the
     // earlier flow's questions and the walk holds the later one's, so record-then-
     // walk is the order the author actually answered them in.
-    row.push(...(byStep.get(step.id) ?? []));
+    const stepRecordDots = byStep.get(step.id) ?? [];
+    row.push(...stepRecordDots);
     byStep.delete(step.id);
 
     const positions = walks[step.id];
     let markedCurrent = false;
+    let walkDotCount = 0;
     if (positions !== undefined && positions.length > 0) {
       const walkDots = buildWalkDots(
         step.id,
@@ -547,8 +620,10 @@ export function buildProgressDots(input: ProgressDotsInput): readonly ProgressDo
         isActiveStep,
         ctx,
         lookupQuestionLabel,
+        i18n,
       );
       row.push(...walkDots);
+      walkDotCount = walkDots.length;
       markedCurrent = walkDots.some((d) => d.kind === "current");
     }
 
@@ -559,9 +634,14 @@ export function buildProgressDots(input: ProgressDotsInput): readonly ProgressDo
       if (currentDot !== null) row.push(currentDot);
     }
 
-    if (!isActiveStep) {
-      const upcoming = upcomingStageDot(step, i, currentIndex, ctx, i18n);
-      if (upcoming !== null) row.push(upcoming);
+    // The stage dot is the FALLBACK granularity, so it is emitted only when
+    // this step contributed nothing finer. Without that guard, a stage the
+    // author has answered and then jumped behind carries both its recorded
+    // question dots AND a stage dot — the "mix of empty and complete dots for
+    // the same stage" the row was reported showing.
+    if (!isActiveStep && stepRecordDots.length === 0 && walkDotCount === 0) {
+      const ahead = aheadStageDot(step, i, currentIndex, ctx, i18n);
+      if (ahead !== null) row.push(ahead);
     }
   }
 

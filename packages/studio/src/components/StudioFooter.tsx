@@ -1,13 +1,38 @@
 // StudioFooter — the footer IS the breadcrumb (spec 057 Q7 resolved; T051,
 // T053, T063 (current dot wiring)).
 //
-// A narrow strip, present on every tab where a project exists, absent — not
-// an empty shell — everywhere else (Q6, FR-040). It names the project
-// (FR-041, `deriveProjectLabel` — the ONE precedence, not a fourth
-// derivation) and renders the whole-journey dot row `decisions/progressDots`
-// assembles (FR-042). Activating a reached dot uses `jumpToLocation` — the
-// SAME primitive the decision trail's deep links use (FR-045); there is no
-// second jump implementation and no second router (FR-006).
+// A narrow strip, present from the moment the journey starts, absent — not an
+// empty shell — before it (Q6, FR-040). It names the project (FR-041,
+// `deriveProjectLabel` — the ONE precedence, not a fourth derivation) and
+// renders the whole-journey dot row `decisions/progressDots` assembles
+// (FR-042). Activating a reached dot uses `jumpToLocation` — the SAME
+// primitive the decision trail's deep links use (FR-045); there is no second
+// jump implementation and no second router (FR-006).
+//
+// WHY THE GATE IS NOT "a project exists" ANY MORE (author's call, 2026-08-05).
+// As shipped, the strip appeared only once `deriveProjectLabel` returned a
+// name — and the earliest tier of that precedence is filled at INSTANTIATION,
+// i.e. when a base keyboard is chosen. But the identity-lite battery runs
+// BEFORE base selection, and its answers (English name, autonym, language
+// code, author attribution) are decisions that reach the emitted `.kps`. Under
+// the old gate the row was hidden for exactly the stretch where the author has
+// already made several recordable decisions and most needs to see where they
+// are. The row must show from the FIRST question.
+//
+// So visibility now keys on "is there a journey", not "is there a name":
+// a published step walk means a step's runner is live and the author is
+// standing on one of its stops (see lib/stepWalk.ts — SurveyRunner publishes
+// on mount, and `WelcomeScreen`/start-over both `reset()` the store, so an
+// author who has not entered the survey has no walks). The old
+// `projectLabel !== null` test is kept as a second disjunct rather than
+// replaced: a deep-link arrival can put a project in scope on a tab whose
+// runner never mounts, and that case rendered a footer before this change.
+//
+// The NAME is a separate question from the STRIP. Before instantiation there
+// genuinely is no project name — `identityResult` is an answer about the
+// language, not a name for the project, and projectLabel.ts's header forbids
+// deriving one from it (FR-041). So the label span is omitted until a name
+// exists, rather than filled with an invented "Untitled".
 //
 // NOT MOUNTED HERE. T052 (mounting this in StudioShell.tsx, on every route
 // where a project exists) belongs to whoever owns that file — this component
@@ -62,6 +87,13 @@ export function StudioFooter() {
   const activeStepId = useSurveySessionStore((s) => s.activeStepId);
   const history = useSurveySessionStore((s) => s.history);
   const selectedTrack = useSurveySessionStore((s) => s.selectedTrack);
+  // `visited` is the high-water mark `isReached` now keys on (see
+  // surveySessionStore.ts). Omitting it here is not a cosmetic gap: the ROW
+  // would go on rendering the author's finished-but-jumped-behind stages as
+  // refused `upcoming` dots while `jumpToLocation` — which reads the whole
+  // snapshot, not this subset — happily performed the jump. The two would
+  // disagree about the same question.
+  const visited = useSurveySessionStore((s) => s.visited);
 
   const record = useDecisionLogStore((s) => s.record);
 
@@ -91,13 +123,18 @@ export function StudioFooter() {
     () => ({
       manifest,
       questionRegistry,
-      traversal: { activeStepId, history, selectedTrack } as unknown as ResolveContext["traversal"],
+      traversal: {
+        activeStepId,
+        history,
+        selectedTrack,
+        visited,
+      } as unknown as ResolveContext["traversal"],
       hasProject,
       // Without this, a dot naming a gallery character would refuse itself as
       // `question-not-in-build` — a character has no questionRegistry entry.
       stepPositions: stepPositionIds(walks),
     }),
-    [activeStepId, history, selectedTrack, hasProject, walks],
+    [activeStepId, history, selectedTrack, visited, hasProject, walks],
   );
 
   const dots = useMemo(
@@ -152,10 +189,12 @@ export function StudioFooter() {
     }
   }, [dots]);
 
-  // Q6 / FR-040: absent, not an empty shell, whenever there is no project to
-  // name — covers Welcome (no working copy at all) and any other state
-  // `deriveProjectLabel`'s precedence cannot yet resolve.
-  if (projectLabel === null) return null;
+  // Q6 / FR-040: absent, not an empty shell, until the journey exists — see
+  // the module header for why this is no longer `projectLabel !== null`.
+  // Welcome is covered because `WelcomeScreen` resets the walk store and no
+  // working copy is open there.
+  const journeyStarted = Object.keys(walks).length > 0 || projectLabel !== null;
+  if (!journeyStarted) return null;
 
   return (
     <footer
@@ -183,20 +222,24 @@ export function StudioFooter() {
         boxSizing: "border-box",
       }}
     >
-      <span
-        style={{
-          flexShrink: 0,
-          fontWeight: 600,
-          color: CSS_TEXT,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          maxWidth: "30%",
-        }}
-        title={projectLabel}
-      >
-        {t({ id: "footer.project.label", message: `Project: ${{ name: projectLabel }}` })}
-      </span>
+      {/* Omitted entirely, not placeholdered, while the project has no name —
+          see the module header. The dot row simply takes the full width. */}
+      {projectLabel !== null && (
+        <span
+          style={{
+            flexShrink: 0,
+            fontWeight: 600,
+            color: CSS_TEXT,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            maxWidth: "30%",
+          }}
+          title={projectLabel}
+        >
+          {t({ id: "footer.project.label", message: `Project: ${{ name: projectLabel }}` })}
+        </span>
+      )}
 
       <div
         ref={rowRef}

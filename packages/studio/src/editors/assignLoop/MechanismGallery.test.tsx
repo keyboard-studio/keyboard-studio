@@ -6,10 +6,13 @@
 // Component contract under test:
 //   - One character at a time from lettersToAdd (inventory when baseIr is null).
 //   - "Apply method for <char>" button records a MechanismAssignment(scope:"individual").
-//   - "Skip this character" is pure forward navigation — it records nothing;
-//     a skipped-over character is never treated as covered/resolved.
+//   - "Mark for later review" (mechanism-gallery-progression) is a per-
+//     character toggle — it records nothing in the working copy, but
+//     satisfies canGoNext exactly like an Apply, so Next/Done can advance
+//     past it. A marked character is never treated as covered for coverage
+//     purposes, only as "accounted for" (see lib/accountedForGate.ts).
 //   - The last character's forward button always reads "Done", disabled
-//     until that character is actually covered.
+//     until every character in lettersToAdd is implemented or marked.
 //   - Coverage status line: "<N> of <M> added".
 //   - Method chooser: "Type a sequence" always present; "Tap a trigger key, then a letter"
 //     always present (S-02 deadkey is always offered, regardless of char type).
@@ -36,6 +39,7 @@ import {
 } from "./MechanismGallery.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { useWorkingCopyStore, bindManifest } from "../../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useStepWalkStore } from "../../stores/stepWalkStore.ts";
 import { charToPositionToken } from "../../lib/stepWalk.ts";
 import {
@@ -208,6 +212,26 @@ function setMockStage(s: Stage) {
   _mockStage = s;
 }
 
+/**
+ * The kbgen suggestion row's full visible text, read off its `role="note"`
+ * container rather than a single text node. The row's key name now renders
+ * boxed inside a `<KeyCap>` element (the physical-key keycap convention),
+ * which splits the sentence across sibling DOM nodes — RTL's `getByText`
+ * only matches a node's OWN direct text-node children (see
+ * `@testing-library/dom`'s `getNodeText`), so a query for the WHOLE sentence
+ * never matches any single node once it contains a nested element. Reading
+ * the note's `textContent` sidesteps that by concatenating every descendant
+ * text node, matching what a sighted user actually sees. Throws (via
+ * `getByRole`) if the row isn't rendered at all — callers asserting absence
+ * should query `queryByRole("note", { name: /kbgen seeder/i })` instead.
+ */
+function suggestionRowText(): string {
+  return (
+    screen.getByRole("note", { name: /Placement suggestion from kbgen seeder/i })
+      .textContent ?? ""
+  );
+}
+
 /** Seed confirmedInventory via Phase B result. baseIr stays null so
  *  useInventoryDiff returns lettersToAdd === inventory (no diff).
  *
@@ -288,6 +312,7 @@ beforeAll(installDialogShim);
 afterEach(() => {
   cleanup();
   useWorkingCopyStore.getState().reset();
+  useSurveySessionStore.getState().reset();
   vi.clearAllMocks();
   _mockStage = { kind: "idle" };
   _lastVfsTransform = undefined;
@@ -295,6 +320,7 @@ afterEach(() => {
 
 beforeEach(() => {
   useWorkingCopyStore.getState().reset();
+  useSurveySessionStore.getState().reset();
 });
 
 // ---------------------------------------------------------------------------
@@ -652,7 +678,10 @@ describe("MechanismGallery — apply (sequence)", () => {
     fireEvent.click(screen.getByTestId("sequences-apply"));
 
     await waitFor(() => {
-      const status = screen.getByRole("status");
+      // Scoped by name — the Done-blocked inline hint (mechanism-gallery-
+      // progression) also carries role="status" once any character is
+      // unaccounted for; a bare getByRole("status") would now be ambiguous.
+      const status = screen.getByRole("status", { name: "0 of 2 added" });
       expect(status.getAttribute("aria-label")).toBe("0 of 2 added");
     });
   });
@@ -800,9 +829,11 @@ describe("MechanismGallery — coexistence with a separately-recorded sequence a
       screen.queryByRole("group", { name: /Added characters — click to remove/i }),
     ).toBeNull();
 
-    // The coverage line excludes it: 0 of 2, not 1 of 2.
+    // The coverage line excludes it: 0 of 2, not 1 of 2. Scoped by name — see
+    // the note in "renders the coverage status line with initial 0-of-N
+    // count" above.
     await waitFor(() => {
-      const status = screen.getByRole("status");
+      const status = screen.getByRole("status", { name: "0 of 2 added" });
       expect(status.getAttribute("aria-label")).toBe("0 of 2 added");
     });
 
@@ -925,40 +956,68 @@ describe("MechanismGallery — advance after apply", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
-    // Coverage updates immediately after Apply (á is now covered).
+    // Coverage updates immediately after Apply (á is now covered). Scoped by
+    // name — see the note in "renders the coverage status line with initial
+    // 0-of-N count" above.
     await waitFor(() => {
-      const status = screen.getByRole("status");
+      const status = screen.getByRole("status", { name: "1 of 2 added" });
       expect(status.getAttribute("aria-label")).toBe("1 of 2 added");
     });
   });
 });
 
 // ---------------------------------------------------------------------------
-// Skip — pure forward navigation; records nothing.
+// Mark for later review — replaces the old "Skip this character" escape
+// (mechanism-gallery-progression). A pure per-character TOGGLE: it does not
+// itself navigate, records nothing in the working copy (authoring metadata
+// only, in surveySessionStore), and satisfies canGoNext so the EXISTING
+// Next/Done control (not a second navigation control) advances.
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — skip character", () => {
-  it("skipping advances to the next char without recording an assignment", async () => {
+describe("MechanismGallery — mark for later review", () => {
+  it("marking the current character records no MechanismAssignment", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
 
-    // No assignment recorded.
     expect(
       useWorkingCopyStore
         .getState()
         .session.assignments.filter((a) => a.modality === "physical"),
     ).toHaveLength(0);
+  });
 
-    // Current char is now é.
+  it("toggles the marked state and reflects it via aria-pressed and the button label", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    const markBtn = screen.getByRole("button", {
+      name: /Mark U\+00E1 á for later review/i,
+    });
+    expect(markBtn.getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(markBtn);
+    const unmarkBtn = await screen.findByRole("button", {
+      name: /Unmark U\+00E1 á/i,
+    });
+    expect(unmarkBtn.getAttribute("aria-pressed")).toBe("true");
+    expect(unmarkBtn.textContent).toContain("Marked for later review");
+
+    fireEvent.click(unmarkBtn);
     await waitFor(() => {
-      expectCurrentChar("é");
+      const remarkBtn = screen.getByRole("button", {
+        name: /Mark U\+00E1 á for later review/i,
+      });
+      expect(remarkBtn.getAttribute("aria-pressed")).toBe("false");
     });
   });
 
-  it("skipping does not change the coverage count and does not mark the character resolved", async () => {
+  it("marking the current character enables Next/Done without changing the coverage count", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -970,24 +1029,42 @@ describe("MechanismGallery — skip character", () => {
       screen.getByRole("status", { name: "0 of 2 added" }).getAttribute("aria-label"),
     ).toBe("0 of 2 added");
 
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    // Untouched character — Next is disabled (canGoNext requires Apply OR mark).
+    expect(
+      (screen.getByRole("button", { name: /Next character/i }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
+    await waitFor(() => {
+      expect(
+        (screen.getByRole("button", { name: /Next character/i }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     await waitFor(() => {
       expectCurrentChar("é");
     });
 
-    // Skipping recorded nothing, so coverage is unchanged.
+    // Marking recorded no assignment, so coverage is unchanged.
     expect(
       screen.getByRole("status", { name: "0 of 2 added" }).getAttribute("aria-label"),
     ).toBe("0 of 2 added");
 
-    // Navigating back to the skipped-over "á": it is NOT treated as resolved —
-    // Next stays disabled until it is actually applied.
+    // Navigating back to the marked "á": Next stays enabled (it is
+    // accounted for), even though it is still not counted toward coverage.
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
-      expectCurrentChar("á");
+      expectCurrentChar("á", { marked: true });
     });
-    const nextBtn = screen.getByRole("button", { name: /Next character/i });
-    expect((nextBtn as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: /Next character/i }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
   });
 });
 
@@ -996,7 +1073,7 @@ describe("MechanismGallery — skip character", () => {
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — Done state (positional: last char's forward button)", () => {
-  it("the only (and therefore last) character's forward button already reads Done, disabled until Apply/Skip", async () => {
+  it("the only (and therefore last) character's forward button already reads Done, disabled until a method is applied", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -1037,13 +1114,12 @@ describe("MechanismGallery — Done state (positional: last char's forward butto
     expect(onComplete).toHaveBeenCalledOnce();
   });
 
-  it("skipping the only (last) character opens the leave-warning modal, then completes via \"Come back later\"", async () => {
-    // Skip on the last position is itself the phase completion attempt —
-    // positional Skip advances by one position, or finishes if there is no
-    // next position, exactly like Next/Done. "á" was skipped (never applied),
-    // so it is unimplemented — the whole-inventory leave-warning modal opens
-    // instead of completing immediately; "Come back later" defers and
-    // completes anyway.
+  it('marking the only (last) character enables Done, which completes directly — no modal', async () => {
+    // Marking the last position is itself the phase-completion enabler: once
+    // "á" is marked (not applied), Done becomes clickable and completes
+    // directly. There is no more "leave-warning" confirm dialog
+    // (mechanism-gallery-progression) — the affordance is disabled, not
+    // click-intercepted.
     const onComplete = vi.fn();
     seedInventory(["á"]);
     await act(async () => {
@@ -1054,93 +1130,71 @@ describe("MechanismGallery — Done state (positional: last char's forward butto
         />,
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
-    expect(onComplete).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Come back later/i }));
+    const doneBtn = screen.getByRole("button", { name: "Done" });
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
+    await waitFor(() => {
+      expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+    });
+    fireEvent.click(doneBtn);
     expect(onComplete).toHaveBeenCalledOnce();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Leave-warning modal — open/closed state + the "Go back and finish" (stay)
-// path, and the Back-button-does-not-trigger-it guard. The "Come back later"
-// (defer) path is covered above; this suite closes the gap on the modal's
-// OTHER outcomes and on the dialog's actual open/closed state (queried via
-// the native <dialog> element's `open` attribute, not just button presence —
-// ConfirmDialog always renders both buttons regardless of `open`, so a bare
-// button-exists query cannot distinguish "modal is showing" from "modal is
-// mounted but closed").
+// Done-blocked inline hint — replaces the old leave-warning ConfirmDialog
+// (mechanism-gallery-progression). No <dialog> element is rendered by this
+// gallery at all anymore; the Done/Continue control is simply disabled while
+// any lettersToAdd character is neither implemented nor marked, and an inline
+// role="status" hint explains why.
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — leave-warning modal open/closed state", () => {
-  it("does NOT open the dialog when Done completes with every character implemented", async () => {
-    const onComplete = vi.fn();
-    seedInventory(["á"]);
-    const { container } = await act(async () =>
-      render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />,
-      ),
-    );
-    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
-    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
-    await waitFor(() => {
-      const doneBtn = screen.getByRole("button", { name: "Done" });
-      expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
-      fireEvent.click(doneBtn);
-    });
-    // Completed directly — the dialog never opened.
-    expect(onComplete).toHaveBeenCalledOnce();
-    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
-  });
-
-  it("opens the dialog (native <dialog open> attribute) when forward-completing with an unimplemented character", async () => {
-    seedInventory(["á"]);
+describe("MechanismGallery — Done-blocked inline hint (no modal)", () => {
+  it("never renders a <dialog> element, even while characters remain unimplemented", async () => {
+    seedInventory(["á", "é"]);
     const { container } = await act(async () =>
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />),
     );
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
-    expect(container.querySelector("dialog")?.hasAttribute("open")).toBe(true);
+    expect(container.querySelector("dialog")).toBeNull();
+
+    // Clicking the (disabled) Next control is a no-op — still no dialog.
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
+    expect(container.querySelector("dialog")).toBeNull();
   });
 
-  it('"Go back and finish" (primary) closes the dialog and does NOT complete — the author stays in the gallery able to finish "á"', async () => {
-    const onComplete = vi.fn();
-    seedInventory(["á"]);
-    const { container } = await act(async () =>
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />),
+  it("shows an inline hint naming the unaccounted characters, and hides it once every character is marked", async () => {
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />);
+    });
+
+    const hint = screen.getByRole("status", {
+      name: (_accessibleName, element) =>
+        element.textContent?.includes("still need an assignment or a mark") ?? false,
+    });
+    expect(hint.textContent).toContain("á");
+    expect(hint.textContent).toContain("é");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
     );
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
-    expect(container.querySelector("dialog")?.hasAttribute("open")).toBe(true);
-
-    fireEvent.click(screen.getByRole("button", { name: /Go back and finish/i }));
-
-    // No advance — onComplete never fires, and the dialog is closed again.
-    expect(onComplete).not.toHaveBeenCalled();
-    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
-    // Still on "á", with the Apply control still available to actually finish it.
-    expectCurrentChar("á");
-    expect(screen.getByRole("button", { name: /Apply method for á/i })).toBeTruthy();
-  });
-
-  it("Escape (the native <dialog> cancel event) does NOT proceed — it stays in the gallery, same as \"Go back and finish\" (P1(a))", async () => {
-    const onComplete = vi.fn();
-    seedInventory(["á"]);
-    const { container } = await act(async () =>
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />),
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
+    await waitFor(() => expectCurrentChar("é"));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E9 é for later review/i }),
     );
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
-    const dialog = container.querySelector("dialog")!;
-    expect(dialog.hasAttribute("open")).toBe(true);
 
-    fireEvent(dialog, new Event("cancel", { cancelable: true }));
-
-    // Escape must map to the STAY action, not the "Come back later" defer —
-    // onComplete must never fire from a dismissal.
-    expect(onComplete).not.toHaveBeenCalled();
-    expect(dialog.hasAttribute("open")).not.toBe(true);
-    expectCurrentChar("á");
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/still need an assignment or a mark/i),
+      ).toBeNull();
+    });
   });
 
-  it("the ← back button never opens the leave-warning modal, even while characters remain unimplemented", async () => {
+  it("the ← back button navigates freely while characters remain unimplemented (no modal, no block)", async () => {
     const onBack = vi.fn();
     seedInventory(["á", "é"]);
     const { container } = await act(async () =>
@@ -1148,25 +1202,25 @@ describe("MechanismGallery — leave-warning modal open/closed state", () => {
         <MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} onComplete={vi.fn()} />,
       ),
     );
-    // Advance to "é" (idx 1) without implementing "á" — Skip is pure forward nav.
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    // Mark "á" so Next is enabled, then advance to "é" without implementing it.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     await waitFor(() => {
       expectCurrentChar("é");
     });
-    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+    expect(container.querySelector("dialog")).toBeNull();
 
-    // Navigate backward through both (still-unimplemented) characters via
-    // the Back control — this is a DIFFERENT control from the forward
-    // Done/Skip-on-last path that triggers the modal, and must never open it.
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
-      expectCurrentChar("á");
+      expectCurrentChar("á", { marked: true });
     });
-    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+    expect(container.querySelector("dialog")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     expect(onBack).toHaveBeenCalledOnce();
-    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+    expect(container.querySelector("dialog")).toBeNull();
   });
 });
 
@@ -2283,7 +2337,13 @@ describe("MechanismGallery — UsesSequencesCard (integration)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Edit after Done — "Unlock to edit" affordance in the locked banner.
+// Edit after Done — auto-unlock on first edit (mechanism-gallery-progression
+// friction removal). The old explicit "Unlock to edit" button is gone: the
+// FIRST edit action on a locked, completed gallery (Apply, Mark for later,
+// suggestion accept, existing-method/sequence removal, or a physical-key tap)
+// calls the same handleUnlock logic that button used to trigger — the lock
+// still gets SET on completion (reducer R1, unchanged) and cleared/re-review-
+// flagged the same way, just without a manual gate in between.
 //
 // Fixture manifest mirrors the shape of the production manifest for this
 // purpose: the "touch" step declares empty `inputs` (production deliberately
@@ -2317,12 +2377,12 @@ const UNLOCK_FIXTURE_MANIFEST: readonly Step[] = [
   makeEditorStepFixture("touch", [], [PATH_GROUPS_FIXTURE]),
 ];
 
-describe("MechanismGallery — edit after Done (unlock affordance)", () => {
+describe("MechanismGallery — edit after Done (auto-unlock on first edit)", () => {
   beforeEach(() => {
     bindManifest(UNLOCK_FIXTURE_MANIFEST);
   });
 
-  it("renders 'Unlock to edit' in the locked banner and clicking it unlocks the gallery", async () => {
+  it("a locked gallery is immediately editable — no unlock click required — and the first edit unlocks it", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(
@@ -2334,21 +2394,22 @@ describe("MechanismGallery — edit after Done (unlock affordance)", () => {
       useWorkingCopyStore.getState().lockDesktop();
     });
 
-    expect(screen.getByText(/Desktop layout locked/i)).toBeTruthy();
-    const unlockBtn = screen.getByRole("button", { name: /unlock desktop layout to edit/i });
-    expect(unlockBtn).toBeTruthy();
+    // No blocking gate: Apply/Mark controls are present and ENABLED while
+    // locked (the old banner+button gate is gone).
+    const markBtn = screen.getByRole("button", {
+      name: /Mark U\+00E1 á for later review/i,
+    });
+    expect((markBtn as HTMLButtonElement).disabled).toBe(false);
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(true);
 
-    fireEvent.click(unlockBtn);
+    // The first edit action (Mark for later) unlocks the desktop layout as a
+    // side effect, in the same click — no throwaway first tap.
+    fireEvent.click(markBtn);
 
     expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
-    // The gallery becomes editable again — Apply/Skip controls return.
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Apply method for á/i })).toBeTruthy();
-      expect(screen.getByRole("button", { name: /Skip this character/i })).toBeTruthy();
-    });
   });
 
-  it("shows a caution line about re-reviewing the touch layout in the locked banner", async () => {
+  it("shows a non-blocking informational note (not a click gate) while the layout is locked", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(
@@ -2358,12 +2419,17 @@ describe("MechanismGallery — edit after Done (unlock affordance)", () => {
     act(() => {
       useWorkingCopyStore.getState().lockDesktop();
     });
+    // The note explains the re-review consequence but is not a button/alert —
+    // no "Unlock to edit" affordance exists any more.
     expect(
-      screen.getByText(/re-reviewing your touch layout/i),
+      screen.getByText(/editing it will flag your touch layout for re-review/i),
     ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: /unlock desktop layout to edit/i }),
+    ).toBeNull();
   });
 
-  it("unlocking when a touch layout already exists marks the touch step stale (surfaces re-review)", async () => {
+  it("auto-unlocking when a touch layout already exists marks the touch step stale (surfaces re-review)", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(
@@ -2377,7 +2443,9 @@ describe("MechanismGallery — edit after Done (unlock affordance)", () => {
 
     expect(useWorkingCopyStore.getState().staleSteps.has(TOUCH_STEP_ID)).toBe(false);
 
-    fireEvent.click(screen.getByRole("button", { name: /unlock desktop layout to edit/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
 
     // handleUnlock marks "touch" directly (not "mechanisms") — production's
     // "touch" step has empty `inputs`, so there is no data edge for
@@ -2385,9 +2453,13 @@ describe("MechanismGallery — edit after Done (unlock affordance)", () => {
     // seeds it as a re-opened root regardless of the missing edge.
     expect(useWorkingCopyStore.getState().staleSteps.has(TOUCH_STEP_ID)).toBe(true);
     expect(useWorkingCopyStore.getState().staleSteps.has(MECHANISMS_STEP_ID)).toBe(false);
+    // A brief, non-timer status note confirms the re-review flag fired.
+    expect(
+      screen.getByText(/touch layout has been flagged for re-review/i),
+    ).toBeTruthy();
   });
 
-  it("unlocking when no touch layout exists does NOT mark anything stale", async () => {
+  it("auto-unlocking when no touch layout exists does NOT mark anything stale", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(
@@ -2399,14 +2471,17 @@ describe("MechanismGallery — edit after Done (unlock affordance)", () => {
     });
     expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /unlock desktop layout to edit/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
 
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
     expect(useWorkingCopyStore.getState().staleSteps.size).toBe(0);
   });
 });
 
-describe("MechanismGallery — Back after skipping the only character", () => {
-  it("Back still calls onBack after skipping the only (first=last) character — position never changed", async () => {
+describe("MechanismGallery — Back after marking the only character", () => {
+  it("Back still calls onBack after marking-then-completing the only (first=last) character — position never changed", async () => {
     const onBack = vi.fn();
     const onComplete = vi.fn();
     seedInventory(["á"]);
@@ -2420,21 +2495,23 @@ describe("MechanismGallery — Back after skipping the only character", () => {
       );
     });
 
-    // Skipping the only character is itself the phase completion attempt
-    // (idx 0 is also the last position) — it does not move currentChar
-    // anywhere. "á" was skipped (never applied), so the leave-warning modal
-    // opens instead of completing immediately; defer via "Come back later".
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
-    expect(onComplete).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Come back later/i }));
+    // Marking the only character enables Done at that same position (idx 0
+    // is also the last position) — it does not move currentChar anywhere.
+    // "á" was marked (never applied), so Done completes directly — no modal.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
+    const doneBtn = await screen.findByRole("button", { name: "Done" });
+    await waitFor(() => expect((doneBtn as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(doneBtn);
     expect(onComplete).toHaveBeenCalledOnce();
 
     // "á" is still the selected chip — positional nav never nulled
     // currentChar out from under the completed character.
-    expectCurrentChar("á");
+    expectCurrentChar("á", { marked: true });
 
     // Back is still positional: idx 0 has no prior position, so it calls
-    // onBack — not gated by the character having just been skipped.
+    // onBack — not gated by the character having just been marked.
     const backBtn = screen.getByRole("button", { name: /← back/i });
     expect(backBtn).toBeTruthy();
     fireEvent.click(backBtn);
@@ -2554,7 +2631,7 @@ describe("MechanismGallery — kbgen suggestion gated on the current char's prod
     // not the suggestion row's presence. waitFor retries until both have
     // caught up, without weakening what's asserted.
     await waitFor(() => {
-      expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
+      expect(suggestionRowText()).toMatch(/Suggested: RAlt \+ a for 'à'/i);
     });
   });
 
@@ -2626,8 +2703,76 @@ describe("MechanismGallery — kbgen suggestion gated on the current char's prod
 });
 
 // ---------------------------------------------------------------------------
+// kbgen suggestion row text — S-01 keycap convention (physical-key-naming
+// ambiguity fix). The S-08 (RALT) shape already has a positive assertion
+// above ("Suggested: RAlt + a for 'à'"); this closes the matching gap for
+// S-01 (a `direct` candidate with no RALT modifier — strategyForCandidate
+// resolves it to S-01) — the KEY name lowercase, the produced CHARACTER
+// quoted in its real case.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — kbgen suggestion row text (S-01 keycap convention)", () => {
+  it("renders the lowercase key name and real-case quoted character for an S-01 (no-modifier direct) candidate", async () => {
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+
+    seedInventory(["x"]);
+
+    const placementMap = makePlacementMap({
+      bcp47Context: "test",
+      baseLayoutFamily: "QWERTY",
+      entries: [
+        {
+          codepoint: "U+0078", // x
+          candidates: [
+            {
+              vkey: "K_Q",
+              modifiers: [],
+              mechanism: "direct",
+              priorSource: "corpus",
+              priorCount: 4,
+              confidence: 0.88,
+            },
+          ],
+        },
+      ],
+    });
+
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} placementMap={placementMap} />,
+      );
+    });
+
+    fireEvent.click(screen.getByTestId("char-scroll-chip-0078"));
+    await waitFor(() => {
+      expectCurrentChar("x");
+    });
+
+    await waitFor(() => {
+      expect(suggestionRowText()).toMatch(/Suggested: Replace the q key with 'x'/i);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Forward button — forced visible/enabled once the whole inventory is
 // covered, even when currentChar is outside lettersToAdd's walk (bug fix).
+//
+// This suite pins TWO independent, OR-ed reasons the Done button can be
+// force-shown for a currentChar outside lettersToAdd's walk:
+//   (a) `allCovered` — the producer-badge signal, exercised by the first two
+//       tests below;
+//   (b) `unaccountedChars.length === 0` — the mark-aware signal, added by
+//       the mechanism-gallery-progression follow-up and exercised by the
+//       third test below (a marked, still-unimplemented character elsewhere
+//       in the walk, reached from an unrelated already-produced out-of-walk
+//       character). See MechanismGallery.tsx's `forwardButton` top-priority
+//       branch doc comment for the full reconciliation between the two.
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — Done button forced visible when the whole inventory is covered", () => {
@@ -2732,6 +2877,73 @@ describe("MechanismGallery — Done button forced visible when the whole invento
     // hidden entirely, exactly as before this fix.
     expect(screen.queryByTestId("mechanisms-continue")).toBeNull();
   });
+
+  it("force-shows an ENABLED Done button via the mark-aware unaccountedChars signal when a DIFFERENT, unimplemented-but-MARKED character remains elsewhere in the walk (mechanism-gallery-progression follow-up)", async () => {
+    // "z" is directly produced by the base (badge count via signal (a)) —
+    // stays OUT of lettersToAdd, the SHOW-ALL-only character this test
+    // navigates to. "á" has no base coverage, so it is the walk's sole
+    // entry (lettersToAdd === ["á"]).
+    const ruleZ: IRRule = {
+      nodeId: "r-z",
+      context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [ruleZ],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+
+    seedInventory(["á", "z"]);
+
+    const onComplete = vi.fn();
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />,
+      );
+    });
+
+    expectCurrentChar("á");
+    // Mark "á" instead of implementing it — its producer badge stays 0
+    // forever (marks are authoring metadata, never a MechanismAssignment),
+    // so `allCovered` over the whole inventory is FALSE for the rest of
+    // this test — the property under test is that Done still force-shows
+    // via `unaccountedChars` alone.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
+
+    // Navigate to "z" via the SHOW-ALL strip — outside lettersToAdd, and NOT
+    // the marked character itself (a marked-but-unimplemented character is
+    // never excluded from the walk, so it can never be "the out-of-walk
+    // char" on its own).
+    fireEvent.click(screen.getByTestId("char-scroll-chip-007A"));
+    await waitFor(() => {
+      expectCurrentChar("z");
+    });
+
+    // Every character is implemented ("z") or marked ("á") —
+    // `unaccountedChars` is empty even though `allCovered` (badge) is
+    // false — Done force-shows, ENABLED, from this out-of-walk character.
+    const doneBtn = screen.getByTestId("mechanisms-continue");
+    expect(doneBtn.textContent).toMatch(/Done/i);
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+
+    // Unlike the badge-only test above, clicking here is expected to
+    // actually complete: `unaccountedChars.length === 0` is the exact
+    // condition `handleForwardComplete` itself checks, so "visible" and
+    // "clicking works" agree on this path — no harness caveat needed.
+    fireEvent.click(doneBtn);
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -2761,16 +2973,18 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // synchronous-getByText-after-render pattern hardened elsewhere in this
     // describe block (see the kbgen-suggestion-gated describe above).
     await waitFor(() => {
-      expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
+      expect(suggestionRowText()).toMatch(/Suggested: RAlt \+ a for 'à'/i);
     });
 
     // Accept it — records the S-08 assignment and dismisses the row (the
     // dismissal is also implied by coveredChars once accepted).
     fireEvent.click(
-      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_A for à/i }),
+      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ a key for 'à'/i }),
     );
     await waitFor(() => {
-      expect(screen.queryByText(/Suggested: RAlt \+ A for à/i)).toBeNull();
+      expect(
+        screen.queryByRole("note", { name: /Placement suggestion from kbgen seeder/i }),
+      ).toBeNull();
     });
 
     // Advance to "é" — its own (not-yet-resolved) suggestion row shows.
@@ -2780,7 +2994,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
       fireEvent.click(nextBtn);
     });
     await waitFor(() => {
-      expect(screen.getByText(/Suggested: RAlt \+ E for é/i)).toBeTruthy();
+      expect(suggestionRowText()).toMatch(/Suggested: RAlt \+ e for 'é'/i);
     });
 
     // Navigate back to "à" without resolving é's suggestion. Scoped via
@@ -2795,14 +3009,17 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     });
 
     // The already-accepted suggestion for "à" must NOT re-render its card.
-    expect(screen.queryByText(/Suggested: RAlt \+ A for à/i)).toBeNull();
+    expect(
+      screen.queryByRole("note", { name: /Placement suggestion from kbgen seeder/i }),
+    ).toBeNull();
   });
 
-  it("a suggestion row REAPPEARS after Skip (unlike Accept/Deny) — Skip resolves nothing", async () => {
+  it("a suggestion row REAPPEARS after marking for later review (unlike Accept/Deny) — marking resolves nothing", async () => {
     // Same fixture as the accepted-suggestion test above, but this time the
-    // character is SKIPPED rather than accepted/denied. Skip is pure
-    // positional navigation and must not add the character to
-    // suggestionResolved, so returning to it must show the suggestion again.
+    // character is MARKED FOR LATER REVIEW rather than accepted/denied.
+    // Marking is a separate toggle from suggestionResolved (see canGoNext's
+    // own doc comment) and must not add the character to suggestionResolved,
+    // so returning to it must show the suggestion again.
     // "à" is the first character in the collated walk (a < e).
     seedInventory(["é", "à"]);
     await act(async () => {
@@ -2818,11 +3035,14 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // synchronous-getByText-after-render pattern hardened elsewhere in this
     // describe block.
     await waitFor(() => {
-      expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
+      expect(suggestionRowText()).toMatch(/Suggested: RAlt \+ a for 'à'/i);
     });
 
-    // Skip it — no accept/deny, no assignment recorded.
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    // Mark it, then advance — no accept/deny, no assignment recorded.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E0 à for later review/i }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     await waitFor(() => {
       expectCurrentChar("é");
     });
@@ -2830,14 +3050,13 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // Navigate back to "à" without ever resolving its suggestion.
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
-      expectCurrentChar("à");
+      expectCurrentChar("à", { marked: true });
     });
 
     // Unlike the accept/deny case above, the suggestion row for "à" MUST
-    // reappear — Skip resolved nothing. (If `skippedChars` were reintroduced
-    // to suppress the row, this assertion would fail.)
+    // reappear — marking resolved nothing about the suggestion itself.
     await waitFor(() => {
-      expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
+      expect(suggestionRowText()).toMatch(/Suggested: RAlt \+ a for 'à'/i);
     });
   });
 });
@@ -2884,12 +3103,10 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
     });
 
     expectCurrentChar("Ƒ");
-    expect(
-      screen.getByText(/Suggested: Shift\+RAlt \+ F for Ƒ/i),
-    ).toBeTruthy();
+    expect(suggestionRowText()).toMatch(/Suggested: Shift\+RAlt \+ f for 'Ƒ'/i);
     expect(
       screen.getByRole("button", {
-        name: /Accept suggestion: Shift\+RAlt \+ K_F for Ƒ/i,
+        name: /Accept suggestion: Shift\+RAlt \+ f key for 'Ƒ'/i,
       }),
     ).toBeTruthy();
   });
@@ -2907,7 +3124,7 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Accept suggestion: Shift\+RAlt \+ K_F for Ƒ/i,
+        name: /Accept suggestion: Shift\+RAlt \+ f key for 'Ƒ'/i,
       }),
     );
 
@@ -2941,10 +3158,10 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
     });
 
     expectCurrentChar("ƒ");
-    expect(screen.getByText(/Suggested: RAlt \+ F for ƒ/i)).toBeTruthy();
+    expect(suggestionRowText()).toMatch(/Suggested: RAlt \+ f for 'ƒ'/i);
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_F for ƒ/i }),
+      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ f key for 'ƒ'/i }),
     );
     const assignments = useWorkingCopyStore
       .getState()
@@ -3042,18 +3259,18 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
     });
 
     expectCurrentChar("ƒ");
-    expect(screen.getByText(/Suggested: Deadkey → f for ƒ/i)).toBeTruthy();
-    expect(screen.getByText(/Suggested: RAlt \+ F for ƒ/i)).toBeTruthy();
+    expect(screen.getByText(/Suggested: Deadkey → 'f' for 'ƒ'/i)).toBeTruthy();
+    expect(suggestionRowText()).toMatch(/Suggested: RAlt \+ f for 'ƒ'/i);
 
     // One shared Deny for the whole row, two independent Accept buttons
     // (each named by its own aria-label, per mechanism).
     expect(
       screen.getByRole("button", {
-        name: /Accept suggestion: deadkey via base letter f for ƒ/i,
+        name: /Accept suggestion: deadkey via base letter 'f' for 'ƒ'/i,
       }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_F for ƒ/i }),
+      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ f key for 'ƒ'/i }),
     ).toBeTruthy();
     expect(
       screen
@@ -3078,7 +3295,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Accept suggestion: deadkey via base letter f for ƒ/i,
+        name: /Accept suggestion: deadkey via base letter 'f' for 'ƒ'/i,
       }),
     );
 
@@ -3110,7 +3327,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
     });
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_F for ƒ/i }),
+      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ f key for 'ƒ'/i }),
     );
 
     const assignments = useWorkingCopyStore
@@ -3161,18 +3378,18 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
     // Accept the deadkey (S-02) chip first.
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Accept suggestion: deadkey via base letter f for ƒ/i,
+        name: /Accept suggestion: deadkey via base letter 'f' for 'ƒ'/i,
       }),
     );
 
     // The deadkey chip's own text is gone, but the RAlt (S-08) chip's text
     // AND its Accept button are STILL rendered — the bug this fixes.
     await waitFor(() => {
-      expect(screen.queryByText(/Suggested: Deadkey → f for ƒ/i)).toBeNull();
-      expect(screen.getByText(/Suggested: RAlt \+ F for ƒ/i)).toBeTruthy();
+      expect(screen.queryByText(/Suggested: Deadkey → 'f' for 'ƒ'/i)).toBeNull();
+      expect(suggestionRowText()).toMatch(/Suggested: RAlt \+ f for 'ƒ'/i);
     });
     const raltAccept = screen.getByRole("button", {
-      name: /Accept suggestion: RAlt \+ K_F for ƒ/i,
+      name: /Accept suggestion: RAlt \+ f key for 'ƒ'/i,
     });
     expect((raltAccept as HTMLButtonElement).disabled).toBe(false);
 
@@ -3226,11 +3443,11 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
     // Accept only the deadkey (S-02) chip; leave the RAlt (S-08) chip alone.
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Accept suggestion: deadkey via base letter f for ƒ/i,
+        name: /Accept suggestion: deadkey via base letter 'f' for 'ƒ'/i,
       }),
     );
     await waitFor(() => {
-      expect(screen.queryByText(/Suggested: Deadkey → f for ƒ/i)).toBeNull();
+      expect(screen.queryByText(/Suggested: Deadkey → 'f' for 'ƒ'/i)).toBeNull();
     });
 
     // Navigate away to "z" and back to "ƒ".
@@ -3246,8 +3463,8 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
     // The already-accepted deadkey chip must NOT reappear (revisit
     // semantics — its mechanism is still on record); the never-touched RAlt
     // chip must still be offered.
-    expect(screen.queryByText(/Suggested: Deadkey → f for ƒ/i)).toBeNull();
-    expect(screen.getByText(/Suggested: RAlt \+ F for ƒ/i)).toBeTruthy();
+    expect(screen.queryByText(/Suggested: Deadkey → 'f' for 'ƒ'/i)).toBeNull();
+    expect(suggestionRowText()).toMatch(/Suggested: RAlt \+ f for 'ƒ'/i);
   });
 
   // -------------------------------------------------------------------------
@@ -3272,11 +3489,11 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Accept suggestion: deadkey via base letter f for ƒ/i,
+        name: /Accept suggestion: deadkey via base letter 'f' for 'ƒ'/i,
       }),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_F for ƒ/i }),
+      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ f key for 'ƒ'/i }),
     );
 
     let deadkeyBadge: HTMLElement | null = null;
@@ -3338,7 +3555,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
     expect(row.style.backgroundColor).not.toBe("rgb(42, 10, 10)"); // #2a0a0a
     expect(row.style.borderColor).not.toBe("rgb(248, 81, 73)"); // #f85149
 
-    const suggestionText = screen.getByText(/Suggested: Deadkey → f for ƒ/i);
+    const suggestionText = screen.getByText(/Suggested: Deadkey → 'f' for 'ƒ'/i);
     expect(suggestionText.style.color).toBe("rgb(86, 211, 100)"); // #56d364
     expect(suggestionText.style.color).not.toBe("rgb(248, 81, 73)"); // #f85149
   });
@@ -3451,7 +3668,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
     expectCurrentChar("ƒ");
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Accept suggestion: RAlt \+ K_F for ƒ/i,
+        name: /Accept suggestion: RAlt \+ f key for 'ƒ'/i,
       }),
     );
 
@@ -3471,12 +3688,12 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Accept suggestion: RAlt \+ K_F for ƒ/i,
+        name: /Accept suggestion: RAlt \+ f key for 'ƒ'/i,
       }),
     );
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Map Ƒ to the Shift\+RAlt layer of K_F/i,
+        name: /Map Ƒ to the Shift\+RAlt layer of the f key/i,
       }),
     );
 
@@ -3514,7 +3731,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
     expectCurrentChar("Ƒ");
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Accept suggestion: Shift\+RAlt \+ K_F for Ƒ/i,
+        name: /Accept suggestion: Shift\+RAlt \+ f key for 'Ƒ'/i,
       }),
     );
 
@@ -3534,7 +3751,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Accept suggestion: RAlt \+ K_F for ƒ/i,
+        name: /Accept suggestion: RAlt \+ f key for 'ƒ'/i,
       }),
     );
     expect(screen.getByText(/has an uppercase form, Ƒ/i)).toBeTruthy();
@@ -3556,7 +3773,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Map Ƒ to the Shift\+RAlt layer of K_F/i,
+        name: /Map Ƒ to the Shift\+RAlt layer of the f key/i,
       }),
     );
 
@@ -4757,7 +4974,7 @@ describe("MechanismGallery — case-pair companion proposal", () => {
     expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Map Θ to the shift layer of K_Q/i }),
+      screen.getByRole("button", { name: /Map Θ to the shift layer of the q key/i }),
     );
 
     const assignments = useWorkingCopyStore
@@ -4869,7 +5086,7 @@ describe("MechanismGallery — CAPS-aware base-layer swap (P0)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Map Θ to the shift layer of K_Q/i }),
+      screen.getByRole("button", { name: /Map Θ to the shift layer of the q key/i }),
     );
 
     const assignments = useWorkingCopyStore
@@ -5007,7 +5224,7 @@ describe("MechanismGallery — companion proposal identity tracking (P1/P2 regre
 
     // 3. Confirm the companion.
     fireEvent.click(
-      screen.getByRole("button", { name: /Map Θ to the shift layer of K_Q/i }),
+      screen.getByRole("button", { name: /Map Θ to the shift layer of the q key/i }),
     );
 
     const assignments = getPhaseCPhysicalAssignments();
@@ -5100,7 +5317,7 @@ describe("MechanismGallery — companion proposal identity tracking (P1/P2 regre
     expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Map Θ to the shift layer of K_Q/i }),
+      screen.getByRole("button", { name: /Map Θ to the shift layer of the q key/i }),
     );
 
     // Nothing was recorded — the stale proposal was dismissed, not applied.
@@ -5130,7 +5347,7 @@ describe("MechanismGallery — companion proposal bcp47 plumbing", () => {
     expect(screen.getByText(/has an uppercase form, İ/i)).toBeTruthy();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Map İ to the shift layer of K_Q/i }),
+      screen.getByRole("button", { name: /Map İ to the shift layer of the q key/i }),
     );
 
     const companion = useWorkingCopyStore
@@ -5957,7 +6174,7 @@ describe("MechanismGallery — shared case-pair affordance (spec 051)", () => {
     await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), "K_Q");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
     expect(
-      screen.getByRole("button", { name: /Map Θ to the shift layer of K_Q/i }),
+      screen.getByRole("button", { name: /Map Θ to the shift layer of the q key/i }),
     ).toBeTruthy();
 
     // 2. Second swap for the SAME character on K_W — at most one proposal is
@@ -5969,7 +6186,7 @@ describe("MechanismGallery — shared case-pair affordance (spec 051)", () => {
     // 3. Confirm — must pair with K_W (the raising placement), not K_Q. An
     //    index/target scan would grab the first θ assignment and emit K_Q.
     fireEvent.click(
-      screen.getByRole("button", { name: /Map Θ to the shift layer of K_W/i }),
+      screen.getByRole("button", { name: /Map Θ to the shift layer of the w key/i }),
     );
 
     const assignments = getPhaseCPhysicalAssignments();
@@ -6389,8 +6606,18 @@ describe("MechanismGallery — within-step walk position", () => {
     expect(useStepWalkStore.getState().cursors[MECHANISMS_STEP_ID]).toBe(
       charToPositionToken("á"),
     );
+    // "Skip this character" no longer exists (mechanism-gallery-progression
+    // replaced it with the "Mark for later review" toggle — see that
+    // describe block above); Next is gated on implemented-OR-marked, so
+    // marking is how this walk-position test advances past an untouched
+    // character without recording a MechanismAssignment.
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /skip this character/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+      );
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     });
     expectCurrentChar("é");
     expect(useStepWalkStore.getState().cursors[MECHANISMS_STEP_ID]).toBe(
@@ -6403,11 +6630,22 @@ describe("MechanismGallery — within-step walk position", () => {
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
+    // Mark-then-Next twice — see the "Skip this character" note above.
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /skip this character/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+      );
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /skip this character/i }));
+      fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
+    });
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Mark U\+00E9 é for later review/i }),
+      );
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     });
     expectCurrentChar("í");
 

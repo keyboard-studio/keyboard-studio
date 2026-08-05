@@ -526,8 +526,8 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
         kind: 'keystroke',
         producedChar: 'a',
         producedRole: 'produced',
-        keystrokeDisplay: 'A',
-        inputSequence: ['A'],
+        keystrokeDisplay: 'a',
+        inputSequence: ['a'],
         output: 'a',
       },
     ]);
@@ -547,15 +547,15 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
         kind: 'keystroke',
         producedChar: 'A',
         producedRole: 'produced',
-        keystrokeDisplay: 'Shift+A',
-        inputSequence: ['Shift+A'],
+        keystrokeDisplay: 'Shift+a',
+        inputSequence: ['Shift+a'],
         output: 'A',
       },
     ]);
   });
 
-  it('kind "keystroke": a MULTI-vkey context yields the full ordered input sequence + joined output (e.g. "A + Shift+B -> GHG")', () => {
-    // Two keystrokes (A, then Shift+B) producing a single multi-char literal
+  it('kind "keystroke": a MULTI-vkey context yields the full ordered input sequence + joined output (e.g. "a + Shift+b -> GHG")', () => {
+    // Two keystrokes (a, then Shift+b) producing a single multi-char literal
     // output "GHG" — the shape the pre-existing-method label must now show
     // as a full sequence, not just a single "Press" keystroke.
     const rule = makeRule('r-digraph',
@@ -574,7 +574,7 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
         kind: 'keystroke',
         producedChar: 'GHG',
         producedRole: 'produced',
-        inputSequence: ['A', 'Shift+B'],
+        inputSequence: ['a', 'Shift+b'],
         output: 'GHG',
       },
     ]);
@@ -599,7 +599,7 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     // unresolvable element aborts the WHOLE sequence rather than silently
     // dropping just that token.
     expect(result.descriptors).toEqual([
-      { kind: 'keystroke', producedChar: 'a', producedRole: 'produced', keystrokeDisplay: 'A' },
+      { kind: 'keystroke', producedChar: 'a', producedRole: 'produced', keystrokeDisplay: 'a' },
     ]);
     expect(result.descriptors[0]).not.toHaveProperty('inputSequence');
     expect(result.descriptors[0]).not.toHaveProperty('output');
@@ -987,7 +987,7 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
         producedChar: 'ɛ',
         producedRole: 'produced',
         storeDisplayName: 'Fanout',
-        inputSequence: ['A'],
+        inputSequence: ['a'],
         output: 'ɛ',
       },
     ]);
