@@ -18,9 +18,10 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { resolveBaselineRef, readCatalogAtRef } from "./git-baseline.js";
 
@@ -37,10 +38,30 @@ function git(args: string[], cwd: string): string {
   return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 }
 
-/** A commit needs no global git config in CI/dev boxes without one set. */
+/**
+ * A commit needs no global git config in CI/dev boxes without one set.
+ * `commit.gpgsign=false` overrides it the same way `user.email`/`user.name`
+ * already do -- a contributor with global GPG signing on would otherwise hit
+ * exactly the "hangs waiting on a pinentry prompt with no tty attached"
+ * failure mode this whole PR exists to close, just relocated into the tests.
+ */
 function commit(cwd: string, message: string): void {
   git(["add", "-A"], cwd);
-  git(["-c", "user.email=t@t.com", "-c", "user.name=t", "commit", "-q", "-m", message], cwd);
+  git(
+    [
+      "-c",
+      "user.email=t@t.com",
+      "-c",
+      "user.name=t",
+      "-c",
+      "commit.gpgsign=false",
+      "commit",
+      "-q",
+      "-m",
+      message,
+    ],
+    cwd,
+  );
 }
 
 function initRepo(branch: string): string {
@@ -183,6 +204,25 @@ describe("readCatalogAtRef", () => {
     expect(readCatalogAtRef("HEAD", file, repo)).toEqual({ "a.b": "hello" });
   });
 
+  it("reads a file nested under subdirectories, exercising the path.sep -> '/' conversion", () => {
+    // Real callers never pass a root-level file -- content-i18n-lint passes
+    // content/i18n/<locale>/<name>.json and i18n-catalog-lint passes
+    // packages/studio/src/locales/<locale>/messages.json. readCatalogAtRef
+    // converts path.relative()'s OS-native separators to git's always-forward-
+    // slash form before building the "<ref>:<path>" spec; on Windows that
+    // conversion is a no-op unless the path actually has multiple segments,
+    // so a root-level fixture (every other test in this file) can't exercise
+    // it. This one nests three levels deep to match the real shape.
+    const repo = initRepo("main");
+    const nestedDir = join(repo, "content", "i18n", "fr");
+    mkdirSync(nestedDir, { recursive: true });
+    const file = join(nestedDir, "messages.json");
+    writeFileSync(file, JSON.stringify({ "greeting.hello": "Bonjour" }));
+    commit(repo, "add nested catalog");
+
+    expect(readCatalogAtRef("HEAD", file, repo)).toEqual({ "greeting.hello": "Bonjour" });
+  });
+
   it("returns null when the file did not exist at that ref (brand-new catalog)", () => {
     const repo = initRepo("main");
     const oldSha = git(["rev-parse", "HEAD"], repo).trim();
@@ -206,5 +246,48 @@ describe("readCatalogAtRef", () => {
     const file = join(repo, "seed.txt");
 
     expect(readCatalogAtRef("not-a-real-ref", file, repo)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Timeout wiring, guarded statically rather than by mocking child_process.
+//
+// Every test above proves the FALLBACK-CHAIN logic is correct by exercising
+// real git failures. None of them can prove the timeout option survives at
+// each call site, because a passing real-git call succeeds long before any
+// 10s ceiling matters either way -- a future refactor could drop `timeout`
+// from one execFileSync call and nothing above would turn red.
+//
+// A behavioral test (mock node:child_process, assert the options it was
+// called with) was tried and abandoned: git-baseline.js is CommonJS and
+// already loaded once via this file's own static `import` above, and
+// vi.doMock + a fresh dynamic import did not reliably re-wire that already-
+// required module's `require("node:child_process")` binding across the
+// CJS/ESM interop boundary -- the "fresh" import silently fell through to the
+// REAL child_process (proven by resolveBaselineRef returning null against a
+// nonexistent /fake/repo path, rather than the mocked "success" value), which
+// would have made this test worthless (or worse, coincidentally green for
+// the wrong reason) rather than merely absent.
+//
+// A direct source-text guard is cruder but cannot be fooled by that interop
+// failure mode: every execFileSync("git", ...) call site must mention
+// `timeout: GIT_TIMEOUT_MS` in its options. It fails loudly if a future edit
+// adds a call site without the option, or removes the option from an
+// existing one -- exactly the regression this test exists to catch.
+// ---------------------------------------------------------------------------
+
+describe("git-baseline timeout wiring (static guard)", () => {
+  it("mentions timeout: GIT_TIMEOUT_MS once per execFileSync(\"git\", ...) call site", () => {
+    const sourcePath = join(dirname(fileURLToPath(import.meta.url)), "git-baseline.js");
+    const source = readFileSync(sourcePath, "utf8");
+
+    const callSites = source.match(/execFileSync\(\s*"git"/g) ?? [];
+    const timeoutMentions = source.match(/timeout:\s*GIT_TIMEOUT_MS/g) ?? [];
+
+    // Not >= 1 each: an exact 1-to-1 count means every call site has its own
+    // timeout, not that some other call site happens to have two mentions
+    // while a new, timeout-less one slips in unnoticed.
+    expect(callSites.length).toBeGreaterThanOrEqual(2); // the git() wrapper's own call + the raw fetch call, at minimum
+    expect(timeoutMentions.length).toBe(callSites.length);
   });
 });

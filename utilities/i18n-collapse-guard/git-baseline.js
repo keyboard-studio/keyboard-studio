@@ -96,4 +96,4 @@ function readCatalogAtRef(ref, absPath, cwd) {
   }
 }
 
-module.exports = { resolveBaselineRef, readCatalogAtRef };
+module.exports = { resolveBaselineRef, readCatalogAtRef, GIT_TIMEOUT_MS };
