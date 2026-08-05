@@ -187,7 +187,7 @@ function checkEnglishCollapse({ en, target, locale, catalog }) {
 }
 
 // ---------------------------------------------------------------------------
-// BASELINE REGRESSION GUARD (#1489)
+// BASELINE REGRESSION GUARD
 // ---------------------------------------------------------------------------
 // checkEnglishCollapse above compares a target locale against English, in the
 // SAME commit. That is blind to a different corruption shape: a target catalog
@@ -196,11 +196,11 @@ function checkEnglishCollapse({ en, target, locale, catalog }) {
 // as all-empty) -- it needs a comparison en can never provide, against what
 // this same locale/catalog looked like BEFORE.
 //
-// This stopped being hypothetical the moment #1483 flipped
-// `skip_untranslated_strings` to `true`: a download from a project holding no
-// translations for a locale now returns EMPTY values instead of English source
-// text, which is exactly the shape checkEnglishCollapse is designed to let
-// through. See #1489.
+// This stopped being hypothetical the moment the Crowdin download workflow's
+// `skip_untranslated_strings` setting flipped to `true`: a download from a
+// project holding no translations for a locale now returns EMPTY values
+// instead of English source text, which is exactly the shape
+// checkEnglishCollapse is designed to let through.
 //
 // Same two-rule shape as the English-collapse guard, for the same reason: a
 // ratio threshold needs enough keys to mean anything (MIN_KEYS_REGRESSION), and
