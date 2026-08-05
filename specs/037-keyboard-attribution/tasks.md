@@ -211,7 +211,7 @@ Sequence rationale — Phase 2 before Phase 3 is not stylistic. The parser is th
 meets untrusted real-world input, so it is settled in a pure module with a corpus-harvested
 fixture table before any consumer can mask a defect behind end-to-end plumbing.
 
-## Content hand-off (Article VI)
+## Content hand-off (Article VI) — written up in [HANDOFF-CONTENT.md](HANDOFF-CONTENT.md)
 
 T015 lands **membership only**. The three revived questions were written for a fuller Phase A
 battery, not for a prefilled confirm-this step, so their **prompt and help text almost certainly

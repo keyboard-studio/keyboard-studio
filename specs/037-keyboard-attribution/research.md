@@ -3,10 +3,27 @@
 Phase 0 output. Resolves the six Open Questions from [spec.md](spec.md) and records the
 codebase findings that shape the Phase 1 design.
 
-**Status of these decisions**: PROPOSED by the engine side, grounded in the corpus scan
-([corpus-scan.py](corpus-scan.py) / [corpus-scan.out.txt](corpus-scan.out.txt)) and in
-existing project positions. Each is cheap to overturn; D4 and D5 carry the most weight and
-are the two worth a deliberate ruling.
+**Status of these decisions** *(updated 2026-08-04, after implementation)*: originally PROPOSED by
+the engine side, grounded in the corpus scan ([corpus-scan.py](corpus-scan.py) /
+[corpus-scan.out.txt](corpus-scan.out.txt)) and in existing project positions.
+
+**All are now IMPLEMENTED and load-bearing in shipped behaviour**, so they are no longer cheap to
+overturn — each has tests and, in D3/D4's case, emitted-artifact consequences:
+
+| | Where it is now load-bearing |
+|---|---|
+| D1 | blank copyright holder defaults to the author name |
+| D2 | `emitYear` is a parameter, and the pure functions never read the clock |
+| D3 | holder ordering in every emitted `LICENSE.md` |
+| D4 | `LICENSE.md` authoritative; exact-match dedupe keeps `SIL International` and `SIL Global` distinct |
+| D5 | download is BLOCKED on an unreadable base notice, with a manual-entry escape hatch |
+| D6 | the author-name question is the one required field |
+
+The user ruled directly on the US2 substance ("the base author's notice with the new author added
+to it, not replacing it"), which D3/D4/D7/D8/D9 all serve. D4 and D5 were the two flagged as
+wanting a deliberate ruling and were implemented as proposed; overturning either is now a real
+change rather than a note. D4's exact-match dedupe has a known consequence for authors — see
+[HANDOFF-CONTENT.md](HANDOFF-CONTENT.md) item 5.
 
 ---
 
@@ -96,6 +113,10 @@ a diagnostic; never merge the two into two holder lines.
 
 **Worth a deliberate ruling** — it is a legal-interpretation call, not a technical one.
 
+**STATUS 2026-08-04**: implemented as written and now load-bearing. The exact-match dedupe this
+decision requires has a consequence for authors — see [HANDOFF-CONTENT.md](HANDOFF-CONTENT.md)
+item 5.
+
 ---
 
 ## D5 — Unparseable base license blocks emission, with an entry escape hatch (resolves OQ-5)
@@ -122,6 +143,10 @@ Copyright © 2015                             year, no holder (legacy/)
 ```
 
 **Worth a deliberate ruling** — it is the one decision that can stop a user completing a walk.
+
+**STATUS 2026-08-04**: implemented as written, including the escape hatch
+(`ScaffoldOptions.baseHolderOverride`), and now load-bearing — download is blocked while a base
+notice is unreadable.
 
 ---
 

@@ -4,10 +4,16 @@
 
 **Created**: 2026-08-04
 
-**Status**: Planned — the six Open Questions are **resolved as PROPOSED decisions** in
-[research.md](research.md) (D1–D6). **D4** (`LICENSE.md` vs `.kmn` precedence) and **D5**
-(unparseable base license blocks emission) are legal/UX calls worth a deliberate ruling before
-implementation; the other four follow from corpus evidence.
+**Status**: **IMPLEMENTED** — US1, US2 and US3 all landed; see [tasks.md](tasks.md) for the task
+record. The six Open Questions were resolved in [research.md](research.md) (D1–D6) and are now
+load-bearing in shipped behaviour rather than proposals.
+
+The "Context: what exists today" section below is the **audit as of the start of this work** and is
+deliberately left as written — it is the evidence the requirements were derived from, and several
+findings in it (the fabricated `LICENSE.md`, the absent `COPYRIGHT` store, the discarded GitHub
+profile fields) describe defects this feature removed.
+
+One follow-up is owned by another team — see [HANDOFF-CONTENT.md](HANDOFF-CONTENT.md).
 
 **Governing docs**: [spec.md](../../spec.md) §12 (working-copy spine), §16 (out of scope). Publication is [024](../024-option-a-github-app/spec.md); this feature supplies the attribution that publication carries.
 
@@ -280,6 +286,14 @@ stored in the working copy rather than read live from the auth session at emit t
 - Legacy keyboards are not reachable as bases, and this feature does not change that.
 - Attribution is captured once per keyboard, not per edit session.
 - GitHub `login` is always present for a signed-in user; `name` and `email` may be null.
+
+## Follow-up owned by another team
+
+- **Attribution question wording** — the three questions carry Content-owned prompt and help text
+  written for a fuller Phase A battery, and their *behaviour* changed when they moved onto the live
+  identity flow (two became optional, one is pre-filled, one has an invisible default). Engine
+  changed none of it. Proposed wording, the reasoning, and one correctness concern are handed off in
+  [HANDOFF-CONTENT.md](HANDOFF-CONTENT.md).
 
 ## Out of Scope
 
