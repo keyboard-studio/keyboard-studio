@@ -1,5 +1,5 @@
 // package-descriptor — the SINGLE writer of the Keyman package descriptor's
-// identity fields (spec 057 FR-005, contracts/package-descriptor.md).
+// identity fields (spec 059 FR-005, contracts/package-descriptor.md).
 //
 // Both authoring tracks and the output projection reach `source/<id>.kps` only
 // through this module. A second writer is a defect, not an optimization: the
@@ -26,7 +26,7 @@ export type { ApplyIdentityToKpsResult } from "./patch.js";
  *
  * Owned by the WRITER, not by the test that reads it. `outputReach.test.ts`
  * validates every `QuestionModule.outputs` entry naming `"package-descriptor"`
- * against this set (spec 057 FR-016), so a question cannot declare it feeds a
+ * against this set (spec 059 FR-016), so a question cannot declare it feeds a
  * field the descriptor never reads. Keeping the table here means adding a field to
  * the writer and declaring it on a question are one change, not two that can
  * disagree.

@@ -661,7 +661,7 @@ group(main) using keys
 });
 
 // ---------------------------------------------------------------------------
-// Step 3.6 — package-descriptor identity (spec 057 T015)
+// Step 3.6 — package-descriptor identity (spec 059 T015)
 // ---------------------------------------------------------------------------
 //
 // The projection is the seam FR-004 names: the author's language reaches the

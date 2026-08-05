@@ -43,7 +43,7 @@ export interface SerializeWorkingCopyResult {
    *
    * The descriptor's own warnings ride here so a failure to write the author's
    * identity into the `.kps` is NAMED on the download path rather than silent
-   * (spec 057 FR-006 / US3-3).
+   * (spec 059 FR-006 / US3-3).
    */
   warnings: string[];
   /** The keyboard id resolved from the store (for the filename). */
@@ -82,7 +82,7 @@ export interface ProjectWorkingCopyForOutputResult {
 /**
  * Options for {@link projectWorkingCopyForOutput}.
  *
- * Added by spec 057 (FR-010). The counterfactual that attributes a
+ * Added by spec 059 (FR-010). The counterfactual that attributes a
  * pre-instantiation identity decision needs two projections differing in exactly
  * one identity value, and FR-010 requires BOTH sides to come from the function
  * that produces the shipped keyboard — building either side from the codec emitter
@@ -127,7 +127,7 @@ export interface ProjectForOutputOptions {
  *   1. Carve deletions (+ 1.5 carve keycaps, 1.6 touch method deletions)
  *   2. Assignments (physical only)
  *   3. Identity (&NAME) — and 3.6, the package descriptor's declared language
- *      and display name (spec 057). The descriptor is written THERE, not here, so
+ *      and display name (spec 059). The descriptor is written THERE, not here, so
  *      the OSK preview sees the same one the zip and the pull request do.
  *
  * This is the same order used by {@link useWorkingCopyTransform} (the OSK
@@ -224,7 +224,7 @@ export async function projectWorkingCopyForOutput(
   // dropped by accident). The rename pass runs there when targetKeyboardId
   // differs from keyboardId.
   //
-  // `languageName` joins the mapped fields for spec 057: the descriptor's
+  // `languageName` joins the mapped fields for spec 059: the descriptor's
   // `<Language>` display text comes through the overlay like every other identity
   // value, so the zip, the pull request, and the OSK preview cannot disagree
   // about it (FR-004/SC-005).
@@ -264,7 +264,7 @@ export async function projectWorkingCopyForOutput(
     // base's raw `.kps`, so on the adapt track there is usually nothing to patch
     // at this point. That silent no-op was invisible for as long as it was because
     // no descriptor was ever written at all. Now the projection's step 3.6
-    // GENERATES the descriptor further down (spec 057 FR-006), and it is handed
+    // GENERATES the descriptor further down (spec 059 FR-006), and it is handed
     // `identity.version` — the bumped value set just below — so the descriptor and
     // the `.kmn` agree by construction rather than by this patch (FR-008).
     // Warning on absence here would therefore report a problem that no longer
@@ -299,7 +299,7 @@ export async function projectWorkingCopyForOutput(
     };
   }
 
-  // 4b. spec 057 FR-010: merge the caller's identity override, for this call only.
+  // 4b. spec 059 FR-010: merge the caller's identity override, for this call only.
   //
   // Applied LAST so it wins over both the store's overlay and the adapt path's
   // bumped version, and applied with `hasOwnProperty` semantics so an explicitly

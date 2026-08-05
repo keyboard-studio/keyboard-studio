@@ -756,7 +756,7 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                 })}
               </p>
             ) : outcome.impact.reason === "no-working-copy-yet" ? (
-              // An EXPLICIT arm (spec 057 FR-012). Falling into the trailing
+              // An EXPLICIT arm (spec 059 FR-012). Falling into the trailing
               // "no re-derivable write path" branch below would tell the author
               // this step cannot be explored, when in fact it can as soon as a
               // base keyboard exists to project.

@@ -1,7 +1,7 @@
 // projectedText — reduce a projection's entries to the `path -> text` baseline the
 // decision trail diffs, and hold volatile content stable across the comparison.
 //
-// Extracted from `snapshotSource.ts` (spec 057 T022, research D-10). FR-013 applies
+// Extracted from `snapshotSource.ts` (spec 059 T022, research D-10). FR-013 applies
 // to BOTH sides of a comparison, and there are now two comparers: the boundary
 // snapshotter (which diffs consecutive projections of the same working copy) and
 // the counterfactual (which diffs two projections that differ in one identity
@@ -44,7 +44,7 @@ export function textBaseline(entries: readonly VirtualFSEntry[]): Map<string, st
  * otherwise show a spurious one-line change attributed to whichever decision
  * happened to be recorded then.
  *
- * For the COUNTERFACTUAL comparison (spec 057) both projections are taken moments
+ * For the COUNTERFACTUAL comparison (spec 059) both projections are taken moments
  * apart, so the stamp cancels in the overwhelming majority of cases — but "almost
  * always cancels" is not a property worth relying on when the whole point of the
  * comparison is to name exactly one changed file. Normalizing both sides makes it

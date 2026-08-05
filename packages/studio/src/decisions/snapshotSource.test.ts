@@ -21,7 +21,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { DecisionImpactSchema, createVirtualFS } from "@keyboard-studio/contracts";
-// spec 057 US4-3 / SC-007: the boundary account and the counterfactual account of
+// spec 059 US4-3 / SC-007: the boundary account and the counterfactual account of
 // the same descriptor must not contradict each other, so both are exercised here.
 import { resolveIdentityCounterfactual } from "./counterfactualProjection.ts";
 import type { DiffHunk, VirtualFSEntry } from "@keyboard-studio/contracts";
@@ -662,7 +662,7 @@ describe("FR-017a — the HISTORY.md date stamp", () => {
 });
 
 // ---------------------------------------------------------------------------
-// US4 (spec 057 T037) — revising the language keeps both answers on the record
+// US4 (spec 059 T037) — revising the language keeps both answers on the record
 // ---------------------------------------------------------------------------
 //
 // Two mechanisms now describe the same descriptor: the boundary capture (this
@@ -672,9 +672,9 @@ describe("FR-017a — the HISTORY.md date stamp", () => {
 // be different if this answer were absent?") — but they must agree on WHICH FILE
 // changed and on the direction of the change, which is what an author reads.
 
-describe("US4 — a post-instantiation language revision (spec 057)", () => {
+describe("US4 — a post-instantiation language revision (spec 059)", () => {
   /**
-   * The descriptor as spec 057's writer emits it — with a `<Languages>` block, which
+   * The descriptor as spec 059's writer emits it — with a `<Languages>` block, which
    * `KPS_V1` above predates (053's fixture only needed `<Info><Name>`).
    */
   function descriptorDeclaring(tag: string): string {

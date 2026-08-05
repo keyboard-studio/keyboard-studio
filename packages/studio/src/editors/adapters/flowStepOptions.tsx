@@ -179,7 +179,7 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
   onCommit(extracted: ProjectNamePayload, deps: FlowStepDeps): void {
     // R7 ordering: setScaffoldSpec BEFORE setIdentity BEFORE onComplete → advance.
     deps.setScaffoldSpec({ keyboardId: extracted.keyboardId, displayName: extracted.displayName });
-    // spec 057 FR-001/FR-002: carry the identity-lite answers into the working
+    // spec 059 FR-001/FR-002: carry the identity-lite answers into the working
     // copy so the package descriptor can declare the AUTHOR's language. Before
     // this, Track 1 set only keyboardId and displayName — the composed tag lived
     // in surveySessionStore.identityResult and never crossed over, so the

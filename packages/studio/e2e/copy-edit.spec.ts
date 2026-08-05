@@ -336,7 +336,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
   }) => {
     // Walk the wizard and download. Unlike the other walks here this one supplies
     // the language code, so the identity-lite series composes a real BCP47 tag for
-    // the package descriptor to declare (spec 057 FR-001) instead of leaving the
+    // the package descriptor to declare (spec 059 FR-001) instead of leaving the
     // field blank and falling back to the `und` placeholder.
     await driveIdentityLite(page, {
       english: FIXTURE.english,

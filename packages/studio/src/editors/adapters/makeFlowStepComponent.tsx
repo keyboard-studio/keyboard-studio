@@ -71,7 +71,7 @@ export interface FlowStepDeps {
    * The identity-lite answers. `bcp47` is the tag the series COMPOSED (spec 030);
    * `english` is the language's English name. Both are read verbatim by
    * projectNameOptions.onCommit so the package descriptor can declare them
-   * (spec 057 FR-001/FR-002) — this step is the only place on the copy track
+   * (spec 059 FR-001/FR-002) — this step is the only place on the copy track
    * where the composed tag crosses from the survey session into the working copy.
    */
   identityResult: { autonym: string; english: string; bcp47: string } | null;

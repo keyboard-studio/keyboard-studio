@@ -97,7 +97,7 @@ describe("output projection completes the scaffold stubs (Track 1)", () => {
     expect(readVfsText(projected!.vfs, "source/welcome.htm")).toBeUndefined();
     // The .kps is NOT a counter-example. Step 5b still skips this track; the
     // descriptor here comes from step 3.6, which runs on BOTH tracks
-    // (spec 057 FR-006). It cannot mask imported package metadata — the
+    // (spec 059 FR-006). It cannot mask imported package metadata — the
     // fear the earlier assertion here encoded — because
     // fetchKeyboardSourceToVfs never fetches the base's .kps in the first
     // place (it references compiled ../build/* artifacts), so before 3.6 the

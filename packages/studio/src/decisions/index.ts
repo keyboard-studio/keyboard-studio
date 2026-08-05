@@ -51,7 +51,7 @@ export type { DecisionRecorderDeps } from "./createDecisionRecorder.ts";
 export { resolveImpact, resolveImpactAsync } from "./impact.ts";
 export type { ResolveImpactDeps, ResolveImpactAsyncDeps } from "./impact.ts";
 
-// spec 057 — attribution for decisions recorded before a working copy existed.
+// spec 059 — attribution for decisions recorded before a working copy existed.
 export { textBaseline, normalizeHistoryDateStamp } from "./projectedText.ts";
 export {
   resolveIdentityCounterfactual,

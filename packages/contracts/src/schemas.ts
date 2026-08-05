@@ -635,7 +635,7 @@ export const DecisionImpactSchema = z.discriminatedUnion("state", [
   z.object({ state: z.literal("none") }),
   z.object({
     state: z.literal("unavailable"),
-    // Mirrors ImpactUnavailableReason. `no-working-copy-yet` is spec 057 FR-012:
+    // Mirrors ImpactUnavailableReason. `no-working-copy-yet` is spec 059 FR-012:
     // a decision recorded before instantiation, whose effect is not yet
     // resolvable rather than permanently unavailable.
     reason: z.enum([

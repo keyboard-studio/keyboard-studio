@@ -33,7 +33,7 @@
 //   3.5 Keycap labels   — applyKeycapLabelsToVfs (see step 3.5 below)
 //   3.6 Package descriptor — applyIdentityToKps writes the AUTHOR's language +
 //                         display name into source/<keyboardId>.kps, generating
-//                         the descriptor when the track has none (spec 057).
+//                         the descriptor when the track has none (spec 059).
 //                         Runs after the .kmn is final (the <Files> list derives
 //                         from it) and before the step-4 rename (which owns <ID>
 //                         and the <Files> paths).
@@ -164,14 +164,14 @@ export type IdentityOverlay = {
   /**
    * The author's composed BCP47 tag.
    *
-   * Consumed by `resetIdentity` during the step-4 id rename AND, since spec 057,
+   * Consumed by `resetIdentity` during the step-4 id rename AND, since spec 059,
    * by step 3.6 as the package descriptor's declared language tag. Taken whole
    * from the identity-lite result — never re-composed here (FR-001).
    */
   bcp47?: string;
   /**
    * The language's name in English, display text for the descriptor's
-   * `<Language>` element (spec 057 FR-002).
+   * `<Language>` element (spec 059 FR-002).
    *
    * Descriptor-only: the codec does not serialize a language name, and teaching
    * it to is out of scope, so this never reaches the `.kmn`.
@@ -496,7 +496,7 @@ export function projectWorkingCopyVfs(
 
   // Step 3.6: Package-descriptor identity — write the AUTHOR's language and
   // display name into `source/<keyboardId>.kps`, generating the descriptor when
-  // the track never had one (spec 057 FR-001…FR-006).
+  // the track never had one (spec 059 FR-001…FR-006).
   //
   // ORDER IS LOAD-BEARING, in both directions:
   //

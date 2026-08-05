@@ -271,7 +271,7 @@ function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
 
 // The scaffolder no longer owns a private `.kps` builder. `buildKpsContent`,
 // the `&TARGETS`->`.js` target table it reads, and the `<Languages>` shape all
-// live in `package-descriptor/` now (spec 057 FR-005) so the output projection
+// live in `package-descriptor/` now (spec 059 FR-005) so the output projection
 // can re-derive the descriptor from the AUTHOR's identity on both authoring
 // tracks. Behaviour here is unchanged: still generated last, still only when the
 // path is absent.
@@ -366,7 +366,7 @@ export function generateStubs(
   //
   // The base's languages are what this stage knows — the author has not answered
   // the identity questions yet at scaffold time. The output projection's step 3.6
-  // replaces this block with the author's own tag before anything ships (spec 057
+  // replaces this block with the author's own tag before anything ships (spec 059
   // FR-001), so declaring the base's tags here is a placeholder, not the final
   // word. `languages[0]` because the descriptor declares exactly ONE language;
   // `undefined` (no base tag) degrades to the writer's `und` placeholder.

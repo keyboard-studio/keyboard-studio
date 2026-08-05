@@ -143,7 +143,7 @@ export type IdentityPatch = Partial<{
   /** Human-readable display name for the new keyboard. */
   displayName: string;
   /**
-   * The language's name in English, as the author confirmed it (spec 057 FR-002).
+   * The language's name in English, as the author confirmed it (spec 059 FR-002).
    *
    * Display text for the package descriptor's `<Language>` element and nothing
    * else — the codec does not serialize a language name, so this never reaches
