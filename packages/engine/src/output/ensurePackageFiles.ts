@@ -63,8 +63,15 @@ export function ensurePackageFiles({
 
   // The descriptor references `..\LICENSE.md` only when a license exists, but a
   // package without one is a package nobody can redistribute. The scaffolder
-  // emits the same MIT stub on Track 1; this closes the adapt track's gap.
-  const holder = copyright !== undefined && copyright !== "" ? copyright : displayName;
+  // covers Track 1; this closes the adapt track's gap.
+  //
+  // spec 059 FR-004: an absent copyright falls back to NOTHING, not to
+  // `displayName`. The MIT body still ships (so the package stays
+  // redistributable) but with no copyright line, rather than one naming the
+  // keyboard as its own rights holder. What stops an unattributed package
+  // shipping at all is the download gate (usePreviewArtifact's
+  // attributionMissing), not a fabricated notice here.
+  const holder = copyright !== undefined && copyright.trim() !== "" ? copyright : null;
   const yyyy = year ?? new Date().getFullYear();
   write("LICENSE.md", licenseMd(holder, yyyy));
 

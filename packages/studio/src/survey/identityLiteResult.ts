@@ -20,6 +20,7 @@
 // `import type { IdentityLiteResult } from "./IdentityLite.tsx"` keeps working
 // and no call site moves.
 
+import type { Attribution } from "@keyboard-studio/contracts";
 import type { ScriptPrefill } from "../lib/scriptAxes.ts";
 
 /** Typed result of the identity-lite step. */
@@ -53,6 +54,12 @@ export interface IdentityLiteResult {
   bcp47: string;
   /** Whether the chosen target script is supported in v1. */
   supported: boolean;
+  /**
+   * Who to attribute the keyboard to (spec 059 US1), or null when the flow
+   * terminated before attribution — which is what a gated script does, since an
+   * author who cannot make a keyboard is never asked who holds its copyright.
+   */
+  attribution: Attribution | null;
   /** Routing/A2 prefill confirmations derived from the target script (spec §5). */
   prefill: ScriptPrefill;
 }

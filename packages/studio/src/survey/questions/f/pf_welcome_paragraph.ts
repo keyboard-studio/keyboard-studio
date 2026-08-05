@@ -12,7 +12,8 @@ export const definition = {
     "very top of the keyboard's help page, so write it in plain language that " +
     "any user can understand. Avoid technical terms. For example: \"This " +
     "keyboard lets you type Bafut (Fa') on any computer. It includes all the " +
-    "tone marks and special letters used in the Bafut alphabet.\"",
+    "tone marks and special letters used in the Bafut alphabet.\" This is the " +
+    "only answer the help page really needs — everything after it is optional.",
   type: "text" as const,
   required: true,
   next: "pf_usage_tip_1",

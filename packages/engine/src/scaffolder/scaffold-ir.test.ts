@@ -34,7 +34,12 @@ describe("scaffoldIR — IR-native scaffolder operations", () => {
     expect(ir.header.name).toBe("My New Keyboard");
     expect(ir.header.bcp47).toEqual(["fr-FR"]);
     expect(ir.header.version).toBe("1.0");
-    expect(ir.header.copyright).toMatch(/Copyright © \d{4} My New Keyboard/);
+    // spec 059 SC-001: this previously asserted the fabricated
+    // `Copyright © <year> My New Keyboard` — naming the KEYBOARD as its own
+    // rights holder. With no copyright supplied, the base's notice is now
+    // preserved instead of being overwritten.
+    expect(ir.header.copyright).toBe("Copyright © 2020 Acme");
+    expect(ir.header.copyright).not.toContain("My New Keyboard");
   });
 
   it("resetIdentity also rewrites the matching &NAME / &COPYRIGHT / &VERSION / &KEYBOARDVERSION system stores", () => {

@@ -91,6 +91,14 @@ function seed() {
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
   ]);
   useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+  // spec 059: the attribution gates block BOTH downloads — the .kmp is the
+  // primary artifact, not a shortcut past them. This suite is about the package
+  // build, so give it an author; the gate itself is asserted in
+  // OutputScreen.test.tsx.
+  useWorkingCopyStore.getState().setAttribution({
+    authorName: "Alice Example",
+    copyrightHolder: "Alice Example",
+  });
 }
 
 function renderReady() {

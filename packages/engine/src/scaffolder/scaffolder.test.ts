@@ -136,7 +136,13 @@ describe("createScaffolderService", () => {
       const content = kmnEntry!.content as string;
 
       expect(content).toContain("store(&NAME) 'My Keyboard'");
-      expect(content).toMatch(/store\(&COPYRIGHT\) 'Copyright © \d{4} My Keyboard'/);
+      // spec 059 SC-001: was `Copyright © <year> My Keyboard`, which named the
+      // keyboard as rights holder and discarded the base's real notice.
+      expect(content).toContain("store(&COPYRIGHT) 'Copyright © 2020 Base Author'");
+      // Scope the negative to the COPYRIGHT store — store(&NAME) legitimately
+      // contains the display name.
+      const copyrightStore = /store\(&COPYRIGHT\) '([^']*)'/.exec(content)?.[1] ?? "";
+      expect(copyrightStore).not.toContain("My Keyboard");
       // &VERSION is the KMN file-format version — always 14.0 (minimum for &CasedKeys).
       expect(content).toContain("store(&VERSION) '14.0'");
       // &KEYBOARDVERSION is the human-visible release version — defaults to "1.0".
@@ -337,7 +343,10 @@ describe("scaffold — displayName sanitization", () => {
     const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
     const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "O'Brien's Keyboard");
     const content = vfs.get("source/my_keyboard.kmn")!.content as string;
-    expect(content).toMatch(/store\(&COPYRIGHT\) 'Copyright © \d{4} O’Brien’s Keyboard'/);
+    // spec 059 SC-001: the display name is no longer used as the holder, so the
+    // base's notice survives. Display-name ESCAPING is still covered by the
+    // &NAME assertion in this same test.
+    expect(content).toContain("store(&COPYRIGHT) 'Copyright © 2020 Base Author'");
   });
 
   it("escapes single quote in stub .kmn store(&NAME)", async () => {
@@ -588,5 +597,477 @@ group(main) using keys
       expect(kps).toContain("<Version>2.0</Version>");
       expect(kps).not.toContain("<Version>1.0</Version>");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Attribution emission (spec 059 US1)
+//
+// Before this feature LICENSE.md read `Copyright © <year> <displayName>` — naming
+// the KEYBOARD as its own rights holder — and resetIdentity independently
+// fabricated the same string into store(&COPYRIGHT), overwriting whatever the
+// base declared. These assertions pin the success criteria.
+// ---------------------------------------------------------------------------
+
+describe("attribution emission (spec 059)", () => {
+  const ATTRIBUTION = {
+    authorName: "Alice Example",
+    authorEmail: "alice@example.org",
+    copyrightHolder: "Bafut Language Committee",
+  };
+  const YEAR = 2026;
+
+  function serviceWithBase() {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+      return Promise.resolve(makeNotFoundResponse());
+    });
+    return createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+  }
+
+  async function scaffoldWith(opts: Record<string, unknown>) {
+    return serviceWithBase().scaffold(baseKeyboard, "my_keyboard", "My Keyboard", opts);
+  }
+
+  function texts(vfs: import("@keyboard-studio/contracts").VirtualFS) {
+    return {
+      license: vfs.get("LICENSE.md")!.content as string,
+      kmn: vfs.get("source/my_keyboard.kmn")!.content as string,
+      kps: vfs.get("source/my_keyboard.kps")!.content as string,
+    };
+  }
+
+  // SC-003: one source of truth. 22 shipped keyboards disagree between their
+  // LICENSE.md and .kmn because those strings were built independently.
+  it("SC-003: LICENSE.md, store(&COPYRIGHT) and .kps <Copyright> all agree on the holder", async () => {
+    const { vfs } = await scaffoldWith({ attribution: ATTRIBUTION, emitYear: YEAR });
+    const { license, kmn, kps } = texts(vfs);
+    const expected = `Copyright © ${YEAR} Bafut Language Committee`;
+    expect(license).toContain(expected);
+    expect(kmn).toContain(`store(&COPYRIGHT) '${expected}'`);
+    expect(kps).toContain(`<Copyright URL="">${expected}</Copyright>`);
+  });
+
+  // SC-001: the bug this feature exists to fix.
+  it("SC-001: the keyboard's display name is NEVER emitted as the copyright holder", async () => {
+    const { vfs } = await scaffoldWith({ attribution: ATTRIBUTION, emitYear: YEAR });
+    const { license, kmn, kps } = texts(vfs);
+    for (const [name, text] of Object.entries({ license, kmn, kps })) {
+      expect(text, `${name} names the keyboard as rights holder`).not.toContain(
+        `Copyright © ${YEAR} My Keyboard`,
+      );
+    }
+    expect(license).not.toContain("My Keyboard");
+  });
+
+  // SC-006: the license body is a constant (all 920 shipped files are MIT with
+  // one canonical body).
+  it("SC-006: the MIT body is byte-identical across differently-named keyboards", async () => {
+    const a = await serviceWithBase().scaffold(baseKeyboard, "kb_one", "Keyboard One", {
+      attribution: ATTRIBUTION,
+      emitYear: YEAR,
+    });
+    const b = await serviceWithBase().scaffold(baseKeyboard, "kb_two", "Keyboard Two", {
+      attribution: { ...ATTRIBUTION, copyrightHolder: "Someone Else" },
+      emitYear: 2019,
+    });
+    const body = (s: string) => s.split("\n\n").slice(1).join("\n\n");
+    const la = a.vfs.get("LICENSE.md")!.content as string;
+    const lb = b.vfs.get("LICENSE.md")!.content as string;
+    expect(body(la)).toBe(body(lb));
+    expect(la).not.toBe(lb); // the holder lines DO differ
+  });
+
+  // T010's finding: resetIdentity used to overwrite the base's copyright with a
+  // fabricated string, stripping the original author from the emitted .kmn.
+  it("stops resetIdentity fabricating a holder — the base's line is replaced by the CONFIRMED one", async () => {
+    const { vfs } = await scaffoldWith({ attribution: ATTRIBUTION, emitYear: YEAR });
+    const { kmn } = texts(vfs);
+    expect(kmn).toContain("store(&COPYRIGHT) 'Copyright © 2026 Bafut Language Committee'");
+    expect(kmn).not.toContain("Copyright © 2026 My Keyboard");
+  });
+
+  it("holder defaults to the author when no explicit copyright holder is given", async () => {
+    const { vfs } = await scaffoldWith({
+      attribution: { authorName: "Alice Example", copyrightHolder: "" },
+      emitYear: YEAR,
+    });
+    expect(texts(vfs).license).toContain(`Copyright © ${YEAR} Alice Example`);
+  });
+
+  it("writes the author into .kps <Author> with a mailto URL when an email is known", async () => {
+    const { vfs } = await scaffoldWith({ attribution: ATTRIBUTION, emitYear: YEAR });
+    expect(texts(vfs).kps).toContain(
+      '<Author URL="mailto:alice@example.org">Alice Example</Author>',
+    );
+  });
+
+  it("omits the mailto URL when the email is private, without dropping the author", async () => {
+    const { vfs } = await scaffoldWith({
+      attribution: { authorName: "Alice Example", copyrightHolder: "Alice Example" },
+      emitYear: YEAR,
+    });
+    const { kps } = texts(vfs);
+    expect(kps).toContain('<Author URL="">Alice Example</Author>');
+    expect(kps).not.toContain("mailto:");
+  });
+
+  it("uses the injected emitYear rather than the clock (D2)", async () => {
+    const { vfs } = await scaffoldWith({ attribution: ATTRIBUTION, emitYear: 1999 });
+    expect(texts(vfs).license).toContain("Copyright © 1999 Bafut Language Committee");
+    expect(vfs.get("LICENSE.md")!.content as string).not.toContain(
+      String(new Date().getFullYear()),
+    );
+  });
+
+  // Fail loud rather than fabricate: no attribution means NO notice, flagged via
+  // a dedicated result field so callers can gate publish/download on it.
+  describe("with no attribution supplied", () => {
+    it("invents no holder — LICENSE.md and .kps carry no notice", async () => {
+      const { vfs } = await scaffoldWith({ emitYear: YEAR });
+      const { license, kps } = texts(vfs);
+      expect(license).not.toMatch(/^Copyright/m);
+      expect(kps).not.toContain("<Copyright");
+    });
+
+    // The .kmn is the one artifact that CAN know a holder without attribution:
+    // parse() read one from the base. Preserving it is what MIT requires of a
+    // derivative, and is strictly better than the pre-059 behaviour of
+    // overwriting it with the keyboard's own display name.
+    it("PRESERVES the base's copyright in the .kmn rather than overwriting it", async () => {
+      const { vfs } = await scaffoldWith({ emitYear: YEAR });
+      const { kmn } = texts(vfs);
+      expect(kmn).toContain("store(&COPYRIGHT) 'Copyright © 2020 Base Author'");
+      const held = /store\(&COPYRIGHT\) '([^']*)'/.exec(kmn)?.[1] ?? "";
+      expect(held).not.toContain("My Keyboard");
+    });
+
+    it("still emits a complete MIT body", async () => {
+      const { vfs } = await scaffoldWith({ emitYear: YEAR });
+      expect(texts(vfs).license).toContain("Permission is hereby granted, free of charge");
+    });
+
+    it("reports attributionMissing so callers can gate", async () => {
+      const missing = await scaffoldWith({ emitYear: YEAR });
+      expect(missing.attributionMissing).toBe(true);
+      const present = await scaffoldWith({ attribution: ATTRIBUTION, emitYear: YEAR });
+      expect(present.attributionMissing).toBe(false);
+    });
+
+    // `warnings` means "fell back to stub-only output"; a missing attribution is
+    // a different condition and must not masquerade as a fetch failure.
+    it("does NOT add a warning — that channel means stub-only fallback", async () => {
+      const { warnings } = await scaffoldWith({ emitYear: YEAR });
+      expect(warnings.filter((w) => /attribut/i.test(w))).toHaveLength(0);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// US2 — a DERIVED keyboard accumulates the base author's notice (spec 059)
+//
+// MIT requires the original copyright notice be retained in a derivative. So the
+// base's holders are carried VERBATIM and the new author is APPENDED, never
+// substituted. Before this, resetIdentity overwrote the base's copyright with a
+// fabricated `Copyright © <year> <displayName>`.
+// ---------------------------------------------------------------------------
+
+describe("derived keyboard accumulates the base's copyright (spec 059 US2)", () => {
+  const NEW_AUTHOR = {
+    authorName: "Second Author",
+    copyrightHolder: "Second Author",
+  };
+
+  /** Base .kmn plus a LICENSE.md served from the keyboard root. */
+  function serviceWithLicense(licenseText: string | null) {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+      if (url.endsWith("/LICENSE.md")) {
+        return licenseText === null
+          ? Promise.resolve(makeNotFoundResponse())
+          : Promise.resolve(makeTextResponse(licenseText));
+      }
+      return Promise.resolve(makeNotFoundResponse());
+    });
+    return createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+  }
+
+  function license(...lines: string[]): string {
+    return `The MIT License (MIT)\n\n${lines.join("\n")}\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\n`;
+  }
+
+  async function derive(licenseText: string | null) {
+    return serviceWithLicense(licenseText).scaffold(
+      baseKeyboard,
+      "my_keyboard",
+      "My Keyboard",
+      { attribution: NEW_AUTHOR, emitYear: 2026 },
+    );
+  }
+
+  it("RETAINS the base author's line and APPENDS the new author", async () => {
+    const { vfs } = await derive(license("Copyright (c) 2016-2021 Original Author"));
+    const out = vfs.get("LICENSE.md")!.content as string;
+    expect(out).toContain("Copyright (c) 2016-2021 Original Author");
+    expect(out).toContain("Copyright © 2026 Second Author");
+  });
+
+  it("keeps the inherited line BYTE-IDENTICAL (FR-007)", async () => {
+    const original = "Copyright (c) 2016-2021 Original Author";
+    const { vfs } = await derive(license(original));
+    const lines = (vfs.get("LICENSE.md")!.content as string).split("\n");
+    expect(lines[0]).toBe(original);
+  });
+
+  it("orders the chain chronologically, oldest first (D3)", async () => {
+    const { vfs } = await derive(
+      license("Copyright (c) 2016-2021 Original Author", "Copyright (c) 2024 Middle Author"),
+    );
+    const out = vfs.get("LICENSE.md")!.content as string;
+    const idx = (s: string) => out.indexOf(s);
+    expect(idx("Original Author")).toBeLessThan(idx("Middle Author"));
+    expect(idx("Middle Author")).toBeLessThan(idx("Second Author"));
+  });
+
+  it("accumulates a THIRD generation (fork of a fork)", async () => {
+    const { vfs } = await derive(
+      license("Copyright (c) 2016-2021 Original Author", "Copyright © 2024 Second Gen"),
+    );
+    const out = vfs.get("LICENSE.md")!.content as string;
+    const holders = out.split("\n").filter((l) => l.startsWith("Copyright"));
+    expect(holders).toHaveLength(3);
+  });
+
+  it("does NOT rewrite SIL International to SIL Global (D4)", async () => {
+    const { vfs } = await derive(license("Copyright © 2019 SIL International"));
+    const out = vfs.get("LICENSE.md")!.content as string;
+    expect(out).toContain("Copyright © 2019 SIL International");
+    expect(out).not.toContain("SIL Global");
+  });
+
+  it("EXTENDS the year range when the same holder derives again, without duplicating", async () => {
+    const { vfs } = await serviceWithLicense(license("Copyright © 2016 Second Author")).scaffold(
+      baseKeyboard,
+      "my_keyboard",
+      "My Keyboard",
+      { attribution: NEW_AUTHOR, emitYear: 2026 },
+    );
+    const out = vfs.get("LICENSE.md")!.content as string;
+    expect(out.split("\n").filter((l) => l.includes("Second Author"))).toHaveLength(1);
+    expect(out).toContain("2016-2026 Second Author");
+  });
+
+  it("reports how many holders were inherited", async () => {
+    const two = await derive(
+      license("Copyright (c) 2016 A Author", "Copyright (c) 2020 B Author"),
+    );
+    expect(two.inheritedHolderCount).toBe(2);
+    const none = await derive(null);
+    expect(none.inheritedHolderCount).toBe(0);
+  });
+
+  it("the .kmn store carries the whole chain, not just the new author", async () => {
+    const { vfs } = await derive(license("Copyright (c) 2016-2021 Original Author"));
+    const kmn = vfs.get("source/my_keyboard.kmn")!.content as string;
+    expect(kmn).toContain("Original Author");
+    expect(kmn).toContain("Second Author");
+  });
+
+  // D5: a notice we cannot read must BLOCK, never be silently dropped.
+  describe("unparseable base notice (D5)", () => {
+    it("flags an unfilled template rather than dropping the notice", async () => {
+      const r = await derive(license("Copyright (c) YYYY _____________________"));
+      expect(r.licenseUnparseable?.reason).toBe("template_placeholder");
+    });
+
+    it("flags a year with no holder", async () => {
+      const r = await derive(license("Copyright © 2015"));
+      expect(r.licenseUnparseable?.reason).toBe("no_holder");
+    });
+
+    it("does not flag a base with no license file at all", async () => {
+      const r = await derive(null);
+      expect(r.licenseUnparseable).toBeUndefined();
+    });
+
+    it("does not flag a license with no copyright line — nothing was retained", async () => {
+      const r = await derive("The MIT License (MIT)\n\nPermission is hereby granted\n");
+      expect(r.licenseUnparseable).toBeUndefined();
+      expect(r.inheritedHolderCount).toBe(0);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D5 escape hatch (spec 059 T037) — the author supplies the original holder
+//
+// A hard block is only acceptable because the author is never stuck, and because
+// the remedy PRESERVES the notice rather than dropping it.
+// ---------------------------------------------------------------------------
+
+describe("D5 escape hatch — baseHolderOverride (spec 059)", () => {
+  const NEW_AUTHOR = { authorName: "Second Author", copyrightHolder: "Second Author" };
+  const UNREADABLE = "The MIT License (MIT)\n\nCopyright (c) YYYY _____________________\n";
+
+  function svc(licenseText: string) {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+      if (url.endsWith("/LICENSE.md")) return Promise.resolve(makeTextResponse(licenseText));
+      return Promise.resolve(makeNotFoundResponse());
+    });
+    return createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+  }
+
+  async function run(override?: string) {
+    return svc(UNREADABLE).scaffold(baseKeyboard, "my_keyboard", "My Keyboard", {
+      attribution: NEW_AUTHOR,
+      emitYear: 2026,
+      ...(override !== undefined ? { baseHolderOverride: override } : {}),
+    });
+  }
+
+  it("without an override, the unreadable notice is reported", async () => {
+    const r = await run();
+    expect(r.licenseUnparseable?.reason).toBe("template_placeholder");
+    expect(r.inheritedHolderCount).toBe(0);
+  });
+
+  it("with an override, the block clears", async () => {
+    const r = await run("Original Author");
+    expect(r.licenseUnparseable).toBeUndefined();
+    expect(r.inheritedHolderCount).toBe(1);
+  });
+
+  it("the supplied holder is RETAINED in the emitted LICENSE.md", async () => {
+    const { vfs } = await run("Original Author");
+    const out = vfs.get("LICENSE.md")!.content as string;
+    expect(out).toContain("Copyright © Original Author");
+    expect(out).toContain("Copyright © 2026 Second Author");
+  });
+
+  it("emits NO year for the supplied holder — the unreadable line never stated one", async () => {
+    const { vfs } = await run("Original Author");
+    const line = (vfs.get("LICENSE.md")!.content as string)
+      .split("\n")
+      .find((l) => l.includes("Original Author"))!;
+    expect(line).not.toMatch(/\d{4}/);
+  });
+
+  it("orders the supplied holder BEFORE the new author (it predates by definition)", async () => {
+    const { vfs } = await run("Original Author");
+    const out = vfs.get("LICENSE.md")!.content as string;
+    expect(out.indexOf("Original Author")).toBeLessThan(out.indexOf("Second Author"));
+  });
+
+  it("ignores a blank or whitespace-only override", async () => {
+    for (const v of ["", "   "]) {
+      const r = await run(v);
+      expect(r.licenseUnparseable?.reason, `override ${JSON.stringify(v)}`).toBe(
+        "template_placeholder",
+      );
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T038 — the single-valued metadata fields use the corpus "Portions" convention
+//
+// store(&COPYRIGHT) and .kps <Copyright> hold ONE value, so a multi-holder chain
+// has to be collapsed. 33 shipped keyboards already establish how, identically in
+// both files — release/fv/fv_dakelh:
+//
+//   (c) 2008-2024 FirstVoices, SIL International. Portions (c) 2006 Chris Harvey
+//
+// This asserts the studio emits that same shape rather than an invented one.
+// ---------------------------------------------------------------------------
+
+describe("single-line copyright metadata uses the Portions convention (spec 059 T038)", () => {
+  const NEW_AUTHOR = { authorName: "New Author", copyrightHolder: "New Author" };
+
+  function svc(licenseText: string | null) {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+      if (url.endsWith("/LICENSE.md")) {
+        return licenseText === null
+          ? Promise.resolve(makeNotFoundResponse())
+          : Promise.resolve(makeTextResponse(licenseText));
+      }
+      return Promise.resolve(makeNotFoundResponse());
+    });
+    return createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+  }
+
+  async function fields(licenseText: string | null) {
+    const { vfs } = await svc(licenseText).scaffold(
+      baseKeyboard,
+      "my_keyboard",
+      "My Keyboard",
+      { attribution: NEW_AUTHOR, emitYear: 2026 },
+    );
+    const kmn = vfs.get("source/my_keyboard.kmn")!.content as string;
+    const kps = vfs.get("source/my_keyboard.kps")!.content as string;
+    return {
+      kmnStore: /store\(&COPYRIGHT\) '([^']*)'/.exec(kmn)?.[1] ?? "",
+      kpsCopyright: /<Copyright URL="">([^<]*)<\/Copyright>/.exec(kps)?.[1] ?? "",
+      license: vfs.get("LICENSE.md")!.content as string,
+    };
+  }
+
+  const ONE = "The MIT License (MIT)\n\nCopyright (c) 2016-2021 Original Author\n";
+  const TWO =
+    "The MIT License (MIT)\n\nCopyright (c) 2016-2021 Original Author\nCopyright © 2024 Second Gen\n";
+
+  it("a single holder needs no Portions clause", async () => {
+    const f = await fields(null);
+    expect(f.kmnStore).toBe("Copyright © 2026 New Author");
+    expect(f.kmnStore).not.toContain("Portions");
+  });
+
+  it("two holders collapse to <primary>. Portions <earlier>", async () => {
+    const f = await fields(ONE);
+    expect(f.kmnStore).toBe(
+      "Copyright © 2026 New Author. Portions (c) 2016-2021 Original Author",
+    );
+  });
+
+  // The DERIVING author is primary; the base author becomes Portions. That is the
+  // derivation relationship: this work is the new author's, incorporating parts
+  // of the base — and it matches how fv_dakelh reads.
+  it("the deriving author is PRIMARY and the base author is the portion", async () => {
+    const f = await fields(ONE);
+    expect(f.kmnStore.indexOf("New Author")).toBeLessThan(f.kmnStore.indexOf("Portions"));
+    expect(f.kmnStore.indexOf("Portions")).toBeLessThan(f.kmnStore.indexOf("Original Author"));
+  });
+
+  it("three holders list the earlier ones comma-separated inside Portions", async () => {
+    const f = await fields(TWO);
+    expect(f.kmnStore).toBe(
+      "Copyright © 2026 New Author. Portions (c) 2016-2021 Original Author, © 2024 Second Gen",
+    );
+  });
+
+  it("inherited markers are preserved inside the Portions clause", async () => {
+    const f = await fields(TWO);
+    // (c) from the first inherited line, © from the second — neither normalised.
+    expect(f.kmnStore).toContain("(c) 2016-2021 Original Author");
+    expect(f.kmnStore).toContain("© 2024 Second Gen");
+  });
+
+  it("the .kps carries the identical string — the two files cannot disagree (SC-003)", async () => {
+    const f = await fields(TWO);
+    expect(f.kpsCopyright).toBe(f.kmnStore);
+  });
+
+  it("LICENSE.md still keeps ONE HOLDER PER LINE — it is the lossless source (D4)", async () => {
+    const f = await fields(TWO);
+    const lines = f.license.split("\n").filter((l) => l.startsWith("Copyright"));
+    expect(lines).toHaveLength(3);
+    expect(f.license).not.toContain("Portions");
+  });
+
+  it("matches the shape of the 33 shipped keyboards that already do this", async () => {
+    const f = await fields(ONE);
+    // release/fv/fv_dakelh: "<holder>. Portions <holder>"
+    expect(f.kmnStore).toMatch(/^Copyright .+\. Portions .+$/);
   });
 });
