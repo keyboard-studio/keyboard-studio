@@ -243,12 +243,13 @@ Verified by mutation: replacing instead of accumulating (7 failures), not fetchi
 license (10), swallowing the D5 case (2), and putting only the new author in the `.kmn` store (1)
 each turn the suite red.
 
-**One documented limitation.** `store(&COPYRIGHT)` and `.kps <Copyright>` are single-valued, so a
-multi-holder chain is joined onto one line with `"; "`. `LICENSE.md` keeps one holder per line and
-is the authoritative notice (D4); the other two are metadata mirrors. Consequence:
-`parseCopyright` splits on newlines, so re-reading a `.kmn` store would see one compound holder
-rather than several. That is acceptable because D4 makes `LICENSE.md` the source a fork reads —
-but it means the `.kmn` is not a lossless fallback for a multi-generation chain.
+**One documented limitation** *(format settled by T038)*. `store(&COPYRIGHT)` and `.kps
+<Copyright>` are single-valued, so a multi-holder chain is collapsed using the corpus's
+`<primary>. Portions <earlier>` convention. `LICENSE.md` keeps one holder per line and is the
+authoritative notice (D4); the other two are metadata mirrors. Consequence: `parseCopyright`
+splits on newlines, so re-reading a `.kmn` store sees one compound holder rather than several —
+exactly as it does for `fv_dakelh` today. Acceptable because D4 makes `LICENSE.md` the source a
+fork reads, but the `.kmn` is not a lossless fallback for a multi-generation chain.
 
 **T037 DONE 2026-08-04.** contracts 454, engine 1555, studio 3749 — all green.
 
@@ -260,7 +261,15 @@ clears while the already-emitted `LICENSE.md` still lacks the holder, so the aut
 the notice was retained when it was not. The harness mocked `retry` with a fresh `vi.fn()` per
 call, which is unassertable; it is now hoisted.
 
-### Still open in US2
+**T038 DONE 2026-08-04.** contracts 454, engine 1563, studio 3749 — all green.
+
+Verified by mutation: reverting to the `"; "` join (4 failures), making the oldest holder primary
+instead of the deriving author (3), dropping the portions clause entirely (6), and normalising
+inherited markers inside it (3) each turn the suite red.
+
+**US2 is now complete.** Nothing in spec 037 remains open.
+
+### Formerly open in US2 — both now closed
 
 - [x] T037 [US2] Surface `licenseUnparseable` in the UI as a hard block with the manual-entry escape hatch D5 requires — **DONE**. `ScaffoldOptions.baseHolderOverride` lets the author name the original holder; the scaffolder then uses it as the inherited holder and stops reporting the block. Emitted with NO year, because the year is exactly what the unreadable line failed to establish — inventing one would put a fabricated fact in a legal notice. Held on the working copy (and persisted, so a reload does not re-block), gated in `usePreviewArtifact`, surfaced in `OutputScreen` with the offending line quoted and an input to resolve it. Confirming re-runs the pipeline so the notice is genuinely retained
-- [ ] T038 [US2] Decide whether `.kps <Copyright>` should carry the joined chain or only the primary holder (see the limitation above)
+- [x] T038 [US2] Decide how the single-valued `store(&COPYRIGHT)` / `.kps <Copyright>` express a multi-holder chain — **DONE, and it overturned the first implementation.** The corpus already settles it: 33 shipped keyboards use `<primary>. Portions <earlier>`, identically in both files (`release/fv/fv_dakelh`: `(c) 2008-2024 FirstVoices, SIL International. Portions (c) 2006 Chris Harvey`). The `"; "` join was an invention and is replaced. The DERIVING author is primary and the base author becomes the portion, which is the derivation relationship: this work is the new author's, incorporating parts of the base. Inherited markers are preserved inside the clause

@@ -961,3 +961,106 @@ describe("D5 escape hatch — baseHolderOverride (spec 037)", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// T038 — the single-valued metadata fields use the corpus "Portions" convention
+//
+// store(&COPYRIGHT) and .kps <Copyright> hold ONE value, so a multi-holder chain
+// has to be collapsed. 33 shipped keyboards already establish how, identically in
+// both files — release/fv/fv_dakelh:
+//
+//   (c) 2008-2024 FirstVoices, SIL International. Portions (c) 2006 Chris Harvey
+//
+// This asserts the studio emits that same shape rather than an invented one.
+// ---------------------------------------------------------------------------
+
+describe("single-line copyright metadata uses the Portions convention (spec 037 T038)", () => {
+  const NEW_AUTHOR = { authorName: "New Author", copyrightHolder: "New Author" };
+
+  function svc(licenseText: string | null) {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+      if (url.endsWith("/LICENSE.md")) {
+        return licenseText === null
+          ? Promise.resolve(makeNotFoundResponse())
+          : Promise.resolve(makeTextResponse(licenseText));
+      }
+      return Promise.resolve(makeNotFoundResponse());
+    });
+    return createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+  }
+
+  async function fields(licenseText: string | null) {
+    const { vfs } = await svc(licenseText).scaffold(
+      baseKeyboard,
+      "my_keyboard",
+      "My Keyboard",
+      { attribution: NEW_AUTHOR, emitYear: 2026 },
+    );
+    const kmn = vfs.get("source/my_keyboard.kmn")!.content as string;
+    const kps = vfs.get("source/my_keyboard.kps")!.content as string;
+    return {
+      kmnStore: /store\(&COPYRIGHT\) '([^']*)'/.exec(kmn)?.[1] ?? "",
+      kpsCopyright: /<Copyright URL="">([^<]*)<\/Copyright>/.exec(kps)?.[1] ?? "",
+      license: vfs.get("LICENSE.md")!.content as string,
+    };
+  }
+
+  const ONE = "The MIT License (MIT)\n\nCopyright (c) 2016-2021 Original Author\n";
+  const TWO =
+    "The MIT License (MIT)\n\nCopyright (c) 2016-2021 Original Author\nCopyright © 2024 Second Gen\n";
+
+  it("a single holder needs no Portions clause", async () => {
+    const f = await fields(null);
+    expect(f.kmnStore).toBe("Copyright © 2026 New Author");
+    expect(f.kmnStore).not.toContain("Portions");
+  });
+
+  it("two holders collapse to <primary>. Portions <earlier>", async () => {
+    const f = await fields(ONE);
+    expect(f.kmnStore).toBe(
+      "Copyright © 2026 New Author. Portions (c) 2016-2021 Original Author",
+    );
+  });
+
+  // The DERIVING author is primary; the base author becomes Portions. That is the
+  // derivation relationship: this work is the new author's, incorporating parts
+  // of the base — and it matches how fv_dakelh reads.
+  it("the deriving author is PRIMARY and the base author is the portion", async () => {
+    const f = await fields(ONE);
+    expect(f.kmnStore.indexOf("New Author")).toBeLessThan(f.kmnStore.indexOf("Portions"));
+    expect(f.kmnStore.indexOf("Portions")).toBeLessThan(f.kmnStore.indexOf("Original Author"));
+  });
+
+  it("three holders list the earlier ones comma-separated inside Portions", async () => {
+    const f = await fields(TWO);
+    expect(f.kmnStore).toBe(
+      "Copyright © 2026 New Author. Portions (c) 2016-2021 Original Author, © 2024 Second Gen",
+    );
+  });
+
+  it("inherited markers are preserved inside the Portions clause", async () => {
+    const f = await fields(TWO);
+    // (c) from the first inherited line, © from the second — neither normalised.
+    expect(f.kmnStore).toContain("(c) 2016-2021 Original Author");
+    expect(f.kmnStore).toContain("© 2024 Second Gen");
+  });
+
+  it("the .kps carries the identical string — the two files cannot disagree (SC-003)", async () => {
+    const f = await fields(TWO);
+    expect(f.kpsCopyright).toBe(f.kmnStore);
+  });
+
+  it("LICENSE.md still keeps ONE HOLDER PER LINE — it is the lossless source (D4)", async () => {
+    const f = await fields(TWO);
+    const lines = f.license.split("\n").filter((l) => l.startsWith("Copyright"));
+    expect(lines).toHaveLength(3);
+    expect(f.license).not.toContain("Portions");
+  });
+
+  it("matches the shape of the 33 shipped keyboards that already do this", async () => {
+    const f = await fields(ONE);
+    // release/fv/fv_dakelh: "<holder>. Portions <holder>"
+    expect(f.kmnStore).toMatch(/^Copyright .+\. Portions .+$/);
+  });
+});

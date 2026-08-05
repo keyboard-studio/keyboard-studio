@@ -270,6 +270,51 @@ const KMW_JS_TARGETS = new Set([
  * so Track 2 import does not silently downgrade a 2.0 keyboard to 1.0.
  */
 /**
+ * Collapse a multi-holder block onto ONE line for `store(&COPYRIGHT)` and the
+ * `.kps <Copyright>`, which are single-valued (spec 037 T038).
+ *
+ * Uses the convention the corpus already established. 33 shipped keyboards
+ * express exactly this, identically in both files — e.g.
+ * release/fv/fv_dakelh:
+ *
+ *   (c) 2008-2024 FirstVoices, SIL International. Portions (c) 2006 Chris Harvey
+ *
+ * So: a PRIMARY holder, then `. Portions ` and the earlier ones. Semantically
+ * "this work is copyright X; parts of it are copyright Y", which is exactly the
+ * derivation relationship — the derived keyboard is the new author's work
+ * incorporating portions of the base.
+ *
+ * The primary is the CURRENT session's holder when there is one, otherwise the
+ * newest inherited holder. Portions keep the chronological D3 order.
+ *
+ * `LICENSE.md` remains the authoritative notice (D4) with one holder per line;
+ * these two fields are metadata mirrors of it. Note the deliberate consequence:
+ * `parseCopyright` reads this back as ONE compound holder rather than several,
+ * exactly as it does for fv_dakelh today. That is acceptable because D4 makes
+ * `LICENSE.md` the source a fork reads — the `.kmn` is not a lossless fallback
+ * for a multi-generation chain.
+ */
+function singleLineNotice(
+  block: readonly import("@keyboard-studio/contracts").CopyrightHolder[],
+): string | null {
+  if (block.length === 0) return null;
+  if (block.length === 1) return renderHolderLine(block[0]!);
+
+  // Primary: the holder added this session, else the newest inherited one
+  // (block is in D3 order, oldest first).
+  const primaryIdx = block.findIndex((h) => !h.inherited);
+  const primary = block[primaryIdx >= 0 ? primaryIdx : block.length - 1]!;
+  const portions = block.filter((h) => h !== primary);
+
+  // Portions drop the leading "Copyright" — the primary clause already carries
+  // it, matching the corpus form.
+  const portionText = portions
+    .map((h) => renderHolderLine(h).replace(/^Copyright\s+/, ""))
+    .join(", ");
+  return `${renderHolderLine(primary)}. Portions ${portionText}`;
+}
+
+/**
  * The single source of truth for this keyboard's attribution (spec 037 FR-003).
  *
  * LICENSE.md, store(&COPYRIGHT) and .kps <Copyright> all read from HERE, so they
@@ -308,11 +353,7 @@ function attributionText(
     return { line: null, license: `${MIT_BODY}\n`, holderCount: 0 };
   }
 
-  // The .kmn store and .kps <Copyright> are single-valued, so a multi-holder
-  // chain is joined onto one line. LICENSE.md is the authoritative notice (D4)
-  // and keeps one holder per line; these two are metadata mirrors of it.
-  const line = block.map(renderHolderLine).join("; ");
-  return { line, license: renderLicense(block), holderCount: block.length };
+  return { line: singleLineNotice(block), license: renderLicense(block), holderCount: block.length };
 }
 
 function buildKpsContent(
