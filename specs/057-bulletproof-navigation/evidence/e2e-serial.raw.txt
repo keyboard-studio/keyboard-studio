@@ -1,0 +1,639 @@
+
+Running 69 tests using 1 worker
+
+  ✓   1 e2e\boot-smoke.spec.ts:27:3 › app boots without an uncaught error (5.9s)
+  ✓   2 e2e\boot-smoke.spec.ts:27:3 › github oauth callback boots without an uncaught error (5.2s)
+  ✓   3 e2e\boot-smoke.spec.ts:27:3 › google oauth callback boots without an uncaught error (3.0s)
+  ✓   4 e2e\boot-smoke.spec.ts:27:3 › lint demo boots without an uncaught error (1.7s)
+  ✘   5 e2e\browser-back.spec.ts:51:3 › browser Back mid-survey (F7) › physical Back button steps back one manifest step at a time (20.4s)
+  ✘   6 e2e\carve.spec.ts:95:3 › Rule Carver — carve one opaque rule, verify IR + emitted .kmn › deleting rule#93 in the carve gallery removes it from the deleted-node IR state and from the emitted .kmn (9.6s)
+  ✓   7 e2e\carve.spec.ts:200:3 › Rule Carver — carve one opaque rule, verify IR + emitted .kmn › control: keeping rule#93 leaves its distinguishing token in the emitted .kmn (8.7s)
+  ✓   8 e2e\compare-isolation.spec.ts:137:3 › Compare cannot write to the author's project (spec 057 US2) › the tab exposes no identity-editing control over the project (6.7s)
+  ✓   9 e2e\compare-isolation.spec.ts:160:3 › Compare cannot write to the author's project (spec 057 US2) › loading another keyboard raises no dialog and leaves the project untouched (dismiss) (13.5s)
+  ✓  10 e2e\compare-isolation.spec.ts:180:3 › Compare cannot write to the author's project (spec 057 US2) › loading another keyboard and ACCEPTING anything offered still leaves the project untouched (13.1s)
+  ✘  11 e2e\copy-edit.spec.ts:171:3 › Track 1 (copy-edit) E2E › walks identity-lite -> base picker -> project-name -> Phase B -> emit (6.6s)
+  ✘  12 e2e\copy-edit.spec.ts:211:3 › Track 1 (copy-edit) E2E › base keyboard compiles cleanly via kmcmplib WASM oracle (open-base mode) (4.0m)
+  ✘  13 e2e\copy-edit.spec.ts:244:3 › Track 1 (copy-edit) E2E › emitted .kps, .kvks, and welcome.htm have non-empty bodies (4.0m)
+  ✓  14 e2e\copy-edit.spec.ts:324:3 › spec 034 proven-script walks + publish paths › T010 [US1]: Cyrillic (russian_mnemonic_r) walks identity → downloadable, compilable ZIP (7.5s)
+  ✘  15 e2e\copy-edit.spec.ts:345:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Latn (basic_kbdfr) reaches a downloadable ZIP (4.0m)
+  ✓  16 e2e\copy-edit.spec.ts:345:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Cyrl (russian_mnemonic_r) reaches a downloadable ZIP (6.8s)
+  ✓  17 e2e\copy-edit.spec.ts:345:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Grek (basic_kbdhe) reaches a downloadable ZIP (6.4s)
+  ✘  18 e2e\copy-edit.spec.ts:345:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Geor (basic_kbdgeo) reaches a downloadable ZIP (4.0m)
+  ✓  19 e2e\copy-edit.spec.ts:345:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Armn (armenian_mnemonic_r) reaches a downloadable ZIP (7.9s)
+  ✘  20 e2e\copy-edit.spec.ts:361:3 › spec 034 proven-script walks + publish paths › T016 [US2]: output screen exposes both publish paths; PR degrades honestly, ZIP still works (4.0m)
+  ✘  21 e2e\copy-edit.spec.ts:428:3 › spec 034 US3 (T028): durable draft survives reload, Back stays consistent, start-over clears it › T028: hard reload resumes the working copy + step position; Back round-trips; 'I'm new' clears the draft (26.2s)
+  ✘  22 e2e\decision-deeplink.spec.ts:83:3 › decision-trail deep link -> revise -> supersede (spec 057 US3) › activating a trail entry's link lands on its question, revising it supersedes and returns to Decisions (21.2s)
+  ✘  23 e2e\exemplar-prefill.spec.ts:55:3 › Phase B exemplar prefill › accept: two actions, alphabet recorded, zero characters typed (SC-008/SC-010) (11.2s)
+  ✓  24 e2e\exemplar-prefill.spec.ts:95:3 › Phase B exemplar prefill › decline: records only what the author typed, and does not re-assert (SC-009) (6.4s)
+  ✘  25 e2e\footer-progress.spec.ts:55:3 › footer progress row (spec 057 US4/US6) › shows the project, grows as questions are answered, distinguishes dot classes by shape, and refuses a gated jump with a reason (7.0s)
+  -  26 e2e\import-improve.spec.ts:104:8 › Track 2 (import-improve) E2E › imports a fixture .kmn via Track 2 without import errors
+  -  27 e2e\import-improve.spec.ts:113:8 › Track 2 (import-improve) E2E › applies one mutation and emits without compile errors
+  -  28 e2e\import-improve.spec.ts:125:8 › Track 2 (import-improve) E2E › round-trip via assertSemanticEquivalence preserves everything except the mutation
+  ✓  29 e2e\locale-switch.spec.ts:46:3 › Locale switcher — persistence + no first-paint English flash › switching to fr translates chrome and persists across reload (5.0s)
+  ✓  30 e2e\locale-switch.spec.ts:92:3 › Compare tab label (spec 057 FR-020) › reads 'Compare' in English and never 'Preview' (1.8s)
+  ✓  31 e2e\locale-switch.spec.ts:100:3 › Compare tab label (spec 057 FR-020) › in fr, falls back to the new id's source string — never the retired id's translation (1.6s)
+  ✓  32 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L1-identity-done × refresh (10.2s)
+  ✓  33 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L1-identity-done × browser-back (6.8s)
+  ✓  34 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L2-base-previewed × refresh (11.2s)
+  ✓  35 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L2-base-previewed × browser-back (8.0s)
+  ✓  36 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L3-base-confirmed × refresh (11.6s)
+  ✓  37 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L3-base-confirmed × browser-back (8.0s)
+  ✓  38 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L4-track-chosen × refresh (11.5s)
+  ✓  39 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L4-track-chosen × browser-back (8.7s)
+  ✓  40 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L5-prefill-confirmed × refresh (11.6s)
+  ✓  41 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L5-prefill-confirmed × browser-back (8.4s)
+  ✓  42 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L6-phaseB-done × refresh (13.0s)
+  ✓  43 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L6-phaseB-done × browser-back (9.1s)
+  ✓  44 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L7-carve-deleted × refresh (13.4s)
+  ✓  45 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L7-carve-deleted × browser-back (9.4s)
+  ✓  46 e2e\switch-base-exploration.spec.ts:431:5 › switch-base exploration matrix › L3-base-confirmed × refresh (OK on dialog) (12.8s)
+  ✓  47 e2e\switch-base-exploration.spec.ts:431:5 › switch-base exploration matrix › L4-track-chosen × refresh (OK on dialog) (13.1s)
+  ✓  48 e2e\switch-base-exploration.spec.ts:431:5 › switch-base exploration matrix › L5-prefill-confirmed × refresh (OK on dialog) (12.1s)
+  ✓  49 e2e\switch-base-exploration.spec.ts:431:5 › switch-base exploration matrix › L6-phaseB-done × refresh (OK on dialog) (14.0s)
+  ✓  50 e2e\switch-base-exploration.spec.ts:431:5 › switch-base exploration matrix › L7-carve-deleted × refresh (OK on dialog) (13.9s)
+  ✓  51 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L2-base-previewed × switch-base (Cancel) (10.2s)
+  ✓  52 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L2-base-previewed × switch-base (OK) (10.2s)
+  ✓  53 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L3-base-confirmed × switch-base (Cancel) (11.3s)
+  ✓  54 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L3-base-confirmed × switch-base (OK) (11.3s)
+  ✓  55 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L4-track-chosen × switch-base (Cancel) (11.9s)
+  ✓  56 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L4-track-chosen × switch-base (OK) (12.2s)
+  ✓  57 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L5-prefill-confirmed × switch-base (Cancel) (12.4s)
+  ✓  58 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L5-prefill-confirmed × switch-base (OK) (12.5s)
+  ✓  59 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L6-phaseB-done × switch-base (Cancel) (15.0s)
+  ✓  60 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L6-phaseB-done × switch-base (OK) (14.1s)
+  ✘  61 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L7-carve-deleted × switch-base (Cancel) (2.2m)
+  -  62 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L7-carve-deleted × switch-base (OK)
+  ✘  63 e2e\switch-base-rebase.spec.ts:143:3 › F1 — switch-base rebase confirm › switching to a DIFFERENT base with edits: Cancel keeps the OLD base everywhere, no advance (9.4s)
+  -  64 e2e\switch-base-rebase.spec.ts:197:3 › F1 — switch-base rebase confirm › re-confirming the SAME base: no popup, phaseResults preserved, wizard advances
+  -  65 e2e\switch-base-rebase.spec.ts:227:3 › F1 — switch-base rebase confirm › F2: refresh at the track step — no popup, phaseResults preserved
+  ✓  66 e2e\tab-roundtrip.spec.ts:100:3 › tab round trip preserves the author's position (spec 057 US1) › mid-walk position, history and Phase B alphabet survive every tab round trip (11.6s)
+  ✘  67 e2e\touch-derivation-us1.spec.ts:234:3 › Touch derivation US1 — import & adapt (spec 035 Scenario A) › carved characters vanish, placed letter lands, base layout survives, and the keyboard compiles (8.3s)
+  ✘  68 e2e\touch-derivation-us2.spec.ts:367:3 › Touch derivation US2 — reseed from desktop (spec 035 Scenario B) › carved characters vanish, placed letter lands, layout is a compact phone projection, and the keyboard compiles (7.6s)
+  ✘  69 e2e\touch-derivation-us2.spec.ts:463:3 › Touch derivation US2-AS4 — explicit reseed discards a shipped touch layout (spec 035) › choosing Reseed on a base that ships a touch layout still produces the desktop projection, not the shipped layout (4.0m)
+
+
+  1) e2e\browser-back.spec.ts:51:3 › browser Back mid-survey (F7) › physical Back button steps back one manifest step at a time 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('track-adapt')
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 15000ms
+      - waiting for getByTestId('track-adapt')
+
+
+      83 |     // earlier screen appeared").
+      84 |     await page.goBack();
+    > 85 |     await expect(page.getByTestId("track-adapt")).toBeVisible({ timeout: 15_000 });
+         |                                                   ^
+      86 |
+      87 |     // A second physical Back: track -> choose_base. The base picker
+      88 |     // reappears — proves the browser's own history stack (not just the
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\browser-back.spec.ts:85:51
+
+    Error Context: test-results\browser-back-browser-Back--158aa-one-manifest-step-at-a-time\error-context.md
+
+  2) e2e\carve.spec.ts:95:3 › Rule Carver — carve one opaque rule, verify IR + emitted .kmn › deleting rule#93 in the carve gallery removes it from the deleted-node IR state and from the emitted .kmn 
+
+    Error: serious/critical axe violations on: carve gallery (bj_cree_woods)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 15
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "help": "Elements must meet minimum color contrast ratio thresholds",
+    +     "impact": "serious",
+    +     "nodes": Array [
+    +       "button[aria-label=\"Hide info panel\"]",
+    +       "button[data-testid=\"carve-continue\"]",
+    +       "button[aria-label=\"Dismiss removal recommendation\"]",
+    +       "button[data-testid=\"carve-card-group#0\"] > span:nth-child(2) > span",
+    +       "div:nth-child(5) > div:nth-child(1) > div:nth-child(2) > div:nth-child(1)",
+    +     ],
+    +     "rule": "color-contrast",
+    +     "screen": "carve gallery (bj_cree_woods)",
+    +   },
+    + ]
+
+       at helpers\axe.ts:46
+
+      44 |       nodes: v.nodes.slice(0, 5).map((n) => n.target.join(" ")),
+      45 |     }));
+    > 46 |   expect(gated, `serious/critical axe violations on: ${screenLabel}`).toEqual([]);
+         |                                                                       ^
+      47 | }
+      48 |
+        at expectNoSeriousAxeViolations (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\helpers\axe.ts:46:71)
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\carve.spec.ts:129:5
+
+    Error Context: test-results\carve-Rule-Carver-—-carve--e53f4-te-and-from-the-emitted-kmn\error-context.md
+
+  3) e2e\copy-edit.spec.ts:171:3 › Track 1 (copy-edit) E2E › walks identity-lite -> base picker -> project-name -> Phase B -> emit 
+
+    Error: serious/critical axe violations on: phase B complete (copy-edit walk)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 12
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "help": "Elements must meet minimum color contrast ratio thresholds",
+    +     "impact": "serious",
+    +     "nodes": Array [
+    +       "button[data-testid=\"convenience-continue\"]",
+    +       "iframe .kmw-spacebar-caption",
+    +     ],
+    +     "rule": "color-contrast",
+    +     "screen": "phase B complete (copy-edit walk)",
+    +   },
+    + ]
+
+       at helpers\axe.ts:46
+
+      44 |       nodes: v.nodes.slice(0, 5).map((n) => n.target.join(" ")),
+      45 |     }));
+    > 46 |   expect(gated, `serious/critical axe violations on: ${screenLabel}`).toEqual([]);
+         |                                                                       ^
+      47 | }
+      48 |
+        at expectNoSeriousAxeViolations (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\helpers\axe.ts:46:71)
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\copy-edit.spec.ts:183:5
+
+    Error Context: test-results\copy-edit-Track-1-copy-edi-e25a8-oject-name---Phase-B---emit\error-context.md
+
+  4) e2e\copy-edit.spec.ts:211:3 › Track 1 (copy-edit) E2E › base keyboard compiles cleanly via kmcmplib WASM oracle (open-base mode) 
+
+    Test timeout of 240000ms exceeded.
+
+    Error: page.click: Test timeout of 240000ms exceeded.
+    Call log:
+      - waiting for locator('a[href="#output"]')
+        - locator resolved to <a href="#output" aria-disabled="true" title="Finish every inventory character before you can access Output">Output</a>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+        450 × waiting for element to be visible, enabled and stable
+            - element is not enabled
+          - retrying click action
+            - waiting 500ms
+
+
+       at helpers\surveyFlow.ts:545
+
+      543 |  */
+      544 | export async function navigateToOutput(page: Page): Promise<void> {
+    > 545 |   await page.click('a[href="#output"]');
+          |              ^
+      546 |   await page.waitForSelector('[data-testid="output-screen-root"]', { timeout: 10_000 });
+      547 | }
+      548 |
+        at navigateToOutput (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\helpers\surveyFlow.ts:545:14)
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\copy-edit.spec.ts:221:11
+
+    Error Context: test-results\copy-edit-Track-1-copy-edi-02dd2-WASM-oracle-open-base-mode-\error-context.md
+
+  5) e2e\copy-edit.spec.ts:244:3 › Track 1 (copy-edit) E2E › emitted .kps, .kvks, and welcome.htm have non-empty bodies 
+
+    Test timeout of 240000ms exceeded.
+
+    Error: page.click: Test timeout of 240000ms exceeded.
+    Call log:
+      - waiting for locator('a[href="#output"]')
+        - locator resolved to <a href="#output" aria-disabled="true" title="Finish every inventory character before you can access Output">Output</a>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+        450 × waiting for element to be visible, enabled and stable
+            - element is not enabled
+          - retrying click action
+            - waiting 500ms
+
+
+       at helpers\surveyFlow.ts:545
+
+      543 |  */
+      544 | export async function navigateToOutput(page: Page): Promise<void> {
+    > 545 |   await page.click('a[href="#output"]');
+          |              ^
+      546 |   await page.waitForSelector('[data-testid="output-screen-root"]', { timeout: 10_000 });
+      547 | }
+      548 |
+        at navigateToOutput (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\helpers\surveyFlow.ts:545:14)
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\copy-edit.spec.ts:254:11
+
+    Error Context: test-results\copy-edit-Track-1-copy-edi-48a70-e-htm-have-non-empty-bodies\error-context.md
+
+  6) e2e\copy-edit.spec.ts:345:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Latn (basic_kbdfr) reaches a downloadable ZIP 
+
+    Test timeout of 240000ms exceeded.
+
+    Error: page.click: Test timeout of 240000ms exceeded.
+    Call log:
+      - waiting for locator('a[href="#output"]')
+        - locator resolved to <a href="#output" aria-disabled="true" title="Finish every inventory character before you can access Output">Output</a>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+        449 × waiting for element to be visible, enabled and stable
+            - element is not enabled
+          - retrying click action
+            - waiting 500ms
+
+
+       at helpers\surveyFlow.ts:545
+
+      543 |  */
+      544 | export async function navigateToOutput(page: Page): Promise<void> {
+    > 545 |   await page.click('a[href="#output"]');
+          |              ^
+      546 |   await page.waitForSelector('[data-testid="output-screen-root"]', { timeout: 10_000 });
+      547 | }
+      548 |
+        at navigateToOutput (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\helpers\surveyFlow.ts:545:14)
+        at walkToOutput (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\copy-edit.spec.ts:309:9)
+        at walkToDownload (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\copy-edit.spec.ts:313:3)
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\copy-edit.spec.ts:348:24
+
+    Error Context: test-results\copy-edit-spec-034-proven--5372c--reaches-a-downloadable-ZIP\error-context.md
+
+  7) e2e\copy-edit.spec.ts:345:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Geor (basic_kbdgeo) reaches a downloadable ZIP 
+
+    Test timeout of 240000ms exceeded.
+
+    Error: page.click: Test timeout of 240000ms exceeded.
+    Call log:
+      - waiting for locator('a[href="#output"]')
+        - locator resolved to <a href="#output" aria-disabled="true" title="Finish every inventory character before you can access Output">Output</a>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+        452 × waiting for element to be visible, enabled and stable
+            - element is not enabled
+          - retrying click action
+            - waiting 500ms
+
+
+       at helpers\surveyFlow.ts:545
+
+      543 |  */
+      544 | export async function navigateToOutput(page: Page): Promise<void> {
+    > 545 |   await page.click('a[href="#output"]');
+          |              ^
+      546 |   await page.waitForSelector('[data-testid="output-screen-root"]', { timeout: 10_000 });
+      547 | }
+      548 |
+        at navigateToOutput (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\helpers\surveyFlow.ts:545:14)
+        at walkToOutput (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\copy-edit.spec.ts:309:9)
+        at walkToDownload (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\copy-edit.spec.ts:313:3)
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\copy-edit.spec.ts:348:24
+
+    Error Context: test-results\copy-edit-spec-034-proven--504bb--reaches-a-downloadable-ZIP\error-context.md
+
+  8) e2e\copy-edit.spec.ts:361:3 › spec 034 proven-script walks + publish paths › T016 [US2]: output screen exposes both publish paths; PR degrades honestly, ZIP still works 
+
+    Test timeout of 240000ms exceeded.
+
+    Error: page.click: Test timeout of 240000ms exceeded.
+    Call log:
+      - waiting for locator('a[href="#output"]')
+        - locator resolved to <a href="#output" aria-disabled="true" title="Finish every inventory character before you can access Output">Output</a>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+        450 × waiting for element to be visible, enabled and stable
+            - element is not enabled
+          - retrying click action
+            - waiting 500ms
+
+
+       at helpers\surveyFlow.ts:545
+
+      543 |  */
+      544 | export async function navigateToOutput(page: Page): Promise<void> {
+    > 545 |   await page.click('a[href="#output"]');
+          |              ^
+      546 |   await page.waitForSelector('[data-testid="output-screen-root"]', { timeout: 10_000 });
+      547 | }
+      548 |
+        at navigateToOutput (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\helpers\surveyFlow.ts:545:14)
+        at walkToOutput (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\copy-edit.spec.ts:309:9)
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\copy-edit.spec.ts:364:5
+
+    Error Context: test-results\copy-edit-spec-034-proven--67e7d-es-honestly-ZIP-still-works\error-context.md
+
+  9) e2e\copy-edit.spec.ts:428:3 › spec 034 US3 (T028): durable draft survives reload, Back stays consistent, start-over clears it › T028: hard reload resumes the working copy + step position; Back round-trips; 'I'm new' clears the draft 
+
+    TimeoutError: page.waitForSelector: Timeout 20000ms exceeded.
+    Call log:
+      - waiting for locator('[data-testid="carve-gallery"]') to be visible
+
+
+      439 |     await completePhaseB(page); // "Done" advances the traversal to "carve".
+      440 |
+    > 441 |     await page.waitForSelector('[data-testid="carve-gallery"]', { timeout: 20_000 });
+          |                ^
+      442 |
+      443 |     // Let the ~500ms autosave debounce (Article IV — independent of the 300ms
+      444 |     // validate cycle) commit the draft before reloading.
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\copy-edit.spec.ts:441:16
+
+    Error Context: test-results\copy-edit-spec-034-US3-T02-be071-ps-I-m-new-clears-the-draft\error-context.md
+
+  10) e2e\decision-deeplink.spec.ts:83:3 › decision-trail deep link -> revise -> supersede (spec 057 US3) › activating a trail entry's link lands on its question, revising it supersedes and returns to Decisions 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('[data-testid="decision-entry"]').filter({ hasText: /Authoring approach/i }).first()
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 15000ms
+      - waiting for locator('[data-testid="decision-entry"]').filter({ hasText: /Authoring approach/i }).first()
+
+
+      108 |       .filter({ hasText: TRACK_QUESTION_LABEL })
+      109 |       .first();
+    > 110 |     await expect(trackEntry).toBeVisible({ timeout: 15_000 });
+          |                              ^
+      111 |     // Nothing superseded yet — this is the entry the revision below creates.
+      112 |     await expect(trackEntry.getByTestId("decision-entry-superseded")).toHaveCount(0);
+      113 |
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\decision-deeplink.spec.ts:110:30
+
+    Error Context: test-results\decision-deeplink-decision-a25e2-es-and-returns-to-Decisions\error-context.md
+
+  11) e2e\exemplar-prefill.spec.ts:55:3 › Phase B exemplar prefill › accept: two actions, alphabet recorded, zero characters typed (SC-008/SC-010) 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('exemplar-offer-preview')
+    Expected substring: "more"
+    Received string:    "aU+0061áU+00E1àU+00E0âU+00E2ǎU+01CEbU+0062dU+0064eU+0065éU+00E9èU+00E8êU+00EAěU+011BəU+0259ɛU+025BfU+0066gU+0067hU+0068iU+0069íU+00EDìU+00ECîU+00EEǐU+01D0kU+006BlU+006CmU+006DnU+006EńU+0144ǹU+01F9ŋU+014BoU+006FóU+00F3òU+00F2ôU+00F4ǒU+01D2ɔU+0254pU+0070rU+0072sU+0073tU+0074uU+0075úU+00FAùU+00F9ûU+00FBǔU+01D4vU+0076wU+0077yU+0079zU+007A◌̀U+0300◌́U+0301◌̂U+0302◌̌U+030C"
+    Timeout: 5000ms
+
+    Call log:
+      - Expect "toContainText" with timeout 5000ms
+      - waiting for getByTestId('exemplar-offer-preview')
+        14 × locator resolved to <div data-testid="exemplar-offer-preview">…</div>
+           - unexpected value "aU+0061áU+00E1àU+00E0âU+00E2ǎU+01CEbU+0062dU+0064eU+0065éU+00E9èU+00E8êU+00EAěU+011BəU+0259ɛU+025BfU+0066gU+0067hU+0068iU+0069íU+00EDìU+00ECîU+00EEǐU+01D0kU+006BlU+006CmU+006DnU+006EńU+0144ǹU+01F9ŋU+014BoU+006FóU+00F3òU+00F2ôU+00F4ǒU+01D2ɔU+0254pU+0070rU+0072sU+0073tU+0074uU+0075úU+00FAùU+00F9ûU+00FBǔU+01D4vU+0076wU+0077yU+0079zU+007A◌̀U+0300◌́U+0301◌̂U+0302◌̌U+030C"
+
+
+      69 |     await expect(preview).toContainText("ə");
+      70 |     await expect(preview).toContainText("ɛ");
+    > 71 |     await expect(preview).toContainText("more");
+         |                           ^
+      72 |
+      73 |     // Action 1: Continue.
+      74 |     await page.click('[data-testid="phase-b-intro-next"]');
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\exemplar-prefill.spec.ts:71:27
+
+    Error Context: test-results\exemplar-prefill-Phase-B-e-2d0d2-acters-typed-SC-008-SC-010-\error-context.md
+
+  12) e2e\footer-progress.spec.ts:55:3 › footer progress row (spec 057 US4/US6) › shows the project, grows as questions are answered, distinguishes dot classes by shape, and refuses a gated jump with a reason 
+
+    Error: serious/critical axe violations on: survey (footer present, characters step)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 12
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "help": "Elements must meet minimum color contrast ratio thresholds",
+    +     "impact": "serious",
+    +     "nodes": Array [
+    +       "button[data-testid=\"phase-b-intro-next\"]",
+    +       "iframe .kmw-spacebar-caption",
+    +     ],
+    +     "rule": "color-contrast",
+    +     "screen": "survey (footer present, characters step)",
+    +   },
+    + ]
+
+       at helpers\axe.ts:46
+
+      44 |       nodes: v.nodes.slice(0, 5).map((n) => n.target.join(" ")),
+      45 |     }));
+    > 46 |   expect(gated, `serious/critical axe violations on: ${screenLabel}`).toEqual([]);
+         |                                                                       ^
+      47 | }
+      48 |
+        at expectNoSeriousAxeViolations (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\helpers\axe.ts:46:71)
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\footer-progress.spec.ts:114:5
+
+    Error Context: test-results\footer-progress-footer-pro-f4427--a-gated-jump-with-a-reason\error-context.md
+
+  13) e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L7-carve-deleted × switch-base (Cancel) 
+
+    Error: expect(locator).toBeEnabled() failed
+
+    Locator:  getByTestId('base-confirm')
+    Expected: enabled
+    Received: disabled
+    Timeout:  120000ms
+
+    Call log:
+      - Expect "toBeEnabled" with timeout 120000ms
+      - waiting for getByTestId('base-confirm')
+        - locator resolved to <button disabled type="button" data-testid="base-confirm" class="ks-focus-ring ks-hit-target">Choose this keyboard</button>
+        - unexpected value "disabled"
+        - locator resolved to <button disabled type="button" data-testid="base-confirm" class="ks-focus-ring ks-hit-target">Preparing preview…</button>
+        237 × unexpected value "disabled"
+            - locator resolved to <button disabled type="button" data-testid="base-confirm" class="ks-focus-ring ks-hit-target">Choose this keyboard</button>
+        - unexpected value "disabled"
+
+
+      229 |     h.note(`previewed ${id} via search`);
+      230 |   }
+    > 231 |   await expect(page.getByTestId("base-confirm")).toBeEnabled({ timeout: 120_000 });
+          |                                                  ^
+      232 |   h.note(`preview compile settled for ${id} (confirm enabled)`);
+      233 | }
+      234 |
+        at previewBase (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\switch-base-exploration.spec.ts:231:50)
+        at probeSwitchBase (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\switch-base-exploration.spec.ts:365:3)
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\switch-base-exploration.spec.ts:454:11
+
+    Error Context: test-results\switch-base-exploration-sw-055f8-leted-×-switch-base-Cancel-\error-context.md
+
+  14) e2e\switch-base-rebase.spec.ts:143:3 › F1 — switch-base rebase confirm › switching to a DIFFERENT base with edits: Cancel keeps the OLD base everywhere, no advance 
+
+    Error: expect(received).not.toContain(expected) // indexOf
+
+    Expected value: not "ks.draft.bj_cree_woods.v1"
+    Received array:     ["ks.draft.basic_kbdfr.v1", "ks.draft.bj_cree_woods.v1"]
+
+      192 |     const draftsAfterOk = await draftKeysInStorage(page);
+      193 |     expect(draftsAfterOk).toContain(`ks.draft.${BASE_B}.v1`);
+    > 194 |     expect(draftsAfterOk).not.toContain(`ks.draft.${BASE_A}.v1`);
+          |                               ^
+      195 |   });
+      196 |
+      197 |   test("re-confirming the SAME base: no popup, phaseResults preserved, wizard advances", async ({ page }) => {
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\switch-base-rebase.spec.ts:194:31
+
+    Error Context: test-results\switch-base-rebase-F1-—-sw-ffa31--base-everywhere-no-advance\error-context.md
+
+  15) e2e\touch-derivation-us1.spec.ts:234:3 › Touch derivation US1 — import & adapt (spec 035 Scenario A) › carved characters vanish, placed letter lands, base layout survives, and the keyboard compiles 
+
+    Error: serious/critical axe violations on: phase B build list (US1 bambara walk)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 15
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "help": "Elements must meet minimum color contrast ratio thresholds",
+    +     "impact": "serious",
+    +     "nodes": Array [
+    +       "button[aria-label=\"Hide info panel\"]",
+    +       "button[data-testid=\"carve-continue\"]",
+    +       "button[data-testid=\"carve-card-group#0\"] > span:nth-child(2) > span > span:nth-child(1)",
+    +       "span:nth-child(2) > span > span:nth-child(2)",
+    +       "span:nth-child(2) > span > span:nth-child(3)",
+    +     ],
+    +     "rule": "color-contrast",
+    +     "screen": "phase B build list (US1 bambara walk)",
+    +   },
+    + ]
+
+       at helpers\axe.ts:46
+
+      44 |       nodes: v.nodes.slice(0, 5).map((n) => n.target.join(" ")),
+      45 |     }));
+    > 46 |   expect(gated, `serious/critical axe violations on: ${screenLabel}`).toEqual([]);
+         |                                                                       ^
+      47 | }
+      48 |
+        at expectNoSeriousAxeViolations (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\helpers\axe.ts:46:71)
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\touch-derivation-us1.spec.ts:257:5
+
+    Error Context: test-results\touch-derivation-us1-Touch-6247b-s-and-the-keyboard-compiles\error-context.md
+
+  16) e2e\touch-derivation-us2.spec.ts:367:3 › Touch derivation US2 — reseed from desktop (spec 035 Scenario B) › carved characters vanish, placed letter lands, layout is a compact phone projection, and the keyboard compiles 
+
+    Error: serious/critical axe violations on: phase B build list (US2 piaroa walk)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 12
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "help": "Elements must meet minimum color contrast ratio thresholds",
+    +     "impact": "serious",
+    +     "nodes": Array [
+    +       "code",
+    +       "button[data-testid=\"convenience-continue\"]",
+    +     ],
+    +     "rule": "color-contrast",
+    +     "screen": "phase B build list (US2 piaroa walk)",
+    +   },
+    + ]
+
+       at helpers\axe.ts:46
+
+      44 |       nodes: v.nodes.slice(0, 5).map((n) => n.target.join(" ")),
+      45 |     }));
+    > 46 |   expect(gated, `serious/critical axe violations on: ${screenLabel}`).toEqual([]);
+         |                                                                       ^
+      47 | }
+      48 |
+        at expectNoSeriousAxeViolations (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\helpers\axe.ts:46:71)
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\touch-derivation-us2.spec.ts:390:5
+
+    Error Context: test-results\touch-derivation-us2-Touch-70870-n-and-the-keyboard-compiles\error-context.md
+
+  17) e2e\touch-derivation-us2.spec.ts:463:3 › Touch derivation US2-AS4 — explicit reseed discards a shipped touch layout (spec 035) › choosing Reseed on a base that ships a touch layout still produces the desktop projection, not the shipped layout 
+
+    Test timeout of 240000ms exceeded.
+
+    Error: locator.click: Test timeout of 240000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: 'Apply method for é' })
+
+
+      259 |   }
+      260 |
+    > 261 |   await page.getByRole("button", { name: `Apply method for ${char}` }).click();
+          |                                                                        ^
+      262 |   await page.getByRole("button", { name: /^(Next character|Done)$/ }).click();
+      263 | }
+      264 |
+        at driveMechanismsPlaceLetter (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\touch-derivation-us2.spec.ts:261:72)
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\touch-derivation-us2.spec.ts:478:5
+
+    Error Context: test-results\touch-derivation-us2-Touch-c7301-tion-not-the-shipped-layout\error-context.md
+
+  17 failed
+    e2e\browser-back.spec.ts:51:3 › browser Back mid-survey (F7) › physical Back button steps back one manifest step at a time 
+    e2e\carve.spec.ts:95:3 › Rule Carver — carve one opaque rule, verify IR + emitted .kmn › deleting rule#93 in the carve gallery removes it from the deleted-node IR state and from the emitted .kmn 
+    e2e\copy-edit.spec.ts:171:3 › Track 1 (copy-edit) E2E › walks identity-lite -> base picker -> project-name -> Phase B -> emit 
+    e2e\copy-edit.spec.ts:211:3 › Track 1 (copy-edit) E2E › base keyboard compiles cleanly via kmcmplib WASM oracle (open-base mode) 
+    e2e\copy-edit.spec.ts:244:3 › Track 1 (copy-edit) E2E › emitted .kps, .kvks, and welcome.htm have non-empty bodies 
+    e2e\copy-edit.spec.ts:345:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Latn (basic_kbdfr) reaches a downloadable ZIP 
+    e2e\copy-edit.spec.ts:345:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Geor (basic_kbdgeo) reaches a downloadable ZIP 
+    e2e\copy-edit.spec.ts:361:3 › spec 034 proven-script walks + publish paths › T016 [US2]: output screen exposes both publish paths; PR degrades honestly, ZIP still works 
+    e2e\copy-edit.spec.ts:428:3 › spec 034 US3 (T028): durable draft survives reload, Back stays consistent, start-over clears it › T028: hard reload resumes the working copy + step position; Back round-trips; 'I'm new' clears the draft 
+    e2e\decision-deeplink.spec.ts:83:3 › decision-trail deep link -> revise -> supersede (spec 057 US3) › activating a trail entry's link lands on its question, revising it supersedes and returns to Decisions 
+    e2e\exemplar-prefill.spec.ts:55:3 › Phase B exemplar prefill › accept: two actions, alphabet recorded, zero characters typed (SC-008/SC-010) 
+    e2e\footer-progress.spec.ts:55:3 › footer progress row (spec 057 US4/US6) › shows the project, grows as questions are answered, distinguishes dot classes by shape, and refuses a gated jump with a reason 
+    e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L7-carve-deleted × switch-base (Cancel) 
+    e2e\switch-base-rebase.spec.ts:143:3 › F1 — switch-base rebase confirm › switching to a DIFFERENT base with edits: Cancel keeps the OLD base everywhere, no advance 
+    e2e\touch-derivation-us1.spec.ts:234:3 › Touch derivation US1 — import & adapt (spec 035 Scenario A) › carved characters vanish, placed letter lands, base layout survives, and the keyboard compiles 
+    e2e\touch-derivation-us2.spec.ts:367:3 › Touch derivation US2 — reseed from desktop (spec 035 Scenario B) › carved characters vanish, placed letter lands, layout is a compact phone projection, and the keyboard compiles 
+    e2e\touch-derivation-us2.spec.ts:463:3 › Touch derivation US2-AS4 — explicit reseed discards a shipped touch layout (spec 035) › choosing Reseed on a base that ships a touch layout still produces the desktop projection, not the shipped layout 
+  3 skipped
+  3 did not run
+  46 passed (36.1m)
+EXIT=1

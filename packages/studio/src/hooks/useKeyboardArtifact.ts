@@ -220,7 +220,7 @@ export type VfsTransform = (
 
 /**
  * Called exactly once per successful fetch→compile run, after both the
- * compile result and the parsed IR are available. The caller (PreviewShell,
+ * compile result and the parsed IR are available. The caller (OutputScreen,
  * SurveyView) uses this to call instantiateFromBase or instantiateFromExisting
  * on the workingCopyStore — separating the pipeline from store ownership.
  *

@@ -199,8 +199,8 @@ vi.mock("./lib/buildTouchLayoutJson.ts", () => ({
   buildTouchLayoutJson: () => ({ json: "{}", warnings: [] }),
 }));
 
-vi.mock("./components/PreviewScreen.tsx", () => ({
-  PreviewScreen: () => <div data-testid="preview-screen-root">preview-screen</div>,
+vi.mock("./components/CompareScreen.tsx", () => ({
+  CompareScreen: () => <div data-testid="compare-screen-root">compare-screen</div>,
 }));
 vi.mock("./components/OutputScreen.tsx", () => ({
   OutputScreen: () => <div data-testid="output-screen-root">output-screen</div>,

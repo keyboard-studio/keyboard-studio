@@ -20,7 +20,7 @@ import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
 export interface OSKFrameProps {
   baseKeyboard: BaseKeyboard | null;
   oskMode: OskMode;
-  /** Lifted from useKeyboardArtifact in the parent (PreviewShell). */
+  /** Lifted from useKeyboardArtifact in the parent screen. */
   stage: Stage;
   /** Retry callback from useKeyboardArtifact in the parent. */
   retry: () => void;

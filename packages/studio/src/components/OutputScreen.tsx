@@ -1,7 +1,18 @@
 // OutputScreen — "ship it" tab.
 //
-// Left pane: shared PickerPane (BaseKeyboardPicker, mode toggle, ScaffoldForm,
-// TrackOneIdentityPanel, KmnEditor, MetadataCard).
+// Left pane: shared PickerPane. Which variant depends on whether a working
+// copy exists (spec 058):
+//   - instantiated (the normal end-of-flow arrival) -> "shipping": read-only
+//     base provenance + a "Change base keyboard" control that routes back to
+//     the survey's choose_base step, plus TrackOneIdentityPanel and KmnEditor.
+//     No mode toggle, no picker — nothing on the ship-it screen can re-base
+//     the working copy in place. See PickerPane.tsx's variant notes.
+//   - not instantiated (cold arrival at #output) -> "full": the historical
+//     pane, so a base can still be selected and compiled here standalone.
+// The variant is a LIVE store subscription, not a mount-once read: SurveyView's
+// onInstantiate can settle after this screen mounts (see usePreviewArtifact's
+// late-instantiation adoption), and an author with a working copy must never be
+// left looking at the start-over pane.
 // Right pane: Download .zip button + downloadError + downloadWarnings banner +
 // showIdentityWarn banner + SignUpPanel.
 //
@@ -9,7 +20,7 @@
 //
 // The pipeline (usePreviewArtifact) runs independently on this screen so
 // stage reaches "ready" and canDownload evaluates correctly without depending
-// on a prior visit to PreviewScreen. The Zustand working-copy store persists
+// on a prior visit to another screen. The Zustand working-copy store persists
 // across hash navigation so handleDownload reads the settled store regardless
 // of which screen ran the compile.
 //
@@ -34,6 +45,7 @@ import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { navigateTo } from "../lib/navigate.ts";
+import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
 import { TOUCH_STEP_ID } from "../steps/reducer.ts";
 import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
 import { ScaffoldForm } from "../editors/panels/ScaffoldForm.tsx";
@@ -43,7 +55,13 @@ import { PickerPane } from "./PickerPane.tsx";
 import { SignUpPanel } from "./SignUpPanel.tsx";
 import { ManagedPRSubmitPanel } from "./ManagedPRSubmitPanel.tsx";
 import { ResizeHandle } from "./ResizeHandle.tsx";
-import { DIVIDER_WIDTH, LEFT_MIN_PCT, LEFT_MAX_PCT, LEFT_INIT_PCT } from "./previewOutputLayout.ts";
+import {
+  DIVIDER_WIDTH,
+  LEFT_MIN_PCT,
+  LEFT_MAX_PCT,
+  LEFT_INIT_PCT,
+  PANE_SECONDARY_BUTTON,
+} from "./previewOutputLayout.ts";
 
 // Shared amber "[WARN]" banner shell used by both the touch-staleness banner
 // and the download-projection-warnings banner below. Only the genuinely
@@ -68,8 +86,6 @@ export function OutputScreen() {
 
   const {
     baseKeyboard,
-    pickerMode,
-    scaffoldSpec,
     canDownload,
     downloading,
     downloadError,
@@ -85,6 +101,11 @@ export function OutputScreen() {
   // name + email from the stored identity claims.
   const { login: ghLogin } = useGitHubAuth();
   const { identity: googleIdentity } = useGoogleAuth();
+
+  // Author-chosen keyboard identity (TrackOneIdentityPanel writes it). The
+  // single source for the download control's announced id — see
+  // downloadKeyboardId below.
+  const identity = useWorkingCopyStore((s) => s.identity);
 
   // ---------------------------------------------------------------------------
   // Coverage-blocked explanation (P0 fix) — mirrors PhaseFGate's display
@@ -126,6 +147,14 @@ export function OutputScreen() {
     // store action's docstring for the P0 regression a forward-push here
     // would reproduce (a stale history entry a later ordinary Back traversal
     // would resurface as Phase F).
+    //
+    // Spec 057 FR-005/FR-008 (D-3): the ORDER here is load-bearing and now
+    // actually holds. Setting the target step before navigating was always the
+    // right shape; it simply did not survive arrival, because `SurveyView`'s
+    // mount reset ran on the remount the hash change causes and put the author
+    // back on the identity question — the very thing the banner had promised
+    // to take them away from. With the reset gone (D-1) this lands on the
+    // gallery it names. Covered by `wizardEntryPoints.test.tsx`.
     sessionBackToUnfinishedGallery(
       touchLayoutCorrupted ? "touch" : blockedOnDesktop ? "mechanisms" : "touch",
     );
@@ -141,6 +170,22 @@ export function OutputScreen() {
   const staleSteps = useWorkingCopyStore((s) => s.staleSteps);
   const touchStale = staleSteps.has(TOUCH_STEP_ID);
 
+  // Pane variant (spec 058). Live subscription through the store's OWN
+  // predicate — do not fork a second notion of "has a working copy".
+  const instantiated = useWorkingCopyStore((s) => s.isInstantiated());
+
+  // "Change base keyboard" — relocates re-basing to the survey's choose_base
+  // step rather than mutating the working copy from the ship-it screen. A BACK
+  // action (see backToChooseBase's docstring for why an advance() would corrupt
+  // the history stack), and it deliberately mutates nothing itself: the rebase
+  // question is answered at the destination by the existing confirmRebaseTo
+  // gate, which also no-ops when the author re-picks the same base.
+  const sessionBackToChooseBase = useSurveySessionStore((s) => s.backToChooseBase);
+  const handleChangeBase = () => {
+    sessionBackToChooseBase();
+    navigateTo("survey");
+  };
+
   // Derive prefill: Google identity takes precedence (has both name + email).
   // GitHub provides only the login handle as a name hint.
   const submitPrefill: { displayName?: string; email?: string } =
@@ -154,12 +199,16 @@ export function OutputScreen() {
 
   // Download button aria-label — computed unconditionally (cheap) so the JSX
   // below stays a single conditional, not a nested t()-per-branch call site.
-  const downloadKeyboardId =
-    baseKeyboard !== null
-      ? pickerMode === "scaffold" && scaffoldSpec !== null
-        ? scaffoldSpec.keyboardId
-        : baseKeyboard.id
-      : "";
+  //
+  // The id MUST come from the same place the emitted filename does, and the way
+  // it does so is by calling the same function — `resolveOutputKeyboardId`, which
+  // `projectWorkingCopyForOutput` also calls for the `<id>-<version>.zip` name.
+  // The previous derivation went through pickerMode/scaffoldSpec instead, and
+  // since pickerMode is per-screen local state that always initializes to "open"
+  // here, it announced the BASE id ("Download keyboard us as zip") while the file
+  // that landed was "dagbanli-<version>.zip" — WCAG 2.2 AA 2.5.3 / 4.1.2. Do not
+  // reintroduce a second derivation of this id; extend the shared helper.
+  const downloadKeyboardId = resolveOutputKeyboardId(identity, baseKeyboard);
   const downloadAriaLabel = touchStale
     ? t({
         id: "output.download.aria.touchStale",
@@ -197,9 +246,23 @@ export function OutputScreen() {
         overflow: "hidden",
       }}
     >
-      {/* Left pane: picker */}
+      {/* Left pane: shipping details once instantiated, else the cold-arrival
+          picker — see the module comment. */}
       <PickerPane
         artifact={artifact}
+        variant={instantiated ? "shipping" : "full"}
+        changeBaseSlot={
+          <button
+            type="button"
+            data-testid="output-change-base"
+            onClick={handleChangeBase}
+            // The left pane owns this treatment even though the slot content is
+            // authored here — see PANE_SECONDARY_BUTTON in previewOutputLayout.
+            style={{ ...PANE_SECONDARY_BUTTON, alignSelf: "flex-start" }}
+          >
+            <Trans id="output.changeBase.label">Change base keyboard</Trans>
+          </button>
+        }
         leftPct={leftPct}
         dividerWidth={DIVIDER_WIDTH}
         pickerSlot={

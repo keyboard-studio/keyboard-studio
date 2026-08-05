@@ -17,11 +17,20 @@
 //                  diff region, which reads as a failure (spec Edge Cases).
 //   unavailable -> the localized reason. The studio cannot isolate this change and
 //                  says so, rather than implying the decision did nothing. The
-//                  two reasons (`lock-gate-dependency` / `no-rederivable-write-path`)
-//                  render distinct prose from each other AND from "none" (FR-020).
+//                  three reasons (`lock-gate-dependency`, `no-rederivable-write-path`,
+//                  `no-working-copy-yet`) each render distinct prose, from each other
+//                  AND from "none" (FR-020; spec 057 FR-012). Each gets an EXPLICIT
+//                  arm — a new reason absorbed into a trailing else would render as
+//                  the old, now-false message.
 //   shed        -> `impact` is null: the detail existed and was dropped to fit the
 //                  save budget. Distinct from "never captured" because the author
 //                  can act on it (a shorter session keeps its detail).
+//
+// Resolution may be ASYNC (spec 057): attributing a decision recorded before a
+// working copy existed means projecting the working copy twice and diffing, which is
+// async because pattern resolution is. `useEntryImpact` owns that, and a stored
+// capture still resolves synchronously so a long-recorded fact never flickers
+// through the pending state.
 //
 // The `data-testid` values here are the contract (trail-ui.contract.md §2);
 // renaming one breaks tests.
@@ -34,7 +43,56 @@ import { headlineFor, type HeadlineDimension, type QuestionName } from "./headli
 import { createLookupQuestionLabel } from "./lookupQuestionLabel.ts";
 import { formatClauseList, stageActionLabel } from "./stageText.ts";
 import { DiffHunkList } from "../ui/DiffHunkList.tsx";
+import { useEntryImpact } from "./useEntryImpact.ts";
 import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
+
+// ---------------------------------------------------------------------------
+// Deep-link jump affordance (spec 057 FR-030/FR-031/FR-035/FR-036, T039/T042).
+//
+// FR-036 draws a hard line this row already respects for IMPACT (see the
+// module header above: expansion, not mount, resolves the diff). LOCATION
+// resolution is the opposite case by the spec's own words — "cheap and pure,
+// and is fine" on every render — so unlike `resolveImpact` this is computed
+// unconditionally, not gated behind `expanded`.
+//
+// `jumpToLocation` is the ONE jump implementation (its own header names the
+// trail and the footer as its two callers); this row calls it directly to
+// PERFORM a jump — that's a `lib/` import, which `.dependency-cruiser.cjs`'s
+// `decisions-layer` rule allows.
+//
+// What this row does NOT do is import `stores/` to pre-CHECK reachability
+// itself. That rule is absolute here (`tsPreCompilationDeps: true` follows
+// even a type-only import — see progressDots.ts's identical note, the
+// sibling module this same feature already had to solve this for), so the
+// live traversal/hasProject state needed for FR-035's pre-emptive
+// "state the reason instead of a link" has to arrive as DATA from a caller
+// above the decisions/ boundary — the same shape `resolveImpact` already
+// is. `resolveCtx` is that seam, and it is deliberately OPTIONAL: without it
+// (today, since DecisionTrailView.tsx is owned by a concurrent task and
+// does not pass it yet) every entry optimistically offers the jump control,
+// and the jump itself is still always correct — `jumpToLocation` resolves
+// for real, live, at click time, safely inside `lib/`. Only the pre-check
+// is dormant until a caller supplies `resolveCtx`.
+//
+// `unreachableReasonLabel` is imported from `./progressDots.ts` rather than
+// redefined here — the footer's dot row (T048) landed the SAME "one reason
+// code, one sentence" vocabulary this row needs (tasks.md T040 explicitly
+// calls the id set "shared by the trail and the footer's upcoming dots"),
+// and reusing it is what makes that true rather than merely intended: two
+// independently-authored switch statements over the same closed
+// `UnreachableReason` union would drift the moment one of them gained a
+// case the other forgot, and would cost a second permanent message-id set
+// for prose that means the same thing either way.
+import { resolveLocation, type ResolveContext, type UnreachableReason } from "../lib/resolveLocation.ts";
+import { jumpToLocation } from "../lib/jumpToLocation.ts";
+import type { Location } from "../lib/location.ts";
+import { unreachableReasonLabel } from "./progressDots.ts";
+
+/** `Location.step`'s value type, without importing `ActiveStepId` from
+ * `stores/surveySessionStore.ts` directly — see the import-boundary note
+ * above. Deriving the type from the already-legal `Location` import gets the
+ * same type with no new edge (progressDots.ts's identical `StepId` alias). */
+type StepId = NonNullable<Location["step"]>;
 
 export interface DecisionEntryRowProps {
   entry: DecisionEntry;
@@ -53,6 +111,23 @@ export interface DecisionEntryRowProps {
    * Returns `null` when the entry's detail was shed.
    */
   resolveImpact: (entry: DecisionEntry) => DecisionImpact | null;
+  /**
+   * Async resolver for an entry whose effect must be re-derived by projecting the
+   * working copy (spec 057 FR-009). Optional: when absent the row falls back to
+   * `resolveImpact` alone, which is what every existing test and the fixture-driven
+   * renders rely on.
+   *
+   * Also called ONLY on expand — `useEntryImpact` gates on that, so passing this
+   * does not make mounting the trail compute anything (FR-011, SC-006).
+   */
+  resolveImpactAsync?: (entry: DecisionEntry) => Promise<DecisionImpact | null>;
+  /**
+   * Live resolution context for the jump affordance (spec 057 FR-013/FR-035).
+   * Optional — see the import-boundary note above the imports for why this
+   * is a prop rather than something this file reads for itself, and why its
+   * absence still leaves the jump control fully working, just un-gated.
+   */
+  resolveCtx?: ResolveContext;
 }
 
 const rowStyle: React.CSSProperties = {
@@ -75,11 +150,40 @@ const expandButtonStyle: React.CSSProperties = {
 
 const noticeStyle: React.CSSProperties = { margin: 0, color: TEXT_DIM };
 
+/**
+ * Stand-in resolver for when no async resolver was supplied.
+ *
+ * Never actually called — `useEntryImpact` is passed `expanded && asyncEnabled`,
+ * which is false in exactly that case. It exists because the hook must be called
+ * unconditionally and its resolver parameter is required; a module-level constant
+ * also keeps the hook's dependency identity stable across renders.
+ */
+const NEVER_RESOLVES = async (): Promise<DecisionImpact | null> => null;
+
+const jumpButtonStyle: React.CSSProperties = {
+  background: "none",
+  border: `1px solid ${BORDER}`,
+  borderRadius: 4,
+  color: ACCENT,
+  cursor: "pointer",
+  padding: "2px 8px",
+  fontSize: 12,
+  whiteSpace: "nowrap",
+};
+
+const jumpUnreachableStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: TEXT_DIM,
+  whiteSpace: "nowrap",
+};
+
 export function DecisionEntryRow({
   entry,
   superseded,
   hidden = false,
   resolveImpact,
+  resolveImpactAsync,
+  resolveCtx,
 }: DecisionEntryRowProps) {
   const { t, i18n } = useLingui();
   const [expanded, setExpanded] = useState(false);
@@ -88,6 +192,56 @@ export function DecisionEntryRow({
   // §1) — resolved once per locale rather than reconstructed on every render.
   const lookupQuestionLabel = useMemo(() => createLookupQuestionLabel(i18n), [i18n]);
   const spec = headlineFor(entry, { lookupQuestionLabel });
+
+  // ---------------------------------------------------------------------------
+  // Jump target + reachability (spec 057 FR-030/FR-031/FR-035/FR-036).
+  //
+  // Built from what the entry already carries — `stepId`, and for a survey
+  // answer `payload.questionId` — never a new field on the record. A cast is
+  // needed because `entry.stepId` is a plain `string` (it can be
+  // PRE_IDENTITY_STEP_ID, or a step a later build removed); `resolveLocation`
+  // is exactly what turns an invalid one of those into a stated reason rather
+  // than a runtime type problem, the same way StepHost's own step-id cast
+  // does at the other end of this same jump.
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  const targetStepId = entry.stepId as StepId;
+  const entryLocation: Location =
+    entry.payload.kind === "survey-answer"
+      ? { route: "survey", step: targetStepId, question: entry.payload.questionId }
+      : { route: "survey", step: targetStepId };
+
+  // Pure and cheap by contract (contracts/location-grammar.md §4) — this is
+  // LOCATION resolution, not IMPACT resolution, so running it unconditionally
+  // on every render (once `resolveCtx` is supplied) is exactly what FR-036
+  // permits (the module header's own distinction: "mounting the trail
+  // resolves NO impact" says nothing about location). `resolveCtx` is
+  // optional (see its own doc comment above) — absent it, there is nothing
+  // to gate on, so the row optimistically treats the entry as jumpable.
+  //
+  // Every entry here carries a `step` (route is always "survey"), and
+  // `resolveLocation` never reports its `"unreachable"` kind for a
+  // step-scoped location — dropping `question` then `step` always leaves the
+  // bare route, which is always reachable, so a step-having request always
+  // resolves either `"reachable"` or `"degraded"` (see resolveLocation.ts's
+  // own `refuse()` and jumpToLocation.test.ts's "every refusable location
+  // degrades instead" case — progressDots.ts documents the identical reading
+  // for its own `!== "reachable"` checks). A "degraded" landing is a real,
+  // working jump — but NOT to the decision point the entry actually names
+  // (the nearest ancestor, dropping the question or the whole step), so
+  // FR-035's "state the reason instead of a link" applies to it exactly as
+  // it would to a flat refusal: a control that silently lands somewhere
+  // other than what it promised is worse than one that says why it can't.
+  const jumpResolution = resolveCtx !== undefined ? resolveLocation(entryLocation, resolveCtx) : null;
+  const jumpUnreachableReason: UnreachableReason | null =
+    jumpResolution === null || jumpResolution.kind === "reachable" ? null : jumpResolution.reason;
+
+  // Activating the jump. `returnTo` is the trail location itself (contract
+  // §5, FR-034): the ONE thing FR-032/FR-033 need is that a revision made
+  // after this jump can find its way back here, and StepHost is the runner
+  // that honours it — this row's job ends at handing the request off.
+  const handleJumpClick = (): void => {
+    jumpToLocation(entryLocation, { returnTo: { route: "trail" } });
+  };
 
   // A question's display name for interpolation. `known: false` selects the
   // FR-014 fallback — readable prose, never the raw questionId and never blank.
@@ -477,7 +631,24 @@ export function DecisionEntryRow({
   // counterfactual should reflect the IR as it is now rather than as it was the
   // first time this row happened to be opened. Never called for a
   // base-contribution entry — see `baseContributionDetail` above.
-  const impact = expanded && !isBaseContribution ? resolveImpact(entry) : null;
+  //
+  // `useEntryImpact` must be called unconditionally (hooks rule), so the gating
+  // lives in its arguments: with `expanded` false, or with no async resolver, it
+  // runs nothing. When an async resolver IS supplied it owns resolution entirely,
+  // including the synchronous stored-capture case — routing that through the sync
+  // resolver as well would ask the same question twice.
+  const asyncEnabled = resolveImpactAsync !== undefined && !isBaseContribution;
+  const asyncResolution = useEntryImpact(
+    entry,
+    expanded && asyncEnabled,
+    resolveImpactAsync ?? NEVER_RESOLVES,
+  );
+  const impact = asyncEnabled
+    ? asyncResolution.impact
+    : expanded && !isBaseContribution
+      ? resolveImpact(entry)
+      : null;
+  const impactPending = asyncEnabled && asyncResolution.pending;
 
   // Derived from the entry's own id (unique per row), never rendered as text —
   // an `id` attribute is not author-facing content, so this is FR-008-clean
@@ -511,6 +682,23 @@ export function DecisionEntryRow({
             })}
           </span>
         )}
+        {jumpUnreachableReason !== null ? (
+          // FR-035: the reason renders IN PLACE of a link — never a link that
+          // would fail, or that would silently land somewhere other than the
+          // decision point it names, and never a dead control with no text.
+          <span data-testid="decision-entry-jump-unreachable" style={jumpUnreachableStyle}>
+            {unreachableReasonLabel(jumpUnreachableReason, i18n)}
+          </span>
+        ) : (
+          <button
+            type="button"
+            data-testid="decision-entry-jump"
+            style={jumpButtonStyle}
+            onClick={handleJumpClick}
+          >
+            {t({ id: "trail.jump.label", message: "Jump to this decision point" })}
+          </button>
+        )}
         <button
           type="button"
           data-testid="decision-entry-expand"
@@ -529,6 +717,16 @@ export function DecisionEntryRow({
         <div data-testid="decision-entry-impact" id={impactRegionId} style={{ marginTop: 4 }}>
           {baseContributionDetail !== null ? (
             baseContributionDetail
+          ) : impactPending ? (
+            // The one transient state. Only ever reached for an entry whose effect
+            // has to be re-derived by projecting (spec 057); a stored capture
+            // resolves on the first render and never passes through here.
+            <p style={noticeStyle} data-testid="decision-entry-impact-pending">
+              {t({
+                id: "trail.entry.impact.pending",
+                message: "Working out what this decision changed…",
+              })}
+            </p>
           ) : impact === null ? (
             // `resolveImpact` returns null only for a shed entry — the detail was
             // captured once and then dropped, which is a different statement from
@@ -576,6 +774,19 @@ export function DecisionEntryRow({
                 id: "trail.entry.impact.unavailable.lockGate",
                 message:
                   "This decision sits behind a step that has since been locked, so its effect can no longer be shown on its own.",
+              })}
+            </p>
+          ) : impact.reason === "no-working-copy-yet" ? (
+            // FR-012's whole requirement: its OWN words, distinct from both other
+            // unavailability messages AND from "changed nothing". This decision has a
+            // write path and did reach the artifact — there is simply no keyboard yet
+            // to project, and the author can fix that by choosing a base. Falling into
+            // the trailing branch below would tell them the opposite.
+            <p style={noticeStyle}>
+              {t({
+                id: "trail.entry.impact.unavailable.noWorkingCopyYet",
+                message:
+                  "This decision was made before a keyboard existed to change, so its effect cannot be shown yet. Choose a base keyboard and it will appear here.",
               })}
             </p>
           ) : (

@@ -82,7 +82,10 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { collateInventory } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
-import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
+import { MECHANISMS_STEP_ID, TOUCH_STEP_ID } from "../../steps/reducer.ts";
+import { useCharWalkPosition } from "../../hooks/useCharWalkPosition.ts";
+import { cursorCharIn } from "../../lib/stepWalk.ts";
+import { peekStepCursor } from "../../stores/stepWalkStore.ts";
 import { getPatternLibraryService } from "../../lib/services.ts";
 import { displayChar } from "../../lib/irToCarveNodes.ts";
 import { capabilityHint } from "./parts/InfoView.tsx";
@@ -112,7 +115,7 @@ import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts"
 import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
 import type { PlacementSeedEntry } from "../../survey/placementSeeds.ts";
 import {
-  getSuggestionForCharWithCasePair,
+  getRankedSuggestionsForChar,
   PLACEMENT_SEED_CONFIDENCE_THRESHOLD,
 } from "../../survey/placementSeeds.ts";
 import {
@@ -184,7 +187,6 @@ import {
   galleryConfigStyle as configStyle,
   galleryCardStyle as cardStyle,
 } from "../../lib/galleryTheme.ts";
-import { ERROR_RED, ERROR_BG } from "../../ui/theme.ts";
 import {
   PATTERN_SEQUENCE,
   PATTERN_DEADKEY,
@@ -387,6 +389,69 @@ function deadkeyNameFor(triggerKey: string): string {
   }
   // Fallback: unknown key — use a generic ID.
   return "dead0";
+}
+
+/**
+ * Canonicalized modifier combo for an S-08 suggestion entry's display text +
+ * aria-labels — derived from the candidate's OWN modifiers (never a
+ * hardcoded "RAlt"), so a case-pair fallback candidate's ["SHIFT","RALT"]
+ * renders as "Shift+RAlt". Falls back to bare RALT when the candidate
+ * carries no modifiers, mirroring handleSuggestionAccept's write-path
+ * fallback. Canonicalization can only throw for a mutually-exclusive combo
+ * (structurally unreachable for a seeder/fallback candidate); the catch
+ * keeps a display-only computation from ever crashing the gallery.
+ *
+ * Pure function of `entry` — not a hook — since it is called once per
+ * rendered suggestion chip (up to 2), a cheap computation that does not
+ * warrant its own memo per entry.
+ */
+function suggestionComboTokensFor(entry: PlacementSeedEntry): ModifierToken[] {
+  if (entry.strategyId !== "S-08") return [];
+  const modifiers = entry.topCandidate.modifiers;
+  const tokens = (
+    modifiers.length > 0 ? modifiers : ["RALT"]
+  ) as ModifierToken[];
+  try {
+    return canonicalizeCombo(tokens);
+  } catch {
+    return tokens;
+  }
+}
+
+/**
+ * Build the S-02 (deadkey) {@link MechanismAssignment} shape — shared by
+ * `handleApply`'s manual deadkey method and `handleSuggestionAccept`'s S-02
+ * branch, so the two write paths cannot drift on this mechanism's
+ * slotValues shape (see docs/design-notes/mechanism-gallery-flow.md's
+ * "Method → assignment" seam).
+ */
+function buildDeadkeyAssignment(params: {
+  currentChar: string;
+  baseLetter: string;
+  triggerVkey: string;
+  deadkeyName: string;
+  accentChar: string;
+}): MechanismAssignment {
+  const { currentChar, baseLetter, triggerVkey, deadkeyName, accentChar } = params;
+  return {
+    scope: "individual",
+    target: currentChar,
+    modality: "physical",
+    mechanisms: [
+      {
+        patternId: PATTERN_DEADKEY,
+        strategyId: "S-02",
+        slotValues: {
+          triggerKey: triggerVkey,
+          deadkeyName,
+          baseLetters: baseLetter,
+          accentedForms: currentChar,
+          accentChar,
+        },
+      },
+    ],
+    source: "user",
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1595,6 +1660,14 @@ export function MechanismGallery({
       // spuriously look like a removal.
       if (prev !== null && indexOfChar(lettersToAdd, prev) !== -1) return prev;
       if (prev === null) {
+        // ARRIVAL POSITION. A cursor stored for this step outranks every
+        // heuristic below: it is either where the author was before a tab switch
+        // unmounted this gallery, or the character a footer dot asked for (see
+        // lib/stepWalk.ts). Both are an explicit statement about where the walk
+        // should resume; "first uncovered" is only a guess for a first-ever
+        // entry, so it stays the fallback rather than overriding an answer.
+        const requested = cursorCharIn(peekStepCursor(MECHANISMS_STEP_ID), lettersToAdd);
+        if (requested !== null) return requested;
         // First-ever pick — prefer the first UNCOVERED char over strict
         // position 0.
         return (
@@ -1615,6 +1688,19 @@ export function MechanismGallery({
     // inventory list itself changes, not when methods are applied.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lettersKey]);
+
+  // Bind this walk to the shared within-step position model, so the footer shows
+  // one dot per character instead of one dot for the whole stage, and so a jump
+  // into the middle of the walk lands. Declared AFTER the sync effect above,
+  // which owns the arrival position (see the hook's own header).
+  const isCharCovered = useCallback((char: string) => coveredChars.has(char), [coveredChars]);
+  useCharWalkPosition({
+    stepId: MECHANISMS_STEP_ID,
+    list: lettersToAdd,
+    currentChar,
+    setCurrentChar,
+    isDone: isCharCovered,
+  });
 
   // ---------------------------------------------------------------------------
   // Pattern loading — needed for patternMap (GalleryPreviewWithPatterns)
@@ -1863,23 +1949,26 @@ export function MechanismGallery({
     [currentChar, sessionAssignments, baseOnlyProducedSet, baseProducedSet],
   );
 
-  // kbgen placement suggestion for the current character (null when no map or
-  // no qualifying candidate). Memoized against currentChar + placementMap so it
-  // only recomputes on actual input changes, not on unrelated re-renders.
+  // kbgen/corpus placement suggestions for the current character (empty
+  // array when no map or no qualifying candidate). Memoized against
+  // currentChar + placementMap so it only recomputes on actual input
+  // changes, not on unrelated re-renders.
   //
-  // getSuggestionForCharWithCasePair additionally falls back to a synthesized
-  // S-08 suggestion for an UPPERCASE letter whose LOWERCASE case-pair sibling
-  // has a direct RALT (S-08) candidate — the uppercase then gets a RAlt+Shift
-  // suggestion on the same vkey instead of no suggestion at all. Same "" ->
-  // undefined bcp47 normalization useCasePairCompanion applies (an identity
-  // with an empty tag is "no locale", not "the empty locale").
+  // getRankedSuggestionsForChar returns up to 2 entries with DISTINCT
+  // strategyIds (e.g. "S-02 deadkey" + "S-08 RAlt", both attested by the
+  // corpus for the same codepoint) — see placementSeeds.ts. It additionally
+  // falls back to the LOWERCASE case-pair sibling's ranked entries, shifted,
+  // for an UPPERCASE letter with no qualifying entries of its own (never a
+  // second, independently-derived uppercase ranking). Same "" -> undefined
+  // bcp47 normalization useCasePairCompanion applies (an identity with an
+  // empty tag is "no locale", not "the empty locale").
   const suggestionBcp47 =
     identity?.bcp47 !== undefined && identity.bcp47 !== ""
       ? identity.bcp47
       : undefined;
-  const suggestion = useMemo((): PlacementSeedEntry | null => {
-    if (placementMap === undefined || currentChar === null) return null;
-    const raw = getSuggestionForCharWithCasePair(
+  const suggestions = useMemo((): PlacementSeedEntry[] => {
+    if (placementMap === undefined || currentChar === null) return [];
+    const ranked = getRankedSuggestionsForChar(
       currentChar,
       placementMap,
       PLACEMENT_SEED_CONFIDENCE_THRESHOLD,
@@ -1888,34 +1977,119 @@ export function MechanismGallery({
     // Never surface a CAPS-based placement as a *suggestion*: CAPS is a
     // case/state modifier, not a layer an author reaches for, so a "Caps + key"
     // recommendation surprises more than it helps. This suppresses only the
-    // suggestion row (and its accept button) for a CAPS-carrying candidate —
+    // suggestion chip (and its accept button) for a CAPS-carrying candidate —
     // CAPS stays fully available as a manual layer pick (computeModifierPool
     // still offers it in every dropdown) and everywhere else is untouched.
-    if (raw !== null && raw.topCandidate.modifiers.includes("CAPS")) return null;
-    return raw;
+    return ranked.filter((entry) => !entry.topCandidate.modifiers.includes("CAPS"));
   }, [currentChar, placementMap, suggestionBcp47]);
 
-  // Canonicalized modifier combo for the S-08 suggestion row's display text +
-  // aria-labels — derived from the candidate's OWN modifiers (never a
-  // hardcoded "RAlt"), so a case-pair fallback candidate's
-  // ["SHIFT","RALT"] renders as "Shift+RAlt". Falls back to bare RALT when
-  // the candidate carries no modifiers, mirroring handleSuggestionAccept's
-  // write-path fallback. Canonicalization can only throw for a mutually-
-  // exclusive combo (structurally unreachable for a seeder/fallback
-  // candidate); the catch keeps a display-only computation from ever
-  // crashing the gallery.
-  const suggestionComboTokens = useMemo<ModifierToken[]>(() => {
-    if (suggestion === null || suggestion.strategyId !== "S-08") return [];
-    const modifiers = suggestion.topCandidate.modifiers;
-    const tokens = (
-      modifiers.length > 0 ? modifiers : ["RALT"]
-    ) as ModifierToken[];
-    try {
-      return canonicalizeCombo(tokens);
-    } catch {
-      return tokens;
+  // ---------------------------------------------------------------------------
+  // Per-chip suggestion resolution — accepts are INDEPENDENT (bug fix).
+  //
+  // `suggestions` can carry up to 2 entries with DISTINCT strategyIds (e.g.
+  // S-02 deadkey + S-08 RAlt for the same codepoint — see
+  // getRankedSuggestionsForChar). Accepting ONE must not hide the OTHER: each
+  // chip's own visibility is resolved independently of the others', and of
+  // the per-char `suggestionResolved` set above (which stays reserved for the
+  // whole-row Deny dismissal — see suggestionDismissed).
+  //
+  // A chip is hidden once EITHER:
+  //   - its own mechanism is already recorded for currentChar — checked by
+  //     strategyId against `mechanismAssignments` (the SAME per-char
+  //     mechanism list charMechanisms.ts's badge/coveredChars/
+  //     appliedForCurrentChar all read), so a successful Accept (or an
+  //     equivalent method applied manually through the MethodChooser card
+  //     below) makes that one chip disappear without touching its sibling.
+  //     This doubles as the "revisit" contract: navigating away and back (or
+  //     removing then re-adding a DIFFERENT method) never re-offers a chip
+  //     whose mechanism is still on record.
+  //   - it was explicitly dismissed without recording anything — a defensive
+  //     path inside handleSuggestionAccept (e.g. an unresolvable modifier
+  //     combo) that must stop offering THAT entry without touching a sibling
+  //     chip that might still be perfectly acceptable.
+  const dismissedSuggestionEntryKey = (char: string, strategyId: string): string =>
+    `${char}::${strategyId}`;
+  const [dismissedSuggestionEntries, setDismissedSuggestionEntries] = useState<
+    Set<string>
+  >(() => new Set());
+  const markSuggestionEntryDismissed = useCallback(
+    (char: string, strategyId: string) => {
+      setDismissedSuggestionEntries((prev) => {
+        const key = dismissedSuggestionEntryKey(char, strategyId);
+        if (prev.has(key)) return prev;
+        const next = new Set(prev);
+        next.add(key);
+        return next;
+      });
+    },
+    [],
+  );
+
+  // Every strategyId already recorded as a NON-sequence mechanism for
+  // currentChar (mechanismAssignments — see excludeSequenceMechanisms above).
+  // Built from the SAME list `coveredChars`/`appliedForCurrentChar` read, so
+  // this can never disagree with what the "Applied methods" chip row shows.
+  const recordedSuggestionStrategyIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (currentChar === null) return ids;
+    for (const a of mechanismAssignments) {
+      if (a.scope !== "individual" || a.target !== currentChar) continue;
+      for (const m of a.mechanisms) {
+        if (m.strategyId !== undefined) ids.add(m.strategyId);
+      }
     }
-  }, [suggestion]);
+    return ids;
+  }, [mechanismAssignments, currentChar]);
+
+  // The chips actually eligible to render right now — `suggestions` minus
+  // whichever entries are already recorded or were explicitly dismissed. Row
+  // visibility (below) is driven off THIS list's length, not `suggestions`
+  // itself, so accepting one chip only ever removes that one chip.
+  const visibleSuggestions = useMemo(
+    () =>
+      currentChar === null
+        ? []
+        : suggestions.filter(
+            (entry) =>
+              !recordedSuggestionStrategyIds.has(entry.strategyId) &&
+              !dismissedSuggestionEntries.has(
+                dismissedSuggestionEntryKey(currentChar, entry.strategyId),
+              ),
+          ),
+    [suggestions, currentChar, recordedSuggestionStrategyIds, dismissedSuggestionEntries],
+  );
+
+  // Whether currentChar already has at least one recorded (non-sequence)
+  // mechanism whose strategyId is NOT among the strategyIds `suggestions`
+  // is currently offering for this char — i.e. the char is covered by
+  // UNRELATED means: a manually-applied method that has nothing to do with
+  // this row's chips (including one with no strategyId attribution at
+  // all). Built from the SAME `mechanismAssignments`/`suggestions` memos
+  // used above rather than re-collecting. Deliberately does NOT fire for a
+  // recorded mechanism whose strategyId DOES match one of the offered
+  // chips — that case is already handled per-chip by
+  // recordedSuggestionStrategyIds (it hides just that one chip), and must
+  // NOT suppress the whole row while a sibling chip is still on offer —
+  // that's the accept-independence contract (accept S-02 -> S-08 chip
+  // stays visible).
+  const hasUnrelatedRecordedMechanism = useMemo(() => {
+    if (currentChar === null) return false;
+    const offeredSuggestionStrategyIds = new Set(
+      suggestions.map((entry) => entry.strategyId),
+    );
+    for (const a of mechanismAssignments) {
+      if (a.scope !== "individual" || a.target !== currentChar) continue;
+      for (const m of a.mechanisms) {
+        if (
+          m.strategyId === undefined ||
+          !offeredSuggestionStrategyIds.has(m.strategyId)
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }, [mechanismAssignments, currentChar, suggestions]);
 
   // Whole-inventory leave-warning (soft gate) — computed from the SAME
   // MechanismAssignment map + lettersToAdd scope this gallery already uses
@@ -2035,13 +2209,20 @@ export function MechanismGallery({
   });
 
   // Whether the suggestion row must stay hidden for the current character —
-  // true once explicitly resolved (Accept/Deny), or once the character is
-  // already covered (a configured char never re-prompts). Skipping does not
-  // resolve a suggestion — Skip records nothing, so a skipped-over character
-  // still shows its suggestion row if revisited.
+  // true only once the WHOLE row has been explicitly Denied (see
+  // handleSuggestionChange/suggestionResolved above). This used to ALSO fire
+  // once the character was "covered" (any mechanism recorded at all), but
+  // that conflated "one of this row's OWN chips was accepted" with "the row
+  // must disappear" — since accepting chip A records a mechanism, that made
+  // chip B vanish too even though it was never touched (the accepts-kill-
+  // each-other bug). Per-chip visibility is now handled independently via
+  // `visibleSuggestions` below (each chip disappears only once ITS OWN
+  // mechanism is recorded — see recordedSuggestionStrategyIds); this flag is
+  // reserved for the whole-row Deny dismissal only. Skipping does not resolve
+  // a suggestion — Skip records nothing, so a skipped-over character still
+  // shows its suggestion row if revisited.
   const suggestionDismissed =
-    currentChar !== null &&
-    (suggestionResolved.has(currentChar) || coveredChars.has(currentChar));
+    currentChar !== null && suggestionResolved.has(currentChar);
 
   // ---------------------------------------------------------------------------
   // Method-input reset — called after apply or suggestion accept
@@ -2081,11 +2262,15 @@ export function MechanismGallery({
   // ---------------------------------------------------------------------------
 
   // Accept: immediately apply the suggested assignment (same logic as handleApply
-  // for swap/ralt, but using the candidate's vkey directly to avoid the async
-  // state-update window that would occur if we pre-filled pickers first).
-  const handleSuggestionAccept = useCallback(() => {
-    if (suggestion === null || currentChar === null) return;
-    const { vkey } = suggestion.topCandidate;
+  // for swap/ralt/deadkey, but using the candidate's own vkey/baseLetter
+  // directly to avoid the async state-update window that would occur if we
+  // pre-filled pickers first). Takes the SPECIFIC entry the author clicked —
+  // the ranked list can carry up to 2 entries (distinct strategyIds) for one
+  // character, each with its own independent Accept button (see the render
+  // below), so this can no longer close over a single `suggestion`.
+  const handleSuggestionAccept = useCallback((entry: PlacementSeedEntry) => {
+    if (currentChar === null) return;
+    const { vkey } = entry.topCandidate;
     let assignment: MechanismAssignment;
     // Set only by the S-08 branch below, to the LOWERCASE placement's own
     // modifiers (never including SHIFT — see the guard there) — carries the
@@ -2093,7 +2278,7 @@ export function MechanismGallery({
     // AFTER recordAssignments below, once `assignment` is the exact object
     // the proposal must reference (FR-008 identity guard).
     let raltCompanionModifiers: ModifierToken[] | null = null;
-    if (suggestion.strategyId === "S-01") {
+    if (entry.strategyId === "S-01") {
       const cp =
         currentChar
           .codePointAt(0)
@@ -2113,17 +2298,17 @@ export function MechanismGallery({
         ],
         source: "user",
       };
-    } else if (suggestion.strategyId === "S-08") {
+    } else if (entry.strategyId === "S-08") {
       // Build from the candidate's OWN modifiers — never hardcode RALT.
       // Mirrors the manual S-08 write path below (comboToKeySpec /
       // canonicalizeCombo), so an uppercase case-pair fallback candidate
-      // (placementSeeds.ts's getSuggestionForCharWithCasePair, which supplies
+      // (placementSeeds.ts's getRankedSuggestionsForChar, which supplies
       // ["SHIFT","RALT"]) emits "[SHIFT RALT vkey]" rather than colliding with
       // the lowercase's "[RALT vkey]". Falls back to bare RALT when the
       // candidate carries no modifiers — today's kbgen seeder emits a direct
       // S-08 candidate with modifiers: ["RALT"], but an empty list is guarded
       // defensively rather than assumed.
-      const candidateModifiers = suggestion.topCandidate.modifiers;
+      const candidateModifiers = entry.topCandidate.modifiers;
       // PlacementCandidate.modifiers are documented Keyman modifier tokens
       // (placementMap.ts) — asserted rather than re-typed here, same as the
       // manual S-08 badge label's `parts as ModifierToken[]` above.
@@ -2136,8 +2321,10 @@ export function MechanismGallery({
       } catch {
         // canonicalizeCombo only throws for a mutually-exclusive combo — a
         // malformed kbgen/case-pair candidate should not crash the gallery;
-        // dismiss the suggestion rather than record a broken assignment.
-        markSuggestionResolved(currentChar);
+        // dismiss THIS chip only (not the whole row — a sibling S-02 chip may
+        // still be perfectly acceptable) rather than record a broken
+        // assignment.
+        markSuggestionEntryDismissed(currentChar, entry.strategyId);
         devLog.warn(
           `[MechanismGallery] handleSuggestionAccept: invalid modifier combo ${JSON.stringify(candidateModifiers)} for S-08 suggestion — dismissing`,
         );
@@ -2163,10 +2350,10 @@ export function MechanismGallery({
       // for the RAlt-layer counterpart, raised right after the author accepts
       // THIS suggestion — the flow the user actually takes, rather than
       // waiting for them to separately navigate to the uppercase character
-      // (which today only gets its OWN suggestion row via
-      // getSuggestionForCharWithCasePair, not this propose-then-confirm
-      // banner). Only when `tokens` has no SHIFT of its own: a candidate that
-      // already carries SHIFT is itself the uppercase case-pair fallback
+      // (which today only gets its OWN ranked suggestions via
+      // getRankedSuggestionsForChar, not this propose-then-confirm banner).
+      // Only when `tokens` has no SHIFT of its own: a candidate that already
+      // carries SHIFT is itself the uppercase case-pair fallback
       // (placementSeeds.ts), so IT is the companion — proposing a further
       // companion for it would double up. `useCasePairCompanion`'s own
       // `caseCounterpart` direction check (toUpper only) independently
@@ -2174,15 +2361,107 @@ export function MechanismGallery({
       if (!tokens.includes("SHIFT")) {
         raltCompanionModifiers = tokens;
       }
+    } else if (entry.strategyId === "S-02") {
+      // Prefills-via-direct-apply: the corpus attests a base LETTER
+      // (entry.topCandidate.baseLetter — the sole thing getRankedSuggestionsForChar
+      // gates an S-02 entry on) but never a TRIGGER key — the corpus has no
+      // signal for which physical key an author wants as the deadkey
+      // trigger, and imposing one would be exactly the kind of synthesized
+      // guess the ranking rule forbids for the base letter itself. Accept
+      // therefore builds the SAME shape handleApply's manual deadkey method
+      // would (via buildDeadkeyAssignment), using the studio's own
+      // currently-held trigger-key state (defaults to K_COLON — see
+      // resetMethodState) exactly as if the author had typed this base
+      // letter into the deadkey card themselves and clicked its own Apply.
+      const baseLetter = entry.topCandidate.baseLetter;
+      if (baseLetter === undefined || baseLetter.length === 0) {
+        // Structurally unreachable — getRankedSuggestionsForChar never
+        // returns an S-02 entry without a baseLetter — guarded defensively
+        // rather than assumed, same posture as the S-08 combo-canon catch
+        // above. Dismisses THIS chip only, same rationale as that catch.
+        markSuggestionEntryDismissed(currentChar, entry.strategyId);
+        devLog.warn(
+          `[MechanismGallery] handleSuggestionAccept: S-02 suggestion for "${currentChar}" carries no baseLetter — dismissing`,
+        );
+        return;
+      }
+      const triggerResolution = resolveKeyPickerSelection(
+        triggerKey,
+        triggerKeyCustomChar,
+        TRIGGER_KEY_RESOLVE_OPTIONS,
+      );
+      const resolvedTriggerVkey = resolvedVkeyOf(triggerResolution);
+      if (resolvedTriggerVkey === null) {
+        // The currently-held trigger-key state doesn't resolve (e.g. a
+        // custom trigger character left blank) — fall back to prefilling
+        // the deadkey method card (defaults-first, §3c) rather than
+        // dismissing outright, so the author can pick a trigger and Apply
+        // manually. Dismisses THIS chip only — a sibling chip (e.g. S-08)
+        // stays offered.
+        setMethod("deadkey");
+        setDeadkeyBaseLetter(baseLetter);
+        markSuggestionEntryDismissed(currentChar, entry.strategyId);
+        return;
+      }
+      let deadkeyName: string;
+      let accentChar: string;
+      if (triggerResolution.kind === "customOk") {
+        deadkeyName = triggerResolution.char
+          .codePointAt(0)!
+          .toString(16)
+          .padStart(4, "0");
+        accentChar = triggerResolution.char;
+      } else {
+        deadkeyName = deadkeyNameFor(triggerKey);
+        accentChar = TRIGGER_KEY_CHARS[triggerKey] ?? "";
+      }
+      assignment = buildDeadkeyAssignment({
+        currentChar,
+        baseLetter,
+        triggerVkey: resolvedTriggerVkey,
+        deadkeyName,
+        accentChar,
+      });
+      // S-02 case-pair proposal — same companion the manual deadkey Apply
+      // raises (see handleApply's method === "deadkey" branch): the base
+      // letter and output case-shift; the trigger key/deadkey name/accent
+      // char are untouched.
+      proposeCompanion({
+        mechanism: "combo",
+        originalChar: currentChar,
+        combo: {
+          kind: "deadkey",
+          triggerKey: resolvedTriggerVkey,
+          deadkeyName,
+          accentChar,
+          baseLetter,
+        },
+        baseAssignment: assignment,
+        alreadyProduced: (counterpart) =>
+          sessionAssignments.some(
+            (a) =>
+              a.target === counterpart &&
+              a.mechanisms.some(
+                (m) =>
+                  m.patternId === PATTERN_DEADKEY &&
+                  m.slotValues?.["triggerKey"] === resolvedTriggerVkey,
+              ),
+          ),
+      });
     } else {
-      markSuggestionResolved(currentChar);
+      markSuggestionEntryDismissed(currentChar, entry.strategyId);
       devLog.warn(
-        `[MechanismGallery] handleSuggestionAccept: unrecognised strategyId "${suggestion.strategyId}" — dismissing suggestion`,
+        `[MechanismGallery] handleSuggestionAccept: unrecognised strategyId "${entry.strategyId}" — dismissing suggestion`,
       );
       return;
     }
     recordAssignments([...sessionAssignments, assignment]);
-    markSuggestionResolved(currentChar);
+    // The successful accept's own mechanism is now recorded with this
+    // strategyId — recordedSuggestionStrategyIds (above) filters this ONE
+    // chip out of visibleSuggestions on the next render; a sibling chip with
+    // a DIFFERENT strategyId is untouched. Marking it dismissed here too is
+    // redundant-but-harmless belt-and-braces (it never needs to reappear).
+    markSuggestionEntryDismissed(currentChar, entry.strategyId);
     if (raltCompanionModifiers !== null) {
       proposeCompanion({
         mechanism: "ralt-layer",
@@ -2212,12 +2491,13 @@ export function MechanismGallery({
     }
     resetMethodState();
   }, [
-    suggestion,
     currentChar,
+    triggerKey,
+    triggerKeyCustomChar,
     sessionAssignments,
     recordAssignments,
     resetMethodState,
-    markSuggestionResolved,
+    markSuggestionEntryDismissed,
     proposeCompanion,
   ]);
 
@@ -2373,25 +2653,13 @@ export function MechanismGallery({
         deadkeyName = deadkeyNameFor(triggerKey);
         accentChar = TRIGGER_KEY_CHARS[triggerKey] ?? "";
       }
-      assignment = {
-        scope: "individual",
-        target: currentChar,
-        modality: "physical",
-        mechanisms: [
-          {
-            patternId: PATTERN_DEADKEY,
-            strategyId: "S-02",
-            slotValues: {
-              triggerKey: resolvedTriggerVkey,
-              deadkeyName,
-              baseLetters: base.value,
-              accentedForms: currentChar,
-              accentChar,
-            },
-          },
-        ],
-        source: "user",
-      };
+      assignment = buildDeadkeyAssignment({
+        currentChar,
+        baseLetter: base.value,
+        triggerVkey: resolvedTriggerVkey,
+        deadkeyName,
+        accentChar,
+      });
 
       // S-02 case-pair proposal: the parallel combo case-shifts the BASE
       // LETTER and the OUTPUT only. The trigger key, its deadkey name, and the
@@ -2699,27 +2967,17 @@ export function MechanismGallery({
       const { parallelCombo, counterpart } = proposal;
 
       if (parallelCombo.kind === "deadkey") {
-        const companionAssignment: MechanismAssignment = {
-          scope: "individual",
-          target: counterpart,
-          modality: "physical",
-          mechanisms: [
-            {
-              patternId: PATTERN_DEADKEY,
-              strategyId: "S-02",
-              slotValues: {
-                // Unchanged: the accent key is a selector, not a letter.
-                triggerKey: parallelCombo.triggerKey,
-                deadkeyName: parallelCombo.deadkeyName,
-                accentChar: parallelCombo.accentChar,
-                // Case-shifted: the base letter in, the accented form out.
-                baseLetters: parallelCombo.baseLetter,
-                accentedForms: counterpart,
-              },
-            },
-          ],
-          source: "user",
-        };
+        // Unchanged: the accent key is a selector, not a letter. Case-shifted:
+        // the base letter in, the accented form out. Same shape as
+        // handleApply's manual deadkey Apply and handleSuggestionAccept's
+        // S-02 branch — see buildDeadkeyAssignment.
+        const companionAssignment = buildDeadkeyAssignment({
+          currentChar: counterpart,
+          baseLetter: parallelCombo.baseLetter,
+          triggerVkey: parallelCombo.triggerKey,
+          deadkeyName: parallelCombo.deadkeyName,
+          accentChar: parallelCombo.accentChar,
+        });
         recordAssignments([...sessionAssignments, companionAssignment]);
       } else {
         // The parallel sequence produces the counterpart, so it belongs in the
@@ -3865,28 +4123,50 @@ export function MechanismGallery({
               <Trans id="editor.assignLoop.addAKeyEyebrow">Add a key</Trans>
             </p>
 
-            {/* kbgen suggestion row — shown above method chooser when a
-                  qualifying placement candidate exists and hasn't been dismissed.
-                  [Accept] pre-fills method + key picker; [Change] dismisses the
-                  row so the author can select manually. No kbgen data => null =>
-                  row is absent and gallery behaves exactly as today.
-                  Gate is strictly `(currentCharBadge?.count ?? 0) === 0` — the
-                  suggestion shows ONLY when the character has ZERO recorded
-                  implementations. This subsumes every prior partial gate: a
-                  recorded SEQUENCE (signal (b) SESSION-DIRECT via
-                  `hasSequenceForChar`), COMPOSITION (signal (c),
-                  `currentCharBadge?.isComposable`), AND — the case the old
-                  gate missed — BASE-DIRECT coverage (signal (a),
-                  `baseOnlyProducedSet`), e.g. a character the base keyboard
-                  already produces via an existing rule sequence. Any of
-                  those already gives count >= 1, so count === 0 is exactly
-                  "the badge the author sees is still at zero" — the same
-                  signal driving the green/red badge itself
-                  (charMechanisms.ts), so the suggestion and the badge can
-                  never visibly disagree. */}
-            {suggestion !== null &&
+            {/* kbgen/corpus suggestion row — shown above method chooser when
+                  1-2 ranked, distinct-strategy placement candidates exist and
+                  the row hasn't been dismissed. Each chip has its OWN
+                  independent Accept button (e.g. "RAlt + F" and "Deadkey →
+                  f" both attested for the same codepoint); ONE Deny button
+                  dismisses the whole row (see suggestionDismissed) — see
+                  getRankedSuggestionsForChar. No corpus data => empty array
+                  => row is absent and gallery behaves exactly as today.
+                  Gate: `visibleSuggestions.length > 0` (accepts-kill-each-
+                  other bug fix — see visibleSuggestions/
+                  recordedSuggestionStrategyIds above) AND the char isn't
+                  ALREADY covered by a means unrelated to any offered chip.
+                  Four suppression signals feed that second half:
+                    (a) BASE-DIRECT — `baseOnlyProducedSet`, e.g. a character
+                        the base keyboard already produces via an existing
+                        rule.
+                    (c) COMPOSITION — `currentCharBadge?.isComposable`.
+                    (d) SEQUENCE — `hasSequenceForChar(sessionAssignments,
+                        currentChar)`; a char already covered by a
+                        PATTERN_SEQUENCE combo never enters
+                        `mechanismAssignments` (see excludeSequenceMechanisms),
+                        so without this check the corpus chips would still
+                        render for it.
+                    (e) UNRELATED MANUAL — `hasUnrelatedRecordedMechanism`; the
+                        char has at least one recorded (non-sequence)
+                        mechanism whose strategyId is NOT among this row's
+                        currently-offered chips (e.g. a manually-applied
+                        method the corpus never suggested).
+                  Coverage arising from ACCEPTING one of THIS row's OWN
+                  offered suggestions (signal (b), SESSION-DIRECT) is
+                  deliberately excluded from all of the above — that's
+                  handled per-chip by recordedSuggestionStrategyIds, so
+                  accepting chip A only hides chip A and never suppresses a
+                  still-offered sibling chip B (the accept-independence
+                  contract). hasUnrelatedRecordedMechanism is defined to
+                  agree with this: a recorded mechanism whose strategyId DOES
+                  match an offered chip does not count as "unrelated". */}
+            {visibleSuggestions.length > 0 &&
               !suggestionDismissed &&
-              (currentCharBadge?.count ?? 0) === 0 && (
+              currentChar !== null &&
+              !baseOnlyProducedSet.has(currentChar) &&
+              !(currentCharBadge?.isComposable ?? false) &&
+              !hasSequenceForChar(sessionAssignments, currentChar) &&
+              !hasUnrelatedRecordedMechanism && (
               <div
                 role="note"
                 aria-label={t({
@@ -3894,94 +4174,125 @@ export function MechanismGallery({
                   message: "Placement suggestion from kbgen seeder",
                 })}
                 style={{
-                  // RED, not green — the suggestion row only ever renders
-                  // when currentCharBadge's count is 0 (see the gate above),
-                  // so it always reads as "not yet implemented", matching
-                  // the badge's own 0-count colors (charMechanisms.ts /
-                  // CharScrollStrip.tsx's `ERROR_RED` + its paired dark-red
-                  // background).
-                  background: ERROR_BG,
-                  border: `1px solid ${ERROR_RED}`,
+                  // GREEN, not red — a suggestion is a proposal/affordance
+                  // the author can accept or deny, not an error state. (This
+                  // row used to borrow the badge's 0-count RED/ERROR_RED
+                  // treatment on the theory that it only ever rendered
+                  // alongside a red "not yet implemented" badge — see the
+                  // gate comment above for why that coupling no longer
+                  // holds now that a row can show one remaining chip
+                  // alongside an already-accepted, now-green sibling.) Uses
+                  // the SAME green family as the gallery's other
+                  // proposal/applied-method chips (Applied methods chips
+                  // below, CharScrollStrip's badgeGood treatment) rather
+                  // than a new pair.
+                  background: "#0d2218",
+                  border: "1px solid #238636",
                   borderRadius: 8,
                   padding: "10px 14px",
                   display: "flex",
                   flexDirection: "column",
-                  gap: 8,
+                  gap: 10,
                 }}
               >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 12,
-                    color: ERROR_RED,
-                    fontFamily: FONT,
-                    fontWeight: 600,
-                  }}
-                >
-                  {(() => {
-                    const keyName = suggestion.topCandidate.vkey.replace(
-                      /^K_/,
-                      "",
-                    );
-                    const charOrEmpty =
-                      currentChar !== null ? displayChar(currentChar) : "";
-                    if (suggestion.strategyId === "S-01") {
-                      return t({
-                        id: "editor.assignLoop.suggestion.replaceText",
-                        message: `Suggested: Replace ${keyName} with ${charOrEmpty}`,
-                      });
-                    }
-                    // S-08: derive the label from the candidate's OWN
-                    // modifiers (never hardcode "Right Alt") — reuses the
-                    // shared per-token label table + "+"-joined formatting
+                {visibleSuggestions.map((entry) => {
+                  const keyName = entry.topCandidate.vkey.replace(/^K_/, "");
+                  const charOrEmpty =
+                    currentChar !== null ? displayChar(currentChar) : "";
+                  const comboTokens = suggestionComboTokensFor(entry);
+
+                  let text: string;
+                  let acceptAriaLabel: string;
+                  if (entry.strategyId === "S-01") {
+                    text = t({
+                      id: "editor.assignLoop.suggestion.replaceText",
+                      message: `Suggested: Replace ${keyName} with ${charOrEmpty}`,
+                    });
+                    acceptAriaLabel = t({
+                      id: "editor.assignLoop.suggestion.acceptSwapAriaLabel",
+                      message: `Accept suggestion: assign ${charOrEmpty} to ${entry.topCandidate.vkey}`,
+                    });
+                  } else if (entry.strategyId === "S-08") {
+                    // Derive the label from the candidate's OWN modifiers
+                    // (never hardcode "Right Alt") — reuses the shared
+                    // per-token label table + "+"-joined formatting
                     // (modifierTokenLabel.ts) rather than a second copy, so a
                     // case-pair fallback candidate's ["SHIFT","RALT"] renders
                     // "Shift+RAlt" instead of the plain-RAlt lowercase text.
-                    const modifierLabel = formatModifierCombo(
-                      suggestionComboTokens,
-                    );
-                    return t({
+                    const modifierLabel = formatModifierCombo(comboTokens);
+                    text = t({
                       id: "editor.assignLoop.suggestion.raltText",
                       message: `Suggested: ${modifierLabel} + ${keyName} for ${charOrEmpty}`,
                     });
-                  })()}
-                </p>
+                    acceptAriaLabel = t({
+                      id: "editor.assignLoop.suggestion.acceptRaltAriaLabel",
+                      message: `Accept suggestion: ${modifierLabel} + ${entry.topCandidate.vkey} for ${charOrEmpty}`,
+                    });
+                  } else {
+                    // S-02: corpus-attested deadkey/store-index — named by
+                    // its mechanism ("Deadkey"), consistent with S-01's
+                    // "Replace" and S-08's modifier-combo attribution.
+                    const baseLetter = entry.topCandidate.baseLetter ?? "";
+                    text = t({
+                      id: "editor.assignLoop.suggestion.deadkeyText",
+                      message: `Suggested: Deadkey → ${baseLetter} for ${charOrEmpty}`,
+                    });
+                    acceptAriaLabel = t({
+                      id: "editor.assignLoop.suggestion.acceptDeadkeyAriaLabel",
+                      message: `Accept suggestion: deadkey via base letter ${baseLetter} for ${charOrEmpty}`,
+                    });
+                  }
+
+                  return (
+                    <div
+                      key={entry.strategyId}
+                      style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                    >
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 12,
+                          // Matches the row's own green background/border
+                          // (see the row-container style above) — a
+                          // suggestion is a proposal, not an error.
+                          color: "#56d364",
+                          fontFamily: FONT,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {text}
+                      </p>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Auto-unlock on first edit (mechanism-gallery-
+                            // progression) — see handleUnlock's doc comment.
+                            if (locked) handleUnlock();
+                            handleSuggestionAccept(entry);
+                          }}
+                          aria-label={acceptAriaLabel}
+                          style={{
+                            padding: "5px 14px",
+                            background: "#238636",
+                            border: "none",
+                            borderRadius: 5,
+                            color: "#e6edf3",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            fontFamily: FONT,
+                          }}
+                        >
+                          <Trans id="editor.assignLoop.suggestion.acceptButton">
+                            Accept
+                          </Trans>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Auto-unlock on first edit (mechanism-gallery-
-                      // progression) — see handleUnlock's doc comment.
-                      if (locked) handleUnlock();
-                      handleSuggestionAccept();
-                    }}
-                    aria-label={
-                      suggestion.strategyId === "S-01"
-                        ? t({
-                            id: "editor.assignLoop.suggestion.acceptSwapAriaLabel",
-                            message: `Accept suggestion: assign ${currentChar} to ${suggestion.topCandidate.vkey}`,
-                          })
-                        : t({
-                            id: "editor.assignLoop.suggestion.acceptRaltAriaLabel",
-                            message: `Accept suggestion: ${formatModifierCombo(suggestionComboTokens)} + ${suggestion.topCandidate.vkey} for ${currentChar}`,
-                          })
-                    }
-                    style={{
-                      padding: "5px 14px",
-                      background: "#238636",
-                      border: "none",
-                      borderRadius: 5,
-                      color: "#e6edf3",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      fontFamily: FONT,
-                    }}
-                  >
-                    <Trans id="editor.assignLoop.suggestion.acceptButton">
-                      Accept
-                    </Trans>
-                  </button>
                   <button
                     type="button"
                     onClick={handleSuggestionChange}

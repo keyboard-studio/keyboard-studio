@@ -18,9 +18,65 @@
 # tiers -- five source catalogs, not one. Anything reasoning about its blast
 # radius should read crowdin.yml, not this header.
 #
-# Requires the repo setting "Allow GitHub Actions to create and approve pull
-# requests" (Settings > Actions > General) -- the job's own contents/pull-
-# requests write permissions aren't sufficient without it.
+# TOKEN: this job opens its PR with a PAT (repo secret L10N_PR_TOKEN), not the
+# built-in GITHUB_TOKEN. Same pattern, and the same shape of reason, as
+# project-status-sync.yml's PROJECT_SYNC_TOKEN. Two independent causes, either
+# of which alone would justify it:
+#
+#   1. GITHUB_TOKEN cannot open a PR unless the repo setting "Allow GitHub
+#      Actions to create and approve pull requests" (Settings > Actions >
+#      General) is enabled, and that setting is repo-ADMIN-only. Every run of
+#      this workflow from its first on 2026-07-22 died at CREATE PULL REQUEST
+#      with a 403 for exactly this reason -- 16 consecutive failures.
+#
+#   2. The one that actually matters: a PR opened with GITHUB_TOKEN does NOT
+#      trigger any workflow. GitHub suppresses that to prevent recursion. ci.yml
+#      runs `build` on pull_request, and utilities/i18n-collapse-guard runs
+#      inside `build` (via the two catalog lints in `pnpm lint`). So a
+#      GITHUB_TOKEN-opened PR would arrive with no checks, a required status that
+#      can never go green, and -- worse -- the collapse guard never executing at
+#      all. Enabling the admin setting on its own would produce an unmergeable
+#      translation PR with the safety net switched off.
+#
+# A PAT fixes both: no repo setting needed, and the PR it opens triggers CI like
+# any human's. Cost: the PR is authored by the token's owner rather than
+# github-actions[bot], and someone has to own a long-lived credential. Scope
+# needed is `repo` on this repository.
+#
+# NORMALIZE STEP AND WHY DOWNLOAD/PUSH ARE SPLIT INTO SEPARATE STEPS: Tier B
+# (content/i18n/<locale>/*.json) needs a genuinely-untranslated key to arrive
+# as "", not as English source text -- packages/studio/src/lib/contentI18n.ts's
+# resolveContentString() falls back to English at render time only when the
+# stored value is empty, and content-i18n-lint's collapse guard fails a
+# catalog whose values are (mostly or entirely) byte-identical to English (see
+# #1489, and PR #1498 which tripped it for real: fr/patterns.json and
+# fr/adaptationQuestions.json had never been translated in Crowdin at all).
+# Tier A (packages/studio/src/locales/*/messages.json) needs the opposite --
+# English source text, because Lingui has no such runtime fallback and
+# skip_untranslated_strings: true DELETES the key outright for this project's
+# JSON format rather than emitting it empty (measured 2026-08-05, see the note
+# on that setting below). One Crowdin setting can't give the two tiers
+# opposite representations, so utilities/content-i18n-normalize rewrites Tier B
+# only, after download and before commit -- it turns any target value that is
+# byte-identical to its English source back into "".
+#
+# That normalize step has to run BETWEEN the Crowdin download and the git
+# commit/push/PR-open, which is why those two used to be one `crowdin/
+# github-action` step and now are not: that action's own entrypoint script
+# nests its push+create-PR logic INSIDE the same shell conditional as its
+# download call (`if download_translations; then crowdin download; if
+# push_translations; then <commit, force-push, open PR>; fi; fi` --
+# verified against crowdin/github-action's entrypoint.sh), so push_translations
+# cannot be deferred to a second invocation of the action: setting
+# download_translations: false on a second call skips that whole block,
+# including the push. The action still does the actual Crowdin API download
+# below (auth, crowdin.yml parsing, file writing -- not something worth
+# hand-rolling); only the commit/force-push/PR-open steps that follow are
+# now plain git + gh, so the normalize step can run in between. They
+# replicate that entrypoint's semantics: base the localization branch off its
+# existing origin tip when present (else fresh), skip everything when nothing
+# changed, and skip PR creation when one is already open for that branch
+# (`create_pull_request()` does the same open-PR check before creating).
 
 name: Crowdin download translations
 
@@ -32,6 +88,9 @@ on:
 jobs:
   download:
     runs-on: ubuntu-latest
+    # These govern the BUILT-IN GITHUB_TOKEN, which actions/checkout still uses
+    # for the initial clone. Every git/PR write in this job (commit, force-push,
+    # gh pr create) uses the PAT below instead -- see the TOKEN note in the header.
     permissions:
       contents: write
       pull-requests: write
@@ -40,6 +99,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Fail here, loudly and by name, rather than letting the crowdin action die
+      # deep in its own CREATE PULL REQUEST step with an opaque auth error that
+      # looks identical to the 403 this token exists to avoid. Read into an env
+      # var rather than interpolated into the script body, so the secret is never
+      # expanded onto a command line.
+      - name: Require L10N_PR_TOKEN
+        env:
+          L10N_PR_TOKEN: ${{ secrets.L10N_PR_TOKEN }}
+        run: |
+          if [ -z "$L10N_PR_TOKEN" ]; then
+            echo "[ERROR] Repo secret L10N_PR_TOKEN is not set."
+            echo "[ERROR] This job needs a PAT with 'repo' scope to open its PR."
+            echo "[ERROR] See the TOKEN note at the top of this workflow file."
+            exit 1
+          fi
+          echo "[OK] L10N_PR_TOKEN is present."
+
+      # push_translations/create_pull_request are deliberately false here --
+      # see the NORMALIZE STEP note in the file header. This call only writes
+      # files into the current (main) checkout; nothing is committed yet.
       - name: Download translations from Crowdin
         uses: crowdin/github-action@v2
         with:
@@ -47,17 +126,87 @@ jobs:
           upload_sources: false
           upload_translations: false
           download_translations: true
-          push_translations: true
-          # Must match crowdin.yml -- this action input overrides the config
-          # file, so leaving it `false` here would silently undo the setting
-          # there. See the long note in crowdin.yml for why it is `true`:
-          # `false` returns English source text for every untranslated string.
-          skip_untranslated_strings: true
-          create_pull_request: true
-          localization_branch_name: l10n_crowdin_action
-          pull_request_title: "chore(process): sync Crowdin translations"
-          pull_request_body: "Automated translation sync from the Crowdin project (Tier A studio UI catalog). Generated by crowdin-download-translations.yml (spec 046 T038)."
+          push_translations: false
+          create_pull_request: false
+          # Must match crowdin.yml -- this action input overrides the config file,
+          # so a mismatch here silently defeats the setting there. Read the long
+          # note in crowdin.yml before changing it: `true` DELETES untranslated
+          # keys (measured 2026-08-05: fr/messages.json 1201 -> 918, fr/patterns
+          # .json 97 -> `{}`), which breaks the key-set parity the loaders need.
+          skip_untranslated_strings: false
+          # This action's container runs as root by default, so the files it
+          # writes come out root-owned on the runner's filesystem. That was
+          # invisible before this PR -- the SAME container did the git
+          # add/commit/push too, as root throughout. Now the normalize step
+          # after it runs as the ordinary (non-root) runner user, which
+          # cannot write a root-owned file: EACCES (measured 2026-08-05,
+          # workflow run 31025433620). "auto" re-execs the download as
+          # whichever uid:gid already owns the checked-out workspace instead.
+          user: "auto"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CROWDIN_PROJECT_ID: ${{ secrets.CROWDIN_PROJECT_ID }}
           CROWDIN_PERSONAL_TOKEN: ${{ secrets.CROWDIN_PERSONAL_TOKEN }}
+
+      # Turns any Tier B (content/i18n/<locale>/*.json) value that came back
+      # byte-identical to its English source back into "" -- see the
+      # NORMALIZE STEP note in the file header. Tier A's messages.json is
+      # never touched by this script.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: "Normalize Tier B catalogs collapsed into English (#1458, #1489)"
+        run: node utilities/content-i18n-normalize/index.js
+
+      # Replaces the crowdin/github-action's own push_translations +
+      # create_pull_request steps (see the NORMALIZE STEP note in the file
+      # header for why those can't run after a step of ours). Mirrors that
+      # action's entrypoint.sh: base the branch off its existing origin tip
+      # when present, no-op when the download+normalize produced no diff, and
+      # skip creating a PR when one is already open for this branch.
+      - name: Commit, force-push, and open the sync PR
+        env:
+          # The PAT, not secrets.GITHUB_TOKEN -- see the TOKEN note in the header.
+          # Swapping this back to GITHUB_TOKEN silently disables CI on the PR this
+          # job opens, which disables the collapse guard with it.
+          GH_TOKEN: ${{ secrets.L10N_PR_TOKEN }}
+          BRANCH: l10n_crowdin_action
+        run: |
+          set -euo pipefail
+
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "NOTHING TO COMMIT"
+            exit 0
+          fi
+
+          # Read the PR body BEFORE switching branches. .github/workflows/
+          # crowdin-sync-pr-body.md is an unmodified tracked file -- the
+          # checkout below replaces every unmodified path with the target
+          # branch's version, and l10n_crowdin_action's existing tip predates
+          # this file. --body-file would then read a path that no longer
+          # exists on disk. A variable has no such dependency on what's
+          # currently checked out.
+          PR_BODY="$(cat .github/workflows/crowdin-sync-pr-body.md)"
+
+          git config user.name "l10n-crowdin-sync"
+          git config user.email "l10n-crowdin-sync@users.noreply.github.com"
+
+          git fetch origin "$BRANCH" 2>/dev/null || true
+          git checkout -B "$BRANCH" "origin/$BRANCH" 2>/dev/null || git checkout -B "$BRANCH"
+
+          git add -A
+          git commit --no-verify -m "chore(process): sync Crowdin translations"
+          git push --no-verify --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$BRANCH"
+
+          open_count=$(gh pr list --head "$BRANCH" --state open --json number --jq 'length')
+          if [ "$open_count" -gt 0 ]; then
+            echo "PULL REQUEST ALREADY EXISTS"
+            exit 0
+          fi
+
+          gh pr create \
+            --title "chore(process): sync Crowdin translations" \
+            --base main \
+            --head "$BRANCH" \
+            --body "$PR_BODY"

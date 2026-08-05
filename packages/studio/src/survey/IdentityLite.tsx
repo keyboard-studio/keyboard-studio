@@ -11,11 +11,8 @@ import type { SurveyPhaseResult, LintFinding, LangtagsProvenance, LanguageDefaul
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { loadModularFlow } from "./loadModularFlow.ts";
 import type { SurveyContext, FlowOption } from "./types.ts";
-import {
-  deriveScriptPrefill,
-  normalizeTargetScript,
-  type ScriptPrefill,
-} from "../lib/scriptAxes.ts";
+import { deriveScriptPrefill, normalizeTargetScript } from "../lib/scriptAxes.ts";
+import type { IdentityLiteResult } from "./identityLiteResult.ts";
 import {
   loadLangtags,
   getLoadedLangtags,
@@ -38,40 +35,11 @@ const LANGTAGS_CAPTION = msg({
   message: "Suggested from langtags — edit if needed",
 });
 
-/** Typed result of the identity-lite step. */
-export interface IdentityLiteResult {
-  /** Language name in its own script (autonym). */
-  autonym: string;
-  /** Language name in English. */
-  english: string;
-  /**
-   * ISO 639 language subtag entered by the author (e.g. "ha", "hi", "fr").
-   * Empty string when the author left the field blank.
-   * Region and variant refinement are deferred to the documentation stage (§8).
-   */
-  languageSubtag: string;
-  /**
-   * Region subtag chosen at `il_language_region` (spec 030 US3), e.g. "DJ".
-   * Empty string when the language was unambiguous by region, the step was
-   * skipped, or the entered value was not a shape-valid BCP47 region subtag
-   * (normalized via `normalizeRegionSubtag`). Folded into `bcp47` at the
-   * region position.
-   */
-  region: string;
-  /** Raw `il_target_script` answer (e.g. "Latn", "romanization-Latn", "fonipa"). */
-  targetScriptRaw: string;
-  /**
-   * Full BCP47 target tag combining language subtag + normalized script/variant,
-   * e.g. "ha-Latn", "hi-Deva", "fr-Latn", "und-fonipa".
-   * Empty string when `languageSubtag` was left blank — `suggestBases()` falls
-   * back to script-match ranking in that case.
-   */
-  bcp47: string;
-  /** Whether the chosen target script is supported in v1. */
-  supported: boolean;
-  /** Routing/A2 prefill confirmations derived from the target script (spec §5). */
-  prefill: ScriptPrefill;
-}
+// `IdentityLiteResult` lives in its own type-only leaf module so the
+// survey-session store can name it without closing an import cycle through this
+// component — see identityLiteResult.ts's header. Re-exported here because this
+// is where every existing call site imports it from.
+export type { IdentityLiteResult };
 
 /**
  * Build the full BCP47 target tag from an ISO 639 language subtag and a raw

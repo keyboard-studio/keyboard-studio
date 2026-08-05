@@ -25,8 +25,9 @@ import type {
   MechanismAssignment,
   IRGroup,
   IRRule,
+  PlacementMap,
 } from "@keyboard-studio/contracts";
-import { createVirtualFS } from "@keyboard-studio/contracts";
+import { createVirtualFS, toUPlusNotation } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
@@ -5120,5 +5121,130 @@ describe("TouchGallery — host-key label casing in the UI (spec 051 FR-013)", (
     expect(screen.getByText(/Suggested: long-press/i).textContent).toMatch(
       /long-press a to reach/i,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Corpus longpress-host tie-breaker (placement-priors v2's PlacementMap.touch)
+// —  fires ONLY when the NFD-decomposition path finds nothing; NFD stays
+// authoritative. See touchCorpusFallbackHostKey in TouchGallery.tsx.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — corpus longpress-host tie-breaker (placement-priors v2)", () => {
+  it("fires a longpress suggestion for a plain, non-decomposable char with no desktop assignment, when placementMap.touch attests a host", async () => {
+    // "中" has no Phase C desktop assignment, is not in the default touch
+    // layout, and is not decomposable-accented — the NFD path finds nothing,
+    // so today (no placementMap) it goes straight to the method chooser (see
+    // the "custom host-key option" describe block above). With a
+    // placementMap carrying a `touch` entry for its codepoint, the tie-
+    // breaker now surfaces a longpress suggestion instead.
+    seedStore({ withInventory: ["中"] });
+    const placementMap: PlacementMap = {
+      entries: [],
+      touch: [
+        {
+          codepoint: toUPlusNotation("中"),
+          hosts: [{ vkey: "K_A", layerClass: "default", priorCount: 3 }],
+        },
+      ],
+    };
+    await act(async () => {
+      render(
+        <TouchGallery onComplete={vi.fn()} onBack={vi.fn()} placementMap={placementMap} />,
+      );
+    });
+
+    expect(screen.getByText(/Suggested: long-press/i)).toBeTruthy();
+  });
+
+  it("accepting the corpus tie-breaker suggestion records a longpress_alternates mechanism on the corpus-attested host", async () => {
+    seedStore({ withInventory: ["中"] });
+    const placementMap: PlacementMap = {
+      entries: [],
+      touch: [
+        {
+          codepoint: toUPlusNotation("中"),
+          hosts: [{ vkey: "K_A", layerClass: "default", priorCount: 3 }],
+        },
+      ],
+    };
+    await act(async () => {
+      render(
+        <TouchGallery onComplete={vi.fn()} onBack={vi.fn()} placementMap={placementMap} />,
+      );
+    });
+
+    const acceptBtn =
+      screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Accept") ?? null;
+    expect(acceptBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(acceptBtn!);
+    });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const entry = draft?.charTouchEntries.find(([c]) => c === "中");
+    expect(entry?.[1]?.mechanisms.map((m) => m.patternId)).toEqual([
+      "longpress_alternates",
+    ]);
+    expect(entry?.[1]?.mechanisms[0]?.slotValues?.["hostKey"]).toBe("K_A");
+  });
+
+  it("NFD stays authoritative: a decomposable-accented char ignores the corpus host and keeps its own NFD-derived host", async () => {
+    // "ä" decomposes to base "a" -> K_A (see the FR-013 casing suite above).
+    // A placementMap.touch entry offering a DIFFERENT host (K_Z) for the SAME
+    // codepoint must be ignored — NFD wins whenever it resolves.
+    seedStore({ withInventory: ["ä"] });
+    const placementMap: PlacementMap = {
+      entries: [],
+      touch: [
+        {
+          codepoint: toUPlusNotation("ä"),
+          hosts: [{ vkey: "K_Z", layerClass: "default", priorCount: 9 }],
+        },
+      ],
+    };
+    await act(async () => {
+      render(
+        <TouchGallery onComplete={vi.fn()} onBack={vi.fn()} placementMap={placementMap} />,
+      );
+    });
+
+    expect(screen.getByText(/Suggested: long-press/i).textContent).toMatch(
+      /long-press a to reach/i,
+    );
+    expect(screen.getByText(/Suggested: long-press/i).textContent).not.toMatch(
+      /long-press z to reach/i,
+    );
+  });
+
+  it("no suggestion when placementMap has no touch entry for the current codepoint", async () => {
+    seedStore({ withInventory: ["中"] });
+    const placementMap: PlacementMap = {
+      entries: [],
+      touch: [
+        {
+          codepoint: toUPlusNotation("x"),
+          hosts: [{ vkey: "K_X", layerClass: "default", priorCount: 3 }],
+        },
+      ],
+    };
+    await act(async () => {
+      render(
+        <TouchGallery onComplete={vi.fn()} onBack={vi.fn()} placementMap={placementMap} />,
+      );
+    });
+
+    expect(screen.queryByText(/Suggested: long-press/i)).toBeNull();
+    // Falls through to the method chooser directly, same as no placementMap.
+    expect(screen.queryByRole("button", { name: /host key/i })).not.toBeNull();
+  });
+
+  it("no suggestion when placementMap is absent (unchanged baseline behavior)", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expect(screen.queryByText(/Suggested: long-press/i)).toBeNull();
   });
 });

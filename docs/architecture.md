@@ -69,6 +69,25 @@ one persistent working copy.
   code [`packages/studio/src/components/StepHost.tsx`](../packages/studio/src/components/StepHost.tsx),
   [`survey/FlowStepHost.tsx`](../packages/studio/src/survey/FlowStepHost.tsx)
 
+- **Location spine (spec 057).** Where the author *is* — tab, step, question —
+  is held in one addressable model, not in component lifetime. The hash grammar
+  is `#route[/step[/question]]`
+  ([`lib/location.ts`](../packages/studio/src/lib/location.ts)); a pure resolver
+  answers whether a location can be honoured and, if not, which of five closed
+  reasons applies ([`lib/resolveLocation.ts`](../packages/studio/src/lib/resolveLocation.ts));
+  and ONE jump primitive
+  ([`lib/jumpToLocation.ts`](../packages/studio/src/lib/jumpToLocation.ts))
+  either arrives or refuses — never partially arrives. `navigateTo()` remains
+  the only writer of `window.location.hash`; the `Location` overload widened its
+  vocabulary without adding a second router.
+
+  The defect this replaced is worth remembering, because it is the shape the
+  spine exists to prevent: `SurveyView` reset the traversal store on mount, so
+  a route change — which unmounts and remounts it — silently restarted the
+  walk while the working-copy store beside it kept every answer. Position was
+  modelled as component lifetime; content was not.
+  → [`specs/057-bulletproof-navigation/`](../specs/057-bulletproof-navigation/spec.md)
+
 ## The meta-flow (end to end)
 
 The application is a pipeline, not a set of independent features. One pass,

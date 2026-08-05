@@ -225,7 +225,17 @@ describe("makeFlowStepComponent", () => {
       // R7: onCommit fires before onComplete (state mutations before navigation).
       expect(callOrder).toEqual(["onCommit", "onComplete"]);
       expect(mockSetSelectedTrack).toHaveBeenCalledWith("copy");
-      expect(onCompleteSpy).toHaveBeenCalledWith({ track: "copy" });
+      // onComplete receives the UNTOUCHED SurveyPhaseResult, not the extracted
+      // `{ track: "copy" }` — StepHost's generic completion path (recordPhase /
+      // recordStepCompletion / advance) needs the real, answers-bearing result.
+      // `extract()`'s reshaping is for this factory's own onCommit effects only
+      // (see the mock FlowStepHost's "fsh-complete" button above for the exact
+      // shape the real runner hands back).
+      expect(onCompleteSpy).toHaveBeenCalledWith({
+        phase: "G",
+        answers: [{ questionId: "track_choice", answerType: "select", value: "copy" }],
+        confirmedInventory: [],
+      });
     });
 
     it("stays on step (no onComplete call) when extract returns undefined", async () => {

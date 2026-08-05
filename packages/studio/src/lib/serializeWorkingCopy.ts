@@ -13,7 +13,7 @@
 //   5. Pass the projected VFS to toZip (via getToZip service accessor).
 //   6. Return { bytes, warnings, keyboardId } so the caller can surface warnings.
 //
-// Entry point for PreviewShell.handleDownload and any other download / output
+// Entry point for OutputScreen's download and any other download / output
 // trigger. If the working copy is not instantiated (baseVfs === null),
 // serializeWorkingCopy returns null so the caller can show a "nothing to download"
 // state.
@@ -25,7 +25,8 @@ import { getToZip, getPatternLibraryService } from "./services.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
-import { bumpKeyboardVersion, stageAdaptHistory } from "@keyboard-studio/engine";
+import { resolveOutputKeyboardId } from "./outputKeyboardId.ts";
+import { bumpKeyboardVersion, generateStubs, stageAdaptHistory } from "@keyboard-studio/engine";
 import { readVfsText } from "./vfsText.ts";
 import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
 
@@ -36,7 +37,14 @@ import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
 export interface SerializeWorkingCopyResult {
   /** Raw zip bytes, ready for a Blob / URL.createObjectURL / download link. */
   bytes: Uint8Array;
-  /** Warnings from projection steps (carve, assignments, identity). May be empty. */
+  /**
+   * Warnings from projection steps (carve, assignments, identity, package
+   * descriptor). May be empty.
+   *
+   * The descriptor's own warnings ride here so a failure to write the author's
+   * identity into the `.kps` is NAMED on the download path rather than silent
+   * (spec 057 FR-006 / US3-3).
+   */
   warnings: string[];
   /** The keyboard id resolved from the store (for the filename). */
   keyboardId: string;
@@ -71,6 +79,30 @@ export interface ProjectWorkingCopyForOutputResult {
   warnings: string[];
 }
 
+/**
+ * Options for {@link projectWorkingCopyForOutput}.
+ *
+ * Added by spec 057 (FR-010). The counterfactual that attributes a
+ * pre-instantiation identity decision needs two projections differing in exactly
+ * one identity value, and FR-010 requires BOTH sides to come from the function
+ * that produces the shipped keyboard — building either side from the codec emitter
+ * would satisfy the type and violate SC-005.
+ */
+export interface ProjectForOutputOptions {
+  /**
+   * Fields merged OVER the store's identity overlay for this call only.
+   *
+   * A PURE INPUT: the store is read as it stands and never written. That matters
+   * for more than tidiness — mutating shared state to answer a read-only question
+   * would make the trail's own rendering depend on the order rows were expanded
+   * in, and would breach the single-working-copy rule (Constitution Article III).
+   *
+   * An explicitly `undefined` value in the override REMOVES that field from the
+   * overlay, which is how "what if the author had left this blank?" is expressed.
+   */
+  identityOverride?: Partial<IdentityOverlay>;
+}
+
 // ---------------------------------------------------------------------------
 // Implementation
 // ---------------------------------------------------------------------------
@@ -94,7 +126,9 @@ export interface ProjectWorkingCopyForOutputResult {
  *   0. Touch layout (Phase E touchLayoutJson → .keyman-touch-layout)
  *   1. Carve deletions (+ 1.5 carve keycaps, 1.6 touch method deletions)
  *   2. Assignments (physical only)
- *   3. Identity (&NAME)
+ *   3. Identity (&NAME) — and 3.6, the package descriptor's declared language
+ *      and display name (spec 057). The descriptor is written THERE, not here, so
+ *      the OSK preview sees the same one the zip and the pull request do.
  *
  * This is the same order used by {@link useWorkingCopyTransform} (the OSK
  * preview hook), enforced by both callers delegating to the same
@@ -104,7 +138,9 @@ export interface ProjectWorkingCopyForOutputResult {
  * @see useWorkingCopyTransform — the hook that uses the same helper for the OSK preview
  * @see serializeWorkingCopy — wraps this and zips the result for download
  */
-export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyForOutputResult | null> {
+export async function projectWorkingCopyForOutput(
+  opts?: ProjectForOutputOptions,
+): Promise<ProjectWorkingCopyForOutputResult | null> {
   // 1. Read current working-copy store state.
   const state = useWorkingCopyStore.getState();
   const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode } = state;
@@ -121,7 +157,7 @@ export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyF
   // `.kmw-keyboard-<baseId>` selectors in *.css plus <ID> / <kbdname>
   // references in *.kps and *.kvks.
   const keyboardId = baseKeyboard.id;
-  const outputKeyboardId = identity?.keyboardId ?? keyboardId;
+  const outputKeyboardId = resolveOutputKeyboardId(identity, baseKeyboard);
 
   // Keyboard release version for the `<id>-<version>.zip` filename. baseIr.header.version
   // carries &KEYBOARDVERSION on import (codec/parse prefers it over &VERSION) and the
@@ -187,9 +223,15 @@ export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyF
   // passed separately as `targetKeyboardId` to `projectWorkingCopyVfs` (not
   // dropped by accident). The rename pass runs there when targetKeyboardId
   // differs from keyboardId.
+  //
+  // `languageName` joins the mapped fields for spec 057: the descriptor's
+  // `<Language>` display text comes through the overlay like every other identity
+  // value, so the zip, the pull request, and the OSK preview cannot disagree
+  // about it (FR-004/SC-005).
   let identityForProjection: IdentityOverlay | null = identity !== null ? {
     ...(identity.displayName !== undefined ? { displayName: identity.displayName } : {}),
     ...(identity.bcp47 !== undefined ? { bcp47: identity.bcp47 } : {}),
+    ...(identity.languageName !== undefined ? { languageName: identity.languageName } : {}),
   } : null;
   // Accumulated warnings for the adapt path — merged with projection warnings below.
   const adaptWarnings: string[] = [];
@@ -210,10 +252,23 @@ export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyF
     // tag before the <Version> match, so a stray top-level <Version> (e.g. under
     // <Info> or <FileVersion>) is not touched.
     //
-    // buildKpsContent (scaffolder) always emits exactly one <Keyboards> block
-    // with exactly one <Keyboard> child and one <Version>. Imported keyboards
-    // that share this shape are patched; those that don't (unusual/legacy layouts)
-    // emit a warning so the user knows the .kmn and .kps versions may differ.
+    // buildKpsContent (the shared package-descriptor writer) always emits exactly
+    // one <Keyboards> block with exactly one <Keyboard> child and one <Version>.
+    // Imported keyboards that share this shape are patched; those that don't
+    // (unusual/legacy layouts) emit a warning so the user knows the .kmn and .kps
+    // versions may differ.
+    //
+    // THE ABSENT CASE IS NOT A FAILURE HERE, and the comment that used to claim
+    // "Track 2 imports an existing keyboard that will have a .kps already" was
+    // simply wrong: `fetchKeyboardSourceToVfs` deliberately does not fetch the
+    // base's raw `.kps`, so on the adapt track there is usually nothing to patch
+    // at this point. That silent no-op was invisible for as long as it was because
+    // no descriptor was ever written at all. Now the projection's step 3.6
+    // GENERATES the descriptor further down (spec 057 FR-006), and it is handed
+    // `identity.version` — the bumped value set just below — so the descriptor and
+    // the `.kmn` agree by construction rather than by this patch (FR-008).
+    // Warning on absence here would therefore report a problem that no longer
+    // exists.
     const kpsPath = `source/${keyboardId}.kps`;
     const kpsText = readVfsText(clonedVfs, kpsPath);
     if (kpsText !== undefined) {
@@ -244,6 +299,26 @@ export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyF
     };
   }
 
+  // 4b. spec 057 FR-010: merge the caller's identity override, for this call only.
+  //
+  // Applied LAST so it wins over both the store's overlay and the adapt path's
+  // bumped version, and applied with `hasOwnProperty` semantics so an explicitly
+  // `undefined` field REMOVES it — "what if this had been left blank?" is a real
+  // question the counterfactual asks. A plain spread would keep the store's value
+  // for an explicit `undefined`, which would silently compare a value against
+  // itself and report that the decision changed nothing.
+  if (opts?.identityOverride !== undefined) {
+    const merged: IdentityOverlay = { ...(identityForProjection ?? {}) };
+    for (const [key, value] of Object.entries(opts.identityOverride)) {
+      if (value === undefined) {
+        delete merged[key as keyof IdentityOverlay];
+      } else {
+        merged[key as keyof IdentityOverlay] = value;
+      }
+    }
+    identityForProjection = merged;
+  }
+
   // 5. Project the working copy onto the cloned VFS. targetKeyboardId triggers
   //    the final rename pass when the author picked a different id.
   const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs({
@@ -270,6 +345,30 @@ export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyF
   // useKeyboardArtifact's compile-id derivation reading from the same
   // contract instead of two hand-maintained copies of the same rule.
   const resolvedKeyboardId = effectiveKeyboardId ?? keyboardId;
+
+  // 5b. Track 1 (new-from-base) output-only completion: fill in any scaffold
+  //     stub files the working copy never received — most importantly the
+  //     `.kps` package. fetchKeyboardSourceToVfs deliberately never writes the
+  //     base's .kps into the VFS (it references compiled ../build/* artifacts),
+  //     and whether the SCAFFOLDED artifact (which does carry a generated .kps)
+  //     ever replaces the open-base VFS in the store is a compile-settle race
+  //     the commit seam intentionally runs only once per base id
+  //     (StudioShell's instantiatedForBaseIdRef). A downloaded keyboard must
+  //     be a submittable directory regardless of which artifact won (spec §12),
+  //     so complete it here. generateStubs only fills MISSING entries — every
+  //     fetched or projected file is left untouched. Scoped to new-from-base:
+  //     Track 2 (adapt-existing) imports a real keyboard whose package
+  //     fidelity is its own concern — a freshly generated stub .kps would
+  //     silently mask the original package's metadata there.
+  if (instantiationMode === "new-from-base") {
+    generateStubs(
+      clonedVfs,
+      resolvedKeyboardId,
+      identity?.displayName ?? baseKeyboard.displayName,
+      identity?.bcp47 !== undefined ? [identity.bcp47] : (baseKeyboard.languages ?? []),
+      version,
+    );
+  }
 
   // 6. Merge the adapt-path warnings (HISTORY/.kps staging) with the projection
   //    warnings. Both output paths (zip + PR) surface the same set.
@@ -303,7 +402,7 @@ export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyF
  * pure helper the GitHub fork+PR path consumes), then serializes the projected
  * VFS to zip via the toZip service accessor. The public return shape
  * ({@link SerializeWorkingCopyResult}) is a superset of the projection metadata
- * plus the zip bytes — PreviewShell, the existing tests, and the
+ * plus the zip bytes — OutputScreen, the existing tests, and the
  * `<id>-<version>.zip` filename all depend on the `version` field.
  *
  * @see projectWorkingCopyForOutput — the projection helper (returns the VFS)

@@ -103,8 +103,22 @@ export { recognizePatterns, classifyRemovalCapabilities } from "./recognizer/ind
 export type { RecognizerRule, MatchResult, RecognizeResult } from "./recognizer/index.js";
 export { isParallelIndexFanOut } from "./recognizer/rules/parallel-index-fanout.js";
 
+// spec 057 — the single package-descriptor writer. Both authoring tracks reach
+// `source/<id>.kps` through this module and nowhere else (FR-005).
+export {
+  buildKpsContent,
+  buildLanguageElement,
+  buildLanguagesBlock,
+  applyIdentityToKps,
+  DESCRIPTOR_CONSUMED_FIELDS,
+} from "./package-descriptor/index.js";
+export type {
+  PackageDescriptorIdentity,
+  ApplyIdentityToKpsResult,
+} from "./package-descriptor/index.js";
+
 // Issue #19 — scaffolder (template-cleanup pipeline).
-export { createScaffolderService, renameFilesInVfs } from "./scaffolder/index.js";
+export { createScaffolderService, renameFilesInVfs, generateStubs } from "./scaffolder/index.js";
 export { scaffoldIR, resetIdentity } from "./scaffolder/scaffold-ir.js";
 export {
   scaffoldTouchLayout,

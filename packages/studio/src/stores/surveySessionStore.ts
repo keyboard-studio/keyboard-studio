@@ -32,13 +32,19 @@
 
 import { create } from "zustand";
 import type { BaseKeyboard, SurveyPhaseResult } from "@keyboard-studio/contracts";
-// Imported directly from the leaf modules (IdentityLite.tsx / types.ts), NOT
-// from the survey/index.ts barrel — that barrel re-exports PhaseB.tsx at
-// runtime, and PhaseB.tsx now imports this store at runtime too (the Phase B
-// character-map pane work), so a type-only import from the barrel here would
-// close a runtime dependency cycle (depcruise no-circular). See survey/types.ts's
-// Track docstring for the full story.
-import type { IdentityLiteResult } from "../survey/IdentityLite.tsx";
+// Imported directly from TYPE-ONLY LEAF modules (identityLiteResult.ts /
+// types.ts), NOT from the survey/index.ts barrel — that barrel re-exports
+// PhaseB.tsx at runtime, and PhaseB.tsx now imports this store at runtime too
+// (the Phase B character-map pane work), so a type-only import from the barrel
+// here would close a runtime dependency cycle (depcruise no-circular). See
+// survey/types.ts's Track docstring for the full story.
+//
+// `identityLiteResult.ts` rather than `IdentityLite.tsx`: SurveyRunner now reads
+// `activeStepId` from this store (to know which step's walk it publishes — see
+// lib/stepWalk.ts), and IdentityLite.tsx renders SurveyRunner, so importing the
+// component module here would close the loop even for a type. That extracted
+// leaf has no runtime dependencies at all.
+import type { IdentityLiteResult } from "../survey/identityLiteResult.ts";
 import type { SurveyContext, Track } from "../survey/types.ts";
 import type { ScaffoldSpec } from "../hooks/useKeyboardArtifact.ts";
 // Runtime import of the sibling store (one-directional: workingCopyStore.ts
@@ -323,6 +329,27 @@ export interface SurveySessionState {
   popHistory: () => void;
 
   /**
+   * Land directly on a step the author has ALREADY walked (spec 057 FR-045).
+   *
+   * The many-step counterpart of `popHistory`: instead of consuming one entry
+   * it consumes every entry after the target, so `history` still describes the
+   * true walked path from the landing point. `lastNavigation` is `"pop"`,
+   * which is what keeps the browser-history bridge from pushing an entry for a
+   * move the browser did not make.
+   *
+   * DELIBERATELY BACKWARD-ONLY. A target that is neither the current step nor
+   * present in `history` is a no-op, so this action can never skip a lock or a
+   * gate the walk enforces — forward jumps are refused upstream by
+   * `resolveLocation`'s `beyond-gate`, and this is the second line of that
+   * same rule rather than a place it could be bypassed.
+   *
+   * FR-063: this truncates `history`, not progress. The footer's completed
+   * dots come from the decision record, so jumping back leaves every dot
+   * ahead of the landing point exactly where it was.
+   */
+  jumpToStep: (target: ActiveStepId) => void;
+
+  /**
    * Special-case back-navigation for the touch step's "Back from the very
    * first character" affordance (spec 035 R12 re-entry path). The generic
    * `popHistory` follows the walked-history stack, which lands on
@@ -379,6 +406,38 @@ export interface SurveySessionState {
    * `popHistory`'s empty-history guard) — still honors the caller's target.
    */
   backToUnfinishedGallery: (target: "mechanisms" | "touch") => void;
+
+  /**
+   * "Change the base keyboard" action (spec 058) — OutputScreen's escape hatch
+   * once a working copy exists. Routes the author back to the `choose_base`
+   * step instead of re-basing in place from the ship-it screen.
+   *
+   * Why this action rather than a plain `advance("choose_base")`: like the two
+   * back-primitives above this is conceptually a BACK, and a forward push
+   * would leave every step between `choose_base` and wherever the author was
+   * sitting on the stack — a later ordinary Back would then walk forward
+   * through the survey it just left. `choose_base` is also not the immediate
+   * predecessor, so `popHistory` cannot express it: this rewinds to the prefix
+   * of `history` that was walked BEFORE `choose_base` (typically just
+   * "identity"), so Back from the picker lands where it did the first time
+   * through and nothing at-or-after the picker survives. Sanitizes first, for
+   * the same persisted-stale-"help" reason as the primitives above.
+   *
+   * Also clears `baseConfirmed`. That flag arms StudioShell's
+   * single-instantiation effect (see StudioShell.tsx — the effect commits as
+   * soon as a compile settles for the confirmed base). Landing on the picker
+   * with it still true would let the very next pipeline settle instantiate
+   * WITHOUT the author clicking "Choose this keyboard" — re-basing, and
+   * discarding edits, on the strength of a stale confirmation from the base
+   * they are trying to move away from. BaseResolutionAdapter's onPreview also
+   * clears it, but that only fires if the author previews first, which is not
+   * guaranteed to happen before the effect runs.
+   *
+   * Falls back to an empty `history` when `choose_base` is absent from the
+   * stack (a hydrated draft that never walked it): empty is Back-safe
+   * (popHistory guards it) and can never resurface a stale forward entry.
+   */
+  backToChooseBase: () => void;
 
   /** Reset every slot to initial (start-over). Includes clearing history. */
   reset: () => void;
@@ -488,7 +547,8 @@ export interface SurveySessionState {
 
 type SurveySessionData = Omit<
   SurveySessionState,
-  | "advance" | "popHistory" | "backToTouchSeedSource" | "backToUnfinishedGallery" | "reset" | "hydrate"
+  | "advance" | "popHistory" | "jumpToStep" | "backToTouchSeedSource"
+  | "backToUnfinishedGallery" | "backToChooseBase" | "reset" | "hydrate"
   | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
   | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
   | "setTouchSeedSource" | "setBaseConfirmed" | "setDiscoveryMethod"
@@ -564,6 +624,24 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
       };
     }),
 
+  jumpToStep: (target) =>
+    set((s) => {
+      if (s.activeStepId === target) return s;
+      // Sanitize first, for the same reason every other back primitive does:
+      // `history` may have been patched straight from a draft written by an
+      // older build (see applyTraversalSnapshot).
+      const sanitized = sanitizeHistory(s.activeStepId, s.history);
+      // The LAST occurrence, so a revisited step lands on the most recent
+      // visit rather than an older one further down the stack.
+      const index = sanitized.lastIndexOf(target);
+      if (index === -1) return s; // not walked — never a forward jump
+      return {
+        activeStepId: target,
+        history: sanitized.slice(0, index),
+        lastNavigation: "pop" as const,
+      };
+    }),
+
   backToTouchSeedSource: () =>
     set((s) => {
       const sanitized = sanitizeHistory(s.activeStepId, s.history);
@@ -606,6 +684,20 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
         activeStepId: target,
         history: sanitized.slice(0, -1),
         lastNavigation: "pop" as const,
+      };
+    }),
+
+  // See the interface docstring above for why this is a Back (not an advance),
+  // why it truncates rather than pops, and why it must clear baseConfirmed.
+  backToChooseBase: () =>
+    set((s) => {
+      const sanitized = sanitizeHistory(s.activeStepId, s.history);
+      const pickerIndex = sanitized.indexOf("choose_base");
+      return {
+        activeStepId: "choose_base" as ActiveStepId,
+        history: pickerIndex === -1 ? ([] as readonly ActiveStepId[]) : sanitized.slice(0, pickerIndex),
+        lastNavigation: "pop" as const,
+        baseConfirmed: false,
       };
     }),
 

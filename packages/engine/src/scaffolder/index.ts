@@ -15,6 +15,11 @@ import { emit } from "../codec/emit.js";
 import { detectBaseLayoutFamily } from "../placement/filters.js";
 import { scaffoldIR, sanitizeDisplayName, kmnStringEscape } from "./scaffold-ir.js";
 import { assetFileExtensions } from "../shared/siblingAssetStores.js";
+import { escapeHtml } from "../shared/escapeHtml.js";
+import {
+  buildKpsContent,
+  type PackageDescriptorIdentity,
+} from "../package-descriptor/index.js";
 
 export { scaffoldIR, resetIdentity } from "./scaffold-ir.js";
 export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffold-ir.js";
@@ -33,15 +38,6 @@ export interface ScaffolderServiceOptions {
 // Defuse PHP block-comment terminator '*/' for stub generation.
 function phpCommentEscape(s: string): string {
   return s.replace(/\*\//g, "* /");
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 /**
@@ -273,82 +269,30 @@ function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
   vfs.set(path, JSON.stringify(data, null, 2));
 }
 
-// &TARGETS tokens for which kmcmplib emits a KeymanWeb `.js` artifact. Desktop-only
-// tokens (windows/macosx/linux/desktop) produce no `.js`, so referencing one in the
-// package `<Files>` would make kmc fail with KM04003 (file not found); conversely a
-// web/touch target with no `.js` in the package warns KM0401A (fatal under
-// CompilerWarningsAsErrors). The list must therefore mirror what the build emits.
-// Derived from the emitted `.kmn`'s `&TARGETS` store (what kmc actually reads), not
-// from `BaseKeyboard.targets` — the two can diverge during scaffolding/import.
-const KMW_JS_TARGETS = new Set([
-  "any",
-  "web",
-  "mobile",
-  "tablet",
-  "iphone",
-  "ipad",
-  "androidphone",
-  "androidtablet",
-]);
+// The scaffolder no longer owns a private `.kps` builder. `buildKpsContent`,
+// the `&TARGETS`->`.js` target table it reads, and the `<Languages>` shape all
+// live in `package-descriptor/` now (spec 057 FR-005) so the output projection
+// can re-derive the descriptor from the AUTHOR's identity on both authoring
+// tracks. Behaviour here is unchanged: still generated last, still only when the
+// path is absent.
 
 /**
- * Build a package (`.kps`) that Keyman Developer can compile to a `.kmp`.
+ * Fill in every scaffold stub file that is MISSING from `vfs` — `.kmn`,
+ * `.kvks`, touch layout, icon, welcome/readme, help, LICENSE, HISTORY,
+ * README, tests, and (last, because it reads the final `.kmn`) the `.kps`
+ * package. Existing entries are never overwritten, so calling this on an
+ * already-populated VFS only completes the keyboard directory.
  *
- * The empty `<Package><Info/><Files/></Package>` stub fails `kmc` with KM04021
- * (blank package version) and KM09010 (missing Description). This emits the
- * minimum buildable shape: `<FollowKeyboardVersion/>` (so the package inherits
- * the keyboard version), a non-empty Description, at least one language, and a
- * `<Files>` list derived from what the build actually produces — `.kmx` always,
- * `.js` only for web/touch targets, `.kvk` only when a visual keyboard exists.
- * `languages` are the base keyboard's BCP47 tags; `und` stands in when unknown.
- * `version` propagates from the base keyboard into `<Keyboards><Keyboard><Version>`
- * so Track 2 import does not silently downgrade a 2.0 keyboard to 1.0.
+ * Exported for the output path: the working copy of a Track 1 (new-from-base)
+ * project is instantiated from `fetchKeyboardSourceToVfs`, which deliberately
+ * never writes the base's `.kps` into the VFS (it references compiled
+ * `../build/*` artifacts). Whether the scaffolded VFS (which does carry a
+ * generated `.kps`) ever replaces it in the working-copy store is a race the
+ * commit seam intentionally does not re-run (StudioShell's
+ * `instantiatedForBaseIdRef`), so serialization completes the directory here
+ * instead — a downloaded keyboard must be submittable as-is (spec §12).
  */
-function buildKpsContent(
-  keyboardId: string,
-  displayName: string,
-  kmnText: string,
-  languages: string[],
-  version = "1.0",
-): string {
-  const targetsMatch = /store\s*\(\s*&TARGETS\s*\)\s*'([^']*)'/i.exec(kmnText);
-  const targetTokens = (targetsMatch?.[1] ?? "").toLowerCase().split(/[\s,]+/).filter(Boolean);
-  const emitsJs = targetTokens.some((t) => KMW_JS_TARGETS.has(t));
-  const hasVisualKeyboard = /store\s*\(\s*&VISUALKEYBOARD\s*\)/i.test(kmnText);
-
-  const files = [`..\\build\\${keyboardId}.kmx`];
-  if (emitsJs) files.push(`..\\build\\${keyboardId}.js`);
-  if (hasVisualKeyboard) files.push(`..\\build\\${keyboardId}.kvk`);
-  files.push("welcome.htm", "readme.htm");
-
-  const fileEntries = files
-    .map((f) => {
-      const ext = f.slice(f.lastIndexOf("."));
-      return `    <File>\n      <Name>${escapeHtml(f)}</Name>\n      <FileType>${ext}</FileType>\n    </File>`;
-    })
-    .join("\n");
-
-  const langTags = languages.length > 0 ? languages : ["und"];
-  const langEntries = langTags
-    .map((t) => `        <Language ID="${escapeHtml(t)}">${escapeHtml(t)}</Language>`)
-    .join("\n");
-
-  const name = escapeHtml(displayName);
-  const description = escapeHtml(`${displayName} keyboard, generated by Keyboard Studio.`);
-
-  return (
-    `<?xml version="1.0" encoding="utf-8"?>\n` +
-    `<Package>\n` +
-    `  <System>\n    <KeymanDeveloperVersion>17.0.0.0</KeymanDeveloperVersion>\n    <FileVersion>7.0</FileVersion>\n  </System>\n` +
-    `  <Options>\n    <ReadMeFile>readme.htm</ReadMeFile>\n    <WelcomeFile>welcome.htm</WelcomeFile>\n    <FollowKeyboardVersion/>\n  </Options>\n` +
-    `  <Info>\n    <Name URL="">${name}</Name>\n    <Description URL="">${description}</Description>\n  </Info>\n` +
-    `  <Files>\n${fileEntries}\n  </Files>\n` +
-    `  <Keyboards>\n    <Keyboard>\n      <Name>${name}</Name>\n      <ID>${escapeHtml(keyboardId)}</ID>\n      <Version>${escapeHtml(version)}</Version>\n      <Languages>\n${langEntries}\n      </Languages>\n    </Keyboard>\n  </Keyboards>\n` +
-    `</Package>\n`
-  );
-}
-
-function generateStubs(
+export function generateStubs(
   vfs: VirtualFS,
   keyboardId: string,
   displayName: string,
@@ -419,12 +363,23 @@ function generateStubs(
 
   // Generate the package last: it reads the final `.kmn` (base-derived or the
   // stub just written above) to decide which build artifacts to list.
+  //
+  // The base's languages are what this stage knows — the author has not answered
+  // the identity questions yet at scaffold time. The output projection's step 3.6
+  // replaces this block with the author's own tag before anything ships (spec 057
+  // FR-001), so declaring the base's tags here is a placeholder, not the final
+  // word. `languages[0]` because the descriptor declares exactly ONE language;
+  // `undefined` (no base tag) degrades to the writer's `und` placeholder.
   const kpsPath = `source/${keyboardId}.kps`;
   if (vfs.get(kpsPath) === undefined) {
     const kmnEntry = vfs.get(`source/${keyboardId}.kmn`);
     const kmnText =
       kmnEntry !== undefined && typeof kmnEntry.content === "string" ? kmnEntry.content : "";
-    vfs.set(kpsPath, buildKpsContent(keyboardId, displayName, kmnText, languages, version), false);
+    const identity: PackageDescriptorIdentity = {
+      displayName,
+      ...(languages[0] !== undefined ? { languageTag: languages[0] } : {}),
+    };
+    vfs.set(kpsPath, buildKpsContent(keyboardId, identity, kmnText, version), false);
   }
 }
 

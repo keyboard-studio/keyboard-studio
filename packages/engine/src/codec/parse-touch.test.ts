@@ -327,6 +327,32 @@ describe("emitTouchLayout", () => {
     expect(irKey2?.hint).toBe("x");
   });
 
+  it("round-trips layerAnnotation: parse → emit → reparse preserves the raw sk[] layer field (placement-priors v2)", () => {
+    const source = JSON.stringify({
+      phone: {
+        layer: [{
+          id: "default",
+          row: [{
+            id: 1,
+            key: [{ id: "K_E", text: "e", sk: [{ id: "K_E", text: "ɛ", layer: "rightalt" }] }],
+          }],
+        }],
+      },
+    });
+    const ir = parseTouchLayout(source);
+    expect(ir.platforms[0]?.layers[0]?.rows[0]?.keys[0]?.sk?.[0]?.layerAnnotation).toBe("rightalt");
+
+    const emitted = emitTouchLayout(ir);
+    const reparsed = JSON.parse(emitted) as Record<
+      string,
+      { layer: Array<{ row: Array<{ key: Array<{ sk?: Array<{ layer?: string }> }> }> }> }
+    >;
+    expect(reparsed["phone"]?.layer[0]?.row[0]?.key[0]?.sk?.[0]?.layer).toBe("rightalt");
+
+    const ir2 = parseTouchLayout(emitted);
+    expect(ir2.platforms[0]?.layers[0]?.rows[0]?.keys[0]?.sk?.[0]?.layerAnnotation).toBe("rightalt");
+  });
+
   it("round-trips pad: parse → emit → reparse preserves pad as numeric IR and string wire value", () => {
     // FIX 2: pad is now parsed from the wire format and emitted back as a string.
     const source = JSON.stringify({
