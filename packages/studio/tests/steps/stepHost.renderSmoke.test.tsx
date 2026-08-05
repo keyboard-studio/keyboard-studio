@@ -65,8 +65,8 @@ vi.mock("../../src/editors/panels/BaseResolution.tsx", () => ({
   BaseResolution: () => <div data-testid="stub-BaseResolution" />,
 }));
 
-vi.mock("../../src/editors/carve/CarveGallery.tsx", () => ({
-  CarveGallery: () => <div data-testid="stub-CarveGallery" />,
+vi.mock("../../src/editors/carve/CarveGalleryV2.tsx", () => ({
+  CarveGalleryV2: () => <div data-testid="stub-CarveGalleryV2" />,
 }));
 
 vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () => ({
@@ -262,7 +262,7 @@ const editorSteps = manifest.filter(
 //   trackStep         → TrackStepFactoryComponent         → FlowStepHost stub (flow_id=track)
 //   projectNameStep   → ProjectNameStepFactoryComponent   → FlowStepHost stub (flow_id=project_name)
 //   charactersStep    → CharactersStep                    → stub-CharactersStep
-//   carveStep         → CarveAdapter                      → CarveGallery stub
+//   carveStep         → CarveAdapter                      → CarveGalleryV2 stub
 //   mechanismsStep    → AddPhysicalAdapter                → MechanismGallery stub
 //   touchSeedSourceStep → TouchSeedSourcePanel            → TouchSeedSourcePanel stub (layout:"full" — P0 fix, spec 035 R4b follow-up)
 //   touchStep         → AddTouchAdapter                   → TouchGallery stub
@@ -274,7 +274,7 @@ const STEP_TO_EXPECTED_STUB: Record<string, string> = {
   track: "stub-FlowStepHost-track",
   project_name: "stub-FlowStepHost-project_name",
   characters: "stub-CharactersStep",
-  carve: "stub-CarveGallery",
+  carve: "stub-CarveGalleryV2",
   mechanisms: "stub-MechanismGallery",
   touch_seed_source: "stub-TouchSeedSourcePanel",
   touch: "stub-TouchGallery",
