@@ -113,7 +113,7 @@ import {
   CUSTOM_KEY_OPTION_VALUE,
 } from "../../lib/keyOptions.ts";
 import { formatModifierCombo } from "../../lib/modifierTokenLabel.ts";
-import { physicalKeyLabel, stripVkeyPrefix } from "../../lib/keyLabel.ts";
+import { keyLabelOrRaw } from "../../lib/keyLabel.ts";
 import { KeyCap } from "../../ui/KeyCap.tsx";
 import {
   resolveCharInput,
@@ -4055,9 +4055,7 @@ export function MechanismGallery({
                   // this entry's accept button aria-label, so the two can
                   // never desync for a given entry — mirrors
                   // CasePairProposalBanner's `keyNameFor`.
-                  const keyName =
-                    physicalKeyLabel(entry.topCandidate.vkey) ??
-                    stripVkeyPrefix(entry.topCandidate.vkey);
+                  const keyName = keyLabelOrRaw(entry.topCandidate.vkey);
                   // Quoted IN THE VALUE, not the message template — an
                   // apostrophe inside an ICU/Lingui message is escape syntax
                   // (it opens a quoted-literal region, swallowing any

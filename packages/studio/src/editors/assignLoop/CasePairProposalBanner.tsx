@@ -28,7 +28,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { canonicalizeCombo } from "@keyboard-studio/engine";
 import { formatModifierCombo } from "../../lib/modifierTokenLabel.ts";
-import { physicalKeyLabel, stripVkeyPrefix } from "../../lib/keyLabel.ts";
+import { keyLabelOrRaw } from "../../lib/keyLabel.ts";
 import { KeyCap } from "../../ui/KeyCap.tsx";
 import { ProposalBanner } from "./parts/ProposalBanner.tsx";
 import type { CasePairProposal } from "./casePairCompanion.ts";
@@ -37,12 +37,13 @@ import type { CasePairProposal } from "./casePairCompanion.ts";
  * Keycap-convention display label for a proposal's physical key (vkey or
  * touch host key) — lowercase unshifted glyph, boxed by the caller as a
  * `<KeyCap>` where the surface is JSX, or embedded plain in an aria-label.
- * See lib/keyLabel.ts for the convention this disambiguates (a bare
- * uppercase "Q" reads as the capital character, not the physical q key).
+ * A proposal's `vkey`/`hostKey` is always a real key here (never an
+ * already-resolved glyph), so the shared `keyLabelOrRaw` applies directly
+ * with no `K_`-prefix guard. See lib/keyLabel.ts for the convention this
+ * disambiguates (a bare uppercase "Q" reads as the capital character, not
+ * the physical q key).
  */
-function keyNameFor(vkeyOrHostKey: string): string {
-  return physicalKeyLabel(vkeyOrHostKey) ?? stripVkeyPrefix(vkeyOrHostKey);
-}
+const keyNameFor = keyLabelOrRaw;
 
 export interface CasePairProposalBannerProps {
   proposal: CasePairProposal;

@@ -5,7 +5,7 @@
 // Digits/symbols/named keys keep vkeyLabel's existing resolution unchanged.
 
 import { describe, it, expect } from "vitest";
-import { physicalKeyLabel, stripVkeyPrefix } from "./keyLabel.ts";
+import { physicalKeyLabel, stripVkeyPrefix, keyLabelOrRaw } from "./keyLabel.ts";
 
 describe("physicalKeyLabel", () => {
   it("lowercases an ordinary letter key (K_Q -> 'q')", () => {
@@ -40,5 +40,21 @@ describe("stripVkeyPrefix", () => {
 
   it("returns an empty string unchanged", () => {
     expect(stripVkeyPrefix("")).toBe("");
+  });
+});
+
+describe("keyLabelOrRaw", () => {
+  it("uses physicalKeyLabel's resolution when vkeyLabel resolves (K_Q -> 'q')", () => {
+    expect(keyLabelOrRaw("K_Q")).toBe("q");
+  });
+
+  it("leaves a named key unchanged (K_BKSP -> 'Backspace')", () => {
+    expect(keyLabelOrRaw("K_BKSP")).toBe("Backspace");
+  });
+
+  it("falls back to stripVkeyPrefix when vkeyLabel can't resolve the name", () => {
+    // Blank input is physicalKeyLabel's undefined floor; the helper must then
+    // return the stripped name rather than "undefined".
+    expect(keyLabelOrRaw("")).toBe("");
   });
 });

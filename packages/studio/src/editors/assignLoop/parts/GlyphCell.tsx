@@ -3,7 +3,7 @@ import { useLingui } from "@lingui/react/macro";
 import type { RemovalCapability } from '@keyboard-studio/contracts';
 import type { GlyphOwner, CharLocation } from '../../../lib/irToCarveNodes.ts';
 import { displayChar } from '../../../lib/irToCarveNodes.ts';
-import { physicalKeyLabel, stripVkeyPrefix } from '../../../lib/keyLabel.ts';
+import { keyLabelOrRaw } from '../../../lib/keyLabel.ts';
 import { KeySeq } from './KeySeq.tsx';
 import { KIND_COLOR } from './KindBadge.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
@@ -19,7 +19,7 @@ import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
  * and re-cased by `vkeyLabel`'s fallback (see keyLabel.ts).
  */
 function keyNameFor(k: string): string {
-  return k.startsWith('K_') ? physicalKeyLabel(k) ?? stripVkeyPrefix(k) : k;
+  return k.startsWith('K_') ? keyLabelOrRaw(k) : k;
 }
 
 // Order the cross-reference summary tags render in: group, then pattern, then store.

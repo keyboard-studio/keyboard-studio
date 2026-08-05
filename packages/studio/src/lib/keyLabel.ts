@@ -56,3 +56,16 @@ export function physicalKeyLabel(vkeyName: string): string | undefined {
     ? label.toLowerCase()
     : label;
 }
+
+/**
+ * The complete desktop key-naming convention with its fallback baked in:
+ * `physicalKeyLabel`'s resolved caption, or a bare `stripVkeyPrefix` of the
+ * name when `vkeyLabel` can't resolve it. This is the one shared spelling of
+ * the `physicalKeyLabel(x) ?? stripVkeyPrefix(x)` pair — call this rather than
+ * re-inlining the `??` at every key-naming site. Callers whose input may be a
+ * non-vkey token (an already-resolved glyph) still guard on `startsWith("K_")`
+ * before calling — see `GlyphCell`.
+ */
+export function keyLabelOrRaw(vkeyName: string): string {
+  return physicalKeyLabel(vkeyName) ?? stripVkeyPrefix(vkeyName);
+}
