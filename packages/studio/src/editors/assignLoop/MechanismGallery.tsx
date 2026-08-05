@@ -172,7 +172,6 @@ import {
   galleryConfigStyle as configStyle,
   galleryCardStyle as cardStyle,
 } from "../../lib/galleryTheme.ts";
-import { ERROR_RED, ERROR_BG } from "../../ui/theme.ts";
 import {
   PATTERN_SEQUENCE,
   PATTERN_DEADKEY,
@@ -1924,6 +1923,82 @@ export function MechanismGallery({
     return ranked.filter((entry) => !entry.topCandidate.modifiers.includes("CAPS"));
   }, [currentChar, placementMap, suggestionBcp47]);
 
+  // ---------------------------------------------------------------------------
+  // Per-chip suggestion resolution — accepts are INDEPENDENT (bug fix).
+  //
+  // `suggestions` can carry up to 2 entries with DISTINCT strategyIds (e.g.
+  // S-02 deadkey + S-08 RAlt for the same codepoint — see
+  // getRankedSuggestionsForChar). Accepting ONE must not hide the OTHER: each
+  // chip's own visibility is resolved independently of the others', and of
+  // the per-char `suggestionResolved` set above (which stays reserved for the
+  // whole-row Deny dismissal — see suggestionDismissed).
+  //
+  // A chip is hidden once EITHER:
+  //   - its own mechanism is already recorded for currentChar — checked by
+  //     strategyId against `mechanismAssignments` (the SAME per-char
+  //     mechanism list charMechanisms.ts's badge/coveredChars/
+  //     appliedForCurrentChar all read), so a successful Accept (or an
+  //     equivalent method applied manually through the MethodChooser card
+  //     below) makes that one chip disappear without touching its sibling.
+  //     This doubles as the "revisit" contract: navigating away and back (or
+  //     removing then re-adding a DIFFERENT method) never re-offers a chip
+  //     whose mechanism is still on record.
+  //   - it was explicitly dismissed without recording anything — a defensive
+  //     path inside handleSuggestionAccept (e.g. an unresolvable modifier
+  //     combo) that must stop offering THAT entry without touching a sibling
+  //     chip that might still be perfectly acceptable.
+  const dismissedSuggestionEntryKey = (char: string, strategyId: string): string =>
+    `${char}::${strategyId}`;
+  const [dismissedSuggestionEntries, setDismissedSuggestionEntries] = useState<
+    Set<string>
+  >(() => new Set());
+  const markSuggestionEntryDismissed = useCallback(
+    (char: string, strategyId: string) => {
+      setDismissedSuggestionEntries((prev) => {
+        const key = dismissedSuggestionEntryKey(char, strategyId);
+        if (prev.has(key)) return prev;
+        const next = new Set(prev);
+        next.add(key);
+        return next;
+      });
+    },
+    [],
+  );
+
+  // Every strategyId already recorded as a NON-sequence mechanism for
+  // currentChar (mechanismAssignments — see excludeSequenceMechanisms above).
+  // Built from the SAME list `coveredChars`/`appliedForCurrentChar` read, so
+  // this can never disagree with what the "Applied methods" chip row shows.
+  const recordedSuggestionStrategyIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (currentChar === null) return ids;
+    for (const a of mechanismAssignments) {
+      if (a.scope !== "individual" || a.target !== currentChar) continue;
+      for (const m of a.mechanisms) {
+        if (m.strategyId !== undefined) ids.add(m.strategyId);
+      }
+    }
+    return ids;
+  }, [mechanismAssignments, currentChar]);
+
+  // The chips actually eligible to render right now — `suggestions` minus
+  // whichever entries are already recorded or were explicitly dismissed. Row
+  // visibility (below) is driven off THIS list's length, not `suggestions`
+  // itself, so accepting one chip only ever removes that one chip.
+  const visibleSuggestions = useMemo(
+    () =>
+      currentChar === null
+        ? []
+        : suggestions.filter(
+            (entry) =>
+              !recordedSuggestionStrategyIds.has(entry.strategyId) &&
+              !dismissedSuggestionEntries.has(
+                dismissedSuggestionEntryKey(currentChar, entry.strategyId),
+              ),
+          ),
+    [suggestions, currentChar, recordedSuggestionStrategyIds, dismissedSuggestionEntries],
+  );
+
   // Whole-inventory leave-warning (soft gate) — computed from the SAME
   // MechanismAssignment map + lettersToAdd scope this gallery already uses
   // for coveredChars, via the shared unimplementedDesktopChars helper (do not
@@ -2007,13 +2082,20 @@ export function MechanismGallery({
   });
 
   // Whether the suggestion row must stay hidden for the current character —
-  // true once explicitly resolved (Accept/Deny), or once the character is
-  // already covered (a configured char never re-prompts). Skipping does not
-  // resolve a suggestion — Skip records nothing, so a skipped-over character
-  // still shows its suggestion row if revisited.
+  // true only once the WHOLE row has been explicitly Denied (see
+  // handleSuggestionChange/suggestionResolved above). This used to ALSO fire
+  // once the character was "covered" (any mechanism recorded at all), but
+  // that conflated "one of this row's OWN chips was accepted" with "the row
+  // must disappear" — since accepting chip A records a mechanism, that made
+  // chip B vanish too even though it was never touched (the accepts-kill-
+  // each-other bug). Per-chip visibility is now handled independently via
+  // `visibleSuggestions` below (each chip disappears only once ITS OWN
+  // mechanism is recorded — see recordedSuggestionStrategyIds); this flag is
+  // reserved for the whole-row Deny dismissal only. Skipping does not resolve
+  // a suggestion — Skip records nothing, so a skipped-over character still
+  // shows its suggestion row if revisited.
   const suggestionDismissed =
-    currentChar !== null &&
-    (suggestionResolved.has(currentChar) || coveredChars.has(currentChar));
+    currentChar !== null && suggestionResolved.has(currentChar);
 
   // ---------------------------------------------------------------------------
   // Method-input reset — called after apply or suggestion accept
@@ -2112,8 +2194,10 @@ export function MechanismGallery({
       } catch {
         // canonicalizeCombo only throws for a mutually-exclusive combo — a
         // malformed kbgen/case-pair candidate should not crash the gallery;
-        // dismiss the suggestion rather than record a broken assignment.
-        markSuggestionResolved(currentChar);
+        // dismiss THIS chip only (not the whole row — a sibling S-02 chip may
+        // still be perfectly acceptable) rather than record a broken
+        // assignment.
+        markSuggestionEntryDismissed(currentChar, entry.strategyId);
         devLog.warn(
           `[MechanismGallery] handleSuggestionAccept: invalid modifier combo ${JSON.stringify(candidateModifiers)} for S-08 suggestion — dismissing`,
         );
@@ -2167,8 +2251,8 @@ export function MechanismGallery({
         // Structurally unreachable — getRankedSuggestionsForChar never
         // returns an S-02 entry without a baseLetter — guarded defensively
         // rather than assumed, same posture as the S-08 combo-canon catch
-        // above.
-        markSuggestionResolved(currentChar);
+        // above. Dismisses THIS chip only, same rationale as that catch.
+        markSuggestionEntryDismissed(currentChar, entry.strategyId);
         devLog.warn(
           `[MechanismGallery] handleSuggestionAccept: S-02 suggestion for "${currentChar}" carries no baseLetter — dismissing`,
         );
@@ -2185,10 +2269,11 @@ export function MechanismGallery({
         // custom trigger character left blank) — fall back to prefilling
         // the deadkey method card (defaults-first, §3c) rather than
         // dismissing outright, so the author can pick a trigger and Apply
-        // manually.
+        // manually. Dismisses THIS chip only — a sibling chip (e.g. S-08)
+        // stays offered.
         setMethod("deadkey");
         setDeadkeyBaseLetter(baseLetter);
-        markSuggestionResolved(currentChar);
+        markSuggestionEntryDismissed(currentChar, entry.strategyId);
         return;
       }
       let deadkeyName: string;
@@ -2237,14 +2322,19 @@ export function MechanismGallery({
           ),
       });
     } else {
-      markSuggestionResolved(currentChar);
+      markSuggestionEntryDismissed(currentChar, entry.strategyId);
       devLog.warn(
         `[MechanismGallery] handleSuggestionAccept: unrecognised strategyId "${entry.strategyId}" — dismissing suggestion`,
       );
       return;
     }
     recordAssignments([...sessionAssignments, assignment]);
-    markSuggestionResolved(currentChar);
+    // The successful accept's own mechanism is now recorded with this
+    // strategyId — recordedSuggestionStrategyIds (above) filters this ONE
+    // chip out of visibleSuggestions on the next render; a sibling chip with
+    // a DIFFERENT strategyId is untouched. Marking it dismissed here too is
+    // redundant-but-harmless belt-and-braces (it never needs to reappear).
+    markSuggestionEntryDismissed(currentChar, entry.strategyId);
     if (raltCompanionModifiers !== null) {
       proposeCompanion({
         mechanism: "ralt-layer",
@@ -2280,7 +2370,7 @@ export function MechanismGallery({
     sessionAssignments,
     recordAssignments,
     resetMethodState,
-    markSuggestionResolved,
+    markSuggestionEntryDismissed,
     proposeCompanion,
   ]);
 
@@ -3826,26 +3916,30 @@ export function MechanismGallery({
                   the row hasn't been dismissed. Each chip has its OWN
                   independent Accept button (e.g. "RAlt + F" and "Deadkey →
                   f" both attested for the same codepoint); ONE Deny button
-                  dismisses the whole row, same as before — see
+                  dismisses the whole row (see suggestionDismissed) — see
                   getRankedSuggestionsForChar. No corpus data => empty array
                   => row is absent and gallery behaves exactly as today.
-                  Gate is strictly `(currentCharBadge?.count ?? 0) === 0` — the
-                  suggestion shows ONLY when the character has ZERO recorded
-                  implementations. This subsumes every prior partial gate: a
-                  recorded SEQUENCE (signal (b) SESSION-DIRECT via
-                  `hasSequenceForChar`), COMPOSITION (signal (c),
-                  `currentCharBadge?.isComposable`), AND — the case the old
-                  gate missed — BASE-DIRECT coverage (signal (a),
-                  `baseOnlyProducedSet`), e.g. a character the base keyboard
-                  already produces via an existing rule sequence. Any of
-                  those already gives count >= 1, so count === 0 is exactly
-                  "the badge the author sees is still at zero" — the same
-                  signal driving the green/red badge itself
-                  (charMechanisms.ts), so the suggestion and the badge can
-                  never visibly disagree. */}
-            {suggestions.length > 0 &&
+                  Gate: `visibleSuggestions.length > 0` (accepts-kill-each-
+                  other bug fix — see visibleSuggestions/
+                  recordedSuggestionStrategyIds above) AND the char isn't
+                  ALREADY covered by a means unrelated to any offered chip —
+                  BASE-DIRECT (signal (a), `baseOnlyProducedSet`, e.g. a
+                  character the base keyboard already produces via an
+                  existing rule) or COMPOSITION (signal (c),
+                  `currentCharBadge?.isComposable`). Coverage arising from
+                  ACCEPTING one of THESE suggestions (signal (b),
+                  SESSION-DIRECT) is deliberately excluded from this row-level
+                  check — that's handled per-chip by
+                  recordedSuggestionStrategyIds, so accepting chip A no
+                  longer hides chip B (the bug this fixes: the row used to
+                  gate on the whole 3-signal badge count, so ANY recorded
+                  mechanism — including the one THIS row's own chip just
+                  wrote — hid every chip, not just the accepted one). */}
+            {visibleSuggestions.length > 0 &&
               !suggestionDismissed &&
-              (currentCharBadge?.count ?? 0) === 0 && (
+              currentChar !== null &&
+              !baseOnlyProducedSet.has(currentChar) &&
+              !(currentCharBadge?.isComposable ?? false) && (
               <div
                 role="note"
                 aria-label={t({
@@ -3853,14 +3947,20 @@ export function MechanismGallery({
                   message: "Placement suggestion from kbgen seeder",
                 })}
                 style={{
-                  // RED, not green — the suggestion row only ever renders
-                  // when currentCharBadge's count is 0 (see the gate above),
-                  // so it always reads as "not yet implemented", matching
-                  // the badge's own 0-count colors (charMechanisms.ts /
-                  // CharScrollStrip.tsx's `ERROR_RED` + its paired dark-red
-                  // background).
-                  background: ERROR_BG,
-                  border: `1px solid ${ERROR_RED}`,
+                  // GREEN, not red — a suggestion is a proposal/affordance
+                  // the author can accept or deny, not an error state. (This
+                  // row used to borrow the badge's 0-count RED/ERROR_RED
+                  // treatment on the theory that it only ever rendered
+                  // alongside a red "not yet implemented" badge — see the
+                  // gate comment above for why that coupling no longer
+                  // holds now that a row can show one remaining chip
+                  // alongside an already-accepted, now-green sibling.) Uses
+                  // the SAME green family as the gallery's other
+                  // proposal/applied-method chips (Applied methods chips
+                  // below, CharScrollStrip's badgeGood treatment) rather
+                  // than a new pair.
+                  background: "#0d2218",
+                  border: "1px solid #238636",
                   borderRadius: 8,
                   padding: "10px 14px",
                   display: "flex",
@@ -3868,7 +3968,7 @@ export function MechanismGallery({
                   gap: 10,
                 }}
               >
-                {suggestions.map((entry) => {
+                {visibleSuggestions.map((entry) => {
                   const keyName = entry.topCandidate.vkey.replace(/^K_/, "");
                   const charOrEmpty =
                     currentChar !== null ? displayChar(currentChar) : "";
@@ -3925,7 +4025,10 @@ export function MechanismGallery({
                         style={{
                           margin: 0,
                           fontSize: 12,
-                          color: ERROR_RED,
+                          // Matches the row's own green background/border
+                          // (see the row-container style above) — a
+                          // suggestion is a proposal, not an error.
+                          color: "#56d364",
                           fontFamily: FONT,
                           fontWeight: 600,
                         }}
