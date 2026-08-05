@@ -1,4 +1,4 @@
-// Tests for the git-plumbing half of the baseline regression guard (#1489).
+// Tests for the git-plumbing half of the baseline regression guard.
 //
 // Unlike measureRegression/checkBaselineRegression (pure, tested with plain
 // objects from utilities/content-i18n-lint/index.test.ts), resolveBaselineRef
@@ -12,9 +12,8 @@
 // remote, no server needed) and exercise the real functions against them.
 //
 // Slower than a typical unit test (each spins up one or two repos), but still
-// fast in absolute terms, and this is the exact code path km-qc flagged as
-// having zero coverage on PR #1535 -- the fallback chain the review asked
-// about shipped unverified.
+// fast in absolute terms, and this is the exact code path a prior review
+// flagged as having zero coverage -- the fallback chain shipped unverified.
 
 import { afterEach, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";

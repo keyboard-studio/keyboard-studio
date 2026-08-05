@@ -1,5 +1,5 @@
 // git-baseline — resolves "what did this catalog look like before" for the
-// baseline regression guard (#1489).
+// baseline regression guard.
 //
 // Deliberately separate from index.js's pure measureRegression/
 // checkBaselineRegression: those take plain objects and are exercised by
