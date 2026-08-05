@@ -1571,6 +1571,16 @@ export function MechanismGallery({
   // currentChar: explicit state — does NOT auto-advance when a method is applied.
   // Only advances when the user clicks "Next character →" or "Skip".
   const [currentChar, setCurrentChar] = useState<string | null>(null);
+
+  // Brief, non-blocking auto-unlock notice (see handleUnlock below) — set the
+  // moment an edit auto-unlocks a completed gallery, cleared on the next
+  // character change (event-driven, not a timer — D3 note in handleUnlock).
+  const [autoUnlockNotice, setAutoUnlockNotice] = useState<string | null>(
+    null,
+  );
+  useEffect(() => {
+    setAutoUnlockNotice(null);
+  }, [currentChar]);
   const lettersKey = lettersToAdd.join("\0");
   // Previous run's lettersToAdd — feeds nearestSurvivingChar's "where was this
   // character before the reflow" lookup below. Updated at the end of the
@@ -3274,16 +3284,43 @@ export function MechanismGallery({
   // user re-completes the touch step (see reducer R2's clearStale(TOUCH_STEP_ID)
   // call). No-op re: touch when no touch layout exists yet, since there is
   // nothing downstream to go stale.
+  //
+  // Auto-unlock (mechanism-gallery-progression friction removal): this is no
+  // longer wired to an explicit "Unlock to edit" button click. Every edit
+  // entry point below (handleKeyTap, Apply, Mark for later, suggestion
+  // accept/remove, existing-method/sequence removal) calls this FIRST,
+  // guarded on `locked`, so the very first interaction with a completed
+  // gallery both unlocks it and performs the edit in one action — the lock
+  // MECHANISM (desktopLocked, markStale(TOUCH_STEP_ID)) is unchanged, only
+  // the requirement to clear it manually before editing is removed.
+  // `autoUnlockNotice` feeds the brief, non-blocking role="status" line
+  // rendered in place of the old blocking banner+button (see leftContent
+  // below); it is cleared on the next character change, not by a timer (D3 —
+  // no new debounce/timer is introduced here).
   const handleUnlock = useCallback(() => {
     unlockDesktop();
     if (touchLayoutJson !== null) {
       markStale(TOUCH_STEP_ID);
+      setAutoUnlockNotice(
+        t({
+          id: "editor.assignLoop.autoUnlockNotice.touchStale",
+          message:
+            "Desktop layout unlocked for editing — your touch layout has been flagged for re-review.",
+        }),
+      );
+    } else {
+      setAutoUnlockNotice(
+        t({
+          id: "editor.assignLoop.autoUnlockNotice.plain",
+          message: "Desktop layout unlocked for editing.",
+        }),
+      );
     }
-  }, [unlockDesktop, markStale, touchLayoutJson]);
+  }, [unlockDesktop, markStale, touchLayoutJson, t]);
 
   const handleKeyTap = useCallback(
     (keyId: string) => {
-      if (locked) return;
+      if (locked) handleUnlock();
       if (method === "swap" && ALL_PICKABLE_KEYS.has(keyId)) {
         setSelectedSwapKey(keyId);
         // Tapping a real key sets the picker to that key; clear the paired
@@ -3299,7 +3336,7 @@ export function MechanismGallery({
       }
       // method === "sequence" or unrecognised key: ignore
     },
-    [method, locked],
+    [method, locked, handleUnlock],
   );
 
   // ---------------------------------------------------------------------------
@@ -3423,8 +3460,11 @@ export function MechanismGallery({
   }
 
   // Invariant: callers always pass onComplete when locked can be true — so
-  // the "no actionable control" state (locked with Apply/Mark/Next all
-  // disabled and no completion button rendered) is unreachable.
+  // the "no actionable control" state (locked with no completion button
+  // rendered) is unreachable. Apply/Mark/suggestion-accept/removal are no
+  // longer disabled while locked (mechanism-gallery-progression auto-unlock —
+  // see handleUnlock); this "Continue" escape stays for a locked, still-
+  // incomplete gallery where the author wants to move on without editing.
   const doneLabel = t({ id: "editor.assignLoop.doneButton", message: "Done" });
   const forwardButton: ForwardButtonSpec | null =
     // TOP PRIORITY (bug fix): once every inventory character has count >= 1
@@ -3585,75 +3625,50 @@ export function MechanismGallery({
         height: "100%",
       }}
     >
-      {/* Locked banner — editing is disabled once Mechanisms has completed
-          (lockDesktop() fires via reducer R1). "Unlock to edit" lets the
-          author return and fix a mistake: it flips desktopLocked back to
-          false (the gallery below re-renders editable) and, when a touch
-          layout has already been built from this physical layout, marks the
-          TOUCH step stale directly so the dashboard flags it for re-review
-          (correctness rail — see handleUnlock for why "touch", not
-          "mechanisms", is marked). Re-completing Mechanisms re-locks via the
-          same reducer path; no second lock path is introduced here. */}
+      {/* Non-blocking lock cue (mechanism-gallery-progression friction
+          removal) — the desktop layout still locks on Mechanisms completion
+          (lockDesktop() fires via reducer R1, unchanged), but editing it no
+          longer requires an explicit "Unlock to edit" click first: every edit
+          entry point (handleKeyTap, Apply, Mark for later, suggestion
+          accept, existing-method/sequence removal) auto-unlocks via
+          handleUnlock on first use. This informational line replaces the old
+          blocking role="alert" banner+button with a quiet, always-visible
+          note while locked — role="status" (not "alert"), same convention as
+          the coverage line below, so it never interrupts. */}
       {locked && (
-        <div
-          role="alert"
+        <p
+          role="status"
           aria-live="polite"
           style={{
-            padding: "10px 14px",
-            background: "#1a1209",
-            border: "1px solid #d29922",
-            borderRadius: 6,
-            color: "#d29922",
-            fontSize: 13,
+            margin: 0,
+            fontSize: 12,
+            color: TEXT_DIM,
             fontFamily: FONT,
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-            }}
-          >
-            <span>
-              <Trans id="editor.assignLoop.desktopLockedBanner">
-                Desktop layout locked — editing disabled
-              </Trans>
-            </span>
-            <button
-              type="button"
-              onClick={handleUnlock}
-              aria-label={t({
-                id: "editor.assignLoop.unlockAriaLabel",
-                message: "Unlock desktop layout to edit",
-              })}
-              style={{
-                flexShrink: 0,
-                padding: "5px 12px",
-                background: "#d29922",
-                border: "1px solid #d29922",
-                borderRadius: 5,
-                color: "#1a1209",
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: FONT,
-              }}
-            >
-              <Trans id="editor.assignLoop.unlockButton">Unlock to edit</Trans>
-            </button>
-          </div>
-          <p style={{ margin: 0, fontSize: 11, fontFamily: FONT }}>
-            <Trans id="editor.assignLoop.unlockHint">
-              Editing the desktop layout may require re-reviewing your touch
-              layout.
-            </Trans>
-          </p>
-        </div>
+          <Trans id="editor.assignLoop.desktopLockedNote">
+            This desktop layout is complete. Editing it will flag your touch
+            layout for re-review.
+          </Trans>
+        </p>
+      )}
+      {/* Brief post-auto-unlock confirmation — fires once handleUnlock runs
+          (the first edit on a locked gallery), cleared on the next character
+          change rather than a timer (see the autoUnlockNotice effect near
+          currentChar's declaration — no new debounce/timer, D3). */}
+      {!locked && autoUnlockNotice !== null && (
+        <p
+          role="status"
+          aria-live="polite"
+          style={{
+            margin: 0,
+            fontSize: 12,
+            color: TEXT_DIM,
+            fontFamily: FONT,
+          }}
+        >
+          {autoUnlockNotice}
+        </p>
       )}
       <>
         {/* Small coverage line */}
@@ -3934,8 +3949,12 @@ export function MechanismGallery({
                 <div style={{ display: "flex", gap: 8 }}>
                   <button
                     type="button"
-                    disabled={locked}
-                    onClick={handleSuggestionAccept}
+                    onClick={() => {
+                      // Auto-unlock on first edit (mechanism-gallery-
+                      // progression) — see handleUnlock's doc comment.
+                      if (locked) handleUnlock();
+                      handleSuggestionAccept();
+                    }}
                     aria-label={
                       suggestion.strategyId === "S-01"
                         ? t({
@@ -4084,8 +4103,11 @@ export function MechanismGallery({
                     return (
                       <HoverDangerChip
                         key={chipKey}
-                        onClick={() => handleRemoveMechanism(a)}
-                        disabled={locked}
+                        onClick={() => {
+                          // Auto-unlock on first edit — see handleUnlock.
+                          if (locked) handleUnlock();
+                          handleRemoveMechanism(a);
+                        }}
                         ariaLabel={t({
                           id: "editor.assignLoop.removeMethodAriaLabel",
                           message: `Remove method ${label} for ${currentChar}`,
@@ -4106,7 +4128,7 @@ export function MechanismGallery({
                           fontSize: 11,
                           fontFamily:
                             "ui-monospace, 'Cascadia Code', Consolas, monospace",
-                          cursor: locked ? "not-allowed" : "pointer",
+                          cursor: "pointer",
                         }}
                       >
                         {label}
@@ -4173,8 +4195,11 @@ export function MechanismGallery({
                     row.deletable ? (
                       <HoverDangerChip
                         key={row.id}
-                        onClick={() => handleRemoveExistingMethod(row)}
-                        disabled={locked}
+                        onClick={() => {
+                          // Auto-unlock on first edit — see handleUnlock.
+                          if (locked) handleUnlock();
+                          handleRemoveExistingMethod(row);
+                        }}
                         ariaLabel={t({
                           id: "editor.assignLoop.removeExistingMethodAriaLabel",
                           message: `Remove existing method ${row.label} for ${currentChar}`,
@@ -4195,7 +4220,7 @@ export function MechanismGallery({
                           fontSize: 11,
                           fontFamily:
                             "ui-monospace, 'Cascadia Code', Consolas, monospace",
-                          cursor: locked ? "not-allowed" : "pointer",
+                          cursor: "pointer",
                         }}
                       >
                         {row.label}
@@ -4241,8 +4266,11 @@ export function MechanismGallery({
                   </span>
                   <button
                     type="button"
-                    onClick={() => unflagCharForSequence(currentChar)}
-                    disabled={locked}
+                    onClick={() => {
+                      // Auto-unlock on first edit — see handleUnlock.
+                      if (locked) handleUnlock();
+                      unflagCharForSequence(currentChar);
+                    }}
                     aria-label={t({
                       id: "editor.assignLoop.removeSequenceAssignmentAriaLabel",
                       message: `Remove recorded sequence for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
@@ -4263,7 +4291,7 @@ export function MechanismGallery({
                       fontSize: 11,
                       fontFamily:
                         "ui-monospace, 'Cascadia Code', Consolas, monospace",
-                      cursor: locked ? "not-allowed" : "pointer",
+                      cursor: "pointer",
                     }}
                   >
                     <Trans id="editor.assignLoop.removeButton">remove</Trans>
@@ -4321,8 +4349,12 @@ export function MechanismGallery({
               {method !== "sequence" && (
                 <button
                   type="button"
-                  onClick={handleApply}
-                  disabled={!canApply || locked}
+                  onClick={() => {
+                    // Auto-unlock on first edit — see handleUnlock.
+                    if (locked) handleUnlock();
+                    handleApply();
+                  }}
+                  disabled={!canApply}
                   aria-label={t({
                     id: "editor.assignLoop.applyMethodAriaLabel",
                     message: `Apply method for ${currentChar}`,
@@ -4346,8 +4378,11 @@ export function MechanismGallery({
               )}
               <button
                 type="button"
-                onClick={() => toggleMarkedForLaterDesktop(currentChar)}
-                disabled={locked}
+                onClick={() => {
+                  // Auto-unlock on first edit — see handleUnlock.
+                  if (locked) handleUnlock();
+                  toggleMarkedForLaterDesktop(currentChar);
+                }}
                 aria-pressed={markedDesktopSet.has(currentChar)}
                 aria-label={
                   markedDesktopSet.has(currentChar)
@@ -4381,7 +4416,7 @@ export function MechanismGallery({
                   color: markedDesktopSet.has(currentChar) ? "#e3b341" : ACCENT,
                   fontSize: 12,
                   fontWeight: markedDesktopSet.has(currentChar) ? 600 : 500,
-                  cursor: locked ? "not-allowed" : "pointer",
+                  cursor: "pointer",
                   fontFamily: FONT,
                   padding: "6px 12px",
                   borderRadius: 6,

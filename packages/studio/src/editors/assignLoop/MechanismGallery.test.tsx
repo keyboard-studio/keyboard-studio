@@ -2315,7 +2315,13 @@ describe("MechanismGallery — UsesSequencesCard (integration)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Edit after Done — "Unlock to edit" affordance in the locked banner.
+// Edit after Done — auto-unlock on first edit (mechanism-gallery-progression
+// friction removal). The old explicit "Unlock to edit" button is gone: the
+// FIRST edit action on a locked, completed gallery (Apply, Mark for later,
+// suggestion accept, existing-method/sequence removal, or a physical-key tap)
+// calls the same handleUnlock logic that button used to trigger — the lock
+// still gets SET on completion (reducer R1, unchanged) and cleared/re-review-
+// flagged the same way, just without a manual gate in between.
 //
 // Fixture manifest mirrors the shape of the production manifest for this
 // purpose: the "touch" step declares empty `inputs` (production deliberately
@@ -2349,12 +2355,12 @@ const UNLOCK_FIXTURE_MANIFEST: readonly Step[] = [
   makeEditorStepFixture("touch", [], [PATH_GROUPS_FIXTURE]),
 ];
 
-describe("MechanismGallery — edit after Done (unlock affordance)", () => {
+describe("MechanismGallery — edit after Done (auto-unlock on first edit)", () => {
   beforeEach(() => {
     bindManifest(UNLOCK_FIXTURE_MANIFEST);
   });
 
-  it("renders 'Unlock to edit' in the locked banner and clicking it unlocks the gallery", async () => {
+  it("a locked gallery is immediately editable — no unlock click required — and the first edit unlocks it", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(
@@ -2366,23 +2372,22 @@ describe("MechanismGallery — edit after Done (unlock affordance)", () => {
       useWorkingCopyStore.getState().lockDesktop();
     });
 
-    expect(screen.getByText(/Desktop layout locked/i)).toBeTruthy();
-    const unlockBtn = screen.getByRole("button", { name: /unlock desktop layout to edit/i });
-    expect(unlockBtn).toBeTruthy();
+    // No blocking gate: Apply/Mark controls are present and ENABLED while
+    // locked (the old banner+button gate is gone).
+    const markBtn = screen.getByRole("button", {
+      name: /Mark U\+00E1 á for later review/i,
+    });
+    expect((markBtn as HTMLButtonElement).disabled).toBe(false);
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(true);
 
-    fireEvent.click(unlockBtn);
+    // The first edit action (Mark for later) unlocks the desktop layout as a
+    // side effect, in the same click — no throwaway first tap.
+    fireEvent.click(markBtn);
 
     expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
-    // The gallery becomes editable again — Apply/Mark controls return.
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Apply method for á/i })).toBeTruthy();
-      expect(
-        screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
-      ).toBeTruthy();
-    });
   });
 
-  it("shows a caution line about re-reviewing the touch layout in the locked banner", async () => {
+  it("shows a non-blocking informational note (not a click gate) while the layout is locked", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(
@@ -2392,12 +2397,17 @@ describe("MechanismGallery — edit after Done (unlock affordance)", () => {
     act(() => {
       useWorkingCopyStore.getState().lockDesktop();
     });
+    // The note explains the re-review consequence but is not a button/alert —
+    // no "Unlock to edit" affordance exists any more.
     expect(
-      screen.getByText(/re-reviewing your touch layout/i),
+      screen.getByText(/editing it will flag your touch layout for re-review/i),
     ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: /unlock desktop layout to edit/i }),
+    ).toBeNull();
   });
 
-  it("unlocking when a touch layout already exists marks the touch step stale (surfaces re-review)", async () => {
+  it("auto-unlocking when a touch layout already exists marks the touch step stale (surfaces re-review)", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(
@@ -2411,7 +2421,9 @@ describe("MechanismGallery — edit after Done (unlock affordance)", () => {
 
     expect(useWorkingCopyStore.getState().staleSteps.has(TOUCH_STEP_ID)).toBe(false);
 
-    fireEvent.click(screen.getByRole("button", { name: /unlock desktop layout to edit/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
 
     // handleUnlock marks "touch" directly (not "mechanisms") — production's
     // "touch" step has empty `inputs`, so there is no data edge for
@@ -2419,9 +2431,13 @@ describe("MechanismGallery — edit after Done (unlock affordance)", () => {
     // seeds it as a re-opened root regardless of the missing edge.
     expect(useWorkingCopyStore.getState().staleSteps.has(TOUCH_STEP_ID)).toBe(true);
     expect(useWorkingCopyStore.getState().staleSteps.has(MECHANISMS_STEP_ID)).toBe(false);
+    // A brief, non-timer status note confirms the re-review flag fired.
+    expect(
+      screen.getByText(/touch layout has been flagged for re-review/i),
+    ).toBeTruthy();
   });
 
-  it("unlocking when no touch layout exists does NOT mark anything stale", async () => {
+  it("auto-unlocking when no touch layout exists does NOT mark anything stale", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(
@@ -2433,8 +2449,11 @@ describe("MechanismGallery — edit after Done (unlock affordance)", () => {
     });
     expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /unlock desktop layout to edit/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
 
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
     expect(useWorkingCopyStore.getState().staleSteps.size).toBe(0);
   });
 });
