@@ -36,6 +36,9 @@ describe("SurveyResetButton", () => {
     render(<SurveyResetButton onReset={onReset} />);
 
     const trigger = screen.getByTestId("survey-reset-arm");
+    // aria-haspopup pairs with aria-expanded on a popover trigger and is present
+    // regardless of armed state (matches AccountControl/SelectMenu/SearchFiltersPopover).
+    expect(trigger.getAttribute("aria-haspopup")).toBe("true");
     fireEvent.click(trigger);
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
 

@@ -115,6 +115,11 @@ export function SurveyResetButton({ onReset }: SurveyResetButtonProps) {
         data-testid="survey-reset-arm"
         aria-label="Reset survey"
         aria-expanded={confirming}
+        // "true", not "dialog": the confirm popover carries role="alert" and no
+        // dialog semantics (see the panel below), so advertising a dialog would
+        // over-promise. Mirrors SearchFiltersPopover's non-token role="group"
+        // trigger; the pairing convention is aria-haspopup alongside aria-expanded.
+        aria-haspopup="true"
         className="ks-focus-ring ks-hit-target"
         style={RESET_BTN_STYLE}
         onClick={() => setConfirming((armed) => !armed)}
