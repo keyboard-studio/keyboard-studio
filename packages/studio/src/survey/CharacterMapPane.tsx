@@ -89,10 +89,19 @@ interface CharacterMapPaneProps {
   // instead of rendering thousands of DOM chips (which flakes past the timeout
   // under full-suite parallel load). Production always uses the default.
   maxCellsPerGroup?: number;
+  // Which category slice of the map this pane offers (the two dedicated pages
+  // split the categories between them — see filteredGroups):
+  //   "alphabet"    — letters, numerals, and marks (the Phase B build-list
+  //                   screen). DEFAULT.
+  //   "punctuation" — punctuation only (the punctuation step between marks
+  //                   and convenience).
+  // Both scopes toggle the SAME shared phaseBDraftStore draft.
+  scope?: "alphabet" | "punctuation";
 }
 
 export function CharacterMapPane({
   maxCellsPerGroup = MAX_CELLS_PER_GROUP,
+  scope = "alphabet",
 }: CharacterMapPaneProps = {}) {
   const { t } = useLingui();
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
@@ -219,19 +228,27 @@ export function CharacterMapPane({
   // the checkbox stays checked.
   const filteredGroups = useMemo(() => {
     if (loadState.status !== "done") return [];
-    // Two cell folds applied before search/blocks filtering (spec 047):
+    // Per-scope cell fold applied before search/blocks filtering (spec 047):
+    //
+    // "alphabet" (the Phase B build-list screen):
     //   1. Cased-script fold — drop the uppercase of a case pair so the map
     //      offers only the lowercase (its uppercase joins the alphabet on
     //      select and is recorded on Done).
-    //   2. This page shows only LETTERS, NUMERALS, and MARKS. Numerals are kept
-    //      because some languages use digits word-formingly. Punctuation,
-    //      symbols, separators, and control/format characters move to a later
-    //      dedicated page.
+    //   2. Shows only LETTERS, NUMERALS, and MARKS. Numerals are kept because
+    //      some languages use digits word-formingly. Punctuation, symbols,
+    //      separators, and control/format characters move to the dedicated
+    //      punctuation page.
+    //
+    // "punctuation" (the punctuation step): PUNCTUATION only — no case fold
+    //   (punctuation is caseless) and no letters/numerals/marks.
     const byTier = loadState.groups
       .map((g) => ({
         ...g,
         cells: g.cells.filter((c) => {
           const nfc = c.char.normalize("NFC");
+          if (scope === "punctuation") {
+            return !c.isCombiningMark && glyphCategory(nfc) === "punctuation";
+          }
           if (isFoldedUppercase(nfc, bcp47)) return false;
           if (c.isCombiningMark) return true; // marks (\p{M}) — glyphCategory folds these to "control"
           const cat = glyphCategory(nfc);
@@ -257,7 +274,7 @@ export function CharacterMapPane({
       );
     }
     return cased;
-  }, [loadState, query, searchFilters, blocksOnly, hasKnownBlocks, chars, bcp47]);
+  }, [loadState, query, searchFilters, blocksOnly, hasKnownBlocks, chars, bcp47, scope]);
 
   // Visible decomposition at the point of picking (spec 046 US5/FR-003): a
   // whole-grapheme pick contributes its base to Letters and its mark(s) to
@@ -414,10 +431,17 @@ export function CharacterMapPane({
         <Trans id="survey.characterMapPane.title">Character map</Trans>
       </h2>
       <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, lineHeight: 1.5 }}>
-        <Trans id="survey.characterMapPane.subtitle">
-          Browse and click to toggle characters into your alphabet — the same
-          list you're building on the left.
-        </Trans>
+        {scope === "punctuation" ? (
+          <Trans id="survey.characterMapPane.subtitlePunctuation">
+            Browse and click to toggle punctuation into your list — the same
+            list you're building on the left.
+          </Trans>
+        ) : (
+          <Trans id="survey.characterMapPane.subtitle">
+            Browse and click to toggle characters into your alphabet — the same
+            list you're building on the left.
+          </Trans>
+        )}
       </p>
       {baseProduced.size > 0 && (
         <p style={{ margin: 0, fontSize: 12, color: BASE_OUTPUT_BORDER, lineHeight: 1.5 }}>
