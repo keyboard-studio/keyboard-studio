@@ -1999,6 +1999,38 @@ export function MechanismGallery({
     [suggestions, currentChar, recordedSuggestionStrategyIds, dismissedSuggestionEntries],
   );
 
+  // Whether currentChar already has at least one recorded (non-sequence)
+  // mechanism whose strategyId is NOT among the strategyIds `suggestions`
+  // is currently offering for this char — i.e. the char is covered by
+  // UNRELATED means: a manually-applied method that has nothing to do with
+  // this row's chips (including one with no strategyId attribution at
+  // all). Built from the SAME `mechanismAssignments`/`suggestions` memos
+  // used above rather than re-collecting. Deliberately does NOT fire for a
+  // recorded mechanism whose strategyId DOES match one of the offered
+  // chips — that case is already handled per-chip by
+  // recordedSuggestionStrategyIds (it hides just that one chip), and must
+  // NOT suppress the whole row while a sibling chip is still on offer —
+  // that's the accept-independence contract (accept S-02 -> S-08 chip
+  // stays visible).
+  const hasUnrelatedRecordedMechanism = useMemo(() => {
+    if (currentChar === null) return false;
+    const offeredSuggestionStrategyIds = new Set(
+      suggestions.map((entry) => entry.strategyId),
+    );
+    for (const a of mechanismAssignments) {
+      if (a.scope !== "individual" || a.target !== currentChar) continue;
+      for (const m of a.mechanisms) {
+        if (
+          m.strategyId === undefined ||
+          !offeredSuggestionStrategyIds.has(m.strategyId)
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }, [mechanismAssignments, currentChar, suggestions]);
+
   // Whole-inventory leave-warning (soft gate) — computed from the SAME
   // MechanismAssignment map + lettersToAdd scope this gallery already uses
   // for coveredChars, via the shared unimplementedDesktopChars helper (do not
@@ -3922,24 +3954,39 @@ export function MechanismGallery({
                   Gate: `visibleSuggestions.length > 0` (accepts-kill-each-
                   other bug fix — see visibleSuggestions/
                   recordedSuggestionStrategyIds above) AND the char isn't
-                  ALREADY covered by a means unrelated to any offered chip —
-                  BASE-DIRECT (signal (a), `baseOnlyProducedSet`, e.g. a
-                  character the base keyboard already produces via an
-                  existing rule) or COMPOSITION (signal (c),
-                  `currentCharBadge?.isComposable`). Coverage arising from
-                  ACCEPTING one of THESE suggestions (signal (b),
-                  SESSION-DIRECT) is deliberately excluded from this row-level
-                  check — that's handled per-chip by
-                  recordedSuggestionStrategyIds, so accepting chip A no
-                  longer hides chip B (the bug this fixes: the row used to
-                  gate on the whole 3-signal badge count, so ANY recorded
-                  mechanism — including the one THIS row's own chip just
-                  wrote — hid every chip, not just the accepted one). */}
+                  ALREADY covered by a means unrelated to any offered chip.
+                  Four suppression signals feed that second half:
+                    (a) BASE-DIRECT — `baseOnlyProducedSet`, e.g. a character
+                        the base keyboard already produces via an existing
+                        rule.
+                    (c) COMPOSITION — `currentCharBadge?.isComposable`.
+                    (d) SEQUENCE — `hasSequenceForChar(sessionAssignments,
+                        currentChar)`; a char already covered by a
+                        PATTERN_SEQUENCE combo never enters
+                        `mechanismAssignments` (see excludeSequenceMechanisms),
+                        so without this check the corpus chips would still
+                        render for it.
+                    (e) UNRELATED MANUAL — `hasUnrelatedRecordedMechanism`; the
+                        char has at least one recorded (non-sequence)
+                        mechanism whose strategyId is NOT among this row's
+                        currently-offered chips (e.g. a manually-applied
+                        method the corpus never suggested).
+                  Coverage arising from ACCEPTING one of THIS row's OWN
+                  offered suggestions (signal (b), SESSION-DIRECT) is
+                  deliberately excluded from all of the above — that's
+                  handled per-chip by recordedSuggestionStrategyIds, so
+                  accepting chip A only hides chip A and never suppresses a
+                  still-offered sibling chip B (the accept-independence
+                  contract). hasUnrelatedRecordedMechanism is defined to
+                  agree with this: a recorded mechanism whose strategyId DOES
+                  match an offered chip does not count as "unrelated". */}
             {visibleSuggestions.length > 0 &&
               !suggestionDismissed &&
               currentChar !== null &&
               !baseOnlyProducedSet.has(currentChar) &&
-              !(currentCharBadge?.isComposable ?? false) && (
+              !(currentCharBadge?.isComposable ?? false) &&
+              !hasSequenceForChar(sessionAssignments, currentChar) &&
+              !hasUnrelatedRecordedMechanism && (
               <div
                 role="note"
                 aria-label={t({

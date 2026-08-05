@@ -3343,6 +3343,92 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
 });
 
 // ---------------------------------------------------------------------------
+// Suggestion row suppression — coverage by means OTHER than one of THIS
+// row's own offered chips. Two signals beyond baseOnlyProducedSet/
+// isComposable: (d) SEQUENCE (hasSequenceForChar) and (e) UNRELATED MANUAL
+// (a recorded non-sequence mechanism whose strategyId isn't among the
+// offered chips). Both must suppress the WHOLE row even though neither one
+// ever populates recordedSuggestionStrategyIds for an OFFERED strategyId —
+// see the render-gate comment in MechanismGallery.tsx.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — suggestion row suppressed by non-chip coverage", () => {
+  it("a char already covered by a recorded PATTERN_SEQUENCE assignment shows no suggestion row", async () => {
+    seedInventory(["ƒ"]);
+    // Mirrors the "coexistence with a separately-recorded sequence
+    // assignment" fixture shape above — a sequence assignment recorded
+    // BEFORE render, for the SAME char the corpus placement map offers
+    // suggestions for.
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ƒ",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_SEQUENCE,
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "f", secondLetter: "f", collapsedChar: "ƒ" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffRankedPlacementMap}
+        />,
+      );
+    });
+
+    expectCurrentChar("ƒ");
+    expect(screen.queryByText(/Suggested:/i)).toBeNull();
+    expect(
+      screen.queryByRole("note", {
+        name: /Placement suggestion from kbgen seeder/i,
+      }),
+    ).toBeNull();
+  });
+
+  it("a char already covered by a manually-applied mechanism whose strategyId is NOT among the offered chips shows no suggestion row", async () => {
+    seedInventory(["ƒ"]);
+    // "S-01" is not one of ffRankedPlacementMap's offered strategyIds
+    // (S-02 deadkey, S-08 RAlt) — an unrelated manual method.
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ƒ",
+        modality: "physical",
+        mechanisms: [
+          { patternId: "simple_swap", strategyId: "S-01", slotValues: { kmnRules: "+ [K_QUOTE] > U+0192" } },
+        ],
+        source: "user",
+      },
+    ]);
+
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffRankedPlacementMap}
+        />,
+      );
+    });
+
+    expectCurrentChar("ƒ");
+    expect(screen.queryByText(/Suggested:/i)).toBeNull();
+    expect(
+      screen.queryByRole("note", {
+        name: /Placement suggestion from kbgen seeder/i,
+      }),
+    ).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Case-pair companion — ralt-layer proposal, raised right after ACCEPTING
 // the lowercase S-08 RAlt suggestion (not on a separate navigation to the
 // uppercase sibling — see handleSuggestionAccept).
